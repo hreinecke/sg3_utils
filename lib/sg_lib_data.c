@@ -12,10 +12,12 @@
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#else
+#define SG_SCSI_STRINGS 1
 #endif
 
 
-const char * sg_lib_version_str = "1.96 20140401";  /* spc4r36s, sbc4r01 */
+const char * sg_lib_version_str = "2.01 20140521";  /* spc4r37, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -156,6 +158,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x92, PDT_TAPE, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
+    {0x9c, 0, "Write atomic(16)"},
     {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
     {0x9e, 0, "Service action in(16)"},
     {0x9f, 0, "Service action out(16)"},
@@ -230,7 +233,7 @@ struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
     {0x7, 0, "download microcode with offsets, save, and activate"},
     {0xa, 0, "write data to echo buffer"},
     {0xd, 0, "download microcode with offsets, select activation events, "
-             " save and defer activate"},
+             "save and defer activate"},
     {0xe, 0, "download microcode with offsets, save and defer activate"},
     {0xf, 0, "activate deferred microcode"},
     {0x1a, 0, "enable expander comms protocol and echo buffer"},
@@ -264,6 +267,14 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
     {0xffff, 0, NULL},
 };
 
+struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = { /* opcode 0x48 */
+    {0x1, 0, "Sanitize, overwrite"},
+    {0x2, 0, "Sanitize, block erase"},
+    {0x3, 0, "Sanitize, cryptographic erase"},
+    {0x1f, 0, "Sanitize, exit failure mode"},
+    {0xffff, 0, NULL},
+};
+
 struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
     {0x1, 0, "Read media serial number"},
     {0xffff, 0, NULL},
@@ -279,11 +290,13 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
     {0x11, 0, "Read long(16)"},
     {0x12, 0, "Get LBA status"},
     {0x13, 0, "Report referrals"},
+    {0x14, PDT_ZBC, "Report zones"},
     {0xffff, 0, NULL},
 };
 
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0x11, 0, "Write long(16)"},
+    {0x14, PDT_ZBC, "Reset write pointer"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
     {0xffff, 0, NULL},
 };
@@ -352,7 +365,8 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xb, 0, "Write(32)"},
     {0xc, 0, "Write an verify(32)"},
     {0xd, 0, "Write same(32)"},
-    {0xe, 0, "Orwrite(32)"},    /* added sbc3r25 */
+    {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
+    {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
     {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
@@ -432,6 +446,10 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
     {0xffff, 0, NULL},
 };
 
+struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {  /* opcode 0x94 */
+    {0xffff, 0, NULL},
+};
+
 struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
     {0xffff, 0, NULL},
 };
@@ -476,7 +494,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140320 */
+ * The following should match asc-num.txt dated 20140516 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -516,6 +534,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x1e,"Conflicting SA creation request"},
     {0x00,0x1f,"Logical unit transitioning to another power condition"},
     {0x00,0x20,"Extended copy information available"},
+    {0x00,0x21,"Atomic command aborted due to ACA"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},
@@ -540,6 +559,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x0c,"Logical unit "
                 "not accessible, target port in unavailable state"},
     {0x04,0x0d,"Logical unit not ready, structure check required"},
+    {0x04,0x0e,"Logical unit not ready, security session in progress"},
     {0x04,0x10,"Logical unit not ready, "
                 "auxiliary memory not accessible"},
     {0x04,0x11,"Logical unit not ready, "
@@ -707,6 +727,10 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},
     {0x21,0x03,"Invalid write crossing layer jump"},
+    {0x21,0x04,"Unaligned write command"},
+    {0x21,0x05,"Write boundary violation"},
+    {0x21,0x06,"Attempt to read invalid data"},
+    {0x21,0x07,"Read boundary violation"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x23,0x00,"Invalid token operation, cause not reportable"},
     {0x23,0x01,"Invalid token operation, unsupported token type"},
@@ -757,6 +781,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x27,0x05,"Permanent write protect"},
     {0x27,0x06,"Conditional write protect"},
     {0x27,0x07,"Space allocation failed write protect"},
+    {0x27,0x08,"Zone is read only"},
     {0x28,0x00,"Not ready to ready change, medium may have changed"},
     {0x28,0x01,"Import or export element accessed"},
     {0x28,0x02,"Format-layer may have changed"},

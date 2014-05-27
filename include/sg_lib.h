@@ -225,35 +225,45 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     int sb_len, int raw_info);
 void sg_print_scsi_status(int scsi_status);
 
-/* Utilities can use these process status values for syntax errors and
+/* Utilities can use these exit status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */
-#define SG_LIB_SYNTAX_ERROR 1
-#define SG_LIB_FILE_ERROR 15
+#define SG_LIB_SYNTAX_ERROR 1   /* command line syntax problem */
+#define SG_LIB_FILE_ERROR 15    /* device or other file problem */
 
 /* The sg_err_category_sense() function returns one of the following.
- * These may be used as process status values (on exit). Notice that
+ * These may be used as exit status values (from a process). Notice that
  * some of the lower values correspond to SCSI sense key values. */
 #define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
 /* Value 1 left unused for utilities to use SG_LIB_SYNTAX_ERROR */
-#define SG_LIB_CAT_NOT_READY 2  /* interpreted from sense buffer */
+#define SG_LIB_CAT_NOT_READY 2  /* sense key, unit stopped? */
                                 /*       [sk,asc,ascq: 0x2,*,*] */
 #define SG_LIB_CAT_MEDIUM_HARD 3 /* medium or hardware error, blank check */
                                 /*       [sk,asc,ascq: 0x3/0x4/0x8,*,*] */
 #define SG_LIB_CAT_ILLEGAL_REQ 5 /* Illegal request (other than invalid */
                                 /* opcode):   [sk,asc,ascq: 0x5,*,*] */
-#define SG_LIB_CAT_UNIT_ATTENTION 6 /* interpreted from sense buffer */
+#define SG_LIB_CAT_UNIT_ATTENTION 6 /* sense key, device state changed */
                                 /*       [sk,asc,ascq: 0x6,*,*] */
         /* was SG_LIB_CAT_MEDIA_CHANGED earlier [sk,asc,ascq: 0x6,0x28,*] */
+#define SG_LIB_CAT_DATA_PROTECT 7 /* sense key, media write protected? */
+                                /*       [sk,asc,ascq: 0x7,*,*] */
 #define SG_LIB_CAT_INVALID_OP 9 /* (Illegal request,) Invalid opcode: */
                                 /*       [sk,asc,ascq: 0x5,0x20,0x0] */
+#define SG_LIB_CAT_COPY_ABORTED 10 /* sense key, some data transferred */
+                                /*       [sk,asc,ascq: 0xa,*,*] */
 #define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer */
-                                /*       [sk,asc,ascq: 0xb,*,*] */
-#define SG_LIB_CAT_MISCOMPARE 14 /* interpreted from sense buffer */
+                                /*       [sk,asc,ascq: 0xb,! 0x10,*] */
+#define SG_LIB_CAT_MISCOMPARE 14 /* sense key, probably verify */
                                 /*       [sk,asc,ascq: 0xe,*,*] */
 #define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense" */
                                 /*       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
                                 /*       [sk,asc,ascq: 0x1,*,*] */
+#define SG_LIB_CAT_RES_CONFLICT SAM_STAT_RESERVATION_CONFLICT
+                                /* 24: this is a SCSI status, not sense. */
+                                /* It indicates reservation by another */
+                                /* machine blocks this command */
+#define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
+                                /*       [sk,asc,ascq: 0xb,0x10,*] */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
@@ -271,7 +281,16 @@ int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len);
 #define SG_LIB_CAT_MEDIUM_HARD_WITH_INFO 18 /* medium or hardware error */
                                 /* sense key plus 'info' field: */
                                 /*       [sk,asc,ascq: 0x3/0x4,*,*] */
+#define SG_LIB_CAT_PROTECTION_WITH_INFO 41 /* aborted command sense key, */
+                                /* protection plus 'info' field: */
+                                /*  [sk,asc,ascq: 0xb,0x10,*] */
 #define SG_LIB_CAT_TIMEOUT 33
+
+/* Yield string associated with sense category. Returns 'buff' (or pointer
+ * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
+ * yield "Sense category: <sense_cat>" string. */
+const char * sg_get_category_sense_str(int sense_cat, int buff_len,
+                                       char * buff, int verbose);
 
 
 /* Iterates to next designation descriptor in the device identification

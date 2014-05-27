@@ -32,7 +32,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.15 20140126";
+static const char * version_str = "1.16 20140517";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -254,6 +254,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     uint64_t addr_arr[MAX_NUM_ADDR];
     unsigned char param_arr[4 + (MAX_NUM_ADDR * 8)];
+    char b[80];
     int param_len = 4;
     int ret = 0;
 
@@ -410,23 +411,9 @@ main(int argc, char * argv[])
         res = sg_ll_reassign_blocks(sg_fd, eight, longlist, param_arr,
                                     param_len, 1, verbose);
         ret = res;
-        if (SG_LIB_CAT_NOT_READY == res) {
-            fprintf(stderr, "REASSIGN BLOCKS failed, device not ready\n");
-            goto err_out;
-        } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-            fprintf(stderr, "REASSIGN BLOCKS, unit attention\n");
-            goto err_out;
-        } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-            fprintf(stderr, "REASSIGN BLOCKS, aborted command\n");
-            goto err_out;
-        } else if (SG_LIB_CAT_INVALID_OP == res) {
-            fprintf(stderr, "REASSIGN BLOCKS not supported\n");
-            goto err_out;
-        } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-            fprintf(stderr, "bad field in REASSIGN BLOCKS cdb\n");
-            goto err_out;
-        } else if (0 != res) {
-            fprintf(stderr, "REASSIGN BLOCKS failed\n");
+        if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "REASSIGN BLOCKS: %s\n", b);
             goto err_out;
         }
     } else /* if (grown || primary) */ {
@@ -440,18 +427,9 @@ main(int argc, char * argv[])
         res = sg_ll_read_defect10(sg_fd, primary, grown, dl_format,
                                   param_arr, param_len, 0, verbose);
         ret = res;
-        if (SG_LIB_CAT_NOT_READY == res) {
-            fprintf(stderr, "READ DEFECT DATA (10) failed, device not "
-                    "ready\n");
-            goto err_out;
-        } else if (SG_LIB_CAT_INVALID_OP == res) {
-            fprintf(stderr, "READ DEFECT DATA (10) not supported\n");
-            goto err_out;
-        } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-            fprintf(stderr, "bad field in READ DEFECT DATA (10) cdb\n");
-            goto err_out;
-        } else if (0 != res) {
-            fprintf(stderr, "READ DEFECT DATA (10) failed\n");
+        if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "READ DEFECT DATA(10): %s\n", b);
             goto err_out;
         }
         if (do_hex) {

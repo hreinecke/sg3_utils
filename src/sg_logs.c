@@ -13,19 +13,22 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <errno.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.16 20140314";    /* spc4r36r + sbc4r01 */
+static const char * version_str = "1.23 20140518";    /* spc4r37 + sbc4r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -68,18 +71,22 @@ static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
         {"brief", no_argument, 0, 'b'},
         {"control", required_argument, 0, 'c'},
+        {"filter", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
+        {"in", required_argument, 0, 'i'},
         {"list", no_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"name", no_argument, 0, 'n'},
         {"new", no_argument, 0, 'N'},
+        {"no_inq", no_argument, 0, 'x'},
         {"old", no_argument, 0, 'O'},
         {"page", required_argument, 0, 'p'},
         {"paramp", required_argument, 0, 'P'},
         {"pcb", no_argument, 0, 'q'},
         {"ppc", no_argument, 0, 'Q'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'X'},
         {"reset", no_argument, 0, 'R'},
         {"sp", no_argument, 0, 's'},
         {"select", no_argument, 0, 'S'},
@@ -100,6 +107,7 @@ struct opts_t {
     int do_pcb;
     int do_ppc;
     int do_raw;
+    int o_readonly;
     int do_pcreset;
     int do_select;
     int do_sp;
@@ -107,25 +115,59 @@ struct opts_t {
     int do_transport;
     int do_verbose;
     int do_version;
+    int filter;
+    int filter_given;
     int page_control;
     int maxlen;
     int pg_code;
     int subpg_code;
     int paramp;
-    const char * device_name;
     int opt_new;
+    int no_inq;
+    const char * device_name;
+    const char * in_fn;
 };
+
+#ifdef SG_LIB_WIN32
+static int win32_spt_init_state = 0;
+static int win32_spt_curr_state = 0;
+#endif
+
+
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
+
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 static void
 usage()
 {
-    printf("Usage: sg_logs [--all] [--brief] [--control=PC] [--help] [--hex] "
-           "[--list]\n"
-           "               [--maxlen=LEN] [--name] [--page=PG[,SPG]] "
-           "[--paramp=PP] [--pcb]\n"
-           "               [--ppc] [--raw] [--reset] [--select] [--sp] "
-           "[--temperature]\n"
-           "               [--transport] [--verbose] [--version] DEVICE\n"
+    pr2serr("Usage: sg_logs [--all] [--brief] [--control=PC] [--filter=PARC] "
+           " [--help]\n"
+           "               [--hex] [--in=FN] [--list] [--no_inq] "
+           "[--maxlen=LEN]\n"
+           "               [--name] [--page=PG[,SPG]] [--paramp=PP] [--pcb] "
+           "[--ppc]\n"
+           "               [--raw] [--readonly] [--reset] [--select] "
+           "[--sp]\n"
+           "               [--temperature] [--transport] [--verbose] "
+           "[--version]\n"
+           "               DEVICE\n"
            "  where:\n"
            "    --all|-a        fetch and decode all log pages\n"
            "                    use twice to fetch and decode all log pages "
@@ -136,13 +178,21 @@ usage()
            "cumulative\n"
            "                          2: default threshhold, 3: default "
            "cumulative\n"
+           "    --filter=PARC|-f PARC    filter based on parameter code "
+           "PARC\n"
            "    --help|-h       print usage message then exit\n"
            "    --hex|-H        output response in hex (default: decode if "
            "known)\n"
+           "    --in=FN|-i FN    FN is a filename containing a log page "
+           "in ASCII hex\n"
+           "                     or binary if --raw also given. For LOG "
+           "SELECT\n"
            "    --list|-l       list supported log page names (equivalent to "
            "'-p 0')\n"
            "                    use twice to list supported log page and "
            "subpage names\n"
+           "    --no_inq|-x     no initial INQUIRY output (twice: no "
+           "INQUIRY call)\n"
            "    --maxlen=LEN|-m LEN    max response length (def: 0 "
            "-> everything)\n"
            "                           when > 1 will request LEN bytes\n"
@@ -155,14 +205,16 @@ usage()
            "    --paramp=PP|-P PP    parameter pointer (decimal) (def: 0)\n"
            "    --pcb|-q        show parameter control bytes in decoded "
            "output\n");
-    printf("    --ppc|-Q        set the Parameter Pointer Control (PPC) bit "
+    pr2serr("    --ppc|-Q        set the Parameter Pointer Control (PPC) bit "
            "(def: 0)\n"
-           "                    the PPC bit made obsolete in SPC-4 rev 18\n"
            "    --raw|-r        output response in binary to stdout\n"
+           "    --readonly|-X    open DEVICE read-only (def: first "
+           "read-write then if\n"
+           "                     fails try open again read-only)\n"
            "    --reset|-R      reset log parameters (takes PC and SP into "
            "account)\n"
            "                    (uses PCR bit in LOG SELECT)\n"
-           "    --select|-S     perform LOG SELECT using SP and PC values\n"
+           "    --select|-S     perform LOG SELECT (def: LOG SENSE)\n"
            "    --sp|-s         set the Saving Parameters (SP) bit (def: 0)\n"
            "    --temperature|-t    decode temperature (log page 0xd or "
            "0x2f)\n"
@@ -177,20 +229,26 @@ usage()
 static void
 usage_old()
 {
-    printf("Usage:  sg_logs [-a] [-A] [-b] [-c=PC] [-h] [-H] [-l] [-L] "
-           "[-m=LEN] [-n]\n"
-           "                [-p=PG[,SPG]] [-paramp=PP] [-pcb] [-ppc] "
-           "[-r] [-select]\n"
-           "                [-sp] [-t] [-T] [-v] [-V] [-?] DEVICE\n"
+    printf("Usage:  sg_logs [-a] [-A] [-b] [-c=PC] [-f=PARC] [-h] [-H] "
+           "[-i=FN]\n"
+           "                [-l] [-L] [-m=LEN] [-n] [-p=PG[,SPG]] "
+           "[-paramp=PP]\n"
+           "                [-pcb] [-ppc] [-r] [-select] [-sp] [-t] [-T] "
+           "[-v] [-V]\n"
+           "                [-x] [-X] [-?] DEVICE\n"
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
            "    -b     shorten the output of some log pages\n"
-           "    -c=PC  page control(PC) (default: 1)\n"
+           "    -c=PC    page control(PC) (default: 1)\n"
            "                  0: current threshhold, 1: current cumulative\n"
            "                  2: default threshhold, 3: default cumulative\n"
+           "    -f=PARC    filter based on parameter code PARC\n"
            "    -h     output in hex (default: decode if known)\n"
            "    -H     output in hex (same as '-h')\n"
+           "    -i=FN    FN is a filename containing a log page "
+           "in ASCII hex.\n"
+           "             For LOG SELECT\n"
            "    -l     list supported log page names (equivalent to "
            "'-p=0')\n"
            "    -L     list supported log page and subpages names "
@@ -210,21 +268,25 @@ usage_old()
            "    -r     reset log parameters (takes PC and SP into "
            "account)\n"
            "           (uses PCR bit in LOG SELECT)\n"
-           "    -select  perform LOG SELECT using SP and PC values\n"
+           "    -select  perform LOG SELECT (def: LOG SENSE)\n"
            "    -sp    set the Saving Parameters (SP) bit (def: 0)\n"
            "    -t     outputs temperature log page (0xd)\n"
            "    -T     outputs transport (protocol specific port) log "
            "page (0x18)\n"
            "    -v     increase verbosity\n"
            "    -V     output version string\n"
+           "    -x     no initial INQUIRY output (twice: no INQUIRY call)\n"
+           "    -X     open DEVICE read-only (def: first read-write then "
+           "if fails\n"
+           "           try open again with read-only)\n"
            "    -?     output this usage message\n\n"
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
 
 static void
-usage_for(const struct opts_t * optsp)
+usage_for(const struct opts_t * op)
 {
-    if (optsp->opt_new)
+    if (op->opt_new)
         usage();
     else
         usage_old();
@@ -233,7 +295,7 @@ usage_for(const struct opts_t * optsp)
 /* Processes command line options according to new option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
-process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c, n, nn;
     char * cp;
@@ -241,139 +303,156 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:hHlLm:nNOp:P:qQrRsStTvV",
+        c = getopt_long(argc, argv, "aAbc:f:hHi:lLm:nNOp:P:qQrRsStTvVxX",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'a':
-            ++optsp->do_all;
+            ++op->do_all;
             break;
         case 'A':
-            optsp->do_all += 2;
+            op->do_all += 2;
             break;
         case 'b':
-            ++optsp->do_brief;
+            ++op->do_brief;
             break;
         case 'c':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 3)) {
-                fprintf(stderr, "bad argument to '--control='\n");
+                pr2serr("bad argument to '--control='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->page_control = n;
+            op->page_control = n;
+            break;
+        case 'f':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xffff)) {
+                pr2serr("bad argument to '--filter='\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->filter = n;
+            ++op->filter_given;
             break;
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'H':
-            ++optsp->do_hex;
+            ++op->do_hex;
+            break;
+        case 'i':
+            op->in_fn = optarg;
             break;
         case 'l':
-            ++optsp->do_list;
+            ++op->do_list;
             break;
         case 'L':
-            optsp->do_list += 2;
+            op->do_list += 2;
             break;
         case 'm':
             n = sg_get_num(optarg);
             if ((n < 0) || (1 == n) || (n > 0xffff)) {
-                fprintf(stderr, "bad argument to '--maxlen=', from 2 to "
-                        "65535 (inclusive) expected\n");
+                pr2serr("bad argument to '--maxlen=', from 2 to 65535 "
+                        "(inclusive) expected\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->maxlen = n;
+            op->maxlen = n;
             break;
         case 'n':
-            ++optsp->do_name;
+            ++op->do_name;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = 0;
+            op->opt_new = 0;
             return 0;
         case 'p':
             cp = strchr(optarg, ',');
             n = sg_get_num_nomult(optarg);
             if ((n < 0) || (n > 63)) {
-                fprintf(stderr, "Bad argument to '--page='\n");
+                pr2serr("Bad argument to '--page='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
                 nn = sg_get_num_nomult(cp + 1);
                 if ((nn < 0) || (nn > 255)) {
-                    fprintf(stderr, "Bad second value in argument to "
-                            "'--page='\n");
+                    pr2serr("Bad second value in argument to '--page='\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
             } else
                 nn = 0;
-            optsp->pg_code = n;
-            optsp->subpg_code = nn;
+            op->pg_code = n;
+            op->subpg_code = nn;
             break;
         case 'P':
             n = sg_get_num(optarg);
             if (n < 0) {
-                fprintf(stderr, "bad argument to '--paramp='\n");
+                pr2serr("bad argument to '--paramp='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->paramp = n;
+            op->paramp = n;
             break;
         case 'q':
-            ++optsp->do_pcb;
+            ++op->do_pcb;
             break;
         case 'Q':       /* N.B. PPC bit obsoleted in SPC-4 rev 18 */
-            ++optsp->do_ppc;
+            ++op->do_ppc;
             break;
         case 'r':
-            ++optsp->do_raw;
+            ++op->do_raw;
             break;
         case 'R':
-            ++optsp->do_pcreset;
-            ++optsp->do_select;
+            ++op->do_pcreset;
+            ++op->do_select;
             break;
         case 's':
-            ++optsp->do_sp;
+            ++op->do_sp;
             break;
         case 'S':
-            ++optsp->do_select;
+            ++op->do_select;
             break;
         case 't':
-            ++optsp->do_temperature;
+            ++op->do_temperature;
             break;
         case 'T':
-            ++optsp->do_transport;
+            ++op->do_transport;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            ++op->do_version;
+            break;
+        case 'x':
+            ++op->no_inq;
+            break;
+        case 'X':
+            ++op->o_readonly;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
+            if (op->do_help)
                 break;
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == optsp->device_name) {
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -384,7 +463,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 /* Processes command line options according to old option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
-process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen, num, n;
     unsigned int u, uu;
@@ -399,50 +478,56 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'a':
-                    ++optsp->do_all;
+                    ++op->do_all;
                     break;
                 case 'A':
-                    optsp->do_all += 2;
+                    op->do_all += 2;
                     break;
                 case 'b':
-                    ++optsp->do_brief;
+                    ++op->do_brief;
                     break;
                 case 'h':
                 case 'H':
-                    ++optsp->do_hex;
+                    ++op->do_hex;
                     break;
                 case 'l':
-                    ++optsp->do_list;
+                    ++op->do_list;
                     break;
                 case 'L':
-                    optsp->do_list += 2;
+                    op->do_list += 2;
                     break;
                 case 'n':
-                    ++optsp->do_name;
+                    ++op->do_name;
                     break;
                 case 'N':
-                    optsp->opt_new = 1;
+                    op->opt_new = 1;
                     return 0;
                 case 'O':
                     break;
                 case 'r':
-                    optsp->do_pcreset = 1;
-                    optsp->do_select = 1;
+                    op->do_pcreset = 1;
+                    op->do_select = 1;
                     break;
                 case 't':
-                    ++optsp->do_temperature;
+                    ++op->do_temperature;
                     break;
                 case 'T':
-                    ++optsp->do_transport;
+                    ++op->do_transport;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    ++op->do_verbose;
                     break;
                 case 'V':
-                    ++optsp->do_version;
+                    ++op->do_version;
+                    break;
+                case 'x':
+                    ++op->no_inq;
+                    break;
+                case 'X':
+                    ++op->o_readonly;
                     break;
                 case '?':
-                    ++optsp->do_help;
+                    ++op->do_help;
                     break;
                 case '-':
                     ++cp;
@@ -460,72 +545,84 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             if (0 == strncmp("c=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", &u);
                 if ((1 != num) || (u > 3)) {
-                    printf("Bad page control after '-c=' option [0..3]\n");
+                    pr2serr("Bad page control after '-c=' option [0..3]\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->page_control = u;
-            } else if (0 == strncmp("m=", cp, 2)) {
+                op->page_control = u;
+            } else if (0 == strncmp("f=", cp, 2)) {
+                n = sg_get_num(cp + 2);
+                if ((n < 0) || (n > 0xffff)) {
+                    pr2serr("Bad argument after '-f=' option\n");
+                    usage_old();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->filter = n;
+                ++op->filter_given;
+            } else if (0 == strncmp("i=", cp, 2))
+                op->in_fn = cp + 2;
+            else if (0 == strncmp("m=", cp, 2)) {
                 num = sscanf(cp + 2, "%d", &n);
                 if ((1 != num) || (n < 0) || (n > MX_ALLOC_LEN)) {
-                    printf("Bad maximum response length after '-m=' option\n");
+                    pr2serr("Bad maximum response length after '-m=' "
+                            "option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->maxlen = n;
+                op->maxlen = n;
             } else if (0 == strncmp("p=", cp, 2)) {
                 if (NULL == strchr(cp + 2, ',')) {
                     num = sscanf(cp + 2, "%x", &u);
                     if ((1 != num) || (u > 63)) {
-                        fprintf(stderr, "Bad page code value after '-p=' "
-                                "option\n");
+                        pr2serr("Bad page code value after '-p=' option\n");
                         usage_old();
                         return SG_LIB_SYNTAX_ERROR;
                     }
-                    optsp->pg_code = u;
+                    op->pg_code = u;
                 } else if (2 == sscanf(cp + 2, "%x,%x", &u, &uu)) {
                     if (uu > 255) {
-                        fprintf(stderr, "Bad sub page code value after '-p=' "
+                        pr2serr("Bad sub page code value after '-p=' "
                                 "option\n");
                         usage_old();
                         return SG_LIB_SYNTAX_ERROR;
                     }
-                    optsp->pg_code = u;
-                    optsp->subpg_code = uu;
+                    op->pg_code = u;
+                    op->subpg_code = uu;
                 } else {
-                    fprintf(stderr, "Bad page code, subpage code sequence "
-                            "after '-p=' option\n");
+                    pr2serr("Bad page code, subpage code sequence after "
+                            "'-p=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
             } else if (0 == strncmp("paramp=", cp, 7)) {
                 num = sscanf(cp + 7, "%x", &u);
                 if ((1 != num) || (u > 0xffff)) {
-                    printf("Bad parameter pointer after '-paramp=' option\n");
+                    pr2serr("Bad parameter pointer after '-paramp=' "
+                            "option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->paramp = u;
+                op->paramp = u;
             } else if (0 == strncmp("pcb", cp, 3))
-                optsp->do_pcb = 1;
+                op->do_pcb = 1;
             else if (0 == strncmp("ppc", cp, 3))
-                optsp->do_ppc = 1;
+                op->do_ppc = 1;
             else if (0 == strncmp("select", cp, 6))
-                optsp->do_select = 1;
+                op->do_select = 1;
             else if (0 == strncmp("sp", cp, 2))
-                optsp->do_sp = 1;
+                op->do_sp = 1;
             else if (0 == strncmp("old", cp, 3))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == optsp->device_name)
-            optsp->device_name = cp;
+        } else if (0 == op->device_name)
+            op->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", optsp->device_name, cp);
+            pr2serr("too many arguments, got: %s, not expecting: %s\n",
+                    op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -540,22 +637,22 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
  * of these options is detected (when processing the other format), processing
  * stops and is restarted using the other format. Clear? */
 static int
-process_cl(struct opts_t * optsp, int argc, char * argv[])
+process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+        op->opt_new = 0;
+        res = process_cl_old(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = process_cl_new(op, argc, argv);
     } else {
-        optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+        op->opt_new = 1;
+        res = process_cl_new(op, argc, argv);
+        if ((0 == res) && (0 == op->opt_new))
+            res = process_cl_old(op, argc, argv);
     }
     return res;
 }
@@ -591,6 +688,185 @@ decode_count(const unsigned char * xp, int len)
     return ull;
 }
 
+/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
+ * stdin). If reading ASCII hex then there should be either one entry per
+ * line or a comma, space or tab separated list of bytes. If no_space is
+ * set then a string of ACSII hex digits is expected, 2 per byte. Everything
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
+ * error. */
+static int
+f2hex_arr(const char * fname, int as_binary, int no_space,
+          unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
+{
+    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
+    unsigned int h;
+    const char * lcp;
+    FILE * fp;
+    char line[512];
+    char carry_over[4];
+    int off = 0;
+
+    if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
+        return 1;
+    fn_len = strlen(fname);
+    if (0 == fn_len)
+        return 1;
+    has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
+    if (as_binary) {
+        if (has_stdin) {
+            fd = STDIN_FILENO;
+                if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                    perror("sg_set_binary_mode");
+        } else {
+            fd = open(fname, O_RDONLY);
+            if (fd < 0) {
+                pr2serr("unable to open binary file %s: %s\n", fname,
+                         safe_strerror(errno));
+                return 1;
+            } else if (sg_set_binary_mode(fd) < 0)
+                perror("sg_set_binary_mode");
+        }
+        k = read(fd, mp_arr, max_arr_len);
+        if (k <= 0) {
+            if (0 == k)
+                pr2serr("read 0 bytes from binary file %s\n", fname);
+            else
+                pr2serr("read from binary file %s: %s\n", fname,
+                        safe_strerror(errno));
+            if (! has_stdin)
+                close(fd);
+            return 1;
+        }
+        *mp_arr_len = k;
+        if (! has_stdin)
+            close(fd);
+        return 0;
+    } else {    /* So read the file as ASCII hex */
+        if (has_stdin)
+            fp = stdin;
+        else {
+            fp = fopen(fname, "r");
+            if (NULL == fp) {
+                pr2serr("Unable to open %s for reading\n", fname);
+                return 1;
+            }
+        }
+    }
+
+    carry_over[0] = 0;
+    for (j = 0; j < 512; ++j) {
+        if (NULL == fgets(line, sizeof(line), fp))
+            break;
+        in_len = strlen(line);
+        if (in_len > 0) {
+            if ('\n' == line[in_len - 1]) {
+                --in_len;
+                line[in_len] = '\0';
+                split_line = 0;
+            } else
+                split_line = 1;
+        }
+        if (in_len < 1) {
+            carry_over[0] = 0;
+            continue;
+        }
+        if (carry_over[0]) {
+            if (isxdigit(line[0])) {
+                carry_over[1] = line[0];
+                carry_over[2] = '\0';
+                if (1 == sscanf(carry_over, "%x", &h))
+                    mp_arr[off - 1] = h;       /* back up and overwrite */
+                else {
+                    pr2serr("f2hex_arr: carry_over error ['%s'] around line "
+                            "%d\n", carry_over, j + 1);
+                    goto bad;
+                }
+                lcp = line + 1;
+                --in_len;
+            } else
+                lcp = line;
+            carry_over[0] = 0;
+        } else
+            lcp = line;
+
+        m = strspn(lcp, " \t");
+        if (m == in_len)
+            continue;
+        lcp += m;
+        in_len -= m;
+        if ('#' == *lcp)
+            continue;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
+        if ((k < in_len) && ('#' != lcp[k])) {
+            pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
+                    j + 1, m + k + 1);
+            goto bad;
+        }
+        if (no_space) {
+            for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
+                 ++k, lcp += 2) {
+                if (1 != sscanf(lcp, "%2x", &h)) {
+                    pr2serr("f2hex_arr: bad hex number in line %d, "
+                            "pos %d\n", j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+                if ((off + k) >= max_arr_len) {
+                    pr2serr("f2hex_arr: array length exceeded\n");
+                    goto bad;
+                }
+                mp_arr[off + k] = h;
+            }
+            if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
+                carry_over[0] = *lcp;
+            off += k;
+        } else {
+            for (k = 0; k < 1024; ++k) {
+                if (1 == sscanf(lcp, "%x", &h)) {
+                    if (h > 0xff) {
+                        pr2serr("f2hex_arr: hex number larger than "
+                                "0xff in line %d, pos %d\n", j + 1,
+                                (int)(lcp - line + 1));
+                        goto bad;
+                    }
+                    if (split_line && (1 == strlen(lcp))) {
+                        /* single trailing hex digit might be a split pair */
+                        carry_over[0] = *lcp;
+                    }
+                    if ((off + k) >= max_arr_len) {
+                        pr2serr("f2hex_arr: array length exceeded\n");
+                        goto bad;
+                    }
+                    mp_arr[off + k] = h;
+                    lcp = strpbrk(lcp, " ,\t");
+                    if (NULL == lcp)
+                        break;
+                    lcp += strspn(lcp, " ,\t");
+                    if ('\0' == *lcp)
+                        break;
+                } else {
+                    if ('#' == *lcp) {
+                        --k;
+                        break;
+                    }
+                    pr2serr("f2hex_arr: error in line %d, at pos %d\n", j + 1,
+                            (int)(lcp - line + 1));
+                    goto bad;
+                }
+            }
+            off += (k + 1);
+        }
+    }
+    *mp_arr_len = off;
+    if (stdin != fp)
+        fclose(fp);
+    return 0;
+bad:
+    if (stdin != fp)
+        fclose(fp);
+    return 1;
+}
+
+
 /* Call LOG SENSE twice: the first time ask for 4 byte response to determine
    actual length of response; then a second time requesting the
    min(actual_len, mx_resp_len) bytes. If the calculated length for the
@@ -601,47 +877,53 @@ decode_count(const unsigned char * xp, int len)
    SG_LIB_CAT_ABORTED_COMMAND and -1 for other errors. */
 static int
 do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
-        const struct opts_t * optsp)
+        const struct opts_t * op)
 {
     int actual_len, res, vb;
 
-    memset(resp, 0, mx_resp_len);
-    vb = optsp->do_verbose;
-    if (optsp->maxlen > 1)
-        actual_len = mx_resp_len;
-    else {
-        if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
-                                   optsp->page_control, optsp->pg_code,
-                                   optsp->subpg_code, optsp->paramp,
-                                   resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   1 /* noisy */, vb))) {
-            switch (res) {
-            case SG_LIB_CAT_NOT_READY:
-            case SG_LIB_CAT_INVALID_OP:
-            case SG_LIB_CAT_ILLEGAL_REQ:
-            case SG_LIB_CAT_UNIT_ATTENTION:
-            case SG_LIB_CAT_ABORTED_COMMAND:
-                return res;
-            default:
-                return -1;
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (0 == win32_spt_init_state) {
+        if (win32_spt_curr_state) {
+            if (mx_resp_len < 16384) {
+                scsi_pt_win32_direct(0);
+                win32_spt_curr_state = 0;
+            }
+        } else {
+            if (mx_resp_len >= 16384) {
+                scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT direct */);
+                win32_spt_curr_state = 1;
             }
         }
+    }
+#endif
+#endif
+    memset(resp, 0, mx_resp_len);
+    vb = op->do_verbose;
+    if (op->maxlen > 1)
+        actual_len = mx_resp_len;
+    else {
+        if ((res = sg_ll_log_sense(sg_fd, op->do_ppc, op->do_sp,
+                                   op->page_control, op->pg_code,
+                                   op->subpg_code, op->paramp,
+                                   resp, LOG_SENSE_PROBE_ALLOC_LEN,
+                                   1 /* noisy */, vb)))
+            return res;
         actual_len = (resp[2] << 8) + resp[3] + 4;
-        if ((0 == optsp->do_raw) && (vb > 1)) {
-            fprintf(stderr, "  Log sense (find length) response:\n");
+        if ((0 == op->do_raw) && (vb > 1)) {
+            pr2serr("  Log sense (find length) response:\n");
             dStrHexErr((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
-            fprintf(stderr, "  hence calculated response length=%d\n",
-                    actual_len);
+            pr2serr("  hence calculated response length=%d\n", actual_len);
         }
-        if (optsp->pg_code != (0x3f & resp[0])) {
+        if (op->pg_code != (0x3f & resp[0])) {
             if (vb)
-                fprintf(stderr, "Page code does not appear in first byte "
-                        "of response so it's suspect\n");
+                pr2serr("Page code does not appear in first byte of "
+                        "response so it's suspect\n");
             if (actual_len > 0x40) {
                 actual_len = 0x40;
                 if (vb)
-                    fprintf(stderr, "Trim response length to 64 bytes due "
-                            "to suspect response format\n");
+                    pr2serr("Trim response length to 64 bytes due to "
+                            "suspect response format\n");
             }
         }
         /* Some HBAs don't like odd transfer lengths */
@@ -650,23 +932,13 @@ do_logs(int sg_fd, unsigned char * resp, int mx_resp_len,
         if (actual_len > mx_resp_len)
             actual_len = mx_resp_len;
     }
-    if ((res = sg_ll_log_sense(sg_fd, optsp->do_ppc, optsp->do_sp,
-                               optsp->page_control, optsp->pg_code,
-                               optsp->subpg_code, optsp->paramp,
-                               resp, actual_len, 1 /* noisy */, vb))) {
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            return res;
-        default:
-            return -1;
-        }
-    }
-    if ((0 == optsp->do_raw) && (vb > 1)) {
-        fprintf(stderr, "  Log sense response:\n");
+    if ((res = sg_ll_log_sense(sg_fd, op->do_ppc, op->do_sp,
+                               op->page_control, op->pg_code,
+                               op->subpg_code, op->paramp,
+                               resp, actual_len, 1 /* noisy */, vb)))
+        return res;
+    if ((0 == op->do_raw) && (vb > 1)) {
+        pr2serr("  Log sense response:\n");
         dStrHexErr((const char *)resp, actual_len, 1);
     }
     return 0;
@@ -843,6 +1115,33 @@ show_page_name(int pg_code, int subpg_code,
             case 0x32:
                 printf("%sData compression (IBM specific)\n", b);
                 break;
+            case 0x33:
+                printf("%sWrite errors (IBM specific)\n", b);
+                break;
+            case 0x34:
+                printf("%sRead forward errors (IBM specific)\n", b);
+                break;
+            case 0x37:
+                printf("%sPerformance characteristics (IBM specific)\n", b);
+                break;
+            case 0x38:
+                printf("%sBlocks/bytes transferred (IBM specific)\n", b);
+                break;
+            case 0x39:
+                printf("%sHost port 0 interface errors (IBM specific)\n", b);
+                break;
+            case 0x3a:
+                printf("%sDrive control verification (IBM specific)\n", b);
+                break;
+            case 0x3b:
+                printf("%sHost port 1 interface errors (IBM specific)\n", b);
+                break;
+            case 0x3c:
+                printf("%sDrive usage information (IBM specific)\n", b);
+                break;
+            case 0x3d:
+                printf("%sSubsystem statistics (IBM specific)\n", b);
+                break;
             default:
                 done = 0;
                 break;
@@ -938,24 +1237,36 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
 
 /* BUFF_OVER_UNDER_LPAGE [0x1] */
 static void
-show_buffer_under_over_run_page(unsigned char * resp, int len, int show_pcb)
+show_buffer_under_over_run_page(unsigned char * resp, int len,
+                                const struct opts_t * op)
 {
-    int num, pl, pcb;
-    unsigned int paramc;
+    int num, pl, pcb, pc;
     uint64_t count;
     unsigned char * ucp;
     const char * cp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Buffer over-run/under-run page  (spc-2) [0x1]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Buffer over-run/under-run page  (spc-2) [0x1]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         cp = NULL;
         pl = ucp[3] + 4;
         count = (pl > 4) ? decode_count(ucp + 4, pl - 4) : 0;
-        paramc = (ucp[0] << 8) + ucp[1];
-        switch (paramc) {
+        pc = (ucp[0] << 8) + ucp[1];
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
         case 0x0:
             cp = "under-run";
             break;
@@ -1030,18 +1341,21 @@ show_buffer_under_over_run_page(unsigned char * resp, int len, int show_pcb)
             break;
         default:
             printf("  undefined parameter code [0x%x], count = %" PRIu64 "",
-                   paramc, count);
+                   pc, count);
             break;
         }
         if (cp)
             printf("  %s = %" PRIu64 "", cp, count);
 
-        if (show_pcb) {
+        if (op->do_pcb) {
             pcb = ucp[2];
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -1050,29 +1364,34 @@ show_buffer_under_over_run_page(unsigned char * resp, int len, int show_pcb)
 /* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
 /* [0x2, 0x3, 0x4, 0x5] */
 static void
-show_error_counter_page(unsigned char * resp, int len, int show_pcb)
+show_error_counter_page(unsigned char * resp, int len,
+                        const struct opts_t * op)
 {
     int num, pl, pc, pcb, pg_code;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
     pg_code = resp[0] & 0x3f;
-    switch(pg_code) {
-    case WRITE_ERR_LPAGE:
-        printf("Write error counter page  (spc-3) [0x%x]\n", pg_code);
-        break;
-    case READ_ERR_LPAGE:
-        printf("Read error counter page  (spc-3) [0x%x]\n", pg_code);
-        break;
-    case READ_REV_ERR_LPAGE:
-        printf("Read Reverse error counter page  (spc-3) [0x%x]\n", pg_code);
-        break;
-    case VERIFY_ERR_LPAGE:
-        printf("Verify error counter page  (spc-3) [0x%x]\n", pg_code);
-        break;
-    default:
-        printf("expecting error counter page, got page = 0x%x\n", resp[0]);
-        return;
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        switch(pg_code) {
+        case WRITE_ERR_LPAGE:
+            printf("Write error counter page  (spc-3) [0x%x]\n", pg_code);
+            break;
+        case READ_ERR_LPAGE:
+            printf("Read error counter page  (spc-3) [0x%x]\n", pg_code);
+            break;
+        case READ_REV_ERR_LPAGE:
+            printf("Read Reverse error counter page  (spc-3) [0x%x]\n",
+                   pg_code);
+            break;
+        case VERIFY_ERR_LPAGE:
+            printf("Verify error counter page  (spc-3) [0x%x]\n", pg_code);
+            break;
+        default:
+            pr2serr("expecting error counter page, got page = 0x%x\n",
+                    resp[0]);
+            return;
+        }
     }
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -1080,6 +1399,17 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0: printf("  Errors corrected without substantial delay"); break;
         case 1: printf("  Errors corrected with possible delays"); break;
@@ -1093,11 +1423,14 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
         default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
         printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -1105,22 +1438,36 @@ show_error_counter_page(unsigned char * resp, int len, int show_pcb)
 
 /* NON_MEDIUM_LPAGE [0x6] */
 static void
-show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
+show_non_medium_error_page(unsigned char * resp, int len,
+                           const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Non-medium error page  (spc-2) [0x6]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Non-medium error page  (spc-2) [0x6]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0:
-            printf("  Non-medium error count"); break;
+            printf("  Non-medium error count");
+            break;
         default:
             if (pc <= 0x7fff)
                 printf("  Reserved [0x%x]", pc);
@@ -1129,11 +1476,14 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
             break;
         }
         printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -1142,19 +1492,31 @@ show_non_medium_error_page(unsigned char * resp, int len, int show_pcb)
 /* PCT_LPAGE [0x1a] */
 static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
-                                      int show_pcb)
+                                      const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Power condition transitions page  (spc-4) [0x1a]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Power condition transitions page  (spc-4) [0x1a]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0:
             printf("  Accumulated transitions to active"); break;
@@ -1172,11 +1534,14 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
             printf("  Reserved [0x%x]", pc);
         }
         printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -1184,7 +1549,8 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
 
 /* Tape usage: Vendor specific (IBM): 0x30 */
 static void
-show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
+show_tape_usage_log_page(unsigned char * resp, int len,
+                         const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
@@ -1195,14 +1561,27 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed tape usage page\n");
+        pr2serr("badly formed tape usage page\n");
         return;
     }
-    printf("Tape usage page  (IBM specific) [0x30]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Tape usage page  (IBM specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
         extra = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         ull = n = 0;
         switch (ucp[3]) {
         case 2:
@@ -1268,17 +1647,20 @@ show_tape_usage_log_page(unsigned char * resp, int len, int show_pcb)
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
     }
 }
 
 /* Tape capacity: vendor specific (IBM): 0x31 */
 static void
-show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
+show_tape_capacity_log_page(unsigned char * resp, int len,
+                            const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
@@ -1288,14 +1670,27 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed tape capacity page\n");
+        pr2serr("badly formed tape capacity page\n");
         return;
     }
-    printf("Tape capacity page  (IBM specific) [0x31]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Tape capacity page  (IBM specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
         extra = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         if (extra != 8)
             continue;
         n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
@@ -1318,18 +1713,21 @@ show_tape_capacity_log_page(unsigned char * resp, int len, int show_pcb)
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
     }
 }
 
 /* Data compression: originally vendor specific 0x32 (IBM), then
  * ssc-4 standardizes it at 0x1b */
 static void
-show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
+show_data_compression_log_page(unsigned char * resp, int len,
+                               const struct opts_t * op)
 {
     int k, j, pl, num, extra, pc, pcb, pg_code;
     uint64_t n;
@@ -1340,19 +1738,33 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed data compression page\n");
+        pr2serr("badly formed data compression page\n");
         return;
     }
-    if (0x1b == pg_code)
-        printf("Data compression page  (ssc-4) [0x1b]\n");
-    else
-        printf("Data compression page  (IBM specific) [0x%x]\n",
-               pg_code);
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (0x1b == pg_code)
+            printf("Data compression page  (ssc-4) [0x1b]\n");
+        else
+            printf("Data compression page  (IBM specific) [0x%x]\n",
+                   pg_code);
+    }
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
         pl = ucp[3];
         extra = pl + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         if ((0 == pl) || (pl > 8)) {
             printf("badly formed data compression log parameter\n");
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
@@ -1405,17 +1817,20 @@ show_data_compression_log_page(unsigned char * resp, int len, int show_pcb)
             break;
         }
 skip_para:
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
     }
 }
 
 /* LAST_N_ERR_LPAGE [0x7] */
 static void
-show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
+show_last_n_error_page(unsigned char * resp, int len,
+                       const struct opts_t * op)
 {
     int k, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -1427,7 +1842,8 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
         printf("No error events logged\n");
         return;
     }
-    printf("Last n error events page  (spc-2) [0x7]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Last n error events page  (spc-2) [0x7]\n");
     for (k = num; k > 0; k -= pl, ucp += pl) {
         if (k < 3) {
             printf("short Last n error events page\n");
@@ -1436,6 +1852,17 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
         pl = ucp[3] + 4;
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         printf("  Error event %d:\n", pc);
         if (pl > 4) {
             if ((pcb & 0x1) && (pcb & 0x2)) {
@@ -1448,16 +1875,19 @@ show_last_n_error_page(unsigned char * resp, int len, int show_pcb)
                 dStrHex((const char *)ucp + 4, pl - 4, 1);
             }
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
     }
 }
 
 /* LAST_N_DEFERRED_LPAGE [0xb] */
 static void
-show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
+show_last_n_deferred_error_page(unsigned char * resp, int len,
+                                const struct opts_t * op)
 {
     int k, num, pl, pc, pcb;
     unsigned char * ucp;
@@ -1469,7 +1899,8 @@ show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
         printf("No deferred errors logged\n");
         return;
     }
-    printf("Last n deferred errors page  (spc-2) [0xb]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Last n deferred errors page  (spc-2) [0xb]\n");
     for (k = num; k > 0; k -= pl, ucp += pl) {
         if (k < 3) {
             printf("short Last n deferred errors page\n");
@@ -1478,12 +1909,25 @@ show_last_n_deferred_error_page(unsigned char * resp, int len, int show_pcb)
         pl = ucp[3] + 4;
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         printf("  Deferred error %d:\n", pc);
         dStrHex((const char *)ucp + 4, pl - 4, 1);
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
     }
 }
 
@@ -1507,9 +1951,9 @@ static const char * self_test_result[] = {
 
 /* SELF_TEST_LPAGE [0x10] */
 static void
-show_self_test_page(unsigned char * resp, int len, int show_pcb)
+show_self_test_page(unsigned char * resp, int len, const struct opts_t * op)
 {
-    int k, num, n, res, pcb;
+    int k, num, n, res, pc, pl, pcb;
     unsigned int v;
     unsigned char * ucp;
     uint64_t ull;
@@ -1518,23 +1962,36 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
 
     num = len - 4;
     if (num < 0x190) {
-        printf("short self-test results page [length 0x%x rather than "
-               "0x190 bytes]\n", num);
+        pr2serr("short self-test results page [length 0x%x rather than "
+                "0x190 bytes]\n", num);
         return;
     }
-    printf("Self-test results page  (spc-3) [0x10]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Self-test results page  (spc-3) [0x10]\n");
     for (k = 0, ucp = resp + 4; k < 20; ++k, ucp += 20 ) {
         pcb = ucp[2];
+        pl = ucp[3] + 4;
+        pc = (ucp[0] << 8) + ucp[1];
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         n = (ucp[6] << 8) | ucp[7];
         if ((0 == n) && (0 == ucp[4]))
             break;
         printf("  Parameter code = %d, accumulated power-on hours = %d\n",
-               (ucp[0] << 8) | ucp[1], n);
+               pc, n);
         printf("    self-test code: %s [%d]\n",
                self_test_code[(ucp[4] >> 5) & 0x7], (ucp[4] >> 5) & 0x7);
         res = ucp[4] & 0xf;
-        printf("    self-test result: %s [%d]\n",
-               self_test_result[res], res);
+        printf("    self-test result: %s [%d]\n", self_test_result[res], res);
         if (ucp[5])
             printf("    self-test number = %d\n", (int)ucp[5]);
         ull = ucp[8]; ull <<= 8; ull |= ucp[9]; ull <<= 8; ull |= ucp[10];
@@ -1552,18 +2009,20 @@ show_self_test_page(unsigned char * resp, int len, int show_pcb)
                 printf("      [%s]\n", sg_get_asc_ascq_str(ucp[17], ucp[18],
                        sizeof(b), b));
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
     }
 }
 
 /* TEMPERATURE_LPAGE [0xd] */
 static void
-show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
-                      int show_unknown)
+show_temperature_page(unsigned char * resp, int len,
+                      const struct opts_t * op, int show_extra)
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
@@ -1572,51 +2031,72 @@ show_temperature_page(unsigned char * resp, int len, int show_pcb, int hdr,
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed Temperature page\n");
+        pr2serr("badly formed Temperature page\n");
         return;
     }
-    if (hdr)
-        printf("Temperature page  (spc-3) [0xd]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (show_extra)
+            printf("Temperature page  (spc-3) [0xd]\n");
+    }
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Temperature page\n");
+            pr2serr("short Temperature page\n");
             return;
         }
         extra = ucp[3] + 4;
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
-        if (0 == pc) {
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0:
             if ((extra > 5) && (k > 5)) {
                 if (ucp[5] < 0xff)
                     printf("  Current temperature = %d C", ucp[5]);
                 else
                     printf("  Current temperature = <not available>");
             }
-        } else if (1 == pc) {
+            break;
+        case 1:
             if ((extra > 5) && (k > 5)) {
                 if (ucp[5] < 0xff)
                     printf("  Reference temperature = %d C", ucp[5]);
                 else
                     printf("  Reference temperature = <not available>");
             }
-
-        } else if (show_unknown) {
-            printf("  unknown parameter code = 0x%x, contents in "
-                   "hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
-        } else
-            continue;
-        if (show_pcb) {
+            break;
+        default:
+            if (show_extra) {
+                printf("  unknown parameter code = 0x%x, contents in "
+                       "hex:\n", pc);
+                dStrHex((const char *)ucp, extra, 1);
+            } else
+                continue;
+            break;
+        }
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
     }
 }
 
 /* START_STOP_LPAGE [0xe] */
 static void
-show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
+show_start_stop_page(unsigned char * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
@@ -1626,26 +2106,39 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed Start-stop cycle counter page\n");
+        pr2serr("badly formed Start-stop cycle counter page\n");
         return;
     }
-    printf("Start-stop cycle counter page  (spc-3) [0xe]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Start-stop cycle counter page  (spc-3) [0xe]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Start-stop cycle counter page\n");
+            pr2serr("short Start-stop cycle counter page\n");
             return;
         }
         extra = ucp[3] + 4;
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 1:
             if (10 == extra)
                 printf("  Date of manufacture, year: %.4s, week: %.2s",
                        &ucp[4], &ucp[8]);
-            else if (verbose) {
-                fprintf(stderr, "  Date of manufacture parameter length "
-                        "strange: %d\n", extra - 4);
+            else if (op->do_verbose) {
+                pr2serr("  Date of manufacture parameter length strange: "
+                        "%d\n", extra - 4);
                 dStrHexErr((const char *)ucp, extra, 1);
             }
             break;
@@ -1653,9 +2146,9 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
             if (10 == extra)
                 printf("  Accounting date, year: %.4s, week: %.2s",
                        &ucp[4], &ucp[8]);
-            else if (verbose) {
-                fprintf(stderr, "  Accounting date parameter length "
-                        "strange: %d\n", extra - 4);
+            else if (op->do_verbose) {
+                pr2serr("  Accounting date parameter length strange: %d\n",
+                        extra - 4);
                 dStrHexErr((const char *)ucp, extra, 1);
             }
             break;
@@ -1705,17 +2198,75 @@ show_start_stop_page(unsigned char * resp, int len, int show_pcb, int verbose)
             dStrHex((const char *)ucp, extra, 1);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+    }
+}
+
+/* APP_CLIENT_LPAGE [0xf] */
+static void
+show_app_client_page(unsigned char * resp, int len, const struct opts_t * op)
+{
+    int k, num, extra, pc, pcb;
+    unsigned char * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    if (num < 4) {
+        pr2serr("badly formed Application Client page\n");
+        return;
+    }
+    if (op->do_verbose || ((op->do_raw == 0) && (op->do_hex == 0)))
+        printf("Application client page  (spc-3) [0xf]\n");
+    if (0 == op->filter_given) {
+        if ((len > 128) && (0 == op->do_hex)) {
+            dStrHex((const char *)resp, 64, 1);
+            printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
+                   "see the rest)]\n", len);
+        }
+        else
+            dStrHex((const char *)resp, len, 1);
+        return;
+    }
+    /* only here if filter_given set */
+    for (k = num; k > 0; k -= extra, ucp += extra) {
+        if (k < 3) {
+            pr2serr("short Application client page\n");
+            return;
+        }
+        extra = ucp[3] + 4;
+        pc = (ucp[0] << 8) + ucp[1];
+        pcb = ucp[2];
+        if (op->filter != pc)
+            continue;
+        if (op->do_raw)
+            dStrRaw((const char *)ucp, extra);
+        else if (0 == op->do_hex)
+            dStrHex((const char *)ucp, extra, 0);
+        else if (1 == op->do_hex)
+            dStrHex((const char *)ucp, extra, 1);
+        else
+            dStrHex((const char *)ucp, extra, -1);
+
+        if (op->do_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        break;
     }
 }
 
 /* IE_LPAGE [0x2f] */
 static void
-show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
+show_ie_page(unsigned char * resp, int len, const struct opts_t * op,
+             int full)
 {
     int k, num, extra, pc, pcb;
     unsigned char * ucp;
@@ -1725,11 +2276,13 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
     num = len - 4;
     ucp = &resp[0] + 4;
     if (num < 4) {
-        printf("badly formed Informational Exceptions page\n");
+        pr2serr("badly formed Informational Exceptions page\n");
         return;
     }
-    if (full)
-        printf("Informational Exceptions page  (spc-3) [0x2f]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (full)
+            printf("Informational Exceptions page  (spc-3) [0x2f]\n");
+    }
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
             printf("short Informational Exceptions page\n");
@@ -1738,7 +2291,20 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
         extra = ucp[3] + 4;
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
-        if (0 == pc) {
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0:
             if (extra > 5) {
                 if (full) {
                     printf("  IE asc = 0x%x, ascq = 0x%x", ucp[4], ucp[5]);
@@ -1761,15 +2327,21 @@ show_ie_page(unsigned char * resp, int len, int show_pcb, int full)
                      }
                 }
             }
-        } else if (full) {
-            printf("  parameter code = 0x%x, contents in hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
+            break;
+        default:
+            if (full) {
+                printf("  parameter code = 0x%x, contents in hex:\n", pc);
+                dStrHex((const char *)ucp, extra, 1);
+            }
+            break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
     }
 }
 
@@ -1910,7 +2482,7 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
 /* PROTO_SPECIFIC_LPAGE [0x18] for a SAS port */
 static void
 show_sas_port_param(unsigned char * ucp, int param_len,
-                    const struct opts_t * optsp)
+                    const struct opts_t * op)
 {
     int j, m, n, nphys, pcb, t, sz, spld_len;
     unsigned char * vcp;
@@ -1922,20 +2494,20 @@ show_sas_port_param(unsigned char * ucp, int param_len,
     sz = sizeof(s);
     pcb = ucp[2];
     t = (ucp[0] << 8) | ucp[1];
-    if (optsp->do_name)
+    if (op->do_name)
         printf("rel_target_port=%d\n", t);
     else
         printf("relative target port id = %d\n", t);
-    if (optsp->do_name)
+    if (op->do_name)
         printf("  gen_code=%d\n", ucp[6]);
     else
         printf("  generation code = %d\n", ucp[6]);
     nphys = ucp[7];
-    if (optsp->do_name)
+    if (op->do_name)
         printf("  num_phys=%d\n", nphys);
     else {
         printf("  number of phys = %d", nphys);
-        if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+        if ((op->do_pcb) && (0 == op->do_name)) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
@@ -1944,7 +2516,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
 
     for (j = 0, vcp = ucp + 8; j < (param_len - 8);
          vcp += spld_len, j += spld_len) {
-        if (optsp->do_name)
+        if (op->do_name)
             printf("    phy_id=%d\n", vcp[1]);
         else
             printf("  phy identifier = %d\n", vcp[1]);
@@ -1953,7 +2525,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             spld_len = 48;      /* in SAS-1 and SAS-1.1 vcp[3]==0 */
         else
             spld_len += 4;
-        if (optsp->do_name) {
+        if (op->do_name) {
             t = ((0x70 & vcp[4]) >> 4);
             printf("      att_dev_type=%d\n", t);
             printf("      att_iport_mask=0x%x\n", vcp[6]);
@@ -1984,7 +2556,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
              * in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
-            case 1: snprintf(s, sz, "end device"); break;
+            case 1: snprintf(s, sz, "SAS or SATA device"); break;
             case 2: snprintf(s, sz, "expander device"); break;
             case 3: snprintf(s, sz, "expander device (fanout)"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
@@ -2092,12 +2664,12 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             unsigned int pvdt;
 
             num_ped = vcp[51];
-            if (optsp->do_verbose > 1)
+            if (op->do_verbose > 1)
                 printf("    <<Phy event descriptors: %d, spld_len: %d, "
                        "calc_ped: %d>>\n", num_ped, spld_len,
                        (spld_len - 52) / 12);
             if (num_ped > 0) {
-                if (optsp->do_name) {
+                if (op->do_name) {
                    printf("      phy_event_desc_num=%d\n", num_ped);
                    return;      /* don't decode at this stage */
                 } else
@@ -2112,7 +2684,7 @@ show_sas_port_param(unsigned char * ucp, int param_len,
                        xcp[11];
                 show_sas_phy_event_info(pes, ui, pvdt);
             }
-        } else if (optsp->do_verbose)
+        } else if (op->do_verbose)
            printf("    <<No phy event descriptors>>\n");
     }
 }
@@ -2120,24 +2692,45 @@ show_sas_port_param(unsigned char * ucp, int param_len,
 /* PROTO_SPECIFIC_LPAGE [0x18] */
 static int
 show_protocol_specific_page(unsigned char * resp, int len,
-                            const struct opts_t * optsp)
+                            const struct opts_t * op)
 {
-    int k, num, param_len;
+    int k, num, pl, pc, pid;
     unsigned char * ucp;
 
     num = len - 4;
-    if (optsp->do_name)
-        printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (op->do_name)
+            printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
+    }
     for (k = 0, ucp = resp + 4; k < num; ) {
-        param_len = ucp[3] + 4;
-        if (6 != (0xf & ucp[4]))
+        pc = (ucp[0] << 8) + ucp[1];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        pid = 0xf & ucp[4];
+        if (6 != pid) {
+            pr2serr("Protocol identifier: %d, only support SAS (SPL) which "
+                    "is 6\n", pid);
             return 0;   /* only decode SAS log page */
-        if ((0 == k) && (0 == optsp->do_name))
+        }
+        if ((0 == k) && (0 == op->do_name))
             printf("Protocol Specific port page for SAS SSP  (sas-2) "
                    "[0x18]\n");
-        show_sas_port_param(ucp, param_len, optsp);
-        k += param_len;
-        ucp += param_len;
+        show_sas_port_param(ucp, pl, op);
+        if (op->filter_given)
+            break;
+skip:
+        k += pl;
+        ucp += pl;
     }
     return 1;
 }
@@ -2146,7 +2739,7 @@ show_protocol_specific_page(unsigned char * resp, int len,
 /* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f */
 static int
 show_stats_perform_page(unsigned char * resp, int len,
-                        const struct opts_t * optsp)
+                        const struct opts_t * op)
 {
     int k, num, n, param_len, param_code, spf, subpg_code, extra;
     int pcb, nam;
@@ -2155,21 +2748,24 @@ show_stats_perform_page(unsigned char * resp, int len,
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    nam = optsp->do_name;
+    nam = op->do_name;
     num = len - 4;
     ucp = resp + 4;
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
-    if (nam) {
-        printf("log_page=0x%x\n", STATS_LPAGE);
-        if (subpg_code > 0)
-            printf("log_subpage=0x%x\n", subpg_code);
-    } else {
-        if (0 == subpg_code)
-            printf("General Statistics and Performance  (spc-4) [0x19]\n");
-        else
-            printf("Group Statistics and Performance (%d)  (spc-4) "
-                   "[0x19,0x%x]\n", subpg_code, subpg_code);
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (nam) {
+            printf("log_page=0x%x\n", STATS_LPAGE);
+            if (subpg_code > 0)
+                printf("log_subpage=0x%x\n", subpg_code);
+        } else {
+            if (0 == subpg_code)
+                printf("General Statistics and Performance  (spc-4) "
+                       "[0x19]\n");
+            else
+                printf("Group Statistics and Performance (%d)  (spc-4) "
+                       "[0x19,0x%x]\n", subpg_code, subpg_code);
+        }
     }
     if (subpg_code > 31)
         return 0;
@@ -2183,6 +2779,18 @@ show_stats_perform_page(unsigned char * resp, int len,
             extra = param_len + 4;
             param_code = (ucp[0] << 8) + ucp[1];
             pcb = ucp[2];
+            if (op->filter_given) {
+                if (param_code != op->filter)
+                    continue;
+                if (op->do_raw) {
+                    dStrRaw((const char *)ucp, extra);
+                    break;
+                } else if (op->do_hex) {
+                    dStrHex((const char *)ucp, extra,
+                            ((1 == op->do_hex) ? 1 : -1));
+                    break;
+                }
+            }
             switch (param_code) {
             case 1:     /* Statistics and performance log parameter */
                 ccp = nam ? "parameter_code=1" : "Statistics and performance "
@@ -2337,16 +2945,18 @@ show_stats_perform_page(unsigned char * resp, int len,
                     printf("parameter_code=%d\n", param_code);
                     printf("  unknown=1\n");
                 } else
-                    fprintf(stderr, "show_performance...  unknown parameter "
-                            "code %d\n", param_code);
-                if (optsp->do_verbose)
+                    pr2serr("show_performance...  unknown parameter code "
+                            "%d\n", param_code);
+                if (op->do_verbose)
                     dStrHexErr((const char *)ucp, extra, 1);
                 break;
             }
-            if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+            if ((op->do_pcb) && (0 == op->do_name)) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
                 printf("    <%s>\n", pcb_str);
             }
+            if (op->filter_given)
+                break;
         }
     } else {    /* Group statistics and performance (n) log page */
         if (num < 0x34)
@@ -2358,6 +2968,18 @@ show_stats_perform_page(unsigned char * resp, int len,
             extra = param_len + 4;
             param_code = (ucp[0] << 8) + ucp[1];
             pcb = ucp[2];
+            if (op->filter_given) {
+                if (param_code != op->filter)
+                    continue;
+                if (op->do_raw) {
+                    dStrRaw((const char *)ucp, extra);
+                    break;
+                } else if (op->do_hex) {
+                    dStrHex((const char *)ucp, extra,
+                            ((1 == op->do_hex) ? 1 : -1));
+                    break;
+                }
+            }
             switch (param_code) {
             case 1:     /* Group n Statistics and performance log parameter */
                 if (nam)
@@ -2460,16 +3082,18 @@ show_stats_perform_page(unsigned char * resp, int len,
                     printf("parameter_code=%d\n", param_code);
                     printf("  unknown=1\n");
                 } else
-                    fprintf(stderr, "show_performance...  unknown parameter "
-                            "code %d\n", param_code);
-                if (optsp->do_verbose)
+                    pr2serr("show_performance...  unknown parameter code "
+                            "%d\n", param_code);
+                if (op->do_verbose)
                     dStrHexErr((const char *)ucp, extra, 1);
                 break;
             }
-            if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+            if ((op->do_pcb) && (0 == op->do_name)) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
                 printf("    <%s>\n", pcb_str);
             }
+            if (op->filter_given)
+                break;
         }
     }
     return 1;
@@ -2479,7 +3103,7 @@ show_stats_perform_page(unsigned char * resp, int len,
 /* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20] */
 static int
 show_cache_stats_page(unsigned char * resp, int len,
-                      const struct opts_t * optsp)
+                      const struct opts_t * op)
 {
     int k, num, n, pc, spf, subpg_code, extra;
     int pcb, nam;
@@ -2488,25 +3112,27 @@ show_cache_stats_page(unsigned char * resp, int len,
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    nam = optsp->do_name;
+    nam = op->do_name;
     num = len - 4;
     ucp = resp + 4;
     if (num < 4) {
-        printf("badly formed Cache memory statistics page\n");
+        pr2serr("badly formed Cache memory statistics page\n");
         return 0;
     }
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
-    if (nam) {
-        printf("log_page=0x%x\n", STATS_LPAGE);
-        if (subpg_code > 0)
-            printf("log_subpage=0x%x\n", subpg_code);
-    } else
-        printf("Cache memory statistics page  (spc-4) [0x19,0x20]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (nam) {
+            printf("log_page=0x%x\n", STATS_LPAGE);
+            if (subpg_code > 0)
+                printf("log_subpage=0x%x\n", subpg_code);
+        } else
+            printf("Cache memory statistics page  (spc-4) [0x19,0x20]\n");
+    }
 
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
-            printf("short Cache memory statistics page\n");
+            pr2serr("short Cache memory statistics page\n");
             return 0;
         }
         if (8 != ucp[3]) {
@@ -2517,6 +3143,18 @@ show_cache_stats_page(unsigned char * resp, int len,
         extra = ucp[3] + 4;
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
+        if (op->filter_given) {
+            if (pc != op->filter)
+                continue;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, extra);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, extra,
+                        ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 1:     /* Read cache memory hits log parameter */
             ccp = nam ? "parameter_code=1" :
@@ -2595,23 +3233,26 @@ show_cache_stats_page(unsigned char * resp, int len,
                 printf("parameter_code=%d\n", pc);
                 printf("  unknown=1\n");
             } else
-                fprintf(stderr, "show_performance...  unknown parameter "
-                        "code %d\n", pc);
-            if (optsp->do_verbose)
+                pr2serr("show_performance...  unknown parameter code %d\n",
+                        pc);
+            if (op->do_verbose)
                 dStrHexErr((const char *)ucp, extra, 1);
             break;
         }
-        if ((optsp->do_pcb) && (0 == optsp->do_name)) {
+        if ((op->do_pcb) && (0 == op->do_name)) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("    <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
     }
     return 1;
 }
 
 /* FORMAT_STATUS_LPAGE [0x8] */
 static void
-show_format_status_page(unsigned char * resp, int len, int show_pcb)
+show_format_status_page(unsigned char * resp, int len,
+                        const struct opts_t * op)
 {
     int k, j, num, pl, pc, pcb, all_ff, counter;
     unsigned char * ucp;
@@ -2619,13 +3260,25 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Format status page  (sbc-2) [0x8]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Format status page  (sbc-2) [0x8]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         counter = 1;
         switch (pc) {
         case 0: printf("  Format data out:\n");
@@ -2663,17 +3316,20 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
                 printf(" <not available>");
             else
                 printf(" = %" PRIu64 "", ull);
-            if (show_pcb) {
+            if (op->do_pcb) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
                 printf("\n        <%s>\n", pcb_str);
             } else
                 printf("\n");
         } else {
-            if (show_pcb) {
+            if (op->do_pcb) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
                 printf("\n        <%s>\n", pcb_str);
             }
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -2681,19 +3337,32 @@ show_format_status_page(unsigned char * resp, int len, int show_pcb)
 
 /* Non-volatile cache page [0x17] */
 static void
-show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
+show_non_volatile_cache_page(unsigned char * resp, int len,
+                             const struct opts_t * op)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Non-volatile cache page  (sbc-2) [0x17]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Non-volatile cache page  (sbc-2) [0x17]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0:
             printf("  Remaining non-volatile time: ");
@@ -2742,10 +3411,13 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
             dStrHex((const char *)ucp, pl, 0);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -2753,20 +3425,33 @@ show_non_volatile_cache_page(unsigned char * resp, int len, int show_pcb)
 
 /* LB_PROV_LPAGE [0xc] */
 static void
-show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
+show_lb_provisioning_page(unsigned char * resp, int len,
+                          const struct opts_t * op)
 {
     int j, num, pl, pc, pcb;
     unsigned char * ucp;
     const char * cp;
     char str[PCB_STR_LEN];
 
-    printf("Logical block provisioning page (sbc-3) [0xc]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Logical block provisioning page (sbc-3) [0xc]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0x1:
             cp = "  Available LBA mapping threshold";
@@ -2791,11 +3476,11 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
             printf("  %s resource count:", cp);
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    fprintf(stderr, "\n    truncated by response length, "
-                            "expected at least 8 bytes\n");
+                    pr2serr("\n    truncated by response length, expected at "
+                            "least 8 bytes\n");
                 else
-                    fprintf(stderr, "\n    parameter length >= 8 expected, "
-                            "got %d\n", pl);
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
                 break;
             }
             j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
@@ -2816,10 +3501,13 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -2827,39 +3515,58 @@ show_lb_provisioning_page(unsigned char * resp, int len, int show_pcb)
 
 /* SOLID_STATE_MEDIA_LPAGE [0x11] */
 static void
-show_solid_state_media_page(unsigned char * resp, int len, int show_pcb)
+show_solid_state_media_page(unsigned char * resp, int len,
+                            const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
 
-    printf("Solid state media page (sbc-3) [0x11]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Solid state media page (sbc-3) [0x11]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        if (0x1 == pc) {
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x1:
             printf("  Percentage used endurance indicator:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    fprintf(stderr, "\n    truncated by response length, "
-                            "expected at least 8 bytes\n");
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
                 else
-                    fprintf(stderr, "\n    parameter length >= 8 expected, "
-                            "got %d\n", pl);
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
                 break;
             }
             printf(" %d%%\n", ucp[7]);
-        } else {
+            break;
+        default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -2887,29 +3594,42 @@ static const char * dt_dev_activity[] = {
 
 /* DT device status [0x11] (ssc, adc) */
 static void
-show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
+show_dt_device_status_page(unsigned char * resp, int len,
+                           const struct opts_t * op)
 {
     int num, pl, pc, pcb, j;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
 
-    printf("DT device status page (ssc-3, adc-3) [0x11]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("DT device status page (ssc-3, adc-3) [0x11]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0x0:
             printf("  Very high frequency data:\n");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    fprintf(stderr, "    truncated by response length, "
-                            "expected at least 8 bytes\n");
+                    pr2serr("    truncated by response length, expected at "
+                            "least 8 bytes\n");
                 else
-                    fprintf(stderr, "    parameter length >= 8 expected, "
-                            "got %d\n", pl);
+                    pr2serr("    parameter length >= 8 expected, got %d\n",
+                            pl);
                 break;
             }
             printf("  PAMR=%d HUI=%d MACC=%d CMPR=%d ", !!(0x80 & ucp[4]),
@@ -2938,11 +3658,11 @@ show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
             printf("  Very high frequency polling delay: ");
             if ((pl < 6) || (num < 6)) {
                 if (num < 6)
-                    fprintf(stderr, "\n    truncated by response length, "
-                            "expected at least 6 bytes\n");
+                    pr2serr("\n    truncated by response length, expected at "
+                            "least 6 bytes\n");
                 else
-                    fprintf(stderr, "\n    parameter length >= 6 expected, "
-                            "got %d\n", pl);
+                    pr2serr("\n    parameter length >= 6 expected, got %d\n",
+                            pl);
                 break;
             }
             printf(" %d milliseconds\n", (ucp[4] << 8) + ucp[5]);
@@ -2952,11 +3672,11 @@ show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
                    "only now):\n");
             if ((pl < 12) || (num < 12)) {
                 if (num < 12)
-                    fprintf(stderr, "    truncated by response length, "
-                            "expected at least 12 bytes\n");
+                    pr2serr("    truncated by response length, expected at "
+                            "least 12 bytes\n");
                 else
-                    fprintf(stderr, "    parameter length >= 12 expected, "
-                            "got %d\n", pl);
+                    pr2serr("    parameter length >= 12 expected, got %d\n",
+                            pl);
                 break;
             }
             dStrHex((const char *)ucp + 4, 8, 1);
@@ -2965,11 +3685,11 @@ show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
             printf("   Key management error data (hex only now):\n");
             if ((pl < 16) || (num < 16)) {
                 if (num < 16)
-                    fprintf(stderr, "    truncated by response length, "
-                            "expected at least 16 bytes\n");
+                    pr2serr("    truncated by response length, expected at "
+                            "least 16 bytes\n");
                 else
-                    fprintf(stderr, "    parameter length >= 16 expected, "
-                            "got %d\n", pl);
+                    pr2serr("    parameter length >= 16 expected, got %d\n",
+                            pl);
                 break;
             }
             dStrHex((const char *)ucp + 4, 12, 1);
@@ -2980,10 +3700,13 @@ show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
             break;
         }
 // xxxxxxxxxxxxxxx
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -2991,20 +3714,33 @@ show_dt_device_status_page(unsigned char * resp, int len, int show_pcb)
 
 /* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] */
 static void
-show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
+show_ata_pt_results_page(unsigned char * resp, int len,
+                         const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     unsigned char * dp;
     char str[PCB_STR_LEN];
 
-    printf("ATA pass-through results page (sat-2) [0x16]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("ATA pass-through results page (sat-2) [0x16]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         if ((pc < 0xf) && (pl > 17)) {
             int extend, sector_count;
 
@@ -3024,10 +3760,13 @@ show_ata_pt_results_page(unsigned char * resp, int len, int show_pcb)
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3062,30 +3801,42 @@ static const char * reassign_status[] = {
 
 /* Background scan results [0x15,0] for disk */
 static void
-show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
-                                  int verbose)
+show_background_scan_results_page(unsigned char * resp, int len,
+                                  const struct opts_t * op)
 {
     int j, m, num, pl, pc, pcb;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
 
-    printf("Background scan results page (sbc-3) [0x15]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Background scan results page (sbc-3) [0x15]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0:
             printf("  Status parameters:\n");
             if ((pl < 16) || (num < 16)) {
                 if (num < 16)
-                    fprintf(stderr, "    truncated by response length, "
-                            "expected at least 16 bytes\n");
+                    pr2serr("    truncated by response length, expected at "
+                            "least 16 bytes\n");
                 else
-                    fprintf(stderr, "    parameter length >= 16 expected, "
-                            "got %d\n", pl);
+                    pr2serr("    parameter length >= 16 expected, got %d\n",
+                            pl);
                 break;
             }
             printf("    Accumulated power on minutes: ");
@@ -3129,11 +3880,11 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
                 printf("  Medium scan parameter # %d [0x%x]\n", pc, pc);
             if ((pl < 24) || (num < 24)) {
                 if (num < 24)
-                    fprintf(stderr, "    truncated by response length, "
-                            "expected at least 24 bytes\n");
+                    pr2serr("    truncated by response length, expected at "
+                            "least 24 bytes\n");
                 else
-                    fprintf(stderr, "    parameter length >= 24 expected, "
-                            "got %d\n", pl);
+                    pr2serr("    parameter length >= 24 expected, got %d\n",
+                            pl);
                 break;
             }
             printf("    Power on minutes when error detected: ");
@@ -3151,7 +3902,7 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
             if (ucp[9] || ucp[10])
                 printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
                                                          sizeof(str), str));
-            if (verbose) {
+            if (op->do_verbose) {
                 printf("    vendor bytes [11 -> 15]: ");
                 for (m = 0; m < 5; ++m)
                     printf("0x%02x ", ucp[11 + m]);
@@ -3163,10 +3914,13 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
             printf("\n");
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3174,49 +3928,61 @@ show_background_scan_results_page(unsigned char * resp, int len, int show_pcb,
 
 /* Sequential access device page [0xc] for tape */
 static void
-show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
-                            int verbose)
+show_sequential_access_page(unsigned char * resp, int len,
+                            const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     uint64_t ull, gbytes;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Sequential access device page (ssc-3)\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Sequential access device page (ssc-3)\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         ull = decode_count(ucp + 4, pl - 4);
         gbytes = ull / 1000000000;
         switch (pc) {
         case 0:
             printf("  Data bytes received with WRITE commands: %" PRIu64
                    " GB", gbytes);
-            if (verbose)
+            if (op->do_verbose)
                 printf(" [%" PRIu64 " bytes]", ull);
             printf("\n");
             break;
         case 1:
             printf("  Data bytes written to media by WRITE commands: %" PRIu64
                    " GB", gbytes);
-            if (verbose)
+            if (op->do_verbose)
                 printf(" [%" PRIu64 " bytes]", ull);
             printf("\n");
             break;
         case 2:
             printf("  Data bytes read from media by READ commands: %" PRIu64
                    " GB", gbytes);
-            if (verbose)
+            if (op->do_verbose)
                 printf(" [%" PRIu64 " bytes]", ull);
             printf("\n");
             break;
         case 3:
             printf("  Data bytes transferred by READ commands: %" PRIu64
                    " GB", gbytes);
-            if (verbose)
+            if (op->do_verbose)
                 printf(" [%" PRIu64 " bytes]", ull);
             printf("\n");
             break;
@@ -3245,7 +4011,7 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
                 printf("  Cleaning action required\n");
             else
                 printf("  Cleaning action not required (or completed)\n");
-            if (verbose)
+            if (op->do_verbose)
                 printf("    cleaning value: %" PRIu64 "\n", ull);
             break;
         default:
@@ -3257,10 +4023,13 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
                        pc, ull);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3268,20 +4037,33 @@ show_sequential_access_page(unsigned char * resp, int len, int show_pcb,
 
 /* 0x14 for tape and ADC */
 static void
-show_device_stats_page(unsigned char * resp, int len, int show_pcb)
+show_device_stats_page(unsigned char * resp, int len,
+                       const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Device statistics page (ssc-3 and adc)\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Device statistics page (ssc-3 and adc)\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         if (pc < 0x1000) {
             ull = decode_count(ucp + 4, pl - 4);
             switch (pc) {
@@ -3350,10 +4132,13 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
                 break;
             }
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3361,20 +4146,32 @@ show_device_stats_page(unsigned char * resp, int len, int show_pcb)
 
 /* 0x14 for media changer */
 static void
-show_media_stats_page(unsigned char * resp, int len, int show_pcb)
+show_media_stats_page(unsigned char * resp, int len, const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Media statistics page (smc-3)\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Media statistics page (smc-3)\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         ull = decode_count(ucp + 4, pl - 4);
         switch (pc) {
         case 0:
@@ -3472,10 +4269,13 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
                    pc, ull);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3483,20 +4283,33 @@ show_media_stats_page(unsigned char * resp, int len, int show_pcb)
 
 /* 0x15 for media changer */
 static void
-show_element_stats_page(unsigned char * resp, int len, int show_pcb)
+show_element_stats_page(unsigned char * resp, int len,
+                        const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned int v;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
 
-    printf("Element statistics page (smc-3) [0x15]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Element statistics page (smc-3) [0x15]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         printf("  Element address: %d\n", pc);
         v = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
         printf("    Number of places: %u\n", v);
@@ -3510,10 +4323,13 @@ show_element_stats_page(unsigned char * resp, int len, int show_pcb)
         printf("    Number of determined volume identifiers: %u\n", v);
         v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
         printf("    Number of unreadable volume identifiers: %u\n", v);
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3521,7 +4337,8 @@ show_element_stats_page(unsigned char * resp, int len, int show_pcb)
 
 /* 0x16 for tape */
 static void
-show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
+show_tape_diag_data_page(unsigned char * resp, int len,
+                         const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned int v;
@@ -3529,13 +4346,25 @@ show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
     char str[PCB_STR_LEN];
     char b[80];
 
-    printf("Tape diagnostics data page (ssc-3) [0x16]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Tape diagnostics data page (ssc-3) [0x16]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         printf("  Parameter code: %d\n", pc);
         printf("    Density code: 0x%x\n", ucp[6]);
         printf("    Medium type: 0x%x\n", ucp[7]);
@@ -3568,10 +4397,13 @@ show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
             printf("    Vendor specific:\n");
             dStrHex((const char *)(ucp + 72), pl - 72, 0);
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3579,7 +4411,8 @@ show_tape_diag_data_page(unsigned char * resp, int len, int show_pcb)
 
 /* 0x16 for media changer */
 static void
-show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
+show_mchanger_diag_data_page(unsigned char * resp, int len,
+                             const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned int v;
@@ -3587,13 +4420,25 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
     char str[PCB_STR_LEN];
     char b[80];
 
-    printf("Media changer diagnostics data page (smc-3) [0x16]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Media changer diagnostics data page (smc-3) [0x16]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         printf("  Parameter code: %d\n", pc);
         printf("    Repeat: %d\n", !!(ucp[5] & 0x80));
         v = ucp[5] & 0xf;
@@ -3646,10 +4491,13 @@ show_mchanger_diag_data_page(unsigned char * resp, int len, int show_pcb)
             printf("    Timestamp:\n");
             dStrHex((const char *)(ucp + 94), 6, 1);
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3707,7 +4555,8 @@ volume_stats_partition(const unsigned char * xp, int len, int hex)
 
 /* Volume Statistics log page (ssc-4) [0x17, 0x1-0xf] */
 static void
-show_volume_stats_page(unsigned char * resp, int len, int show_pcb)
+show_volume_stats_page(unsigned char * resp, int len,
+                       const struct opts_t * op)
 {
     int num, pl, pc, pcb, spf, subpg_code;
     unsigned char * ucp;
@@ -3715,15 +4564,18 @@ show_volume_stats_page(unsigned char * resp, int len, int show_pcb)
 
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
-    if (0 == subpg_code)
-        printf("Volume statistics page (ssc-4) but subpage=0, abnormal: "
-               "treat like subpage=1\n");
-    else if (subpg_code < 0x10)
-        printf("Volume statistics page (ssc-4), subpage=%d\n", subpg_code);
-    else {
-        printf("Volume statistics page (ssc-4), subpage=%d; Reserved, "
-               "skip\n", subpg_code);
-        return;
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (0 == subpg_code)
+            printf("Volume statistics page (ssc-4) but subpage=0, abnormal: "
+                   "treat like subpage=1\n");
+        else if (subpg_code < 0x10)
+            printf("Volume statistics page (ssc-4), subpage=%d\n",
+                   subpg_code);
+        else {
+            printf("Volume statistics page (ssc-4), subpage=%d; Reserved, "
+                   "skip\n", subpg_code);
+            return;
+        }
     }
     num = len - 4;
     ucp = &resp[0] + 4;
@@ -3731,6 +4583,17 @@ show_volume_stats_page(unsigned char * resp, int len, int show_pcb)
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
 
         switch (pc) {
         case 0:
@@ -3894,7 +4757,7 @@ show_volume_stats_page(unsigned char * resp, int len, int show_pcb)
             break;
         case 0x300:
             printf("  Mount history, payload in hex:\n");
-            // xxxxxxxxxxxxxxxxx
+            // xxxxxxxx TODO
             dStrHex((const char *)(ucp + 4), pl - 4, 0);
             break;
 
@@ -3908,10 +4771,13 @@ show_volume_stats_page(unsigned char * resp, int len, int show_pcb)
             dStrHex((const char *)(ucp + 4), pl - 4, 0);
             break;
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -3983,25 +4849,37 @@ static const char * tape_alert_strs[] = {
 
 /* TAPE_ALERT_LPAGE [0x2e] */
 static void
-show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
-                         const struct opts_t * optsp)
+show_tape_alert_ssc_page(unsigned char * resp, int len,
+                         const struct opts_t * op)
 {
     int num, pl, pc, pcb, flag;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
 
     /* N.B. the Tape alert log page for smc-3 is different */
-    printf("Tape alert page (ssc-3) [0x2e]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Tape alert page (ssc-3) [0x2e]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         flag = ucp[4] & 1;
-        if (optsp->do_verbose && (0 == optsp->do_brief) && flag)
+        if (op->do_verbose && (0 == op->do_brief) && flag)
             printf("  >>>> ");
-        if ((0 == optsp->do_brief) || optsp->do_verbose || flag) {
+        if ((0 == op->do_brief) || op->do_verbose || flag) {
             if (pc < (int)(sizeof(tape_alert_strs) /
                            sizeof(tape_alert_strs[0])))
                 printf("  %s: %d\n", tape_alert_strs[pc], flag);
@@ -4009,10 +4887,13 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
                 printf("  Reserved parameter code 0x%x, flag: %d\n", pc,
                        flag);
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
         }
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -4020,19 +4901,32 @@ show_tape_alert_ssc_page(unsigned char * resp, int len, int show_pcb,
 
 /* 0x37 */
 static void
-show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
+show_seagate_cache_page(unsigned char * resp, int len,
+                        const struct opts_t * op)
 {
     int num, pl, pc, pcb;
     unsigned char * ucp;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Seagate cache page [0x37]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Seagate cache page [0x37]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         switch (pc) {
         case 0: printf("  Blocks sent to initiator"); break;
         case 1: printf("  Blocks received from initiator"); break;
@@ -4049,11 +4943,14 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
         printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -4061,20 +4958,33 @@ show_seagate_cache_page(unsigned char * resp, int len, int show_pcb)
 
 /* 0x3e */
 static void
-show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
+show_seagate_factory_page(unsigned char * resp, int len,
+                          const struct opts_t * op)
 {
     int num, pl, pc, pcb, valid;
     unsigned char * ucp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
-    printf("Seagate/Hitachi factory page [0x3e]\n");
+    if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Seagate/Hitachi factory page [0x3e]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
         pc = (ucp[0] << 8) | ucp[1];
         pcb = ucp[2];
         pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
         valid = 1;
         switch (pc) {
         case 0: printf("  number of hours powered up"); break;
@@ -4092,11 +5002,14 @@ show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
             else
                 printf(" = %" PRIu64 "", ull);
         }
-        if (show_pcb) {
+        if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
             printf("\n");
+        if (op->filter_given)
+            break;
+skip:
         num -= pl;
         ucp += pl;
     }
@@ -4105,12 +5018,12 @@ show_seagate_factory_page(unsigned char * resp, int len, int show_pcb)
 static void
 show_ascii_page(unsigned char * resp, int len,
                 struct sg_simple_inquiry_resp * inq_dat,
-                const struct opts_t * optsp)
+                const struct opts_t * op)
 {
     int k, num, done, pg_code, subpg_code, spf;
 
     if (len < 0) {
-        printf("response has bad length\n");
+        pr2serr("%s: response has bad length\n", __func__);
         return;
     }
     num = len - 4;
@@ -4142,26 +5055,26 @@ show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case BUFF_OVER_UNDER_LPAGE: /* 0x1 */
-        show_buffer_under_over_run_page(resp, len, optsp->do_pcb);
+        show_buffer_under_over_run_page(resp, len, op);
         break;
     case WRITE_ERR_LPAGE:       /* 0x2 */
     case READ_ERR_LPAGE:        /* 0x3 */
     case READ_REV_ERR_LPAGE:    /* 0x4 */
     case VERIFY_ERR_LPAGE:      /* 0x5 */
-        show_error_counter_page(resp, len, optsp->do_pcb);
+        show_error_counter_page(resp, len, op);
         break;
     case NON_MEDIUM_LPAGE:      /* 0x6 */
-        show_non_medium_error_page(resp, len, optsp->do_pcb);
+        show_non_medium_error_page(resp, len, op);
         break;
     case LAST_N_ERR_LPAGE:      /* 0x7 */
-        show_last_n_error_page(resp, len, optsp->do_pcb);
+        show_last_n_error_page(resp, len, op);
         break;
     case FORMAT_STATUS_LPAGE:   /* 0x8 */
         {
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
-                show_format_status_page(resp, len, optsp->do_pcb);
+                show_format_status_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4170,18 +5083,17 @@ show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case LAST_N_DEFERRED_LPAGE: /* 0xb */
-        show_last_n_deferred_error_page(resp, len, optsp->do_pcb);
+        show_last_n_deferred_error_page(resp, len, op);
         break;
     case 0xc:
         {
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: /* LB_PROV_LPAGE */
-                show_lb_provisioning_page(resp, len, optsp->do_pcb);
+                show_lb_provisioning_page(resp, len, op);
                 break;
             case PDT_TAPE: case PDT_PRINTER:
                 /* tape and (printer) type devices */
-                show_sequential_access_page(resp, len, optsp->do_pcb,
-                                            optsp->do_verbose);
+                show_sequential_access_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4190,21 +5102,24 @@ show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case TEMPERATURE_LPAGE:     /* 0xd */
-        show_temperature_page(resp, len, optsp->do_pcb, 1, 1);
+        show_temperature_page(resp, len, op, 1);
         break;
     case START_STOP_LPAGE:      /* 0xe */
-        show_start_stop_page(resp, len, optsp->do_pcb, optsp->do_verbose);
+        show_start_stop_page(resp, len, op);
+        break;
+    case APP_CLIENT_LPAGE:      /* 0xf */
+        show_app_client_page(resp, len, op);
         break;
     case SELF_TEST_LPAGE:       /* 0x10 */
-        show_self_test_page(resp, len, optsp->do_pcb);
+        show_self_test_page(resp, len, op);
         break;
     case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
         switch (inq_dat->peripheral_type) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
-            show_solid_state_media_page(resp, len, optsp->do_pcb);
+            show_solid_state_media_page(resp, len, op);
             break;
         case PDT_TAPE: case PDT_ADC:
-            show_dt_device_status_page(resp, len, optsp->do_pcb);
+            show_dt_device_status_page(resp, len, op);
             break;
         default:
             done = 0;
@@ -4216,10 +5131,10 @@ show_ascii_page(unsigned char * resp, int len,
             switch (inq_dat->peripheral_type) {
             case PDT_TAPE: case PDT_ADC:
                 /* tape and adc type devices */
-                show_device_stats_page(resp, len, optsp->do_pcb);
+                show_device_stats_page(resp, len, op);
                 break;
             case PDT_MCHANGER: /* smc-3 */
-                show_media_stats_page(resp, len, optsp->do_pcb);
+                show_media_stats_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4233,13 +5148,12 @@ show_ascii_page(unsigned char * resp, int len,
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
                 if (0 == subpg_code)
-                    show_background_scan_results_page(resp, len,
-                                 optsp->do_pcb, optsp->do_verbose);
+                    show_background_scan_results_page(resp, len, op);
                 else
                     done = 0;   /* todo: pending defects [0x15,1] */
                 break;
             case PDT_MCHANGER: /* smc-3 */
-                show_element_stats_page(resp, len, optsp->do_pcb);
+                show_element_stats_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4252,13 +5166,13 @@ show_ascii_page(unsigned char * resp, int len,
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
-                show_ata_pt_results_page(resp, len, optsp->do_pcb);
+                show_ata_pt_results_page(resp, len, op);
                 break;
             case PDT_TAPE: /* ssc-4 */
-                show_tape_diag_data_page(resp, len, optsp->do_pcb);
+                show_tape_diag_data_page(resp, len, op);
                 break;
             case PDT_MCHANGER: /* smc-3 */
-                show_mchanger_diag_data_page(resp, len, optsp->do_pcb);
+                show_mchanger_diag_data_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4271,10 +5185,10 @@ show_ascii_page(unsigned char * resp, int len,
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
-                show_non_volatile_cache_page(resp, len, optsp->do_pcb);
+                show_non_volatile_cache_page(resp, len, op);
                 break;
             case PDT_TAPE: /* ssc-4, subpages 1 to 0xf */
-                show_volume_stats_page(resp, len, optsp->do_pcb);
+                show_volume_stats_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4283,27 +5197,27 @@ show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case PROTO_SPECIFIC_LPAGE:  /* 0x18 */
-        done = show_protocol_specific_page(resp, len, optsp);
+        done = show_protocol_specific_page(resp, len, op);
         break;
     case STATS_LPAGE: /* 0x19, defined for subpages 0 to 32 inclusive */
         if (subpg_code <= HIGH_GRP_STATS_SUBPG)
-            done = show_stats_perform_page(resp, len, optsp);
+            done = show_stats_perform_page(resp, len, op);
         else if (subpg_code == CACHE_STATS_SUBPG)
-            done = show_cache_stats_page(resp, len, optsp);
+            done = show_cache_stats_page(resp, len, op);
         else
             done = 0;
         break;
     case PCT_LPAGE:     /* 0x1a */
-        show_power_condition_transitions_page(resp, len, optsp->do_pcb);
+        show_power_condition_transitions_page(resp, len, op);
         break;
     case 0x1b:
-        show_data_compression_log_page(resp, len, optsp->do_pcb);
+        show_data_compression_log_page(resp, len, op);
         break;
     case TAPE_ALERT_LPAGE:      /* 0x2e */
         {
             switch (inq_dat->peripheral_type) {
             case PDT_TAPE:     /* ssc only */
-                show_tape_alert_ssc_page(resp, len, optsp->do_pcb, optsp);
+                show_tape_alert_ssc_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4312,23 +5226,23 @@ show_ascii_page(unsigned char * resp, int len,
         }
         break;
     case 0x30:  /* vendor specific: IBM */
-        show_tape_usage_log_page(resp, len, optsp->do_pcb);
+        show_tape_usage_log_page(resp, len, op);
         break;
     case 0x31:  /* vendor specific: IBM */
-        show_tape_capacity_log_page(resp, len, optsp->do_pcb);
+        show_tape_capacity_log_page(resp, len, op);
         break;
     case 0x32:  /* vendor specific, now tweaked and standardized at 0x1b */
-        show_data_compression_log_page(resp, len, optsp->do_pcb);
+        show_data_compression_log_page(resp, len, op);
         break;
     case IE_LPAGE:
-        show_ie_page(resp, len, optsp->do_pcb, 1);
+        show_ie_page(resp, len, op, 1);
         break;
     case 0x37:
         {
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
-                show_seagate_cache_page(resp, len, optsp->do_pcb);
+                show_seagate_cache_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4341,7 +5255,7 @@ show_ascii_page(unsigned char * resp, int len,
             switch (inq_dat->peripheral_type) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
                 /* disk (direct access) type devices */
-                show_seagate_factory_page(resp, len, optsp->do_pcb);
+                show_seagate_factory_page(resp, len, op);
                 break;
             default:
                 done = 0;
@@ -4372,38 +5286,38 @@ show_ascii_page(unsigned char * resp, int len,
 
 static int
 fetchTemperature(int sg_fd, unsigned char * resp, int max_len,
-                 struct opts_t * optsp)
+                 struct opts_t * op)
 {
     int len;
     int res = 0;
 
-    optsp->pg_code = TEMPERATURE_LPAGE;
-    optsp->subpg_code = NOT_SPG_SUBPG;
-    res = do_logs(sg_fd, resp, max_len, optsp);
+    op->pg_code = TEMPERATURE_LPAGE;
+    op->subpg_code = NOT_SPG_SUBPG;
+    res = do_logs(sg_fd, resp, max_len, op);
     if (0 == res) {
         len = (resp[2] << 8) + resp[3] + 4;
-        if (optsp->do_raw)
+        if (op->do_raw)
             dStrRaw((const char *)resp, len);
-        else if (optsp->do_hex)
-            dStrHex((const char *)resp, len, (1 == optsp->do_hex));
+        else if (op->do_hex)
+            dStrHex((const char *)resp, len, (1 == op->do_hex));
         else
-            show_temperature_page(resp, len, optsp->do_pcb, 0, 0);
+            show_temperature_page(resp, len, op, 0);
     }else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "Device not ready\n");
+        pr2serr("Device not ready\n");
     else {
-        optsp->pg_code = IE_LPAGE;
-        res = do_logs(sg_fd, resp, max_len, optsp);
+        op->pg_code = IE_LPAGE;
+        res = do_logs(sg_fd, resp, max_len, op);
         if (0 == res) {
             len = (resp[2] << 8) + resp[3] + 4;
-            if (optsp->do_raw)
+            if (op->do_raw)
                 dStrRaw((const char *)resp, len);
-            else if (optsp->do_hex)
-                dStrHex((const char *)resp, len, (1 == optsp->do_hex));
+            else if (op->do_hex)
+                dStrHex((const char *)resp, len, (1 == op->do_hex));
             else
-                show_ie_page(resp, len, 0, 0);
+                show_ie_page(resp, len, op, 0);
         } else
-            fprintf(stderr, "Unable to find temperature in either "
-                    "Temperature or IE log page\n");
+            pr2serr("Unable to find temperature in either Temperature or "
+                    "IE log page\n");
     }
     sg_cmds_close_device(sg_fd);
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
@@ -4414,126 +5328,175 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, k, pg_len, res, resp_len;
+    int in_len = -1;
     int ret = 0;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts;
+    struct opts_t * op;
 
-    memset(&opts, 0, sizeof(opts));
+    op = &opts;
+    memset(op, 0, sizeof(opts));
     memset(rsp_buff, 0, sizeof(rsp_buff));
     /* N.B. some disks only give data for current cumulative */
-    opts.page_control = 1;
-    res = process_cl(&opts, argc, argv);
+    op->page_control = 1;
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        usage_for(&opts);
+    if (op->do_help) {
+        usage_for(op);
         return 0;
     }
-    if (opts.do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+    if (op->do_version) {
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
-    if (NULL == opts.device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
-        usage_for(&opts);
+    if (NULL == op->device_name) {
+        pr2serr("No DEVICE argument given\n");
+        usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_raw) {
+    if (op->do_select) {
+        if (op->do_temperature) {
+            pr2serr("--select cannot be used with --temperature\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (op->do_transport) {
+            pr2serr("--select cannot be used with --transport\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    } else if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
             return SG_LIB_FILE_ERROR;
         }
     }
+    if (op->do_all) {
+        if (op->do_select) {
+            pr2serr("--all conflicts with --select\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (op->filter) {
+            pr2serr("--all conflicts with --filter\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    if (op->in_fn) {
+        if (! op->do_select) {
+            pr2serr("--in=FN can only be used with --select\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (f2hex_arr(op->in_fn, op->do_raw, 0, rsp_buff, &in_len,
+                      sizeof(rsp_buff)))
+            return SG_LIB_FILE_ERROR;
+    }
 
-    if ((sg_fd = sg_cmds_open_device(opts.device_name, 0 /* rw */,
-                                     opts.do_verbose)) < 0) {
-        if ((sg_fd = sg_cmds_open_device(opts.device_name, 1 /* r0 */,
-                                         opts.do_verbose)) < 0) {
-            fprintf(stderr, "error opening file: %s: %s \n",
-                    opts.device_name, safe_strerror(-sg_fd));
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    win32_spt_init_state = scsi_pt_win32_spt_state();
+    if (op->do_verbose > 4)
+        pr2serr("Initial win32 SPT interface state: %s\n",
+                win32_spt_init_state ? "direct" : "indirect");
+#endif
+#endif
+    sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
+                                op->do_verbose);
+    if ((sg_fd < 0) && (0 == op->o_readonly))
+        sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+                                    op->do_verbose);
+    if (sg_fd < 0) {
+        pr2serr("error opening file: %s: %s \n", op->device_name,
+                safe_strerror(-sg_fd));
+        return SG_LIB_FILE_ERROR;
+    }
+    if (op->do_list || op->do_all) {
+        op->pg_code = SUPP_PAGES_LPAGE;
+        if ((op->do_list > 1) || (op->do_all > 1))
+            op->subpg_code = SUPP_SPGS_SUBPG;
+    }
+    if (op->do_transport) {
+        if ((op->pg_code > 0) || (op->subpg_code > 0) ||
+            op->do_temperature) {
+            pr2serr("'-T' should not be mixed with options implying other "
+                    "pages\n");
             return SG_LIB_FILE_ERROR;
         }
-    }
-    if (opts.do_list || opts.do_all) {
-        opts.pg_code = SUPP_PAGES_LPAGE;
-        if ((opts.do_list > 1) || (opts.do_all > 1))
-            opts.subpg_code = SUPP_SPGS_SUBPG;
-    }
-    if (opts.do_transport) {
-        if ((opts.pg_code > 0) || (opts.subpg_code > 0) ||
-            opts.do_temperature) {
-            fprintf(stderr, "'-T' should not be mixed with options "
-                    "implying other pages\n");
-            return SG_LIB_FILE_ERROR;
-        }
-        opts.pg_code = PROTO_SPECIFIC_LPAGE;
+        op->pg_code = PROTO_SPECIFIC_LPAGE;
     }
     pg_len = 0;
 
-    if (0 == opts.do_raw) {
-        if (sg_simple_inquiry(sg_fd, &inq_out, 1, opts.do_verbose)) {
-            fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
-                    opts.device_name);
+    if (op->no_inq < 2)  {
+        if (sg_simple_inquiry(sg_fd, &inq_out, 1, op->do_verbose)) {
+            pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
+                    op->device_name);
             sg_cmds_close_device(sg_fd);
             return SG_LIB_CAT_OTHER;
-        } else if ((0 == opts.do_hex) && (0 == opts.do_name))
+        }
+        if ((0 == op->do_raw) && (0 == op->do_hex) && (0 == op->do_name) &&
+            (0 == op->no_inq))
             printf("    %.8s  %.16s  %.4s\n", inq_out.vendor,
                    inq_out.product, inq_out.revision);
     } else
         memset(&inq_out, 0, sizeof(inq_out));
 
-    if (1 == opts.do_temperature)
-        return fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, &opts);
+    if (1 == op->do_temperature)
+        return fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op);
 
-    if (opts.do_select) {
-        k = sg_ll_log_select(sg_fd, !!(opts.do_pcreset), opts.do_sp,
-                             opts.page_control, opts.pg_code, opts.subpg_code,
-                             NULL, 0, 1, opts.do_verbose);
+    if (op->do_select) {
+        k = sg_ll_log_select(sg_fd, !!(op->do_pcreset), op->do_sp,
+                             op->page_control, op->pg_code, op->subpg_code,
+                             rsp_buff, ((in_len > 0) ? in_len : 0),
+                             1, op->do_verbose);
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
-                fprintf(stderr, "log_select: device not ready\n");
+                pr2serr("log_select: device not ready\n");
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "log_select: field in cdb illegal\n");
+                pr2serr("log_select: field in cdb illegal\n");
             else if (SG_LIB_CAT_INVALID_OP == k)
-                fprintf(stderr, "log_select: not supported\n");
+                pr2serr("log_select: not supported\n");
             else if (SG_LIB_CAT_UNIT_ATTENTION == k)
-                fprintf(stderr, "log_select: unit attention\n");
+                pr2serr("log_select: unit attention\n");
             else if (SG_LIB_CAT_ABORTED_COMMAND == k)
-                fprintf(stderr, "log_select: aborted command\n");
+                pr2serr("log_select: aborted command\n");
             else
-                fprintf(stderr, "log_select: failed (%d), try '-v' for more "
+                pr2serr("log_select: failed (%d), try '-v' for more "
                         "information\n", k);
         }
         return (k >= 0) ?  k : SG_LIB_CAT_OTHER;
     }
-    resp_len = (opts.maxlen > 0) ? opts.maxlen : MX_ALLOC_LEN;
-    res = do_logs(sg_fd, rsp_buff, resp_len, &opts);
+    resp_len = (op->maxlen > 0) ? op->maxlen : MX_ALLOC_LEN;
+    res = do_logs(sg_fd, rsp_buff, resp_len, op);
     if (0 == res) {
         pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
         if ((pg_len + 4) > resp_len) {
-            printf("Only fetched %d bytes of response (available: %d "
-                   "bytes)\n    truncate output\n",
+            pr2serr("Only fetched %d bytes of response (available: %d "
+                    "bytes)\n    truncate output\n",
                    resp_len, pg_len + 4);
             pg_len = resp_len - 4;
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "log_sense: not supported\n");
+        pr2serr("log_sense: not supported\n");
     else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "log_sense: device not ready\n");
+        pr2serr("log_sense: device not ready\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "log_sense: field in cdb illegal\n");
+        pr2serr("log_sense: field in cdb illegal\n");
     else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "log_sense: unit attention\n");
+        pr2serr("log_sense: unit attention\n");
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "log_sense: aborted command\n");
-    if (0 == opts.do_all) {
-        if (opts.do_raw)
+        pr2serr("log_sense: aborted command\n");
+    if (0 == op->do_all) {
+        if (op->filter_given) {
+            if (op->do_hex > 2)
+                dStrHex((const char *)rsp_buff, pg_len + 4,
+                        (op->do_hex < 4));
+            else
+                show_ascii_page(rsp_buff, pg_len + 4, &inq_out, op);
+        } else if (op->do_raw)
             dStrRaw((const char *)rsp_buff, pg_len + 4);
-        else if (opts.do_hex > 1)
-            dStrHex((const char *)rsp_buff, pg_len + 4, (2 == opts.do_hex));
+        else if (op->do_hex > 1)
+            dStrHex((const char *)rsp_buff, pg_len + 4, (2 == op->do_hex));
         else if (pg_len > 1) {
-            if (opts.do_hex) {
+            if (op->do_hex) {
                 if (rsp_buff[0] & 0x40)
                     printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, "
                            "page_len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
@@ -4544,46 +5507,46 @@ main(int argc, char * argv[])
                 dStrHex((const char *)rsp_buff, pg_len + 4, 1);
             }
             else
-                show_ascii_page(rsp_buff, pg_len + 4, &inq_out, &opts);
+                show_ascii_page(rsp_buff, pg_len + 4, &inq_out, op);
         }
     }
     ret = res;
 
-    if (opts.do_all && (pg_len > 1)) {
+    if (op->do_all && (pg_len > 1)) {
         int my_len = pg_len;
         int spf;
         unsigned char parr[1024];
 
         spf = !!(rsp_buff[0] & 0x40);
         if (my_len > (int)sizeof(parr)) {
-            fprintf(stderr, "Unexpectedly large page_len=%d, trim to %d\n",
-                    my_len, (int)sizeof(parr));
+            pr2serr("Unexpectedly large page_len=%d, trim to %d\n", my_len,
+                    (int)sizeof(parr));
             my_len = sizeof(parr);
         }
         memcpy(parr, rsp_buff + 4, my_len);
         for (k = 0; k < my_len; ++k) {
-            if (0 == opts.do_raw)
+            if (0 == op->do_raw)
                 printf("\n");
-            opts.pg_code = parr[k] & 0x3f;
+            op->pg_code = parr[k] & 0x3f;
             if (spf)
-                opts.subpg_code = parr[++k];
+                op->subpg_code = parr[++k];
             else
-                opts.subpg_code = NOT_SPG_SUBPG;
+                op->subpg_code = NOT_SPG_SUBPG;
 
-            res = do_logs(sg_fd, rsp_buff, resp_len, &opts);
+            res = do_logs(sg_fd, rsp_buff, resp_len, op);
             if (0 == res) {
                 pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
                 if ((pg_len + 4) > resp_len) {
-                    fprintf(stderr, "Only fetched %d bytes of response, "
-                            "truncate output\n", resp_len);
+                    pr2serr("Only fetched %d bytes of response, truncate "
+                            "output\n", resp_len);
                     pg_len = resp_len - 4;
                 }
-                if (opts.do_raw)
+                if (op->do_raw)
                     dStrRaw((const char *)rsp_buff, pg_len + 4);
-                else if (opts.do_hex > 1)
+                else if (op->do_hex > 1)
                     dStrHex((const char *)rsp_buff, pg_len + 4,
-                            (2 == opts.do_hex));
-                else if (opts.do_hex) {
+                            (2 == op->do_hex));
+                else if (op->do_hex) {
                     if (rsp_buff[0] & 0x40)
                         printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
                                "len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
@@ -4595,22 +5558,21 @@ main(int argc, char * argv[])
                     dStrHex((const char *)rsp_buff, pg_len + 4, 1);
                 }
                 else
-                    show_ascii_page(rsp_buff, pg_len + 4, &inq_out, &opts);
+                    show_ascii_page(rsp_buff, pg_len + 4, &inq_out, op);
             } else if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "log_sense: page=0x%x,0x%x not supported\n",
-                        opts.pg_code, opts.subpg_code);
+                pr2serr("log_sense: page=0x%x,0x%x not supported\n",
+                        op->pg_code, op->subpg_code);
             else if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "log_sense: device not ready\n");
+                pr2serr("log_sense: device not ready\n");
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "log_sense: field in cdb illegal "
-                        "[page=0x%x,0x%x]\n", opts.pg_code, opts.subpg_code);
+                pr2serr("log_sense: field in cdb illegal "
+                        "[page=0x%x,0x%x]\n", op->pg_code, op->subpg_code);
             else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                fprintf(stderr, "log_sense: unit attention\n");
+                pr2serr("log_sense: unit attention\n");
             else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                fprintf(stderr, "log_sense: aborted command\n");
+                pr2serr("log_sense: aborted command\n");
             else
-                fprintf(stderr, "log_sense: failed, try '-v' for more "
-                        "information\n");
+                pr2serr("log_sense: failed, try '-v' for more information\n");
         }
     }
     sg_cmds_close_device(sg_fd);

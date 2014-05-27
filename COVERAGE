@@ -1,8 +1,8 @@
                         Command coverage
                         ================
 The following table lists SCSI commands in alphabetical order on the
-left and the sg3_utils utilities that implement invocations of them
-on the right. The second table lists supported ATA commands.
+left and the sg3_utils (or related) utilities that implement invocations
+of them on the right. The second table lists supported ATA commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
@@ -13,7 +13,8 @@ ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
                      (previous four in the examples directory)]
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
 COMPARE AND WRITE   sg_compare_and_write
-EXTENDED COPY(LID1)    sg_xcopy, ++
+COPY OPERATION ABORT    ddptctl, ++
+EXTENDED COPY(LID1)    sg_xcopy, ddpt, ++
 GET CONFIGURATION   sg_get_config, ++
 GET LBA STATUS      sg_get_lba_status, ++
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
@@ -22,16 +23,17 @@ INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
 FORMAT UNIT         sg_format, ++
 LOG SELECT          sg_logs('-r' or '-select'), ++
 LOG SENSE           sg_logs, ++
-MODE SELECT(6)      sg_wr_mode, sginfo, sg_format,
+MODE SELECT(6)      sdparm, sg_wr_mode, sginfo, sg_format,
                     sg_emc_trespass, sg_rdac, ++
-MODE SELECT(10)     sg_wr_mode, sginfo, sg_format,
+MODE SELECT(10)     sdparm, sg_wr_mode, sginfo, sg_format,
                     sg_emc_trespass, sg_rdac, ++
-MODE SENSE(6)       sg_modes, sg_wr_mode, sginfo, sg_format,
+MODE SENSE(6)       sdparm, sg_modes, sg_wr_mode, sginfo, sg_format,
                     sg_senddiag('-e'), sg_rdac, ++
-MODE SENSE(10)      sg_modes, sg_wr_mode, sginfo, sg_format,
+MODE SENSE(10)      sdparm, sg_modes, sg_wr_mode, sginfo, sg_format,
                     sg_senddiag('-e'), sg_rdac, ++
 PERSISTENT RESERVE IN       sg_persist, ++
 PERSISTENT RESERVE OUT      sg_persist, ++
+POPULATE TOKEN      ddpt, ddptctl, ++
 PREVENT ALLOW MEDIUM REMOVAL        sg_prevent, ++
 READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
@@ -49,9 +51,11 @@ READ MEDIA SERIAL NUMBER     sg_rmsn, ++
 REASSIGN BLOCKS     sg_reassign, ++
 RECEIVE COPY DATA(LID1)    sg_copy_results, ++
 RECEIVE COPY FAILURE DETAILS(LID1)    sg_copy_results, ++
-RECEIVE COPY OPERATING PARAMETERS    sg_copy_results, sg_xcopy, ++
+RECEIVE COPY OPERATING PARAMETERS    ddpt, sg_copy_results, sg_xcopy, ++
 RECEIVE COPY STATUS(LID1)    sg_copy_results, ++
 RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses, ++
+RECEIVE ROD TOKEN INFORMATION    ddpt, ddptctl ++
+REPORT ALL ROD TOKENS    ddptctl ++
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
 REPORT REFERRALS    sg_referrals, ++
@@ -74,12 +78,14 @@ WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
 WRITE(16)           sg_dd, sgm_dd, sgp_dd
+WRITE ATOMIC(16)    ddpt
 WRITE BUFFER        sg_test_rwbuf, sg_write_buffer, ++
 WRITE LONG(10)      sg_write_long, ++
 WRITE LONG(16)      sg_write_long, ++
 WRITE SAME(10)      sg_write_same
 WRITE SAME(16)      sg_write_same
 WRITE SAME(32)      sg_write_same
+WRITE USING TOKEN   ddpt, ddptctl, ++
 <most commands>     sg_raw
 
 
@@ -104,8 +110,10 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 The RECEIVE COPY * commands in SPC-4 were grouped as one command name
 with 4 service actions in SPC-3 and earlier. The single SPC-3 command
-name is RECEIVE COPY RESULTS.
+name is RECEIVE COPY RESULTS. The two opcodes associated with all
+EXTENDED COPY commands are now known as THIRD PARTY COPY IN (0x84) and
+THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-10th December 2013
+22nd May 2014

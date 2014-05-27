@@ -2,6 +2,44 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.39 [20140522] [svn: r583]
+  - sg_ses: add --eiioe=auto|force option
+    - fix AES dpage element indexing problems
+    - add --readonly option
+  - sg_write_buffer: add --bpw=CS option to call
+    write buffer multiple times for big blobs
+  - sg_format: add --ip_def option to fully provision
+  - sg_opcodes: add --mask option
+  - sg_logs: add --in=FN option for log select params
+    - add --filter=PARC (parameter code)
+    - add --no_inq for suppress initial INQUIRY call
+    - add --readonly option
+  - sg_persist: add --readonly option, environment
+    variable SG_PERSIST_IN_RDONLY sets ro on prin cmds
+  - sg_inq: sync version descriptors dated 20105176
+  - sg_vpd: add --vendor=VP option, re-order vendor
+    specific pages, split lto into lto5 and lto6
+    - add Supported block lengths and protection types
+      page (sbc4r01)
+    - add Block device characterics extension
+      page (sbc4r02)
+  - sg_copy_results, sg_get_lba_status, sg_luns,
+    sg_read_buffer, sg_readcap, sg_referrals, sg_rtpg,
+    sg_sat_set_features, sg_sat_identify:
+    add --readonly option
+  - sginfo: strip trailing spaces from INQUIRY text
+  - sg_rbuf: add --echo option (to use echo buffer)
+  - sg_lib: add sanitize command service action names
+    - add 'sense' categories for reservation conflict,
+      data protect and protection information violations
+    - add sg_get_category_sense_str() to API
+    - add initial zbc service actions
+    - dStrHex(Err): fix output truncation error
+  - sg_lib_data: sync asc/ascq codes with T10 20140516
+    - sync operation code with T10 20140515
+  - win32: sg_scan, sg_ses and sg_log fixes
+  - examples/sgq_dd: re-add old utility as example
+
 Changelog for sg3_utils-1.38 [20140401] [svn: r563]
   - sg_ses: add --dev-slot-num= and --sas-addr=
     - fix --data=- problem with large buffers

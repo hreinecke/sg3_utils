@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
 
 */
 
-static const char * version_str = "0.38 20130507";    /* mmc6r02 */
+static const char * version_str = "0.39 20140516";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -1098,16 +1098,11 @@ main(int argc, char * argv[])
         else
             decode_config(resp_buffer, sizeof(resp_buffer), len, brief,
                           inner_hex);
-    } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Get Configuration command not supported\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "field in Get Configuration command illegal\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Get Configuration received unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Get Configuration: aborted command\n");
-    else {
-        fprintf(stderr, "Get Configuration command failed\n");
+    } else {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Get Configuration command: %s\n", b);
         if (0 == verbose)
             fprintf(stderr, "    try '-v' option for more information\n");
     }

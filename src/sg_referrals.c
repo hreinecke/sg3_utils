@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2013 Hannes Reinecke.
+ * Copyright (c) 2010-2014 Hannes Reinecke.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.03 20130507";    /* sbc3r24 */
+static const char * version_str = "1.04 20150515";    /* sbc4r01 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -82,6 +82,7 @@ static struct option long_options[] = {
         {"maxlen", required_argument, 0, 'm'},
         {"one-segment", no_argument, 0, 's'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -92,9 +93,9 @@ usage()
 {
     fprintf(stderr, "Usage: "
             "sg_referrals  [--help] [--hex] [--lba=LBA] [--maxlen=LEN]\n"
-            "                     [--one-segment] [--raw] [--verbose] "
-            "[--version]\n"
-            "                     DEVICE\n"
+            "                     [--one-segment] [--raw] [--readonly] "
+            "[--verbose]\n"
+            "                     [--version] DEVICE\n"
             "  where:\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
@@ -172,6 +173,7 @@ main(int argc, char * argv[])
     int sg_fd, k, res, c, rlen;
     int do_hex = 0;
     int do_one_segment = 0;
+    int o_readonly = 0;
     int64_t ll;
     uint64_t lba = 0;
     int maxlen = DEF_REFER_BUFF_LEN;
@@ -185,7 +187,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHl:m:rsvV", long_options,
+        c = getopt_long(argc, argv, "hHl:m:rRsvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -219,6 +221,9 @@ main(int argc, char * argv[])
             break;
         case 'r':
             ++do_raw;
+            break;
+        case 'R':
+            ++o_readonly;
             break;
         case 'v':
             ++verbose;
@@ -266,7 +271,7 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -328,16 +333,11 @@ main(int argc, char * argv[])
             k += res;
             desc++;
         }
-    } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Report Referrals command not supported\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Report Referrals, aborted command\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Report Referrals command has bad field in cdb\n");
-    else {
-        fprintf(stderr, "Report Referrals command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+    } else {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Report Referrals command failed: %s\n", b);
     }
 
 the_end:

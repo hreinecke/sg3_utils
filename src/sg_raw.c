@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2013 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2014 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.8 (2013-12-19)"
+#define SG_RAW_VERSION "0.4.9 (2014-05-14)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -132,7 +132,7 @@ usage()
 }
 
 static int
-process_cl(struct opts_t *optsp, int argc, char *argv[])
+process_cl(struct opts_t * op, int argc, char *argv[])
 {
     while (1) {
         int c, n;
@@ -143,18 +143,18 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
 
         switch (c) {
         case 'b':
-            optsp->datain_binary = 1;
+            op->datain_binary = 1;
             break;
         case 'h':
         case '?':
-            optsp->do_help = 1;
+            op->do_help = 1;
             return 0;
         case 'i':
-            if (optsp->dataout_file) {
+            if (op->dataout_file) {
                 fprintf(stderr, "Too many '--infile=' options\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->dataout_file = optarg;
+            op->dataout_file = optarg;
             break;
         case 'k':
             n = sg_get_num(optarg);
@@ -162,38 +162,38 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
                 fprintf(stderr, "Invalid argument to '--skip'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->dataout_offset = n;
+            op->dataout_offset = n;
             break;
         case 'n':
-            optsp->no_sense = 1;
+            op->no_sense = 1;
             break;
         case 'o':
-            if (optsp->datain_file) {
+            if (op->datain_file) {
                 fprintf(stderr, "Too many '--outfile=' options\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->datain_file = optarg;
+            op->datain_file = optarg;
             break;
         case 'r':
-            optsp->do_datain = 1;
+            op->do_datain = 1;
             n = sg_get_num(optarg);
             if (n < 0 || n > MAX_SCSI_DXLEN) {
                 fprintf(stderr, "Invalid argument to '--request'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->datain_len = n;
+            op->datain_len = n;
             break;
         case 'R':
-            ++optsp->readonly;
+            ++op->readonly;
             break;
         case 's':
-            optsp->do_dataout = 1;
+            op->do_dataout = 1;
             n = sg_get_num(optarg);
             if (n < 0 || n > MAX_SCSI_DXLEN) {
                 fprintf(stderr, "Invalid argument to '--send'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->dataout_len = n;
+            op->dataout_len = n;
             break;
         case 't':
             n = sg_get_num(optarg);
@@ -201,13 +201,13 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
                 fprintf(stderr, "Invalid argument to '--timeout'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->timeout = n;
+            op->timeout = n;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            optsp->do_version = 1;
+            op->do_version = 1;
             return 0;
         default:
             return SG_LIB_SYNTAX_ERROR;
@@ -218,7 +218,7 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
         fprintf(stderr, "No device specified\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    optsp->device_name = argv[optind];
+    op->device_name = argv[optind];
     ++optind;
 
     while (optind < argc) {
@@ -230,15 +230,15 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
 
-        if (optsp->cdb_length > MAX_SCSI_CDBSZ) {
+        if (op->cdb_length > MAX_SCSI_CDBSZ) {
             fprintf(stderr, "CDB too long (max. %d bytes)\n", MAX_SCSI_CDBSZ);
             return SG_LIB_SYNTAX_ERROR;
         }
-        optsp->cdb[optsp->cdb_length] = cmd;
-        ++optsp->cdb_length;
+        op->cdb[op->cdb_length] = cmd;
+        ++op->cdb_length;
     }
 
-    if (optsp->cdb_length < MIN_SCSI_CDBSZ) {
+    if (op->cdb_length < MIN_SCSI_CDBSZ) {
         fprintf(stderr, "CDB too short (min. %d bytes)\n", MIN_SCSI_CDBSZ);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -325,17 +325,17 @@ skip(int fd, off_t offset)
 }
 
 static unsigned char *
-fetch_dataout(struct opts_t *optsp)
+fetch_dataout(struct opts_t * op)
 {
     unsigned char *buf = NULL;
     unsigned char *wrkBuf = NULL;
     int fd, len;
     int ok = 0;
 
-    if (optsp->dataout_file) {
-        fd = open(optsp->dataout_file, O_RDONLY);
+    if (op->dataout_file) {
+        fd = open(op->dataout_file, O_RDONLY);
         if (fd < 0) {
-            perror(optsp->dataout_file);
+            perror(op->dataout_file);
             goto bail;
         }
 
@@ -347,23 +347,23 @@ fetch_dataout(struct opts_t *optsp)
         goto bail;
     }
 
-    if (optsp->dataout_offset > 0) {
-        if (skip(fd, optsp->dataout_offset) != 0) {
+    if (op->dataout_offset > 0) {
+        if (skip(fd, op->dataout_offset) != 0) {
             goto bail;
         }
     }
 
-    buf = my_memalign(optsp->dataout_len, &wrkBuf);
+    buf = my_memalign(op->dataout_len, &wrkBuf);
     if (buf == NULL) {
         perror("malloc");
         goto bail;
     }
 
-    len = read(fd, buf, optsp->dataout_len);
+    len = read(fd, buf, op->dataout_len);
     if (len < 0) {
         perror("Failed to read input data");
         goto bail;
-    } else if (len < optsp->dataout_len) {
+    } else if (len < op->dataout_len) {
         fprintf(stderr, "EOF on input file/stream\n");
         goto bail;
     }
@@ -420,33 +420,35 @@ main(int argc, char *argv[])
 {
     int ret = 0;
     int res_cat, status, slen, k, ret2;
-    struct opts_t opts;
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
     unsigned char sense_buffer[32];
     unsigned char * dxfer_buffer_in = NULL;
     unsigned char * dxfer_buffer_out = NULL;
     unsigned char *wrkBuf = NULL;
+    struct opts_t opts;
+    struct opts_t * op;
     char b[128];
 
-    memset(&opts, 0, sizeof(opts));
-    opts.timeout = DEFAULT_TIMEOUT;
-    ret = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->timeout = DEFAULT_TIMEOUT;
+    ret = process_cl(op, argc, argv);
     if (ret != 0) {
         usage();
         goto done;
-    } else if (opts.do_help) {
+    } else if (op->do_help) {
         usage();
         goto done;
-    } else if (opts.do_version) {
+    } else if (op->do_version) {
         version();
         goto done;
     }
 
-    sg_fd = scsi_pt_open_device(opts.device_name, opts.readonly,
-                                opts.do_verbose);
+    sg_fd = scsi_pt_open_device(op->device_name, op->readonly,
+                                op->do_verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "%s: %s\n", opts.device_name, safe_strerror(-sg_fd));
+        fprintf(stderr, "%s: %s\n", op->device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
         goto done;
     }
@@ -457,39 +459,39 @@ main(int argc, char *argv[])
         ret = SG_LIB_CAT_OTHER;
         goto done;
     }
-    if (opts.do_verbose) {
+    if (op->do_verbose) {
         fprintf(stderr, "    cdb to send: ");
-        for (k = 0; k < opts.cdb_length; ++k)
-            fprintf(stderr, "%02x ", opts.cdb[k]);
+        for (k = 0; k < op->cdb_length; ++k)
+            fprintf(stderr, "%02x ", op->cdb[k]);
         fprintf(stderr, "\n");
-        if (opts.do_verbose > 2) {
-            sg_get_command_name(opts.cdb, 0, sizeof(b) - 1, b);
+        if (op->do_verbose > 2) {
+            sg_get_command_name(op->cdb, 0, sizeof(b) - 1, b);
             b[sizeof(b) - 1] = '\0';
             fprintf(stderr, "    Command name: %s\n", b);
         }
     }
-    set_scsi_pt_cdb(ptvp, opts.cdb, opts.cdb_length);
+    set_scsi_pt_cdb(ptvp, op->cdb, op->cdb_length);
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
-    if (opts.do_dataout) {
-        dxfer_buffer_out = fetch_dataout(&opts);
+    if (op->do_dataout) {
+        dxfer_buffer_out = fetch_dataout(op);
         if (dxfer_buffer_out == NULL) {
             ret = SG_LIB_CAT_OTHER;
             goto done;
         }
-        set_scsi_pt_data_out(ptvp, dxfer_buffer_out, opts.dataout_len);
+        set_scsi_pt_data_out(ptvp, dxfer_buffer_out, op->dataout_len);
     }
-    if (opts.do_datain) {
-        dxfer_buffer_in = my_memalign(opts.datain_len, &wrkBuf);
+    if (op->do_datain) {
+        dxfer_buffer_in = my_memalign(op->datain_len, &wrkBuf);
         if (dxfer_buffer_in == NULL) {
             perror("malloc");
             ret = SG_LIB_CAT_OTHER;
             goto done;
         }
-        set_scsi_pt_data_in(ptvp, dxfer_buffer_in, opts.datain_len);
+        set_scsi_pt_data_in(ptvp, dxfer_buffer_in, op->datain_len);
     }
 
-    ret = do_scsi_pt(ptvp, sg_fd, opts.timeout, opts.do_verbose);
+    ret = do_scsi_pt(ptvp, sg_fd, op->timeout, op->do_verbose);
     if (ret > 0) {
         if (SCSI_PT_DO_BAD_PARAMS == ret) {
             fprintf(stderr, "do_scsi_pt: bad pass through setup\n");
@@ -537,7 +539,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "SCSI Status: ");
     sg_print_scsi_status(status);
     fprintf(stderr, "\n\n");
-    if ((SAM_STAT_CHECK_CONDITION == status) && (! opts.no_sense)) {
+    if ((SAM_STAT_CHECK_CONDITION == status) && (! op->no_sense)) {
         if (SCSI_PT_RESULT_SENSE != res_cat)
             slen = get_scsi_pt_sense_len(ptvp);
         if (0 == slen)
@@ -545,29 +547,31 @@ main(int argc, char *argv[])
                     "Sense Information\n");
         else {
             fprintf(stderr, "Sense Information:\n");
-            sg_print_sense(NULL, sense_buffer, slen, (opts.do_verbose > 0));
+            sg_print_sense(NULL, sense_buffer, slen, (op->do_verbose > 0));
             fprintf(stderr, "\n");
         }
     }
+    if (SAM_STAT_RESERVATION_CONFLICT == status)
+        ret = SG_LIB_CAT_RES_CONFLICT;
 
-    if (opts.do_datain) {
-        int data_len = opts.datain_len - get_scsi_pt_resid(ptvp);
+    if (op->do_datain) {
+        int data_len = op->datain_len - get_scsi_pt_resid(ptvp);
         if (data_len == 0) {
             fprintf(stderr, "No data received\n");
         } else {
-            if (opts.datain_file == NULL && !opts.datain_binary) {
+            if (op->datain_file == NULL && !op->datain_binary) {
                 fprintf(stderr, "Received %d bytes of data:\n", data_len);
                 dStrHexErr((const char *)dxfer_buffer_in, data_len, 0);
             } else {
                 const char * cp = "stdout";
 
-                if (opts.datain_file &&
-                    ! ((1 == strlen(opts.datain_file)) &&
-                       ('-' == opts.datain_file[0])))
-                    cp = opts.datain_file;
+                if (op->datain_file &&
+                    ! ((1 == strlen(op->datain_file)) &&
+                       ('-' == op->datain_file[0])))
+                    cp = op->datain_file;
                 fprintf(stderr, "Writing %d bytes of data to %s\n", data_len,
                         cp);
-                ret2 = write_dataout(opts.datain_file, dxfer_buffer_in,
+                ret2 = write_dataout(op->datain_file, dxfer_buffer_in,
                                      data_len);
                 if (0 != ret2) {
                     if (0 == ret)
@@ -579,6 +583,10 @@ main(int argc, char *argv[])
     }
 
 done:
+    if (op->do_verbose) {
+        sg_get_category_sense_str(ret, sizeof(b), b, op->do_verbose - 1);
+        fprintf(stderr, "%s\n", b);
+    }
     if (wrkBuf)
         free(wrkBuf);
     if (ptvp)

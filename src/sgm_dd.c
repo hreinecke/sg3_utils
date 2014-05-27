@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2013 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2014 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static const char * version_str = "1.38 20131014 shared_mmap";
+static const char * version_str = "1.39 20140516 shared_mmap";
 #else
-static const char * version_str = "1.38 20131014";
+static const char * version_str = "1.39 20140516";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -518,10 +518,8 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
     return 0;
 }
 
-/* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_SYNTAX_ERROR,
- * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ILLEGAL_REQ,
- * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
- * -1 -> unrecoverable error */
+/* Returns 0 -> successful, various SG_LIB_CAT_* positive values,
+ * -2 -> recoverable (ENOMEM), -1 -> unrecoverable error */
 static int
 sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
         int bs, int cdbsz, int fua, int dpo, int do_mmap)
@@ -609,10 +607,8 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     return 0;
 }
 
-/* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_SYNTAX_ERROR,
- * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ILLEGAL_REQ,
- * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
- * -1 -> unrecoverable error */
+/* Returns 0 -> successful, various SG_LIB_CAT_* positive values,
+ * -2 -> recoverable (ENOMEM), -1 -> unrecoverable error */
 static int
 sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
          int bs, int cdbsz, int fua, int dpo, int do_mmap,
@@ -807,6 +803,7 @@ main(int argc, char * argv[])
     int in_sect_sz, out_sect_sz;
     int n, flags;
     char ebuff[EBUFF_SZ];
+    char b[80];
     int blocks_per;
     size_t psz;
     struct flags_t in_flags;
@@ -1183,14 +1180,8 @@ main(int argc, char * argv[])
                 res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
-                if (res == SG_LIB_CAT_INVALID_OP)
-                    fprintf(stderr, "read capacity not supported on %s\n",
-                            inf);
-                else if (res == SG_LIB_CAT_NOT_READY)
-                    fprintf(stderr, "read capacity failed, %s not ready\n",
-                            inf);
-                else
-                    fprintf(stderr, "Unable to read capacity on %s\n", inf);
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Read capacity (if=%s): %s\n", inf, b);
                 in_num_sect = -1;
             }
         } else if (FT_BLOCK == in_type) {
@@ -1218,14 +1209,8 @@ main(int argc, char * argv[])
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
-                if (res == SG_LIB_CAT_INVALID_OP)
-                    fprintf(stderr, "read capacity not supported on %s\n",
-                            outf);
-                else if (res == SG_LIB_CAT_NOT_READY)
-                    fprintf(stderr, "read capacity failed, %s not ready\n",
-                            outf);
-                else
-                    fprintf(stderr, "Unable to read capacity on %s\n", outf);
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Read capacity (of=%s): %s\n", inf, b);
                 out_num_sect = -1;
             }
         } else if (FT_BLOCK == out_type) {
@@ -1470,8 +1455,10 @@ main(int argc, char * argv[])
                 fprintf(stderr, "Unit attention(out), continuing\n");
                 res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 0, 0);
             }
-            if (0 != res)
-                fprintf(stderr, "Unable to synchronize cache\n");
+            if (0 != res) {
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Synchronize cache(out): %s\n", b);
+            }
         }
     }
 

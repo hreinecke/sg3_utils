@@ -29,7 +29,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "3.89 20140115";
+static const char * version_str = "3.92 20140515";
 
 #define ME "sg_readcap: "
 
@@ -47,6 +47,7 @@ static struct option long_options[] = {
         {"old", 0, 0, 'O'},
         {"pmi", 0, 0, 'p'},
         {"raw", 0, 0, 'r'},
+        {"readonly", 0, 0, 'R'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -60,6 +61,7 @@ struct opts_t {
     int do_long;
     int do_pmi;
     int do_raw;
+    int o_readonly;
     int do_verbose;
     int do_version;
     uint64_t llba;
@@ -71,8 +73,9 @@ static void usage()
 {
     fprintf(stderr, "Usage: sg_readcap [--brief] [--help] [--hex] "
             "[--lba=LBA] [--long] [--16]\n"
-            "                  [--pmi] [--raw] [--verbose] [--version] "
-            "DEVICE\n"
+            "                  [--pmi] [--raw] [--readonly] [--verbose] "
+            "[--version]\n"
+            "                  DEVICE\n"
             "  where:\n"
             "    --brief|-b      brief, two hex numbers: number of blocks "
             "and block size\n"
@@ -91,6 +94,8 @@ static void usage()
             "                    total disk capacity) [made obsolete in "
             "sbc3r26]\n"
             "    --raw|-r        output response in binary to stdout\n"
+            "    --readonly|-R    open DEVICE read-only (def: RCAP(16) "
+            "read-write)\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
             "Perform a SCSI READ CAPACITY (10 or 16) command\n");
@@ -99,7 +104,7 @@ static void usage()
 static void usage_old()
 {
     fprintf(stderr, "Usage:  sg_readcap [-16] [-b] [-h] [-H] [-lba=LBA] "
-            "[-pmi] [-r] [-v] [-V]\n"
+            "[-pmi] [-r] [-R] [-v] [-V]\n"
             "                   DEVICE\n"
             "  where:\n"
             "    -16    use READ CAPACITY (16) cdb (def: use "
@@ -116,20 +121,21 @@ static void usage_old()
             "shows total\n"
             "           disk capacity)\n"
             "    -r     output response in binary to stdout\n"
+            "    -R     open DEVICE read-only (def: RCAP(16) read-write)\n"
             "    -v     increase verbosity\n"
             "    -V     print version string and exit\n\n"
             "Perform a SCSI READ CAPACITY command\n");
 }
 
-static void usage_for(const struct opts_t * optsp)
+static void usage_for(const struct opts_t * op)
 {
-    if (optsp->opt_new)
+    if (op->opt_new)
         usage();
     else
         usage_old();
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c;
     int a_one = 0;
@@ -138,7 +144,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "16bhHlL:NOprvV", long_options,
+        c = getopt_long(argc, argv, "16bhHlL:NOprRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -149,20 +155,20 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case '6':
             if (a_one)
-                ++optsp->do_long;
+                ++op->do_long;
             break;
         case 'b':
-            ++optsp->do_brief;
+            ++op->do_brief;
             break;
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'H':
-            ++optsp->do_hex;
+            ++op->do_hex;
             break;
         case 'l':
-            ++optsp->do_long;
+            ++op->do_long;
             break;
         case 'L':
             nn = sg_get_llnum(optarg);
@@ -171,40 +177,43 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->llba = nn;
+            op->llba = nn;
             /* force READ_CAPACITY16 for large lbas */
-            if (optsp->llba > 0xfffffffeULL)
-                ++optsp->do_long;
-            ++optsp->do_lba;
+            if (op->llba > 0xfffffffeULL)
+                ++op->do_long;
+            ++op->do_lba;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = 0;
+            op->opt_new = 0;
             return 0;
         case 'p':
-            ++optsp->do_pmi;
+            ++op->do_pmi;
             break;
         case 'r':
-            ++optsp->do_raw;
+            ++op->do_raw;
+            break;
+        case 'R':
+            ++op->o_readonly;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            ++op->do_version;
             break;
         default:
             fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            if (op->do_help)
                 break;
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == optsp->device_name) {
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -218,7 +227,7 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     const char * cp;
@@ -234,43 +243,46 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 switch (*cp) {
                 case '1':
                     if ('6' == *(cp + 1)) {
-                        ++optsp->do_long;
+                        ++op->do_long;
                         ++cp;
                         --plen;
                     } else
                         jmp_out = 1;
                     break;
                 case 'b':
-                    ++optsp->do_brief;
+                    ++op->do_brief;
                     break;
                 case 'h':
                 case '?':
-                    ++optsp->do_help;
+                    ++op->do_help;
                     break;
                 case 'H':
-                    ++optsp->do_hex;
+                    ++op->do_hex;
                     break;
                 case 'N':
-                    optsp->opt_new = 1;
+                    op->opt_new = 1;
                     return 0;
                 case 'O':
                     break;
                 case 'p':
                     if (0 == strncmp("pmi", cp, 3)) {
-                        ++optsp->do_pmi;
+                        ++op->do_pmi;
                         cp += 2;
                         plen -= 2;
                     } else
                         jmp_out = 1;
                     break;
                 case 'r':
-                    ++optsp->do_raw;
+                    ++op->do_raw;
+                    break;
+                case 'R':
+                    ++op->o_readonly;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    ++op->do_verbose;
                     break;
                 case 'V':
-                    ++optsp->do_version;
+                    ++op->do_version;
                     break;
                 default:
                     jmp_out = 1;
@@ -290,9 +302,9 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 }
                 /* force READ_CAPACITY16 for large lbas */
                 if (uu > 0xfffffffeULL)
-                    ++optsp->do_long;
-                optsp->llba = uu;
-                ++optsp->do_lba;
+                    ++op->do_long;
+                op->llba = uu;
+                ++op->do_lba;
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
@@ -300,11 +312,11 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == optsp->device_name)
-            optsp->device_name = cp;
+        } else if (0 == op->device_name)
+            op->device_name = cp;
         else {
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", optsp->device_name, cp);
+                    "%s\n", op->device_name, cp);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -312,22 +324,22 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+        op->opt_new = 0;
+        res = process_cl_old(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = process_cl_new(op, argc, argv);
     } else {
-        optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+        op->opt_new = 1;
+        res = process_cl_new(op, argc, argv);
+        if ((0 == res) && (0 == op->opt_new))
+            res = process_cl_old(op, argc, argv);
     }
     return res;
 }
@@ -342,32 +354,35 @@ static void dStrRaw(const char* str, int len)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, k, res, prot_en, p_type, lbppbe;
+    int sg_fd, k, res, prot_en, p_type, lbppbe, rw_0_flag;
     uint64_t llast_blk_addr;
     int ret = 0;
     unsigned int last_blk_addr, block_size;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
+    char b[80];
     struct opts_t opts;
+    struct opts_t * op;
 
-    memset(&opts, 0, sizeof(opts));
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        usage_for(&opts);
+    if (op->do_help) {
+        usage_for(op);
         return 0;
     }
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
 
-    if (NULL == opts.device_name) {
+    if (NULL == op->device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
-        usage_for(&opts);
+        usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_raw) {
+    if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
             return SG_LIB_FILE_ERROR;
@@ -376,25 +391,29 @@ int main(int argc, char * argv[])
 
     memset(resp_buff, 0, sizeof(resp_buff));
 
-    if ((0 == opts.do_pmi) && (opts.llba > 0)) {
+    if ((0 == op->do_pmi) && (op->llba > 0)) {
         fprintf(stderr, ME "lba can only be non-zero when '--pmi' is set\n");
-        usage_for(&opts);
+        usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((sg_fd = sg_cmds_open_device(opts.device_name,
-                 (opts.do_long ? 0 /* rw */ : 1), opts.do_verbose)) < 0) {
-        fprintf(stderr, ME "error opening file: %s: %s\n", opts.device_name,
+    if (op->do_long)
+        rw_0_flag = op->o_readonly;
+    else
+        rw_0_flag = 1;  /* RCAP(10) has opened RO in past, so leave */
+    if ((sg_fd = sg_cmds_open_device(op->device_name, rw_0_flag,
+                                     op->do_verbose)) < 0) {
+        fprintf(stderr, ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
-    if (! opts.do_long) {
-        res = sg_ll_readcap_10(sg_fd, opts.do_pmi, (unsigned int)opts.llba,
-                               resp_buff, RCAP_REPLY_LEN, 1, opts.do_verbose);
+    if (! op->do_long) {
+        res = sg_ll_readcap_10(sg_fd, op->do_pmi, (unsigned int)op->llba,
+                               resp_buff, RCAP_REPLY_LEN, 1, op->do_verbose);
         ret = res;
         if (0 == res) {
-            if (opts.do_hex || opts.do_raw) {
-                if (opts.do_raw)
+            if (op->do_hex || op->do_raw) {
+                if (op->do_raw)
                     dStrRaw((const char *)resp_buff, RCAP_REPLY_LEN);
                 else
                     dStrHex((const char *)resp_buff, RCAP_REPLY_LEN, 1);
@@ -405,20 +424,20 @@ int main(int argc, char * argv[])
             if (0xffffffff != last_blk_addr) {
                 block_size = ((resp_buff[4] << 24) | (resp_buff[5] << 16) |
                              (resp_buff[6] << 8) | resp_buff[7]);
-                if (opts.do_brief) {
+                if (op->do_brief) {
                     printf("0x%x 0x%x\n", last_blk_addr + 1, block_size);
                     goto good;
                 }
                 printf("Read Capacity results:\n");
-                if (opts.do_pmi)
+                if (op->do_pmi)
                     printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
-                           "before delay=0x%x\n", opts.llba, last_blk_addr);
+                           "before delay=0x%x\n", op->llba, last_blk_addr);
                 else
                     printf("   Last logical block address=%u (0x%x), Number "
                            "of blocks=%u\n", last_blk_addr, last_blk_addr,
                            last_blk_addr + 1);
                 printf("   Logical block length=%u bytes\n", block_size);
-                if (! opts.do_pmi) {
+                if (! op->do_pmi) {
                     uint64_t total_sz = last_blk_addr + 1;
                     double sz_mb, sz_gb;
 
@@ -440,38 +459,32 @@ int main(int argc, char * argv[])
             } else {
                 printf("READ CAPACITY (10) indicates device capacity too "
                        "large\n  now trying 16 byte cdb variant\n");
-                opts.do_long = 1;
+                op->do_long = 1;
             }
         } else if (SG_LIB_CAT_INVALID_OP == res) {
-            opts.do_long = 1;
+            op->do_long = 1;
             sg_cmds_close_device(sg_fd);
-            if ((sg_fd = sg_cmds_open_device(opts.device_name, 0 /*rw */,
-                                             opts.do_verbose))
-                < 0) {
+            if ((sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
+                                             op->do_verbose)) < 0) {
                 fprintf(stderr, ME "error re-opening file: %s (rw): %s\n",
-                        opts.device_name, safe_strerror(-sg_fd));
+                        op->device_name, safe_strerror(-sg_fd));
                 return SG_LIB_FILE_ERROR;
             }
-            if (opts.do_verbose)
+            if (op->do_verbose)
                 fprintf(stderr, "READ CAPACITY (10) not supported, trying "
                         "READ CAPACITY (16)\n");
-        } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in READ CAPACITY (10) cdb\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "READ CAPACITY (10) failed, device not ready\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "READ CAPACITY (10) failed, aborted command\n");
-        else if (! opts.do_verbose)
-            fprintf(stderr, "READ CAPACITY (10) failed [res=%d], try "
-                    "with '-v'\n", res);
+        } else if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            fprintf(stderr, "READ CAPACITY (10) failed: %s\n", b);
+        }
     }
-    if (opts.do_long) {
-        res = sg_ll_readcap_16(sg_fd, opts.do_pmi, opts.llba, resp_buff,
-                               RCAP16_REPLY_LEN, 1, opts.do_verbose);
+    if (op->do_long) {
+        res = sg_ll_readcap_16(sg_fd, op->do_pmi, op->llba, resp_buff,
+                               RCAP16_REPLY_LEN, 1, op->do_verbose);
         ret = res;
         if (0 == res) {
-            if (opts.do_hex || opts.do_raw) {
-                if (opts.do_raw)
+            if (op->do_hex || op->do_raw) {
+                if (op->do_raw)
                     dStrRaw((const char *)resp_buff, RCAP16_REPLY_LEN);
                 else
                     dStrHex((const char *)resp_buff, RCAP16_REPLY_LEN, 1);
@@ -483,7 +496,7 @@ int main(int argc, char * argv[])
             }
             block_size = ((resp_buff[8] << 24) | (resp_buff[9] << 16) |
                           (resp_buff[10] << 8) | resp_buff[11]);
-            if (opts.do_brief) {
+            if (op->do_brief) {
                 printf("0x%" PRIx64 " 0x%x\n", llast_blk_addr + 1, block_size);
                 goto good;
             }
@@ -498,9 +511,9 @@ int main(int argc, char * argv[])
                 printf("\n");
             printf("   Logical block provisioning: lbpme=%d, lbprz=%d\n",
                    !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
-            if (opts.do_pmi)
+            if (op->do_pmi)
                 printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
-                       "before delay=0x%" PRIx64 "\n", opts.llba,
+                       "before delay=0x%" PRIx64 "\n", op->llba,
                        llast_blk_addr);
             else
                 printf("   Last logical block address=%" PRIu64 " (0x%"
@@ -517,7 +530,7 @@ int main(int argc, char * argv[])
                 printf("\n");
             printf("   Lowest aligned logical block address=%d\n",
                    ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
-            if (! opts.do_pmi) {
+            if (! op->do_pmi) {
                 uint64_t total_sz = llast_blk_addr + 1;
                 double sz_mb, sz_gb;
 
@@ -536,21 +549,15 @@ int main(int argc, char * argv[])
 #endif
             }
             goto good;
-        }
-        else if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "READ CAPACITY (16) not supported\n");
-        else if (SG_LIB_CAT_NOT_READY == res)
-            fprintf(stderr, "READ CAPACITY (16) failed, device not ready\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "READ CAPACITY (16) failed, aborted command\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             fprintf(stderr, "bad field in READ CAPACITY (16) cdb "
                     "including unsupported service action\n");
-        else if (! opts.do_verbose)
-            fprintf(stderr, "READ CAPACITY (16) failed [res=%d], try "
-                    "with '-v'\n", res);
+        else if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            fprintf(stderr, "READ CAPACITY (16) failed: %s\n", b);
+        }
     }
-    if (opts.do_brief)
+    if (op->do_brief)
         printf("0x0 0x0\n");
 
 good:

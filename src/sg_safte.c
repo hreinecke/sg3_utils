@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2014 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.24 20130507";
+static const char * version_str = "0.25 20140516";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -524,6 +524,7 @@ main(int argc, char * argv[])
     int do_insertions = 0;
     const char * cp;
     char buff[48];
+    char b[80];
     struct sg_simple_inquiry_resp inq_resp;
     const char op_name[] = "READ BUFFER";
 
@@ -718,23 +719,9 @@ err_out:
     case 0:
     case SG_LIB_CAT_RECOVERED:
         break;
-    case SG_LIB_CAT_ABORTED_COMMAND:
-        fprintf(stderr, "%s: aborted command\n", op_name);
-        break;
-    case SG_LIB_CAT_NOT_READY:
-        fprintf(stderr, "%s: device not ready\n", op_name);
-        break;
-    case SG_LIB_CAT_UNIT_ATTENTION:
-        fprintf(stderr, "%s: unit attention\n", op_name);
-        break;
-    case SG_LIB_CAT_INVALID_OP:
-        fprintf(stderr, "%s: operation not supported\n", op_name);
-        break;
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        fprintf(stderr, "%s: bad field in cdb\n", op_name);
-        break;
     default:
-        fprintf(stderr, "%s failed\n", op_name);
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "%s failed: %s\n", op_name, b);
         break;
     }
     ret = res;

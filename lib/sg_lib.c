@@ -572,8 +572,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     processed = 0;
                     break;
                 }
-                n += my_snprintf(b + n, blen - n, "    Error in %s byte %d",
-                                 (descp[4] & 0x40) ? "Command" : "Data",
+                n += my_snprintf(b + n, blen - n, "    Error in %s: byte %d",
+                                 (descp[4] & 0x40) ? "Command" :
+                                                     "Data parameters",
                                  (descp[5] << 8) | descp[6]);
                 if (descp[4] & 0x08) {
                     n += my_snprintf(b + n, blen - n, " bit %d\n",
@@ -947,8 +948,9 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                 switch (ssh.sense_key) {
                 case SPC_SK_ILLEGAL_REQUEST:
                     r += my_snprintf(b + r, blen - r, "  Sense Key Specific: "
-                             "Error in %s byte %d",
-                             ((sense_buffer[15] & 0x40) ? "Command" : "Data"),
+                             "Error in %s: byte %d",
+                             ((sense_buffer[15] & 0x40) ? "Command" :
+                                                          "Data parameters"),
                              (sense_buffer[16] << 8) | sense_buffer[17]);
                     if (sense_buffer[15] & 0x08)
                         r += my_snprintf(b + r, blen - r, " bit %d\n",
@@ -1113,12 +1115,17 @@ sg_err_category_sense(const unsigned char * sense_buffer, int sb_len)
                 return SG_LIB_CAT_ILLEGAL_REQ;
             break;
         case SPC_SK_ABORTED_COMMAND:
-            return SG_LIB_CAT_ABORTED_COMMAND;
+            if (0x10 == ssh.asc)
+                return SG_LIB_CAT_PROTECTION;
+            else
+                return SG_LIB_CAT_ABORTED_COMMAND;
         case SPC_SK_MISCOMPARE:
             return SG_LIB_CAT_MISCOMPARE;
         case SPC_SK_DATA_PROTECT:
-        case SPC_SK_COMPLETED:
+            return SG_LIB_CAT_DATA_PROTECT;
         case SPC_SK_COPY_ABORTED:
+            return SG_LIB_CAT_COPY_ABORTED;
+        case SPC_SK_COMPLETED:
         case SPC_SK_VOLUME_OVERFLOW:
             return SG_LIB_CAT_SENSE;
         default:
@@ -1280,7 +1287,7 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         vnp = get_value_name(sg_lib_read_buff_arr, service_action,
                              peri_type);
         if (vnp)
-            my_snprintf(buff, buff_len, "Read buffer (%s)\n", vnp->name);
+            my_snprintf(buff, buff_len, "Read buffer, %s", vnp->name);
         else
             my_snprintf(buff, buff_len, "Read buffer, mode=0x%x",
                         service_action);
@@ -1290,9 +1297,18 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         vnp = get_value_name(sg_lib_write_buff_arr, service_action,
                              peri_type);
         if (vnp)
-            my_snprintf(buff, buff_len, "Write buffer (%s)\n", vnp->name);
+            my_snprintf(buff, buff_len, "Write buffer, %s", vnp->name);
         else
             my_snprintf(buff, buff_len, "Write buffer, mode=0x%x",
+                        service_action);
+        break;
+    case SG_SANITIZE:
+        vnp = get_value_name(sg_lib_sanitize_sa_arr, service_action,
+                             peri_type);
+        if (vnp)
+            my_snprintf(buff, buff_len, "%s", vnp->name);
+        else
+            my_snprintf(buff, buff_len, "Sanitize, service action=0x%x",
                         service_action);
         break;
     default:
@@ -1379,6 +1395,139 @@ sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
     return (k == page_len) ? -1 : -2;
 }
 
+static const char * bad_sense_cat = "Bad sense category";
+
+/* Yield string associated with sense++ category. Returns 'buff' (or pointer
+ * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
+ * yield "Sense category: <sense_cat>" string. */
+const char *
+sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
+                          int verbose)
+{
+    int n;
+
+    if (NULL == buff)
+        return bad_sense_cat;
+    if (buff_len <= 0)
+        return buff;
+    switch (sense_cat) {
+    case SG_LIB_CAT_CLEAN:              /* 0 */
+        snprintf(buff, buff_len, "No errors");
+        break;
+    case SG_LIB_SYNTAX_ERROR:           /* 1 */
+        snprintf(buff, buff_len, "Syntax error");
+        break;
+    case SG_LIB_CAT_NOT_READY:          /* 2 */
+        n = snprintf(buff, buff_len, "Not ready");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_MEDIUM_HARD:        /* 3 */
+        n = snprintf(buff, buff_len, "Medium or hardware error");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key (plus blank check)");
+        break;
+    case SG_LIB_CAT_ILLEGAL_REQ:        /* 5 */
+        n = snprintf(buff, buff_len, "Illegal request");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key, apart from Invalid "
+                     "opcode");
+        break;
+    case SG_LIB_CAT_UNIT_ATTENTION:     /* 6 */
+        n = snprintf(buff, buff_len, "Unit attention");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_DATA_PROTECT:       /* 7 */
+        n = snprintf(buff, buff_len, "Data protect");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key, write protected "
+                     "media?");
+        break;
+    case SG_LIB_CAT_INVALID_OP:         /* 9 */
+        n = snprintf(buff, buff_len, "Illegal request, invalid opcode");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_COPY_ABORTED:       /* 10 */
+        n = snprintf(buff, buff_len, "Copy aborted");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_ABORTED_COMMAND:    /* 11 */
+        n = snprintf(buff, buff_len, "Aborted command");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key, other than "
+                     "protection related (asc=0x10)");
+        break;
+    case SG_LIB_CAT_MISCOMPARE:         /* 14 */
+        n = snprintf(buff, buff_len, "Miscompare");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_FILE_ERROR:             /* 15 */
+        snprintf(buff, buff_len, "File error");
+        break;
+    case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:  /* 17 */
+        snprintf(buff, buff_len, "Illegal request with info");
+        break;
+    case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:  /* 18 */
+        snprintf(buff, buff_len, "Medium or hardware error with info");
+        break;
+    case SG_LIB_CAT_NO_SENSE:           /* 20 */
+        n = snprintf(buff, buff_len, "No sense key");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " probably additional sense "
+                     "information");
+        break;
+    case SG_LIB_CAT_RECOVERED:          /* 21 */
+        n = snprintf(buff, buff_len, "Recovered error");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " sense key");
+        break;
+    case SG_LIB_CAT_RES_CONFLICT:       /* 24 */
+        n = snprintf(buff, buff_len, "Reservation conflict");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_TIMEOUT:            /* 33 */
+        snprintf(buff, buff_len, "SCSI command timeout");
+        break;
+    case SG_LIB_CAT_PROTECTION:         /* 40 */
+        n = snprintf(buff, buff_len, "Aborted command, protection");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " information (PI) problem");
+        break;
+    case SG_LIB_CAT_PROTECTION_WITH_INFO: /* 41 */
+        n = snprintf(buff, buff_len, "Aborted command with info, protection");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " information (PI) problem");
+        break;
+    case SG_LIB_CAT_MALFORMED:          /* 97 */
+        n = snprintf(buff, buff_len, "Malformed response");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " to SCSI command");
+        break;
+    case SG_LIB_CAT_SENSE:              /* 98 */
+        n = snprintf(buff, buff_len, "Some other sense data problem");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, ", try '-v' option for more "
+                     "information");
+        break;
+    case SG_LIB_CAT_OTHER:              /* 99 */
+        n = snprintf(buff, buff_len, "Some other error/warning has occurred");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, ", possible transport of driver "
+                     "issue");
+    default:
+        n = snprintf(buff, buff_len, "Sense category: %d", sense_cat);
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, ", try '-v' option for more "
+                     "information");
+        break;
+    }
+    return buff;
+}
 
 /* safe_strerror() contributed by Clayton Weaver <cgweav at email dot com>
  * Allows for situation in which strerror() is given a wild value (or the
@@ -1430,7 +1579,12 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     if (len <= 0)
         return;
     blen = (int)sizeof(buff);
-    formatstr = (0 == no_ascii) ? "%.76s\n" : "%.48s\n";
+    if (0 == no_ascii)  /* address at left and ASCII at right */
+        formatstr = "%.76s\n";
+    else if (no_ascii > 0)
+        formatstr = "%.58s\n";
+    else /* negative: no address at left and no ASCII at right */
+        formatstr = "%.48s\n";
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {
@@ -1438,8 +1592,6 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
         bpos = bpstart;
         for (k = 0; k < len; k++) {
             c = *p++;
-            if (0 != (k % 16))
-                bpos += 3;
             if (bpos == (bpstart + (8 * 3)))
                 bpos++;
             my_snprintf(&buff[bpos], blen - bpos, "%.2x",
@@ -1449,7 +1601,8 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
                 fprintf(fp, formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
-            }
+            } else
+                bpos += 3;
         }
         if (bpos > bpstart) {
             buff[bpos + 2] = '\0';

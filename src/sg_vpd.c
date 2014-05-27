@@ -33,15 +33,18 @@
 
 */
 
-static const char * version_str = "0.81 20140330";  /* spc4r36s + sbc4r01 */
+static const char * version_str = "0.85 20140522";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
-void svpd_enumerate_vendor(void);
-int svpd_search_vendor_vpds(int num_vpd);
+void svpd_enumerate_vendor(int vp_num);
+int svpd_count_vendor_vpds(int num_vpd, int vp_num);
 int svpd_decode_vendor(int sg_fd, int num_vpd, int subvalue, int maxlen,
                        int do_hex, int do_raw, int do_long, int do_quiet,
                        int verbose);
 const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
+int svpd_find_vp_num_by_acron(const char * vp_ap);
+const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
+                                                          int vp_num);
 
 
 /* standard VPD pages, in ascending page number order */
@@ -73,7 +76,9 @@ const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 #define VPD_LB_PROVISIONING 0xb2   /* SBC-3 */
 #define VPD_REFERRALS 0xb3   /* SBC-3 */
 #define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
+#define VPD_SUP_BLOCK_LENS 0xb4 /* SBC-4 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
+#define VPD_BLOCK_DEV_C_EXTENS 0xb5 /* SBC-4 */
 #define VPD_NO_RATHER_STD_INQ -2      /* request for standard inquiry */
 
 /* Device identification VPD page associations */
@@ -129,6 +134,7 @@ static struct option long_options[] = {
         {"page", required_argument, 0, 'p'},
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
+        {"vendor", required_argument, 0, 'M'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -145,6 +151,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_BLOCK_LIMITS, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_BLOCK_DEV_CHARS, 0, 0, "bdc", "Block device characteristics "
      "(SBC)"},
+    {VPD_BLOCK_DEV_C_EXTENS, 0, 0, "bdce", "Block device characteristics "
+     "extension (SBC)"},
     {VPD_CFA_PROFILE_INFO, 0, 0, "cfa", "CFA profile information"},
     {VPD_DEVICE_CONSTITUENTS, 0, -1, "dc", "Device constituents"},
     {VPD_DEVICE_ID, 0, -1, "di", "Device identification"},
@@ -183,6 +191,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_UNIT_SERIAL_NUM, 0, -1, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, "sp", "SCSI ports"},
     {VPD_SECURITY_TOKEN, 0, 0x11, "st", "Security token (OSD)"},
+    {VPD_SUP_BLOCK_LENS, 0, 0, "sbl", "Supported block lengths and "
+     "protection types (SBC)"},
     {VPD_SUPPORTED_VPDS, 0, -1, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, "tas", "TapeAlert supported flags (SSC)"},
     {VPD_3PARTY_COPY, 0, -1, "tpc", "Third party copy"},
@@ -217,7 +227,7 @@ usage()
             "[--inhex=fn]\n"
             "               [--long] [--maxlen=LEN] [--page=PG] [--quiet] "
             "[--raw]\n"
-            "               [--verbose] [--version] DEVICE\n");
+            "               [--vendor=VP] [--verbose] [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --enumerate|-e    enumerate known VPD pages names (ignore "
             "DEVICE),\n"
@@ -242,6 +252,8 @@ usage()
             "is given (e.g. '0x83')\n"
             "    --quiet|-q      suppress some output when decoding\n"
             "    --raw|-r        output page in binary\n"
+            "    --vendor=VP | -M VP    vendor/product abbreviation [or "
+            "number]\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
             "Fetch Vital Product Data (VPD) page using SCSI INQUIRY or "
@@ -473,17 +485,12 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else if (ret < 4) {
@@ -614,11 +621,11 @@ enumerate_vpds(int standard, int vendor)
         }
     }
     if (vendor)
-        svpd_enumerate_vendor();
+        svpd_enumerate_vendor(-2);
 }
 
 static int
-search_standard_vpds(int num_vpd)
+count_standard_vpds(int num_vpd)
 {
     const struct svpd_values_name_t * vnp;
     int matches;
@@ -2253,7 +2260,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:  /* Block limits */
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
         if (len < 16) {
             pr2serr("Block limits VPD page length too short=%d\n", len);
             return;
@@ -2305,6 +2312,17 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
                    mwsl);
         }
+        if (len > 44) {     /* added in sbc4r02 */
+            u = ((unsigned int)buff[44] << 24) | (buff[45] << 16) |
+                (buff[46] << 8) | buff[47];
+            printf("  Maximum atomic transfer length: %u\n", u);
+            u = ((unsigned int)buff[48] << 24) | (buff[49] << 16) |
+                (buff[50] << 8) | buff[51];
+            printf("  Atomic alignment: %u\n", u);
+            u = ((unsigned int)buff[52] << 24) | (buff[53] << 16) |
+                (buff[54] << 8) | buff[55];
+            printf("  Atomic transfer length granularity: %u\n", u);
+        }
         break;
     case PDT_TAPE: case PDT_MCHANGER:
         printf("  WORM=%d\n", !!(buff[4] & 0x1));
@@ -2342,7 +2360,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
         if (len < 64) {
             pr2serr("Block device characteristics VPD page length too "
                     "short=%d\n", len);
@@ -2452,6 +2470,104 @@ decode_block_lb_prov_vpd(unsigned char * b, int len)
     return 0;
 }
 
+/* VPD_SUP_BLOCK_LENS  0xb4 */
+static void
+decode_sup_block_lens_vpd(unsigned char * buff, int len)
+{
+    int k;
+    unsigned int u;
+    unsigned char * ucp;
+
+    if (len < 4) {
+        pr2serr("Supported block lengths and protection types VPD page "
+                "length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    ucp = buff + 4;
+    for (k = 0; k < len; k += 8, ucp += 8) {
+        u = ((unsigned int)ucp[0] << 24) | (ucp[1] << 16) | (ucp[2] << 8) |
+            ucp[3];
+        printf("  Logical block length: %u\n", u);
+        printf("    P_I_I_SUP: %d\n", !!(ucp[4] & 0x40));
+        printf("    GRD_CHK: %d\n", !!(ucp[4] & 0x4));
+        printf("    APP_CHK: %d\n", !!(ucp[4] & 0x2));
+        printf("    REF_CHK: %d\n", !!(ucp[4] & 0x1));
+        printf("    T3PS_SUP: %d\n", !!(ucp[5] & 0x8));
+        printf("    T2PS_SUP: %d\n", !!(ucp[5] & 0x4));
+        printf("    T1PS_SUP: %d\n", !!(ucp[5] & 0x2));
+        printf("    T0PS_SUP: %d\n", !!(ucp[5] & 0x1));
+    }
+}
+
+/* VPD_BLOCK_DEV_C_EXTENS  0xb5 */
+static void
+decode_block_dev_char_ext_vpd(unsigned char * b, int len)
+{
+    unsigned int u;
+
+    if (len < 16) {
+        pr2serr("Block device characteristics extension VPD page "
+                "length too short=%d\n", len);
+        return;
+    }
+    printf("  Utilization type: ");
+    switch (b[5]) {
+    case 1:
+        printf("Combined writes and reads");
+        break;
+    case 2:
+        printf("Writes only");
+        break;
+    case 3:
+        printf("Separate writes and reads");
+        break;
+    default:
+        printf("Reserved");
+        break;
+    }
+    printf(" [0x%x]\n", b[5]);
+    printf("  Utilization units: ");
+    switch (b[6]) {
+    case 2:
+        printf("megabytes");
+        break;
+    case 3:
+        printf("gigabytes");
+        break;
+    case 4:
+        printf("terabytes");
+        break;
+    case 5:
+        printf("petabytes");
+        break;
+    case 6:
+        printf("exabytes");
+        break;
+    default:
+        printf("Reserved");
+        break;
+    }
+    printf(" [0x%x]\n", b[6]);
+    printf("  Utilization interval: ");
+    switch (b[7]) {
+    case 0xa:
+        printf("per day");
+        break;
+    case 0xe:
+        printf("per year");
+        break;
+    default:
+        printf("Reserved");
+        break;
+    }
+    printf(" [0x%x]\n", b[7]);
+    u = ((unsigned int)b[8] << 24) | (b[9] << 16) | (b[10] << 8) | b[11];
+    printf("  Utilization B: %u\n", u);
+    u = ((unsigned int)b[12] << 24) | (b[13] << 16) | (b[14] << 8) | b[15];
+    printf("  Utilization A: %u\n", u);
+}
+
 /* VPD_TA_SUPPORTED */
 static int
 decode_tapealert_supported_vpd(unsigned char * b, int len)
@@ -2505,7 +2621,7 @@ decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
         decode_block_lb_prov_vpd(buff, len);
         break;
     case PDT_TAPE: case PDT_MCHANGER:
@@ -2531,7 +2647,7 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
         return;
     }
     switch (pdt) {
-    case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
         if (len < 16) {
             pr2serr("Referrals VPD page length too short=%d\n", len);
             break;
@@ -2549,6 +2665,53 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
             len = sizeof(obuff) - 1;
         memcpy(obuff, b + 4, len);
         printf("  Automation device serial number: %s\n", obuff);
+        break;
+    default:
+        pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+        dStrHexErr((const char *)b, len, 0);
+        break;
+    }
+}
+
+/* VPD_SUP_BLOCK_LENS sbc */
+/* VPD_DTDE_ADDRESS ssc */
+static void
+decode_b4_vpd(unsigned char * b, int len, int do_hex, int pdt)
+{
+    int k;
+
+    if (do_hex) {
+        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    switch (pdt) {
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+        decode_sup_block_lens_vpd(b, len);
+        break;
+    case PDT_TAPE: case PDT_MCHANGER:
+        printf("  Data transfer device element address: 0x");
+        for (k = 4; k < len; ++k)
+            printf("%02x", (unsigned int)b[k]);
+        printf("\n");
+        break;
+    default:
+        pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
+        dStrHexErr((const char *)b, len, 0);
+        break;
+    }
+}
+
+/* VPD_BLOCK_DEV_C_EXTENS sbc */
+static void
+decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
+{
+    if (do_hex) {
+        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    switch (pdt) {
+    case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+        decode_block_dev_char_ext_vpd(b, len);
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
@@ -2608,8 +2771,8 @@ svpd_unable_to_decode(int sg_fd, int num_vpd, int subvalue, int maxlen,
 
 /* Returns 0 if successful, else see sg_ll_inquiry() */
 static int
-svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
-                int do_raw, int do_long, int do_quiet, int vb)
+svpd_decode_t10(int sg_fd, int pn, int subvalue, int vp_num, int maxlen,
+                int do_hex, int do_raw, int do_long, int do_quiet, int vb)
 {
     int len, pdt, num, k, resid, alloc_len;
     int res = 0;
@@ -2674,6 +2837,16 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                                    vnp->acron);
                         else
                             printf("  %s [%s]\n", vnp->name, vnp->acron);
+                    } else if (vp_num >= 0) {
+                        vnp = svpd_find_vendor_by_num(pn, vp_num);
+                        if (vnp) {
+                            if (do_long)
+                                printf("  0x%02x  %s [%s]\n", pn, vnp->name,
+                                       vnp->acron);
+                            else
+                                printf("  %s [%s]\n", vnp->name, vnp->acron);
+                        } else
+                            printf("  0x%x\n", pn);
                     } else
                         printf("  0x%x\n", pn);
                 }
@@ -2940,7 +3113,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
             pdt = rp[0] & 0x1f;
             if ((! do_raw) && (! do_quiet) && (do_hex < 3)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("Block limits VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
@@ -2951,7 +3124,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                     printf("OSD information VPD page (OSD):\n");
                     break;
                 default:
-                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb0, pdt);
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
                     break;
                 }
             }
@@ -2975,7 +3148,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
             pdt = rp[0] & 0x1f;
             if ((! do_raw) && (! do_quiet) && (do_hex < 3)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("Block device characteristics VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
@@ -2990,7 +3163,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                            "(ADC):\n");
                     break;
                 default:
-                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb1, pdt);
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
                     break;
                 }
             }
@@ -3013,14 +3186,14 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
             pdt = rp[0] & 0x1f;
             if ((! do_raw) && (! do_quiet) && (do_hex < 3)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("Logical block provisioning VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
                     printf("TapeAlert supported flags VPD page (SSC):\n");
                     break;
                 default:
-                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb2, pdt);
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
                     break;
                 }
             }
@@ -3043,7 +3216,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
             pdt = rp[0] & 0x1f;
             if ((! do_raw) && (! do_quiet) && (do_hex < 3)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("Referrals VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
@@ -3051,7 +3224,7 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
                            "(SSC):\n");
                     break;
                 default:
-                    printf("VPD page=0x%x, pdt=0x%x:\n", 0xb3, pdt);
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
                     break;
                 }
             }
@@ -3068,26 +3241,64 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
         } else if ((! do_raw) && (! do_quiet) && (do_hex < 3))
             printf("VPD page=0xb3\n");
         break;
-    case VPD_DTDE_ADDRESS:      /* 0xb4 */
-        if ((! do_raw) && (! do_quiet) && (do_hex < 3))
-            printf("Data transfer device element address (SSC):\n");
+    case 0xb4:          /* VPD page depends on pdt */
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, maxlen, vb, &len);
         if (0 == res) {
+            pdt = rp[0] & 0x1f;
+            if ((! do_raw) && (! do_quiet) && (do_hex < 3)) {
+                switch (pdt) {
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                    printf("Supported block lengths and protection types "
+                           "VPD page (SBC):\n");
+                    break;
+                case PDT_TAPE: case PDT_MCHANGER:
+                    printf("Data transfer device element address (SSC):\n");
+                    break;
+                default:
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                    break;
+                }
+            }
             if (do_raw)
                 dStrRaw((const char *)rp, len);
             else {
-                pdt = rp[0] & 0x1f;
                 if (vb || do_long)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                printf("  Data transfer device element address: 0x");
-                for (k = 4; k < len; ++k)
-                    printf("%02x", (unsigned int)rp[k]);
-                printf("\n");
+                decode_b4_vpd(rp, len, do_hex, pdt);
             }
             return 0;
-        }
+        } else if ((! do_raw) && (! do_quiet) && (do_hex < 3))
+            printf("VPD page=0xb4\n");
+        break;
+    case 0xb5:          /* VPD page depends on pdt */
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, maxlen, vb, &len);
+        if (0 == res) {
+            pdt = rp[0] & 0x1f;
+            if ((! do_raw) && (! do_quiet) && (do_hex < 3)) {
+                switch (pdt) {
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                    printf("Block device characteristics extension VPD page "
+                           "(SBC):\n");
+                    break;
+                default:
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                    break;
+                }
+            }
+            if (do_raw)
+                dStrRaw((const char *)rp, len);
+            else {
+                if (vb || do_long)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_b5_vpd(rp, len, do_hex, pdt);
+            }
+            return 0;
+        } else if ((! do_raw) && (! do_quiet) && (do_hex < 3))
+            printf("VPD page=0xb5\n");
         break;
     default:
         return SG_LIB_SYNTAX_ERROR;
@@ -3099,15 +3310,17 @@ svpd_decode_t10(int sg_fd, int pn, int subvalue, int maxlen, int do_hex,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, res, matches, inhex_len;
+    int sg_fd, c, res, matches;
     const char * device_name = NULL;
     const struct svpd_values_name_t * vnp;
     const char * page_str = NULL;
     const char * inhex_fn = NULL;
+    const char * vp_str = NULL;
     const char * cp;
     int num_vpd = 0;
     int do_enum = 0;
     int do_hex = 0;
+    int inhex_len = 0;
     int do_ident = 0;
     int do_long = 0;
     int maxlen = 0;
@@ -3117,11 +3330,12 @@ main(int argc, char * argv[])
     int ret = 0;
     int subvalue = 0;
     int page_pdt = -1;
+    int vp_num = -1;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ehHiI:lm:p:qrvV", long_options,
+        c = getopt_long(argc, argv, "ehHiI:lm:M:p:qrvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -3158,6 +3372,14 @@ main(int argc, char * argv[])
                         MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'M':
+            if (vp_str) {
+                pr2serr("only one '--vendor=' option permitted\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            } else
+                vp_str = optarg;
             break;
         case 'p':
             if (page_str) {
@@ -3201,6 +3423,25 @@ main(int argc, char * argv[])
         if (device_name)
             pr2serr("Device name %s ignored when --enumerate given\n",
                     device_name);
+        if (vp_str) {
+            if (isdigit(vp_str[0])) {
+                vp_num = sg_get_num_nomult(vp_str);
+                if ((vp_num < 0) || (vp_num > 10)) {
+                    pr2serr("Bad vendor/product number after '--vendor=' "
+                            "option\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else {
+                vp_num = svpd_find_vp_num_by_acron(vp_str);
+                if (vp_num < 0) {
+                    pr2serr("Bad vendor/product acronym after '--vendor=' "
+                            "option\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
+            svpd_enumerate_vendor(vp_num);
+            return 0;
+        }
         if (page_str) {
             if ((0 == strcmp("-1", page_str)) ||
                 (0 == strcmp("-2", page_str)))
@@ -3216,9 +3457,9 @@ main(int argc, char * argv[])
                         "numbers\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            matches = search_standard_vpds(num_vpd);
+            matches = count_standard_vpds(num_vpd);
             if (0 == matches)
-                matches = svpd_search_vendor_vpds(num_vpd);
+                matches = svpd_count_vendor_vpds(num_vpd, vp_num);
             if (0 == matches)
                 printf("No matches found for VPD page number 0x%x\n",
                        num_vpd);
@@ -3237,31 +3478,68 @@ main(int argc, char * argv[])
                 vnp = svpd_find_vendor_by_acron(page_str);
                 if (NULL == vnp) {
                     pr2serr("abbreviation doesn't match a VPD page\n");
-                    printf("available VPD pages:\n");
+                    printf("Available standard VPD pages:\n");
                     enumerate_vpds(1, 1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
             num_vpd = vnp->value;
             subvalue = vnp->subvalue;
+            vp_num = subvalue;
             page_pdt = vnp->pdt;
         } else {
             cp = strchr(page_str, ',');
+            if (cp && vp_str) {
+                pr2serr("the --page=pg,vp and the --vendor=vp forms overlap, "
+                        "choose one or the other\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             num_vpd = sg_get_num_nomult(page_str);
             if ((num_vpd < 0) || (num_vpd > 255)) {
                 pr2serr("Bad page code value after '-p' option\n");
-                printf("available VPD pages:\n");
+                printf("Available standard VPD pages:\n");
                 enumerate_vpds(1, 1);
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
-                subvalue = sg_get_num_nomult(cp + 1);
-                if ((subvalue < 0) || (subvalue > 255)) {
-                    pr2serr("Bad subvalue code value after '-p' option\n");
+                if (isdigit(*(cp + 1)))
+                    vp_num = sg_get_num_nomult(cp + 1);
+                else
+                    vp_num = svpd_find_vp_num_by_acron(cp + 1);
+                if ((vp_num < 0) || (vp_num > 255)) {
+                    pr2serr("Bad vendor/product acronym after comma in '-p' "
+                            "option\n");
+                    if (vp_num < 0)
+                        svpd_enumerate_vendor(-1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
+                subvalue = vp_num;
+            } else if (vp_str) {
+                if (isdigit(vp_str[0]))
+                    vp_num = sg_get_num_nomult(vp_str);
+                else
+                    vp_num = svpd_find_vp_num_by_acron(vp_str);
+                if ((vp_num < 0) || (vp_num > 255)) {
+                    pr2serr("Bad vendor/product acronym after '--vendor=' "
+                            "option\n");
+                    svpd_enumerate_vendor(-1);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                subvalue = vp_num;
             }
         }
+    } else if (vp_str) {
+        if (isdigit(vp_str[0]))
+            vp_num = sg_get_num_nomult(vp_str);
+        else
+            vp_num = svpd_find_vp_num_by_acron(vp_str);
+        if ((vp_num < 0) || (vp_num > 255)) {
+            pr2serr("Bad vendor/product acronym after '--vendor=' "
+                    "option\n");
+            svpd_enumerate_vendor(-1);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        subvalue = vp_num;
     }
     if (inhex_fn) {
         if (device_name) {
@@ -3329,10 +3607,10 @@ main(int argc, char * argv[])
     }
 
     if (inhex_fn) {
-        res = svpd_decode_t10(-1, num_vpd, subvalue, inhex_len, do_hex,
-                              do_raw, do_long, do_quiet, do_verbose);
+        res = svpd_decode_t10(-1, num_vpd, subvalue, vp_num, inhex_len,
+                              do_hex, do_raw, do_long, do_quiet, do_verbose);
         if (SG_LIB_SYNTAX_ERROR == res) {
-            res = svpd_decode_vendor(-1, num_vpd, subvalue, inhex_len, do_hex,
+            res = svpd_decode_vendor(-1, num_vpd, vp_num, inhex_len, do_hex,
                                      do_raw, do_long, do_quiet, do_verbose);
             if (SG_LIB_SYNTAX_ERROR == res)
                 res = svpd_unable_to_decode(-1, num_vpd, subvalue, inhex_len,
@@ -3350,10 +3628,10 @@ main(int argc, char * argv[])
     }
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-    res = svpd_decode_t10(sg_fd, num_vpd, subvalue, maxlen, do_hex, do_raw,
-                          do_long, do_quiet, do_verbose);
+    res = svpd_decode_t10(sg_fd, num_vpd, subvalue, vp_num, maxlen, do_hex,
+                          do_raw, do_long, do_quiet, do_verbose);
     if (SG_LIB_SYNTAX_ERROR == res) {
-        res = svpd_decode_vendor(sg_fd, num_vpd, subvalue, maxlen, do_hex,
+        res = svpd_decode_vendor(sg_fd, num_vpd, vp_num, maxlen, do_hex,
                                  do_raw, do_long, do_quiet, do_verbose);
         if (SG_LIB_SYNTAX_ERROR == res)
             res = svpd_unable_to_decode(sg_fd, num_vpd, subvalue, maxlen,
@@ -3362,8 +3640,12 @@ main(int argc, char * argv[])
     }
     if (SG_LIB_CAT_ABORTED_COMMAND == res)
         pr2serr("fetching VPD page failed, aborted command\n");
-    else if (res)
-        pr2serr("fetching VPD page failed\n");
+    else if (res) {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, do_verbose);
+        pr2serr("fetching VPD page failed: %s\n", b);
+    }
     ret = res;
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

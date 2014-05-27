@@ -1,10 +1,10 @@
-.TH SG_LUNS "8" "March" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_LUNS "8" "May" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
 .B sg_luns
 [\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-linux\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
 [\fI\-\-select=SR\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_luns
@@ -65,22 +65,35 @@ before the LUN listing.
 \fB\-r\fR, \fB\-\-raw\fR
 output the SCSI response (i.e. the data-out buffer) in binary (to stdout).
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
+.TP
 \fB\-s\fR, \fB\-\-select\fR=\fISR\fR
 this option sets the SELECT REPORT field (\fISR\fR) in the SCSI REPORT
-LUNS command. The default value is 0. For detailed information see the
-REPORT LUNS command in SPC (most recent is SPC\-4 revision 36s in section
+LUNS command. The default value is 0. Hexadecimal values may be given with
+a leading "0x" or a trailing "h". For detailed information see the
+REPORT LUNS command in SPC (most recent is SPC\-4 revision 37 in section
 6.33). To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
 meanings of the \fISR\fR values defined to date for SPC\-4 are:
 .br
-  \fB0\fR : all LUNs excluding well known logical units
+  \fB0\fR : most LUs excluding well known logical units
 .br
   \fB1\fR : well known logical units
 .br
-  \fB2\fR : all LUNs
+  \fB2\fR : all LUs accessible to this I_T nexus
 .br
-Values between 0xf8 and 0xff (inclusive) are vendor specific (SPC\-4 rev
-36e), other values greater than 2 are reserved. This utility will accept
-any value between 0 and 255 (0xff) for \fISR\fR .
+  \fB0x10\fR : only accessible administrative LUs
+.br
+  \fB0x11\fR : administrative LUs and associated LUs (see SPC\-4)
+.br
+  \fB0x12\fR : if the addressed LU is administrative, then reports its
+.br
+               subsidiary LUs
+.br
+Values between 0xf8 and 0xff (inclusive) are vendor specific (added
+SPC\-4 rev 36e), other values greater than 2 are reserved. This utility
+will accept any value between 0 and 255 (0xff) for \fISR\fR .
 .TP
 \fB\-t\fR, \fB\-\-test\fR=\fIALUN\fR
 \fIALUN\fR is assumed to be a hexadecimal number in ASCII hex or the
