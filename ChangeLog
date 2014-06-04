@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140527] [svn: r584]
+Changelog for sg3_utils-1.39 [20140603] [svn: r585]
   - sg_rep_zones: new utility for ZBC REPORT ZONES
   - sg_reset_wp: new utility, ZBC RESET WRITE POINTER
   - sg_ses: add --eiioe=auto|force option
@@ -40,6 +40,7 @@ Changelog for sg3_utils-1.39 [20140527] [svn: r584]
     - add sg_get_category_sense_str() to API
     - add initial zbc service actions
     - dStrHex(Err): fix output truncation error
+    - linux, sg: support SCSI_PT_FLAGS_QUEUE_AT_TAIL
   - sg_lib_data: sync asc/ascq codes with T10 20140516
     - sync operation code with T10 20140515
     - add id string for SPC-5
