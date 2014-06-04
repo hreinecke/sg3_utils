@@ -33,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.86 20140527";  /* spc4r37 + sbc4r01 */
+static const char * version_str = "0.87 20140529";  /* spc4r37 + sbc4r01 */
         /* And with sbc3r35, vale Mark Evans */
 
 void svpd_enumerate_vendor(int vp_num);
@@ -2095,11 +2095,11 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
                         (ucp[8 + j + 2] << 8) | ucp[8 + j + 3];
                     printf("  ROD Type %u:\n", u);
                     printf("    Internal: %s\n",
-                           ucp[8 + j + 4] & 0x80 ? "yes" : "no");
+                           (ucp[8 + j + 4] & 0x80) ? "yes" : "no");
                     printf("    Token In: %s\n",
-                           ucp[8 + j + 4] & 0x02 ? "yes" : "no");
+                           (ucp[8 + j + 4] & 0x02) ? "yes" : "no");
                     printf("    Token Out: %s\n",
-                           ucp[8 + j + 4] & 0x01 ? "yes" : "no");
+                           (ucp[8 + j + 4] & 0x01) ? "yes" : "no");
                     printf("    Preference: %d\n",
                            (ucp[8 + j + 6] << 8) + ucp[8 + j + 7]);
                 }

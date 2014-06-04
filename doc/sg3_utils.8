@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG3_UTILS "8" "June 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -16,7 +16,9 @@ The names of all utilities start with "sg" and most start with "sg_" often
 followed by the name, or a shortening of the name, of the SCSI command that
 they send. For example the "sg_verify" utility sends the SCSI VERIFY
 command. A mapping between SCSI commands and the sg3_utils utilities that
-issue them is shown in the COVERAGE file.
+issue them is shown in the COVERAGE file. The sg_raw utility can be used to
+send an arbitrary SCSI command (supplied on the command line) to the
+given \fIDEVICE\fR.
 .PP
 SCSI draft standards can be found at http://www.t10.org . The standards
 themselves can be purchased from ANSI and other standards organizations.
