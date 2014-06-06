@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.21 20140603 */
+/* sg_pt_linux version 1.22 20140606 */
 
 
 #include <stdio.h>
@@ -278,6 +278,9 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
 #ifndef SG_FLAG_Q_AT_TAIL
 #define SG_FLAG_Q_AT_TAIL 0x10
 #endif
+#ifndef SG_FLAG_Q_AT_HEAD
+#define SG_FLAG_Q_AT_HEAD 0x20
+#endif
 
 void
 set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
@@ -286,10 +289,13 @@ set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
 
     /* default action of sg driver [sg v3 interface] is QUEUE_AT_HEAD */
     /* default action of block layer SG_IO ioctl is QUEUE_AT_TAIL */
-    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags)
-        ptp->io_hdr.flags |= SG_FLAG_Q_AT_TAIL;
-    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags) {  /* favour AT_HEAD */
+        ptp->io_hdr.flags |= SG_FLAG_Q_AT_HEAD;
         ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_TAIL;
+    } else if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) {
+        ptp->io_hdr.flags |= SG_FLAG_Q_AT_TAIL;
+        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_HEAD;
+    }
 }
 
 /* Executes SCSI command (or at least forwards it to lower layers).
@@ -747,10 +753,16 @@ set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
 #ifndef BSG_FLAG_Q_AT_TAIL
 #define BSG_FLAG_Q_AT_TAIL 0x10
 #endif
+#ifndef BSG_FLAG_Q_AT_HEAD
+#define BSG_FLAG_Q_AT_HEAD 0x20
+#endif
 
 /* Need this later if translated to v3 interface */
 #ifndef SG_FLAG_Q_AT_TAIL
 #define SG_FLAG_Q_AT_TAIL 0x10
+#endif
+#ifndef SG_FLAG_Q_AT_HEAD
+#define SG_FLAG_Q_AT_HEAD 0x20
 #endif
 
 void
@@ -760,10 +772,13 @@ set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
 
     /* default action of bsg driver (sg v4) is QUEUE_AT_HEAD */
     /* default action of block layer SG_IO ioctl is QUEUE_AT_TAIL */
-    if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags)
-        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_TAIL;
-    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags)
+    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags) {  /* favour AT_HEAD */
+        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_HEAD;
         ptp->io_hdr.flags &= ~BSG_FLAG_Q_AT_TAIL;
+    } else if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) {
+        ptp->io_hdr.flags |= BSG_FLAG_Q_AT_TAIL;
+        ptp->io_hdr.flags &= ~BSG_FLAG_Q_AT_HEAD;
+    }
 }
 
 /* N.B. Returns din_resid and ignores dout_resid */
@@ -930,7 +945,9 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
         v3_hdr.mx_sb_len = (unsigned char)ptp->io_hdr.max_response_len;
     }
     v3_hdr.pack_id = (int)ptp->io_hdr.spare_in;
-    if (BSG_FLAG_Q_AT_TAIL & ptp->io_hdr.flags)
+    if (BSG_FLAG_Q_AT_HEAD & ptp->io_hdr.flags)
+        v3_hdr.flags |= SG_FLAG_Q_AT_HEAD;      /* favour AT_HEAD */
+    else if (BSG_FLAG_Q_AT_TAIL & ptp->io_hdr.flags)
         v3_hdr.flags |= SG_FLAG_Q_AT_TAIL;
 
     if (NULL == v3_hdr.cmdp) {

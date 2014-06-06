@@ -30,7 +30,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.01 20140527";
+static const char * version_str = "1.02 20140604";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -116,11 +116,8 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int report_opts, void * resp,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if ((zs_lba >> 56) & 0xff) {
-        pr2serr("%s: zone start LBA too large\n", __func__);
-        return SG_LIB_CAT_MALFORMED;
-    }
-    /* a 7 byte field as zbc-r01a claims ?? */
+    /* assume zbc-r01a is wrong and that ZS LBA is an 8 byte field */
+    rzCmdBlk[2] = (zs_lba >> 56) & 0xff;
     rzCmdBlk[3] = (zs_lba >> 48) & 0xff;
     rzCmdBlk[4] = (zs_lba >> 40) & 0xff;
     rzCmdBlk[5] = (zs_lba >> 32) & 0xff;

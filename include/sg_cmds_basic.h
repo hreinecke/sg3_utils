@@ -168,7 +168,7 @@ int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
 struct sg_simple_inquiry_resp {
     unsigned char peripheral_qualifier;
     unsigned char peripheral_type;
-    unsigned char rmb;
+    unsigned char byte_1;       /* was rmb only prior to version 1.39 */
     unsigned char version;      /* as per recent drafts: whole of byte 2 */
     unsigned char byte_3;
     unsigned char byte_5;

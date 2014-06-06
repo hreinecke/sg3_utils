@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.00 20140527";
+static const char * version_str = "1.01 20140604";
 
 #define SERVICE_ACTION_OUT_16_CMD 0x9f
 #define SERVICE_ACTION_OUT_16_CMDLEN 16
@@ -103,11 +103,8 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int reset_all, int noisy,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if ((zid >> 56) & 0xff) {
-        pr2serr("%s: zone id (LBA) too large\n", __func__);
-        return SG_LIB_CAT_MALFORMED;
-    }
-    /* a 7 byte field as zbc-r01a claims ?? */
+    /* assume zbc-r01a is wrong and that ZS LBA is an 8 byte field */
+    rwpCmdBlk[2] = (zid >> 56) & 0xff;
     rwpCmdBlk[3] = (zid >> 48) & 0xff;
     rwpCmdBlk[4] = (zid >> 40) & 0xff;
     rwpCmdBlk[5] = (zid >> 32) & 0xff;

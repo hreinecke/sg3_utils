@@ -14,7 +14,7 @@
 #endif
 
 
-static const char * scsi_pt_version_str = "2.11 20140603";
+static const char * scsi_pt_version_str = "2.12 20140606";
 
 const char *
 scsi_pt_version()
