@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140603] [svn: r585]
+Changelog for sg3_utils-1.39 [20140606] [svn: r586]
   - sg_rep_zones: new utility for ZBC REPORT ZONES
   - sg_reset_wp: new utility, ZBC RESET WRITE POINTER
   - sg_ses: add --eiioe=auto|force option
@@ -22,6 +22,8 @@ Changelog for sg3_utils-1.39 [20140603] [svn: r585]
     - suppress dev-id VPD messages so they only appear
       when --verbose is given
     - add new SCSI_IDENT_*_ATA pair to --export output
+  - sg_luns: add decoding for conglomerate LUNS
+    - add --lu_cong option for test mode
   - sg_vpd: add --vendor=VP option, re-order vendor
     specific pages, split lto into lto5 and lto6
     - add Supported block lengths and protection types
@@ -38,9 +40,11 @@ Changelog for sg3_utils-1.39 [20140603] [svn: r585]
     - add 'sense' categories for reservation conflict,
       data protect and protection information violations
     - add sg_get_category_sense_str() to API
+    - change struct sg_simple_inquiry_resp::rmb to byte_1
     - add initial zbc service actions
     - dStrHex(Err): fix output truncation error
-    - linux, sg: support SCSI_PT_FLAGS_QUEUE_AT_TAIL
+    - linux, sg: support SCSI_PT_FLAGS_QUEUE_AT_TAIL and
+      SCSI_PT_FLAGS_QUEUE_AT_HEAD (block layer queueing)
   - sg_lib_data: sync asc/ascq codes with T10 20140516
     - sync operation code with T10 20140515
     - add id string for SPC-5

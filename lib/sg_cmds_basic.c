@@ -27,7 +27,7 @@
 #endif
 
 
-static const char * version_str = "1.67 20140514";
+static const char * version_str = "1.68 20140604";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -361,7 +361,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     if (0 == ret) {
         inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
         inq_data->peripheral_type = inq_resp[0] & 0x1f;
-        inq_data->rmb = (inq_resp[1] & 0x80) ? 1 : 0;
+        inq_data->byte_1 = inq_resp[1];
         inq_data->version = inq_resp[2];
         inq_data->byte_3 = inq_resp[3];
         inq_data->byte_5 = inq_resp[5];

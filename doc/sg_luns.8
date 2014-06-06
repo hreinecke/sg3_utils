@@ -1,11 +1,12 @@
-.TH SG_LUNS "8" "May" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_LUNS "8" "June" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
 .B sg_luns
 [\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-linux\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
-[\fI\-\-select=SR\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-lu_cong\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-select=SR\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_luns
 \fI\-\-test=ALUN\fR [\fI\-\-hex\fR] [\fI\-\-verbose\fR]
@@ -51,6 +52,11 @@ each 64 bit LUN (in 16 hexadecimal digits), if this option is given then
 to the right, in square brackets, is the Linux LUN integer in decimal.
 If the \fI\-\-hex\fR option is given twice (e.g. \-HH) as well then the
 Linux LUN integer is output in hexadecimal.
+.TP
+\fB\-L\fR, \fB\-\-lu_cong\fR
+[test mode] decode \fIALUN\fR as if the LU_CONG bit is set in its
+corresponding standard INQUIRY response. In other words treat \fIALUN\fR
+as if it is a conglomerate LUN.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
