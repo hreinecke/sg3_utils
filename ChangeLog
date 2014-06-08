@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140606] [svn: r586]
+Changelog for sg3_utils-1.39 [20140608] [svn: r587]
   - sg_rep_zones: new utility for ZBC REPORT ZONES
   - sg_reset_wp: new utility, ZBC RESET WRITE POINTER
   - sg_ses: add --eiioe=auto|force option
@@ -23,7 +23,7 @@ Changelog for sg3_utils-1.39 [20140606] [svn: r586]
       when --verbose is given
     - add new SCSI_IDENT_*_ATA pair to --export output
   - sg_luns: add decoding for conglomerate LUNS
-    - add --lu_cong option for test mode
+    - add --lu_cong option to simulate the LU_CONG bit
   - sg_vpd: add --vendor=VP option, re-order vendor
     specific pages, split lto into lto5 and lto6
     - add Supported block lengths and protection types

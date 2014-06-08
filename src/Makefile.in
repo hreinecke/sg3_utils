@@ -322,7 +322,23 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_prevent$(EXEEXT) sg_raw$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_rdac$(EXEEXT) sg_readcap$(EXEEXT)
+@OS_FREEBSD_TRUE@	sg_rdac$(EXEEXT) sg_readcap$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_read_block_limits$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_read_buffer$(EXEEXT) sg_read_long$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_reassign$(EXEEXT) sg_referrals$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_rep_zones$(EXEEXT) sg_requests$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_sanitize$(EXEEXT) sg_sat_identify$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_sat_phy_event$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_sync$(EXEEXT) sg_turs$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_vpd$(EXEEXT) sg_write_buffer$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_wr_mode$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
@@ -1497,12 +1513,6 @@ uninstall-am: uninstall-binPROGRAMS
 
 @OS_WIN32_CYGWIN_TRUE@sg_scan.c : sg_scan.c.win32
 @OS_WIN32_CYGWIN_TRUE@	cp sg_scan.c.win32 sg_scan.c
-@OS_FREEBSD_TRUE@	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
-@OS_FREEBSD_TRUE@	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
-@OS_FREEBSD_TRUE@	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-@OS_FREEBSD_TRUE@	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg sg_sync \
-@OS_FREEBSD_TRUE@	sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
-@OS_FREEBSD_TRUE@	sg_write_same sg_wr_mode
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

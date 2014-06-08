@@ -78,7 +78,7 @@ if OS_FREEBSD
 bin_PROGRAMS = \
 	sg_compare_and_write sg_decode_sense sg_format sg_get_config \
 	sg_get_lba_status sg_ident sg_inq sg_logs sg_luns sg_modes \
-	sg_opcodes sg_persist sg_prevent sg_raw sg_rdac sg_readcap 
+	sg_opcodes sg_persist sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
 	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \

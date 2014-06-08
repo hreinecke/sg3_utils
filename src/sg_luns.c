@@ -29,7 +29,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.26 20140606";
+static const char * version_str = "1.27 20140607";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -80,17 +80,18 @@ usage()
 #ifdef SG_LIB_LINUX
     pr2serr("Usage: "
             "sg_luns    [--decode] [--help] [--hex] [--linux] "
+            "[--lu_cong]\n"
+            "                  [--maxlen=LEN] [--quiet] [--raw] "
+            "[--readonly]\n"
+            "                  [--select=SR] [--verbose] [--version] "
+            "DEVICE\n");
+#else
+    pr2serr("Usage: "
+            "sg_luns    [--decode] [--help] [--hex] [--lu_cong] "
             "[--maxlen=LEN]\n"
             "                  [--quiet] [--raw] [--readonly] "
             "[--select=SR]\n"
             "                  [--verbose] [--version] DEVICE\n");
-#else
-    pr2serr("Usage: "
-            "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] "
-            "[--quiet]\n"
-            "                  [--raw] [--readonly] [--select=SR] "
-            "[--verbose]\n"
-            "                  [--version] DEVICE\n");
 #endif
     pr2serr("     or\n"
             "       sg_luns    --test=ALUN [--hex] [--lu_cong] [--verbose]\n"
@@ -104,7 +105,9 @@ usage()
     pr2serr("    --linux|-l         show Linux integer lun after T10 "
             "representation\n");
 #endif
-    pr2serr("    --lu_cong          decode ALUN as if LU_CONG is set\n"
+    pr2serr("    --lu_cong          decode as if LU_CONG is set; used "
+            "twice:\n"
+            "                       decode as if LU_CONG is clear\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n"
@@ -117,15 +120,22 @@ usage()
             "                          1 -> only 'well known' "
             "logical unit numbers\n"
             "                          2 -> all luns\n"
-            "                          spc4r36 added 0x10, 0x11 and 0x12\n"
+            "                          0x10 -> administrative luns\n"
+            "                          0x11 -> admin luns + "
+            "non-conglomerate luns\n"
+            "                          0x12 -> admin lun + its "
+            "subsidiary luns\n"
             "    --test=ALUN|-t ALUN    decode ALUN and ignore most other "
             "options\n"
             "                           and DEVICE (apart from '-H')\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
-            "Performs a SCSI REPORT LUNS command. When the --test=ALUN "
-            "option is\ngiven, decodes ALUN rather than sending a "
-            "REPORT LUNS command.\n", DEF_RLUNS_BUFF_LEN );
+            "Performs a SCSI REPORT LUNS command or decodes the given ALUN. "
+            "When SR is\n0x10 or 0x11 DEVICE must be LUN 0 or REPORT LUNS "
+            "well known logical unit;\nwhen SR is 0x12 DEVICE must be an "
+            "administrative logical unit. When the\n--test=ALUN option is "
+            "given, decodes ALUN rather than sending a REPORT\nLUNS "
+            "command.\n", DEF_RLUNS_BUFF_LEN );
 }
 
 /* Decoded according to SAM-5 rev 10. Note that one draft: BCC rev 0,
@@ -398,8 +408,8 @@ main(int argc, char * argv[])
 #ifdef SG_LIB_LINUX
     int do_linux = 0;
 #endif
-    int asif_lu_cong = 0;
-    int ir_lu_cong = 0;
+    int lu_cong = 0;
+    int lu_cong_given = 0;
     int maxlen = 0;
     int do_quiet = 0;
     int do_raw = 0;
@@ -450,7 +460,8 @@ main(int argc, char * argv[])
             break;
 #endif
         case 'L':
-            ++asif_lu_cong;
+            ++lu_cong;
+            ++lu_cong_given;
             break;
         case 'm':
             maxlen = sg_get_num(optarg);
@@ -586,7 +597,7 @@ main(int argc, char * argv[])
         }
 #endif
         printf("Decoded LUN:\n");
-        decode_lun("  ", lun_arr, asif_lu_cong, do_hex, verbose);
+        decode_lun("  ", lun_arr, (lu_cong % 2), do_hex, verbose);
         return 0;
     }
     if (NULL == device_name) {
@@ -607,7 +618,7 @@ main(int argc, char * argv[])
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (decode) {
+    if (decode && (! lu_cong_given)) {
         /* check if LU_CONG set in standard INQUIRY response */
         res = sg_simple_inquiry(sg_fd, &sir, 0, verbose);
         ret = res;
@@ -615,8 +626,8 @@ main(int argc, char * argv[])
             pr2serr("fetching standard INQUIRY response failed\n");
             goto the_end;
         }
-        ir_lu_cong = !!(0x40 & sir.byte_1);
-        if (verbose && ir_lu_cong)
+        lu_cong = !!(0x40 & sir.byte_1);
+        if (verbose && lu_cong)
             pr2serr("LU_CONG bit set in standard INQUIRY response\n");
     }
 
@@ -682,8 +693,8 @@ main(int argc, char * argv[])
 #endif
             printf("\n");
             if (decode)
-                decode_lun("      ", reportLunsBuff + off, ir_lu_cong, do_hex,
-                           verbose);
+                decode_lun("      ", reportLunsBuff + off, (lu_cong % 2),
+                           do_hex, verbose);
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         pr2serr("Report Luns command not supported (support mandatory in "
