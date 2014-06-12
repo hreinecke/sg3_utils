@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140608] [svn: r587]
+Changelog for sg3_utils-1.39 [20140612] [svn: r588]
   - sg_rep_zones: new utility for ZBC REPORT ZONES
   - sg_reset_wp: new utility, ZBC RESET WRITE POINTER
   - sg_ses: add --eiioe=auto|force option
@@ -28,7 +28,7 @@ Changelog for sg3_utils-1.39 [20140608] [svn: r587]
     specific pages, split lto into lto5 and lto6
     - add Supported block lengths and protection types
       page (sbc4r01)
-    - add Block device characterics extension
+    - add Block device characteristics extension
       page (sbc4r02)
   - sg_copy_results, sg_get_lba_status, sg_luns,
     sg_read_buffer, sg_readcap, sg_referrals, sg_rtpg,
@@ -51,6 +51,7 @@ Changelog for sg3_utils-1.39 [20140608] [svn: r587]
   - scripts/59-scsi-sg3_utils.rules: removed
     - functionality split into two scripts:
       55-scsi-sg3_id.rules + 58-scsi-sg3_symlink.rules
+  - examples/sg_persist_tst.sh: add --exclusive option
   - win32: sg_scan, sg_ses and sg_log fixes
   - examples/sgq_dd: re-add old utility as example
 

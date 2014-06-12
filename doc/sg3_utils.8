@@ -230,7 +230,7 @@ requested command.
 .TP
 .B 10
 the \fIDEVICE\fR reports a "copy aborted". This implies another command or
-device problem has stopped and copy operation. The EXTENDED COPY family of
+device problem has stopped a copy operation. The EXTENDED COPY family of
 commands (including WRITE USING TOKEN) may return this sense key.
 .TP
 .B 11
@@ -415,11 +415,11 @@ given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
 .SH SCRIPTS, EXAMPLES and UTILS
 There are several bash shell scripts in the 'scripts' subdirectory that
-invoke compiled utilities (e.g. sg_readcap). The scripts start with 'scsi_'
-rather than 'sg_'. One purpose of these scripts is to call the same
-utility (e.g. sg_readcap) on multiple disks. Most of the basic compiled
-utilities only allow one device as an argument. Some distributions
-install these scripts in a visible directory (e.g. /usr/src/bin). Some of
+invoke compiled utilities (e.g. sg_readcap). Several of the scripts start
+with 'scsi_' rather than 'sg_'. One purpose of these scripts is to call the
+same utility (e.g. sg_readcap) on multiple devices. Most of the basic
+compiled utilities only allow one device as an argument. Some distributions
+install these scripts in a more visible directory (e.g. /usr/bin). Some of
 these scripts have man page entries. See the README file in the 'scripts'
 subdirectory.
 .PP

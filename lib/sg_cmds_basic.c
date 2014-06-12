@@ -358,7 +358,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     } else
         ret = 0;
 
-    if (0 == ret) {
+    if (inq_data && (0 == ret)) {
         inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
         inq_data->peripheral_type = inq_resp[0] & 0x1f;
         inq_data->byte_1 = inq_resp[1];
