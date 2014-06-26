@@ -1,6 +1,6 @@
 Summary: Utilities for devices that use SCSI command sets
 Name: sg3_utils
-Version: 1.39
+Version: 1.40
 # Release: 1%{?dist}
 Release: 1
 License: GPL
@@ -20,7 +20,7 @@ mode and log pages (sginfo, sg_modes and sg_logs); spin up and down
 disks (sg_start); do self tests (sg_senddiag); and various other functions.
 See the README, ChangeLog and COVERAGE files. Requires the linux kernel 2.4
 series or later. In the 2.4 series SCSI generic device names (e.g. /dev/sg0)
-must be used. In the 2.6 series other device names may be used as
+must be used. In the 2.6 series and later other device names may be used as
 well (e.g. /dev/sda).
 
 Warning: Some of these tools access the internals of your system
@@ -79,6 +79,10 @@ fi
 %{_libdir}/*.la
 
 %changelog
+* Fri Jun 13 2014 - dgilbert at interlog dot com
+- track t10 changes
+  * sg3_utils-1.40
+
 * Thu Jun 12 2014 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.39

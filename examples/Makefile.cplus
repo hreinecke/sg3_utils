@@ -9,7 +9,7 @@ LD = g++
 ## CC = clang++
 ## LD = clang++
 
-EXECS = sg_tst_excl sg_tst_excl2 sg_tst_excl3 sg_tst_context
+EXECS = sg_tst_excl sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async
 
 EXTRAS =
 
@@ -53,6 +53,9 @@ sg_tst_excl3: sg_tst_excl3.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_context: sg_tst_context.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_tst_async: sg_tst_async.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
