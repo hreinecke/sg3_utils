@@ -9,11 +9,11 @@
 #include <errno.h>
 #include <limits.h>
 #include <signal.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#include <sys/poll.h>
 #include <linux/major.h>
 #include <sys/time.h>
 typedef unsigned char u_char;   /* horrible, for scsi.h */

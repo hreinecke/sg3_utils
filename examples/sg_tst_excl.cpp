@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.07 20131110";
+static const char * version_str = "1.08 20140710";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -72,6 +72,8 @@ static const char * util_name = "sg_tst_excl";
  *   g++ -Wall -std=c++11 -pthread -I ../include ../lib/sg_lib.o
  *     ../lib/sg_lib_data.o ../lib/sg_io_linux.o -o sg_tst_excl
  *     sg_tst_excl.cpp
+ * or use the C++ Makefile in that directory:
+ *   make -f Makefile.cplus sg_tst_excl
  *
  * Currently this utility is Linux only and assumes the SG_IO v3 interface
  * which is supported by sg and block devices (but not bsg devices which
