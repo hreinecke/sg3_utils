@@ -1,13 +1,13 @@
-.TH SG_FORMAT "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_FORMAT "8" "July 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_format \- format, resize or modify protection information of a SCSI disk
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
 [\fI\-\-early\fR] [\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR]
-[\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR] [\fI\-\-pfu=PFU\fR]
-[\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR] [\fI\-\-resize\fR]
-[\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
+[\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR]
+[\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR]
+[\fI\-\-resize\fR] [\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
 [\fI\-\-size=SIZE\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fI\-\-wait\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -134,8 +134,15 @@ issue a SCSI FORMAT UNIT command.
 This option is required to change the block size of a disk. The user is given
 a 15 second count down to ponder the wisdom of doing this, during which time
 control\-C (amongst other Unix commands) can be used to kill this process
-before it does any damage. See NOTES section for implementation details and
-EXAMPLES section for typical use.
+before it does any damage.
+.br
+When used three times (or more) the preliminary MODE SENSE and SELECT
+commands are bypassed, leaving only the initial INQUIRY and FORMAT UNIT
+commands. This is for emergency use (e.g. when the MODE SENSE/SELECT
+commands are not working) and cannot change the logical block size.
+.br
+See NOTES section for implementation details and EXAMPLES section for typical
+use.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage information then exit.
@@ -159,6 +166,11 @@ the needs more than 32 bits to represent its logical blocks then it is
 set internally. This option does not set the LONGLIST bit in the FORMAT UNIT
 command. The LONGLIST bit is set as required depending other
 parameters (e.g. when '\-\-pie=PIE' is greater than zero).
+.TP
+\fB\-M\fR, \fB\-\-mode\fR=\fIMP\fR
+\fIMP\fR is a mode page number (0 to 62 inclusive) that will be used for
+reading and perhaps changing the device logical block size. The default
+is 1 which is the Read\-Write Error Recovery mode page.
 .TP
 \fB\-P\fR, \fB\-\-pfu\fR=\fIPFU\fR
 sets the "Protection Field Usage" field in the parameter block associated
@@ -251,7 +263,7 @@ contains those detected during the format operation, the DLIST is a list of
 defects that can be given to the format operation. The GLIST is the grown
 list which starts in the format process as CLIST+DLIST and can "grow" later
 due to automatic reallocation (see the ARRE and AWRE bits in the
-read\-write error recovery mode page (see sdparm(8))) and use of the
+Read\-Write Error Recovery mode page (see sdparm(8))) and use of the
 SCSI REASSIGN BLOCKS command (see sg_reassign(8)).
 .PP
 The CMPLST bit (controlled by the \fI\-\-cmplst=\fR0|1 option) determines

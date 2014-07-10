@@ -264,7 +264,7 @@ subdirectory:
     sg_sat_chk_power, sg__sat_identify, sg__sat_phy_event,
     sg__sat_set_features, sg_sat_smart_rd_data, sg_simple1, sg_simple2,
     sg_simple3, sg_simple4, sg_simple5, sg_simple16, sg_tst_excl,
-    sg_tst_excl2 and sg_tst_excl3
+    sg_tst_excl2, sg_tst_excl3, sg_tst_context and sg_tst_async
 
 Also in that subdirectory is a script to test sg_persist, an example data
 file for sg_persist (called "transport_ids.txt") and an example data file for
@@ -403,4 +403,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-12th June 2014
+10th July 2014

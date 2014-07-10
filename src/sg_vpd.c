@@ -33,8 +33,7 @@
 
 */
 
-static const char * version_str = "0.87 20140529";  /* spc4r37 + sbc4r01 */
-        /* And with sbc3r35, vale Mark Evans */
+static const char * version_str = "0.88 20140704";  /* spc4r37 + sbc4r02 */
 
 void svpd_enumerate_vendor(int vp_num);
 int svpd_count_vendor_vpds(int num_vpd, int vp_num);

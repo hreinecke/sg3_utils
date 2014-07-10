@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.39 20140527";    /* SPC-4 rev 37 */
+static const char * version_str = "1.40 20140704";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2274,11 +2274,15 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
             (buff[16] << 8) + buff[17]);
 }
 
+/* VPD_BLOCK_LIMITS sbc */
+/* Sequential access device characteristics,  ssc+smc */
+/* OSD information, osd */
 static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex)
 {
-    int pdt;
+    int pdt, m;
     unsigned int u;
+    uint64_t mwsl;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
@@ -2324,6 +2328,27 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
                 u = ((unsigned int)(buff[32] & 0x7f) << 24) |
                     (buff[33] << 16) | (buff[34] << 8) | buff[35];
                 printf("  Unmap granularity alignment: %u\n", u);
+            }
+            if (len > 43) {     /* added in sbc3r26 */
+                mwsl = 0;
+                for (m = 0; m < 8; ++m) {
+                    if (m > 0)
+                        mwsl <<= 8;
+                    mwsl |= buff[36 + m];
+                }
+                printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
+                       mwsl);
+            }
+            if (len > 44) {     /* added in sbc4r02 */
+                u = ((unsigned int)buff[44] << 24) | (buff[45] << 16) |
+                    (buff[46] << 8) | buff[47];
+                printf("  Maximum atomic transfer length: %u\n", u);
+                u = ((unsigned int)buff[48] << 24) | (buff[49] << 16) |
+                    (buff[50] << 8) | buff[51];
+                printf("  Atomic alignment: %u\n", u);
+                u = ((unsigned int)buff[52] << 24) | (buff[53] << 16) |
+                    (buff[54] << 8) | buff[55];
+                printf("  Atomic transfer length granularity: %u\n", u);
             }
             break;
         case PDT_TAPE: case PDT_MCHANGER:

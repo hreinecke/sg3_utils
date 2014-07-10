@@ -13,23 +13,8 @@
  *   the Free Software Foundation; either version 2, or (at your option)
  *   any later version.
  *
- * http://www.t10.org/scsi-3.htm
- * http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO
- *
- *
- *  List of some (older) disk manufacturers' block counts.
- *  These are not needed in newer disks which will automatically use
- *  the manufacturers' recommended block count if a count of -1 is given.
- *      Inquiry         Block Count (@512 byte blocks)
- *      ST150150N       8388315
- *      IBM_DCHS04F     8888543
- *      IBM_DGHS09Y     17916240
- *      ST336704FC      71132960
- *      ST318304FC      35145034  (Factory spec is 35885167 sectors)
- *      ST336605FC      ???
- *      ST336753FC      71132960  (Factory spec is 71687372 sectors)
- *  and a newer one:
- *      ST33000650SS    5860533168 (3 TB SAS disk)
+ * See http://www.t10.org for relevant standards and drafts. The most recent
+ * draft is SBC-4 revision 2.
  */
 
 #include <stdio.h>
@@ -47,13 +32,10 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.26 20140516";
+static const char * version_str = "1.28 20140704";
 
-#define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
-#define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
-#define CONTROL_MODE_PAGE 0xa     /* alternative page all devices have?? */
 
-#define THIS_MPAGE_EXISTS RW_ERROR_RECOVERY_PAGE
+#define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
 
 #define SHORT_TIMEOUT           20   /* 20 seconds unless --wait given */
 #define FORMAT_TIMEOUT          (20 * 3600)       /* 20 hours ! */
@@ -88,6 +70,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"ip_def", no_argument, 0, 'I'},
         {"long", no_argument, 0, 'l'},
+        {"mode", required_argument, 0, 'M'},
         {"pinfo", no_argument, 0, 'p'},
         {"pfu", required_argument, 0, 'P'},
         {"pie", required_argument, 0, 'q'},
@@ -111,19 +94,19 @@ usage()
                "[--early]\n"
                "                 [--fmtpinfo=FPI] [--format] [--help] "
                "[--ip_def] [--long]\n"
-               "                 [--pfu=PFU] [--pie=PIE] [--pinfo] "
-               "[--poll=PT] [--resize]\n"
-               "                 [--rto_req] [--security] [--six] "
-               "[--size=SIZE] [--verbose]\n"
-               "                 [--version] [--wait] DEVICE\n"
+               "                 [--mode=MP] [--pfu=PFU] [--pie=PIE] "
+               "[--pinfo] [--poll=PT]\n"
+               "                 [--resize] [--rto_req] [--security] "
+               "[--six] [--size=SIZE]\n"
+               "                 [--verbose] [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
                "(default: 1)\n"
-               "    --count=COUNT|-c COUNT    number of blocks to "
-               "report after format or\n"
-               "                              resize. With format "
-               "defaults to same as current\n"
+               "    --count=COUNT|-c COUNT    number of blocks to report "
+               "after format or\n"
+               "                              resize. Format default is "
+               "same as current\n"
                "    --dcrt|-D       disable certification (doesn't "
                "verify media)\n"
                "    --early|-e      exit once format started (user can "
@@ -132,12 +115,14 @@ usage()
                "(default: 0)\n"
                "    --format|-F     format unit (default: report current "
                "count and size)\n"
+               "                    use thrice for FORMAT UNIT command "
+               "only\n"
                "    --help|-h       prints out this usage message\n"
                "    --ip_def|-I     initialization pattern: default\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
                "32 bit lbas)\n"
-               "    --pfu=PFU|-P PFU    Protection Field Usage value "
-               "(default: 0)\n"
+               "    --mode=MP|-M MP     mode page (def: 1 -> RW error "
+               "recovery mpage)\n"
                "    --pie=PIE|-q PIE    Protection Information Exponent "
                "(default: 0)\n"
                "    --pinfo|-p      set upper bit of FMTPINFO field\n"
@@ -397,7 +382,7 @@ print_read_cap(int fd, int do_16, int verbose)
 int
 main(int argc, char **argv)
 {
-        const int mode_page = THIS_MPAGE_EXISTS;        /* hopefully */
+        int mode_page = RW_ERROR_RECOVERY_PAGE;
         int fd, res, calc_len, bd_len, dev_specific_param;
         int offset, j, bd_blk_len, prob, len;
         uint64_t ull;
@@ -431,7 +416,7 @@ main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhIlpP:q:rRs:SvVwx:6",
+                c = getopt_long(argc, argv, "c:C:Def:FhIlM:pP:q:rRs:SvVwx:6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -473,7 +458,7 @@ main(int argc, char **argv)
                         }
                         break;
                 case 'F':
-                        format = 1;
+                        ++format;
                         break;
                 case 'h':
                         usage();
@@ -484,6 +469,14 @@ main(int argc, char **argv)
                 case 'l':
                         long_lba = 1;
                         do_rcap16 = 1;
+                        break;
+                case 'M':
+                        mode_page = sg_get_num(optarg);
+                        if ((mode_page < 0) || ( mode_page > 62)) {
+                                fprintf(stderr, "bad argument to '--mode', "
+                                        "accepts 0 to 62 inclusive\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
                         break;
                 case 'p':
                         pinfo = 1;
@@ -602,6 +595,9 @@ main(int argc, char **argv)
                         device_name, safe_strerror(-fd));
                 return SG_LIB_FILE_ERROR;
         }
+
+        if (format > 2)
+                goto format_only;
 
         if (sg_simple_inquiry(fd, &inq_out, 1, verbose)) {
                 fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
@@ -835,7 +831,8 @@ again_with_long_lba:
                 goto out;
         }
 
-        if (format)
+        if (format) {
+format_only:
 #if 1
                 printf("\nA FORMAT will commence in 15 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
@@ -861,6 +858,7 @@ again_with_long_lba:
 #else
                 fprintf(stderr, "FORMAT ignored, testing\n");
 #endif
+        }
 
 out:
         res = sg_cmds_close_device(fd);

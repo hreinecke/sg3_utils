@@ -2,8 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20140626] [svn: r590]
+Changelog for sg3_utils-1.40 [20140710] [svn: r591]
   - sg_copy_results: correct response length calculations
+  - sg_format: make '-FFF' bypass mode sense/select
+    - add --mode=MP to supply alternate mode page,
+      default remains read-write error recovery mpage
+  - sg_inq: expand Block limits VPD page output
+  - sg_lib: trim trailing spaces in dStrHex() and friends
+  - examples/sg_tst_async: new Linux sg test utility
 
 Changelog for sg3_utils-1.39 [20140612] [svn: r588]
   - sg_rep_zones: new utility for ZBC REPORT ZONES

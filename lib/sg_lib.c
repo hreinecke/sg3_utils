@@ -1555,6 +1555,18 @@ safe_strerror(int errnum)
     return errstr;
 }
 
+static void
+trimTrailingSpaces(char * b)
+{
+    int k;
+
+    for (k = ((int)strlen(b) - 1); k >= 0; --k) {
+        if (' ' != b[k])
+            break;
+    }
+    if ('\0' != b[k + 1])
+        b[k + 1] = '\0';
+}
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
  * in this file go to sg_warnings_strm (default stderr).]
@@ -1582,9 +1594,9 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     if (0 == no_ascii)  /* address at left and ASCII at right */
         formatstr = "%.76s\n";
     else if (no_ascii > 0)
-        formatstr = "%.58s\n";
+        formatstr = "%s\n";     /* was: "%.58s\n" */
     else /* negative: no address at left and no ASCII at right */
-        formatstr = "%.48s\n";
+        formatstr = "%s\n";     /* was: "%.48s\n"; */
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {
@@ -1598,6 +1610,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
                         (int)(unsigned char)c);
             buff[bpos + 2] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 16))) {
+                trimTrailingSpaces(buff);
                 fprintf(fp, formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
@@ -1606,6 +1619,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
         }
         if (bpos > bpstart) {
             buff[bpos + 2] = '\0';
+            trimTrailingSpaces(buff);
             fprintf(fp, "%s\n", buff);
         }
         return;
@@ -1629,6 +1643,8 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
             buff[cpos++] = c;
         }
         if (cpos > (cpstart + 15)) {
+            if (no_ascii)
+                trimTrailingSpaces(buff);
             fprintf(fp, formatstr, buff);
             bpos = bpstart;
             cpos = cpstart;
@@ -1640,6 +1656,8 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     }
     if (cpos > cpstart) {
         buff[cpos] = '\0';
+        if (no_ascii)
+            trimTrailingSpaces(buff);
         fprintf(fp, "%s\n", buff);
     }
 }
@@ -1671,8 +1689,11 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
     char buff[122];
     int bpstart, bpos, k, n;
 
-    if (len <= 0)
+    if (len <= 0) {
+	if (b_len > 0)
+	    b[0] = '\0';
         return;
+    }
     if (0 != format) {
         ;       /* do nothing different for now */
     }
@@ -1697,7 +1718,8 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
                     (int)(unsigned char)c);
         buff[bpos + 2] = ' ';
         if ((k > 0) && (0 == ((k + 1) % 16))) {
-            n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
+            trimTrailingSpaces(buff);
+            n += my_snprintf(b + n, b_len - n, "%s\n", buff);
             if (n >= (b_len - 1))
                 return;
             bpos = bpstart;
@@ -1707,8 +1729,10 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
         } else
             bpos += 3;
     }
-    if (bpos > bpstart)
-        n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
+    if (bpos > bpstart) {
+        trimTrailingSpaces(buff);
+        n += my_snprintf(b + n, b_len - n, "%s\n", buff);
+    }
     return;
 }
 
