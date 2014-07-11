@@ -35,6 +35,7 @@
 #include <mutex>
 #include <chrono>
 #include <atomic>
+#include <random>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -45,6 +46,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <time.h>
+#include <limits.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <sys/ioctl.h>
@@ -53,7 +55,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.00 20140710";
+static const char * version_str = "1.01 20140710";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -95,7 +97,7 @@ using namespace std::chrono;
 
 #define DEF_NUM_PER_THREAD 1000
 #define DEF_NUM_THREADS 4
-#define DEF_WAIT_MS 10          /* 0: yield; -1: don't wait; -2: sleep(0) */
+#define DEF_WAIT_MS 10          /* 0: yield or no wait */
 #define DEF_TIMEOUT_MS 20000    /* 20 seconds */
 #define DEF_LB_SZ 512
 #define DEF_BLOCKING 0
@@ -103,6 +105,7 @@ using namespace std::chrono;
 #define DEF_NO_XFER 0
 
 #define Q_PER_FD 16
+#define MAX_CONSEC_NOMEMS 16
 
 #ifndef SG_FLAG_Q_AT_TAIL
 #define SG_FLAG_Q_AT_TAIL 0x10
@@ -134,6 +137,7 @@ struct opts_t {
     int num_per_thread;
     bool block;
     uint64_t lba;
+    unsigned int hi_lba;        /* one after last */
     int lb_sz;
     bool no_xfer;
     int verbose;
@@ -142,11 +146,33 @@ struct opts_t {
     blkQDiscipline bqd;
 };
 
+#if 0
+class Rand_uint {
+public:
+    Rand_uint(unsigned int lo, unsigned int hi_p1) : p{lo, hi_p1} {}
+    unsigned int operator()() const { return r(); }
+private:
+    uniform_int_distribution<unsigned int>::param_type p;
+    auto r = bind(uniform_int_distribution<unsigned int>{p},
+                  default_random_engine());
+};
+#endif
+class Rand_uint {
+public:
+    Rand_uint(unsigned int lo, unsigned int hi_p1)
+        : r(bind(uniform_int_distribution<unsigned int>{lo, hi_p1},
+                 default_random_engine())) {}
+    unsigned int operator()() const { return r(); }
+private:
+    function<unsigned int()> r;
+};
+
+
 
 static void
 usage(void)
 {
-    printf("Usage: %s [-d] [-f] [-h] [-l <lba>] [-n <n_per_thr>] [-N]\n"
+    printf("Usage: %s [-d] [-f] [-h] [-l <lba+>] [-n <n_per_thr>] [-N]\n"
            "                    [-q 0|1] [-R] [-s <lb_sz>] [-t <num_thrs>] "
            "[-T]\n"
            "                    [-v] [-V] [-w <wait_ms>] [-W] "
@@ -160,6 +186,7 @@ usage(void)
     printf("    -h                print this usage message then exit\n");
     printf("    -l <lba>          logical block to access (def: %u)\n",
            DEF_LBA);
+    printf("    -l <lba,hi_lba>    logical block range (inclusive)\n");
     printf("    -n <n_per_thr>    number of commands per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
     printf("    -N                no data xfer (def: xfer on READ and "
@@ -178,7 +205,9 @@ usage(void)
     printf("Multiple threads do READ(16), WRITE(16) or TEST UNIT READY "
            "(TUR) SCSI\ncommands. Each thread has its own file descriptor "
            "and queues up to\n16 commands. One block is transferred by "
-           "each READ and WRITE; zeros\nare written.\n");
+           "each READ and WRITE; zeros\nare written. If a logical block "
+           "range is given, a uniform distribution\ngenerates a pseudo "
+           "random sequence of LBAs.\n");
 }
 
 
@@ -254,9 +283,14 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
     pt.pack_id = pack_id;
     pt.flags = flags;
 
-    if (write(sg_fd, &pt, sizeof(pt)) < 0) {
+    for (int k = 0; write(sg_fd, &pt, sizeof(pt)) < 0; ++k) {
+        if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
+            this_thread::yield();
+            continue;
+        }
         console_mutex.lock();
-        cerr << __func__ << ": " << np << " pack_id=" << pack_id;
+        cerr << __func__ << ": " << np << " pack_id=" << pack_id << " [k=" <<
+                k << "]" << endl;
         perror(" write(sg)");
         console_mutex.unlock();
         return -1;
@@ -372,11 +406,12 @@ work_thread(int id, struct opts_t * op)
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
     unsigned int thr_eagain_count = 0;
-    int k, res, sg_fd, num_outstanding, do_inc, num, pack_id, sg_flags;
+    int k, n, res, sg_fd, num_outstanding, do_inc, num, pack_id, sg_flags;
     int open_flags = O_RDWR;
     char ebuff[EBUFF_SZ];
     unsigned char * lbp;
     const char * err = NULL;
+    Rand_uint * ruip = NULL;
     struct pollfd  pfd;
     list<unsigned char *> free_lst;
     map<int, unsigned char *> pi_map;
@@ -400,6 +435,10 @@ work_thread(int id, struct opts_t * op)
     }
     pfd.fd = sg_fd;
     pfd.events = POLLIN;
+
+    if (op->hi_lba)
+        ruip = new Rand_uint((unsigned int)op->lba, op->hi_lba);
+
     sg_flags = 0;
     if (BQ_AT_TAIL == op->bqd)
         sg_flags |= SG_FLAG_Q_AT_TAIL;
@@ -436,9 +475,10 @@ work_thread(int id, struct opts_t * op)
                 }
             } else
                 lbp = NULL;
-            if (start_sg3_cmd(sg_fd, op->c2e, pack_id, op->lba, lbp,
+            if (start_sg3_cmd(sg_fd, op->c2e, pack_id,
+                              (ruip ? (uint64_t)(*ruip)() : op->lba), lbp,
                               op->lb_sz, sg_flags)) {
-                err = "start_sg3_cmd() failed";
+                err = "start_sg3_cmd()";
                 break;
             }
             ++thr_async_starts;
@@ -463,7 +503,7 @@ work_thread(int id, struct opts_t * op)
         while (res-- > 0) {
             if (finish_sg3_cmd(sg_fd, op->c2e, pack_id, op->wait_ms,
                                thr_eagain_count)) {
-                err = "finish_sg3_cmd() failed";
+                err = "finish_sg3_cmd()";
                 break;
             }
             ++thr_async_finishes;
@@ -483,13 +523,16 @@ work_thread(int id, struct opts_t * op)
             }
         }
     }
-    close(sg_fd);
+    if (ruip)
+        delete ruip;
+    close(sg_fd);       // sg driver will handle any commands "in flight"
+
     if (err || (k < num) || (op->verbose > 0)) {
         console_mutex.lock();
         if (k < num) {
             cerr << "thread id=" << id << " FAILed at iteration: " << k;
             if (err)
-                cerr << " Reason: " << err << endl;
+                cerr << ", Reason: " << err << endl;
             else
                 cerr << endl;
         } else {
@@ -501,18 +544,24 @@ work_thread(int id, struct opts_t * op)
         }
         console_mutex.unlock();
     }
-    k = pi_map.size();
-    if (k > 0) {
+    n = pi_map.size();
+    if (n > 0) {
         console_mutex.lock();
-            cerr << "thread id=" << id << " Still " << k << " elements " <<
+            cerr << "thread id=" << id << " Still " << n << " elements " <<
                     "in pack_id map on exit" << endl;
         console_mutex.unlock();
     }
-    while (! free_lst.empty()) {
+    for (k = 0; ! free_lst.empty(); ++k) {
         lbp = free_lst.back();
         free_lst.pop_back();
         if (lbp)
             free(lbp);
+    }
+    if ((op->verbose > 2) && (k > 0)) {
+        console_mutex.lock();
+            cerr << "thread id=" << id <<
+                    " Maximum number of READ/WRITEs queued: " << k << endl;
+        console_mutex.unlock();
     }
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
@@ -613,11 +662,13 @@ main(int argc, char * argv[])
     struct timespec start_tm, end_tm;
     struct opts_t opts;
     struct opts_t * op;
+    const char * cp;
 
     op = &opts;
     op->dev_name = NULL;
     op->direct = !! DEF_DIRECT;
     op->lba = DEF_LBA;
+    op->hi_lba = 0;
     op->lb_sz = DEF_LB_SZ;;
     op->num_per_thread = DEF_NUM_PER_THREAD;
     op->no_xfer = !! DEF_NO_XFER;
@@ -645,6 +696,16 @@ main(int argc, char * argv[])
                     return 1;
                 } else
                     op->lba = (uint64_t)ll;
+                cp = strchr(argv[k], ',');
+                if (cp) {
+                    ll = sg_get_llnum(cp + 1);
+                    if ((-1 == ll) || (ll >= (UINT_MAX - 1))) {
+                        fprintf(stderr, "could not decode hi_lba, or too "
+                                "large\n");
+                        return 1;
+                    } else
+                        op->hi_lba = (unsigned int)ll + 1;
+                }
             } else
                 break;
         } else if (0 == memcmp("-n", argv[k], 2)) {
@@ -707,14 +768,14 @@ main(int argc, char * argv[])
         } else if (0 == memcmp("-W", argv[k], 2))
             op->c2e = SCSI_WRITE16;
         else if (*argv[k] == '-') {
-            printf("Unrecognized switch: %s\n", argv[k]);
+            fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
             op->dev_name = NULL;
             break;
         }
         else if (! op->dev_name)
             op->dev_name = argv[k];
         else {
-            printf("too many arguments\n");
+            cerr << "too many arguments" << endl;
             op->dev_name = NULL;
             break;
         }
@@ -723,6 +784,11 @@ main(int argc, char * argv[])
         usage();
         return 1;
     }
+    if (op->hi_lba && (op->lba >= op->hi_lba)) {
+        cerr << "lba,hi_lba range is illegal" << endl;
+        return 1;
+    }
+
     try {
         struct stat a_stat;
 
@@ -746,9 +812,10 @@ main(int argc, char * argv[])
             // For safety, since <lba> written to, only permit scsi_debug
             // devices. Bypass this with '-f' option.
             if (0 != memcmp("scsi_debug", b, 10)) {
-                fprintf(stderr, "Since this utility writes to LBA 0x%" PRIx64
-                        ", only devices with scsi_debug\n"
-                        "product ID accepted\n", op->lba);
+                fprintf(stderr, "Since this utility may write to LBA 0x%"
+                        PRIx64 ", only devices with the\n"
+                        "product ID 'scsi_debug' accepted. Use '-f' to "
+                        "override.\n", op->lba);
                 return 2;
             }
             ebusy_count += inq_ebusy_count;
