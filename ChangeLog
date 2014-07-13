@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20140711] [svn: r592]
+Changelog for sg3_utils-1.40 [20140712] [svn: r593]
   - sg_copy_results: correct response length calculations
   - sg_format: make '-FFF' bypass mode sense/select
     - add --mode=MP to supply alternate mode page,
