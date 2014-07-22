@@ -1,0 +1,131 @@
+.TH "WRITE AND VERIFY" "8" "July 2014" "sg3_utils\-1.40" SG3_UTILS
+.SH NAME
+sg_write_and_verify \- send the SCSI WRITE AND VERIFY command
+.SH SYNOPSIS
+.B sg_write_verify
+[\fI\-\-16\fR] [\fI\-\-bytchk=BC\fR] [\fI\-\-dpo\fR] [\fI\-\-group=GN\fR]
+[\fI\-\-help\fR] [\fI\-\-in=IF\fR] [\fI\-\-ilen=ILEN\fR] \fI\-\-lba=LBA\fR
+[\fI\-\-num=NUM\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+Send a SCSI WRITE AND VERIFY (10) or (16) command to \fIDEVICE\fR. The
+data to be written is read from the \fIIF\fR file or, in its absence, a
+buffer full of 0xff bytes is used. The length of the data\-out buffer sent
+with the command is \fIILEN\fR bytes or, if that is not given, then it is
+the length of the \fIIF\fR file.
+.PP
+The write operation is to the \fIDEVICE\fR's medium (optionally to its cache)
+starting at logical block address \fILBA\fR for \fINUM\fR logical blocks.
+After the write to medium is performed a verify operation takes place which
+may viewed as a medium read (with appropriate checks) but without the data
+being returned. Additionally, if \fIBS\fR is set to one, the data read back
+from the medium in the verify operation is compared to the original data\-out
+buffer.
+.PP
+The relationship between the number of logical blocks to be written (i.e.
+\fINUM\fR) and the length (in bytes) of the data\-out buffer (i.e.
+\fIILEN\fR) may be simply found by multiplying the former by the logica
+block size. However if the \fIDEVICE\fR has protection information (PI)
+then it becomes a bit more complicated. Hence the calculation is left to
+the user with the default \fIILEN\fR, in the absence of the \fIIF\fR file,
+being set to \fINUM\fR * 512.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long option name.
+.TP
+\fB\-S\fR, \fB\-\-16\fR
+Send a WRITE AND VERIFY(16) command. The default is to send a WRITE AND
+VERIFY(10) command unless \fILBA\fR or \fINUM\fR are too large for the
+10 byte variant.
+.TP
+\fB\-b\fR, \fB\-\-bytchk\fR=\fIBC\fR
+where \fIBC\fR is the value to place in the command's BYTCHK field. Values
+between 0 and 3 (inclusive) are accepted. The default is value is 0 which
+implies only a write to the medium then a verify operation are performed. The
+only other value T10 defines currently is 1 which does performs an additional
+comparision between the data\-out buffer that was used by the write operation
+and the contents of the logical blocks read back from the medium.
+.TP
+\fB\-d\fR, \fB\-\-dpo\fR
+Set the DPO (disable page out) bit in the command. The default is to leave
+it clear.
+.TP
+\fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
+where \fIGN\fR is the value to place in the command's GROUP NUMBER field.
+Values between 0 and 31 (inclusive) are accepted. The default is value is 0.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
+read data (binary) from file named \fIIF\fR. This data will become the
+data\-out buffer and will be written to the \fIDEVICE\fR's medium. If
+\fIBC\fR is 1 then that data\-out buffer will be held until after the
+verify operation and compared to the data read back from the medium.
+.TP
+\fB\-I\fR, \fB\-\-ilen\fR=\fIILEN\fR
+where \fIILEN\fR is the number of bytes that will be placed in the data\-out
+buffer. If the \fIIF\fR file is given then no more than \fIILEN\fR bytes
+are read from that file. If the \fIIF\fR file does not contain \fIILEN\fR
+bytes then an error is reported. If the  \fIIF\fR file is not given then
+a data\-out buffer with \fIILEN\fR bytes of 0xff is sent.
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the logical block address to start the write to medium.
+Assumed to be in decimal unless prefixed with '0x' or has a trailing 'h'.
+Must be provided.
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
+where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write
+to the medium. The default value for \fINUM\fR is 1.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
+where \fITO\fR is the command timeout value in seconds. The default value is
+60 seconds. If \fINUM\fR is large then command may require considerably more
+time than 60 seconds to complete.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the degree of verbosity (debug messages).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+output version string then exit.
+.TP
+\fB\-w\fR, \fB\-\-wrprotect\fR=\fIWP\fR
+set the WRPROTECT field in the cdb to \fIWP\fR. The default value is 0 which
+implies no protection information is sent (along with the user data) in the
+data\-out buffer.
+.SH NOTES
+Other SCSI WRITE commands have a Force Unit Access (FUA) bit but that is
+set (implicitly) by WRITE AND VERIFY commands hence there is no option to set
+it. The data\-out buffer may still additionally be placed in the
+\fIDEVICE\fR's cache and setting the DPO bit is a hint not to do that.
+.PP
+Normal SCSI WRITEs can be done with the ddpt and the sg_dd utilities. The
+SCSI WRITE SAME command can be done with the sg_write_same utility while
+the SCSI COMPARE AND WRITE command (sg_compare_and_write utility) offers
+a "test and set" facility.
+.PP
+Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
+suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
+in the sg3_utils(8) man page.
+.SH EXIT STATUS
+The exit status of sg_write_verify is 0 when it is successful. If the verify
+operation fails that is typically indicated with a medium error which leads
+to an exit status of 3.
+.PP
+If \fIBC\fR is set to 1 and the comparison it causes fails this utility will
+indicate the miscompare with an exit status of 14. For other exit status
+values see the EXIT STATUS section in the sg3_utils(8) man page.
+.SH AUTHORS
+Bruno Goncalves and Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2014 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B ddpt(in a package of that name), sg_compare_and_write(8), sg_dd(8),
+.B sg_write_same(8)

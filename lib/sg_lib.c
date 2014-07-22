@@ -49,6 +49,12 @@
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
+#ifdef __GNUC__
+static int my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
+                       __attribute__ ((format (printf, 3, 4)));
+#else
+static int my_snprintf(char * cp, int cp_max_len, const char * fmt, ...);
+#endif
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
  * functions. Returns number number of chars placed in cp excluding the
@@ -809,8 +815,7 @@ sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
 {
     int n = 0;
 
-    if (slen) { ; }     /* unused, suppress warning */
-    if (blen < 1)
+    if ((blen < 1) || (slen < 12))
         return;
     if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2]))
         n += my_snprintf(b + n, blen - n, "  >> expected Sense key: "
@@ -1690,8 +1695,8 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
     int bpstart, bpos, k, n;
 
     if (len <= 0) {
-	if (b_len > 0)
-	    b[0] = '\0';
+        if (b_len > 0)
+            b[0] = '\0';
         return;
     }
     if (0 != format) {
