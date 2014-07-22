@@ -51,7 +51,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.09 20140516";
+static const char * version_str = "1.09 20140715";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -137,8 +137,8 @@ usage()
                 "                        not given)\n"
                 "    --inw=WF|-D WF      WF is a file containing a write "
                 "buffer\n"
-                "    --lba=LBA|-l LBA    LBA of the first block of the "
-                "compare and write\n"
+                "    --lba=LBA|-l LBA    LBA of the first block to compare "
+                "and write\n"
                 "    --num=NUM|-n NUM    number of blocks to "
                 "compare/write (def: 1)\n"
                 "    --quiet|-q          suppress MISCOMPARE report to "
