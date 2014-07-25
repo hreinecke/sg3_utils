@@ -33,7 +33,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.02 20140721";
+static const char * version_str = "1.02 20140723";
 
 
 #define ME "sg_write_verify: "
@@ -50,16 +50,27 @@ static const char * version_str = "1.02 20140721";
 
 #define DEF_TIMEOUT_SECS 60
 
+/* Only uncomment the following for testing */
+#define WRITE_FOR_WVERIFY 1
+
+#ifdef WRITE_FOR_WVERIFY
+#define WRITE10_CMD      0x2a
+#define WRITE16_CMD      0x8a
+
+#warning "<<<TEST>>> version using WRITE cdbs instead of WRITE AND VERIFY"
+#endif
+
 static struct option long_options[] = {
         {"16", no_argument, 0, 'S'},
         {"bytchk", required_argument, 0, 'b'},
         {"dpo", no_argument, 0, 'd'},
         {"group", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
-        {"in", required_argument, 0, 'i'},
         {"ilen", required_argument, 0, 'I'},
+        {"in", required_argument, 0, 'i'},
         {"lba", required_argument, 0, 'l'},
         {"num", required_argument, 0, 'n'},
+        {"repeat", no_argument, 0, 'R'},
         {"timeout", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
@@ -74,9 +85,10 @@ usage()
  fprintf(stderr, "Usage: "
          "sg_write_verify [--16] [--bytchk=BC] [--dpo] [--group=GN] "
          "[--help]\n"
-         "                       [--in=IF] [--ilen=IL] --lba=LBA "
+         "                       [--ilen=IL] [--in=IF] --lba=LBA "
          "[--num=NUM]\n"
-         "                       [--timeout=TO] [--verbose] [--version]\n"
+         "                       [--repeat] [--timeout=TO] [--verbose] "
+         "[--version]\n"
          "                       [--wrprotect=WPR] DEVICE\n"
          "  where:\n"
          "    --16|-S              do WRITE AND VERIFY(16) (default: 10)\n"
@@ -84,28 +96,30 @@ usage()
          "    --dpo|-d             set DPO bit (default: 0)\n"
          "    --group=GN|-g GN     GN is group number (default: 0)\n"
          "    --help|-h            print out usage message\n"
-         "    --in=IF|-i IF        IF is a file containing the data to "
-         "be written\n"
          "    --ilen=IL| -I IL     input (file) length in bytes, becomes "
          "data-out\n"
          "                         buffer length (def: deduced from IF "
          "size)\n"
+         "    --in=IF|-i IF        IF is a file containing the data to "
+         "be written\n"
          "    --lba=LBA|-l LBA     LBA of the first block to write "
          "and verify;\n"
          "                         no default, must be given\n"
          "    --num=NUM|-n NUM     number of logical blocks to write and "
          "verify\n"
+         "    --repeat|-R          while IF still has data to read, send "
+         "another\n"
+         "                         command, bumping LBA with up to NUM "
+         "blocks again\n"
          "    --timeout=TO|-t TO   command timeout in seconds (def: 60)\n"
          "    --verbose|-v         increase verbosity\n"
          "    --version|-V         print version string then exit\n"
          "    --wrprotect|-w WPR   WPR is the WRPROTECT field value "
          "(def: 0)\n\n"
-         "Performs a SCSI WRITE AND VERIFY (10 or 16) command. NUM logical "
-         "blocks\nstarting at LBA written to DEVICE. Written data is fetched "
-         "from the IF file\n(of no more than IL bytes). If BC is 0 then a "
-         "verify takes place (e.g. ECC\nrechecked) after the write. If BC "
-         "is 1 then additionally data is read back\nand compared with the "
-         "original data-out buffer (that the DEVICE received).\n"
+         "Performs a SCSI WRITE AND VERIFY (10 or 16) command on DEVICE, "
+         "startings\nat LBA for NUM logical blocks. More commands performed "
+         "only if '--repeat'\noption given. Data to be written is fetched "
+         "from the IF file.\n"
          );
 }
 
@@ -121,7 +135,11 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
     struct sg_pt_base * ptvp;
     char b[32];
 
+#ifdef WRITE_FOR_WVERIFY
+    snprintf(b, sizeof(b), "Write(%d)", cdb_len);
+#else
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);
+#endif
     if (verbose) {
        fprintf(stderr, "    %s cmd: ", b);
        for (k = 0; k < cdb_len; ++k)
@@ -188,7 +206,11 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
     unsigned char wv_cdb[WRITE_VERIFY10_CMDLEN];
 
     memset(wv_cdb, 0, WRITE_VERIFY10_CMDLEN);
+#ifdef WRITE_FOR_WVERIFY
+    wv_cdb[0] = WRITE10_CMD;
+#else
     wv_cdb[0] = WRITE_VERIFY10_CMD;
+#endif
     wv_cdb[1] = ((wrprotect & WRPROTECT_MASK) << WRPROTECT_SHIFT);
     if (dpo)
         wv_cdb[1] |= 0x10;
@@ -219,7 +241,11 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
 
 
     memset(wv_cdb, 0, sizeof(wv_cdb));
+#ifdef WRITE_FOR_WVERIFY
+    wv_cdb[0] = WRITE16_CMD;
+#else
     wv_cdb[0] = WRITE_VERIFY16_CMD;
+#endif
     wv_cdb[1] = ((wrprotect & WRPROTECT_MASK) << WRPROTECT_SHIFT);
     if (dpo)
         wv_cdb[1] |= 0x10;
@@ -269,7 +295,7 @@ open_if(const char * fn, int got_stdin)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, n;
+    int sg_fd, res, c, n, first_time;
     unsigned char * wvb = NULL;
     void * wrkBuff = NULL;
     int dpo = 0;
@@ -280,6 +306,8 @@ main(int argc, char * argv[])
     uint64_t llba = 0;
     int lba_given = 0;
     uint32_t num_lb = 1;
+    uint32_t snum_lb = 1;
+    int repeat = 0;
     int timeout = DEF_TIMEOUT_SECS;
     int verbose = 0;
     int64_t ll;
@@ -288,14 +316,15 @@ main(int argc, char * argv[])
     const char * ifnp;
     int has_filename = 0;
     int ilen = -1;
-    int wfd = -1;
+    int ifd = -1;
     int ret = 1;
+    int b_p_lb = 512;
     char cmd_name[32];
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:dg:hi:I:l:n:St:w:vV", long_options,
+        c = getopt_long(argc, argv, "b:dg:hi:I:l:n:RSt:w:vV", long_options,
                        &option_index);
         if (c == -1)
             break;
@@ -358,6 +387,9 @@ main(int argc, char * argv[])
             }
             num_lb = (uint32_t)n;
             break;
+        case 'R':
+            ++repeat;
+            break;
         case 'S':
             do_16 = 1;
             given_do_16 = 1;
@@ -414,6 +446,26 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (repeat) {
+        if (! has_filename) {
+            fprintf(stderr, "with '--repeat' need '--in=IF' option\n");
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (ilen < 1) {
+            fprintf(stderr, "with '--repeat' need '--ilen=ILEN' option\n");
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        } else {
+            b_p_lb = ilen / num_lb;
+            if (b_p_lb < 64) {
+                fprintf(stderr, "calculated %d bytes per logical block, "
+                        "too small\n", b_p_lb);
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        }
+    }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
@@ -432,90 +484,128 @@ main(int argc, char * argv[])
         fprintf(stderr, "Switching to %s because LBA or NUM too large\n",
                 cmd_name);
 
-    //If a file with data to write has been provided
-    if (has_filename) {
-        struct stat a_stat;
-
-        if ((1 == strlen(ifnp)) && ('-' == ifnp[0])) {
-            fprintf(stderr, ME "don't allow stdin for write "
-                    "file\n");
-            ret = SG_LIB_FILE_ERROR;
-            goto err_out;
-        }
-        wfd = open_if(ifnp, 0);
-        if (wfd < 0) {
-            ret = -wfd;
-            goto err_out;
-        }
-        if (ilen < 1) {
-            if (fstat(wfd, &a_stat) < 0) {
-                fprintf(stderr, "Could not fstat(%s)\n", ifnp);
-                goto err_out;
-            }
-            ilen = (int)a_stat.st_size;
-            if (ilen < 1) {
-                fprintf(stderr, "%s file size too small\n", ifnp);
-                goto err_out;
-            } else if (verbose)
-                fprintf(stderr, "Using file size of %d bytes\n", ilen);
-        }
-        if (NULL == (wrkBuff = malloc(ilen))) {
-            fprintf(stderr, ME "out of memory\n");
-            ret = SG_LIB_CAT_OTHER;
-            goto err_out;
-        }
-        wvb = (unsigned char *)wrkBuff;
-
-        res = read(wfd, wvb, ilen);
-        if (res < 0) {
-            fprintf(stderr, "Could not read from %s", ifnp);
-            goto err_out;
-        }
-
-        //Check if the amount to write is not bigger than file itself
-        if (res < ilen) {
-            fprintf(stderr, "Read only %d bytes (expected %d) from %s\n",
-                    res, ilen, ifnp);
-            goto err_out;
-        }
-    } else {
-        if (ilen < 1) {
-            if (verbose)
-                fprintf(stderr, "Default write length to %d*%d=%d bytes\n",
-                        num_lb, 512, 512 * num_lb);
-            ilen = 512 * num_lb;
-        }
-        if (NULL == (wrkBuff = malloc(ilen))) {
-            fprintf(stderr, ME "out of memory\n");
-            ret = SG_LIB_CAT_OTHER;
-            goto err_out;
-        }
-        wvb = (unsigned char *)wrkBuff;
-        /* Not sure this is a good idea to default contents to 0xff bytes */
-        memset(wrkBuff, 0xff, ilen);
-    }
-
     if (verbose) {
         fprintf(stderr, "Issue %s to device %s\n\tilen= %d "
                 "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 ")\n\twrprotect=%d, "
-                "dpo=%d, bytchk=%d, group=%d\n", cmd_name, device_name,
-                ilen, ilen, llba, llba, wrprotect, dpo, bytchk, group);
+                "dpo=%d, bytchk=%d, group=%d, repeat=%d\n", cmd_name,
+                device_name, ilen, ilen, llba, llba, wrprotect, dpo, bytchk,
+                group, repeat);
     }
 
-    if (do_16)
-        res = sg_ll_write_verify16(sg_fd, wrprotect, dpo, bytchk, llba,
-                                   num_lb, group, wvb, ilen, timeout,
-                                   verbose);
-    else
-        res = sg_ll_write_verify10(sg_fd, wrprotect, dpo, bytchk,
-                                   (unsigned int)llba, num_lb, group, wvb,
-                                   ilen, timeout, verbose);
-    ret = res;
+    first_time = 1;
+    do {
+        if (first_time) {
+            //If a file with data to write has been provided
+            if (has_filename) {
+                struct stat a_stat;
+
+                if ((1 == strlen(ifnp)) && ('-' == ifnp[0])) {
+                    ifd = STDIN_FILENO;
+                    ifnp = "<stdin>";
+                    if (verbose > 1)
+                        fprintf(stderr, "Reading input data from stdin\n");
+                } else {
+                    ifd = open_if(ifnp, 0);
+                    if (ifd < 0) {
+                        ret = -ifd;
+                        goto err_out;
+                    }
+                }
+                if (ilen < 1) {
+                    if (fstat(ifd, &a_stat) < 0) {
+                        fprintf(stderr, "Could not fstat(%s)\n", ifnp);
+                        goto err_out;
+                    }
+                    if (! S_ISREG(a_stat.st_mode)) {
+                        fprintf(stderr, "Cannot determine IF size, please "
+                                "give '--ilen='\n");
+                        goto err_out;
+                    }
+                    ilen = (int)a_stat.st_size;
+                    if (ilen < 1) {
+                        fprintf(stderr, "%s file size too small\n", ifnp);
+                        goto err_out;
+                    } else if (verbose)
+                        fprintf(stderr, "Using file size of %d bytes\n", ilen);
+                }
+                if (NULL == (wrkBuff = malloc(ilen))) {
+                    fprintf(stderr, ME "out of memory\n");
+                    ret = SG_LIB_CAT_OTHER;
+                    goto err_out;
+                }
+                wvb = (unsigned char *)wrkBuff;
+                res = read(ifd, wvb, ilen);
+                if (res < 0) {
+                    fprintf(stderr, "Could not read from %s", ifnp);
+                    goto err_out;
+                }
+                if (res < ilen) {
+                    fprintf(stderr, "Read only %d bytes (expected %d) from "
+                            "%s\n", res, ilen, ifnp);
+                    if (repeat)
+                        fprintf(stderr, "Will scale subsequent pieces when "
+                                "repeat=1, but this is first\n");
+                    goto err_out;
+                }
+            } else {
+                if (ilen < 1) {
+                    if (verbose)
+                        fprintf(stderr, "Default write length to %d*%d=%d "
+                                "bytes\n", num_lb, 512, 512 * num_lb);
+                    ilen = 512 * num_lb;
+                }
+                if (NULL == (wrkBuff = malloc(ilen))) {
+                    fprintf(stderr, ME "out of memory\n");
+                    ret = SG_LIB_CAT_OTHER;
+                    goto err_out;
+                }
+                wvb = (unsigned char *)wrkBuff;
+                /* Not sure about this: default contents to 0xff bytes */
+                memset(wrkBuff, 0xff, ilen);
+            }
+            first_time = 0;
+            snum_lb = num_lb;
+        } else {        /* repeat=1, first_time=0, must be reading file */
+            llba += snum_lb;
+            res = read(ifd, wvb, ilen);
+            if (res < 0) {
+                fprintf(stderr, "Could not read from %s", ifnp);
+                goto err_out;
+            } else {
+                if (verbose > 1)
+                fprintf(stderr, "Subsequent read from %s got %d bytes\n",
+                        ifnp, res);
+                if (0 == res)
+                    break;
+                if (res < ilen) {
+                    snum_lb = (uint32_t)(res / b_p_lb);
+                    n = res % b_p_lb;
+                    if (0 != n)
+                        fprintf(stderr, ">>> warning: ignoring last %d "
+                                "bytes of %s\n", n, ifnp);
+                    if (snum_lb < 1)
+                        break;
+                }
+            }
+        }
+        if (do_16)
+            res = sg_ll_write_verify16(sg_fd, wrprotect, dpo, bytchk, llba,
+                                       snum_lb, group, wvb, ilen, timeout,
+                                       verbose);
+        else
+            res = sg_ll_write_verify10(sg_fd, wrprotect, dpo, bytchk,
+                                       (unsigned int)llba, snum_lb, group,
+                                       wvb, ilen, timeout, verbose);
+        ret = res;
+        if (ret || (snum_lb != num_lb))
+            break;
+    } while (repeat);
+
 err_out:
     if (wrkBuff)
         free(wrkBuff);
-    if (wfd >= 0)
-        close(wfd);
+    if ((ifd >= 0) && (STDIN_FILENO != ifd))
+        close(ifd);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));
