@@ -33,7 +33,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.02 20140723";
+static const char * version_str = "1.03 20140729";
 
 
 #define ME "sg_write_verify: "
@@ -51,7 +51,7 @@ static const char * version_str = "1.02 20140723";
 #define DEF_TIMEOUT_SECS 60
 
 /* Only uncomment the following for testing */
-#define WRITE_FOR_WVERIFY 1
+/* #define WRITE_FOR_WVERIFY 1 */
 
 #ifdef WRITE_FOR_WVERIFY
 #define WRITE10_CMD      0x2a
@@ -319,6 +319,7 @@ main(int argc, char * argv[])
     int ifd = -1;
     int ret = 1;
     int b_p_lb = 512;
+    int tnum_lb_wr = 0;
     char cmd_name[32];
 
     while (1) {
@@ -478,18 +479,24 @@ main(int argc, char * argv[])
         do_16 = 1;
     if ((0 == do_16) && (num_lb > 0xffff))
         do_16 = 1;
+#ifdef WRITE_FOR_WVERIFY
+    snprintf(cmd_name, sizeof(cmd_name), "Write [and not verify](%d)",
+             (do_16 ? 16 : 10));
+#else
     snprintf(cmd_name, sizeof(cmd_name), "Write and verify(%d)",
              (do_16 ? 16 : 10));
+#endif
     if (verbose && (0 == given_do_16) && do_16)
         fprintf(stderr, "Switching to %s because LBA or NUM too large\n",
                 cmd_name);
-
     if (verbose) {
-        fprintf(stderr, "Issue %s to device %s\n\tilen= %d "
-                "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 ")\n\twrprotect=%d, "
-                "dpo=%d, bytchk=%d, group=%d, repeat=%d\n", cmd_name,
-                device_name, ilen, ilen, llba, llba, wrprotect, dpo, bytchk,
-                group, repeat);
+        fprintf(stderr, "Issue %s to device %s\n\tilen=%d", cmd_name,
+                device_name, ilen);
+        if (ilen > 0)
+            fprintf(stderr, " [0x%x]", ilen);
+        fprintf(stderr, ", lba=%" PRIu64 " [0x%" PRIx64 "]\n\twrprotect=%d, "
+                "dpo=%d, bytchk=%d, group=%d, repeat=%d\n", llba, llba,
+                wrprotect, dpo, bytchk, group, repeat);
     }
 
     first_time = 1;
@@ -597,11 +604,16 @@ main(int argc, char * argv[])
                                        (unsigned int)llba, snum_lb, group,
                                        wvb, ilen, timeout, verbose);
         ret = res;
+        if (repeat && (0 == ret))
+            tnum_lb_wr += snum_lb;
         if (ret || (snum_lb != num_lb))
             break;
     } while (repeat);
 
 err_out:
+    if (repeat)
+        fprintf(stderr, "%d [0x%x] logical blocks written, in total\n",
+                tnum_lb_wr, tnum_lb_wr);
     if (wrkBuff)
         free(wrkBuff);
     if ((ifd >= 0) && (STDIN_FILENO != ifd))
