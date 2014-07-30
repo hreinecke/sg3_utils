@@ -37,7 +37,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.12 (win32) 20130513";
+static const char * version_str = "1.13 (win32) 20140728";
 
 #define MAX_SCSI_ELEMS 1024
 #define MAX_ADAPTER_NUM 64
@@ -366,7 +366,7 @@ enum_scsi_adapters(void)
     BYTE bus;
     BOOL success;
     char adapter_name[64];
-    char inqDataBuff[2048];
+    char inqDataBuff[8192];
     PSCSI_ADAPTER_BUS_INFO  ai;
     char b[256];
 

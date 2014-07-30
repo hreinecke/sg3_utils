@@ -23,28 +23,31 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "0.41 20140517";
+
+static const char * version_str = "0.42 20140729";
 
 #define ME "sg_senddiag: "
 
-#define MX_ALLOC_LEN (1024 * 4)
+#define DEF_ALLOC_LEN (1024 * 4)
 
 static struct option long_options[] = {
-        {"doff", 0, 0, 'd'},
-        {"extdur", 0, 0, 'e'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"list", 0, 0, 'l'},
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
-        {"pf", 0, 0, 'p'},
-        {"raw", 1, 0, 'r'},
-        {"selftest", 1, 0, 's'},
-        {"test", 0, 0, 't'},
-        {"uoff", 0, 0, 'u'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"doff", no_argument, 0, 'd'},
+        {"extdur", no_argument, 0, 'e'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"list", no_argument, 0, 'l'},
+        {"maxlen", required_argument, 0, 'm'},
+        {"new", no_argument, 0, 'N'},
+        {"old", no_argument, 0, 'O'},
+        {"pf", no_argument, 0, 'p'},
+        {"raw", required_argument, 0, 'r'},
+        {"selftest", required_argument, 0, 's'},
+        {"test", no_argument, 0, 't'},
+        {"uoff", no_argument, 0, 'u'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -54,6 +57,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int do_list;
+    int maxlen;
     int do_pf;
     int do_raw;
     int do_selftest;
@@ -66,13 +70,15 @@ struct opts_t {
     int opt_new;
 };
 
-static void usage()
+
+static void
+usage()
 {
     printf("Usage: sg_senddiag [--doff] [--extdur] [--help] [--hex] "
-           "[--list] [--pf]\n"
-           "                   [--raw=H,H...] [--selftest=ST] "
-           "[--test] [--uoff]\n"
-           "                   [--verbose] [--version] "
+           "[--list]\n"
+           "                   [--maxlen=LEN] [--pf] [--raw=H,H...] "
+           "[--selftest=ST]\n"
+           "                   [--test] [--uoff] [--verbose] [--version] "
            "[DEVICE]\n"
            "  where:\n"
            "    --doff|-d       device online (def: 0, only with '--test')\n"
@@ -82,6 +88,9 @@ static void usage()
            "    --hex|H         output in hex\n"
            "    --list|-l       list supported page codes (with or without "
            "DEVICE)\n"
+           "    --maxlen=LEN|-m LEN    parameter list length or maximum "
+           "allocation\n"
+           "                           length (default: 4096 bytes)\n"
            "    --pf|-p         set PF bit (def: 0)\n"
            "    --raw=H,H...|-r H,H...    sequence of hex bytes to form "
            "diag page to send\n"
@@ -102,7 +111,8 @@ static void usage()
         );
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     printf("Usage: sg_senddiag [-doff] [-e] [-h] [-H] [-l] [-pf]"
            " [-raw=H,H...]\n"
@@ -133,46 +143,56 @@ static void usage_old()
         );
 }
 
-static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dehHlNOpr:s:tuvV", long_options,
+        c = getopt_long(argc, argv, "dehHlm:NOpr:s:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'd':
-            optsp->do_doff = 1;
+            op->do_doff = 1;
             break;
         case 'e':
-            optsp->do_extdur = 1;
+            op->do_extdur = 1;
             break;
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'H':
-            ++optsp->do_hex;
+            ++op->do_hex;
             break;
         case 'l':
-            ++optsp->do_list;
+            ++op->do_list;
+            break;
+        case 'm':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xffff)) {
+                fprintf(stderr, "bad argument to '--maxlen=' or greater "
+                        "than 65535 [0xffff]\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->maxlen = n;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = 0;
+            op->opt_new = 0;
             return 0;
         case 'p':
-            optsp->do_pf = 1;
+            op->do_pf = 1;
             break;
         case 'r':
-            optsp->raw_arg = optarg;
-            optsp->do_raw = 1;
+            op->raw_arg = optarg;
+            op->do_raw = 1;
             break;
         case 's':
             n = sg_get_num(optarg);
@@ -181,31 +201,31 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_selftest = n;
+            op->do_selftest = n;
             break;
         case 't':
-            optsp->do_deftest = 1;
+            op->do_deftest = 1;
             break;
         case 'u':
-            optsp->do_uoff = 1;
+            op->do_uoff = 1;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            ++op->do_version;
             break;
         default:
             fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            if (op->do_help)
                 break;
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == optsp->device_name) {
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -219,7 +239,8 @@ static int process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     unsigned int u;
@@ -235,54 +256,54 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 switch (*cp) {
                 case 'd':
                     if (0 == strncmp("doff", cp, 4)) {
-                        optsp->do_doff = 1;
+                        op->do_doff = 1;
                         cp += 3;
                         plen -= 3;
                     } else
                         jmp_out = 1;
                     break;
                 case 'e':
-                    optsp->do_extdur = 1;
+                    op->do_extdur = 1;
                     break;
                 case 'h':
                 case 'H':
-                    ++optsp->do_hex;
+                    ++op->do_hex;
                     break;
                 case 'l':
-                    ++optsp->do_list;
+                    ++op->do_list;
                     break;
                 case 'N':
-                    optsp->opt_new = 1;
+                    op->opt_new = 1;
                     return 0;
                 case 'O':
                     break;
                 case 'p':
                     if (0 == strncmp("pf", cp, 2)) {
-                        optsp->do_pf = 1;
+                        op->do_pf = 1;
                         ++cp;
                         --plen;
                     } else
                         jmp_out = 1;
                     break;
                 case 't':
-                    optsp->do_deftest = 1;
+                    op->do_deftest = 1;
                     break;
                 case 'u':
                     if (0 == strncmp("uoff", cp, 4)) {
-                        optsp->do_uoff = 1;
+                        op->do_uoff = 1;
                         cp += 3;
                         plen -= 3;
                     } else
                         jmp_out = 1;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    ++op->do_verbose;
                     break;
                 case 'V':
-                    ++optsp->do_version;
+                    ++op->do_version;
                     break;
                 case '?':
-                    ++optsp->do_help;
+                    ++op->do_help;
                     break;
                 default:
                     jmp_out = 1;
@@ -294,8 +315,8 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             if (plen <= 0)
                 continue;
             if (0 == strncmp("raw=", cp, 4)) {
-                optsp->raw_arg = cp + 4;
-                optsp->do_raw = 1;
+                op->raw_arg = cp + 4;
+                op->do_raw = 1;
             } else if (0 == strncmp("s=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", &u);
                 if ((1 != num) || (u > 7)) {
@@ -303,7 +324,7 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_selftest = u;
+                op->do_selftest = u;
             } else if (0 == strncmp("-old", cp, 5))
                 ;
             else if (jmp_out) {
@@ -311,11 +332,11 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == optsp->device_name)
-            optsp->device_name = cp;
+        } else if (0 == op->device_name)
+            op->device_name = cp;
         else {
             fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", optsp->device_name, cp);
+                    "%s\n", op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -323,30 +344,32 @@ static int process_cl_old(struct opts_t * optsp, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * optsp, int argc, char * argv[])
+static int
+process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+        op->opt_new = 0;
+        res = process_cl_old(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = process_cl_new(op, argc, argv);
     } else {
-        optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+        op->opt_new = 1;
+        res = process_cl_new(op, argc, argv);
+        if ((0 == res) && (0 == op->opt_new))
+            res = process_cl_old(op, argc, argv);
     }
     return res;
 }
 
 /* Return of 0 -> success, otherwise see sg_ll_send_diag() */
-static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
-                       int devofl_bit, int unitofl_bit, void * outgoing_pg,
-                       int outgoing_len, int noisy, int verbose)
+static int
+do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
+            int unitofl_bit, void * outgoing_pg, int outgoing_len,
+            int noisy, int verbose)
 {
     int long_duration = 0;
 
@@ -357,9 +380,10 @@ static int do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                            outgoing_len, noisy, verbose);
 }
 
-/* Get expected extended self-test time from mode page 0xa (for '-e' option) */
-static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
-                       int mode6, int verbose)
+/* Get expected extended self-test time from mode page 0xa (for '-e') */
+static int
+do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy, int mode6,
+            int verbose)
 {
     int res;
 
@@ -381,8 +405,9 @@ static int do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy,
 /* Read hex numbers from command line (comma separated list) or from */
 /* stdin (one per line, comma separated list or space separated list). */
 /* Returns 0 if ok, or 1 if error. */
-static int build_diag_page(const char * inp, unsigned char * mp_arr,
-                           int * mp_arr_len, int max_arr_len)
+static int
+build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
+                int max_arr_len)
 {
     int in_len, k, j, m;
     unsigned int h;
@@ -555,7 +580,8 @@ static struct page_code_desc pc_desc_arr[] = {
         {0x42, "Rebuild assist (direct access)"}, /* sbc3r31 */
 };
 
-static const char * find_page_code_desc(int page_num)
+static const char *
+find_page_code_desc(int page_num)
 {
     int k;
     int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
@@ -570,7 +596,8 @@ static const char * find_page_code_desc(int page_num)
     return NULL;
 }
 
-static void list_page_codes()
+static void
+list_page_codes()
 {
     int k;
     int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
@@ -583,49 +610,59 @@ static void list_page_codes()
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, k, num, rsp_len, res;
-    unsigned char rsp_buff[MX_ALLOC_LEN];
-    int rsp_buff_size = MX_ALLOC_LEN;
+    int rsp_buff_size;
     int read_in_len = 0;
-    const char * cp;
-    unsigned char read_in[MX_ALLOC_LEN];
     int ret = 0;
     struct opts_t opts;
+    struct opts_t * op;
+    unsigned char * rsp_buff = NULL;
+    const char * cp;
+    unsigned char * read_in = NULL;
 
-    memset(&opts, 0, sizeof(opts));
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    op->maxlen = DEF_ALLOC_LEN;
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        if (opts.opt_new)
+    if (op->do_help) {
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return 0;
     }
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
+    rsp_buff_size = op->maxlen;
 
-    if (NULL == opts.device_name) {
-        if (opts.do_list) {
+    if (NULL == op->device_name) {
+        if (op->do_list) {
             list_page_codes();
             return 0;
         }
         fprintf(stderr, "No DEVICE argument given\n");
-        if (opts.opt_new)
+        if (op->opt_new)
             usage();
         else
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_raw) {
-        if (build_diag_page(opts.raw_arg, read_in, &read_in_len,
+    if (op->do_raw) {
+        read_in = (unsigned char *)calloc(op->maxlen, 1);
+        if (NULL == read_in) {
+            fprintf(stderr, "unable to allocate %d bytes\n", op->maxlen);
+            return SG_LIB_CAT_OTHER;
+        }
+        if (build_diag_page(op->raw_arg, read_in, &read_in_len,
                             sizeof(read_in))) {
-            if (opts.opt_new) {
+            if (op->opt_new) {
                 printf("Bad sequence after '--raw=' option\n");
                 usage();
             } else {
@@ -636,8 +673,8 @@ int main(int argc, char * argv[])
         }
     }
 
-    if ((opts.do_doff || opts.do_uoff) && (! opts.do_deftest)) {
-        if (opts.opt_new) {
+    if ((op->do_doff || op->do_uoff) && (! op->do_deftest)) {
+        if (op->opt_new) {
             printf("setting --doff or --uoff only useful when -t is set\n");
             usage();
         } else {
@@ -646,8 +683,8 @@ int main(int argc, char * argv[])
         }
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((opts.do_selftest > 0) && opts.do_deftest) {
-        if (opts.opt_new) {
+    if ((op->do_selftest > 0) && op->do_deftest) {
+        if (op->opt_new) {
             printf("either set --selftest=SF or --test (not both)\n");
             usage();
         } else {
@@ -656,10 +693,10 @@ int main(int argc, char * argv[])
         }
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_raw) {
-        if ((opts.do_selftest > 0) || opts.do_deftest || opts.do_extdur ||
-            opts.do_list) {
-            if (opts.opt_new) {
+    if (op->do_raw) {
+        if ((op->do_selftest > 0) || op->do_deftest || op->do_extdur ||
+            op->do_list) {
+            if (op->opt_new) {
                 printf("'--raw=' cannot be used with self-tests, '-e' or "
                        "'-l'\n");
                 usage();
@@ -670,8 +707,8 @@ int main(int argc, char * argv[])
             }
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (! opts.do_pf) {
-            if (opts.opt_new)
+        if (! op->do_pf) {
+            if (op->opt_new)
                 printf(">>> warning, '--pf' probably should be used with "
                        "'--raw='\n");
             else
@@ -679,15 +716,29 @@ int main(int argc, char * argv[])
                        "'-raw='\n");
         }
     }
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (op->verbose > 4)
+        pr2serr("Initial win32 SPT interface state: %s\n",
+                scsi_pt_win32_spt_state() ? "direct" : "indirect");
+    if (op->maxlen >= 16384)
+        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+#endif
+#endif
 
-    if ((sg_fd = sg_cmds_open_device(opts.device_name, 0 /* rw */,
-                                     opts.do_verbose)) < 0) {
-        fprintf(stderr, ME "error opening file: %s: %s\n", opts.device_name,
+    if ((sg_fd = sg_cmds_open_device(op->device_name, 0 /* rw */,
+                                     op->do_verbose)) < 0) {
+        fprintf(stderr, ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (opts.do_extdur) {
-        res = do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, opts.do_verbose);
+    rsp_buff = (unsigned char *)calloc(op->maxlen, 1);
+    if (NULL == rsp_buff) {
+        fprintf(stderr, "unable to allocate %d bytes (2)\n", op->maxlen);
+        return SG_LIB_CAT_OTHER;
+    }
+    if (op->do_extdur) {
+        res = do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, op->do_verbose);
         if (0 == res) {
             /* Assume mode sense(10) response without block descriptors */
             num = (rsp_buff[0] << 8) + rsp_buff[1] - 6;
@@ -709,16 +760,15 @@ int main(int argc, char * argv[])
             printf("Extended self-test duration (mode page 0xa) failed\n");
             goto err_out9;
         }
-    } else if (opts.do_list) {
-        memset(rsp_buff, 0, sizeof(rsp_buff));
+    } else if (op->do_list) {
         res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
-                          opts.do_verbose);
+                          op->do_verbose);
         if (0 == res) {
             if (0 == sg_ll_receive_diag(sg_fd, 0, 0, rsp_buff,
-                                        rsp_buff_size, 1, opts.do_verbose)) {
+                                        rsp_buff_size, 1, op->do_verbose)) {
                 printf("Supported diagnostic pages response:\n");
                 rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
-                if (opts.do_hex)
+                if (op->do_hex)
                     dStrHex((const char *)rsp_buff, rsp_len, 1);
                 else {
                     for (k = 0; k < (rsp_len - 4); ++k) {
@@ -737,21 +787,21 @@ int main(int argc, char * argv[])
             ret = res;
             goto err_out;
         }
-    } else if (opts.do_raw) {
-        res = do_senddiag(sg_fd, 0, opts.do_pf, 0, 0, 0, read_in,
-                          read_in_len, 1, opts.do_verbose);
+    } else if (op->do_raw) {
+        res = do_senddiag(sg_fd, 0, op->do_pf, 0, 0, 0, read_in,
+                          read_in_len, 1, op->do_verbose);
         if (res) {
             ret = res;
             goto err_out;
         }
     } else {
-        res = do_senddiag(sg_fd, opts.do_selftest, opts.do_pf,
-                          opts.do_deftest, opts.do_doff, opts.do_uoff, NULL,
-                          0, 1, opts.do_verbose);
+        res = do_senddiag(sg_fd, op->do_selftest, op->do_pf, op->do_deftest,
+                          op->do_doff, op->do_uoff, NULL, 0, 1,
+                          op->do_verbose);
         if (0 == res) {
-            if ((5 == opts.do_selftest) || (6 == opts.do_selftest))
+            if ((5 == op->do_selftest) || (6 == op->do_selftest))
                 printf("Foreground self-test returned GOOD status\n");
-            else if (opts.do_deftest && (! opts.do_doff) && (! opts.do_uoff))
+            else if (op->do_deftest && (! op->do_doff) && (! op->do_uoff))
                 printf("Default self-test returned GOOD status\n");
         } else {
             ret = res;
@@ -774,10 +824,14 @@ err_out:
     else
         fprintf(stderr, "SEND DIAGNOSTIC command, failed\n");
 err_out9:
-    if (opts.do_verbose < 2)
+    if (op->do_verbose < 2)
         fprintf(stderr, "  try again with '-vv' for more information\n");
     res = sg_cmds_close_device(sg_fd);
     if ((res < 0) && (0 == ret))
         return SG_LIB_FILE_ERROR;
+    if (read_in)
+        free(read_in);
+    if (rsp_buff)
+        free(rsp_buff);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

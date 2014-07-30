@@ -151,6 +151,32 @@ to an exit status of 3.
 If \fIBC\fR is set to 1 and the comparison it causes fails this utility will
 indicate the miscompare with an exit status of 14. For other exit status
 values see the EXIT STATUS section in the sg3_utils(8) man page.
+.SH EXAMPLES
+To start with, a simple example: write 1 block of data held in file t.bin
+that is 512 bytes long then write that block to LBA 0x1234 on /dev/sg4 .
+.PP
+  # sg_write_verify \-\-lba=0x1234 \-\-in=t.bin /dev/sg4
+.PP
+Since '\-\-num=' is not given then it defaults to 1. Further the \fIILEN\fR
+value is obtained from the file size of t.bin . To additionally do a
+data\-out comparison to the read back data:
+.PP
+  # sg_write_verify -l 0x1234 -i t.bin --bytchk=1 /dev/sg4
+.PP
+The ddpt command can do copies between SCSI devices using READ and WRITE
+commands. However, currently it has no facility to promote those WRITES
+to WRITE AND VERIFY coomands. Using a pipe, that could be done like this:
+.PP
+  # ddpt if=/dev/sg2 bs=512 bpt=8 count=11 of=- |
+.br
+sg_write_verify \-\-in=\- \-l 0x567 \-n 8 \-\-ilen=4096 \-\-repeat /dev/sg4
+.PP
+Both ddpt and sg_write_verify are configured for segments of 8 512 byte
+logical blocks. Since 11 logical blocks are read then first 8 logical blocks
+are copied followed by a copy of the remaing 3 blocks. Since it is assumed
+that there is no protection information then the data\-in and data\-out
+buffers will be 4096 bytes each. For sg_write_verify this needs to be stated
+explicity with the \-\-ilen=4096 option.
 .SH AUTHORS
 Bruno Goncalves and Douglas Gilbert.
 .SH "REPORTING BUGS"
