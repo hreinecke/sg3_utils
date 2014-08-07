@@ -1,4 +1,4 @@
-.TH SG_SCAN "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SCAN "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_scan \- scan storage devices and map to volume names
 .SH SYNOPSIS
@@ -13,6 +13,11 @@ and tape drives and maps them to the corresponding volumes. There may be
 many, one or no corresponding volumes. There is one line output per device
 with identification strings to the right. Its purpose is to list the
 storage device names that can be used by other utilities in this package.
+.PP
+In later versions of Windows this utility may need to be "run as
+Administrator" for disks and other devices to be seen. If not those devices
+will simply not appear as calls to query them fail with access permission
+problems.
 .PP
 There is an optional SCSI adapter scan which may find additional storage
 devices other than the ones listed above. An example is a SCSI Enclosure

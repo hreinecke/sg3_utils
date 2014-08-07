@@ -26,7 +26,7 @@
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
 
-static const char * version_str = "0.42 20140729";
+static const char * version_str = "0.43 20140807";
 
 #define ME "sg_senddiag: "
 
@@ -718,8 +718,8 @@ main(int argc, char * argv[])
     }
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
-    if (op->verbose > 4)
-        pr2serr("Initial win32 SPT interface state: %s\n",
+    if (op->do_verbose > 4)
+        fprintf(stderr, "Initial win32 SPT interface state: %s\n",
                 scsi_pt_win32_spt_state() ? "direct" : "indirect");
     if (op->maxlen >= 16384)
         scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
