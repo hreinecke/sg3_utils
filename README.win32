@@ -25,6 +25,11 @@ shell) builds freestanding console executables. The Unix library support is
 not as advanced with MinGW which has led to some timing functions being
 compiled out when sg3_utils is built for MinGW.
 
+In later versions of Windows these utilities may need to be "run as
+Administrator" for disks and other devices to be seen. If not those devices
+will simply not be found as calls to query them fail with access permission
+problems.
+
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
@@ -216,4 +221,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-7th March 2013
+7th August 2014

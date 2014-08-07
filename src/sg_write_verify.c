@@ -33,7 +33,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.03 20140729";
+static const char * version_str = "1.04 20140807";
 
 
 #define ME "sg_write_verify: "
@@ -50,15 +50,6 @@ static const char * version_str = "1.03 20140729";
 
 #define DEF_TIMEOUT_SECS 60
 
-/* Only uncomment the following for testing */
-/* #define WRITE_FOR_WVERIFY 1 */
-
-#ifdef WRITE_FOR_WVERIFY
-#define WRITE10_CMD      0x2a
-#define WRITE16_CMD      0x8a
-
-#warning "<<<TEST>>> version using WRITE cdbs instead of WRITE AND VERIFY"
-#endif
 
 static struct option long_options[] = {
         {"16", no_argument, 0, 'S'},
@@ -135,11 +126,7 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
     struct sg_pt_base * ptvp;
     char b[32];
 
-#ifdef WRITE_FOR_WVERIFY
-    snprintf(b, sizeof(b), "Write(%d)", cdb_len);
-#else
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);
-#endif
     if (verbose) {
        fprintf(stderr, "    %s cmd: ", b);
        for (k = 0; k < cdb_len; ++k)
@@ -206,11 +193,7 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
     unsigned char wv_cdb[WRITE_VERIFY10_CMDLEN];
 
     memset(wv_cdb, 0, WRITE_VERIFY10_CMDLEN);
-#ifdef WRITE_FOR_WVERIFY
-    wv_cdb[0] = WRITE10_CMD;
-#else
     wv_cdb[0] = WRITE_VERIFY10_CMD;
-#endif
     wv_cdb[1] = ((wrprotect & WRPROTECT_MASK) << WRPROTECT_SHIFT);
     if (dpo)
         wv_cdb[1] |= 0x10;
@@ -241,11 +224,7 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
 
 
     memset(wv_cdb, 0, sizeof(wv_cdb));
-#ifdef WRITE_FOR_WVERIFY
-    wv_cdb[0] = WRITE16_CMD;
-#else
     wv_cdb[0] = WRITE_VERIFY16_CMD;
-#endif
     wv_cdb[1] = ((wrprotect & WRPROTECT_MASK) << WRPROTECT_SHIFT);
     if (dpo)
         wv_cdb[1] |= 0x10;
@@ -273,23 +252,23 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
 static int
 open_if(const char * fn, int got_stdin)
 {
-        int fd;
+    int fd;
 
-        if (got_stdin)
-                fd = STDIN_FILENO;
-        else {
-                fd = open(fn, O_RDONLY);
-                if (fd < 0) {
-                    fprintf(stderr, ME "open error: %s: %s\n", fn,
-                            safe_strerror(errno));
-                    return -SG_LIB_FILE_ERROR;
-                }
-        }
-        if (sg_set_binary_mode(fd) < 0) {
-            perror("sg_set_binary_mode");
+    if (got_stdin)
+        fd = STDIN_FILENO;
+    else {
+        fd = open(fn, O_RDONLY);
+        if (fd < 0) {
+            fprintf(stderr, ME "open error: %s: %s\n", fn,
+                    safe_strerror(errno));
             return -SG_LIB_FILE_ERROR;
         }
-        return fd;
+    }
+    if (sg_set_binary_mode(fd) < 0) {
+        perror("sg_set_binary_mode");
+        return -SG_LIB_FILE_ERROR;
+    }
+    return fd;
 }
 
 int
@@ -322,6 +301,7 @@ main(int argc, char * argv[])
     int tnum_lb_wr = 0;
     char cmd_name[32];
 
+    ifnp = "";          /* keep MinGW quiet */
     while (1) {
         int option_index = 0;
 
@@ -479,13 +459,8 @@ main(int argc, char * argv[])
         do_16 = 1;
     if ((0 == do_16) && (num_lb > 0xffff))
         do_16 = 1;
-#ifdef WRITE_FOR_WVERIFY
-    snprintf(cmd_name, sizeof(cmd_name), "Write [and not verify](%d)",
-             (do_16 ? 16 : 10));
-#else
     snprintf(cmd_name, sizeof(cmd_name), "Write and verify(%d)",
              (do_16 ? 16 : 10));
-#endif
     if (verbose && (0 == given_do_16) && do_16)
         fprintf(stderr, "Switching to %s because LBA or NUM too large\n",
                 cmd_name);
