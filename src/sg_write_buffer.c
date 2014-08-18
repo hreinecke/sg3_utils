@@ -26,7 +26,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.15 20140518";    /* spc4r37 */
+static const char * version_str = "1.16 20140817";    /* spc4r37 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -478,7 +478,12 @@ main(int argc, char * argv[])
                     if (verbose) {
                         pr2serr("tried to read %d bytes from %s, got %d "
                                 "bytes\n", wb_len, file_name, res);
-                        pr2serr("will write %d bytes\n", res);
+                        pr2serr("will write %d bytes", res);
+                        if ((bpw > 0) && (bpw < wb_len))
+                            pr2serr(", %d bytes per WRITE BUFFER command\n",
+                                    bpw);
+                        else
+                            pr2serr("\n");
                     }
                     wb_len = res;
                 }

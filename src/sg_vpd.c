@@ -33,7 +33,7 @@
 
 */
 
-static const char * version_str = "0.90 20140812";  /* spc4r37 + sbc4r02 */
+static const char * version_str = "0.91 20140816";  /* spc4r37 + sbc4r02 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -1768,6 +1768,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
     char b[80];
     int num, is_be;
     const char * cp;
+    const char * ata_transp;
 
     if (len < 36) {
         pr2serr("ATA information VPD page length too short=%d\n", len);
@@ -1788,10 +1789,12 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
     printf("  SAT Product revision level: %s\n", b);
     if (len < 56)
         return;
+    ata_transp = (0x34 == buff[36]) ? "SATA" : "PATA";
     if (do_long) {
-        printf("  Signature (Device to host FIS):\n");
+        printf("  Device signature [%s] (in hex):\n", ata_transp);
         dStrHex((const char *)buff + 36, 20, 0);
-    }
+    } else
+        printf("  Device signature indicates %s transport\n", ata_transp);
     if (len < 60)
         return;
     is_be = sg_is_big_endian();

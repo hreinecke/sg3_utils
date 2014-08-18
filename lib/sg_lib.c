@@ -135,7 +135,8 @@ sg_print_command(const unsigned char * command)
 void
 sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {
-    const char * ccp;
+    const char * ccp = NULL;
+    int unknown = 0;
 
     if ((NULL == buff) || (buff_len < 1))
         return;
@@ -150,15 +151,20 @@ sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
         case 0x4: ccp = "Condition Met"; break;
         case 0x8: ccp = "Busy"; break;
         case 0x10: ccp = "Intermediate (obsolete)"; break;
-        case 0x14: ccp = "Intermediate-Condition Met (obs)"; break;
+        case 0x14: ccp = "Intermediate-Condition Met (obsolete)"; break;
         case 0x18: ccp = "Reservation Conflict"; break;
         case 0x22: ccp = "Command Terminated (obsolete)"; break;
         case 0x28: ccp = "Task set Full"; break;
         case 0x30: ccp = "ACA Active"; break;
         case 0x40: ccp = "Task Aborted"; break;
-        default: ccp = "Unknown status"; break;
+        default:
+            unknown = 1;
+            break;
     }
-    my_snprintf(buff, buff_len, "%s", ccp);
+    if (unknown)
+        my_snprintf(buff, buff_len, "Unknown status [0x%x]", scsi_status);
+    else
+        my_snprintf(buff, buff_len, "%s", ccp);
 }
 
 void
@@ -173,6 +179,8 @@ sg_print_scsi_status(int scsi_status)
     fprintf(sg_warnings_strm, "%s ", buff);
 }
 
+/* Get sense key from sense buffer. If successful returns a sense key value
+ * between 0 and 15. If sense buffer cannot be decode, returns -1 . */
 int
 sg_get_sense_key(const unsigned char * sensep, int sense_len)
 {
@@ -190,6 +198,7 @@ sg_get_sense_key(const unsigned char * sensep, int sense_len)
     }
 }
 
+/* Yield string associated with sense_key value. Returns 'buff'. */
 char *
 sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
 {
@@ -204,6 +213,7 @@ sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
     return buff;
 }
 
+/* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
 char *
 sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
@@ -253,6 +263,9 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
     return buff;
 }
 
+/* Attempt to find the first SCSI sense data descriptor that matches the
+ * given 'desc_type'. If found return pointer to start of sense data
+ * descriptor; otherwise (including fixed format sense data) returns NULL. */
 const unsigned char *
 sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
                         int desc_type)
@@ -279,6 +292,9 @@ sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
     return NULL;
 }
 
+/* Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
+ * information field is written out via 'info_outp' (except when it is
+ * NULL). Handles both fixed and descriptor sense formats. */
 int
 sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
                       uint64_t * info_outp)
@@ -318,6 +334,10 @@ sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     }
 }
 
+/* Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
+ * In descriptor format if the stream commands descriptor not found
+ * then returns 0. Writes 1 or 0 corresponding to these bits to the
+ * last three arguments if they are non-NULL. */
 int
 sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
                               int * filemark_p, int * eom_p, int * ili_p)
