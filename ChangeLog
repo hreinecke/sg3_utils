@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20140812] [svn: r598]
+Changelog for sg3_utils-1.40 [20140818] [svn: r599]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_senddiag: add --maxlen= option
   - sg_copy_results: correct response length calculations
@@ -11,7 +11,9 @@ Changelog for sg3_utils-1.40 [20140812] [svn: r598]
       default remains read-write error recovery mpage
   - sg_inq: expand Block limits VPD page output
   - sg_vpd: add --all option
+  - sg_ses: fix problem with --index=sse (and ssc)
   - sg_logs: refine tape drive output
+  - sg_sat_*: mention t_type and multiple_count fields
   - win32: sg_scan: handle larger configurations
   - sg_lib: trim trailing spaces in dStrHex() and friends
   - examples/sg_tst_async: new Linux sg test utility

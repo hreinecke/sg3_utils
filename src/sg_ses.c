@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.91 20140515";    /* ses3r06 */
+static const char * version_str = "1.92 20140818";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -726,9 +726,11 @@ parse_index(struct opts_t *op)
         if (NULL == cp)
             op->ind_indiv = -1;
     } else { /* element type abbreviation perhaps followed by <num> */
+        int blen = strlen(b);
+
         for (etp = element_type_arr; etp->desc; ++etp) {
             n = strlen(etp->abbrev);
-            if (0 == strncmp(b, etp->abbrev, n))
+            if ((n == blen) && (0 == strncmp(b, etp->abbrev, n)))
                 break;
         }
         if (NULL == etp->desc) {
