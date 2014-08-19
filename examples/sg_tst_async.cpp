@@ -56,12 +56,13 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.04 20140712";
+static const char * version_str = "1.05 20140819";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
- * driver. Each thread opens 1 file descriptor to the given sg device and
- * then starts up to 16 commands while checking with the poll command (or
+ * driver. Each thread opens 1 file descriptor to the next sg device (1
+ * or more can be given on the command line) and then starts up to 16
+ * commands while checking with the poll command (or
  * ioctl(SG_GET_NUM_WAITING) ) for the completion of those commands. Each
  * command has a unique "pack_id" which is a sequence starting at 1.
  * Either TEST UNIT UNIT, READ(16) or WRITE(16) commands are issued.
@@ -105,8 +106,9 @@ using namespace std::chrono;
 #define DEF_BLOCKING 0
 #define DEF_DIRECT 0
 #define DEF_NO_XFER 0
+#define DEF_LBA 1000
 
-#define Q_PER_FD 16     /* sg driver per file descriptor limit */
+#define MAX_Q_PER_FD 16     /* sg driver per file descriptor limit */
 #define MAX_CONSEC_NOMEMS 16
 #define URANDOM_DEV "/dev/urandom"
 
@@ -118,7 +120,6 @@ using namespace std::chrono;
 #endif
 
 
-#define DEF_LBA 1000
 
 #define EBUFF_SZ 256
 
@@ -137,12 +138,14 @@ enum blkQDiscipline {BQ_DEFAULT, BQ_AT_HEAD, BQ_AT_TAIL};
 enum myQDiscipline {MQD_LOW, MQD_MEDIUM, MQD_HIGH};
 
 struct opts_t {
-    const char * dev_name;
+    vector<const char *> dev_names;
     bool direct;
+    int maxq_per_thread;
     int num_per_thread;
     bool block;
     uint64_t lba;
     unsigned int hi_lba;        /* last one, inclusive range */
+    vector<unsigned int> hi_lbas; /* only used when hi_lba=-1 */
     int lb_sz;
     bool no_xfer;
     int verbose;
@@ -191,11 +194,13 @@ private:
 static void
 usage(void)
 {
-    printf("Usage: %s [-d] [-f] [-h] [-l <lba+>] [-n <n_per_thr>] [-N]\n"
-           "                    [-q 0|1] [-Q 0|1|2] [-R] [-s <lb_sz>]\n"
-           "                    [-t <num_thrs>] [-T] [-v] [-V] "
-           "[-w <wait_ms>]\n"
-           "                    [-W] <sg_disk_device>\n", util_name);
+    printf("Usage: %s [-d] [-f] [-h] [-l <lba+>] [-M <maxq_per_thr>]\n"
+           "                    [-n <n_per_thr>] [-N] [-q 0|1] [-Q 0|1|2] "
+           "[-R]\n"
+           "                    [-s <lb_sz>] [-t <num_thrs>] [-T] [-v] "
+           "[-V]\n"
+           "                    [-w <wait_ms>] [-W] <sg_disk_device>*\n",
+           util_name);
     printf("  where\n");
     printf("    -d                do direct_io (def: indirect)\n");
     printf("    -f                force: any sg device (def: only scsi_debug "
@@ -204,7 +209,11 @@ usage(void)
     printf("    -h                print this usage message then exit\n");
     printf("    -l <lba>          logical block to access (def: %u)\n",
            DEF_LBA);
-    printf("    -l <lba,hi_lba>    logical block range (inclusive)\n");
+    printf("    -l <lba,hi_lba>    logical block range (inclusive), if "
+           "hi_lba=-1\n"
+           "                       assume last block on device\n");
+    printf("    -M <maxq_per_thr>    maximum commands queued per thread "
+           "(def:%d)\n", MAX_Q_PER_FD);
     printf("    -n <n_per_thr>    number of commands per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
     printf("    -N                no data xfer (def: xfer on READ and "
@@ -224,27 +233,28 @@ usage(void)
     printf("    -w <wait_ms>      >0: poll(<wait_ms>); =0: poll(0); (def: "
            "%d)\n", DEF_WAIT_MS);
     printf("    -W                do WRITEs (def: TUR)\n\n");
-    printf("Multiple threads do READ(16), WRITE(16) or TEST UNIT READY "
-           "(TUR) SCSI\ncommands. Each thread has its own file descriptor "
-           "and queues up to\n16 commands. One block is transferred by "
-           "each READ and WRITE; zeros\nare written. If a logical block "
-           "range is given, a uniform distribution\ngenerates a pseudo "
+    printf("Multiple threads send READ(16), WRITE(16) or TEST UNIT READY "
+           "(TUR) SCSI\ncommands. There can be 1 or more <sg_disk_device>s "
+           "and each thread takes\nthe next in a round robin fashion. "
+           "Each thread queues up to 16 commands.\nOne block is transferred "
+           "by each READ and WRITE; zeros are written. If a\nlogical block "
+           "range is given, a uniform distribution generates a pseudo\n"
            "random sequence of LBAs.\n");
 }
 
 #ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
+static int pr2serr_lk(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
-static void pr_errno(int e_no, const char * fmt, ...)
+static void pr_errno_lk(int e_no, const char * fmt, ...)
         __attribute__ ((format (printf, 2, 3)));
 #else
-static int pr2serr(const char * fmt, ...);
-static void pr_errno(int e_no, const char * fmt, ...);
+static int pr2serr_lk(const char * fmt, ...);
+static void pr_errno_lk(int e_no, const char * fmt, ...);
 #endif
 
 
 static int
-pr2serr(const char * fmt, ...)
+pr2serr_lk(const char * fmt, ...)
 {
     int n;
 
@@ -261,9 +271,9 @@ pr2serr(const char * fmt, ...)
 }
 
 static void
-pr_errno(int e_no, const char * fmt, ...)
+pr_errno_lk(int e_no, const char * fmt, ...)
 {
-    char b[128];
+    char b[160];
 
     console_mutex.lock();
     {
@@ -372,7 +382,7 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
             this_thread::yield();
             continue;
         }
-        pr_errno(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
+        pr_errno_lk(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
         return -1;
     }
     return 0;
@@ -416,7 +426,7 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
             sleep(0);                   // process yield ??
     }
     if (res < 0) {
-        pr_errno(errno, "%s: %s", __func__, np);
+        pr_errno_lk(errno, "%s: %s", __func__, np);
         return -1;
     }
     /* now for the error processing */
@@ -427,7 +437,7 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
         ok = 1;
         break;
     case SG_LIB_CAT_RECOVERED:
-        pr2serr("%s: Recovered error on %s, continuing\n", __func__, np);
+        pr2serr_lk("%s: Recovered error on %s, continuing\n", __func__, np);
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
@@ -453,7 +463,7 @@ get_aligned_heap(int bytes_at_least)
 #if 1
     int err = posix_memalign(&wp, page_size, n);
     if (err) {
-        pr2serr("posix_memalign: error [%d] out of memory?\n", err);
+        pr2serr_lk("posix_memalign: error [%d] out of memory?\n", err);
         return NULL;
     }
     memset(wp, 0, n);
@@ -464,7 +474,7 @@ get_aligned_heap(int bytes_at_least)
         memset(wp, 0, n);
         return (unsigned char *)wp;
     } else {
-        pr2serr("get_aligned_heap: too fiddly to align, choose smaller "
+        pr2serr_lk("get_aligned_heap: too fiddly to align, choose smaller "
                 "lb_sz\n");
         return NULL;
     }
@@ -485,6 +495,7 @@ work_thread(int id, struct opts_t * op)
     char ebuff[EBUFF_SZ];
     uint64_t lba;
     unsigned char * lbp;
+    const char * dev_name;
     const char * err = NULL;
     Rand_uint * ruip = NULL;
     struct pollfd  pfd[1];
@@ -492,15 +503,25 @@ work_thread(int id, struct opts_t * op)
     map<int, unsigned char *> pi_2_buff;
     map<int, uint64_t> pi_2_lba;
 
-    if (op->verbose)
-        pr2serr("Enter work_thread id=%d\n", id);
+    n = op->dev_names.size();
+    dev_name = op->dev_names[id % n];
+    if (op->verbose) {
+        if ((op->verbose > 1) && op->hi_lba)
+            pr2serr_lk("Enter work_thread id=%d using %s\n"
+                       "    LBA range: 0x%x to 0x%x (inclusive)\n",
+                       id, dev_name, (unsigned int)op->lba,
+                       (UINT_MAX == op->hi_lba) ? op->hi_lbas[id % n]
+                                                : op->hi_lba);
+        else
+            pr2serr_lk("Enter work_thread id=%d using %s\n", id, dev_name);
+    }
     if (! op->block)
         open_flags |= O_NONBLOCK;
 
-    sg_fd = open(op->dev_name, open_flags);
+    sg_fd = open(dev_name, open_flags);
     if (sg_fd < 0) {
-        pr_errno(errno, "%s: id=%d, error opening file: %s", __func__, id,
-                 op->dev_name);
+        pr_errno_lk(errno, "%s: id=%d, error opening file: %s", __func__, id,
+                 dev_name);
         return;
     }
     pfd[0].fd = sg_fd;
@@ -508,8 +529,12 @@ work_thread(int id, struct opts_t * op)
     if (is_rw && op->hi_lba) {
         seed = get_urandom_uint();
         if (op->verbose > 1)
-            pr2serr("  id=%d, /dev/urandom seed=0x%x\n", id, seed);
-        ruip = new Rand_uint((unsigned int)op->lba, op->hi_lba, seed);
+            pr2serr_lk("  id=%d, /dev/urandom seed=0x%x\n", id, seed);
+        if (UINT_MAX == op->hi_lba)
+            ruip = new Rand_uint((unsigned int)op->lba, op->hi_lbas[id % n],
+                                 seed);
+        else
+            ruip = new Rand_uint((unsigned int)op->lba, op->hi_lba, seed);
     }
 
     sg_flags = 0;
@@ -522,14 +547,15 @@ work_thread(int id, struct opts_t * op)
     if (op->no_xfer)
         sg_flags |= SG_FLAG_NO_DXFER;
     if (op->verbose > 1)
-        pr2serr("sg_flags=0x%x, %s cmds\n", sg_flags, ((SCSI_TUR == op->c2e) ?
-                     "TUR": ((SCSI_READ16 == op->c2e) ? "READ" : "WRITE")));
+        pr2serr_lk("  id=%d, sg_flags=0x%x, %s cmds\n", id, sg_flags,
+                   ((SCSI_TUR == op->c2e) ? "TUR":
+                    ((SCSI_READ16 == op->c2e) ? "READ" : "WRITE")));
 
     num = op->num_per_thread;
     for (k = 0, num_outstanding = 0; (k < num) || num_outstanding;
          k = do_inc ? k + 1 : k) {
         do_inc = 0;
-        if ((num_outstanding < Q_PER_FD) && (k < num)) {
+        if ((num_outstanding < op->maxq_per_thread) && (k < num)) {
             do_inc = 1;
             pack_id = uniq_pack_id.fetch_add(1);
             if (is_rw) {
@@ -549,7 +575,8 @@ work_thread(int id, struct opts_t * op)
                 if (ruip) {
                     lba = ruip->get();
                     if (op->verbose > 3)
-                        pr2serr("  start IO at lba=0x%" PRIx64 "\n", lba);
+                        pr2serr_lk("  id=%d: start IO at lba=0x%" PRIx64 "\n",
+                                   id, lba);
                 } else
                     lba = op->lba;
             } else
@@ -566,7 +593,7 @@ work_thread(int id, struct opts_t * op)
                 pi_2_lba[pack_id] = lba;
         }
         num_to_read = 0;
-        if ((num_outstanding >= Q_PER_FD) || (k >= num)) {
+        if ((num_outstanding >= op->maxq_per_thread) || (k >= num)) {
             /* full queue or finished injecting */
             num_waiting_read = 0;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting_read) < 0) {
@@ -653,8 +680,12 @@ work_thread(int id, struct opts_t * op)
             if (ruip && (pack_id > 0)) {
                 auto q = pi_2_lba.find(pack_id);
 
-                if (q != pi_2_lba.end())
+                if (q != pi_2_lba.end()) {
+                    if (op->verbose > 3)
+                        pr2serr_lk("    id=%d: finish IO at lba=0x%" PRIx64
+                                   "\n", id, q->second);
                     pi_2_lba.erase(q);
+                }
             }
             if (err)
                 break;
@@ -668,15 +699,15 @@ work_thread(int id, struct opts_t * op)
 
     if (err || (k < num)) {
         if (k < num)
-            pr2serr("thread id=%d FAILed at iteration %d%s%s\n", id, k,
+            pr2serr_lk("thread id=%d FAILed at iteration %d%s%s\n", id, k,
                     (err ? ", Reason: " : ""), (err ? err : ""));
         else
-            pr2serr("thread id=%d FAILed on last%s%s\n", id,
+            pr2serr_lk("thread id=%d FAILed on last%s%s\n", id,
                     (err ? ", Reason: " : ""), (err ? err : ""));
     }
     n = pi_2_buff.size();
     if (n > 0)
-        pr2serr("thread id=%d Still %d elements in pi_2_buff map on exit\n",
+        pr2serr_lk("thread id=%d Still %d elements in pi_2_buff map on exit\n",
                 id, n);
     for (k = 0; ! free_lst.empty(); ++k) {
         lbp = free_lst.back();
@@ -685,7 +716,7 @@ work_thread(int id, struct opts_t * op)
             free(lbp);
     }
     if ((op->verbose > 2) && (k > 0))
-        pr2serr("thread id=%d Maximum number of READ/WRITEs queued: %d\n",
+        pr2serr_lk("thread id=%d Maximum number of READ/WRITEs queued: %d\n",
                 id, k);
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
@@ -707,16 +738,13 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     unsigned char inqBuff[INQ_REPLY_LEN];
     unsigned char sense_buffer[64];
-    char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 
     if (! block)
         open_flags |= O_NONBLOCK;
     sg_fd = open(dev_name, open_flags);
     if (sg_fd < 0) {
-        snprintf(ebuff, EBUFF_SZ,
-                 "do_inquiry_prod_id: error opening file: %s", dev_name);
-        perror(ebuff);
+        pr_errno_lk(errno, "%s: error opening file: %s", __func__, dev_name);
         return -1;
     }
     /* Prepare INQUIRY command */
@@ -736,7 +764,7 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
     /* pt.usr_ptr = NULL; */
 
     if (ioctl(sg_fd, SG_IO, &pt) < 0) {
-        perror("do_inquiry_prod_id: Inquiry SG_IO ioctl error");
+        pr_errno_lk(errno, "%s: Inquiry SG_IO ioctl error", __func__);
         close(sg_fd);
         return -1;
     }
@@ -748,11 +776,13 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
         ok = 1;
         break;
     case SG_LIB_CAT_RECOVERED:
-        fprintf(stderr, "Recovered error on INQUIRY, continuing\n");
+        pr2serr_lk("Recovered error on INQUIRY, continuing\n");
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
+        console_mutex.lock();
         sg_chk_n_print3("INQUIRY command error", &pt, 1);
+        console_mutex.unlock();
         break;
     }
     if (ok) {
@@ -773,6 +803,65 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
     return ret;
 }
 
+/* Only allow ranges up to 2**32-1 upper limit, so READ CAPACITY(10)
+ * sufficient. Return of 0 -> success, -1 -> failure, 2 -> try again */
+static int
+do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
+                 unsigned int * blk_sz)
+{
+    int res, sg_fd;
+    unsigned char rcCmdBlk [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char rcBuff[64];
+    unsigned char sense_b[64];
+    sg_io_hdr_t io_hdr;
+    int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
+
+    if (! block)
+        open_flags |= O_NONBLOCK;
+    sg_fd = open(dev_name, open_flags);
+    if (sg_fd < 0) {
+        pr_errno_lk(errno, "%s: error opening file: %s", __func__, dev_name);
+        return -1;
+    }
+    /* Prepare READ CAPACITY(10) command */
+    memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
+    io_hdr.interface_id = 'S';
+    io_hdr.cmd_len = sizeof(rcCmdBlk);
+    io_hdr.mx_sb_len = sizeof(sense_b);
+    io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
+    io_hdr.dxfer_len = sizeof(rcBuff);
+    io_hdr.dxferp = rcBuff;
+    io_hdr.cmdp = rcCmdBlk;
+    io_hdr.sbp = sense_b;
+    io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */;
+
+    if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        pr_errno_lk(errno, "%s (SG_IO) error", __func__);
+        close(sg_fd);
+        return -1;
+    }
+    res = sg_err_category3(&io_hdr);
+    if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+        console_mutex.lock();
+        sg_chk_n_print3("read capacity", &io_hdr, 1);
+        console_mutex.unlock();
+        close(sg_fd);
+        return 2; /* probably have another go ... */
+    } else if (SG_LIB_CAT_CLEAN != res) {
+        console_mutex.lock();
+        sg_chk_n_print3("read capacity", &io_hdr, 1);
+        console_mutex.unlock();
+        close(sg_fd);
+        return -1;
+    }
+    *last_lba = ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
+                 (rcBuff[2] << 8) | rcBuff[3]);
+    *blk_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
+               (rcBuff[6] << 8) | rcBuff[7];
+    close(sg_fd);
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -780,20 +869,19 @@ main(int argc, char * argv[])
     int k, n, res;
     int force = 0;
     int64_t ll;
-    unsigned int inq_ebusy_count = 0;
     int num_threads = DEF_NUM_THREADS;
-    char b[64];
+    char b[128];
     struct timespec start_tm, end_tm;
     struct opts_t opts;
     struct opts_t * op;
     const char * cp;
 
     op = &opts;
-    op->dev_name = NULL;
     op->direct = !! DEF_DIRECT;
     op->lba = DEF_LBA;
     op->hi_lba = 0;
-    op->lb_sz = DEF_LB_SZ;;
+    op->lb_sz = DEF_LB_SZ;
+    op->maxq_per_thread = MAX_Q_PER_FD;
     op->num_per_thread = DEF_NUM_PER_THREAD;
     op->no_xfer = !! DEF_NO_XFER;
     op->verbose = 0;
@@ -817,20 +905,36 @@ main(int argc, char * argv[])
             if ((k < argc) && isdigit(*argv[k])) {
                 ll = sg_get_llnum(argv[k]);
                 if (-1 == ll) {
-                    fprintf(stderr, "could not decode lba\n");
+                    pr2serr_lk("could not decode lba\n");
                     return 1;
                 } else
                     op->lba = (uint64_t)ll;
                 cp = strchr(argv[k], ',');
                 if (cp) {
-                    ll = sg_get_llnum(cp + 1);
-                    if ((-1 == ll) || (ll > UINT_MAX)) {
-                        fprintf(stderr, "could not decode hi_lba, or > "
-                                "UINT_MAX\n");
-                        return 1;
-                    } else
-                        op->hi_lba = (unsigned int)ll;
+                    if (0 == strcmp("-1", cp + 1))
+                        op->hi_lba = UINT_MAX;
+                    else {
+                        ll = sg_get_llnum(cp + 1);
+                        if ((-1 == ll) || (ll > UINT_MAX)) {
+                            pr2serr_lk("could not decode hi_lba, or > "
+                                       "UINT_MAX\n");
+                            return 1;
+                        } else
+                            op->hi_lba = (unsigned int)ll;
+                    }
                 }
+            } else
+                break;
+        } else if (0 == memcmp("-M", argv[k], 2)) {
+            ++k;
+            if ((k < argc) && isdigit(*argv[k])) {
+                n = atoi(argv[k]);
+                if ((n < 1) || (n > MAX_Q_PER_FD)) {
+                    pr2serr_lk("-M expects a value from 1 to %d\n",
+                               MAX_Q_PER_FD);
+                    return 1;
+                }
+                op->maxq_per_thread = n;
             } else
                 break;
         } else if (0 == memcmp("-n", argv[k], 2)) {
@@ -849,7 +953,8 @@ main(int argc, char * argv[])
                     op->bqd = BQ_AT_HEAD;
                 else if (1 == n)
                     op->bqd = BQ_AT_TAIL;
-            }
+            } else
+                break;
         } else if (0 == memcmp("-Q", argv[k], 2)) {
             ++k;
             if ((k < argc) && isdigit(*argv[k])) {
@@ -860,7 +965,8 @@ main(int argc, char * argv[])
                     op->mqd = MQD_MEDIUM;
                 else if (2 == n)
                     op->mqd = MQD_HIGH;
-            }
+            } else
+                break;
         } else if (0 == memcmp("-R", argv[k], 2))
             op->c2e = SCSI_READ16;
         else if (0 == memcmp("-s", argv[k], 2)) {
@@ -904,19 +1010,12 @@ main(int argc, char * argv[])
         } else if (0 == memcmp("-W", argv[k], 2))
             op->c2e = SCSI_WRITE16;
         else if (*argv[k] == '-') {
-            fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
-            op->dev_name = NULL;
-            break;
-        }
-        else if (! op->dev_name)
-            op->dev_name = argv[k];
-        else {
-            cerr << "too many arguments" << endl;
-            op->dev_name = NULL;
-            break;
-        }
+            pr2serr_lk("Unrecognized switch: %s\n", argv[k]);
+            return 1;
+        } else
+            op->dev_names.push_back(argv[k]);
     }
-    if (0 == op->dev_name) {
+    if (0 == op->dev_names.size()) {
         usage();
         return 1;
     }
@@ -928,34 +1027,59 @@ main(int argc, char * argv[])
     try {
         struct stat a_stat;
 
-        if (stat(op->dev_name, &a_stat) < 0) {
-            perror("stat() on dev_name failed");
-            return 1;
-        }
-        if (! S_ISCHR(a_stat.st_mode)) {
-            fprintf(stderr, "%s should be a sg device which is a char "
-                    "device. %s\n", op->dev_name, op->dev_name);
-            fprintf(stderr, "is not a char device and damage could be done "
-                    "if it is a BLOCK\ndevice, exiting ...\n");
-            return 1;
-        }
-        if (! force) {
-            res = do_inquiry_prod_id(op->dev_name, op->block, b, sizeof(b));
-            if (res) {
-                fprintf(stderr, "INQUIRY failed on %s\n", op->dev_name);
+        for (k = 0; k < (int)op->dev_names.size(); ++k) {
+            if (stat(op->dev_names[k], &a_stat) < 0) {
+                snprintf(b, sizeof(b), "could not stat() %s",
+                         op->dev_names[k]);
+                perror(b);
                 return 1;
             }
-            // For safety, since <lba> written to, only permit scsi_debug
-            // devices. Bypass this with '-f' option.
-            if (0 != memcmp("scsi_debug", b, 10)) {
-                fprintf(stderr, "Since this utility may write to LBA 0x%"
-                        PRIx64 ", only devices with the\n"
-                        "product ID 'scsi_debug' accepted. Use '-f' to "
-                        "override.\n", op->lba);
-                return 2;
+            if (! S_ISCHR(a_stat.st_mode)) {
+                pr2serr_lk("%s should be a sg device which is a char "
+                        "device. %s\n", op->dev_names[k], op->dev_names[k]);
+                pr2serr_lk("is not a char device and damage could be "
+                        "done if it is a BLOCK\ndevice, exiting ...\n");
+                return 1;
             }
-            ebusy_count += inq_ebusy_count;
+            if (! force) {
+                res = do_inquiry_prod_id(op->dev_names[k], op->block, b,
+                                         sizeof(b));
+                if (res) {
+                    pr2serr_lk("INQUIRY failed on %s\n", op->dev_names[k]);
+                    return 1;
+                }
+                // For safety, since <lba> written to, only permit scsi_debug
+                // devices. Bypass this with '-f' option.
+                if (0 != memcmp("scsi_debug", b, 10)) {
+                    pr2serr_lk("Since this utility may write to LBAs, "
+                               "only devices with the\n"
+                               "product ID 'scsi_debug' accepted. Use '-f' "
+                               "to override.\n");
+                    return 2;
+                }
+            }
+            if (UINT_MAX == op->hi_lba) {
+                unsigned int last_lba;
+                unsigned int blk_sz;
+
+                res = do_read_capacity(op->dev_names[k], op->block,
+                                       &last_lba, &blk_sz);
+                if (2 == res)
+                    res = do_read_capacity(op->dev_names[k], op->block,
+                                           &last_lba, &blk_sz);
+                if (res) {
+                    pr2serr_lk("READ CAPACITY(10) failed on %s\n",
+                               op->dev_names[k]);
+                    return 1;
+                }
+                op->hi_lbas.push_back(last_lba);
+                if (blk_sz != (unsigned int)op->lb_sz)
+                    pr2serr_lk(">>> warning: Logical block size (%d) of %s\n"
+                               "    differs from command line option (or "
+                               "default)\n", blk_sz, op->dev_names[k]);
+            }
         }
+
         start_tm.tv_sec = 0;
         start_tm.tv_nsec = 0;
         if (clock_gettime(CLOCK_MONOTONIC, &start_tm) < 0)
