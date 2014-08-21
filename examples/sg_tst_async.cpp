@@ -56,7 +56,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.05 20140819";
+static const char * version_str = "1.05 20140821";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -134,8 +134,13 @@ static atomic<int> uniq_pack_id(1);
 static int page_size = 4096;   /* rough guess, will ask sysconf() */
 
 enum command2execute {SCSI_TUR, SCSI_READ16, SCSI_WRITE16};
-enum blkQDiscipline {BQ_DEFAULT, BQ_AT_HEAD, BQ_AT_TAIL};
-enum myQDiscipline {MQD_LOW, MQD_MEDIUM, MQD_HIGH};
+/* Linux Block layer queue disciplines: */
+enum blkLQDiscipline {BLQ_DEFAULT, BLQ_AT_HEAD, BLQ_AT_TAIL};
+/* Queue disciplines of this utility. When both completions and
+ * queuing a new command are both possible: */
+enum myQDiscipline {MYQD_LOW,   /* favour completions over new cmds */
+                    MYQD_MEDIUM,
+                    MYQD_HIGH}; /* favour new cmds over completions */
 
 struct opts_t {
     vector<const char *> dev_names;
@@ -151,8 +156,8 @@ struct opts_t {
     int verbose;
     int wait_ms;
     command2execute c2e;
-    blkQDiscipline bqd;
-    myQDiscipline mqd;
+    blkLQDiscipline blqd;
+    myQDiscipline myqd;
 };
 
 #if 0
@@ -180,11 +185,16 @@ private:
 };
 #endif
 
+/* Use this class to wrap C++11 <random> features to produce uniform random
+ * unsigned ints in the range [lo, hi] (inclusive) given a_seed */
 class Rand_uint {
 public:
-    Rand_uint(unsigned int lo, unsigned int hi, unsigned int my_seed)
-        : uid(lo, hi), dre(my_seed) { }
+    Rand_uint(unsigned int lo, unsigned int hi, unsigned int a_seed)
+        : uid(lo, hi), dre(a_seed) { }
+    /* uid ctor takes inclusive range when integral type */
+
     unsigned int get() { return uid(dre); }
+
 private:
     uniform_int_distribution<unsigned int> uid;
     default_random_engine dre;
@@ -293,15 +303,16 @@ get_urandom_uint(void)
     unsigned int res = 0;
     int n;
     unsigned char b[sizeof(unsigned int)];
-    int fd = open(URANDOM_DEV, O_RDONLY);
 
+    rand_lba_mutex.lock();
+    int fd = open(URANDOM_DEV, O_RDONLY);
     if (fd >= 0) {
-        /* assume this read is atomic */
         n = read(fd, b, sizeof(unsigned int));
         if (sizeof(unsigned int) == n)
             memcpy(&res, b, sizeof(unsigned int));
         close(fd);
     }
+    rand_lba_mutex.unlock();
     return res;
 }
 
@@ -469,13 +480,14 @@ get_aligned_heap(int bytes_at_least)
     memset(wp, 0, n);
     return (unsigned char *)wp;
 #else
+    /* hack if posix_memalign() is not available */
     if (n == page_size) {
         wp = calloc(page_size, 1);
         memset(wp, 0, n);
         return (unsigned char *)wp;
     } else {
         pr2serr_lk("get_aligned_heap: too fiddly to align, choose smaller "
-                "lb_sz\n");
+                   "lb_sz\n");
         return NULL;
     }
 #endif
@@ -488,7 +500,8 @@ work_thread(int id, struct opts_t * op)
     int thr_async_finishes = 0;
     unsigned int thr_eagain_count = 0;
     unsigned int seed = 0;
-    int k, n, res, sg_fd, num_outstanding, do_inc, num, pack_id, sg_flags;
+    unsigned int hi_lba;
+    int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
     int num_waiting_read, num_to_read;
     int open_flags = O_RDWR;
     bool is_rw = (SCSI_TUR != op->c2e);
@@ -499,19 +512,23 @@ work_thread(int id, struct opts_t * op)
     const char * err = NULL;
     Rand_uint * ruip = NULL;
     struct pollfd  pfd[1];
-    list<unsigned char *> free_lst;
-    map<int, unsigned char *> pi_2_buff;
-    map<int, uint64_t> pi_2_lba;
+    list<unsigned char *> free_lst;         /* of aligned lb buffers */
+    map<int, unsigned char *> pi_2_buff;    /* pack_id -> lb buffer */
+    map<int, uint64_t> pi_2_lba;            /* pack_id -> LBA */
 
+    /* device name and hi_lba may depend on id */
     n = op->dev_names.size();
     dev_name = op->dev_names[id % n];
+    if ((UINT_MAX == op->hi_lba) && (n == (int)op->hi_lbas.size()))
+        hi_lba = op->hi_lbas[id % n];
+    else
+        hi_lba = op->hi_lba;
+
     if (op->verbose) {
-        if ((op->verbose > 1) && op->hi_lba)
+        if ((op->verbose > 1) && hi_lba)
             pr2serr_lk("Enter work_thread id=%d using %s\n"
                        "    LBA range: 0x%x to 0x%x (inclusive)\n",
-                       id, dev_name, (unsigned int)op->lba,
-                       (UINT_MAX == op->hi_lba) ? op->hi_lbas[id % n]
-                                                : op->hi_lba);
+                       id, dev_name, (unsigned int)op->lba, hi_lba);
         else
             pr2serr_lk("Enter work_thread id=%d using %s\n", id, dev_name);
     }
@@ -521,26 +538,22 @@ work_thread(int id, struct opts_t * op)
     sg_fd = open(dev_name, open_flags);
     if (sg_fd < 0) {
         pr_errno_lk(errno, "%s: id=%d, error opening file: %s", __func__, id,
-                 dev_name);
+                    dev_name);
         return;
     }
     pfd[0].fd = sg_fd;
     pfd[0].events = POLLIN;
-    if (is_rw && op->hi_lba) {
+    if (is_rw && hi_lba) {
         seed = get_urandom_uint();
         if (op->verbose > 1)
             pr2serr_lk("  id=%d, /dev/urandom seed=0x%x\n", id, seed);
-        if (UINT_MAX == op->hi_lba)
-            ruip = new Rand_uint((unsigned int)op->lba, op->hi_lbas[id % n],
-                                 seed);
-        else
-            ruip = new Rand_uint((unsigned int)op->lba, op->hi_lba, seed);
+        ruip = new Rand_uint((unsigned int)op->lba, hi_lba, seed);
     }
 
     sg_flags = 0;
-    if (BQ_AT_TAIL == op->bqd)
+    if (BLQ_AT_TAIL == op->blqd)
         sg_flags |= SG_FLAG_Q_AT_TAIL;
-    else if (BQ_AT_HEAD == op->bqd)
+    else if (BLQ_AT_HEAD == op->blqd)
         sg_flags |= SG_FLAG_Q_AT_HEAD;
     if (op->direct)
         sg_flags |= SG_FLAG_DIRECT_IO;
@@ -551,14 +564,16 @@ work_thread(int id, struct opts_t * op)
                    ((SCSI_TUR == op->c2e) ? "TUR":
                     ((SCSI_READ16 == op->c2e) ? "READ" : "WRITE")));
 
-    num = op->num_per_thread;
-    for (k = 0, num_outstanding = 0; (k < num) || num_outstanding;
+    npt = op->num_per_thread;
+    /* main loop, continues until num_per_thread exhausted and there are
+     * no more outstanding responses */
+    for (k = 0, num_outstanding = 0; (k < npt) || num_outstanding;
          k = do_inc ? k + 1 : k) {
         do_inc = 0;
-        if ((num_outstanding < op->maxq_per_thread) && (k < num)) {
+        if ((num_outstanding < op->maxq_per_thread) && (k < npt)) {
             do_inc = 1;
             pack_id = uniq_pack_id.fetch_add(1);
-            if (is_rw) {
+            if (is_rw) {    /* get new lb buffer or one from free list */
                 if (free_lst.empty()) {
                     lbp = get_aligned_heap(op->lb_sz);
                     if (NULL == lbp) {
@@ -573,7 +588,7 @@ work_thread(int id, struct opts_t * op)
                 lbp = NULL;
             if (is_rw) {
                 if (ruip) {
-                    lba = ruip->get();
+                    lba = ruip->get();  /* fetch a random LBA */
                     if (op->verbose > 3)
                         pr2serr_lk("  id=%d: start IO at lba=0x%" PRIx64 "\n",
                                    id, lba);
@@ -593,7 +608,7 @@ work_thread(int id, struct opts_t * op)
                 pi_2_lba[pack_id] = lba;
         }
         num_to_read = 0;
-        if ((num_outstanding >= op->maxq_per_thread) || (k >= num)) {
+        if ((num_outstanding >= op->maxq_per_thread) || (k >= npt)) {
             /* full queue or finished injecting */
             num_waiting_read = 0;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting_read) < 0) {
@@ -603,23 +618,23 @@ work_thread(int id, struct opts_t * op)
             if (1 == num_waiting_read)
                 num_to_read = num_waiting_read;
             else if (num_waiting_read > 0) {
-                if (k >= num)
+                if (k >= npt)
                     num_to_read = num_waiting_read;
                 else {
-                    switch (op->mqd) {
-                    case MQD_LOW:
+                    switch (op->myqd) {
+                    case MYQD_LOW:
                         num_to_read = num_waiting_read;
                         break;
-                    case MQD_MEDIUM:
+                    case MYQD_MEDIUM:
                         num_to_read = num_waiting_read / 2;
                         break;
-                    case MQD_HIGH:
+                    case MYQD_HIGH:
                     default:
                         num_to_read = 1;
                         break;
                     }
                 }
-            } else {
+            } else {    /* nothing waiting to be read */
                 n = (op->wait_ms > 0) ? op->wait_ms : 0;
                 while (0 == (res = poll(pfd, 1, n))) {
                     if (res < 0) {
@@ -631,7 +646,7 @@ work_thread(int id, struct opts_t * op)
                     break;
             }
         } else {        /* not full, not finished injecting */
-            if (MQD_HIGH == op->mqd)
+            if (MYQD_HIGH == op->myqd)
                 num_to_read = 0;
             else {
                 num_waiting_read = 0;
@@ -641,7 +656,7 @@ work_thread(int id, struct opts_t * op)
                 }
                 if (num_waiting_read > 0)
                     num_to_read = num_waiting_read /
-                                  ((MQD_LOW == op->mqd) ? 1 : 2);
+                                  ((MYQD_LOW == op->myqd) ? 1 : 2);
                 else
                     num_to_read = 0;
             }
@@ -697,18 +712,18 @@ work_thread(int id, struct opts_t * op)
     if (ruip)
         delete ruip;
 
-    if (err || (k < num)) {
-        if (k < num)
+    if (err || (k < npt)) {
+        if (k < npt)
             pr2serr_lk("thread id=%d FAILed at iteration %d%s%s\n", id, k,
-                    (err ? ", Reason: " : ""), (err ? err : ""));
+                       (err ? ", Reason: " : ""), (err ? err : ""));
         else
             pr2serr_lk("thread id=%d FAILed on last%s%s\n", id,
-                    (err ? ", Reason: " : ""), (err ? err : ""));
+                       (err ? ", Reason: " : ""), (err ? err : ""));
     }
     n = pi_2_buff.size();
     if (n > 0)
-        pr2serr_lk("thread id=%d Still %d elements in pi_2_buff map on exit\n",
-                id, n);
+        pr2serr_lk("thread id=%d Still %d elements in pi_2_buff map on "
+                   "exit\n", id, n);
     for (k = 0; ! free_lst.empty(); ++k) {
         lbp = free_lst.back();
         free_lst.pop_back();
@@ -717,7 +732,7 @@ work_thread(int id, struct opts_t * op)
     }
     if ((op->verbose > 2) && (k > 0))
         pr2serr_lk("thread id=%d Maximum number of READ/WRITEs queued: %d\n",
-                id, k);
+                   id, k);
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
     eagain_count += thr_eagain_count;
@@ -875,6 +890,7 @@ main(int argc, char * argv[])
     struct opts_t opts;
     struct opts_t * op;
     const char * cp;
+    const char * dev_name;
 
     op = &opts;
     op->direct = !! DEF_DIRECT;
@@ -887,9 +903,9 @@ main(int argc, char * argv[])
     op->verbose = 0;
     op->wait_ms = DEF_WAIT_MS;
     op->c2e = SCSI_TUR;
-    op->bqd = BQ_DEFAULT;
+    op->blqd = BLQ_DEFAULT;
     op->block = !! DEF_BLOCKING;
-    op->mqd = MQD_HIGH;
+    op->myqd = MYQD_HIGH;
     page_size = sysconf(_SC_PAGESIZE);
 
     for (k = 1; k < argc; ++k) {
@@ -950,9 +966,9 @@ main(int argc, char * argv[])
             if ((k < argc) && isdigit(*argv[k])) {
                 n = atoi(argv[k]);
                 if (0 == n)
-                    op->bqd = BQ_AT_HEAD;
+                    op->blqd = BLQ_AT_HEAD;
                 else if (1 == n)
-                    op->bqd = BQ_AT_TAIL;
+                    op->blqd = BLQ_AT_TAIL;
             } else
                 break;
         } else if (0 == memcmp("-Q", argv[k], 2)) {
@@ -960,11 +976,11 @@ main(int argc, char * argv[])
             if ((k < argc) && isdigit(*argv[k])) {
                 n = atoi(argv[k]);
                 if (0 == n)
-                    op->mqd = MQD_LOW;
+                    op->myqd = MYQD_LOW;
                 else if (1 == n)
-                    op->mqd = MQD_MEDIUM;
+                    op->myqd = MYQD_MEDIUM;
                 else if (2 == n)
-                    op->mqd = MQD_HIGH;
+                    op->myqd = MYQD_HIGH;
             } else
                 break;
         } else if (0 == memcmp("-R", argv[k], 2))
@@ -1028,24 +1044,23 @@ main(int argc, char * argv[])
         struct stat a_stat;
 
         for (k = 0; k < (int)op->dev_names.size(); ++k) {
-            if (stat(op->dev_names[k], &a_stat) < 0) {
-                snprintf(b, sizeof(b), "could not stat() %s",
-                         op->dev_names[k]);
+            dev_name = op->dev_names[k];
+            if (stat(dev_name, &a_stat) < 0) {
+                snprintf(b, sizeof(b), "could not stat() %s", dev_name);
                 perror(b);
                 return 1;
             }
             if (! S_ISCHR(a_stat.st_mode)) {
                 pr2serr_lk("%s should be a sg device which is a char "
-                        "device. %s\n", op->dev_names[k], op->dev_names[k]);
-                pr2serr_lk("is not a char device and damage could be "
-                        "done if it is a BLOCK\ndevice, exiting ...\n");
+                           "device. %s\n", dev_name, dev_name);
+                pr2serr_lk("is not a char device and damage could be done "
+                           "if it is a BLOCK\ndevice, exiting ...\n");
                 return 1;
             }
             if (! force) {
-                res = do_inquiry_prod_id(op->dev_names[k], op->block, b,
-                                         sizeof(b));
+                res = do_inquiry_prod_id(dev_name, op->block, b, sizeof(b));
                 if (res) {
-                    pr2serr_lk("INQUIRY failed on %s\n", op->dev_names[k]);
+                    pr2serr_lk("INQUIRY failed on %s\n", dev_name);
                     return 1;
                 }
                 // For safety, since <lba> written to, only permit scsi_debug
@@ -1062,21 +1077,20 @@ main(int argc, char * argv[])
                 unsigned int last_lba;
                 unsigned int blk_sz;
 
-                res = do_read_capacity(op->dev_names[k], op->block,
-                                       &last_lba, &blk_sz);
+                res = do_read_capacity(dev_name, op->block, &last_lba,
+                                       &blk_sz);
                 if (2 == res)
-                    res = do_read_capacity(op->dev_names[k], op->block,
-                                           &last_lba, &blk_sz);
+                    res = do_read_capacity(dev_name, op->block, &last_lba,
+                                           &blk_sz);
                 if (res) {
-                    pr2serr_lk("READ CAPACITY(10) failed on %s\n",
-                               op->dev_names[k]);
+                    pr2serr_lk("READ CAPACITY(10) failed on %s\n", dev_name);
                     return 1;
                 }
                 op->hi_lbas.push_back(last_lba);
                 if (blk_sz != (unsigned int)op->lb_sz)
                     pr2serr_lk(">>> warning: Logical block size (%d) of %s\n"
                                "    differs from command line option (or "
-                               "default)\n", blk_sz, op->dev_names[k]);
+                               "default)\n", blk_sz, dev_name);
             }
         }
 
@@ -1118,7 +1132,7 @@ main(int argc, char * argv[])
             if (a > 0.000001) {
                 printf("Time to complete %d commands was %d.%06d seconds\n",
                        n, (int)res_tm.tv_sec, (int)(res_tm.tv_nsec / 1000));
-                cout << "Implies " << (b / a) << " IOPS" << endl;
+                printf("Implies %.0f IOPS\n", (b / a));
             }
         }
 
