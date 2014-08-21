@@ -16,6 +16,8 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -33,7 +35,7 @@
 
 */
 
-static const char * version_str = "0.91 20140816";  /* spc4r37 + sbc4r02 */
+static const char * version_str = "0.92 20140821";  /* spc4r37 + sbc4r02 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -302,6 +304,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
     char line[512];
     char carry_over[4];
     int off = 0;
+    struct stat a_stat;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
         return 1;
@@ -330,6 +333,22 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if (! has_stdin)
                 close(fd);
             return 1;
+        }
+        if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
+            /* pipe; keep reading till error or 0 read */
+            while (k < max_arr_len) {
+                m = read(fd, mp_arr + k, max_arr_len - k);
+                if (0 == m)
+                   break;
+                if (m < 0) {
+                    pr2serr("read from binary pipe %s: %s\n", fname,
+                            safe_strerror(errno));
+                    if (! has_stdin)
+                        close(fd);
+                    return 1;
+                }
+                k += m;
+            }
         }
         *mp_arr_len = k;
         if (! has_stdin)
@@ -3427,8 +3446,12 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             }
             prev_pn = pn;
             op->num_vpd = pn;
-            if (pn > max_pn)
+            if (pn > max_pn) {
+                if (op->verbose > 2)
+                    pr2serr("%s: skipping as this pn=0x%x exceeds "
+                            "max_pn=0x%x\n", __func__, pn, max_pn);
                 continue;
+            }
             if (op->do_long)
                 printf("[0x%x] ", pn);
 
@@ -3684,7 +3707,8 @@ main(int argc, char * argv[])
                       sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
         op->do_raw = 0;         /* don't want raw on output with --inhex= */
-        if (NULL == op->page_str) {     /* may be able to deduce VPD page */
+        if ((NULL == op->page_str) && (0 == op->do_all)) {
+            /* may be able to deduce VPD page */
             if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
                 if (op->verbose)
                     pr2serr("Guessing from --inhex= this is a standard "
