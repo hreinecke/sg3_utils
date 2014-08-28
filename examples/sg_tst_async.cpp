@@ -55,8 +55,9 @@
 #include <sys/stat.h>
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.05 20140821";
+static const char * version_str = "1.06 20140824";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -346,16 +347,9 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
         break;
     case SCSI_READ16:
         np = "READ(16)";
-        if (lba > 0xffffffff) {
-            r16CmdBlk[2] = (lba >> 56) & 0xff;
-            r16CmdBlk[3] = (lba >> 48) & 0xff;
-            r16CmdBlk[4] = (lba >> 40) & 0xff;
-            r16CmdBlk[5] = (lba >> 32) & 0xff;
-        }
-        r16CmdBlk[6] = (lba >> 24) & 0xff;
-        r16CmdBlk[7] = (lba >> 16) & 0xff;
-        r16CmdBlk[8] = (lba >> 8) & 0xff;
-        r16CmdBlk[9] = lba & 0xff;
+        if (lba > 0xffffffff)
+            sg_put_unaligned_be32(lba >> 32, &r16CmdBlk[2]);
+        sg_put_unaligned_be32(lba & 0xffffffff, &r16CmdBlk[6]);
         pt.cmdp = r16CmdBlk;
         pt.cmd_len = sizeof(r16CmdBlk);
         pt.dxfer_direction = SG_DXFER_FROM_DEV;
@@ -364,16 +358,9 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
         break;
     case SCSI_WRITE16:
         np = "WRITE(16)";
-        if (lba > 0xffffffff) {
-            w16CmdBlk[2] = (lba >> 56) & 0xff;
-            w16CmdBlk[3] = (lba >> 48) & 0xff;
-            w16CmdBlk[4] = (lba >> 40) & 0xff;
-            w16CmdBlk[5] = (lba >> 32) & 0xff;
-        }
-        w16CmdBlk[6] = (lba >> 24) & 0xff;
-        w16CmdBlk[7] = (lba >> 16) & 0xff;
-        w16CmdBlk[8] = (lba >> 8) & 0xff;
-        w16CmdBlk[9] = lba & 0xff;
+        if (lba > 0xffffffff)
+            sg_put_unaligned_be32(lba >> 32, &w16CmdBlk[2]);
+        sg_put_unaligned_be32(lba & 0xffffffff, &w16CmdBlk[6]);
         pt.cmdp = w16CmdBlk;
         pt.cmd_len = sizeof(w16CmdBlk);
         pt.dxfer_direction = SG_DXFER_TO_DEV;
@@ -869,10 +856,8 @@ do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
         close(sg_fd);
         return -1;
     }
-    *last_lba = ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
-                 (rcBuff[2] << 8) | rcBuff[3]);
-    *blk_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
-               (rcBuff[6] << 8) | rcBuff[7];
+    *last_lba = sg_get_unaligned_be32(&rcBuff[0]);
+    *blk_sz = sg_get_unaligned_be32(&rcBuff[4]);
     close(sg_fd);
     return 0;
 }
