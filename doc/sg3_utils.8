@@ -20,6 +20,10 @@ issue them is shown in the COVERAGE file. The sg_raw utility can be used to
 send an arbitrary SCSI command (supplied on the command line) to the
 given \fIDEVICE\fR.
 .PP
+sg_decode_sense can be used to decode SCSI sense data given on the command
+line or in a file. sg_raw \-vvv will output the T10 name of a given SCSI
+CDB which is most often 16 bytes or less in length.
+.PP
 SCSI draft standards can be found at http://www.t10.org . The standards
 themselves can be purchased from ANSI and other standards organizations.
 A good overview of various SCSI standards can be seen in

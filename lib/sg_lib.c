@@ -46,6 +46,11 @@
 
 #define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d  /* corresponding ASC is 0 */
 
+/* The following two opcodes were renamed to 'Third party copy out/in' in
+ * spc4r34 */
+#define SG_THIRD_PARTY_COPY_OUT SG_EXTENDED_COPY
+#define SG_THIRD_PARTY_COPY_IN SG_RECEIVE_COPY
+
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
@@ -1200,12 +1205,39 @@ sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
     sg_get_opcode_sa_name(cmdp[0], service_action, peri_type, buff_len, buff);
 }
 
+struct op_code2sa_t {
+    int op_code;
+    struct sg_lib_value_name_t * arr;
+    const char * prefix;
+};
+
+static struct op_code2sa_t op_code2sa_arr[] = {
+    {SG_VARIABLE_LENGTH_CMD, sg_lib_variable_length_arr, NULL},
+    {SG_MAINTENANCE_IN, sg_lib_maint_in_arr, NULL},
+    {SG_MAINTENANCE_OUT, sg_lib_maint_out_arr, NULL},
+    {SG_SERVICE_ACTION_IN_12, sg_lib_serv_in12_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_12, sg_lib_serv_out12_arr, NULL},
+    {SG_SERVICE_ACTION_IN_16, sg_lib_serv_in16_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_16, sg_lib_serv_out16_arr, NULL},
+    {SG_SERVICE_ACTION_BIDI, sg_lib_serv_bidi_arr, NULL},
+    {SG_PERSISTENT_RESERVE_IN, sg_lib_pr_in_arr, "Persistent reserve in"},
+    {SG_PERSISTENT_RESERVE_OUT, sg_lib_pr_out_arr, "Persistent reserve out"},
+    {SG_THIRD_PARTY_COPY_OUT, sg_lib_xcopy_sa_arr, NULL},
+    {SG_THIRD_PARTY_COPY_IN, sg_lib_rec_copy_sa_arr, NULL},
+    {SG_READ_BUFFER, sg_lib_read_buff_arr, "Read buffer"},
+    {SG_WRITE_BUFFER, sg_lib_write_buff_arr, "Write buffer"},
+    {SG_SANITIZE, sg_lib_sanitize_sa_arr, "Sanitize"},
+    {0xffff, NULL, NULL},
+};
+
 
 void
 sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                       int peri_type, int buff_len, char * buff)
 {
     const struct sg_lib_value_name_t * vnp;
+    const struct op_code2sa_t * osp;
+    char b[80];
 
     if ((NULL == buff) || (buff_len < 1))
         return;
@@ -1213,133 +1245,26 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         buff[0] = '\0';
         return;
     }
-    switch ((int)cmd_byte0) {
-    case SG_VARIABLE_LENGTH_CMD:
-        vnp = get_value_name(sg_lib_variable_length_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Variable length service action=0x%x",
-                        service_action);
-        break;
-    case SG_MAINTENANCE_IN:
-        vnp = get_value_name(sg_lib_maint_in_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Maintenance in service action=0x%x",
-                        service_action);
-        break;
-    case SG_MAINTENANCE_OUT:
-        vnp = get_value_name(sg_lib_maint_out_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Maintenance out service action=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_IN_12:
-        vnp = get_value_name(sg_lib_serv_in12_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action in(12)=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_OUT_12:
-        vnp = get_value_name(sg_lib_serv_out12_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action out(12)=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_IN_16:
-        vnp = get_value_name(sg_lib_serv_in16_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action in(16)=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_OUT_16:
-        vnp = get_value_name(sg_lib_serv_out16_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action out(16)=0x%x",
-                        service_action);
-        break;
-    case SG_PERSISTENT_RESERVE_IN:
-        vnp = get_value_name(sg_lib_pr_in_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Persistent reserve in, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_PERSISTENT_RESERVE_OUT:
-        vnp = get_value_name(sg_lib_pr_out_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Persistent reserve out, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_EXTENDED_COPY:
-        /* 'Extended copy' was renamed 'Third party copy out' in spc4r34 */
-        vnp = get_value_name(sg_lib_xcopy_sa_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Third party copy out, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_RECEIVE_COPY:
-        /* 'Receive copy results' was renamed 'Third party copy in' in
-         * spc4r34 */
-        vnp = get_value_name(sg_lib_rec_copy_sa_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Third party copy in, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_READ_BUFFER:
-        /* spc4r34 requested treating mode as service action */
-        vnp = get_value_name(sg_lib_read_buff_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "Read buffer, %s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Read buffer, mode=0x%x",
-                        service_action);
-        break;
-    case SG_WRITE_BUFFER:
-        /* spc4r34 requested treating mode as service action */
-        vnp = get_value_name(sg_lib_write_buff_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "Write buffer, %s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Write buffer, mode=0x%x",
-                        service_action);
-        break;
-    case SG_SANITIZE:
-        vnp = get_value_name(sg_lib_sanitize_sa_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Sanitize, service action=0x%x",
-                        service_action);
-        break;
-    default:
-        sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
-        break;
+
+    for (osp = op_code2sa_arr; osp->arr; ++osp) {
+        if ((int)cmd_byte0 == osp->op_code) {
+            vnp = get_value_name(osp->arr, service_action, peri_type);
+            if (vnp) {
+                if (osp->prefix)
+                    my_snprintf(buff, buff_len, "%s, %s", osp->prefix,
+                                vnp->name);
+                else
+                    my_snprintf(buff, buff_len, "%s", vnp->name);
+            } else {
+                sg_get_opcode_name(cmd_byte0, peri_type, sizeof(b), b);
+                my_snprintf(buff, buff_len, "%s service action=0x%x",
+                            b, service_action);
+            }
+            return;
+        }
     }
+
+    sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
 }
 
 void

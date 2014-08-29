@@ -57,7 +57,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.06 20140824";
+static const char * version_str = "1.07 20140827";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -268,16 +268,12 @@ static int
 pr2serr_lk(const char * fmt, ...)
 {
     int n;
+    va_list args;
+    lock_guard<mutex> lg(console_mutex);
 
-    console_mutex.lock();
-    {
-        va_list args;
-
-        va_start(args, fmt);
-        n = vfprintf(stderr, fmt, args);
-        va_end(args);
-    }
-    console_mutex.unlock();
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
     return n;
 }
 
@@ -285,17 +281,13 @@ static void
 pr_errno_lk(int e_no, const char * fmt, ...)
 {
     char b[160];
-
-    console_mutex.lock();
-    {
     va_list args;
+    lock_guard<mutex> lg(console_mutex);
 
-        va_start(args, fmt);
-        vsnprintf(b, sizeof(b), fmt, args);
-        fprintf(stderr, "%s: %s\n", b, strerror(e_no));
-        va_end(args);
-    }
-    console_mutex.unlock();
+    va_start(args, fmt);
+    vsnprintf(b, sizeof(b), fmt, args);
+    fprintf(stderr, "%s: %s\n", b, strerror(e_no));
+    va_end(args);
 }
 
 static unsigned int
@@ -304,8 +296,8 @@ get_urandom_uint(void)
     unsigned int res = 0;
     int n;
     unsigned char b[sizeof(unsigned int)];
+    lock_guard<mutex> lg(rand_lba_mutex);
 
-    rand_lba_mutex.lock();
     int fd = open(URANDOM_DEV, O_RDONLY);
     if (fd >= 0) {
         n = read(fd, b, sizeof(unsigned int));
@@ -313,7 +305,6 @@ get_urandom_uint(void)
             memcpy(&res, b, sizeof(unsigned int));
         close(fd);
     }
-    rand_lba_mutex.unlock();
     return res;
 }
 
@@ -439,9 +430,10 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        console_mutex.lock();
-        sg_chk_n_print3(np, &pt, 1);
-        console_mutex.unlock();
+        {
+            lock_guard<mutex> lg(console_mutex);
+            sg_chk_n_print3(np, &pt, 1);
+        }
         break;
     }
     return ok ? 0 : -1;
@@ -782,9 +774,10 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
         ok = 1;
         break;
     default: /* won't bother decoding other categories */
-        console_mutex.lock();
-        sg_chk_n_print3("INQUIRY command error", &pt, 1);
-        console_mutex.unlock();
+        {
+            lock_guard<mutex> lg(console_mutex);
+            sg_chk_n_print3("INQUIRY command error", &pt, 1);
+        }
         break;
     }
     if (ok) {
@@ -844,15 +837,13 @@ do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
     }
     res = sg_err_category3(&io_hdr);
     if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        console_mutex.lock();
+        lock_guard<mutex> lg(console_mutex);
         sg_chk_n_print3("read capacity", &io_hdr, 1);
-        console_mutex.unlock();
         close(sg_fd);
         return 2; /* probably have another go ... */
     } else if (SG_LIB_CAT_CLEAN != res) {
-        console_mutex.lock();
+        lock_guard<mutex> lg(console_mutex);
         sg_chk_n_print3("read capacity", &io_hdr, 1);
-        console_mutex.unlock();
         close(sg_fd);
         return -1;
     }
