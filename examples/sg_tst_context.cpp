@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.01 20131119";
+static const char * version_str = "1.02 20140828";
 static const char * util_name = "sg_tst_context";
 
 /* This is a test program for checking that file handles keep their
@@ -165,9 +165,9 @@ pt_cat_no_good(int cat, struct sg_pt_base * ptp, const unsigned char * sbp)
         break;
     }
     if (cp) {
-        console_mutex.lock();
+        lock_guard<mutex> lg(console_mutex);
+
         fprintf(stderr, cp, b);
-        console_mutex.unlock();
     }
     return -EIO /* -5 */;
 }
@@ -191,11 +191,13 @@ do_tur(int pt_fd, int id)
     set_scsi_pt_sense(ptp, sense_buffer, sizeof(sense_buffer));
     res = do_scsi_pt(ptp, pt_fd, 20 /* secs timeout */, 1);
     if (res) {
-        console_mutex.lock();
-        fprintf(stderr, "TEST UNIT READY do_scsi_pt() submission error, "
-                "id=%d\n", id);
+        {
+            lock_guard<mutex> lg(console_mutex);
+
+            fprintf(stderr, "TEST UNIT READY do_scsi_pt() submission error, "
+                    "id=%d\n", id);
+        }
         res = pt_err(res);
-        console_mutex.unlock();
         goto err;
     }
     cat = get_scsi_pt_result_category(ptp);
@@ -206,10 +208,12 @@ do_tur(int pt_fd, int id)
             res = 1024;
             goto err;
         }
-        console_mutex.lock();
-        fprintf(stderr, "TEST UNIT READY do_scsi_pt() category problem, "
-                "id=%d\n", id);
-        console_mutex.unlock();
+        {
+            lock_guard<mutex> lg(console_mutex);
+
+            fprintf(stderr, "TEST UNIT READY do_scsi_pt() category problem, "
+                    "id=%d\n", id);
+        }
         res = pt_cat_no_good(cat, ptp, sense_buffer);
         goto err;
     }
@@ -237,11 +241,13 @@ do_ssu(int pt_fd, int id, bool start)
     set_scsi_pt_sense(ptp, sense_buffer, sizeof(sense_buffer));
     res = do_scsi_pt(ptp, pt_fd, 40 /* secs timeout */, 1);
     if (res) {
-        console_mutex.lock();
-        fprintf(stderr, "START STOP UNIT do_scsi_pt() submission error, "
-                "id=%d\n", id);
+        {
+            lock_guard<mutex> lg(console_mutex);
+
+            fprintf(stderr, "START STOP UNIT do_scsi_pt() submission error, "
+                    "id=%d\n", id);
+        }
         res = pt_err(res);
-        console_mutex.unlock();
         goto err;
     }
     cat = get_scsi_pt_result_category(ptp);
@@ -252,10 +258,12 @@ do_ssu(int pt_fd, int id, bool start)
             res = 1024;
             goto err;
         }
-        console_mutex.lock();
-        fprintf(stderr, "START STOP UNIT do_scsi_pt() category problem, "
-                "id=%d\n", id);
-        console_mutex.unlock();
+        {
+            lock_guard<mutex> lg(console_mutex);
+
+            fprintf(stderr, "START STOP UNIT do_scsi_pt() category problem, "
+                    "id=%d\n", id);
+        }
         res = pt_cat_no_good(cat, ptp, sense_buffer);
         goto err;
     }
@@ -278,10 +286,12 @@ work_thread(const char * dev_name, int id, int num, bool share,
     bool started = true;
     char ebuff[EBUFF_SZ];
 
-    console_mutex.lock();
-    cerr << "Enter work_thread id=" << id << " num=" << num << " share="
-         << share << endl;
-    console_mutex.unlock();
+    {
+        lock_guard<mutex> lg(console_mutex);
+
+        cerr << "Enter work_thread id=" << id << " num=" << num << " share="
+             << share << endl;
+    }
     if (! share) {
         int open_flags = O_RDWR;
 
@@ -301,9 +311,9 @@ work_thread(const char * dev_name, int id, int num, bool share,
             return;
         }
         if (thr_ebusy_count) {
-            count_mutex.lock();
+            lock_guard<mutex> lg(count_mutex);
+
             ebusy_count += thr_ebusy_count;
-            count_mutex.unlock();
         }
     }
     for (k = 0; k < num; ++k) {
@@ -329,18 +339,22 @@ work_thread(const char * dev_name, int id, int num, bool share,
     if (! share)
         scsi_pt_close_device(pt_fd);
 
-    count_mutex.lock();
-    even_notreadys += thr_even_notreadys;
-    odd_notreadys += thr_odd_notreadys;
-    count_mutex.unlock();
+    {
+        lock_guard<mutex> lg(count_mutex);
 
-    console_mutex.lock();
-    if (k < num)
-        cerr << "thread id=" << id << " FAILed at iteration: " << k
-             << "  [negated errno: " << res << "]\n";
-    else
-        cerr << "thread id=" << id << " normal exit" << '\n';
-    console_mutex.unlock();
+        even_notreadys += thr_even_notreadys;
+        odd_notreadys += thr_odd_notreadys;
+    }
+
+    {
+        lock_guard<mutex> lg(console_mutex);
+
+        if (k < num)
+            cerr << "thread id=" << id << " FAILed at iteration: " << k
+                 << "  [negated errno: " << res << "]\n";
+        else
+            cerr << "thread id=" << id << " normal exit" << '\n';
+    }
 }
 
 

@@ -27,7 +27,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.9 (2014-05-14)"
+#define SG_RAW_VERSION "0.4.10 (2014-08-29)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -242,7 +242,20 @@ process_cl(struct opts_t * op, int argc, char *argv[])
         fprintf(stderr, "CDB too short (min. %d bytes)\n", MIN_SCSI_CDBSZ);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (op->do_verbose > 2) {
+        int sa;
+        char b[80];
 
+        if (op->cdb_length > 16) {
+            sa = (op->cdb[8] << 8) + op->cdb[9];
+            if (0x7f != op->cdb[0])
+                printf(">>> Unlikely to be SCSI CDB since all over 16 "
+                       "bytes long should\n>>> start with 0x7f\n");
+        } else
+            sa = op->cdb[1] & 0x1f;
+        sg_get_opcode_sa_name(op->cdb[0], sa, 0, sizeof(b), b);
+        printf("Attempt to decode cdb name: %s\n", b);
+    }
     return 0;
 }
 

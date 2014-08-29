@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.04 20140812";  /* spc4r37, sbc4r02 */
+const char * sg_lib_version_str = "2.05 20140828";  /* spc4r37a, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -213,7 +213,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
-/* Read buffer [0x3c] service actions */
+/* Read buffer [0x3c] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x0, 0, "combined header and data [or multiple modes]"},
     {0x2, 0, "data"},
@@ -225,7 +225,7 @@ struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0xffff, 0, NULL},
 };
 
-/* Write buffer [0x3b] service actions */
+/* Write buffer [0x3b] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
     {0x0, 0, "combined header and data [or multiple modes]"},
     {0x2, 0, "data"},
@@ -273,12 +273,12 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
     {0xffff, 0, NULL},
 };
 
-/* Sanitize [0x48] service actions */
+/* Sanitize [0x48] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
-    {0x1, 0, "Sanitize, overwrite"},
-    {0x2, 0, "Sanitize, block erase"},
-    {0x3, 0, "Sanitize, cryptographic erase"},
-    {0x1f, 0, "Sanitize, exit failure mode"},
+    {0x1, 0, "overwrite"},
+    {0x2, 0, "block erase"},
+    {0x3, 0, "cryptographic erase"},
+    {0x1f, 0, "exit failure mode"},
     {0xffff, 0, NULL},
 };
 
@@ -317,26 +317,26 @@ struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = {
     {0xffff, 0, NULL},
 };
 
-/* Persistent reserve in [0x5e] service actions */
+/* Persistent reserve in [0x5e] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
-    {0x0, 0, "Persistent reserve in, read keys"},
-    {0x1, 0, "Persistent reserve in, read reservation"},
-    {0x2, 0, "Persistent reserve in, report capabilities"},
-    {0x3, 0, "Persistent reserve in, read full status"},
+    {0x0, 0, "read keys"},
+    {0x1, 0, "read reservation"},
+    {0x2, 0, "report capabilities"},
+    {0x3, 0, "read full status"},
     {0xffff, 0, NULL},
 };
 
-/* Persistent reserve out [0x5f] service actions */
+/* Persistent reserve out [0x5f] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
-    {0x0, 0, "Persistent reserve out, register"},
-    {0x1, 0, "Persistent reserve out, reserve"},
-    {0x2, 0, "Persistent reserve out, release"},
-    {0x3, 0, "Persistent reserve out, clear"},
-    {0x4, 0, "Persistent reserve out, preempt"},
-    {0x5, 0, "Persistent reserve out, preempt and abort"},
-    {0x6, 0, "Persistent reserve out, register and ignore existing key"},
-    {0x7, 0, "Persistent reserve out, register and move"},
-    {0x8, 0, "Persistent reserve out, replace lost reservation"},
+    {0x0, 0, "register"},
+    {0x1, 0, "reserve"},
+    {0x2, 0, "release"},
+    {0x3, 0, "clear"},
+    {0x4, 0, "preempt"},
+    {0x5, 0, "preempt and abort"},
+    {0x6, 0, "register and ignore existing key"},
+    {0x7, 0, "register and move"},
+    {0x8, 0, "replace lost reservation"},
     {0xffff, 0, NULL},
 };
 
