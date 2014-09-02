@@ -648,6 +648,7 @@ OS_LINUX_TRUE
 OS_FREEBSD_FALSE
 OS_FREEBSD_TRUE
 os_libs
+os_cflags
 GETOPT_O_FILES
 CPP
 OTOOL64
@@ -11615,6 +11616,8 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_LINUX 1
 _ACEOF
 
+                os_cflags=''
+
                 os_libs=''
  ;;
         *-*-linux*)
@@ -11622,6 +11625,8 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_LINUX 1
 _ACEOF
+
+                os_cflags=''
 
                 os_libs=''
  ;;
@@ -11631,6 +11636,8 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_FREEBSD 1
 _ACEOF
 
+                os_cflags=''
+
                 os_libs='-lcam'
 ;;
         *-*-solaris*)
@@ -11638,6 +11645,8 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_SOLARIS 1
 _ACEOF
+
+                os_cflags=''
 
                 os_libs=''
 ;;
@@ -11647,6 +11656,8 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_OSF1 1
 _ACEOF
 
+                os_cflags=''
+
                 os_libs=''
  ;;
         *-*-cygwin*)
@@ -11654,6 +11665,8 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_WIN32 1
 _ACEOF
+
+                os_cflags='-Wno-char-subscripts'
 
                 os_libs=''
  ;;
@@ -11668,6 +11681,8 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_MINGW 1
 _ACEOF
 
+                os_cflags=''
+
                 os_libs=''
  ;;
         *)
@@ -11675,6 +11690,8 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_LINUX 1
 _ACEOF
+
+                os_cflags=''
 
                 os_libs=''
  ;;
