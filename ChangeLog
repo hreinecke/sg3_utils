@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20140829] [svn: r603]
+Changelog for sg3_utils-1.40 [20140801] [svn: r604]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_senddiag: add --maxlen= option
   - sg_copy_results: correct response length calculations
