@@ -27,7 +27,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.12 20140516";
+static const char * version_str = "1.13 20140904";
 
 #define ME "sg_ident: "
 
@@ -95,7 +95,8 @@ static void usage()
           "    --clear|-C      clear (set to zero length) identifying "
           "information\n"
           "    --help|-h       print out usage message\n"
-          "    --itype=IT|-i IT    specify information type\n"
+          "    --itype=IT|-i IT    specify identifying information type "
+          "(def: 0)\n"
           "    --raw|-r        output identifying information to "
           "stdout\n"
           "    --set|-S        invoke set identifying information with "

@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.05 20140828";  /* spc4r37a, sbc4r02 */
+const char * sg_lib_version_str = "2.06 20140904";  /* spc4r37a, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -380,7 +380,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x9, 0, "Read(32)"},
     {0xa, 0, "Verify(32)"},
     {0xb, 0, "Write(32)"},
-    {0xc, 0, "Write an verify(32)"},
+    {0xc, 0, "Write and verify(32)"},
     {0xd, 0, "Write same(32)"},
     {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
     {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */

@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.41 20140521";    /* spc4r37 */
+static const char * version_str = "0.42 20140904";    /* spc4r37 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -53,6 +53,7 @@ static int do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len,
 
 static struct option long_options[] = {
         {"alpha", 0, 0, 'a'},
+        {"compact", 0, 0, 'c'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"mask", 0, 0, 'm'},
@@ -73,6 +74,7 @@ static struct option long_options[] = {
 
 struct opts_t {
     int do_alpha;
+    int do_compact;
     int do_help;
     int do_hex;
     int no_inquiry;
@@ -95,15 +97,17 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage:  sg_opcodes [--alpha] [--help] [--hex] [--mask] "
-            "[--no-inquiry]\n"
-            "                   [--opcode=OP[,SA]] [--raw] [--rctd] "
-            "[--repd] [--sa=SA]\n"
-            "                   [--tmf] [--unsorted] [--verbose] "
-            "[--version] DEVICE\n"
+            "Usage:  sg_opcodes [--alpha] [--compact] [--help] [--hex] "
+            "[--mask]\n"
+            "                   [--no-inquiry] [--opcode=OP[,SA]] [--raw] "
+            "[--rctd]\n"
+            "                   [--repd] [--sa=SA] [--tmf] [--unsorted] "
+            "[--verbose]\n"
+            "                   [--version] DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
+            "    --compact|-c    more compact output\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
             "    --mask|-m       and show cdb usage data (a mask) when "
@@ -137,12 +141,13 @@ static void
 usage_old()
 {
     fprintf(stderr,
-            "Usage:  sg_opcodes [-a] [-H] [-m] [-n] [-o=OP] [-q] [-r] [-R] "
-            "[-s=SA]\n"
+            "Usage:  sg_opcodes [-a] [-c] [-H] [-m] [-n] [-o=OP] [-q] [-r] "
+            "[-R] [-s=SA]\n"
             "                   [-t] [-u] [-v] [-V] DEVICE\n"
             "  where:\n"
             "    -a    output list of operation codes sorted "
             "alphabetically\n"
+            "    -c    more compact output\n"
             "    -H    print response in hex\n"
             "    -m    and show cdb usage data (a mask) when all listed\n"
             "    -n    don't output INQUIRY information\n"
@@ -171,14 +176,17 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ahHmnNo:OqrRs:tuvV", long_options,
+        c = getopt_long(argc, argv, "achHmnNo:OqrRs:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'a':
-            optsp->do_alpha = 1;
+            ++optsp->do_alpha;
+            break;
+        case 'c':
+            ++optsp->do_compact;
             break;
         case 'h':
         case '?':
@@ -300,6 +308,9 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 switch (*cp) {
                 case 'a':
                     ++optsp->do_alpha;
+                    break;
+                case 'c':
+                    ++optsp->do_compact;
                     break;
                 case 'H':
                     ++optsp->do_hex;
@@ -477,7 +488,7 @@ static void
 list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                int sg_fd)
 {
-    int k, j, m, cd_len, serv_act, len, servactv, opcode, res;
+    int k, j, m, cd_len, serv_act, len, sa_v, opcode, res;
     unsigned int to;
     unsigned char * ucp;
     char name_buff[NAME_BUFF_SZ];
@@ -496,14 +507,27 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         return;
     }
     if (op->do_rctd) {
-        printf("\nOpcode  Service    CDB   Nominal  Recommended  Name\n");
-        printf(  "(hex)   action(h)  size  timeout  timeout(sec)     \n");
-        printf("-----------------------------------------------------------"
-               "-----\n");
+        if (op->do_compact) {
+            printf("\nOpcode,sa  Nominal  Recommended  Name\n");
+            printf(  "  (hex)    timeout  timeout(sec)     \n");
+            printf("-----------------------------------------------"
+                   "---------\n");
+        } else {
+            printf("\nOpcode  Service    CDB   Nominal  Recommended  Name\n");
+            printf(  "(hex)   action(h)  size  timeout  timeout(sec)     \n");
+            printf("-------------------------------------------------------"
+                   "---------\n");
+        }
     } else {
-        printf("\nOpcode  Service    CDB    Name\n");
-        printf(  "(hex)   action(h)  size       \n");
-        printf("-----------------------------------------------\n");
+        if (op->do_compact) {
+            printf("\nOpcode,sa  Name\n");
+            printf(  "  (hex)        \n");
+            printf("---------------------------------------\n");
+        } else {
+            printf("\nOpcode  Service    CDB    Name\n");
+            printf(  "(hex)   action(h)  size       \n");
+            printf("-----------------------------------------------\n");
+        }
     }
     /* SPC-4 does _not_ require any ordering of opcodes in the response */
     if (! op->do_unsorted) {
@@ -526,21 +550,28 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         ucp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
         len = (ucp[5] & 0x2) ? 20 : 8;
         opcode = ucp[0];
-        servactv = ucp[5] & 1;
+        sa_v = ucp[5] & 1;
         serv_act = 0;
-        if (servactv) {
+        if (sa_v) {
             serv_act = ((ucp[2] << 8) | ucp[3]);
             sg_get_opcode_sa_name(opcode, serv_act, peri_type, NAME_BUFF_SZ,
                                   name_buff);
-            snprintf(sa_buff, sizeof(sa_buff), "%4x", serv_act);
+            if (op->do_compact)
+                snprintf(sa_buff, sizeof(sa_buff), "%-4x", serv_act);
+            else
+                snprintf(sa_buff, sizeof(sa_buff), "%4x", serv_act);
         } else {
             sg_get_opcode_name(opcode, peri_type, NAME_BUFF_SZ, name_buff);
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
             if (ucp[5] & 0x2) {
-                printf(" %.2x     %.4s       %3d", opcode, sa_buff,
-                       ((ucp[6] << 8) | ucp[7]));
+                if (op->do_compact)
+                    printf(" %.2x%c%.4s", opcode, (sa_v ? ',' : ' '),
+                           sa_buff);
+                else
+                    printf(" %.2x     %.4s       %3d", opcode, sa_buff,
+                           ((ucp[6] << 8) | ucp[7]));
                 to = ((unsigned int)ucp[12] << 24) + (ucp[13] << 16) +
                      (ucp[14] << 8) + ucp[15];
                 if (0 == to)
@@ -555,23 +586,34 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                     printf("   %8u", to);
                 printf("    %s\n", name_buff);
             } else
-                printf(" %.2x     %.4s       %3d                         "
-                       "%s\n", opcode, sa_buff, ((ucp[6] << 8) | ucp[7]),
-                       name_buff);
+                if (op->do_compact)
+                    printf(" %.2x%c%.4s                        %s\n", opcode,
+                           (sa_v ? ',' : ' '), sa_buff, name_buff);
+                else
+                    printf(" %.2x     %.4s       %3d                         "
+                           "%s\n", opcode, sa_buff, ((ucp[6] << 8) | ucp[7]),
+                           name_buff);
         } else
-            printf(" %.2x     %.4s       %3d    %s\n",
-                   ucp[0], sa_buff, ((ucp[6] << 8) | ucp[7]), name_buff);
+            if (op->do_compact)
+                printf(" %.2x%c%.4s   %s\n", ucp[0], (sa_v ? ',' : ' '),
+                       sa_buff, name_buff);
+            else
+                printf(" %.2x     %.4s       %3d    %s\n",
+                       ucp[0], sa_buff, ((ucp[6] << 8) | ucp[7]), name_buff);
         if (op->do_mask) {
             int cdb_sz;
             unsigned char b[64];
 
             memset(b, 0, sizeof(b));
-            res = do_rsoc(sg_fd, 0, (servactv ? 2 : 1), opcode, serv_act,
+            res = do_rsoc(sg_fd, 0, (sa_v ? 2 : 1), opcode, serv_act,
                           b, sizeof(b), 1, op->do_verbose);
             if (0 == res) {
                 cdb_sz = (b[2] << 8) + b[3];
                 if ((cdb_sz > 0) && (cdb_sz <= 80)) {
-                    printf("        cdb usage: ");
+                    if (op->do_compact)
+                        printf("             usage: ");
+                    else
+                        printf("        cdb usage: ");
                     for (m = 0; m < cdb_sz; ++m)
                         printf("%.2x ", b[4 + m]);
                     printf("\n");
@@ -780,7 +822,7 @@ main(int argc, char * argv[])
                       op->do_verbose);
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
-        fprintf(stderr, "%s: %s command\n", op_name, b);
+        fprintf(stderr, "%s: %s\n", op_name, b);
         goto err_out;
     }
     if (op->do_taskman) {
