@@ -13,8 +13,8 @@ EXTRA_EXECS = hxascdmp sg_chk_asc tst_sg_lib
 MAN_PGS = hxascdmp.1
 MAN_PREF = man1
 
-CFLAGS = -g -O2 -W -Wall -I ../include
-# CFLAGS = -g -O2 -W -I ../include -pedantic -std=c99
+CFLAGS = -g -O2 -W -Wall -iquote ../include
+# CFLAGS = -g -O2 -W -iquote ../include -pedantic -std=c99
 
 LDFLAGS =
 

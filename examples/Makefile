@@ -22,9 +22,9 @@ MAN_PREF = man8
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
-CFLAGS = -g -O2 -W -Wall -I../include -D_REENTRANT $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -I../include -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -pedantic -I../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+# CFLAGS = -g -O2 -Wall -iquote ../include -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
+# CFLAGS = -g -O2 -Wall -pedantic -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 
 LDFLAGS =
 
