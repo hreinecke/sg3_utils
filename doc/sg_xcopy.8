@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_XCOPY "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -254,6 +254,14 @@ when set, equivalent to 'oflag=append'. When clear the action is
 to overwrite the existing file (if it exists); this is the default.
 See the 'append' flag.
 .SH NOTES
+Copying data behind an Operating System's back can cause problems. In the
+case of Linux, users should look at this link:
+http://linux\-mm.org/Drop_Caches
+.br
+This command sequence may be useful:
+.br
+  sync; echo 3 > /proc/sys/vm/drop_caches
+.PP
 Various numeric arguments (e.g. \fISKIP\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
