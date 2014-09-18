@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.92 20140818";    /* ses3r06 */
+static const char * version_str = "1.93 20140917";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -3387,6 +3387,10 @@ try_again:
             if (NULL == ed_ucp)
                 continue;
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3];
+            /* some element descriptor strings have a trailing NULL and
+             * count it in their length; adjust */
+            if ('\0' == ed_ucp[4 + desc_len - 1])
+                --desc_len;
             if (desc_len != dn_len)
                 continue;
             if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),
@@ -3759,6 +3763,10 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             if (NULL == ed_ucp)
                 continue;
             desc_len = (ed_ucp[2] << 8) + ed_ucp[3];
+            /* some element descriptor strings have a trailing NULL and
+             * count it; adjust */
+            if ('\0' == ed_ucp[4 + desc_len - 1])
+                --desc_len;
             if (desc_len != dn_len)
                 continue;
             if (0 != strncmp(op->desc_name, (const char *)(ed_ucp + 4),

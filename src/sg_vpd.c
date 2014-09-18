@@ -25,6 +25,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
 /* This utility program was originally written for the Linux OS SCSI subsystem.
 
@@ -35,7 +36,7 @@
 
 */
 
-static const char * version_str = "0.92 20140821";  /* spc4r37 + sbc4r02 */
+static const char * version_str = "0.93 20140916";  /* spc4r37 + sbc4r02 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -554,7 +555,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     int res, resid, rlen, len, n;
 
     if (sg_fd < 0) {
-        len = ((rp[2] << 8) + rp[3]) + 4;
+        len = sg_get_unaligned_be16(rp + 2) + 4;
         if (vb && (len > mxlen))
             pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
                     "file (%d)\n",  len , mxlen);
@@ -588,7 +589,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     if (mxlen < 0)
         len = rp[3] + 4;
     else
-        len = ((rp[2] << 8) + rp[3]) + 4;
+        len = sg_get_unaligned_be16(rp + 2) + 4;
     if (len <= rlen) {
         if (rlenp)
             *rlenp = len;
@@ -856,7 +857,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         printf("  %s, Service type: %s\n",
                assoc_arr[(ucp[0] >> 5) & 0x3],
                network_service_type_arr[ucp[0] & 0x1f]);
-        na_len = (ucp[2] << 8) + ucp[3];
+        na_len = sg_get_unaligned_be16(ucp + 2);
         bump = 4 + na_len;
         if ((k + bump) > len) {
             pr2serr("Management network addresses VPD page, short "
@@ -938,9 +939,9 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
-        rel_port = (ucp[2] << 8) + ucp[3];
+        rel_port = sg_get_unaligned_be16(ucp + 2);
         printf("  Relative port=%d\n", rel_port);
-        ip_tid_len = (ucp[6] << 8) + ucp[7];
+        ip_tid_len = sg_get_unaligned_be16(ucp + 6);
         bump = 8 + ip_tid_len;
         if ((k + bump) > len) {
             pr2serr("SCSI Ports VPD page, short descriptor "
@@ -954,7 +955,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
             } else
                 decode_transport_id("    ", ucp + 8, ip_tid_len);
         }
-        tpd_len = (ucp[bump + 2] << 8) + ucp[bump + 3];
+        tpd_len = sg_get_unaligned_be16(ucp + bump + 2);
         if ((k + bump + tpd_len + 4) > len) {
             pr2serr("SCSI Ports VPD page, short descriptor(tgt) "
                     "length=%d, left=%d\n", bump, (len - k));
@@ -1135,7 +1136,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         case 4: /* Relative target port */
             if ((0 == is_sas) || (1 != c_set) || (1 != assoc) || (4 != i_len))
                 break;
-            rtp = ((ip[2] << 8) | ip[3]);
+            rtp = sg_get_unaligned_be16(ip + 2);
             if (sas_tport_addr[0]) {
                 printf("  0x");
                 for (m = 0; m < 8; ++m)
@@ -1253,32 +1254,21 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
         ci_off = 0;
         if (16 == i_len) {
             ci_off = 8;
-            id_ext = 0;
-            for (m = 0; m < 8; ++m) {
-                if (m > 0)
-                    id_ext <<= 8;
-                id_ext |= ip[m];
-            }
+            id_ext = sg_get_unaligned_be64(ip);
             printf("      Identifier extension: 0x%" PRIx64 "\n", id_ext);
         } else if ((8 != i_len) && (12 != i_len)) {
             pr2serr("      << can only decode 8, 12 and 16 byte ids>>\n");
             dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        c_id = ((ip[ci_off] << 16) | (ip[ci_off + 1] << 8) |
-                ip[ci_off + 2]);
+        c_id = sg_get_unaligned_be24(ip + ci_off);
         printf("      IEEE Company_id: 0x%x\n", c_id);
-        vsei = 0;
-        for (m = 0; m < 5; ++m) {
-            if (m > 0)
-                vsei <<= 8;
-            vsei |= ip[ci_off + 3 + m];
-        }
+        vsei = ((uint64_t)sg_get_unaligned_be32(ip + ci_off + 3) << 8) +
+               ip[ci_off + 3 + 4];      /* 5 byte integer */
         printf("      Vendor Specific Extension Identifier: 0x%" PRIx64
                "\n", vsei);
         if (12 == i_len) {
-            d_id = (((unsigned int)ip[8] << 24) | (ip[9] << 16) |
-                    (ip[10] << 8) | ip[11]);
+            d_id = sg_get_unaligned_be32(ip + 8);
             printf("      Directory ID: 0x%x\n", d_id);
         }
         break;
@@ -1297,9 +1287,9 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            d_id = (((ip[0] & 0xf) << 8) | ip[1]);
-            c_id = ((ip[2] << 16) | (ip[3] << 8) | ip[4]);
-            vsi = ((ip[5] << 16) | (ip[6] << 8) | ip[7]);
+            d_id = sg_get_unaligned_be16(ip) & 0xfff;
+            c_id = sg_get_unaligned_be24(ip + 2);
+            vsi = sg_get_unaligned_be24(ip + 5);
             if (long_out) {
                 printf("      NAA 2, vendor specific identifier A: "
                        "0x%x\n", d_id);
@@ -1376,12 +1366,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
                 printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
                 printf("      Vendor Specific Identifier: 0x%" PRIx64
                        "\n", vsei);
-                vsei = 0;
-                for (m = 0; m < 8; ++m) {
-                    if (m > 0)
-                        vsei <<= 8;
-                    vsei |= ip[8 + m];
-                }
+                vsei = sg_get_unaligned_be64(ip + 8);
                 printf("      Vendor Specific Identifier Extension: "
                        "0x%" PRIx64 "\n", vsei);
                 printf("      [0x");
@@ -1408,7 +1393,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
             dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        d_id = ((ip[2] << 8) | ip[3]);
+        d_id = sg_get_unaligned_be16(ip + 2);
         printf("      Relative target port: 0x%x\n", d_id);
         break;
     case 5: /* (primary) Target port group */
@@ -1418,7 +1403,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
             dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        d_id = ((ip[2] << 8) | ip[3]);
+        d_id = sg_get_unaligned_be16(ip + 2);
         printf("      Target port group: 0x%x\n", d_id);
         break;
     case 6: /* Logical unit group */
@@ -1428,7 +1413,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
             dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        d_id = ((ip[2] << 8) | ip[3]);
+        d_id = sg_get_unaligned_be16(ip + 2);
         printf("      Logical unit group: 0x%x\n", d_id);
         break;
     case 7: /* MD5 logical unit identifier */
@@ -1539,7 +1524,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
 static void
 decode_transport_id(const char * leadin, unsigned char * ucp, int len)
 {
-    int format_code, proto_id, num, j, k;
+    int format_code, proto_id, num, k;
     uint64_t ull;
     int bump;
 
@@ -1562,12 +1547,12 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_SPI:        /* Scsi Parallel Interface */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
-                   leadin, ((ucp[2] << 8) | ucp[3]));
+                   leadin, sg_get_unaligned_be16(ucp + 2));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
+                   "0x%x\n", leadin, sg_get_unaligned_be16(ucp + 6));
             bump = 24;
             break;
         case TPROTO_SSA:
@@ -1594,7 +1579,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
-            num = ((ucp[2] << 8) | ucp[3]);
+            num = sg_get_unaligned_be16(ucp + 2);
             if (0 == format_code)
                 printf("name: %.*s\n", num, &ucp[4]);
             else if (1 == format_code)
@@ -1606,12 +1591,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             bump = (((num + 4) < 24) ? 24 : num + 4);
             break;
         case TPROTO_SAS:
-            ull = 0;
-            for (j = 0; j < 8; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                ull |= ucp[4 + j];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -1638,7 +1618,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             break;
         case TPROTO_SOP:
             printf("%s  SOP ", leadin);
-            num = ((ucp[2] << 8) | ucp[3]);
+            num = sg_get_unaligned_be16(ucp + 2);
             if (0 == format_code)
                 printf("Routing ID: 0x%x\n", num);
             else {
@@ -1737,7 +1717,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         printf("  CBCS=%d\n", !!(b[8] & 0x1));
         printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
         printf("  Extended self-test completion minutes=%d\n",
-               (b[10] << 8) + b[11]);
+               sg_get_unaligned_be16(b + 10));
         printf("  POA_SUP=%d\n", !!(b[12] & 0x80));     /* spc4r32 */
         printf("  HRA_SUP=%d\n", !!(b[12] & 0x40));     /* spc4r32 */
         printf("  VSA_SUP=%d\n", !!(b[12] & 0x20));     /* spc4r32 */
@@ -1757,7 +1737,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
            !!(b[7] & 0x10), !!(b[7] & 0x1), !!(b[8] & 0x10), !!(b[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
-           (b[10] << 8) + b[11]);    /* spc4r27 */
+           sg_get_unaligned_be16(b + 10));    /* spc4r27 */
     printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
            !!(b[12] & 0x80), !!(b[12] & 0x40), !!(b[12] & 0x20));
     printf("  Maximum supported sense data length=%d\n", b[13]); /* spc4r34 */
@@ -1775,8 +1755,8 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
     buff += 4;
     for ( ; len > 5; len -= 6, buff += 6) {
         printf("    IEEE Company_id: 0x%06x, vendor specific extension "
-               "id: 0x%06x\n", (buff[0] << 16) | (buff[1] << 8) | buff[2],
-               (buff[3] << 16) | (buff[4] << 8) | buff[5]);
+               "id: 0x%06x\n", sg_get_unaligned_be24(buff),
+               sg_get_unaligned_be24(buff + 3));
     }
 }
 
@@ -1861,17 +1841,17 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
            !!(buff[4] & 0x2), !!(buff[4] & 0x1),
            !!(buff[5] & 0x4), !!(buff[5] & 0x2), !!(buff[5] & 0x1));
     printf("  Stopped condition recovery time (ms) %d\n",
-            (buff[6] << 8) + buff[7]);
+           sg_get_unaligned_be16(buff + 6));
     printf("  Standby_z condition recovery time (ms) %d\n",
-            (buff[8] << 8) + buff[9]);
+           sg_get_unaligned_be16(buff + 8));
     printf("  Standby_y condition recovery time (ms) %d\n",
-            (buff[10] << 8) + buff[11]);
+           sg_get_unaligned_be16(buff + 10));
     printf("  Idle_a condition recovery time (ms) %d\n",
-            (buff[12] << 8) + buff[13]);
+           sg_get_unaligned_be16(buff + 12));
     printf("  Idle_b condition recovery time (ms) %d\n",
-            (buff[14] << 8) + buff[15]);
+           sg_get_unaligned_be16(buff + 14));
     printf("  Idle_c condition recovery time (ms) %d\n",
-            (buff[16] << 8) + buff[17]);
+           sg_get_unaligned_be16(buff + 16));
 }
 
 static const char * power_unit_arr[] =
@@ -1914,7 +1894,7 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
         if (do_hex > 1)
             dStrHex((const char *)ucp, 4, 1);
         else {
-            value = (ucp[2] << 8) + ucp[3];
+            value = sg_get_unaligned_be16(ucp + 2);
             printf("  Power consumption identifier: 0x%x", ucp[0]);
             if (value >= 1000 && (ucp[1] & 0x7) > 0)
                 printf("    Maximum power consumption: %d.%03d %s\n",
@@ -1933,84 +1913,37 @@ static void
 decode_rod_descriptor(const unsigned char * buff, int len)
 {
     const unsigned char * ucp = buff;
-    int k, bump, j;
-    uint64_t ull;
+    int k, bump;
 
     for (k = 0; k < len; k += bump, ucp += bump) {
-        bump = (ucp[2] << 8) + ucp[3] + 4;
+        bump = sg_get_unaligned_be16(ucp + 2) + 4;
         switch (ucp[0]) {
             case 0:
                 /* Block ROD device type specific descriptor */
                 printf("   Optimal block ROD length granularity: %d\n",
-                       (ucp[6] << 8) + ucp[7]);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[8 + j];
-                }
-                printf("  Maximum Bytes in block ROD: %" PRIu64 "\n", ull);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[16 + j];
-                }
+                       sg_get_unaligned_be16(ucp + 6));
+                printf("  Maximum Bytes in block ROD: %" PRIu64 "\n",
+                       sg_get_unaligned_be64(ucp + 8));
                 printf("  Optimal Bytes in block ROD transfer: %" PRIu64 "\n",
-                       ull);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[24 + j];
-                }
+                       sg_get_unaligned_be64(ucp + 16));
                 printf("  Optimal Bytes to token per segment: %" PRIu64 "\n",
-                       ull);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[32 + j];
-                }
+                       sg_get_unaligned_be64(ucp + 24));
                 printf("  Optimal Bytes from token per segment:"
-                       " %" PRIu64 "\n", ull);
+                       " %" PRIu64 "\n", sg_get_unaligned_be64(ucp + 32));
                 break;
             case 1:
                 /* Stream ROD device type specific descriptor */
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[8 + j];
-                }
-                printf("  Maximum Bytes in stream ROD: %" PRIu64 "\n", ull);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[16 + j];
-                }
+                printf("  Maximum Bytes in stream ROD: %" PRIu64 "\n",
+                       sg_get_unaligned_be64(ucp + 8));
                 printf("  Optimal Bytes in stream ROD transfer:"
-                       " %" PRIu64 "\n", ull);
+                       " %" PRIu64 "\n", sg_get_unaligned_be64(ucp + 16));
                 break;
             case 3:
                 /* Copy manager ROD device type specific descriptor */
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[8 + j];
-                }
-                printf("  Maximum Bytes in processor ROD:"
-                       " %" PRIu64 "\n", ull);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[16 + j];
-                }
+                printf("  Maximum Bytes in processor ROD: %" PRIu64 "\n",
+                       sg_get_unaligned_be64(ucp + 8));
                 printf("  Optimal Bytes in processor ROD transfer:"
-                       " %" PRIu64 "\n", ull);
+                       " %" PRIu64 "\n", sg_get_unaligned_be64(ucp + 16));
                 break;
             default:
                 printf("  Unhandled descriptor (format %d, device type %d)\n",
@@ -2020,6 +1953,94 @@ decode_rod_descriptor(const unsigned char * buff, int len)
     }
 }
 
+struct tpc_desc_type {
+    unsigned char code;
+    const char * name;
+};
+
+static struct tpc_desc_type tpc_desc_arr[] = {
+    {0x0, "block -> stream"},
+    {0x1, "stream -> block"},
+    {0x2, "block -> block"},
+    {0x3, "stream -> stream"},
+    {0x4, "inline -> stream"},
+    {0x5, "embedded -> stream"},
+    {0x6, "stream -> discard"},
+    {0x7, "verify CSCD"},
+    {0x8, "block<o> -> stream"},
+    {0x9, "stream -> block<o>"},
+    {0xa, "block<o> -> block<o>"},
+    {0xb, "block -> stream & application_client"},
+    {0xc, "stream -> block & application_client"},
+    {0xd, "block -> block & application_client"},
+    {0xe, "stream -> stream&application_client"},
+    {0xf, "stream -> discard&application_client"},
+    {0x10, "filemark -> tape"},
+    {0x11, "space -> tape"},
+    {0x12, "locate -> tape"},
+    {0x13, "<i>tape -> <i>tape"},
+    {0x14, "register persistent reservation key"},
+    {0x15, "third party persistent reservation source I_T nexus"},
+    {0x16, "<i>block -> <i>block"},
+    {0xbe, "ROD <- block range(n)"},
+    {0xbf, "ROD <- block range(1)"},
+    {0xe0, "CSCD: FC N_Port_Name"},
+    {0xe1, "CSCD: FC N_Port_ID"},
+    {0xe2, "CSCD: FC N_Port_ID with N_Port_Name, checking"},
+    {0xe3, "CSCD: Parallel interface: I_T"},
+    {0xe4, "CSCD: Identification Descriptor"},
+    {0xe5, "CSCD: IPv4"},
+    {0xe6, "CSCD: Alias"},
+    {0xe7, "CSCD: RDMA"},
+    {0xe8, "CSCD: IEEE 1394 EUI-64"},
+    {0xe9, "CSCD: SAS SSP"},
+    {0xea, "CSCD: IPv6"},
+    {0xeb, "CSCD: IP copy service"},
+    {0xfe, "CSCD: ROD"},
+    {0xff, "CSCD: extension"},
+    {0x0, NULL},
+};
+
+static const char *
+get_tpc_desc_name(unsigned char code)
+{
+    const struct tpc_desc_type * dtp;
+
+    for (dtp = tpc_desc_arr; dtp->name; ++dtp) {
+        if (code == dtp->code)
+            return dtp->name;
+    }
+    return "";
+}
+
+struct tpc_rod_type {
+    uint32_t type;
+    const char * name;
+};
+
+static struct tpc_rod_type tpc_rod_arr[] = {
+    {0x0, "copy manager internal"},
+    {0x10000, "access upon reference"},
+    {0x800000, "point in time copy - default"},
+    {0x800001, "point in time copy - change vulnerable"},
+    {0x800002, "point in time copy - persistent"},
+    {0x80ffff, "point in time copy - any"},
+    {0xffff0001, "block device zero"},
+    {0x0, NULL},
+};
+
+static const char *
+get_tpc_rod_name(uint32_t rod_type)
+{
+    const struct tpc_rod_type * rtp;
+
+    for (rtp = tpc_rod_arr; rtp->name; ++rtp) {
+        if (rod_type == rtp->type)
+            return rtp->name;
+    }
+    return "";
+}
+
 /* VPD_3PARTY_COPY [3PC, third party copy] */
 static void
 decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
@@ -2027,6 +2048,7 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
     int j, k, m, bump, desc_type, desc_len, sa_len;
     unsigned int u;
     const unsigned char * ucp;
+    const char * cp;
     uint64_t ull;
     char b[80];
 
@@ -2037,8 +2059,8 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
-        desc_type = (ucp[0] << 8) + ucp[1];
-        desc_len = (ucp[2] << 8) + ucp[3];
+        desc_type = sg_get_unaligned_be16(ucp);
+        desc_len = sg_get_unaligned_be16(ucp + 2);
         if (verbose)
             printf("Descriptor type=%d, len %d\n", desc_type, desc_len);
         bump = 4 + desc_len;
@@ -2058,26 +2080,14 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
             case 0x0000:    /* Required if POPULATE TOKEN (or friend) used */
                 printf(" Block Device ROD Token Limits:\n");
                 printf("  Maximum Range Descriptors: %d\n",
-                       (ucp[10] << 8) + ucp[11]);
-                u = (ucp[12] << 24) | (ucp[13] << 16) | (ucp[14] << 8) |
-                    ucp[15];
+                       sg_get_unaligned_be16(ucp + 10));
+                u = sg_get_unaligned_be32(ucp + 12);
                 printf("  Maximum Inactivity Timeout: %u seconds\n", u);
-                u = (ucp[16] << 24) | (ucp[17] << 16) | (ucp[18] << 8) |
-                    ucp[19];
+                u = sg_get_unaligned_be32(ucp + 16);
                 printf("  Default Inactivity Timeout: %u seconds\n", u);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[20 + j];
-                }
+                ull = sg_get_unaligned_be64(ucp + 20);
                 printf("  Maximum Token Transfer Size: %" PRIu64 "\n", ull);
-                ull = 0;
-                for (j = 0; j < 8; j++) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[28 + j];
-                }
+                ull = sg_get_unaligned_be64(ucp + 28);
                 printf("  Optimal Transfer Count: %" PRIu64 "\n", ull);
                 break;
             case 0x0001:    /* Mandatory (SPC-4) */
@@ -2096,49 +2106,52 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
             case 0x0004:
                 printf(" Parameter Data:\n");
                 printf("  Maximum CSCD Descriptor Count: %d\n",
-                       (ucp[8] << 8) + ucp[9]);
+                       sg_get_unaligned_be16(ucp + 8));
                 printf("  Maximum Segment Descriptor Count: %d\n",
-                       (ucp[10] << 8) + ucp[11]);
-                u = (ucp[12] << 24) | (ucp[13] << 16) | (ucp[14] << 8) |
-                    ucp[15];
+                       sg_get_unaligned_be16(ucp + 10));
+                u = sg_get_unaligned_be32(ucp + 12);
                 printf("  Maximum Descriptor List Length: %u\n", u);
-                u = (ucp[16] << 24) | (ucp[17] << 16) | (ucp[18] << 8) |
-                    ucp[19];
+                u = sg_get_unaligned_be32(ucp + 16);
                 printf("  Maximum Inline Data Length: %u\n", u);
                 break;
             case 0x0008:
                 printf(" Supported Descriptors:\n");
                 for (j = 0; j < ucp[4]; j++) {
-                    printf("  0x%x\n", ucp[5 + j]);
+                    cp = get_tpc_desc_name(ucp[5 + j]);
+                    if (strlen(cp) > 0)
+                        printf("  %s [0x%x]\n", cp, ucp[5 + j]);
+                    else
+                        printf("  0x%x\n", ucp[5 + j]);
                 }
                 break;
             case 0x000C:
                 printf(" Supported CSCD IDs:\n");
-                for (j = 0; j < (ucp[4] << 8) + ucp[5]; j += 2) {
-                    u = (ucp[6 + j] << 8) | ucp[7 + j];
+                for (j = 0; j < sg_get_unaligned_be16(ucp + 4); j += 2) {
+                    u = sg_get_unaligned_be16(ucp + 6 + j);
                     printf("  0x%04x\n", u);
                 }
                 break;
             case 0x0106:
                 printf(" ROD Token Features:\n");
                 printf("  Remote Tokens: %d\n", ucp[4] & 0x0f);
-                u = (ucp[16] << 24) | (ucp[17] << 16) | (ucp[18] << 8) |
-                    ucp[19];
+                u = sg_get_unaligned_be32(ucp + 16);
                 printf("  Minimum Token Lifetime: %u seconds\n", u);
-                u = (ucp[20] << 24) | (ucp[21] << 16) | (ucp[22] << 8) |
-                    ucp[23];
+                u = sg_get_unaligned_be32(ucp + 20);
                 printf("  Maximum Token Lifetime: %u seconds\n", u);
-                u = (ucp[24] << 24) | (ucp[25] << 16) | (ucp[26] << 8) |
-                    ucp[27];
+                u = sg_get_unaligned_be32(ucp + 24);
                 printf("  Maximum Token inactivity timeout: %d\n", u);
-                decode_rod_descriptor(&ucp[48], (ucp[46] << 8) + ucp[47]);
+                decode_rod_descriptor(ucp + 48,
+                                      sg_get_unaligned_be16(ucp + 46));
                 break;
             case 0x0108:
                 printf(" Supported ROD Token and ROD Types:\n");
-                for (j = 0; j < (ucp[6] << 8) + ucp[7]; j+= 64) {
-                    u = (ucp[8 + j] << 24) | (ucp[8 + j + 1] << 16) |
-                        (ucp[8 + j + 2] << 8) | ucp[8 + j + 3];
-                    printf("  ROD Type %u:\n", u);
+                for (j = 0; j < sg_get_unaligned_be16(ucp + 6); j+= 64) {
+                    u = sg_get_unaligned_be32(ucp + 8 + j);
+                    cp = get_tpc_rod_name(u);
+                    if (strlen(cp) > 0)
+                        printf("  ROD Type: %s [0x%x]\n", cp, u);
+                    else
+                        printf("  ROD Type: 0x%x\n", u);
                     printf("    Internal: %s\n",
                            (ucp[8 + j + 4] & 0x80) ? "yes" : "no");
                     printf("    Token In: %s\n",
@@ -2146,35 +2159,30 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
                     printf("    Token Out: %s\n",
                            (ucp[8 + j + 4] & 0x01) ? "yes" : "no");
                     printf("    Preference: %d\n",
-                           (ucp[8 + j + 6] << 8) + ucp[8 + j + 7]);
+                           sg_get_unaligned_be16(ucp + 8 + j + 6));
                 }
                 break;
             case 0x8001:    /* Mandatory (SPC-4) */
                 printf(" General Copy Operations:\n");
-                u = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) |
-                    ucp[7];
+                u = sg_get_unaligned_be32(ucp + 4);
                 printf("  Total Concurrent Copies: %u\n", u);
-                u = (ucp[8] << 24) | (ucp[9] << 16) | (ucp[10] << 8) |
-                    ucp[11];
+                u = sg_get_unaligned_be32(ucp + 8);
                 printf("  Maximum Identified Concurrent Copies: %u\n", u);
-                u = (ucp[12] << 24) | (ucp[13] << 16) | (ucp[14] << 8) |
-                    ucp[15];
+                u = sg_get_unaligned_be32(ucp + 12);
                 printf("  Maximum Segment Length: %u\n", u);
-                ull = (1 << ucp[16]);
+                ull = (1 << ucp[16]); /* field is power of 2 */
                 printf("  Data Segment Granularity: %" PRIu64 "\n", ull);
                 ull = (1 << ucp[17]);
                 printf("  Inline Data Granularity: %" PRIu64 "\n", ull);
                 break;
             case 0x9101:
                 printf(" Stream Copy Operations:\n");
-                u = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) |
-                    ucp[7];
+                u = sg_get_unaligned_be32(ucp + 4);
                 printf("  Maximum Stream Device Transfer Size: %u\n", u);
                 break;
             case 0xC001:
                 printf(" Held Data:\n");
-                u = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) |
-                    ucp[7];
+                u = sg_get_unaligned_be32(ucp + 4);
                 printf("  Held Data Limit: %u\n", u);
                 ull = (1 << ucp[8]);
                 printf("  Held Data Granularity: %" PRIu64 "\n", ull);
@@ -2207,10 +2215,10 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
-        rel_port = (ucp[0] << 8) + ucp[1];
+        rel_port = sg_get_unaligned_be16(ucp);
         printf("  Relative port=%d\n", rel_port);
         proto = ucp[2] & 0xf;
-        desc_len = (ucp[6] << 8) + ucp[7];
+        desc_len = sg_get_unaligned_be16(ucp + 6);
         bump = 8 + desc_len;
         if ((k + bump) > len) {
             pr2serr("Protocol-specific logical unit information VPD page, "
@@ -2258,10 +2266,10 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
-        rel_port = (ucp[0] << 8) + ucp[1];
+        rel_port = sg_get_unaligned_be16(ucp);
         printf("  Relative port=%d\n", rel_port);
         proto = ucp[2] & 0xf;
-        desc_len = (ucp[6] << 8) + ucp[7];
+        desc_len = sg_get_unaligned_be16(ucp + 6);
         bump = 8 + desc_len;
         if ((k + bump) > len) {
             pr2serr("Protocol-specific port VPD page, short descriptor "
@@ -2310,62 +2318,43 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             pr2serr("Block limits VPD page length too short=%d\n", len);
             return;
         }
-        printf("  Write same no zero (WSNZ): %d\n", !!(buff[4] & 0x1));
+        printf("  Write same non-zero (WSNZ): %d\n", !!(buff[4] & 0x1));
         printf("  Maximum compare and write length: %u blocks\n",
                buff[5]);
-        u = (buff[6] << 8) | buff[7];
+        u = sg_get_unaligned_be16(buff + 6);
         printf("  Optimal transfer length granularity: %u blocks\n", u);
-        u = (buff[8] << 24) | (buff[9] << 16) | (buff[10] << 8) |
-            buff[11];
+        u = sg_get_unaligned_be32(buff + 8);
         printf("  Maximum transfer length: %u blocks\n", u);
-        u = (buff[12] << 24) | (buff[13] << 16) | (buff[14] << 8) |
-            buff[15];
+        u = sg_get_unaligned_be32(buff + 12);
         printf("  Optimal transfer length: %u blocks\n", u);
         if (len > 19) {     /* added in sbc3r09 */
-            u = (buff[16] << 24) | (buff[17] << 16) | (buff[18] << 8) |
-                buff[19];
+            u = sg_get_unaligned_be32(buff + 16);
             printf("  Maximum prefetch length: %u blocks\n", u);
             /* was 'Maximum prefetch transfer length' prior to sbc3r33 */
         }
         if (len > 27) {     /* added in sbc3r18 */
-            u = ((unsigned int)buff[20] << 24) | (buff[21] << 16) |
-                (buff[22] << 8) | buff[23];
+            u = sg_get_unaligned_be32(buff + 20);
             printf("  Maximum unmap LBA count: %u\n", u);
-            u = ((unsigned int)buff[24] << 24) | (buff[25] << 16) |
-                (buff[26] << 8) | buff[27];
+            u = sg_get_unaligned_be32(buff + 24);
             printf("  Maximum unmap block descriptor count: %u\n", u);
         }
         if (len > 35) {     /* added in sbc3r19 */
-            int m;
-            uint64_t mwsl;
-
-            u = ((unsigned int)buff[28] << 24) | (buff[29] << 16) |
-                (buff[30] << 8) | buff[31];
+            u = sg_get_unaligned_be32(buff + 28);
             printf("  Optimal unmap granularity: %u\n", u);
             printf("  Unmap granularity alignment valid: %u\n",
                    !!(buff[32] & 0x80));
-            u = ((unsigned int)(buff[32] & 0x7f) << 24) | (buff[33] << 16) |
-                (buff[34] << 8) | buff[35];
+            u = sg_get_unaligned_be32(buff + 32);
             printf("  Unmap granularity alignment: %u\n", u);
             /* added in sbc3r26 */
-            mwsl = 0;
-            for (m = 0; m < 8; ++m) {
-                if (m > 0)
-                    mwsl <<= 8;
-                mwsl |= buff[36 + m];
-            }
             printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
-                   mwsl);
+                   sg_get_unaligned_be64(buff + 36));
         }
         if (len > 44) {     /* added in sbc4r02 */
-            u = ((unsigned int)buff[44] << 24) | (buff[45] << 16) |
-                (buff[46] << 8) | buff[47];
+            u = sg_get_unaligned_be32(buff + 44);
             printf("  Maximum atomic transfer length: %u\n", u);
-            u = ((unsigned int)buff[48] << 24) | (buff[49] << 16) |
-                (buff[50] << 8) | buff[51];
+            u = sg_get_unaligned_be32(buff + 48);
             printf("  Atomic alignment: %u\n", u);
-            u = ((unsigned int)buff[52] << 24) | (buff[53] << 16) |
-                (buff[54] << 8) | buff[55];
+            u = sg_get_unaligned_be32(buff + 52);
             printf("  Atomic transfer length granularity: %u\n", u);
         }
         break;
@@ -2411,7 +2400,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
                     "short=%d\n", len);
             return;
         }
-        u = (buff[4] << 8) | buff[5];
+        u = sg_get_unaligned_be16(buff + 4);
         if (0 == u)
             printf("  Medium rotation rate is not reported\n");
         else if (1 == u)
@@ -2531,8 +2520,7 @@ decode_sup_block_lens_vpd(unsigned char * buff, int len)
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += 8, ucp += 8) {
-        u = ((unsigned int)ucp[0] << 24) | (ucp[1] << 16) | (ucp[2] << 8) |
-            ucp[3];
+        u = sg_get_unaligned_be32(ucp);
         printf("  Logical block length: %u\n", u);
         printf("    P_I_I_SUP: %d\n", !!(ucp[4] & 0x40));
         printf("    GRD_CHK: %d\n", !!(ucp[4] & 0x4));
@@ -2549,8 +2537,6 @@ decode_sup_block_lens_vpd(unsigned char * buff, int len)
 static void
 decode_block_dev_char_ext_vpd(unsigned char * b, int len)
 {
-    unsigned int u;
-
     if (len < 16) {
         pr2serr("Block device characteristics extension VPD page "
                 "length too short=%d\n", len);
@@ -2607,10 +2593,8 @@ decode_block_dev_char_ext_vpd(unsigned char * b, int len)
         break;
     }
     printf(" [0x%x]\n", b[7]);
-    u = ((unsigned int)b[8] << 24) | (b[9] << 16) | (b[10] << 8) | b[11];
-    printf("  Utilization B: %u\n", u);
-    u = ((unsigned int)b[12] << 24) | (b[13] << 16) | (b[14] << 8) | b[15];
-    printf("  Utilization A: %u\n", u);
+    printf("  Utilization B: %u\n", sg_get_unaligned_be32(b + 8));
+    printf("  Utilization A: %u\n", sg_get_unaligned_be32(b + 12));
 }
 
 /* VPD_TA_SUPPORTED */
@@ -2697,10 +2681,9 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
             pr2serr("Referrals VPD page length too short=%d\n", len);
             break;
         }
-        u = ((unsigned int)b[8] << 24) | (b[9] << 16) | (b[10] << 8) | b[11];
+        u = sg_get_unaligned_be32(b + 8);
         printf("  User data segment size: %u\n", u);
-        u = ((unsigned int)b[12] << 24) | (b[13] << 16) |
-            (b[14] << 8) | b[15];
+        u = sg_get_unaligned_be32(b + 12);
         printf("  User data segment multiplier: %u\n", u);
         break;
     case PDT_TAPE: case PDT_MCHANGER:
@@ -3433,7 +3416,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
         for (k = 0, off = 0; off < in_len; ++k, off += bump) {
             rp = rsp_buff + off;
             pn = rp[1];
-            bump = (rp[2] << 8) + rp[3] + 4;
+            bump = sg_get_unaligned_be16(rp + 2) + 4;
             if ((off + bump) > in_len) {
                 pr2serr("%s: page 0x%x size (%d) exceeds buffer\n", __func__,
                         pn, bump);
