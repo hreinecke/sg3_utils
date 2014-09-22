@@ -32,7 +32,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.28 20140704";
+static const char * version_str = "1.29 20140921";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -141,11 +141,12 @@ usage()
                "    --six|-6        use 6 byte MODE SENSE/SELECT to probe "
                "disk\n"
                "                    (def: use 10 byte MODE SENSE/SELECT)\n"
-               "    --size=SIZE|-s SIZE    bytes per block, defaults to "
-               "DEVICE's current\n"
-               "                           block size. Only needed to "
-               "change current block\n"
-               "                           size\n"
+               "    --size=SIZE|-s SIZE    bytes per logical block, "
+               "defaults to DEVICE's\n"
+               "                           current logical block size. Only "
+               "needed to\n"
+               "                           change current logical block "
+               "size\n"
                "    --verbose|-v    increase verbosity\n"
                "    --version|-V    print version details and exit\n"
                "    --wait|-w       format command waits until format "

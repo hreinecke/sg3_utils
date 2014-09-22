@@ -231,7 +231,7 @@ set_logging_level()
     echo $LEVEL > /proc/sys/dev/scsi/logging_level
     if [ $? != 0 ]
     then
- 	echo "$SCRIPTNAME: could not write scsi logging level" \
+ 	echo "$SCRIPTNAME: could not write scsi logging level $LEVEL" \
  	     "(kernel probably without SCSI_LOGGING support)"
  	exit 1
     fi

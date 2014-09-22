@@ -24,9 +24,10 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "0.43 20140807";
+static const char * version_str = "0.44 20140919";
 
 #define ME "sg_senddiag: "
 
@@ -41,6 +42,7 @@ static struct option long_options[] = {
         {"maxlen", required_argument, 0, 'm'},
         {"new", no_argument, 0, 'N'},
         {"old", no_argument, 0, 'O'},
+        {"page", required_argument, 0, 'P'},
         {"pf", no_argument, 0, 'p'},
         {"raw", required_argument, 0, 'r'},
         {"selftest", required_argument, 0, 's'},
@@ -58,6 +60,7 @@ struct opts_t {
     int do_hex;
     int do_list;
     int maxlen;
+    int page_code;
     int do_pf;
     int do_raw;
     int do_selftest;
@@ -76,21 +79,24 @@ usage()
 {
     printf("Usage: sg_senddiag [--doff] [--extdur] [--help] [--hex] "
            "[--list]\n"
-           "                   [--maxlen=LEN] [--pf] [--raw=H,H...] "
-           "[--selftest=ST]\n"
-           "                   [--test] [--uoff] [--verbose] [--version] "
-           "[DEVICE]\n"
+           "                   [--maxlen=LEN] [--page=PG] [--pf] "
+           "[--raw=H,H...]\n"
+           "                   [--selftest=ST] [--test] [--uoff] "
+           "[--verbose] [--version]\n"
+           "                   [DEVICE]\n"
            "  where:\n"
            "    --doff|-d       device online (def: 0, only with '--test')\n"
            "    --extdur|-e     duration of an extended self-test (from mode "
            "page 0xa)\n"
            "    --help|-h       print usage message then exit\n"
-           "    --hex|H         output in hex\n"
+           "    --hex|-H        output in hex\n"
            "    --list|-l       list supported page codes (with or without "
            "DEVICE)\n"
            "    --maxlen=LEN|-m LEN    parameter list length or maximum "
            "allocation\n"
            "                           length (default: 4096 bytes)\n"
+           "    --page=PG|-p PG    do RECEIVE DIAGNOSTIC RESULTS only, set "
+           "PCV\n"
            "    --pf|-p         set PF bit (def: 0)\n"
            "    --raw=H,H...|-r H,H...    sequence of hex bytes to form "
            "diag page to send\n"
@@ -151,7 +157,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dehHlm:NOpr:s:tuvV", long_options,
+        c = getopt_long(argc, argv, "dehHlm:NOpP:r:s:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -189,6 +195,15 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             return 0;
         case 'p':
             op->do_pf = 1;
+            break;
+        case 'P':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xff)) {
+                fprintf(stderr, "bad argument to '--page=' or greater "
+                        "than 255 [0xff]\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->page_code = n;
             break;
         case 'r':
             op->raw_arg = optarg;
@@ -613,8 +628,7 @@ list_page_codes()
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, res;
-    int rsp_buff_size;
+    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg;
     int read_in_len = 0;
     int ret = 0;
     struct opts_t opts;
@@ -626,6 +640,7 @@ main(int argc, char * argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     op->maxlen = DEF_ALLOC_LEN;
+    op->page_code = -1;
     res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -741,11 +756,11 @@ main(int argc, char * argv[])
         res = do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, op->do_verbose);
         if (0 == res) {
             /* Assume mode sense(10) response without block descriptors */
-            num = (rsp_buff[0] << 8) + rsp_buff[1] - 6;
+            num = sg_get_unaligned_be16(rsp_buff) - 6;
             if (num >= 0xc) {
                 int secs;
 
-                secs = (rsp_buff[18] << 8) + rsp_buff[19];
+                secs = sg_get_unaligned_be16(rsp_buff + 18);
 #ifdef SG_LIB_MINGW
                 printf("Expected extended self-test duration=%d seconds "
                        "(%g minutes)\n", secs, secs / 60.0);
@@ -760,22 +775,37 @@ main(int argc, char * argv[])
             printf("Extended self-test duration (mode page 0xa) failed\n");
             goto err_out9;
         }
-    } else if (op->do_list) {
-        res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
-                          op->do_verbose);
+    } else if ((op->do_list) || (op->page_code >= 0x0)) {
+        pg = op->page_code;
+        if (pg < 0)
+            res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
+                              op->do_verbose);
+        else
+            res = 0;
         if (0 == res) {
-            if (0 == sg_ll_receive_diag(sg_fd, 0, 0, rsp_buff,
+            if (0 == sg_ll_receive_diag(sg_fd, (pg >= 0x0),
+                                        ((pg >= 0x0) ? pg : 0), rsp_buff,
                                         rsp_buff_size, 1, op->do_verbose)) {
-                printf("Supported diagnostic pages response:\n");
-                rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
-                if (op->do_hex)
-                    dStrHex((const char *)rsp_buff, rsp_len, 1);
-                else {
-                    for (k = 0; k < (rsp_len - 4); ++k) {
-                        cp = find_page_code_desc(rsp_buff[k + 4]);
-                        printf("  0x%02x  %s\n", rsp_buff[k + 4],
-                               (cp ? cp : "<unknown>"));
+                rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
+                if (pg < 0x1) {
+                    printf("Supported diagnostic pages response:\n");
+                    if (op->do_hex)
+                        dStrHex((const char *)rsp_buff, rsp_len, 1);
+                    else {
+                        for (k = 0; k < (rsp_len - 4); ++k) {
+                            cp = find_page_code_desc(rsp_buff[k + 4]);
+                            printf("  0x%02x  %s\n", rsp_buff[k + 4],
+                                   (cp ? cp : "<unknown>"));
+                        }
                     }
+                } else {
+                    cp = find_page_code_desc(pg);
+                    if (cp)
+                        printf("%s diagnostic page [0x%x] response in "
+                               "hex:\n", cp, pg);
+                    else
+                        printf("diagnostic page 0x%x response in hex:\n", pg);
+                    dStrHex((const char *)rsp_buff, rsp_len, 1);
                 }
             } else {
                 ret = res;

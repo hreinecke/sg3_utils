@@ -11,7 +11,8 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-nickname=SEN\fR]
 [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
 [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR]
-[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-warn\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -255,6 +256,13 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.TP
+\fB\-w\fR, \fB\-\-warn\fR
+warn about certain irregularities with warnings sent to stderr. The join
+is a complex operation that relies on information from several pages to be
+synchronized. The quality of SES devices vary and to be fair, the
+descriptions from T10 drafts and standards have been tweaked several
+times (see the EIIOE bit) in order to clear up confusion.
 .SH INDEXES
 An enclosure can have information about its disk and tape drives plus other
 supporting components like power supplies spread across several pages.
@@ -363,7 +371,8 @@ byte 2 would be represented as 2:7:8 with the most significant bit being
 .PP
 The <value> is optional but is ignored if provided to \fI\-\-get=STR\fR.
 For \fI\-\-set=STR\fR the default <value> is 1 while for \fI\-\-clear=STR\fR
-the default value is 0 .
+the default value is 0 . <value> is assumed to be decimal, hexadecimal
+values can be given in the normal fashion.
 .PP
 The supported list of <acronym>s can be viewed by using the
 \fI\-\-enumerate\fR option twice (or "\-ee").
