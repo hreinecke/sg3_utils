@@ -1,12 +1,13 @@
-.TH SG_SENDDIAG "8" "July 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_SENDDIAG "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
 .B sg_senddiag
 [\fI\-\-doff\fR] [\fI\-\-extdur\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-pf\fR] [\fI\-\-raw=H,H...\fR]
-[\fI\-\-raw=\-\fR] [\fI\-\-selftest=ST\fR] [\fI\-\-test\fR] [\fI\-\-uoff\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-pf\fR]
+[\fI\-\-raw=H,H...\fR] [\fI\-\-raw=\-\fR] [\fI\-\-selftest=ST\fR]
+[\fI\-\-test\fR] [\fI\-\-uoff\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .PP
 .B sg_senddiag
 [\fI\-doff\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-l\fR] [\fI\-pf\fR]
@@ -66,6 +67,14 @@ is 4096 bytes. \fILEN\fR cannot exceed 65535 or 0xffff in hexadecimal.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
+.TP
+\fB\-P\fR, \fB\-\-page\fR=\fIPG\fR
+where \fIPG\fR is the RECEIVE DIAGNOSTIC RESULTS command page code field.
+If this option is given the PCV bit in that command is set. When this option
+is given then no SEND DIAGNOSTIC command is sent (unlike \fI\-\-list\fR).
+If \fIPG\fR is 0 then the response is decoded as if it is the SPC Supported
+Diagnostic pages diagnostic page. Other \fIPG\fR values (i.e. 1 to 255)
+have their responses output in hex.
 .TP
 \fB\-p\fR, \fB\-\-pf\fR
 set Page Format (PF) bit. By default it is clear (i.e. 0) unless the

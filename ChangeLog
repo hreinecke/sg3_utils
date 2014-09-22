@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20140817] [svn: r607]
+Changelog for sg3_utils-1.40 [20140821] [svn: r608]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_senddiag: add --maxlen= option
   - sg_copy_results: correct response length calculations
@@ -13,15 +13,20 @@ Changelog for sg3_utils-1.40 [20140817] [svn: r607]
   - sg_vpd: add --all option
     - more TPC VPD page decoding
   - sg_ses: fix problem with --index=sse (and ssc)
+    - SAS connector status element: add overcurrent bit
     - handle element descriptor names that count a
       trailing NULL
+    - add --warn option mainly for broken joins
+    - add optional descriptions to -ee output
   - sg_logs: refine tape drive output
   - sg_raw: with -vvv decode T10 CDB name
   - sg_opcodes: add --compact field
+  - sg_senddiag: add --page=PG option
   - sg_sat_*: mention t_type and multiple_count fields
   - win32: sg_scan: handle larger configurations
   - sg_lib: trim trailing spaces in dStrHex() and friends
     - clean up service action string functions
+    - sg_ll_unmap_v2(): fix group number
   - sg_unaligned.h: add header for building parameters
   - examples/sg_tst_async: new Linux sg test utility
 
