@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.94 20140516";
+static const char * version_str = "0.95 20140923";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -64,6 +64,7 @@ static struct option long_options[] = {
     {"block", no_argument, 0, 'B'},
     {"count", required_argument, 0, 'c'},
     {"crypto", no_argument, 0, 'C'},
+    {"desc", no_argument, 0, 'd'},
     {"early", no_argument, 0, 'e'},
     {"fail", no_argument, 0, 'F'},
     {"help", no_argument, 0, 'h'},
@@ -76,6 +77,7 @@ static struct option long_options[] = {
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
     {"wait", no_argument, 0, 'w'},
+    {"zero", no_argument, 0, 'z'},
     {0, 0, 0, 0},
 };
 
@@ -84,6 +86,7 @@ struct opts_t {
     int block;
     int count;
     int crypto;
+    int desc;
     int early;
     int fail;
     int invert;
@@ -93,6 +96,7 @@ struct opts_t {
     int quick;
     int verbose;
     int wait;
+    int zero;
     const char * pattern_fn;
 };
 
@@ -114,6 +118,9 @@ usage()
           "    --count=OC|-c OC     OC is overwrite count field (from 1 "
           "(def) to 31)\n"
           "    --crypto|-C          do CRYPTOGRAPHIC ERASE sanitize\n"
+          "    --desc|-d            polling request sense sets 'desc' "
+          "field\n"
+          "                         (def: clear 'desc' field)\n"
           "    --early|-e           exit once sanitize started (IMMED set "
           "in cdb)\n"
           "                         user can monitor progress with REQUEST "
@@ -137,9 +144,11 @@ usage()
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string then exit\n"
           "    --wait|-w            wait for command to finish (could "
-          "take hours)\n\n"
+          "take hours)\n"
+          "    --zero|-z            use pattern of zeros for "
+          "OVERWRITE\n\n"
           "Performs a SCSI SANITIZE command.\n    <<<WARNING>>>: all data "
-          "on DEVICE will lost.\nDefault action is to give user time to "
+          "on DEVICE will be lost.\nDefault action is to give user time to "
           "reconsider; then execute SANITIZE\ncommand with IMMED bit set; "
           "then use REQUEST SENSE command every 60\nseconds to poll for a "
           "progress indication; then exit when there is no\nmore progress "
@@ -238,7 +247,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, res, c, infd, progress, vb, n, desc, resp_len;
+    int sg_fd, k, res, c, infd, progress, vb, n, resp_len;
     int got_stdin = 0;
     int param_lst_len = 0;
     const char * device_name = NULL;
@@ -259,7 +268,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ABc:CeFhi:IOp:QT:vVw", long_options,
+        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:QT:vVwz", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -281,6 +290,9 @@ main(int argc, char * argv[])
             break;
         case 'C':
             ++op->crypto;
+            break;
+        case 'd':
+            ++op->desc;
             break;
         case 'e':
             ++op->early;
@@ -328,6 +340,9 @@ main(int argc, char * argv[])
         case 'w':
             ++op->wait;
             break;
+        case 'z':
+            ++op->zero;
+            break;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
@@ -360,34 +375,42 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->overwrite) {
-        if (NULL == op->pattern_fn) {
-            fprintf(stderr, "'--overwrite' requires '--pattern=PF' "
-                    "option\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
-        if (! got_stdin) {
-            memset(&a_stat, 0, sizeof(a_stat));
-            if (stat(op->pattern_fn, &a_stat) < 0) {
-                fprintf(stderr, "pattern file: unable to stat(%s): %s\n",
-                        op->pattern_fn, safe_strerror(errno));
-                return SG_LIB_FILE_ERROR;
+        if (op->zero) {
+            if (op->pattern_fn) {
+                fprintf(stderr, "confused: both '--pattern=PF' and '--zero' "
+                        "options\n");
+                return SG_LIB_SYNTAX_ERROR;
             }
-            if (op->ipl <= 0) {
-                op->ipl = (int)a_stat.st_size;
-                if (op->ipl > MAX_XFER_LEN) {
-                    fprintf(stderr, "pattern file length exceeds 65535 "
-                            "bytes, need '--ipl=LEN' option\n");
-                     return SG_LIB_FILE_ERROR;
+            op->ipl = 4;
+        } else {
+            if (NULL == op->pattern_fn) {
+                fprintf(stderr, "'--overwrite' requires '--pattern=PF' "
+                        "or '--zero' option\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
+            if (! got_stdin) {
+                memset(&a_stat, 0, sizeof(a_stat));
+                if (stat(op->pattern_fn, &a_stat) < 0) {
+                    fprintf(stderr, "pattern file: unable to stat(%s): %s\n",
+                            op->pattern_fn, safe_strerror(errno));
+                    return SG_LIB_FILE_ERROR;
+                }
+                if (op->ipl <= 0) {
+                    op->ipl = (int)a_stat.st_size;
+                    if (op->ipl > MAX_XFER_LEN) {
+                        fprintf(stderr, "pattern file length exceeds 65535 "
+                                "bytes, need '--ipl=LEN' option\n");
+                         return SG_LIB_FILE_ERROR;
+                    }
                 }
             }
+            if (op->ipl < 1) {
+                fprintf(stderr, "'--overwrite' requires '--ipl=LEN' "
+                        "option if can't get PF length\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         }
-        if (op->ipl < 1) {
-            fprintf(stderr, "'--overwrite' requires '--ipl=LEN' "
-                    "option if can't get PF length\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
@@ -419,38 +442,44 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if (got_stdin) {
-            infd = STDIN_FILENO;
-            if (sg_set_binary_mode(STDIN_FILENO) < 0)
-                perror("sg_set_binary_mode");
+        if (op->zero) {
+            if (2 == op->zero)  /* treat -zz as fill with 0xff bytes */
+                memset(wBuff + 4, 0xff, op->ipl);
+            else
+                memset(wBuff + 4, 0, op->ipl);
         } else {
-            if ((infd = open(op->pattern_fn, O_RDONLY)) < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for reading", op->pattern_fn);
+            if (got_stdin) {
+                infd = STDIN_FILENO;
+                if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                    perror("sg_set_binary_mode");
+            } else {
+                if ((infd = open(op->pattern_fn, O_RDONLY)) < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
+                             "reading", op->pattern_fn);
+                    perror(ebuff);
+                    ret = SG_LIB_FILE_ERROR;
+                    goto err_out;
+                } else if (sg_set_binary_mode(infd) < 0)
+                    perror("sg_set_binary_mode");
+            }
+            res = read(infd, wBuff + 4, op->ipl);
+            if (res < 0) {
+                snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
+                         op->pattern_fn);
                 perror(ebuff);
+                if (! got_stdin)
+                    close(infd);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
-            } else if (sg_set_binary_mode(infd) < 0)
-                perror("sg_set_binary_mode");
-        }
-        res = read(infd, wBuff + 4, op->ipl);
-        if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
-                     op->pattern_fn);
-            perror(ebuff);
+            }
+            if (res < op->ipl) {
+                fprintf(stderr, "tried to read %d bytes from %s, got %d "
+                        "bytes\n", op->ipl, op->pattern_fn, res);
+                fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
+            }
             if (! got_stdin)
                 close(infd);
-            ret = SG_LIB_FILE_ERROR;
-            goto err_out;
         }
-        if (res < op->ipl) {
-            fprintf(stderr, "tried to read %d bytes from %s, got %d "
-                    "bytes\n", op->ipl, op->pattern_fn, res);
-            fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
-        }
-        if (! got_stdin)
-            close(infd);
-
         wBuff[0] = op->count & 0x1f;;
         if (op->test)
             wBuff[0] |= ((op->test & 0x3) << 5);
@@ -482,10 +511,10 @@ main(int argc, char * argv[])
     }
 
     if ((0 == ret) && (0 == op->early) && (0 == op->wait)) {
-        for (k = 0, desc = 1 ;; ++k) {
+        for (k = 0 ;; ++k) {
             sleep_for(POLL_DURATION_SECS);
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
+            res = sg_ll_request_sense(sg_fd, op->desc, requestSenseBuff,
                                       sizeof(requestSenseBuff), 1, vb);
             if (res) {
                 ret = res;
@@ -493,10 +522,10 @@ main(int argc, char * argv[])
                     fprintf(stderr, "Request Sense command not supported\n");
                 else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                     fprintf(stderr, "bad field in Request Sense cdb\n");
-                    if (1 == desc) {
+                    if (1 == op->desc) {
                         fprintf(stderr, "Descriptor type sense may not be "
                                 "supported, try again with fixed type\n");
-                        desc = 0;
+                        op->desc = 0;
                         continue;
                     }
                 } else {
