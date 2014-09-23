@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20140821] [svn: r608]
+Changelog for sg3_utils-1.40 [20140923] [svn: r609]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_senddiag: add --maxlen= option
   - sg_copy_results: correct response length calculations
@@ -18,6 +18,7 @@ Changelog for sg3_utils-1.40 [20140821] [svn: r608]
       trailing NULL
     - add --warn option mainly for broken joins
     - add optional descriptions to -ee output
+  - sg_sanitize: add --desc and --zero options
   - sg_logs: refine tape drive output
   - sg_raw: with -vvv decode T10 CDB name
   - sg_opcodes: add --compact field
