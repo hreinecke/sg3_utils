@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.93 20140921";    /* ses3r06 */
+static const char * version_str = "1.94 20140929";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -634,10 +634,11 @@ usage(int help_num)
             "    --version|-V        print version string and exit\n"
             "    --warn|-w           warn about join (and other) issues\n\n"
             "If no options are given then DEVICE's supported diagnostic "
-            "pages are\noutput. STR can be '<acronym>[=val]' or\n"
-            "'<start_byte>:<start_bit>[:<num_bits>][=<val>]'. Element "
-            "type\nabbreviations may be followed by a number (e.g. 'ps1' "
-            "is the second\npower supply element type).\n\n"
+            "pages are\nlisted. STR can be '<start_byte>:<start_bit>"
+            "[:<num_bits>][=<val>]'\nor '<acronym>[=val]'. Element type "
+            "abbreviations may be followed by a\nnumber (e.g. 'ps1' is "
+            "the second power supply element type). Use\n'sg_ses -e' and "
+            "'sg_ses -ee' for more information.\n\n"
             );
         pr2serr(
             "Low level indexing can be done with one of the two '--index=' "
@@ -1383,7 +1384,7 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
         el = ucp[3] + 4;
         sum_elem_types += ucp[2];
         printf("    Subenclosure identifier: %d%s\n", ucp[1],
-               (ucp[1] ? "" : " (primary)"));
+               (ucp[1] ? "" : " [primary]"));
         printf("      relative ES process id: %d, number of ES processes"
                ": %d\n", ((ucp[0] & 0x70) >> 4), (ucp[0] & 0x7));
         printf("      number of type descriptor headers: %d\n", ucp[2]);
@@ -2668,6 +2669,38 @@ ses_supported_pages_sdg(const char * leadin, const unsigned char * resp,
     }
 }
 
+/* An array of Download microcode status field values and descriptions */
+static struct diag_page_code mc_status_arr[] = {
+    {0x0, "No download microcode operation in progress"},
+    {0x1, "Download in progress, awaiting more"},
+    {0x2, "Download complete, updating storage"},
+    {0x3, "Updating storage with deferred microcode"},
+    {0x10, "Complete, no error, starting now"},
+    {0x11, "Complete, no error, start after hard reset or power cycle"},
+    {0x12, "Complete, no error, start after power cycle"},
+    {0x13, "Complete, no error, start after activate_mc, hard reset or "
+           "power cycle"},
+    {0x80, "Error, discarded, see additional status"},
+    {0x81, "Error, discarded, image error"},
+    {0x82, "Timeout, discarded"},
+    {0x83, "Internal error, need new microcode before reset"},
+    {0x84, "Internal error, need new microcode, reset safe"},
+    {0x85, "Unexpected activate_mc received"},
+    {0x1000, NULL},
+};
+
+static const char *
+get_mc_status(unsigned char status_val)
+{
+    const struct diag_page_code * mcsp;
+
+    for (mcsp = mc_status_arr; mcsp->desc; ++mcsp) {
+        if (status_val == mcsp->page_code)
+            return mcsp->desc;
+    }
+    return "";
+}
+
 /* DPC_DOWNLOAD_MICROCODE [0xe] */
 static void
 ses_download_code_sdg(const unsigned char * resp, int resp_len)
@@ -2676,6 +2709,7 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len)
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
+    const char * cp;
 
     printf("Download microcode status diagnostic page:\n");
     if (resp_len < 4)
@@ -2691,9 +2725,16 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len)
     for (k = 0; k < num_subs; ++k, ucp += 16) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        printf("   subenclosure identifier: %d\n", ucp[1]);
-        printf("     download microcode status: 0x%x [additional status: "
-               "0x%x]\n", ucp[2], ucp[3]);
+        cp = (0 == ucp[1]) ? " [primary]" : "";
+        printf("   subenclosure identifier: %d%s\n", ucp[1], cp);
+        cp = get_mc_status(ucp[2]);
+        if (strlen(cp) > 0) {
+            printf("     download microcode status: %s [0x%x]\n", cp, ucp[2]);
+            printf("     download microcode additional status: 0x%x\n",
+                   ucp[3]);
+        } else
+            printf("     download microcode status: 0x%x [additional "
+                   "status: 0x%x]\n", ucp[2], ucp[3]);
         printf("     download microcode maximum size: %d bytes\n",
                (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7]);
         printf("     download microcode expected buffer id: 0x%x\n", ucp[11]);
@@ -4144,6 +4185,8 @@ main(int argc, char * argv[])
         case DPC_DOWNLOAD_MICROCODE: /* Download Microcode Control [0xe] */
             printf("Sending Download Microcode Control [0x%x] page, with "
                    "page length=%d bytes\n", op->page_code, op->arr_len);
+            printf("  Perhaps it would be better to use the sg_ses_microcode "
+                   "utility\n");
             ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
                               op->verbose);
             if (ret) {

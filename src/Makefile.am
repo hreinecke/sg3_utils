@@ -16,9 +16,9 @@ bin_PROGRAMS = \
 	sg_read_long sg_reassign sg_referrals sg_rep_zones sg_requests \
 	sg_reset sg_reset_wp sg_rmsn sg_rtpg sg_safte sg_sanitize \
 	sg_sat_identify sg_sat_phy_event sg_sat_set_features sg_scan \
-	sg_senddiag sg_ses sg_start sg_stpg sg_sync sg_test_rwbuf sg_turs \
-	sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_write_verify sg_wr_mode sg_xcopy
+	sg_senddiag sg_ses sg_ses_microcode sg_start sg_stpg sg_sync \
+	sg_test_rwbuf sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_write_verify sg_wr_mode sg_xcopy
 
 distclean-local:
 	rm -f sg_scan.c
@@ -38,9 +38,10 @@ bin_PROGRAMS = \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
 	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_write_same sg_write_verify sg_wr_mode
+	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_ses_microcode \
+	sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd \
+	sg_write_buffer sg_write_long sg_write_same sg_write_verify \
+	sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -60,9 +61,10 @@ bin_PROGRAMS = \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
 	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_start sg_stpg \
-	sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
-	sg_write_long sg_write_same sg_write_verify sg_wr_mode
+	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_ses_microcode \
+	sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd \
+	sg_write_buffer sg_write_long sg_write_same sg_write_verify \
+	sg_wr_mode
 
 distclean-local:
 	rm -f sg_scan.c
@@ -82,9 +84,10 @@ bin_PROGRAMS = \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
 	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg sg_sync \
-	sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_write_verify sg_wr_mode
+	sg_sat_set_features sg_senddiag sg_ses sg_ses_microcode \
+	sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd \
+	sg_write_buffer sg_write_long sg_write_same sg_write_verify \
+	sg_wr_mode
 
 endif
 
@@ -98,9 +101,9 @@ bin_PROGRAMS = \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
 	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
 	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg sg_sync \
-	sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_write_verify sg_wr_mode
+	sg_sat_set_features sg_senddiag sg_ses sg_ses_microcode sg_start \
+	sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_write_verify sg_wr_mode
 
 endif
 
@@ -112,11 +115,11 @@ bin_PROGRAMS = \
 	sg_get_lba_status sg_ident sg_inq sg_logs sg_luns sg_modes \
 	sg_opcodes sg_persist sg_prevent sg_raw sg_rdac sg_readcap \
 	sg_read_block_limits sg_read_buffer sg_read_long sg_reassign \
-	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn \
-	sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-	sg_sat_set_features sg_senddiag sg_ses sg_start sg_stpg sg_sync \
-	sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer sg_write_long \
-	sg_write_same sg_write_verify sg_wr_mode
+	sg_referrals sg_rep_zones sg_requests sg_reset_wp sg_rmsn sg_rtpg \
+	sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
+	sg_sat_set_features sg_senddiag sg_ses sg_ses_microcode sg_start \
+	sg_stpg sg_sync sg_turs sg_unmap sg_verify sg_vpd sg_write_buffer \
+	sg_write_long sg_write_same sg_write_verify sg_wr_mode
 
 endif
 
@@ -253,6 +256,9 @@ sg_senddiag_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_ses_SOURCES = sg_ses.c
 sg_ses_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_ses_microcode_SOURCES = sg_ses_microcode.c
+sg_ses_microcode_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_start_SOURCES = sg_start.c
 sg_start_LDADD = ../lib/libsgutils2.la @os_libs@
