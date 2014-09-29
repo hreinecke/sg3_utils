@@ -208,6 +208,15 @@ MSYS or "cmd" shell. Various build options are available by giving
 command line options to "./configure", see the INSTALL file for generic
 information about the build infrastructure.
 
+MinGW can be used to cross built on some Redhat (Linux) platforms. After
+loading the cross build packages, the ./configure call in the normal
+autotools sequence should be replaced by either mingw32-configure or
+mingw64-configure. These scripts will set up the environment for
+the cross build and then call ./configure (so this invocation should be
+made in the top level of the untarred source). Options given to either
+script (e.g. --enable-win32-spt-direct) will be passed through to
+./configure .
+
 Binary and Text files
 =====================
 A problem has been reported with binary output being written in a MinGW
@@ -221,4 +230,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-7th August 2014
+24th September 2014

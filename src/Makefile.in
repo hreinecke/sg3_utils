@@ -112,6 +112,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_scan$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ses$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ses_microcode$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_start$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sync$(EXEEXT) \
@@ -158,6 +159,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_scan$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ses$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ses_microcode$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_start$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sync$(EXEEXT) \
@@ -203,6 +205,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ses$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ses_microcode$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_start$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sync$(EXEEXT) \
@@ -248,6 +251,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ses$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ses_microcode$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_start$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sync$(EXEEXT) \
@@ -305,6 +309,7 @@ host_triplet = @host@
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_scan$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_senddiag$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_ses$(EXEEXT) \
+@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_ses_microcode$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_start$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_stpg$(EXEEXT) \
 @OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sync$(EXEEXT) \
@@ -338,10 +343,11 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@	sg_sat_phy_event$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sync$(EXEEXT) sg_turs$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_vpd$(EXEEXT) sg_write_buffer$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_ses_microcode$(EXEEXT) sg_start$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_stpg$(EXEEXT) sg_sync$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_turs$(EXEEXT) sg_unmap$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) \
+@OS_FREEBSD_TRUE@	sg_write_buffer$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
 @OS_FREEBSD_TRUE@	sg_write_verify$(EXEEXT) sg_wr_mode$(EXEEXT)
 subdir = src
@@ -487,6 +493,9 @@ sg_senddiag_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_ses_OBJECTS = sg_ses.$(OBJEXT)
 sg_ses_OBJECTS = $(am_sg_ses_OBJECTS)
 sg_ses_DEPENDENCIES = ../lib/libsgutils2.la
+am_sg_ses_microcode_OBJECTS = sg_ses_microcode.$(OBJEXT)
+sg_ses_microcode_OBJECTS = $(am_sg_ses_microcode_OBJECTS)
+sg_ses_microcode_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_start_OBJECTS = sg_start.$(OBJEXT)
 sg_start_OBJECTS = $(am_sg_start_OBJECTS)
 sg_start_DEPENDENCIES = ../lib/libsgutils2.la
@@ -589,7 +598,8 @@ SOURCES = $(sg_compare_and_write_SOURCES) $(sg_copy_results_SOURCES) \
 	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
 	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
-	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) $(sg_start_SOURCES) \
+	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
+	$(sg_ses_microcode_SOURCES) $(sg_start_SOURCES) \
 	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
 	$(sg_turs_SOURCES) $(sg_unmap_SOURCES) $(sg_verify_SOURCES) \
 	$(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
@@ -615,7 +625,8 @@ DIST_SOURCES = $(sg_compare_and_write_SOURCES) \
 	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
 	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
 	$(sg_sat_set_features_SOURCES) $(sg_scan_SOURCES) \
-	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) $(sg_start_SOURCES) \
+	$(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
+	$(sg_ses_microcode_SOURCES) $(sg_start_SOURCES) \
 	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
 	$(sg_turs_SOURCES) $(sg_unmap_SOURCES) $(sg_verify_SOURCES) \
 	$(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
@@ -855,6 +866,8 @@ sg_senddiag_SOURCES = sg_senddiag.c
 sg_senddiag_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_ses_SOURCES = sg_ses.c
 sg_ses_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_ses_microcode_SOURCES = sg_ses_microcode.c
+sg_ses_microcode_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_start_SOURCES = sg_start.c
 sg_start_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_stpg_SOURCES = sg_stpg.c
@@ -1143,6 +1156,10 @@ sg_ses$(EXEEXT): $(sg_ses_OBJECTS) $(sg_ses_DEPENDENCIES) $(EXTRA_sg_ses_DEPENDE
 	@rm -f sg_ses$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_ses_OBJECTS) $(sg_ses_LDADD) $(LIBS)
 
+sg_ses_microcode$(EXEEXT): $(sg_ses_microcode_OBJECTS) $(sg_ses_microcode_DEPENDENCIES) $(EXTRA_sg_ses_microcode_DEPENDENCIES) 
+	@rm -f sg_ses_microcode$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_ses_microcode_OBJECTS) $(sg_ses_microcode_LDADD) $(LIBS)
+
 sg_start$(EXEEXT): $(sg_start_OBJECTS) $(sg_start_DEPENDENCIES) $(EXTRA_sg_start_DEPENDENCIES) 
 	@rm -f sg_start$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_start_OBJECTS) $(sg_start_LDADD) $(LIBS)
@@ -1260,6 +1277,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_senddiag.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses_microcode.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_start.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_stpg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sync.Po@am__quote@

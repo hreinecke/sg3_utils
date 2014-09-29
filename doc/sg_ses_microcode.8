@@ -1,0 +1,187 @@
+.TH SG_SES_MICROCODE "8" "September 2014" "sg3_utils\-1.39" SG3_UTILS
+.SH NAME
+sg_ses_microcode \- send microcode to a SCSI enclosure
+.SH SYNOPSIS
+.B sg_ses_microcode
+[\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
+[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
+[\fI\-\-skip=SKIP\fR] [\fI\-\-subenc=MS\fR] [\fI\-\-tlength=TLEN\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility attempts to download microcode to an enclosure (or an
+associated sub\-enclosure) associated with the \fIDEVICE\fR. The
+process for doing this is defined in the SCSI Enclosure Services (SES)
+standards and drafts maintained by the T10 committee.
+.PP
+The process is to send one or more sequences containing a SCSI SEND
+DIAGNOSTIC command followed by a RECEIVE DIAGNOSTIC RESULTS command. The
+former sends a Download microcode Control diagnostic page (dpage) and
+the latter fetches a Download microcode status dpage which can be viewed
+as a report on the former command.
+.PP
+The default action (i.e. when the \fI\-\-mode=MO\fR option is not given)
+is fetch the Download microcode status dpage and print it to the console.
+This does not need any additional data so the \fI\-\-in=FILE\fR option
+is not required.
+.PP
+The most recent reference for this utility is the draft SCSI Enclosure
+Services 3 (SES\-3) document T10/2149\-D Revision 6 at http://www.t10.org .
+Existing standards for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI
+INCITS 448\-2008 respectively.
+.PP
+Most other support for SES in this package (apart from downloading
+microcode) can be found in the sg_ses package. Another way of downloading
+firmware to a SCSI device is with the WRITE BUFFER command defined in
+SPC\-4, see the sg_write_buffer utility.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-bpw\fR=\fICS\fR
+where \fICS\fR is the chunk size in bytes and should be a multiple of 4.
+This will be the maximum number of bytes sent per SEND DIAGNOSTIC command.
+So if \fICS\fR is less than the effective length of the microcode then
+multiple SEND DIAGNOSTIC commands are sent, each taking the next chunk
+from the read data and inceasing the buffer offset field in the Download
+microcode control dpage by the appropriate amount. The default is
+a chunk size of 0 which is interpreted as a very large number hence only
+one SEND DIAGNOSTIC command will be sent.
+.br
+The number in \fICS\fR can optionally be followed by ",act" or ",activate".
+In this case after the microcode has been successfuly sent to the
+\fIDEVICE\fR, an additional Download microcode control dpage with its mode
+set to "Activate deferred microcode" [0xf] is sent.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit. If used multiple times also prints
+the mode names and their acronyms.
+.TP
+\fB\-i\fR, \fB\-\-id\fR=\fIID\fR
+this option sets the BUFFER ID field in the Download microcode control
+dpage. \fIID\fR is a value between 0 (default) and 255 inclusive.
+.TP
+\fB\-I\fR, \fB\-\-in\fR=\fIFILE\fR
+read data from file \fIFILE\fR that will be sent with the SEND DIAGNOSTIC
+command.  If \fIFILE\fR is '\-' then stdin is read until an EOF is
+detected (this is the same action as \fI\-\-raw\fR). Data is read from
+the beginning of \fIFILE\fR except in the case when it is a regular file
+and the \fI\-\-skip=SKIP\fR option is given.
+.TP
+\fB\-l\fR, \fB\-\-length\fR=\fILEN\fR
+where \fILEN\fR is the length, in bytes, of data to be written to the device.
+If not given (and the length cannot be deduced from \fI\-\-in=FILE\fR or
+\fI\-\-raw\fR) then defaults to zero. If the option is given and the length
+deduced from \fI\-\-in=FILE\fR or \fI\-\-raw\fR is less (or no data is
+provided), then bytes of 0xff are used as fill bytes.
+.TP
+\fB\-m\fR, \fB\-\-mode\fR=\fIMO\fR
+this option sets the MODE. \fIMO\fR is a value between
+0 (which is dmc_status and the default) and 255 inclusive. Alternatively
+an abbreviation can be given. See the MODES section below. To list the
+available mode abbreviations at run time give an invalid
+one (e.g. '\-\-mode=xxx') or use the '\-h' option.
+.TP
+\fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
+this option sets the BUFFER OFFSET field in the Download microcode control
+dpage. \fIOFF\fR is a value between 0 (default) and 2**32\-1 . It is a
+byte offset.
+.TP
+\fB\-s\fR, \fB\-\-skip\fR=\fISKIP\fR
+this option is only active when \fI\-\-in=FILE\fR is given and \fIFILE\fR is
+a regular file, rather than stdin. Data is read starting at byte offset
+\fISKIP\fR to the end of file (or the amount given by \fI\-\-length=LEN\fR).
+If not given the byte offset defaults to 0 (i.e. the start of the file).
+.TP
+\fB\-S\fR, \fB\-\-subenc\fR=\fISEID\fR
+\fISEID\fR is the subenclosure identify. It defaults to 0 which is the
+primary enclosure identifier.
+.TP
+\fB\-t\fR, \fB\-\-tlength\fR=\fITLEN\fR
+\fITLEN\fR is the total length in bytes of the microcode to be (or being)
+downloaded. It defaults to 0 which is okay in most cases. This option is
+only needed when sections of microcode and being sent in separate invocations
+of this utility.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH MODES
+Following is a list accepted by the \fIMO\fR argument of this utility.
+First shown is an acronym followed in square brackets by the corresponding
+decimal and hex values that may also be given for \fIMO\fR.
+.TP
+dmc_status  [0, 0x0]
+Use RECEIVE DIAGNOSTIC RESULTS to fetch the Download microcode status dpage
+and print it out.
+.TP
+dmc_offs  [6, 0x6]
+Download microcode with offsets and activate.
+.TP
+dmc_offs_save  [7, 0x7]
+Download microcode with offsets, save, and activate.
+.TP
+dmc_offs_defer  [14, 0xe]
+Download microcode with offsets, save, and defer activate.
+.TP
+activate_mc  [15, 0xf]
+Activate deferred microcode.
+.PP
+Apart from dmc_status, these are placed in the Download microcode mode
+field in the Download microcode control dpage. In the case of dmc_status
+the Download microcode status dpage is fetch with the RECEIVE DIAGNOSTIC
+RESULTS command and decoded.
+.SH NOTES
+This utility can handle a maximum size of 128 MB of microcode which
+should be sufficient for most purposes. In a system that is memory
+constrained, such large allocations of memory may fail.
+.PP
+The user should be aware that most operating systems have limits on the
+amount of data that can be sent with one SCSI command. In Linux this
+depends on the pass through mechanism used (e.g. block SG_IO or the sg
+driver) and various setting in sysfs in the Linux lk 2.6/3
+series (e.g. /sys/block/sda/queue/max_sectors_kb). Devices (i.e. logical
+units) also typically have limits on the maximum amount of data they can
+handle in one command. These two limitations suggest that modes
+containing the word "offset" together with the \fI\-\-bpw=CS\fR option
+are required as firmware files get larger and larger. And \fICS\fR
+can be quite small, for example 4096 bytes, resulting in many SEND
+DIAGNOSTIC commands being sent.
+.PP
+Downloading incorrect microcode into a device has the ability to render
+that device inoperable. One would hope that the device vendor verifies
+the data before activating it.
+.PP
+A long (operating system) timeout of 7200 seconds is set on each SEND
+DIAGNOSTIC command.
+.PP
+All numbers given with options are assumed to be decimal.
+Alternatively numerical values can be given in hexadecimal preceded by
+either "0x" or "0X" (or has a trailing "h" or "H").
+.SH EXAMPLES
+The following sends new firmware to an enclosure. Sending a 1.5 MB
+file in one command caused the enclosure to lock up temporarily and did
+not update the firmware. Breaking the firmware file into 4 KB chunks (an
+educated guess) was more successful:
+.PP
+  sg_ses_microcode \-b 4k \-m dmc_offs_save \-I firmware.bin /dev/sg4
+.PP
+The firmware update occurred in the following enclosure power cycle. With
+a modern enclosure the Extended Inquiry VPD page gives indications in which
+situations a firmware upgrade will take place.
+.SH EXIT STATUS
+The exit status of sg_ses_microcode is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2014 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_ses, sg_write_buffer(sg3_utils)
