@@ -4,16 +4,16 @@ sg_ses_microcode \- send microcode to a SCSI enclosure
 .SH SYNOPSIS
 .B sg_ses_microcode
 [\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
-[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
-[\fI\-\-skip=SKIP\fR] [\fI\-\-subenc=MS\fR] [\fI\-\-tlength=TLEN\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-non\fR]
+[\fI\-\-offset=OFF\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-subenc=MS\fR]
+[\fI\-\-tlength=TLEN\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-This utility attempts to download microcode to an enclosure (or an
-associated sub\-enclosure) associated with the \fIDEVICE\fR. The
-process for doing this is defined in the SCSI Enclosure Services (SES)
-standards and drafts maintained by the T10 committee.
+This utility attempts to download microcode to an enclosure (or one of its
+sub\-enclosures) associated with the \fIDEVICE\fR. The process for doing
+this is defined in the SCSI Enclosure Services (SES) standards and drafts
+maintained by the T10 committee.
 .PP
 The process is to send one or more sequences containing a SCSI SEND
 DIAGNOSTIC command followed by a RECEIVE DIAGNOSTIC RESULTS command. The
@@ -22,8 +22,8 @@ the latter fetches a Download microcode status dpage which can be viewed
 as a report on the former command.
 .PP
 The default action (i.e. when the \fI\-\-mode=MO\fR option is not given)
-is fetch the Download microcode status dpage and print it to the console.
-This does not need any additional data so the \fI\-\-in=FILE\fR option
+is to fetch the Download microcode status dpage and decode it. This does
+not require the microcode (firmware) itself so the \fI\-\-in=FILE\fR option
 is not required.
 .PP
 The most recent reference for this utility is the draft SCSI Enclosure
@@ -32,7 +32,7 @@ Existing standards for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI
 INCITS 448\-2008 respectively.
 .PP
 Most other support for SES in this package (apart from downloading
-microcode) can be found in the sg_ses package. Another way of downloading
+microcode) can be found in the sg_ses utility. Another way of downloading
 firmware to a SCSI device is with the WRITE BUFFER command defined in
 SPC\-4, see the sg_write_buffer utility.
 .SH OPTIONS
@@ -43,13 +43,13 @@ where \fICS\fR is the chunk size in bytes and should be a multiple of 4.
 This will be the maximum number of bytes sent per SEND DIAGNOSTIC command.
 So if \fICS\fR is less than the effective length of the microcode then
 multiple SEND DIAGNOSTIC commands are sent, each taking the next chunk
-from the read data and inceasing the buffer offset field in the Download
+from the read data and increasing the buffer offset field in the Download
 microcode control dpage by the appropriate amount. The default is
 a chunk size of 0 which is interpreted as a very large number hence only
 one SEND DIAGNOSTIC command will be sent.
 .br
 The number in \fICS\fR can optionally be followed by ",act" or ",activate".
-In this case after the microcode has been successfuly sent to the
+In this case after the microcode has been successfully sent to the
 \fIDEVICE\fR, an additional Download microcode control dpage with its mode
 set to "Activate deferred microcode" [0xf] is sent.
 .TP
@@ -81,6 +81,12 @@ this option sets the MODE. \fIMO\fR is a value between
 an abbreviation can be given. See the MODES section below. To list the
 available mode abbreviations at run time give an invalid
 one (e.g. '\-\-mode=xxx') or use the '\-h' option.
+.TP
+\fB\-N\fR, \fB\-\-non\fR
+allow for non\-standard implementations that reset their Download microcode
+engine after a RECEIVE DIAGNOSTIC RESULTS command with the Download microcode
+status dpage is sent. When this option is given sending that command and
+dpage combination is avoided unless an error has already occurred.
 .TP
 \fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
 this option sets the BUFFER OFFSET field in the Download microcode control
