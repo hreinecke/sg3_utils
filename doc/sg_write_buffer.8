@@ -25,7 +25,7 @@ Arguments to long options are mandatory for short options as well.
 where \fICS\fR is the chunk size in bytes. This will be the maximum number
 of bytes sent per WRITE BUFFER command. So if \fICS\fR is less than the
 effective length then multiple WRITE BUFFER commands are sent, each taking
-the next chunk from the read data and inceasing the buffer offset field
+the next chunk from the read data and increasing the buffer offset field
 in the WRITE BUFFER command by the appropriate amount. The default is
 a chunk size of 0 which is interpreted as a very large number hence only
 one WRITE BUFFER command will be sent. This option should only be used with
@@ -157,7 +157,7 @@ driver) and various setting in sysfs in the Linux lk 2.6/3
 series (e.g. /sys/block/sda/queue/max_sectors_kb). Devices (i.e. logical
 units) also typically have limits on the maximum amount of data they can
 handle in one command. These two limitations suggest that modes
-containing the word "offset" togther with the \fI\-\-bpw=CS\fR option
+containing the word "offset" together with the \fI\-\-bpw=CS\fR option
 are required as firmware files get larger and larger. And \fICS\fR
 can be quite small, for example 4096 bytes, resulting in many WRITE
 BUFFER commands being sent.

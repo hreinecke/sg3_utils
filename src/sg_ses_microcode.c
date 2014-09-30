@@ -36,7 +36,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.00 20140829";    /* ses3r06 */
+static const char * version_str = "1.00 20140830";    /* ses3r06 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -53,6 +53,7 @@ struct opts_t {
     int mc_len;
     int mc_len_given;
     int mc_mode;
+    int mc_non;
     int mc_offset;
     int mc_skip;
     int mc_subenc;
@@ -67,6 +68,7 @@ static struct option long_options[] = {
     {"in", required_argument, 0, 'I'},
     {"length", required_argument, 0, 'l'},
     {"mode", required_argument, 0, 'm'},
+    {"non", no_argument, 0, 'N'},
     {"offset", required_argument, 0, 'o'},
     {"skip", required_argument, 0, 's'},
     {"subenc", required_argument, 0, 'S'},
@@ -103,10 +105,12 @@ usage()
     pr2serr("Usage: "
             "sg_ses_microcode [--bpw=CS] [--help] [--id=ID] [--in=FILE]\n"
             "                        [--length=LEN] [--mode=MO] "
-            "[--offset=OFF]\n"
-            "                        [--skip=SKIP] [--subenc=SEID] "
-            "[--tlength=TLEN]\n"
-            "                        [--verbose] [--version] DEVICE\n"
+            "[--non]\n"
+            "                        [--offset=OFF] [--skip=SKIP] "
+            "[--subenc=SEID]\n"
+            "                        [--tlength=TLEN] [--verbose] "
+            "[--version]\n"
+            "                        DEVICE\n"
             "  where:\n"
             "    --bpw=CS|-b CS         CS is chunk size: bytes per send "
             "diagnostic\n"
@@ -123,6 +127,10 @@ usage()
             "    --mode=MO|-m MO        download microcode mode, MO is "
             "number or\n"
             "                           acronym (def: 0 -> 'dmc_status')\n"
+            "    --non|-N               non-standard: bypass all receive "
+            "diagnostic\n"
+            "                           results commands except after check "
+            "condition\n"
             "    --offset=OFF|-o OFF    buffer offset (unit: bytes, def: "
             "0);\n"
             "                           ignored if --bpw=CS given\n"
@@ -328,12 +336,19 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                           0 /* devofl */, 0 /* unitofl */,
                           1 /* long_duration */, wp->doutp, do_len,
                           1 /* noisy */, op->verbose);
-    if (res)
+    if (op->mc_non) {
+        /* If non-standard, only call RDR after failed SD */
+        if (0 == res)
+            return 0;
+        /* If RDR error after SD error, prefer reporting SD error */
+        ret = res;
+    } else if (res)
         return res;
+
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
                              DEF_DI_LEN, 1, op->verbose);
     if (res)
-        return res;
+        return ret ? ret : res;
     rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
     if (rsp_len > DEF_DI_LEN) {
         pr2serr("<<< warning response buffer too small [%d but need "
@@ -342,7 +357,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     }
     if (rsp_len < 8) {
         pr2serr("Download microcode status dpage too short\n");
-        return SG_LIB_CAT_OTHER;
+        return ret ? ret : SG_LIB_CAT_OTHER;
     }
     rec_gen_code = sg_get_unaligned_be32(dip + 4);
     if (rec_gen_code != gen_code)
@@ -361,7 +376,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                 pr2serr("mc offset=%d: status: %s [0x%x, additional=0x%x]\n",
                         off_off, cp, mc_status, ucp[3]);
             if (mc_status >= 0x80)
-                ret = SG_LIB_CAT_OTHER;
+                ret = ret ? ret : SG_LIB_CAT_OTHER;
         }
     }
     return ret;
@@ -394,7 +409,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:hi:I:l:m:o:s:S:t:vV", long_options,
+        c = getopt_long(argc, argv, "b:hi:I:l:m:No:s:S:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -456,6 +471,9 @@ main(int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
+            break;
+        case 'N':
+            ++op->mc_non;
             break;
         case 'o':
            op->mc_offset = sg_get_num(optarg);
@@ -652,6 +670,11 @@ main(int argc, char * argv[])
     }
     if (op->mc_tlen < op->mc_len)
         op->mc_tlen = op->mc_len;
+    if (op->mc_non && (MODE_DNLD_STATUS == op->mc_mode)) {
+        pr2serr("Do nothing because '--non' given so fetching the Download "
+                "microcode status\ndpage might be dangerous\n");
+        goto fini;
+    }
 
     if (NULL == (dip = (unsigned char *)malloc(DEF_DI_LEN))) {
         pr2serr(ME "out of memory (data-in buffer)\n");
@@ -659,7 +682,7 @@ main(int argc, char * argv[])
         goto fini;
     }
     memset(dip, 0, DEF_DI_LEN);
-    /* Fetch Download microde status dpage for generation code ++ */
+    /* Fetch Download microcode status dpage for generation code ++ */
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
                              DEF_DI_LEN, 1, op->verbose);
     if (0 == res) {

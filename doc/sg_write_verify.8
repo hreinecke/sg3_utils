@@ -25,7 +25,7 @@ buffer.
 .PP
 The relationship between the number of logical blocks to be written (i.e.
 \fINUM\fR) and the length (in bytes) of the data\-out buffer (i.e.
-\fIILEN\fR) may be simply found by multiplying the former by the logica
+\fIILEN\fR) may be simply found by multiplying the former by the logical
 block size. However if the \fIDEVICE\fR has protection information (PI)
 then it becomes a bit more complicated. Hence the calculation is left to
 the user with the default \fIILEN\fR, in the absence of the \fIIF\fR file,
@@ -48,7 +48,7 @@ where \fIBC\fR is the value to place in the command's BYTCHK field. Values
 between 0 and 3 (inclusive) are accepted. The default is value is 0 which
 implies only a write to the medium then a verify operation are performed. The
 only other value T10 defines currently is 1 which does performs an additional
-comparision between the data\-out buffer that was used by the write operation
+comparison between the data\-out buffer that was used by the write operation
 and the contents of the logical blocks read back from the medium.
 .TP
 \fB\-d\fR, \fB\-\-dpo\fR
@@ -109,7 +109,7 @@ set the WRPROTECT field in the cdb to \fIWP\fR. The default value is 0 which
 implies no protection information is sent (along with the user data) in the
 data\-out buffer.
 .SH REPEAT
-For data sizes around a megabyte and larger, it may be appropraite to send
+For data sizes around a megabyte and larger, it may be appropriate to send
 multiple SCSI WRITE AND VERIFY commands due to operating system
 limitations (e.g. pass\-through SCSI interfaces often limit the amount
 of data that can be passed with a SCSI command). With this utility the
@@ -165,7 +165,7 @@ data\-out comparison to the read back data:
 .PP
 The ddpt command can do copies between SCSI devices using READ and WRITE
 commands. However, currently it has no facility to promote those WRITES
-to WRITE AND VERIFY coomands. Using a pipe, that could be done like this:
+to WRITE AND VERIFY commands. Using a pipe, that could be done like this:
 .PP
   # ddpt if=/dev/sg2 bs=512 bpt=8 count=11 of=- |
 .br
@@ -173,10 +173,10 @@ sg_write_verify \-\-in=\- \-l 0x567 \-n 8 \-\-ilen=4096 \-\-repeat /dev/sg4
 .PP
 Both ddpt and sg_write_verify are configured for segments of 8 512 byte
 logical blocks. Since 11 logical blocks are read then first 8 logical blocks
-are copied followed by a copy of the remaing 3 blocks. Since it is assumed
+are copied followed by a copy of the remaining 3 blocks. Since it is assumed
 that there is no protection information then the data\-in and data\-out
 buffers will be 4096 bytes each. For sg_write_verify this needs to be stated
-explicity with the \-\-ilen=4096 option.
+explicitly with the \-\-ilen=4096 option.
 .SH AUTHORS
 Bruno Goncalves and Douglas Gilbert.
 .SH "REPORTING BUGS"

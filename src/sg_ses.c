@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.94 20140929";    /* ses3r06 */
+static const char * version_str = "1.95 20140930";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -483,6 +483,7 @@ static struct option long_options[] = {
     {"data", required_argument, 0, 'd'},
     {"descriptor", required_argument, 0, 'D'},
     {"dev-slot-num", required_argument, 0, 'x'},
+    {"dsn", required_argument, 0, 'x'},
     {"eiioe", required_argument, 0, 'E'},
     {"enumerate", no_argument, 0, 'e'},
     {"filter", no_argument, 0, 'f'},
@@ -553,9 +554,9 @@ usage(int help_num)
             "              [--version] [--warn] DEVICE\n"
             "  where the main options are:\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
-            "    --descriptor=DN|-D DN    descriptor name, indexing method\n"
-            "    --dev-slot-num=SN|-x SN    device slot number, indexing "
-            "method\n"
+            "    --descriptor=DN|-D DN    descriptor name (for indexing)\n"
+            "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
+            "(for indexing)\n"
             "    --eiioe=A_F|-E A_F    where A_F is either 'auto' or 'force'."
             "'force'\n"
             "                          acts as if EIIOE is set, 'auto' tries "
@@ -592,8 +593,7 @@ usage(int help_num)
             "or number)\n"
             "                        (def: 'ssp' [0x0] (supported diagnostic "
             "pages))\n"
-            "    --sas-addr=SA|-A SA    SAS address in hex, indexing "
-            "method\n"
+            "    --sas-addr=SA|-A SA    SAS address in hex (for indexing)\n"
             "    --set=STR|-S STR    set value of field by acronym or "
             "position\n\n"
             "Fetches status or sends control data to a SCSI enclosure. Use "
