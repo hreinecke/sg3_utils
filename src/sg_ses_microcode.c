@@ -36,7 +36,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.00 20140830";    /* ses3r06 */
+static const char * version_str = "1.01 20141002";    /* ses3r06 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -282,15 +282,16 @@ static int
 send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                   const unsigned char * dmp, int dmp_len,
                   struct dout_buff_t * wp, unsigned char * dip,
-                  const struct opts_t * op)
+                  int last, const struct opts_t * op)
 {
-    int do_len, rem, res, rsp_len, k, num, mc_status;
+    int do_len, rem, res, rsp_len, k, num, mc_status, verb;
     int send_data = 0;
     int ret = 0;
     uint32_t rec_gen_code;
     const unsigned char * ucp;
     const char * cp;
 
+    verb = (op->verbose > 1) ? op->verbose - 1 : 0;
     switch (op->mc_mode) {
     case MODE_DNLD_MC_OFFS:
     case MODE_DNLD_MC_OFFS_SAVE:
@@ -335,18 +336,40 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     res = sg_ll_send_diag(sg_fd, 0 /* sf_code */, 1 /* pf */, 0 /* sf */,
                           0 /* devofl */, 0 /* unitofl */,
                           1 /* long_duration */, wp->doutp, do_len,
-                          1 /* noisy */, op->verbose);
+                          1 /* noisy */, verb);
     if (op->mc_non) {
         /* If non-standard, only call RDR after failed SD */
         if (0 == res)
             return 0;
         /* If RDR error after SD error, prefer reporting SD error */
         ret = res;
-    } else if (res)
-        return res;
+    } else {
+        switch (op->mc_mode) {
+        case MODE_DNLD_MC_OFFS:
+        case MODE_DNLD_MC_OFFS_SAVE:
+            if (res)
+                return res;
+            else if (last)
+                return 0;   /* RDR after last may hit a device reset */
+            break;
+        case MODE_DNLD_MC_OFFS_DEFER:
+            if (res)
+                return res;
+            break;
+        case MODE_ACTIVATE_MC:
+            if (0 == res)
+                return 0;   /* RDR after ACTIVATE_MC may hit a device reset */
+            /* SD has failed, so do a RDR but return SD's error */
+            ret = res;
+            break;
+        default:
+            pr2serr("send_then_receive: mc_mode=0x%x\n", op->mc_mode);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
 
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
-                             DEF_DI_LEN, 1, op->verbose);
+                             DEF_DI_LEN, 1, verb);
     if (res)
         return ret ? ret : res;
     rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
@@ -375,6 +398,10 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
             if ((mc_status >= 0x80) || op->verbose)
                 pr2serr("mc offset=%d: status: %s [0x%x, additional=0x%x]\n",
                         off_off, cp, mc_status, ucp[3]);
+            if (op->verbose > 1)
+                pr2serr("  subenc_id=%d, expected_buffer_id=%d, "
+                        "expected_offset=0x%" PRIx32 "\n", ucp[1], ucp[11],
+                        sg_get_unaligned_be32(ucp + 12));
             if (mc_status >= 0x80)
                 ret = ret ? ret : SG_LIB_CAT_OTHER;
         }
@@ -386,7 +413,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, len, k, n, got_stdin, is_reg, rsp_len;
+    int sg_fd, res, c, len, k, n, got_stdin, is_reg, rsp_len, verb, last;
     int infd = -1;
     int do_help = 0;
     const char * device_name = NULL;
@@ -400,7 +427,7 @@ main(int argc, char * argv[])
     struct opts_t opts;
     struct opts_t * op;
     const struct mode_s * mp;
-    uint32_t gen_code;
+    uint32_t gen_code = 0;
     int ret = 0;
 
     op = &opts;
@@ -682,9 +709,10 @@ main(int argc, char * argv[])
         goto fini;
     }
     memset(dip, 0, DEF_DI_LEN);
+    verb = (op->verbose > 1) ? op->verbose - 1 : 0;
     /* Fetch Download microcode status dpage for generation code ++ */
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
-                             DEF_DI_LEN, 1, op->verbose);
+                             DEF_DI_LEN, 1, verb);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
         if (rsp_len > DEF_DI_LEN) {
@@ -707,22 +735,25 @@ main(int argc, char * argv[])
         ses_download_code_sdg(dip, rsp_len, gen_code);
         goto fini;
     } else if (MODE_ACTIVATE_MC == op->mc_mode) {
-        res = send_then_receive(sg_fd, gen_code, 0, NULL, 0, &dout, dip, op);
+        res = send_then_receive(sg_fd, gen_code, 0, NULL, 0, &dout, dip, 1,
+                                op);
         ret = res;
         goto fini;
     }
 
     res = 0;
     if (op->bpw > 0) {
-        for (k = 0; k < op->mc_len; k += n) {
+        for (k = 0, last = 0; k < op->mc_len; k += n) {
             n = op->mc_len - k;
             if (n > op->bpw)
                 n = op->bpw;
+            else
+                last = 1;
             if (op->verbose)
-                pr2serr("send_then_receive: mode=0x%x, id=%d, off_off=%d, "
-                        "len=%d\n", op->mc_mode, op->mc_id, k, n);
+                pr2serr("bpw loop: mode=0x%x, id=%d, off_off=%d, len=%d, "
+                        "last=%d\n", op->mc_mode, op->mc_id, k, n, last);
             res = send_then_receive(sg_fd, gen_code, k, dmp + k, n, &dout,
-                                    dip, op);
+                                    dip, last, op);
             if (res)
                 break;
         }
@@ -731,15 +762,14 @@ main(int argc, char * argv[])
             if (op->verbose)
                 pr2serr("sending Activate deferred microcode [0xf]\n");
             res = send_then_receive(sg_fd, gen_code, 0, NULL, 0, &dout,
-                                    dip, op);
+                                    dip, 1, op);
         }
     } else {
         if (op->verbose)
-            pr2serr("single send_then_receive: mode=0x%x, id=%d, offset=%d, "
-                    "len=%d\n", op->mc_mode, op->mc_id,
-                    op->mc_offset, op->mc_len);
+            pr2serr("single: mode=0x%x, id=%d, offset=%d, len=%d\n",
+                    op->mc_mode, op->mc_id, op->mc_offset, op->mc_len);
         res = send_then_receive(sg_fd, gen_code, 0, dmp, op->mc_len, &dout,
-                                dip, op);
+                                dip, 1, op);
     }
     if (res)
         ret = res;

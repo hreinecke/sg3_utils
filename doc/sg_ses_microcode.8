@@ -1,4 +1,4 @@
-.TH SG_SES_MICROCODE "8" "September 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_SES_MICROCODE "8" "October 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_ses_microcode \- send microcode to a SCSI enclosure
 .SH SYNOPSIS
@@ -16,10 +16,10 @@ this is defined in the SCSI Enclosure Services (SES) standards and drafts
 maintained by the T10 committee.
 .PP
 The process is to send one or more sequences containing a SCSI SEND
-DIAGNOSTIC command followed by a RECEIVE DIAGNOSTIC RESULTS command. The
-former sends a Download microcode Control diagnostic page (dpage) and
-the latter fetches a Download microcode status dpage which can be viewed
-as a report on the former command.
+DIAGNOSTIC command followed optionally by a RECEIVE DIAGNOSTIC RESULTS
+command. The former sends a Download microcode Control diagnostic
+page (dpage) and the latter fetches a Download microcode status dpage which
+can be viewed as a report on the former command.
 .PP
 The default action (i.e. when the \fI\-\-mode=MO\fR option is not given)
 is to fetch the Download microcode status dpage and decode it. This does
@@ -133,12 +133,36 @@ dmc_offs_defer  [14, 0xe]
 Download microcode with offsets, save, and defer activate.
 .TP
 activate_mc  [15, 0xf]
-Activate deferred microcode.
+Activate deferred microcode. There is no follow-up RECEIVE DIAGNOSTIC RESULTS
+to fetch the Download microcode status dpage since the \fIDEVICE\fR might be
+resetting.
 .PP
 Apart from dmc_status, these are placed in the Download microcode mode
 field in the Download microcode control dpage. In the case of dmc_status
 the Download microcode status dpage is fetch with the RECEIVE DIAGNOSTIC
 RESULTS command and decoded.
+.SH WHEN THE DOWNLOAD FAILS
+Firstly, if it succeeds, this utility should stay silent and return.
+Typically vendors will change the "revision" string (which is 4 characters
+long) whenever they release new firmware. That can be seen in the response
+to a SCSI INQUIRY command, for example by using the sg_inq utility.
+It is possible that the device needs to be power cycled before the new
+microcode becomes active. Also if mode dmc_offs_defer [0xe] is used to
+download the microcode, then another invocation with activate_mc may
+be needed.
+.PP
+If something goes wrong, there will typically be messages printed out
+by this utility. The first thing to check is the microcode (firmware)
+file itself. Is it designed for the device model; has it been corrupted,
+and if downgrading (i.e. trying to re-instate older firmware), does
+the vendor allow that?
+.PP
+Getting new firmware on a device is a delicate operation that is not
+always well defined by T10's standards and drafts. One might speculate
+that they are deliberately vague. In testing this utility one vendor's
+interpretation of the standard was somewhat surprising. The \fI\-\-non\fR
+option was added to cope with their interpretation. So if the above
+suggestions don't help, try adding the \fI\-\-non\fR option.
 .SH NOTES
 This utility can handle a maximum size of 128 MB of microcode which
 should be sufficient for most purposes. In a system that is memory
@@ -156,6 +180,10 @@ are required as firmware files get larger and larger. And \fICS\fR
 can be quite small, for example 4096 bytes, resulting in many SEND
 DIAGNOSTIC commands being sent.
 .PP
+The exact error from the non\-standard implementation was a sense key of
+ILLEGAL REQUEST and an asc/ascq code of 0x26,0x0 which is "Invalid field in
+parameter list". If that is seen try again with the \fI\-\-non\fR option.
+.PP
 Downloading incorrect microcode into a device has the ability to render
 that device inoperable. One would hope that the device vendor verifies
 the data before activating it.
@@ -167,7 +195,32 @@ All numbers given with options are assumed to be decimal.
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or has a trailing "h" or "H").
 .SH EXAMPLES
-The following sends new firmware to an enclosure. Sending a 1.5 MB
+If no microcode/firmware file is given then this utility fetches and decodes
+the Download microcode status dpage which could possibly show another
+initiator in the process of updating the microcode. Even if that is
+happening, fetching the status page should not cause any problems:
+.PP
+  sg_ses_microcode /dev/sg3
+.br
+Download microcode status diagnostic page:
+.br
+  number of secondary subenclosures: 0
+.br
+  generation code: 0x0
+.br
+   subenclosure identifier: 0 [primary]
+.br
+     download microcode status: No download microcode operation in progress [0x0]
+.br
+     download microcode additional status: 0x0
+.br
+     download microcode maximum size: 1048576 bytes
+.br
+     download microcode expected buffer id: 0x0
+.br
+     download microcode expected buffer id offset: 0
+.PP
+The following sends new microcode/firmware to an enclosure. Sending a 1.5 MB
 file in one command caused the enclosure to lock up temporarily and did
 not update the firmware. Breaking the firmware file into 4 KB chunks (an
 educated guess) was more successful:
