@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.95 20140930";    /* ses3r06 */
+static const char * version_str = "1.96 20141004";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -101,7 +101,7 @@ struct opts_t {
     int do_control;
     int do_data;
     int dev_slot_num;
-    int do_enumerate;
+    int enumerate;
     int eiioe_auto;
     int eiioe_force;
     int do_filter;
@@ -391,12 +391,13 @@ static struct element_type_t element_type_by_code =
 static struct acronym2tuple ecs_a2t_arr[] = {
     {"active", DEVICE_ETC, 2, 7, 1, NULL},     /* for control only */
     {"active", ARRAY_DEV_ETC, 2, 7, 1, NULL},  /* for control only */
-    {"conscheck", ARRAY_DEV_ETC, 1, 4, 1, NULL},
+    {"conscheck", ARRAY_DEV_ETC, 1, 4, 1, "consistency check"},
     {"disable", -1, 0, 5, 1, NULL},        /* -1 is for all element types */
     {"devoff", DEVICE_ETC, 3, 4, 1, NULL},     /* device off */
     {"devoff", ARRAY_DEV_ETC, 3, 4, 1, NULL},
-    {"dnr", DEVICE_ETC, 2, 6, 1, NULL},        /* do not remove */
-    {"dnr", ARRAY_DEV_ETC, 2, 6, 1, NULL},
+    {"dnr", DEVICE_ETC, 2, 6, 1, "do not remove"},
+    {"dnr", ARRAY_DEV_ETC, 2, 6, 1, "do not remove"},
+    {"fail", SAS_CONNECTOR_ETC, 3, 6, 1, NULL},
     {"fault", DEVICE_ETC, 3, 5, 1, NULL},
     {"fault", ARRAY_DEV_ETC, 3, 5, 1, NULL},
     {"hotspare", ARRAY_DEV_ETC, 1, 5, 1, NULL},
@@ -406,32 +407,35 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"ident", COOLING_ETC, 1, 7, 1, "flash LED"},
     {"ident", ENCLOSURE_ETC, 1, 7, 1, "flash LED"},
     {"ident", AUD_ALARM_ETC, 1, 7, 1, NULL},
+    {"ident", SAS_CONNECTOR_ETC, 1, 7, 1, "flash LED"},
     {"incritarray", ARRAY_DEV_ETC, 1, 3, 1, NULL},
     {"infailedarray", ARRAY_DEV_ETC, 1, 2, 1, NULL},
     {"info", AUD_ALARM_ETC, 3, 3, 1, "emits warning tone when set"},
     {"insert", DEVICE_ETC, 2, 3, 1, NULL},
     {"insert", ARRAY_DEV_ETC, 2, 3, 1, NULL},
-    {"locate", DEVICE_ETC, 2, 1, 1, NULL},
-    {"locate", ARRAY_DEV_ETC, 2, 1, 1, NULL},
-    {"locate", POWER_SUPPLY_ETC, 1, 7, 1, NULL},
-    {"locate", COOLING_ETC, 1, 7, 1, NULL},
-    {"locate", ENCLOSURE_ETC, 1, 7, 1, NULL},
+    {"locate", DEVICE_ETC, 2, 1, 1, "flash LED"},
+    {"locate", ARRAY_DEV_ETC, 2, 1, 1, "flash LED"},
+    {"locate", POWER_SUPPLY_ETC, 1, 7, 1, "flash LED"},
+    {"locate", COOLING_ETC, 1, 7, 1, "flash LED"},
+    {"locate", ENCLOSURE_ETC, 1, 7, 1, "flash LED"},
+    {"locate", SAS_CONNECTOR_ETC, 1, 7, 1, "flash LED"},
     {"missing", DEVICE_ETC, 2, 4, 1, NULL},
     {"missing", ARRAY_DEV_ETC, 2, 4, 1, NULL},
     {"ok", ARRAY_DEV_ETC, 1, 7, 1, NULL},
     {"on", POWER_SUPPLY_ETC, 3, 5, 1, "0: turn (remain) off; 1: turn on"},
+    {"overcurrent", SAS_CONNECTOR_ETC, 3, 5, 1, NULL},
     {"locate", DEVICE_ETC, 2, 1, 1, NULL},
     {"locate", ARRAY_DEV_ETC, 2, 1, 1, NULL},
     {"pow_cycle", ENCLOSURE_ETC, 2, 7, 2,
      "0: no; 1: start power cycle in pow_c_delay minutes; 2: cancel"},
     {"pow_c_delay", ENCLOSURE_ETC, 2, 5, 6,
      "delay in minutes before starting power cycle"},
-    {"prdfail", -1, 0, 6, 1, NULL},
+    {"prdfail", -1, 0, 6, 1, "predict failure"},
     {"rebuildremap", ARRAY_DEV_ETC, 1, 1, 1, NULL},
     {"remove", DEVICE_ETC, 2, 2, 1, NULL},
     {"remove", ARRAY_DEV_ETC, 2, 2, 1, NULL},
-    {"rrabort", ARRAY_DEV_ETC, 1, 0, 1, NULL},
-    {"rsvddevice", ARRAY_DEV_ETC, 1, 6, 1, NULL},
+    {"rrabort", ARRAY_DEV_ETC, 1, 0, 1, "rebuild/remap abort"},
+    {"rsvddevice", ARRAY_DEV_ETC, 1, 6, 1, "reserved device"},
     {"speed_act", COOLING_ETC, 1, 2, 11, "actual speed (rpm / 10)"},
     {"speed_code", COOLING_ETC, 3, 2, 3,
      "0: leave; 1: lowest... 7: highest"},
@@ -448,13 +452,16 @@ static struct acronym2tuple th_a2t_arr[] = {
     {NULL, 0, 0, 0, 0, NULL},
 };
 
-/* These are for the Additional element status diagnostic page for SAS
- * with the EIP bit set. First phy only. */
+/* These are for the Additional element status diagnostic page for SAS with
+ * the EIP bit set. First phy only. Index from start of AES descriptor */
 static struct acronym2tuple ae_sas_a2t_arr[] = {
     {"at_sas_addr", -1, 12, 7, 64, NULL},  /* best viewed with --hex --get= */
-    {"dev_type", -1, 8, 6, 3, NULL},
+        /* typically this is the expander's SAS address */
+    {"dev_type", -1, 8, 6, 3, "1: SAS/SATA dev, 2: expander"},
+    {"dsn", -1, 7, 7, 8, "device slot number (255: none)"},
+    {"num_phys", -1, 4, 7, 8, "number of phys"},
     {"phy_id", -1, 28, 7, 8, NULL},
-    {"sas_addr", -1, 20, 7, 64, NULL}, /* from disk's POV */
+    {"sas_addr", -1, 20, 7, 64, NULL},  /* should be disk or tape ... */
     {"sata_dev", -1, 11, 0, 1, NULL},
     {"sata_port_sel", -1, 11, 7, 1, NULL},
     {"smp_init", -1, 10, 1, 1, NULL},
@@ -837,7 +844,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             op->desc_name = optarg;
             break;
         case 'e':
-            ++op->do_enumerate;
+            ++op->enumerate;
             break;
         case 'E':
             if (0 == strcmp("auto", optarg))
@@ -1022,7 +1029,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                 pr2serr("assume --page=2 (es) option is set\n");
         }
     }
-    if (op->do_list || op->do_enumerate)
+    if (op->do_list || op->enumerate)
         return 0;
     if (op->do_control && op->do_status) {
         pr2serr("cannot have both '--control' and '--status'\n");
@@ -2207,7 +2214,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         pr2serr("  <<state of enclosure changed, please try again>>\n");
         return;
     }
-    printf("  element descriptor by type list\n");
+    printf("  element descriptor list (grouped by type):\n");
     ucp = resp + 8;
     for (k = 0, got1 = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
         if ((ucp + 3) > last_ucp)
@@ -3602,37 +3609,37 @@ strcase_eq(const char * s1p, const char * s2p)
 static int
 is_acronym_in_status_ctl(const struct tuple_acronym_val * tavp)
 {
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
 
-    for (a2tp = ecs_a2t_arr; a2tp->acron; ++ a2tp) {
-        if (strcase_eq(tavp->acron, a2tp->acron))
+    for (ap = ecs_a2t_arr; ap->acron; ++ ap) {
+        if (strcase_eq(tavp->acron, ap->acron))
             break;
     }
-    return (a2tp->acron ? 1 : 0);
+    return (ap->acron ? 1 : 0);
 }
 
 static int
 is_acronym_in_threshold(const struct tuple_acronym_val * tavp)
 {
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
 
-    for (a2tp = th_a2t_arr; a2tp->acron; ++ a2tp) {
-        if (strcase_eq(tavp->acron, a2tp->acron))
+    for (ap = th_a2t_arr; ap->acron; ++ ap) {
+        if (strcase_eq(tavp->acron, ap->acron))
             break;
     }
-    return (a2tp->acron ? 1 : 0);
+    return (ap->acron ? 1 : 0);
 }
 
 static int
 is_acronym_in_additional(const struct tuple_acronym_val * tavp)
 {
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
 
-    for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++ a2tp) {
-        if (strcase_eq(tavp->acron, a2tp->acron))
+    for (ap = ae_sas_a2t_arr; ap->acron; ++ ap) {
+        if (strcase_eq(tavp->acron, ap->acron))
             break;
     }
-    return (a2tp->acron ? 1 : 0);
+    return (ap->acron ? 1 : 0);
 }
 
 /* DPC_ENC_STATUS  DPC_ENC_CONTROL
@@ -3645,7 +3652,7 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
 {
     int ret, len, s_byte, s_bit, n_bits;
     uint64_t ui;
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
 
     if (NULL == tavp->acron) {
         s_byte = tavp->start_byte;
@@ -3653,19 +3660,19 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
         n_bits = tavp->num_bits;
     }
     if (tavp->acron) {
-        for (a2tp = ecs_a2t_arr; a2tp->acron; ++ a2tp) {
-            if (((jrp->etype == a2tp->etype) || (-1 == a2tp->etype)) &&
-                strcase_eq(tavp->acron, a2tp->acron))
+        for (ap = ecs_a2t_arr; ap->acron; ++ ap) {
+            if (((jrp->etype == ap->etype) || (-1 == ap->etype)) &&
+                strcase_eq(tavp->acron, ap->acron))
                 break;
         }
-        if (a2tp->acron) {
-            s_byte = a2tp->start_byte;
-            s_bit = a2tp->start_bit;
-            n_bits = a2tp->num_bits;
+        if (ap->acron) {
+            s_byte = ap->start_byte;
+            s_bit = ap->start_bit;
+            n_bits = ap->num_bits;
         } else {
-            if (-1 != a2tp->etype) {
-                for (a2tp = ecs_a2t_arr; a2tp->acron; ++ a2tp) {
-                    if (0 == strcase_eq(tavp->acron, a2tp->acron)) {
+            if (-1 != ap->etype) {
+                for (ap = ecs_a2t_arr; ap->acron; ++ap) {
+                    if (0 == strcase_eq(tavp->acron, ap->acron)) {
                         pr2serr(">>> Found %s acronym but not for element "
                                 "type %d\n", tavp->acron, jrp->etype);
                         break;
@@ -3710,7 +3717,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
 {
     int ret, len, s_byte, s_bit, n_bits;
     uint64_t ui;
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
 
     if (NULL == jrp->thresh_inp) {
         pr2serr("No Threshold In/Out element available\n");
@@ -3722,15 +3729,15 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
         n_bits = tavp->num_bits;
     }
     if (tavp->acron) {
-        for (a2tp = th_a2t_arr; a2tp->acron; ++ a2tp) {
-            if (((jrp->etype == a2tp->etype) || (-1 == a2tp->etype)) &&
-                strcase_eq(tavp->acron, a2tp->acron))
+        for (ap = th_a2t_arr; ap->acron; ++ap) {
+            if (((jrp->etype == ap->etype) || (-1 == ap->etype)) &&
+                strcase_eq(tavp->acron, ap->acron))
                 break;
         }
-        if (a2tp->acron) {
-            s_byte = a2tp->start_byte;
-            s_bit = a2tp->start_bit;
-            n_bits = a2tp->num_bits;
+        if (ap->acron) {
+            s_byte = ap->start_byte;
+            s_bit = ap->start_bit;
+            n_bits = ap->num_bits;
         } else
             return -2;
     }
@@ -3765,7 +3772,7 @@ cgs_additional_el(const struct join_row_t * jrp,
 {
     int s_byte, s_bit, n_bits;
     uint64_t ui;
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
 
     if (NULL == jrp->add_elem_statp) {
         pr2serr("No additional element status element available\n");
@@ -3777,15 +3784,15 @@ cgs_additional_el(const struct join_row_t * jrp,
         n_bits = tavp->num_bits;
     }
     if (tavp->acron) {
-        for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++ a2tp) {
-            if (((jrp->etype == a2tp->etype) || (-1 == a2tp->etype)) &&
-                strcase_eq(tavp->acron, a2tp->acron))
+        for (ap = ae_sas_a2t_arr; ap->acron; ++ap) {
+            if (((jrp->etype == ap->etype) || (-1 == ap->etype)) &&
+                strcase_eq(tavp->acron, ap->acron))
                 break;
         }
-        if (a2tp->acron) {
-            s_byte = a2tp->start_byte;
-            s_bit = a2tp->start_bit;
-            n_bits = a2tp->num_bits;
+        if (ap->acron) {
+            s_byte = ap->start_byte;
+            s_bit = ap->start_bit;
+            n_bits = ap->num_bits;
         } else
             return -2;
     }
@@ -3965,16 +3972,16 @@ enumerate_diag_pages(void)
 static void
 enumerate_work(const struct opts_t * op)
 {
-    int num;
+    int num, e3;
     const struct element_type_t * etp;
-    const struct acronym2tuple * a2tp;
+    const struct acronym2tuple * ap;
     char b[64];
     const char * cp;
 
     if (op->dev_name)
         printf(">>> DEVICE %s ignored when --%s option given.\n",
                op->dev_name, (op->do_list ? "list" : "enumerate"));
-    num = op->do_enumerate + op->do_list;
+    num = op->enumerate + op->do_list;
     if (num < 2) {
         enumerate_diag_pages();
         printf("\nSES element type names, followed by abbreviation and "
@@ -3983,33 +3990,37 @@ enumerate_work(const struct opts_t * op)
             printf("    %s  [%s] [0x%x]\n", etp->desc, etp->abbrev,
                    etp->elem_type_code);
     } else {
+        e3 = (op->enumerate > 2);
         /* command line has multiple --enumerate and/or --list options */
         printf("--clear, --get, --set acronyms for Enclosure Status/Control "
                "['es' or 'ec'] page:\n");
-        for (a2tp = ecs_a2t_arr; a2tp->acron; ++a2tp) {
-            cp = (a2tp->etype < 0) ? "*" :
-                         find_element_tname(a2tp->etype, b, sizeof(b));
-            printf("    %s  [%s] [%d:%d:%d]\t%s\n", a2tp->acron,
-                   (cp ? cp : "??"), a2tp->start_byte, a2tp->start_bit,
-                   a2tp->num_bits, (a2tp->info ? a2tp->info : ""));
+        for (ap = ecs_a2t_arr; ap->acron; ++ap) {
+            cp = (ap->etype < 0) ?
+                         "*" : find_element_tname(ap->etype, b, sizeof(b));
+            printf("    %s  [%s] [%d:%d:%d]%s\t%s\n", ap->acron,
+                   (cp ? cp : "??"), ap->start_byte, ap->start_bit,
+                   ap->num_bits, ((e3 && ap->info) ? "\n\t\t" : ""),
+                   (ap->info ? ap->info : ""));
         }
         printf("\n--clear, --get, --set acronyms for Threshold In/Out "
                "['th'] page:\n");
-        for (a2tp = th_a2t_arr; a2tp->acron; ++a2tp) {
-            cp = (a2tp->etype < 0) ? "*" :
-                         find_element_tname(a2tp->etype, b, sizeof(b));
-            printf("    %s  [%s] [%d:%d:%d]\t%s\n", a2tp->acron,
-                   (cp ? cp : "??"), a2tp->start_byte, a2tp->start_bit,
-                   a2tp->num_bits, (a2tp->info ? a2tp->info : ""));
+        for (ap = th_a2t_arr; ap->acron; ++ap) {
+            cp = (ap->etype < 0) ? "*" :
+                         find_element_tname(ap->etype, b, sizeof(b));
+            printf("    %s  [%s] [%d:%d:%d]%s\t%s\n", ap->acron,
+                   (cp ? cp : "??"), ap->start_byte, ap->start_bit,
+                   ap->num_bits, ((e3 && ap->info) ? "\n\t\t" : ""),
+                   (ap->info ? ap->info : ""));
         }
         printf("\n--get acronyms for Additional Element Status ['aes'] page "
                "(SAS EIP=1):\n");
-        for (a2tp = ae_sas_a2t_arr; a2tp->acron; ++a2tp) {
-            cp = (a2tp->etype < 0) ? "*" :
-                        find_element_tname(a2tp->etype, b, sizeof(b));
-            printf("    %s  [%s] [%d:%d:%d]\t%s\n", a2tp->acron,
-                   (cp ? cp : "??"), a2tp->start_byte, a2tp->start_bit,
-                   a2tp->num_bits, (a2tp->info ? a2tp->info : ""));
+        for (ap = ae_sas_a2t_arr; ap->acron; ++ap) {
+            cp = (ap->etype < 0) ? "*" :
+                        find_element_tname(ap->etype, b, sizeof(b));
+            printf("    %s  [%s] [%d:%d:%d]%s\t%s\n", ap->acron,
+                   (cp ? cp : "??"), ap->start_byte, ap->start_bit,
+                   ap->num_bits, ((e3 && ap->info) ? "\n\t\t" : ""),
+                   (ap->info ? ap->info : ""));
         }
     }
 }
@@ -4043,7 +4054,7 @@ main(int argc, char * argv[])
         usage(op->do_help);
         return 0;
     }
-    if (op->do_enumerate || op->do_list) {
+    if (op->enumerate || op->do_list) {
         enumerate_work(op);
         return 0;
     }

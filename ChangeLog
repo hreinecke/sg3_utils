@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20141002] [svn: r612]
+Changelog for sg3_utils-1.40 [20141006] [svn: r613]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_ses_microcode: new utility
   - sg_senddiag: add --maxlen= option
@@ -10,6 +10,7 @@ Changelog for sg3_utils-1.40 [20141002] [svn: r612]
   - sg_format: make '-FFF' bypass mode sense/select
     - add --mode=MP to supply alternate mode page,
       default remains read-write error recovery mpage
+    - output unit serial number and LU name prior to
   - sg_inq: expand Block limits VPD page output
   - sg_vpd: add --all option
     - more TPC VPD page decoding
@@ -20,6 +21,7 @@ Changelog for sg3_utils-1.40 [20141002] [svn: r612]
     - add --warn option mainly for broken joins
     - add optional descriptions to -ee output
   - sg_sanitize: add --desc and --zero options
+    - output unit serial number and LU name prior to
   - sg_logs: refine tape drive output
   - sg_raw: with -vvv decode T10 CDB name
   - sg_opcodes: add --compact field
@@ -29,6 +31,9 @@ Changelog for sg3_utils-1.40 [20141002] [svn: r612]
   - sg_lib: trim trailing spaces in dStrHex() and friends
     - clean up service action string functions
     - sg_ll_unmap_v2(): fix group number
+    - sg_ll_inquiry(), sg_ll_mode_sense*(),
+      sg_ll_log_sense(): use resid to clear unfilled
+      data-in buffer
   - sg_unaligned.h: add header for building parameters
   - examples/sg_tst_async: new Linux sg test utility
 

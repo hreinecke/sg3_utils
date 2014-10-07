@@ -27,7 +27,7 @@
 #endif
 
 
-static const char * version_str = "1.68 20140604";
+static const char * version_str = "1.69 20141006";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -46,7 +46,7 @@ static const char * version_str = "1.68 20140604";
 #define TUR_CMD  0x0
 #define TUR_CMDLEN  6
 
-#define INQUIRY_RESP_INITIAL_LEN 36
+#define SAFE_STD_INQ_RESP_LEN 36 /* other lengths lock up some devices */
 
 
 const char *
@@ -235,7 +235,7 @@ int
 sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
               int mx_resp_len, int noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, k, sense_cat, resid;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * up;
@@ -274,6 +274,7 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
@@ -295,6 +296,15 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
     } else
         ret = 0;
 
+    if (resid > 0) {
+        if (resid > mx_resp_len) {
+            fprintf(sg_warnings_strm, "inquiry: resid (%d) should never "
+                    "exceed requested len=%d\n", resid, mx_resp_len);
+            return ret ? ret : SG_LIB_CAT_MALFORMED;
+        }
+        /* zero unfilled section of response buffer */
+        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+    }
     return ret;
 }
 
@@ -308,7 +318,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     int res, ret, k, sense_cat;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char inq_resp[INQUIRY_RESP_INITIAL_LEN];
+    unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
     struct sg_pt_base * ptvp;
 
     if (inq_data) {

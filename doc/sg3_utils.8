@@ -77,11 +77,11 @@ is tightly bound to Linux and hence is not ported to other OSes. A more
 generic utility (than sg_dd) called ddpt in a package of the same name has
 been ported to other OSes.
 .SH LINUX DEVICE NAMING
-Normal disk block devices have names like /dev/sda, /dev/sdb,
-/dev/sdc, etc. SCSI disks in Linux have always had names like that but
-in recent Linux kernels (e.g. lk 2.6 series) it is becoming more common
-for almost all disks to be named like that. Partitions within a disk
-are specified by a number appended to the device name, starting at
+Most disk block devices have names like /dev/sda, /dev/sdb, /dev/sdc, etc.
+SCSI disks in Linux have always had names like that but in recent Linux
+kernels it has become more common for many other disks (including SATA
+disks and USB storage devices) to be named like that. Partitions within a
+disk are specified by a number appended to the device name, starting at
 1 (e.g. /dev/sda1 ).
 .PP
 Tape drives are named /dev/st<num> or /dev/nst<num> where <num> starts
@@ -104,6 +104,8 @@ and alternate device names.
 Prior to the Linux kernel 2.6 series these utilities could only use
 generic device names (e.g. /dev/sg1 ). In almost all cases in the Linux
 kernel 2.6 series, any device name can be used by these utilities.
+.PP
+Very little has changed in Linux device naming in the lk 3 series.
 .SH WINDOWS DEVICE NAMING
 Storage and related devices can have several device names in Windows.
 Probably the most common in the volume name (e.g. "D:"). There are also

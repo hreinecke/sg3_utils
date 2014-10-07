@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.40 20140704";    /* SPC-4 rev 37 */
+static const char * version_str = "1.41 20141006";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -935,7 +935,7 @@ static int
 pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
            int * residp, int noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, k, sense_cat, resid;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * up;
@@ -970,8 +970,9 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
     if (residp)
-        *residp = get_scsi_pt_resid(ptvp);
+        *residp = resid;
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
@@ -992,6 +993,15 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
     } else
         ret = 0;
 
+    if (resid > 0) {
+        if (resid > mx_resp_len) {
+            pr2serr("INQUIRY resid (%d) should never exceed requested "
+                    "len=%d\n", resid, mx_resp_len);
+            return ret ? ret : SG_LIB_CAT_MALFORMED;
+        }
+        /* zero unfilled section of response buffer */
+        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+    }
     return ret;
 }
 
