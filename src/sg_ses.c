@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.96 20141004";    /* ses3r06 */
+static const char * version_str = "1.97 20141007";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2338,7 +2338,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
             per_ucp = ucp + 4 + eip_offset + eip_offset;
             for (j = 0; j < phys; ++j, per_ucp += 28) {
                 printf("%sphy index: %d\n", pad, j);
-                printf("%s  device type: %s\n", pad,
+                printf("%s  SAS device type: %s\n", pad,
                        sas_device_type[(0x70 & per_ucp[0]) >> 4]);
                 if (nofilter || (0xe & per_ucp[2]))
                     printf("%s  initiator port for:%s%s%s\n", pad,

@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_PERSIST "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -82,7 +82,8 @@ these two: 'sg_persist \-\-device=/dev/sg2' and 'sg_persist /dev/sg2'
 are equivalent.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-output a usage message.
+output a usage message showing main options. Use twice (e.g. '\-hh') for
+the other option and more help.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 the response to a valid PRIN sub\-command will be output in hexadecimal.
@@ -127,7 +128,7 @@ Default value is 0. This option is needed by some PROUT sub\-commands.
 Preempt is a sub\-command of the PROUT command. Preempts the existing
 persistent reservation (identified by \fI\-\-param\-sark=SARK\fR) with
 the registration key that is registered for this I_T_L nexus (identified
-by \fI\-\-param\-rk=RK\fR). If a new reservation is establised as
+by \fI\-\-param\-rk=RK\fR). If a new reservation is established as
 a result of the preemption then the supplied \fI\-\-prout\-type=TYPE\fR
 is used as the type for this new reservation.
 .TP
@@ -135,7 +136,7 @@ is used as the type for this new reservation.
 Preempt and Abort is a sub\-command of the PROUT command. Preempts
 the existing persistent reservation (identified by \fI\-\-param\-sark=SARK\fR)
 with the registration key that is registered for this I_T_L nexus (identified
-by \fI\-\-param\-rk=RK\fR). If a new reservation is establised as
+by \fI\-\-param\-rk=RK\fR). If a new reservation is established as
 a result of the preemption then the supplied \fI\-\-prout\-type=TYPE\fR
 is used as the type for this new reservation. ACA and other pending
 tasks are aborted.
@@ -278,7 +279,7 @@ form is an iSCSI qualified name. Apart from "iqn" the other transport
 specific leadin string may be given in upper case (e.g. "FCP,").
 .PP
 The "fcp," form should be followed by 16 ASCII hex digits that represent an
-initiator's N_PORT_NAME (e.g. "fcp,10000000C9F3A571"). The "spi," form shoul
+initiator's N_PORT_NAME (e.g. "fcp,10000000C9F3A571"). The "spi," form should
 be followed by "<scsi_address>,<relative_target_port_identifier>" (both
 decimal numbers). The "sbp," form should be followed by 16 ASCII hex digits
 that represent an initiator's EUI\-64 name. The "srp," form should be
@@ -306,7 +307,7 @@ then stdin (standard input) is read. If the \fITIDS\fR argument is of the
 form "file=<name>" than a file called <name> is read.
 A valid SPC\-4 TransportID is built from the transport specific string
 outlined in the previous paragraphs. The parsing of the data read is
-realtively simple. Empty lines are ignored. Everything from and including
+relatively simple. Empty lines are ignored. Everything from and including
 a "#" on a line is ignored. Leading spaces and tabs are ignored. There
 can be one transportID per line. The transportID can either be a comma,
 space or tab separated list of ASCII hex bytes that represent a
