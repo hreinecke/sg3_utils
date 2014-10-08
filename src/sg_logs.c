@@ -28,7 +28,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.25 20140808";    /* spc4r37 + sbc4r02 */
+static const char * version_str = "1.26 20141007";    /* spc4r37 + sbc4r02 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2555,8 +2555,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
-            /* attached device type. In SAS-1.1 case 2 was an edge expander;
-             * in SAS-2 case 3 is marked as obsolete. */
+            /* attached SAS device type. In SAS-1.1 case 2 was an edge
+             * expander; in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "SAS or SATA device"); break;
@@ -2564,7 +2564,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 3: snprintf(s, sz, "expander device (fanout)"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
-            printf("    attached device type: %s\n", s);
+            /* the word 'SAS' in following added in spl4r01 */
+            printf("    attached SAS device type: %s\n", s);
             t = 0xf & vcp[4];
             switch (t) {
             case 0: snprintf(s, sz, "unknown"); break;

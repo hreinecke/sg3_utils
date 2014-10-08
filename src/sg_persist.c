@@ -27,7 +27,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.48 20140515";
+static const char * version_str = "0.49 20141007";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -71,39 +71,39 @@ struct opts_t {
 
 
 static struct option long_options[] = {
-    {"alloc-length", 1, 0, 'l'},
-    {"clear", 0, 0, 'C'},
-    {"device", 1, 0, 'd'},
-    {"help", 0, 0, 'h'},
-    {"hex", 0, 0, 'H'},
-    {"in", 0, 0, 'i'},
-    {"no-inquiry", 0, 0, 'n'},
-    {"out", 0, 0, 'o'},
-    {"param-alltgpt", 0, 0, 'Y'},
-    {"param-aptpl", 0, 0, 'Z'},
-    {"param-rk", 1, 0, 'K'},
-    {"param-sark", 1, 0, 'S'},
-    {"param-unreg", 0, 0, 'U'},
-    {"preempt", 0, 0, 'P'},
-    {"preempt-abort", 0, 0, 'A'},
-    {"prout-type", 1, 0, 'T'},
-    {"read-full-status", 0, 0, 's'},
-    {"read-keys", 0, 0, 'k'},
-    {"readonly", 0, 0, 'y'},
-    {"read-reservation", 0, 0, 'r'},
-    {"read-status", 0, 0, 's'},
-    {"register", 0, 0, 'G'},
-    {"register-ignore", 0, 0, 'I'},
-    {"register-move", 0, 0, 'M'},
-    {"release", 0, 0, 'L'},
-    {"relative-target-port", 1, 0, 'Q'},
-    {"replace-lost", 0, 0, 'z'},
-    {"report-capabilities", 0, 0, 'c'},
-    {"reserve", 0, 0, 'R'},
-    {"transport-id", 1, 0, 'X'},
-    {"unreg", 0, 0, 'U'},
-    {"verbose", 0, 0, 'v'},
-    {"version", 0, 0, 'V'},
+    {"alloc-length", required_argument, 0, 'l'},
+    {"clear", no_argument, 0, 'C'},
+    {"device", required_argument, 0, 'd'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"in", no_argument, 0, 'i'},
+    {"no-inquiry", no_argument, 0, 'n'},
+    {"out", no_argument, 0, 'o'},
+    {"param-alltgpt", no_argument, 0, 'Y'},
+    {"param-aptpl", no_argument, 0, 'Z'},
+    {"param-rk", required_argument, 0, 'K'},
+    {"param-sark", required_argument, 0, 'S'},
+    {"param-unreg", no_argument, 0, 'U'},
+    {"preempt", no_argument, 0, 'P'},
+    {"preempt-abort", no_argument, 0, 'A'},
+    {"prout-type", required_argument, 0, 'T'},
+    {"read-full-status", no_argument, 0, 's'},
+    {"read-keys", no_argument, 0, 'k'},
+    {"readonly", no_argument, 0, 'y'},
+    {"read-reservation", no_argument, 0, 'r'},
+    {"read-status", no_argument, 0, 's'},
+    {"register", no_argument, 0, 'G'},
+    {"register-ignore", no_argument, 0, 'I'},
+    {"register-move", no_argument, 0, 'M'},
+    {"release", no_argument, 0, 'L'},
+    {"relative-target-port", required_argument, 0, 'Q'},
+    {"replace-lost", no_argument, 0, 'z'},
+    {"report-capabilities", no_argument, 0, 'c'},
+    {"reserve", no_argument, 0, 'R'},
+    {"transport-id", required_argument, 0, 'X'},
+    {"unreg", no_argument, 0, 'U'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
     {0, 0, 0, 0}
 };
 
@@ -170,59 +170,88 @@ pr2serr(const char * fmt, ...)
 }
 
 static void
-usage()
+usage(int help)
 {
-    pr2serr("Usage: sg_persist [OPTIONS] [DEVICE]\n"
-            "  where OPTIONS include:\n"
-            "    --alloc-length=LEN|-l LEN    allocation length hex value "
-            "(used with\n"
-            "                                 PR In only) (default: 8192 "
-            "(2000 in hex))\n"
-            "    --clear|-C                 PR Out: Clear\n"
-            "    --device=DEVICE|-d DEVICE    query or change DEVICE\n"
-            "    --help|-h                  output this usage message\n"
-            "    --hex|-H                   output response in hex\n"
-            "    --in|-i                    request PR In command (default)\n"
-            "    --no-inquiry|-n            skip INQUIRY (default: do "
-            "INQUIRY)\n"
-            "    --out|-o                   request PR Out command\n"
-            "    --param-alltgpt|-Y         PR Out parameter 'ALL_TG_PT'\n"
-            "    --param-aptpl|-Z           PR Out parameter 'APTPL'\n"
-            "    --param-rk=RK|-K RK        PR Out parameter reservation key\n"
-            "                               (RK is in hex)\n"
-            "    --param-sark=SARK|-S SARK    PR Out parameter service "
-            "action\n"
-            "                               reservation key (SARK is in "
-            "hex)\n"
-            "    --preempt|-P               PR Out: Preempt\n"
-            "    --preempt-abort|-A         PR Out: Preempt and Abort\n"
-            "    --prout-type=TYPE|-T TYPE    PR Out command type\n"
-            "    --read-full-status|-s      PR In: Read Full Status\n"
-            "    --read-keys|-k             PR In: Read Keys\n");
-    pr2serr("    --readonly|-y              open DEVICE read-only (def: "
-            "read-write)\n"
-            "    --read-reservation|-r      PR In: Read Reservation\n"
-            "    --read-status|-s           PR In: Read Full Status\n"
-            "    --register|-G              PR Out: Register\n"
-            "    --register-ignore|-I       PR Out: Register and Ignore\n"
-            "    --register-move|-M         PR Out: Register and Move\n"
-            "    --relative-target-port=RTPI|-Q RTPI    relative target port "
-            "identifier\n"
-            "                               for '--register-move'\n"
-            "    --release|-L               PR Out: Release\n"
-            "    --replace-lost|-x          PR Out: Replace Lost Reservation\n"
-            "    --report-capabilities|-c   PR In: Report Capabilities\n"
-            "    --reserve|-R               PR Out: Reserve\n"
-            "    --transport-id=TIDS|-X TIDS    one or more "
-            "TransportIDs can\n"
-            "                               be given in several forms\n"
-            "    --unreg|-U                 optional with PR Out Register "
-            "and Move\n"
-            "    --verbose|-v               output additional debug "
-            "information\n"
-            "    --version|-V               output version string\n"
-            "    -?                         output this usage message\n\n"
-            "Performs a SCSI PERSISTENT RESERVE (IN or OUT) command\n");
+    if (help < 2) {
+        pr2serr("Usage: sg_persist [OPTIONS] [DEVICE]\n"
+                "  where the main OPTIONS are:\n"
+                "    --clear|-C                 PR Out: Clear\n"
+                "    --help|-h                  print usage message, "
+                "twice for more\n"
+                "    --in|-i                    request PR In command "
+                "(default)\n"
+                "    --out|-o                   request PR Out command\n"
+                "    --param-rk=RK|-K RK        PR Out parameter reservation "
+                "key\n"
+                "                               (RK is in hex)\n"
+                "    --param-sark=SARK|-S SARK    PR Out parameter service "
+                "action\n"
+                "                                 reservation key (SARK is "
+                "in hex)\n"
+                "    --preempt|-P               PR Out: Preempt\n"
+                "    --preempt-abort|-A         PR Out: Preempt and Abort\n"
+                "    --prout-type=TYPE|-T TYPE    PR Out type field (see "
+                "'-hh')\n"
+                "    --read-full-status|-s      PR In: Read Full Status\n"
+                "    --read-keys|-k             PR In: Read Keys "
+                "(default)\n");
+        pr2serr("    --read-reservation|-r      PR In: Read Reservation\n"
+                "    --read-status|-s           PR In: Read Full Status\n"
+                "    --register|-G              PR Out: Register\n"
+                "    --register-ignore|-I       PR Out: Register and Ignore\n"
+                "    --register-move|-M         PR Out: Register and Move\n"
+                "                               for '--register-move'\n"
+                "    --release|-L               PR Out: Release\n"
+                "    --replace-lost|-x          PR Out: Replace Lost "
+                "Reservation\n"
+                "    --report-capabilities|-c   PR In: Report Capabilities\n"
+                "    --reserve|-R               PR Out: Reserve\n"
+                "    --unreg|-U                 optional with PR Out "
+                "Register and Move\n\n"
+                "Performs a SCSI PERSISTENT RESERVE (IN or OUT) command. "
+                "Invoking\n'sg_persist DEVICE' will do a PR In Read Keys "
+                "command. Use '-hh'\nfor more options and TYPE meanings.\n");
+    } else {
+        pr2serr("Usage: sg_persist [OPTIONS] [DEVICE]\n"
+                "  where the other OPTIONS are:\n"
+                "    --alloc-length=LEN|-l LEN    allocation length hex "
+                "value (used with\n"
+                "                                 PR In only) (default: 8192 "
+                "(2000 in hex))\n"
+                "    --device=DEVICE|-d DEVICE    supply DEVICE as an option "
+                "rather than\n"
+                "                                 an argument\n"
+                "    --hex|-H                   output response in hex (for "
+                "PR In commands)\n"
+                "    --no-inquiry|-n            skip INQUIRY (default: do "
+                "INQUIRY)\n"
+                "    --param-alltgpt|-Y         PR Out parameter "
+                "'ALL_TG_PT'\n"
+                "    --param-aptpl|-Z           PR Out parameter 'APTPL'\n"
+                "    --readonly|-y              open DEVICE read-only (def: "
+                "read-write)\n"
+                "    --relative-target-port=RTPI|-Q RTPI    relative target "
+                "port "
+                "identifier\n"
+                "    --transport-id=TIDS|-X TIDS    one or more "
+                "TransportIDs can\n"
+                "                                   be given in several "
+                "forms\n"
+                "    --verbose|-v               output additional debug "
+                "information\n"
+                "    --version|-V               output version string\n\n"
+                "For the main options use '--help' or '-h' once.\n\n\n");
+        pr2serr("PR Out TYPE field value meanings:\n"
+                "  0:    obsolete (was 'read shared' in SPC)\n"
+                "  1:    write exclusive\n"
+                "  2:    obsolete (was 'read exclusive')\n"
+                "  3:    exclusive access\n"
+                "  4:    obsolete (was 'shared access')\n"
+                "  5:    write exclusive, registrants only\n"
+                "  6:    exclusive access, registrants only\n"
+                "  7:    write exclusive, all registrants\n"
+                "  8:    exclusive access, all registrants\n");
+    }
 }
 
 /* If num_tids==0 then only one TransportID is assumed with len bytes in
@@ -1029,6 +1058,7 @@ main(int argc, char * argv[])
     int sg_fd, c, res;
     const char * device_name = NULL;
     char buff[48];
+    int help =0;
     int num_prin_sa = 0;
     int num_prout_sa = 0;
     int num_prout_param = 0;
@@ -1078,8 +1108,8 @@ main(int argc, char * argv[])
             ++num_prout_sa;
             break;
         case 'h':
-            usage();
-            return 0;
+            ++help;
+            break;
         case 'H':
             ++op->hex;
             break;
@@ -1199,11 +1229,11 @@ main(int argc, char * argv[])
             ++num_prout_param;
             break;
         case '?':
-            usage();
+            usage(1);
             return 0;
         default:
             pr2serr("unrecognised switch code 0x%x ??\n", c);
-            usage();
+            usage(1);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -1215,19 +1245,23 @@ main(int argc, char * argv[])
         if (optind < argc) {
             for (; optind < argc; ++optind)
                 pr2serr("Unexpected extra argument: %s\n", argv[optind]);
-            usage();
+            usage(1);
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+    if (help > 0) {
+        usage(help);
+        return 0;
     }
 
     if (NULL == device_name) {
         pr2serr("No device name given\n");
-        usage();
+        usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((want_prout + want_prin) > 1) {
         pr2serr("choose '--in' _or_ '--out' (not both)\n");
-        usage();
+        usage(1);
         return SG_LIB_SYNTAX_ERROR;
     } else if (want_prout) { /* syntax check on PROUT arguments */
         op->prin = 0;
@@ -1251,7 +1285,7 @@ main(int argc, char * argv[])
             ++num_prin_sa;
         } else if (num_prin_sa > 1)  {
             pr2serr("Too many service actions given; choose one only\n");
-            usage();
+            usage(1);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -1259,14 +1293,14 @@ main(int argc, char * argv[])
         (PROUT_REG_MOVE_SA != op->prout_sa)) {
         pr2serr("--unreg or --relative-target-port only useful with "
                 "--register-move\n");
-        usage();
+        usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((PROUT_REG_MOVE_SA == op->prout_sa) &&
         (1 != op->num_transportids)) {
         pr2serr("with --register-move one (and only one) --transport-id "
                 "should be given\n");
-        usage();
+        usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (((PROUT_RES_SA == op->prout_sa) ||
