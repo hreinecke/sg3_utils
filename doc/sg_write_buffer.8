@@ -1,4 +1,4 @@
-.TH SG_WRITE_BUFFER "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_write_buffer \- send SCSI WRITE BUFFER commands
 .SH SYNOPSIS
@@ -17,7 +17,8 @@ stdin when either \fI\-\-raw\fR or \fI\-\-in=\-\fR is given.
 .PP
 Some WRITE BUFFER command variants do not have associated data to send to the
 device. For example "activate_mc" activates deferred microcode that was sent
-via prior WRITE BUFFER commands.
+via prior WRITE BUFFER commands. There is a different method used to download
+microcode to SES devices, see the sg_ses_microcode utility.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -162,6 +163,13 @@ are required as firmware files get larger and larger. And \fICS\fR
 can be quite small, for example 4096 bytes, resulting in many WRITE
 BUFFER commands being sent.
 .PP
+Attempting to download a microcode/firmware file that is too large may
+cause an error to occur in the pass-through layer (i.e. before the
+SCSI command is issued). In Linux such error reports can be obscure as
+in "pass through os error invalid argument". FreeBSD reports such
+errors well to the machine's console but returns a cryptic error message
+to this utility.
+.PP
 Downloading incorrect microcode into a device has the ability to render
 that device inoperable. One would hope that the device vendor verifies
 the data before activating it. If the SCSI WRITE BUFFER command is given
@@ -201,4 +209,4 @@ Copyright \(co 2006\-2014 Luben Tuikov and Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_read_buffer(sg3_utils)
+.B sg_read_buffer, sg_ses_microcode(sg3_utils)

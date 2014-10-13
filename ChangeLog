@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20141007] [svn: r614]
+Changelog for sg3_utils-1.40 [20141012] [svn: r615]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_ses_microcode: new utility
   - sg_senddiag: add --maxlen= option
@@ -15,6 +15,7 @@ Changelog for sg3_utils-1.40 [20141007] [svn: r614]
   - sg_vpd: add --all option
     - more TPC VPD page decoding
   - sg_ses: fix problem with --index=sse (and ssc)
+    - mask status element before using as control
     - SAS connector status element: add overcurrent bit
     - handle element descriptor names that count a
       trailing NULL
