@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.97 20141007";    /* ses3r06 */
+static const char * version_str = "1.97 20141012";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -68,7 +68,7 @@ static const char * version_str = "1.97 20141007";    /* ses3r06 */
 #define TEMPERATURE_ETC 0x4
 #define DOOR_ETC 0x5    /* prior to ses3r05 was DOOR_LOCK_ETC */
 #define AUD_ALARM_ETC 0x6
-#define ESC_ELECTRONICS_ETC 0x7
+#define ENC_ELECTRONICS_ETC 0x7
 #define SCC_CELECTR_ETC 0x8
 #define NV_CACHE_ETC 0x9
 #define INV_OP_REASON_ETC 0xa
@@ -87,6 +87,9 @@ static const char * version_str = "1.97 20141007";    /* ses3r06 */
 #define ARRAY_DEV_ETC 0x17
 #define SAS_EXPANDER_ETC 0x18
 #define SAS_CONNECTOR_ETC 0x19
+#define LAST_ETC SAS_CONNECTOR_ETC      /* adjust as necessary */
+
+#define NUM_ETC (LAST_ETC + 1)
 
 
 struct element_type_t {
@@ -361,7 +364,7 @@ static struct element_type_t element_type_arr[] = {
     {DOOR_ETC, "do", "Door"},   /* prior to ses3r05 was 'dl' (for Door Lock)
                                    but the "Lock" has been dropped */
     {AUD_ALARM_ETC, "aa", "Audible alarm"},
-    {ESC_ELECTRONICS_ETC, "esc", "Enclosure services controller electronics"},
+    {ENC_ELECTRONICS_ETC, "esc", "Enclosure services controller electronics"},
     {SCC_CELECTR_ETC, "sce", "SCC controller electronics"},
     {NV_CACHE_ETC, "nc", "Nonvolatile cache"},
     {INV_OP_REASON_ETC, "ior", "Invalid operation reason"},
@@ -427,7 +430,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"locate", DEVICE_ETC, 2, 1, 1, NULL},
     {"locate", ARRAY_DEV_ETC, 2, 1, 1, NULL},
     {"pow_cycle", ENCLOSURE_ETC, 2, 7, 2,
-     "0: no; 1: start power cycle in pow_c_delay minutes; 2: cancel"},
+     "0: no; 1: start in pow_c_delay minutes; 2: cancel"},
     {"pow_c_delay", ENCLOSURE_ETC, 2, 5, 6,
      "delay in minutes before starting power cycle"},
     {"prdfail", -1, 0, 6, 1, "predict failure"},
@@ -514,6 +517,38 @@ static struct option long_options[] = {
     {"version", no_argument, 0, 'V'},
     {0, 0, 0, 0},
 };
+
+/* For overzealous SES device servers that don't like some status elements
+ * sent back as control elements. This table is as per ses3r06. */
+static uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
+    {0x40, 0xff, 0xff, 0xff},   /* [0] */
+    {0x40, 0, 0xde, 0x3c},      /* DEVICE_ETC */
+    {0x40, 0x80, 0, 0x60},      /* POWER_SUPPLY_ETC */
+    {0x40, 0x80, 0, 0x67},      /* COOLING_ETC */
+    {0x40, 0xc0, 0, 0},         /* TEMPERATURE_ETC */
+    {0x40, 0xc0, 0, 0x1},       /* DOOR_ETC */
+    {0x40, 0xc0, 0, 0x5f},      /* AUD_ALARM_ETC */
+    {0x40, 0xc0, 0x1, 0},       /* ENC_ELECTRONICS_ETC */
+    {0x40, 0xc0, 0, 0},         /* SCC_CELECTR_ETC */
+    {0x40, 0xc0, 0, 0},         /* NV_CACHE_ETC */
+    {0x40, 0, 0, 0},            /* [10] INV_OP_REASON_ETC */
+    {0x40, 0, 0, 0xc0},         /* UI_POWER_SUPPLY_ETC */
+    {0x40, 0xc3, 0xff, 0xff},   /* DISPLAY_ETC */
+    {0x40, 0xc3, 0, 0},         /* KEY_PAD_ETC */
+    {0x40, 0x80, 0xff, 0xff},   /* ENCLOSURE_ETC */
+    {0x40, 0xc0, 0, 0x1},       /* SCSI_PORT_TRAN_ETC */
+    {0x40, 0x80, 0xff, 0xff},   /* LANGUAGE_ETC */
+    {0x40, 0xc0, 0, 0x1},       /* COMM_PORT_ETC */
+    {0x40, 0xc0, 0, 0},         /* VOLT_SENSOR_ETC */
+    {0x40, 0xc0, 0, 0},         /* CURR_SENSOR_ETC */
+    {0x40, 0xc0, 0, 0x1},       /* [20] SCSI_TPORT_ETC */
+    {0x40, 0xc0, 0, 0x1},       /* SCSI_IPORT_ETC */
+    {0x40, 0xc0, 0, 0},         /* SIMPLE_SUBENC_ETC */
+    {0x40, 0xff, 0xbe, 0x3c},   /* ARRAY_ETC */
+    {0x40, 0xc0, 0, 0},         /* SAS_EXPANDER_ETC */
+    {0x40, 0x80, 0, 0xc0},      /* SAS_CONNECTOR_ETC */
+};
+
 
 static int read_hex(const char * inp, unsigned char * arr, int * arr_len,
                     int verb);
@@ -1781,7 +1816,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                    "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
-    case ESC_ELECTRONICS_ETC: /* enclosure services controller electronics */
+    case ENC_ELECTRONICS_ETC: /* enclosure services controller electronics */
         if (nofilter || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
             (0x80 & statp[3]))
             printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
@@ -2280,7 +2315,7 @@ static void
 additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                        int elem_type, const struct opts_t * op)
 {
-    int ports, phys, j, m, desc_type, eip_offset, print_sas_addr;
+    int ports, phys, j, m, desc_type, eip_offset, print_sas_addr, saddr_nz;
     const unsigned char * per_ucp;
     int nofilter = ! op->do_filter;
     char b[64];
@@ -2353,17 +2388,25 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                            ((per_ucp[3] & 2) ? " SMP" : ""),
                            ((per_ucp[3] & 1) ? " SATA_device" : ""));
                 print_sas_addr = 0;
-                if (nofilter || saddr_non_zero(per_ucp + 4)) {
+                saddr_nz = saddr_non_zero(per_ucp + 4);
+                if (nofilter || saddr_nz) {
                     ++print_sas_addr;
                     printf("%s  attached SAS address: 0x", pad);
-                    for (m = 0; m < 8; ++m)
-                        printf("%02x", per_ucp[4 + m]);
+                    if (saddr_nz) {
+                        for (m = 0; m < 8; ++m)
+                            printf("%02x", per_ucp[4 + m]);
+                    } else
+                        printf("0");
                 }
-                if (nofilter || saddr_non_zero(per_ucp + 12)) {
+                saddr_nz = saddr_non_zero(per_ucp + 12);
+                if (nofilter || saddr_nz) {
                     ++print_sas_addr;
                     printf("\n%s  SAS address: 0x", pad);
-                    for (m = 0; m < 8; ++m)
-                        printf("%02x", per_ucp[12 + m]);
+                    if (saddr_nz) {
+                        for (m = 0; m < 8; ++m)
+                            printf("%02x", per_ucp[12 + m]);
+                    } else
+                        printf("0");
                 }
                 if (print_sas_addr)
                     printf("\n%s  phy identifier: 0x%x\n", pad, per_ucp[20]);
@@ -2389,7 +2432,7 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                 }
             } else if ((SCSI_TPORT_ETC == elem_type) ||
                        (SCSI_IPORT_ETC == elem_type) ||
-                       (ESC_ELECTRONICS_ETC == elem_type)) {
+                       (ENC_ELECTRONICS_ETC == elem_type)) {
                 printf("%snumber of phys: %d\n", pad, phys);
                 per_ucp = ucp + 6 + eip_offset;
                 for (j = 0; j < phys; ++j, per_ucp += 12) {
@@ -2981,21 +3024,9 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
         case DPC_STRING:
             printf("String In diagnostic page (for primary "
                    "subenclosure):\n");
-            if (resp_len > 4) {
-#if 1
+            if (resp_len > 4)
                 dStrHex((const char *)(resp + 4), resp_len - 4, 0);
-#else
-                int j;
-
-                printf("  ");
-                for (j = 0; j < (resp_len - 4); ++j) {
-                    if ((j > 0) && (0 == (j % 16)))
-                        printf("\n  ");
-                    printf("%02x ", *(resp + 4 + j));
-                }
-                printf("\n");
-#endif
-            } else
+            else
                 printf("  <empty>\n");
             break;
         case DPC_THRESHOLD:
@@ -3650,7 +3681,7 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
                  const struct tuple_acronym_val * tavp,
                  const struct opts_t * op)
 {
-    int ret, len, s_byte, s_bit, n_bits;
+    int ret, len, s_byte, s_bit, n_bits, k;
     uint64_t ui;
     const struct acronym2tuple * ap;
 
@@ -3690,8 +3721,12 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
             printf("0x%" PRIx64 "\n", ui);
         else
             printf("%" PRId64 "\n", (int64_t)ui);
-    } else {
-        jrp->enc_statp[0] &= 0x40;  /* keep PRDFAIL bit in byte 0 */
+    } else {    /* --set or --clear */
+        if (jrp->etype < NUM_ETC) {
+            for (k = 0; k < 4; ++k)
+                jrp->enc_statp[k] &= ses3_element_cmask_arr[jrp->etype][k];
+        } else
+            jrp->enc_statp[0] &= 0x40;  /* keep PRDFAIL is set in byte 0 */
         set_big_endian((uint64_t)tavp->val,
                        jrp->enc_statp + s_byte, s_bit, n_bits);
         jrp->enc_statp[0] |= 0x80;  /* set SELECT bit */
@@ -3972,10 +4007,11 @@ enumerate_diag_pages(void)
 static void
 enumerate_work(const struct opts_t * op)
 {
-    int num, e3;
+    int num;
     const struct element_type_t * etp;
     const struct acronym2tuple * ap;
     char b[64];
+    char a[160];
     const char * cp;
 
     if (op->dev_name)
@@ -3990,37 +4026,45 @@ enumerate_work(const struct opts_t * op)
             printf("    %s  [%s] [0x%x]\n", etp->desc, etp->abbrev,
                    etp->elem_type_code);
     } else {
-        e3 = (op->enumerate > 2);
         /* command line has multiple --enumerate and/or --list options */
         printf("--clear, --get, --set acronyms for Enclosure Status/Control "
                "['es' or 'ec'] page:\n");
         for (ap = ecs_a2t_arr; ap->acron; ++ap) {
             cp = (ap->etype < 0) ?
                          "*" : find_element_tname(ap->etype, b, sizeof(b));
-            printf("    %s  [%s] [%d:%d:%d]%s\t%s\n", ap->acron,
-                   (cp ? cp : "??"), ap->start_byte, ap->start_bit,
-                   ap->num_bits, ((e3 && ap->info) ? "\n\t\t" : ""),
-                   (ap->info ? ap->info : ""));
+            snprintf(a, sizeof(a), "  %s  [%s] [%d:%d:%d]", ap->acron,
+                     (cp ? cp : "??"), ap->start_byte, ap->start_bit,
+                     ap->num_bits);
+            if (ap->info)
+                printf("%-44s  %s\n", a, ap->info);
+            else
+                printf("%s\n", a);
         }
         printf("\n--clear, --get, --set acronyms for Threshold In/Out "
                "['th'] page:\n");
         for (ap = th_a2t_arr; ap->acron; ++ap) {
             cp = (ap->etype < 0) ? "*" :
                          find_element_tname(ap->etype, b, sizeof(b));
-            printf("    %s  [%s] [%d:%d:%d]%s\t%s\n", ap->acron,
-                   (cp ? cp : "??"), ap->start_byte, ap->start_bit,
-                   ap->num_bits, ((e3 && ap->info) ? "\n\t\t" : ""),
-                   (ap->info ? ap->info : ""));
+            snprintf(a, sizeof(a), "  %s  [%s] [%d:%d:%d]", ap->acron,
+                     (cp ? cp : "??"), ap->start_byte, ap->start_bit,
+                     ap->num_bits);
+            if (ap->info)
+                printf("%-34s  %s\n", a, ap->info);
+            else
+                printf("%s\n", a);
         }
         printf("\n--get acronyms for Additional Element Status ['aes'] page "
                "(SAS EIP=1):\n");
         for (ap = ae_sas_a2t_arr; ap->acron; ++ap) {
             cp = (ap->etype < 0) ? "*" :
                         find_element_tname(ap->etype, b, sizeof(b));
-            printf("    %s  [%s] [%d:%d:%d]%s\t%s\n", ap->acron,
-                   (cp ? cp : "??"), ap->start_byte, ap->start_bit,
-                   ap->num_bits, ((e3 && ap->info) ? "\n\t\t" : ""),
-                   (ap->info ? ap->info : ""));
+            snprintf(a, sizeof(a), "  %s  [%s] [%d:%d:%d]", ap->acron,
+                     (cp ? cp : "??"), ap->start_byte, ap->start_bit,
+                     ap->num_bits);
+            if (ap->info)
+                printf("%-34s  %s\n", a, ap->info);
+            else
+                printf("%s\n", a);
         }
     }
 }
