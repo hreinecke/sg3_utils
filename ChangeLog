@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20141012] [svn: r615]
+Changelog for sg3_utils-1.40 [20141019] [svn: r616]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_ses_microcode: new utility
   - sg_senddiag: add --maxlen= option
@@ -12,6 +12,7 @@ Changelog for sg3_utils-1.40 [20141012] [svn: r615]
       default remains read-write error recovery mpage
     - output unit serial number and LU name prior to
   - sg_inq: expand Block limits VPD page output
+    - fix --cmddt output if not supported by device
   - sg_vpd: add --all option
     - more TPC VPD page decoding
   - sg_ses: fix problem with --index=sse (and ssc)
@@ -29,6 +30,7 @@ Changelog for sg3_utils-1.40 [20141012] [svn: r615]
   - sg_opcodes: add --compact field
   - sg_senddiag: add --page=PG option
   - sg_sat_*: mention t_type and multiple_count fields
+  - sg_raw: do not output/print data-in if error
   - win32: sg_scan: handle larger configurations
   - sg_lib: trim trailing spaces in dStrHex() and friends
     - clean up service action string functions

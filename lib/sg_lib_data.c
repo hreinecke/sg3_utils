@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.06 20140904";  /* spc4r37a, sbc4r02 */
+const char * sg_lib_version_str = "2.07 20141019";  /* spc4r37a, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -117,7 +117,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x51, PDT_MMC, "Read disk information"},
     {0x52, 0, "Xdread(10)"},            /* obsolete in SBC-3 r31 */
     {0x52, PDT_MMC, "Read track information"},
-    {0x53, 0, "Reserve track"},
+    {0x53, 0, "Xdwriteread(10)"},
     {0x54, 0, "Send OPC information"},
     {0x55, 0, "Mode select(10)"},
     {0x56, 0, "Reserve(10)"},           /* obsolete in SPC-4 r11 */
