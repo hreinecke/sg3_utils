@@ -27,7 +27,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.10 (2014-08-29)"
+#define SG_RAW_VERSION "0.4.11 (2014-10-18)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -569,7 +569,11 @@ main(int argc, char *argv[])
 
     if (op->do_datain) {
         int data_len = op->datain_len - get_scsi_pt_resid(ptvp);
-        if (data_len == 0) {
+
+        if (ret && !(SG_LIB_CAT_RECOVERED == ret ||
+                     SG_LIB_CAT_NO_SENSE == ret))
+            fprintf(stderr, "Error %d occurred, no data received\n", ret);
+        else if (data_len == 0) {
             fprintf(stderr, "No data received\n");
         } else {
             if (op->datain_file == NULL && !op->datain_binary) {

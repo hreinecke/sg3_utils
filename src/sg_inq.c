@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.41 20141006";    /* SPC-4 rev 37 */
+static const char * version_str = "1.42 20141016";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -3091,7 +3091,8 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                            "given standard INQUIRY response, stop\n", k);
                     break;
                 }
-            }
+            } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                break;
             else {
                 pr2serr("CmdDt INQUIRY on opcode=0x%.2x: failed\n", k);
                 break;
@@ -3152,8 +3153,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                 } else
                     printf("  Support field: %s\n", desc_p);
             }
-        }
-        else {
+        } else if (SG_LIB_CAT_ILLEGAL_REQ != res) {
             if (! op->do_raw) {
                 printf("CmdDt INQUIRY, opcode=0x%.2x:  [", op->page_num);
                 sg_get_opcode_name((unsigned char)op->page_num, 0,
