@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.97 20141012";    /* ses3r06 */
+static const char * version_str = "1.98 20141023";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -535,7 +535,7 @@ static uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
     {0x40, 0, 0, 0xc0},         /* UI_POWER_SUPPLY_ETC */
     {0x40, 0xc3, 0xff, 0xff},   /* DISPLAY_ETC */
     {0x40, 0xc3, 0, 0},         /* KEY_PAD_ETC */
-    {0x40, 0x80, 0xff, 0xff},   /* ENCLOSURE_ETC */
+    {0x40, 0x80, 0, 0xff},      /* ENCLOSURE_ETC */
     {0x40, 0xc0, 0, 0x1},       /* SCSI_PORT_TRAN_ETC */
     {0x40, 0x80, 0xff, 0xff},   /* LANGUAGE_ETC */
     {0x40, 0xc0, 0, 0x1},       /* COMM_PORT_ETC */

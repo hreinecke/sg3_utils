@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2013 D. Gilbert
+ *  Copyright (C) 1999-2014 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.58 20130507";
+static const char * version_str = "0.59 20141024";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -105,7 +105,7 @@ usage(int compat_mode)
 
 int main(int argc, char * argv[])
 {
-    int c, sg_fd, res, k;
+    int c, sg_fd, res, k, hold_errno;
     int do_device_reset = 0;
     int do_bus_reset = 0;
     int do_host_reset = 0;
@@ -226,22 +226,43 @@ int main(int argc, char * argv[])
     }
     if (no_escalate)
         k += SG_SCSI_RESET_NO_ESCALATE;
+    if (verbose > 2)
+        fprintf(stderr, "    third argument to ioctl(SG_SCSI_RESET) is "
+                "0x%x\n", k);
 
     res = ioctl(sg_fd, SG_SCSI_RESET, &k);
     if (res < 0) {
-        if (EBUSY == errno)
+        hold_errno = errno;
+        switch (errno) {
+        case EBUSY:
             fprintf(stderr, ME "BUSY, may be resetting now\n");
-        else if (EIO == errno)
+            break;
+        case ENODEV:
+            fprintf(stderr, ME "'no device' error, may be temporary while "
+                    "device is resetting\n");
+            break;
+        case EAGAIN:
+            fprintf(stderr, ME "try again later, may be resetting now\n");
+            break;
+        case EIO:
             fprintf(stderr, ME "reset (for value=0x%x) may not be "
                     "available\n", k);
-        else if (EACCES == errno)
+            break;
+        case EPERM:
+        case EACCES:
             fprintf(stderr, ME "reset requires CAP_SYS_ADMIN (root) "
                    "permission\n");
-        else if (EINVAL == errno)
+            break;
+        case EINVAL:
             fprintf(stderr, ME "SG_SCSI_RESET not supported (for "
                     "value=0x%x)\n", k);
-        else
+        default:
             perror(ME "SG_SCSI_RESET failed");
+            break;
+        }
+        if (verbose > 1)
+            fprintf(stderr, ME "ioctl(SG_SCSI_RESET) returned %d, errno=%d\n",
+                    res, hold_errno);
         close(sg_fd);
         return 1;
     }

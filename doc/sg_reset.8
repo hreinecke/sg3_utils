@@ -1,4 +1,4 @@
-.TH SG_RESET "8" "August 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_RESET "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_reset \- sends SCSI device, target, bus or host reset; or checks reset
 state
@@ -79,8 +79,7 @@ large storage configurations the escalation may be (very) undesirable.
 .PP
 This utility calls the SG_SCSI_RESET ioctl and as of lk 3.10.7 the
 \fI\-\-no-esc\fR option is not supported. Patches to implement this
-functionality have not been accepted. If you want it, post your concern
-to linux-scsi@vger.kernel.org which is the linux-scsi list.
+functionality may be accepted in lk 3.18 or 3.19 .
 .PP
 SAM\-4 and 5 define a hard reset, a LOGICAL UNIT RESET and a I_T NEXUS
 RESET. A hard reset is defined to be a power on condition, a microcode
@@ -123,7 +122,7 @@ sg_reset: completed host reset
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH COPYRIGHT
-Copyright \(co 1999\-2013 Douglas Gilbert
+Copyright \(co 1999\-2014 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
