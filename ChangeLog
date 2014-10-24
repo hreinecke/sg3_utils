@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20141019] [svn: r616]
+Changelog for sg3_utils-1.40 [20141024] [svn: r617]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_ses_microcode: new utility
   - sg_senddiag: add --maxlen= option
@@ -33,6 +33,7 @@ Changelog for sg3_utils-1.40 [20141019] [svn: r616]
   - sg_raw: do not output/print data-in if error
   - win32: sg_scan: handle larger configurations
   - sg_lib: trim trailing spaces in dStrHex() and friends
+  - sg_reset: add words for EAGAIN from reset ioctl
     - clean up service action string functions
     - sg_ll_unmap_v2(): fix group number
     - sg_ll_inquiry(), sg_ll_mode_sense*(),
