@@ -8,11 +8,11 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-enumerate\fR]
 [\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
-[\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-nickname=SEN\fR]
-[\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR]
-[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-warn\fR]
-\fIDEVICE\fR
+[\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-nickname=SEN\fR] [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR]
+[\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-warn\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -194,6 +194,24 @@ NUMBER AND SAS ADDRESS sections below.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 This option is equivalent to \fI\-\-enumerate\fR. See that option.
+.TP
+\fB\-M\fR, \fB\-\-mask\fR
+When modifying elements, the default action is a read (status element),
+mask, modify (based on \fI\-\-clear=STR\fR or \fI\-\-set=STR\fR) then write
+back as the control element. The mask step is new in sg_ses version 1.98
+and is based on what is allowable (and in the same location) in draft SES\-3
+revision 6. Those masks may evolve, as they have in the past. This option
+re\-instates the previous logic which was to ignore the mask step. The
+default action (i.e. without this option) is to perform the mask step in
+the read\-mask\-modify\-write sequence.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+\fILEN\fR is placed in the ALLOCATION LENGTH field of the SCSI RECEIVE
+DIAGNOSTIC RESULTS commands sent by the utility. It represents the maximum
+size of data the SES device can return (in bytes). It cannot exceed 65535
+and defaults to 65532 (bytes). Some systems may not permit such large sizes
+hence the need for this option. If \fILEN\fR is set to 0 then the default
+size is used.
 .TP
 \fB\-n\fR, \fB\-\-nickname\fR=\fISEN\fR
 where \fISEN\fR is the new Subenclosure Nickname. Only the first 32

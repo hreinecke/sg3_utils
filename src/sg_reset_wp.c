@@ -22,15 +22,16 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
  * This program issues the SCSI RESET WRITE POINTER command to the given SCSI
- * device.
+ * device. Based on zbc-r01c.pdf .
  */
 
-static const char * version_str = "1.01 20140604";
+static const char * version_str = "1.02 20141028";
 
 #define SERVICE_ACTION_OUT_16_CMD 0x9f
 #define SERVICE_ACTION_OUT_16_CMDLEN 16
@@ -103,15 +104,7 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int reset_all, int noisy,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    /* assume zbc-r01a is wrong and that ZS LBA is an 8 byte field */
-    rwpCmdBlk[2] = (zid >> 56) & 0xff;
-    rwpCmdBlk[3] = (zid >> 48) & 0xff;
-    rwpCmdBlk[4] = (zid >> 40) & 0xff;
-    rwpCmdBlk[5] = (zid >> 32) & 0xff;
-    rwpCmdBlk[6] = (zid >> 24) & 0xff;
-    rwpCmdBlk[7] = (zid >> 16) & 0xff;
-    rwpCmdBlk[8] = (zid >> 8) & 0xff;
-    rwpCmdBlk[9] = zid & 0xff;
+    sg_put_unaligned_be64(zid, rwpCmdBlk + 2);
     if (reset_all)
         rwpCmdBlk[14] = 0x1;
     if (verbose) {
