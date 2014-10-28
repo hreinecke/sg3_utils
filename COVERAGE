@@ -112,6 +112,9 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 (2) this command was known as REPORT DEVICE IDENTIFIER prior to spc4r07
 (3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
 
+Note that any SCSI command, including bi-directional and variable length
+commands (whose cdb size is > 16 bytes) can be issued by the sg_raw utility.
+
 The RECEIVE COPY * commands in SPC-4 were grouped as one command name
 with 4 service actions in SPC-3 and earlier. The single SPC-3 command
 name is RECEIVE COPY RESULTS. The two opcodes associated with all
@@ -120,4 +123,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-29th September 2014
+25th October 2014

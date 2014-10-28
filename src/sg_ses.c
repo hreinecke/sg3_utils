@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.98 20141023";    /* ses3r06 */
+static const char * version_str = "1.98 20141027";    /* ses3r06 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -117,6 +117,7 @@ struct opts_t {
     int inner_hex;
     int do_join;
     int do_list;
+    int mask_ign;       /* element read-mask-modify-write actions */
     int maxlen;
     int seid;
     int seid_given;
@@ -506,6 +507,7 @@ static struct option long_options[] = {
     {"list", no_argument, 0, 'l'},
     {"nickid", required_argument, 0, 'N'},
     {"nickname", required_argument, 0, 'n'},
+    {"mask", required_argument, 0, 'M'},
     {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
     {"raw", no_argument, 0, 'r'},
@@ -521,32 +523,33 @@ static struct option long_options[] = {
 /* For overzealous SES device servers that don't like some status elements
  * sent back as control elements. This table is as per ses3r06. */
 static uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
-    {0x40, 0xff, 0xff, 0xff},   /* [0] */
-    {0x40, 0, 0xde, 0x3c},      /* DEVICE_ETC */
-    {0x40, 0x80, 0, 0x60},      /* POWER_SUPPLY_ETC */
-    {0x40, 0x80, 0, 0x67},      /* COOLING_ETC */
-    {0x40, 0xc0, 0, 0},         /* TEMPERATURE_ETC */
-    {0x40, 0xc0, 0, 0x1},       /* DOOR_ETC */
-    {0x40, 0xc0, 0, 0x5f},      /* AUD_ALARM_ETC */
-    {0x40, 0xc0, 0x1, 0},       /* ENC_ELECTRONICS_ETC */
-    {0x40, 0xc0, 0, 0},         /* SCC_CELECTR_ETC */
-    {0x40, 0xc0, 0, 0},         /* NV_CACHE_ETC */
-    {0x40, 0, 0, 0},            /* [10] INV_OP_REASON_ETC */
-    {0x40, 0, 0, 0xc0},         /* UI_POWER_SUPPLY_ETC */
-    {0x40, 0xc3, 0xff, 0xff},   /* DISPLAY_ETC */
-    {0x40, 0xc3, 0, 0},         /* KEY_PAD_ETC */
-    {0x40, 0x80, 0, 0xff},      /* ENCLOSURE_ETC */
-    {0x40, 0xc0, 0, 0x1},       /* SCSI_PORT_TRAN_ETC */
-    {0x40, 0x80, 0xff, 0xff},   /* LANGUAGE_ETC */
-    {0x40, 0xc0, 0, 0x1},       /* COMM_PORT_ETC */
-    {0x40, 0xc0, 0, 0},         /* VOLT_SENSOR_ETC */
-    {0x40, 0xc0, 0, 0},         /* CURR_SENSOR_ETC */
-    {0x40, 0xc0, 0, 0x1},       /* [20] SCSI_TPORT_ETC */
-    {0x40, 0xc0, 0, 0x1},       /* SCSI_IPORT_ETC */
-    {0x40, 0xc0, 0, 0},         /* SIMPLE_SUBENC_ETC */
-    {0x40, 0xff, 0xbe, 0x3c},   /* ARRAY_ETC */
-    {0x40, 0xc0, 0, 0},         /* SAS_EXPANDER_ETC */
-    {0x40, 0x80, 0, 0xc0},      /* SAS_CONNECTOR_ETC */
+                                /* Element type code (ETC) names; comment */
+    {0x40, 0xff, 0xff, 0xff},   /* [0] unspecified */
+    {0x40, 0, 0x4e, 0x3c},      /* DEVICE */
+    {0x40, 0x80, 0, 0x60},      /* POWER_SUPPLY */
+    {0x40, 0x80, 0, 0x60},      /* COOLING; requested speed as is unless */
+    {0x40, 0xc0, 0, 0},         /* TEMPERATURE */
+    {0x40, 0xc0, 0, 0x1},       /* DOOR */
+    {0x40, 0xc0, 0, 0x5f},      /* AUD_ALARM */
+    {0x40, 0xc0, 0x1, 0},       /* ENC_ELECTRONICS */
+    {0x40, 0xc0, 0, 0},         /* SCC_CELECTR */
+    {0x40, 0xc0, 0, 0},         /* NV_CACHE */
+    {0x40, 0, 0, 0},            /* [10] INV_OP_REASON */
+    {0x40, 0, 0, 0xc0},         /* UI_POWER_SUPPLY */
+    {0x40, 0xc0, 0xff, 0xff},   /* DISPLAY */
+    {0x40, 0xc3, 0, 0},         /* KEY_PAD */
+    {0x40, 0x80, 0, 0xff},      /* ENCLOSURE */
+    {0x40, 0xc0, 0, 0x10},      /* SCSI_PORT_TRAN */
+    {0x40, 0x80, 0xff, 0xff},   /* LANGUAGE */
+    {0x40, 0xc0, 0, 0x1},       /* COMM_PORT */
+    {0x40, 0xc0, 0, 0},         /* VOLT_SENSOR */
+    {0x40, 0xc0, 0, 0},         /* CURR_SENSOR */
+    {0x40, 0xc0, 0, 0x1},       /* [20] SCSI_TPORT */
+    {0x40, 0xc0, 0, 0x1},       /* SCSI_IPORT */
+    {0x40, 0xc0, 0, 0},         /* SIMPLE_SUBENC */
+    {0x40, 0xff, 0x4e, 0x3c},   /* ARRAY */
+    {0x40, 0xc0, 0, 0},         /* SAS_EXPANDER */
+    {0x40, 0x80, 0, 0x40},      /* SAS_CONNECTOR */
 };
 
 
@@ -589,11 +592,11 @@ usage(int help_num)
             "[--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] "
             "[--join] [--list]\n"
-            "              [--maxlen=LEN] [--nickname=SEN] [--nickid=SEID] "
-            "[--page=PG]\n"
-            "              [--raw] [--sas-addr=SA] [--set=STR] [--status] "
-            "[--verbose]\n"
-            "              [--version] [--warn] DEVICE\n"
+            "              [--mask] [--maxlen=LEN] [--nickname=SEN] "
+            "[--nickid=SEID]\n"
+            "              [--page=PG] [--raw] [--sas-addr=SA] [--set=STR] "
+            "[--status]\n"
+            "              [--verbose] [--version] [--warn] DEVICE\n"
             "  where the main options are:\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
             "    --descriptor=DN|-D DN    descriptor name (for indexing)\n"
@@ -657,6 +660,10 @@ usage(int help_num)
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
             "    --list|-l           same as '--enumerate' option\n"
+            "    --mask|-M           ignore status element mask in modify "
+            "actions\n"
+            "                        (e.g.--set= and --clear=) (def: apply "
+            "mask)\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
@@ -831,7 +838,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:p:rRsS:v"
+        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:rRsS:v"
                         "Vwx:", long_options, &option_index);
         if (c == -1)
             break;
@@ -936,6 +943,9 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                         "inclusive expected)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'M':
+            ++op->mask_ign;
             break;
         case 'p':
             if (isdigit(optarg[0])) {
@@ -3722,11 +3732,15 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {    /* --set or --clear */
-        if (jrp->etype < NUM_ETC) {
+        if ((0 == op->mask_ign) && (jrp->etype < NUM_ETC)) {
+            if (op->verbose > 2)
+                pr2serr("Applying mask to element status [etc=%d] prior to "
+                        "modify then write\n", jrp->etype);
             for (k = 0; k < 4; ++k)
                 jrp->enc_statp[k] &= ses3_element_cmask_arr[jrp->etype][k];
         } else
             jrp->enc_statp[0] &= 0x40;  /* keep PRDFAIL is set in byte 0 */
+        /* next we modify requested bit(s) */
         set_big_endian((uint64_t)tavp->val,
                        jrp->enc_statp + s_byte, s_bit, n_bits);
         jrp->enc_statp[0] |= 0x80;  /* set SELECT bit */
