@@ -36,7 +36,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.01 20141002";    /* ses3r06 */
+static const char * version_str = "1.02 20141029";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)

@@ -46,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.09 20140816";
+static const char * version_str = "1.09 20141030";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -318,8 +318,8 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'l':
-           cdb_len = sg_get_num(optarg);
-           if (! ((cdb_len == 12) || (cdb_len == 16))) {
+            cdb_len = sg_get_num(optarg);
+            if (! ((cdb_len == 12) || (cdb_len == 16))) {
                 fprintf(stderr, "argument to '--len' should be 12 or 16\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

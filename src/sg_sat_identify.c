@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.11 20140816";
+static const char * version_str = "1.11 20141030";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -365,8 +365,8 @@ int main(int argc, char * argv[])
             ++do_indent;
             break;
         case 'l':
-           cdb_len = sg_get_num(optarg);
-           if (! ((cdb_len == 12) || (cdb_len == 16))) {
+            cdb_len = sg_get_num(optarg);
+            if (! ((cdb_len == 12) || (cdb_len == 16))) {
                 fprintf(stderr, "argument to '--len' should be 12 or 16\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "0.94 20141006";  /* spc4r37 + sbc4r02 */
+static const char * version_str = "0.95 20141029";  /* spc4r37 + sbc4r02 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -112,6 +112,7 @@ int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
 #define VPD_SUP_BLOCK_LENS 0xb4 /* SBC-4 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
 #define VPD_BLOCK_DEV_C_EXTENS 0xb5 /* SBC-4 */
+#define VPD_ZBC_DEV_CHARS 0xb6  /* ZBC */
 #define VPD_NO_RATHER_STD_INQ -2      /* request for standard inquiry */
 
 /* Device identification VPD page associations */
@@ -218,6 +219,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, "tas", "TapeAlert supported flags (SSC)"},
     {VPD_3PARTY_COPY, 0, -1, "tpc", "Third party copy"},
+    {VPD_ZBC_DEV_CHARS, 0, -1, "zbdc", "Zoned block device characteristics"},
+        /* Use pdt of -1 since this page both for pdt=0 and pdt=0x14 */
     {0, 0, 0, NULL, NULL},
 };
 
@@ -2758,6 +2761,43 @@ decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_ZBC_DEV_CHARS  sbc or zbc */
+static void
+decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
+{
+    uint32_t u;
+
+    if (do_hex) {
+        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 64) {
+        pr2serr("Zoned block device characteristics VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    printf("  URSWRZ type: %d\n", !!(b[4] & 0x1));
+    u = sg_get_unaligned_be32(b + 8);
+    printf("  Optimal number of open sequential write preferred zones: ");
+    if (0xffffffff == u)
+        printf("0xffffffff\n");
+    else
+        printf("%" PRIu32 "\n", u);
+    u = sg_get_unaligned_be32(b + 12);
+    printf("  Optimal number of non-sequentially written sequential write "
+           "preferred zones: ");
+    if (0xffffffff == u)
+        printf("0xffffffff\n");
+    else
+        printf("%" PRIu32 "\n", u);
+    u = sg_get_unaligned_be32(b + 16);
+    printf("  Maximum number of open sequential write required: ");
+    if (0xffffffff == u)
+        printf("0xffffffff\n");
+    else
+        printf("%" PRIu32 "\n", u);
+}
+
 /* Returns 0 if successful */
 static int
 svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
@@ -3348,6 +3388,34 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
                 decode_b5_vpd(rp, len, op->do_hex, pdt);
+            }
+            return 0;
+        } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3))
+            printf("VPD page=0xb5\n");
+        break;
+    case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (0 == res) {
+            pdt = rp[0] & 0x1f;
+            if (allow_name) {
+                switch (pdt) {
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                    printf("Zoned block device characteristics VPD page "
+                           "(SBC, ZBC):\n");
+                    break;
+                default:
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                    break;
+                }
+            }
+            if (op->do_raw)
+                dStrRaw((const char *)rp, len);
+            else {
+                if (vb || long_notquiet)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_zbdc_vpd(rp, len, op->do_hex);
             }
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3))

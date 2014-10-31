@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.40 [20141028] [svn: r618]
+Changelog for sg3_utils-1.40 [20141029] [svn: r619]
   - sg_write_verify: new utility for WRITE AND VERIFY
   - sg_ses_microcode: new utility
   - sg_senddiag: add --maxlen= option
@@ -15,6 +15,7 @@ Changelog for sg3_utils-1.40 [20141028] [svn: r618]
     - fix --cmddt output if not supported by device
   - sg_vpd: add --all option
     - more TPC VPD page decoding
+    - add zoned block device characteristics page
   - sg_ses: fix problem with --index=sse (and ssc)
     - mask status element before using as control
     - defeat previous item with --mask (ignore) option
@@ -23,6 +24,7 @@ Changelog for sg3_utils-1.40 [20141028] [svn: r618]
       trailing NULL
     - add --warn option mainly for broken joins
     - add optional descriptions to -ee output
+    - sync with ses3r07: add OC on SAS connector
   - sg_sanitize: add --desc and --zero options
     - output unit serial number and LU name prior to
   - sg_rep_zones: corrections, sync with zbc-r01c
