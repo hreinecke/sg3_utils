@@ -57,7 +57,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.07 20140827";
+static const char * version_str = "1.08 20141028";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -932,7 +932,7 @@ main(int argc, char * argv[])
         } else if (0 == memcmp("-n", argv[k], 2)) {
             ++k;
             if ((k < argc) && isdigit(*argv[k]))
-                op->num_per_thread = atoi(argv[k]);
+                op->num_per_thread = sg_get_num(argv[k]);
             else
                 break;
         } else if (0 == memcmp("-N", argv[k], 2))

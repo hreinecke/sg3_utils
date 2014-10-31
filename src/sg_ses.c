@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.98 20141027";    /* ses3r06 */
+static const char * version_str = "1.99 20141028";    /* ses3r07 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -427,7 +427,8 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"missing", ARRAY_DEV_ETC, 2, 4, 1, NULL},
     {"ok", ARRAY_DEV_ETC, 1, 7, 1, NULL},
     {"on", POWER_SUPPLY_ETC, 3, 5, 1, "0: turn (remain) off; 1: turn on"},
-    {"overcurrent", SAS_CONNECTOR_ETC, 3, 5, 1, NULL},
+    {"overcurrent", POWER_SUPPLY_ETC, 2, 1, 1, "DC overcurrent"},
+    {"overcurrent", SAS_CONNECTOR_ETC, 3, 5, 1, NULL},  /* added ses3r07 */
     {"locate", DEVICE_ETC, 2, 1, 1, NULL},
     {"locate", ARRAY_DEV_ETC, 2, 1, 1, NULL},
     {"pow_cycle", ENCLOSURE_ETC, 2, 7, 2,
@@ -2014,7 +2015,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
                !!(statp[1] & 0x40));
         break;
-    case SAS_CONNECTOR_ETC:
+    case SAS_CONNECTOR_ETC:     /* OC (overcurrent) added in ses3r07 */
         printf("%sIdent=%d, %s\n", pad, !!(statp[1] & 0x80),
                find_sas_connector_type((statp[1] & 0x7f), bb, sizeof(bb)));
         printf("%sConnector physical link=0x%x, Fail=%d, OC=%d\n", pad,
