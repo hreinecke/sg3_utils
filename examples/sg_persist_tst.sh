@@ -3,19 +3,22 @@
 # in the sg3_utils package. This script works as expected on the
 # author's Fujitsu MAM3184, Seagate ST373455 and ST9146803SS disks.
 #
-#  Version 1.8 20140521
+#  Version 1.9 20140612
 
 # N.B. make sure the device name is correct for your environment.
 
 key="123abc"
 key2="333aaa"
 kk=${key}
+rtype="1"
 verbose=""
 
 usage()
 {
-  echo "Usage: sg_persist_tst.sh [-h] [-s] [-v] <device>"
+  echo "Usage: sg_persist_tst.sh [-e] [-h] [-s] [-v] <device>"
   echo "  where:"
+  echo -n "    -e, --exclusive      exclusive access (def: write "
+  echo "exclusive)"
   echo "    -h, --help           print usage message"
   echo "    -s, --second         use second key"
   echo "    -v, --verbose        more verbose output"
@@ -25,14 +28,17 @@ usage()
   echo "Test SCSI Persistent Reservations with sg_persist utility."
   echo "Default key is ${key} and alternate, second key is ${key2} ."
   echo "Should be harmless (unless one of those keys is already in use)."
-  echo "Also the APTPL bit is not set on the PR register so a power cycle"
-  echo "on the device will clear it."
+  echo "The APTPL bit is not set in the PR register so a power cycle"
+  echo "on the device will clear the reservation if this script stops"
+  echo "(or is stopped) before clearing it. Tape drives only seem to "
+  echo "support 'exclusive access' type (so use '-e')."
 }
 
 opt="$1"
 while test ! -z "$opt" -a -z "${opt##-*}"; do
   opt=${opt#-}
   case "$opt" in
+    e|-exclusive) rtype="3" ;;
     h|-help) usage ; exit 0 ;;
     s|-second) kk=${key2} ;;
     vvv) verbose="-vvv" ;;
@@ -90,7 +96,7 @@ sleep 1
 
 echo
 echo ">>> reserve the device (based on key ${kk}):"
-sg_persist -n --out --reserve --param-rk=${kk} --prout-type=1 ${verbose} $1
+sg_persist -n --out --reserve --param-rk=${kk} --prout-type=${rtype} ${verbose} $1
 sleep 1
 
 echo
@@ -105,7 +111,7 @@ sleep 1
 
 echo
 echo ">>> now release reservation:"
-sg_persist -n --out --release --param-rk=${kk} --prout-type=1 ${verbose} $1
+sg_persist -n --out --release --param-rk=${kk} --prout-type=${rtype} ${verbose} $1
 sleep 1
 
 echo

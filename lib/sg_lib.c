@@ -46,9 +46,20 @@
 
 #define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d  /* corresponding ASC is 0 */
 
+/* The following two opcodes were renamed to 'Third party copy out/in' in
+ * spc4r34 */
+#define SG_THIRD_PARTY_COPY_OUT SG_EXTENDED_COPY
+#define SG_THIRD_PARTY_COPY_IN SG_RECEIVE_COPY
+
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
+#ifdef __GNUC__
+static int my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
+                       __attribute__ ((format (printf, 3, 4)));
+#else
+static int my_snprintf(char * cp, int cp_max_len, const char * fmt, ...);
+#endif
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
  * functions. Returns number number of chars placed in cp excluding the
@@ -129,7 +140,8 @@ sg_print_command(const unsigned char * command)
 void
 sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {
-    const char * ccp;
+    const char * ccp = NULL;
+    int unknown = 0;
 
     if ((NULL == buff) || (buff_len < 1))
         return;
@@ -144,15 +156,20 @@ sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
         case 0x4: ccp = "Condition Met"; break;
         case 0x8: ccp = "Busy"; break;
         case 0x10: ccp = "Intermediate (obsolete)"; break;
-        case 0x14: ccp = "Intermediate-Condition Met (obs)"; break;
+        case 0x14: ccp = "Intermediate-Condition Met (obsolete)"; break;
         case 0x18: ccp = "Reservation Conflict"; break;
         case 0x22: ccp = "Command Terminated (obsolete)"; break;
         case 0x28: ccp = "Task set Full"; break;
         case 0x30: ccp = "ACA Active"; break;
         case 0x40: ccp = "Task Aborted"; break;
-        default: ccp = "Unknown status"; break;
+        default:
+            unknown = 1;
+            break;
     }
-    my_snprintf(buff, buff_len, "%s", ccp);
+    if (unknown)
+        my_snprintf(buff, buff_len, "Unknown status [0x%x]", scsi_status);
+    else
+        my_snprintf(buff, buff_len, "%s", ccp);
 }
 
 void
@@ -167,6 +184,8 @@ sg_print_scsi_status(int scsi_status)
     fprintf(sg_warnings_strm, "%s ", buff);
 }
 
+/* Get sense key from sense buffer. If successful returns a sense key value
+ * between 0 and 15. If sense buffer cannot be decode, returns -1 . */
 int
 sg_get_sense_key(const unsigned char * sensep, int sense_len)
 {
@@ -184,6 +203,7 @@ sg_get_sense_key(const unsigned char * sensep, int sense_len)
     }
 }
 
+/* Yield string associated with sense_key value. Returns 'buff'. */
 char *
 sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
 {
@@ -198,6 +218,7 @@ sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
     return buff;
 }
 
+/* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
 char *
 sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
@@ -247,6 +268,9 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
     return buff;
 }
 
+/* Attempt to find the first SCSI sense data descriptor that matches the
+ * given 'desc_type'. If found return pointer to start of sense data
+ * descriptor; otherwise (including fixed format sense data) returns NULL. */
 const unsigned char *
 sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
                         int desc_type)
@@ -273,6 +297,9 @@ sg_scsi_sense_desc_find(const unsigned char * sensep, int sense_len,
     return NULL;
 }
 
+/* Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
+ * information field is written out via 'info_outp' (except when it is
+ * NULL). Handles both fixed and descriptor sense formats. */
 int
 sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
                       uint64_t * info_outp)
@@ -312,6 +339,10 @@ sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     }
 }
 
+/* Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
+ * In descriptor format if the stream commands descriptor not found
+ * then returns 0. Writes 1 or 0 corresponding to these bits to the
+ * last three arguments if they are non-NULL. */
 int
 sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
                               int * filemark_p, int * eom_p, int * ili_p)
@@ -809,8 +840,7 @@ sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
 {
     int n = 0;
 
-    if (slen) { ; }     /* unused, suppress warning */
-    if (blen < 1)
+    if ((blen < 1) || (slen < 12))
         return;
     if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2]))
         n += my_snprintf(b + n, blen - n, "  >> expected Sense key: "
@@ -1175,12 +1205,39 @@ sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
     sg_get_opcode_sa_name(cmdp[0], service_action, peri_type, buff_len, buff);
 }
 
+struct op_code2sa_t {
+    int op_code;
+    struct sg_lib_value_name_t * arr;
+    const char * prefix;
+};
+
+static struct op_code2sa_t op_code2sa_arr[] = {
+    {SG_VARIABLE_LENGTH_CMD, sg_lib_variable_length_arr, NULL},
+    {SG_MAINTENANCE_IN, sg_lib_maint_in_arr, NULL},
+    {SG_MAINTENANCE_OUT, sg_lib_maint_out_arr, NULL},
+    {SG_SERVICE_ACTION_IN_12, sg_lib_serv_in12_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_12, sg_lib_serv_out12_arr, NULL},
+    {SG_SERVICE_ACTION_IN_16, sg_lib_serv_in16_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_16, sg_lib_serv_out16_arr, NULL},
+    {SG_SERVICE_ACTION_BIDI, sg_lib_serv_bidi_arr, NULL},
+    {SG_PERSISTENT_RESERVE_IN, sg_lib_pr_in_arr, "Persistent reserve in"},
+    {SG_PERSISTENT_RESERVE_OUT, sg_lib_pr_out_arr, "Persistent reserve out"},
+    {SG_THIRD_PARTY_COPY_OUT, sg_lib_xcopy_sa_arr, NULL},
+    {SG_THIRD_PARTY_COPY_IN, sg_lib_rec_copy_sa_arr, NULL},
+    {SG_READ_BUFFER, sg_lib_read_buff_arr, "Read buffer"},
+    {SG_WRITE_BUFFER, sg_lib_write_buff_arr, "Write buffer"},
+    {SG_SANITIZE, sg_lib_sanitize_sa_arr, "Sanitize"},
+    {0xffff, NULL, NULL},
+};
+
 
 void
 sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                       int peri_type, int buff_len, char * buff)
 {
     const struct sg_lib_value_name_t * vnp;
+    const struct op_code2sa_t * osp;
+    char b[80];
 
     if ((NULL == buff) || (buff_len < 1))
         return;
@@ -1188,133 +1245,26 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         buff[0] = '\0';
         return;
     }
-    switch ((int)cmd_byte0) {
-    case SG_VARIABLE_LENGTH_CMD:
-        vnp = get_value_name(sg_lib_variable_length_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Variable length service action=0x%x",
-                        service_action);
-        break;
-    case SG_MAINTENANCE_IN:
-        vnp = get_value_name(sg_lib_maint_in_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Maintenance in service action=0x%x",
-                        service_action);
-        break;
-    case SG_MAINTENANCE_OUT:
-        vnp = get_value_name(sg_lib_maint_out_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Maintenance out service action=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_IN_12:
-        vnp = get_value_name(sg_lib_serv_in12_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action in(12)=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_OUT_12:
-        vnp = get_value_name(sg_lib_serv_out12_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action out(12)=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_IN_16:
-        vnp = get_value_name(sg_lib_serv_in16_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action in(16)=0x%x",
-                        service_action);
-        break;
-    case SG_SERVICE_ACTION_OUT_16:
-        vnp = get_value_name(sg_lib_serv_out16_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Service action out(16)=0x%x",
-                        service_action);
-        break;
-    case SG_PERSISTENT_RESERVE_IN:
-        vnp = get_value_name(sg_lib_pr_in_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Persistent reserve in, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_PERSISTENT_RESERVE_OUT:
-        vnp = get_value_name(sg_lib_pr_out_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Persistent reserve out, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_EXTENDED_COPY:
-        /* 'Extended copy' was renamed 'Third party copy out' in spc4r34 */
-        vnp = get_value_name(sg_lib_xcopy_sa_arr, service_action, peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Third party copy out, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_RECEIVE_COPY:
-        /* 'Receive copy results' was renamed 'Third party copy in' in
-         * spc4r34 */
-        vnp = get_value_name(sg_lib_rec_copy_sa_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Third party copy in, service "
-                        "action=0x%x", service_action);
-        break;
-    case SG_READ_BUFFER:
-        /* spc4r34 requested treating mode as service action */
-        vnp = get_value_name(sg_lib_read_buff_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "Read buffer, %s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Read buffer, mode=0x%x",
-                        service_action);
-        break;
-    case SG_WRITE_BUFFER:
-        /* spc4r34 requested treating mode as service action */
-        vnp = get_value_name(sg_lib_write_buff_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "Write buffer, %s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Write buffer, mode=0x%x",
-                        service_action);
-        break;
-    case SG_SANITIZE:
-        vnp = get_value_name(sg_lib_sanitize_sa_arr, service_action,
-                             peri_type);
-        if (vnp)
-            my_snprintf(buff, buff_len, "%s", vnp->name);
-        else
-            my_snprintf(buff, buff_len, "Sanitize, service action=0x%x",
-                        service_action);
-        break;
-    default:
-        sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
-        break;
+
+    for (osp = op_code2sa_arr; osp->arr; ++osp) {
+        if ((int)cmd_byte0 == osp->op_code) {
+            vnp = get_value_name(osp->arr, service_action, peri_type);
+            if (vnp) {
+                if (osp->prefix)
+                    my_snprintf(buff, buff_len, "%s, %s", osp->prefix,
+                                vnp->name);
+                else
+                    my_snprintf(buff, buff_len, "%s", vnp->name);
+            } else {
+                sg_get_opcode_name(cmd_byte0, peri_type, sizeof(b), b);
+                my_snprintf(buff, buff_len, "%s service action=0x%x",
+                            b, service_action);
+            }
+            return;
+        }
     }
+
+    sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
 }
 
 void
@@ -1555,6 +1505,18 @@ safe_strerror(int errnum)
     return errstr;
 }
 
+static void
+trimTrailingSpaces(char * b)
+{
+    int k;
+
+    for (k = ((int)strlen(b) - 1); k >= 0; --k) {
+        if (' ' != b[k])
+            break;
+    }
+    if ('\0' != b[k + 1])
+        b[k + 1] = '\0';
+}
 
 /* Note the ASCII-hex output goes to stdout. [Most other output from functions
  * in this file go to sg_warnings_strm (default stderr).]
@@ -1582,9 +1544,9 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     if (0 == no_ascii)  /* address at left and ASCII at right */
         formatstr = "%.76s\n";
     else if (no_ascii > 0)
-        formatstr = "%.58s\n";
+        formatstr = "%s\n";     /* was: "%.58s\n" */
     else /* negative: no address at left and no ASCII at right */
-        formatstr = "%.48s\n";
+        formatstr = "%s\n";     /* was: "%.48s\n"; */
     memset(buff, ' ', 80);
     buff[80] = '\0';
     if (no_ascii < 0) {
@@ -1598,6 +1560,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
                         (int)(unsigned char)c);
             buff[bpos + 2] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 16))) {
+                trimTrailingSpaces(buff);
                 fprintf(fp, formatstr, buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
@@ -1606,6 +1569,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
         }
         if (bpos > bpstart) {
             buff[bpos + 2] = '\0';
+            trimTrailingSpaces(buff);
             fprintf(fp, "%s\n", buff);
         }
         return;
@@ -1629,6 +1593,8 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
             buff[cpos++] = c;
         }
         if (cpos > (cpstart + 15)) {
+            if (no_ascii)
+                trimTrailingSpaces(buff);
             fprintf(fp, formatstr, buff);
             bpos = bpstart;
             cpos = cpstart;
@@ -1640,6 +1606,8 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     }
     if (cpos > cpstart) {
         buff[cpos] = '\0';
+        if (no_ascii)
+            trimTrailingSpaces(buff);
         fprintf(fp, "%s\n", buff);
     }
 }
@@ -1671,8 +1639,11 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
     char buff[122];
     int bpstart, bpos, k, n;
 
-    if (len <= 0)
+    if (len <= 0) {
+        if (b_len > 0)
+            b[0] = '\0';
         return;
+    }
     if (0 != format) {
         ;       /* do nothing different for now */
     }
@@ -1697,7 +1668,8 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
                     (int)(unsigned char)c);
         buff[bpos + 2] = ' ';
         if ((k > 0) && (0 == ((k + 1) % 16))) {
-            n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
+            trimTrailingSpaces(buff);
+            n += my_snprintf(b + n, b_len - n, "%s\n", buff);
             if (n >= (b_len - 1))
                 return;
             bpos = bpstart;
@@ -1707,8 +1679,10 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
         } else
             bpos += 3;
     }
-    if (bpos > bpstart)
-        n += my_snprintf(b + n, b_len - n, "%.*s\n", bpstart + 48, buff);
+    if (bpos > bpstart) {
+        trimTrailingSpaces(buff);
+        n += my_snprintf(b + n, b_len - n, "%s\n", buff);
+    }
     return;
 }
 

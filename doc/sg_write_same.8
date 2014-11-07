@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SG_WRITE_SAME "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -157,14 +157,16 @@ greater. If both this option and the \fIIF\fR option are given and
 \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR is the
 data out buffer length with zeros used as pad bytes.
 .SH UNMAP
-Logical block provisioning is a new term introduced in SBC\-3 revision
-25 for the ability to mark blocks as unused. It is closely related to the
-ATA DATA SET MANAGEMENT command with the "Trim" bit set. For large
-storage arrays, it is a way to provision less physical storage than the
-READ CAPACITY command reports is available, potentially allocating more
-physical storage when WRITE commands require it. For flash memory it is
-a way of potentially saving power (and perhaps access time) when it is
-known large sections (or almost all) of the flash memory is not in use.
+Logical block provisioning is a new term introduced in SBC\-3 revision 25
+for the ability to mark blocks as unused. For large storage arrays, it is a
+way to provision less physical storage than the READ CAPACITY command reports
+is available, potentially allocating more physical storage when WRITE
+commands require it. For flash memory (e.g. SSD drives) it is a way of
+potentially saving power (and perhaps access time) when it is known large
+sections (or almost all) of the flash memory is not in use. SSDs need wear
+levelling algorithms to have acceptable endurance and typically over
+provision to simplify those algorithms; hence they typically contain more
+physical flash storage than their logical size would dictate.
 .PP
 Support for logical block provisioning is indicated by the LBPME bit being
 set in the READ CAPACITY(16) command response (see the sg_readcap utility).
@@ -191,20 +193,29 @@ set then the UNMAP bit is ignored and the data out buffer is written to the
 \fIDEVICE\fR as if the UNMAP bit was zero. In the absence of the
 \fI\-\-in=IF\fR option, this utility will attempt build a data out buffer
 that meets the requirements for the UNMAP bit in the cdb to be acted on by
-the \fIDEVICE\fR. 
+the \fIDEVICE\fR.
 .PP
 Logical blocks may also be unmapped by the SCSI UNMAP and FORMAT UNIT
 commands (see the sg_unmap and sg_format utilities).
+.PP
+The unmap capability in SCSI is closely related to the ATA DATA SET
+MANAGEMENT command with the "Trim" bit set. That ATA trim capability does
+not interact well with SATA command queueing known as NCQ. T13 have
+introduced a new command called the SFQ DATA SET MANAGEMENT command also
+with a the "Trim" bit to address that problem. The SCSI WRITE SAME with
+the UNMAP bit set and the UNMAP commands do not have any problems with
+SCSI queueing.
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
 .PP
 In Linux at this time the sg driver does not support cdb sizes greater than
-16 bytes. Hence a device node like /dev/sg1 which is associated with the
-sg driver will fail with this utility if the \fI\-\-32\fR option is
-given (or implied by other options). The bsg driver with device nodes like
-/dev/bsg/6:0:0:1 does support cdb sizes greater than 16 bytes.
+16 bytes. [This restriction will be removed in lk 3.17 .] Hence a device
+node like /dev/sg1 which is associated with the sg driver will fail with
+this utility if the \fI\-\-32\fR option is given (or implied by other
+options). The bsg driver with device nodes like /dev/bsg/6:0:0:1 does
+support cdb sizes greater than 16 bytes.
 .SH EXIT STATUS
 The exit status of sg_write_same is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -296,7 +307,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2013 Douglas Gilbert
+Copyright \(co 2009\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -2,7 +2,51 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.39 [20140522] [svn: r583]
+Changelog for sg3_utils-1.40 [20141028] [svn: r618]
+  - sg_write_verify: new utility for WRITE AND VERIFY
+  - sg_ses_microcode: new utility
+  - sg_senddiag: add --maxlen= option
+  - sg_copy_results: correct response length calculations
+  - sg_format: make '-FFF' bypass mode sense/select
+    - add --mode=MP to supply alternate mode page,
+      default remains read-write error recovery mpage
+    - output unit serial number and LU name prior to
+  - sg_inq: expand Block limits VPD page output
+    - fix --cmddt output if not supported by device
+  - sg_vpd: add --all option
+    - more TPC VPD page decoding
+  - sg_ses: fix problem with --index=sse (and ssc)
+    - mask status element before using as control
+    - defeat previous item with --mask (ignore) option
+    - SAS connector status element: add overcurrent bit
+    - handle element descriptor names that count a
+      trailing NULL
+    - add --warn option mainly for broken joins
+    - add optional descriptions to -ee output
+  - sg_sanitize: add --desc and --zero options
+    - output unit serial number and LU name prior to
+  - sg_rep_zones: corrections, sync with zbc-r01c
+  - sg_persist: split help into two pages, '-hh' for 2nd
+  - sg_logs: refine tape drive output
+  - sg_raw: with -vvv decode T10 CDB name
+  - sg_opcodes: add --compact field
+  - sg_senddiag: add --page=PG option
+  - sg_sat_*: mention t_type and multiple_count fields
+  - sg_raw: do not output/print data-in if error
+  - win32: sg_scan: handle larger configurations
+  - sg_lib: trim trailing spaces in dStrHex() and friends
+  - sg_reset: add words for EAGAIN from reset ioctl
+    - clean up service action string functions
+    - sg_ll_unmap_v2(): fix group number
+    - sg_ll_inquiry(), sg_ll_mode_sense*(),
+      sg_ll_log_sense(): use resid to clear unfilled
+      data-in buffer
+  - sg_unaligned.h: add header for building parameters
+  - examples/sg_tst_async: new Linux sg test utility
+
+Changelog for sg3_utils-1.39 [20140612] [svn: r588]
+  - sg_rep_zones: new utility for ZBC REPORT ZONES
+  - sg_reset_wp: new utility, ZBC RESET WRITE POINTER
   - sg_ses: add --eiioe=auto|force option
     - fix AES dpage element indexing problems
     - add --readonly option
@@ -17,11 +61,16 @@ Changelog for sg3_utils-1.39 [20140522] [svn: r583]
   - sg_persist: add --readonly option, environment
     variable SG_PERSIST_IN_RDONLY sets ro on prin cmds
   - sg_inq: sync version descriptors dated 20105176
+    - suppress dev-id VPD messages so they only appear
+      when --verbose is given
+    - add new SCSI_IDENT_*_ATA pair to --export output
+  - sg_luns: add decoding for conglomerate LUNS
+    - add --lu_cong option to simulate the LU_CONG bit
   - sg_vpd: add --vendor=VP option, re-order vendor
     specific pages, split lto into lto5 and lto6
     - add Supported block lengths and protection types
       page (sbc4r01)
-    - add Block device characterics extension
+    - add Block device characteristics extension
       page (sbc4r02)
   - sg_copy_results, sg_get_lba_status, sg_luns,
     sg_read_buffer, sg_readcap, sg_referrals, sg_rtpg,
@@ -33,10 +82,18 @@ Changelog for sg3_utils-1.39 [20140522] [svn: r583]
     - add 'sense' categories for reservation conflict,
       data protect and protection information violations
     - add sg_get_category_sense_str() to API
+    - change struct sg_simple_inquiry_resp::rmb to byte_1
     - add initial zbc service actions
     - dStrHex(Err): fix output truncation error
+    - linux, sg: support SCSI_PT_FLAGS_QUEUE_AT_TAIL and
+      SCSI_PT_FLAGS_QUEUE_AT_HEAD (block layer queueing)
   - sg_lib_data: sync asc/ascq codes with T10 20140516
     - sync operation code with T10 20140515
+    - add id string for SPC-5
+  - scripts/59-scsi-sg3_utils.rules: removed
+    - functionality split into two scripts:
+      55-scsi-sg3_id.rules + 58-scsi-sg3_symlink.rules
+  - examples/sg_persist_tst.sh: add --exclusive option
   - win32: sg_scan, sg_ses and sg_log fixes
   - examples/sgq_dd: re-add old utility as example
 

@@ -1,13 +1,14 @@
-.TH SG_SANITIZE "8" "September 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_SANITIZE "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 .SH SYNOPSIS
 .B sg_sanitize
 [\fI\-\-ause\fR] [\fI\-\-block\fR] [\fI\-\-count=OC\fR] [\fI\-\-crypto\fR]
-[\fI\-\-early\fR] [\fI\-\-fail\fR] [\fI\-\-help\fR] [\fI\-\-invert\fR]
-[\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR] [\fI\-\-pattern=PF\fR]
-[\fI\-\-quick\fR] [\fI\-\-test=TE\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-wait\fR] \fIDEVICE\fR
+[\fI\-\-desc\fR] [\fI\-\-early\fR] [\fI\-\-fail\fR] [\fI\-\-help\fR]
+[\fI\-\-invert\fR] [\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR]
+[\fI\-\-pattern=PF\fR] [\fI\-\-quick\fR] [\fI\-\-test=TE\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR] [\fI\-\-zero\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -32,7 +33,7 @@ the \fI\-\-quick\fR option is given in which case the sanitize operation
 starts immediately. The disk's INQUIRY response strings are printed out just
 in case the wrong \fIDEVICE\fR has been given.
 .PP
-If the \fI\-\-early\fR option is given this utility will exit soon
+If the \fI\-\-early\fR option is given then this utility will exit soon
 after starting the SANITIZE command with the IMMED bit set. The user can
 monitor the progress of the sanitize operation with
 the "sg_request \-\-num=9999 \-\-progress" which sends a REQUEST SENSE
@@ -51,7 +52,7 @@ option name.
 .TP
 \fB\-A\fR, \fB\-\-ause\fR
 sets the AUSE bit in the cdb. AUSE is an acronym for "allow unrestricted
-sanitize exit". Default action is to leave the bit cleared.
+sanitize exit". The default action is to leave the AUSE bit cleared.
 .TP
 \fB\-B\fR, \fB\-\-block\fR
 perform a "block erase" sanitize operation.
@@ -64,11 +65,19 @@ the default.
 \fB\-C\fR, \fB\-\-crypto\fR
 perform a "cryptographic erase" sanitize operation.
 .TP
+\fB\-d\fR, \fB\-\-desc\fR
+sets the DESC field in the REQUEST SENSE command used for polling. By
+default this field is set to zero. A REQUEST SENSE polling loop is
+used after the SANITIZE command is issued (assuming that neither the
+\fI\-\-early\fR nor the \fI\-\-wait\fR option have been given) to check
+on the progress of this command as it can take some time.
+.TP
 \fB\-e\fR, \fB\-\-early\fR
 the default action of this utility is to poll the disk every 60 seconds to
 fetch the progress indication until the sanitize is finished. When this
-option is given this utility will exit "early" as soon as the sanitize
-has commenced. This option and \fI\-\-wait\fR cannot both be given.
+option is given this utility will exit "early" as soon as the SANITIZE
+command with the IMMED bit set to 1 has been acknowledged. This option and
+\fI\-\-wait\fR cannot both be given.
 .TP
 \fB\-F\fR, \fB\-\-fail\fR
 perform an "exit failure mode" sanitize operation. Typically requires the
@@ -79,10 +88,11 @@ print out the usage information then exit.
 .TP
 \fB\-i\fR, \fB\-\-ipl\fR=\fILEN\fR
 set the initialization pattern length to \fILEN\fR bytes. By default it is
-set to the length of the pattern file (\fIPF\fR). Only active when the
-\fI\-\-overwrite\fR option is also given. It is the number of bytes from
-the \fIPF\fR file that will be used as the initialization pattern. The
-minimum size is 1 byte and the maximum is the logical block size of the
+set to the length of the pattern file (\fIPF\fR) or 4 if the \fI\-\-zero\fR
+option is given. Only active when the \fI\-\-overwrite\fR option is also
+given. It is the number of bytes from the \fIPF\fR file that will be used
+as the initialization pattern (if the \fI\-\-zero\fR option is not given).
+The minimum size is 1 byte and the maximum is the logical block size of the
 \fIDEVICE\fR (and not to exceed 65535). If \fILEN\fR exceeds the \fIPF\fR
 file size then the initialization pattern is padded with zeros.
 .TP
@@ -93,8 +103,8 @@ INVERT bit. When the INVERT bit is set then the initialization pattern
 is inverted between consecutive overwrite passes.
 .TP
 \fB\-O\fR, \fB\-\-overwrite\fR
-perform an "overwrite" sanitize operation. When this option is given
-then the \fI\-\-pattern=PF\fR option is required.
+perform an "overwrite" sanitize operation. When this option is given then
+the \fI\-\-pattern=PF\fR or the \fI\-\-zero\fR option is required.
 .TP
 \fB\-p\fR, \fB\-\-pattern\fR=\fIPF\fR
 where \fIPF\fR is the filename of a file containing the initialization
@@ -128,11 +138,23 @@ operation is complete (or fails). When this option is given (and the
 \fI\-\-early\fR option is not given) then the SANITIZE command is started
 with the IMMED bit clear. For a large disk this might take hours. [A
 cryptographic erase operation could potentially be very quick.]
+.TP
+\fB\-z\fR, \fB\-\-zero\fR
+with an "overwrite" sanitize operation this option causes the initialization
+pattern to be zero (4 zeros are used as the initialization pattern). Cannot
+be used with the \fI\-\-pattern=PF\fR option. If this option is given
+twice (e.g. '\-zz') then 0xff is used as the initialization byte.
 .SH NOTES
 The SCSI SANITIZE command is closely related to the ATA SANITIZE command,
 both are relatively new with the ATA command being the first one defined.
 The SCSI to ATA Translation (SAT) definition for the SCSI SANITIZE command
 appeared in the SAT\-3 revision 4 draft.
+.PP
+When a SAT layer is used to a (S)ATA disk then for OVERWRITE the
+initialization pattern must be 4 bytes long. So this means either the
+\fI\-\-zero\fR option may be given, or a pattern file (with the
+\fI\-\-pattern=PF\fR option) that is 4 bytes long or set to that
+length with the \fI\-\-ipl=LEN\fR option.
 .PP
 The SCSI SANITIZE command is related to the SCSI FORMAT UNIT command. It
 is likely that a block erase sanitize operation would take a similar
@@ -183,7 +205,7 @@ If the 15 second reconsideration time is not required add the
 .PP
    sg_sanitize \-\-block \-\-quick \-\-early /dev/sdm
 .PP
-To do an "overwrite" sanitize a pattern file is required:
+To do an "overwrite" sanitize a pattern file may be given:
 .PP
    sg_sanitize \-\-overwrite \-\-pattern=rand.img /dev/sdm
 .PP
@@ -193,6 +215,8 @@ sanitize operation:
 .PP
    sg_sanitize \-\-overwrite \-\-pattern=rand.img \-\-ipl=17 /dev/sdm
 .PP
+To overwrite with zeros use:
+   sg_sanitize \-\-overwrite \-\-zero /dev/sdm
 .SH EXIT STATUS
 The exit status of sg_sanitize is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
@@ -202,7 +226,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2011\-2013 Douglas Gilbert
+Copyright \(co 2011\-2014 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

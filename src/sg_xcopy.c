@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.45 20140516";
+static const char * version_str = "0.46 20140625";
 
 #define ME "sg_xcopy: "
 
@@ -749,8 +749,8 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     len = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
            rcBuff[3]) + 4;
     if (len > rcBuffLen) {
-        pr2serr("  <<report too long for internal buffer, output "
-                "truncated\n");
+        pr2serr("  <<report len %d > %d too long for internal buffer, output "
+                "truncated\n", len, rcBuffLen);
     }
     if (verbose > 2) {
         pr2serr("\nOutput response in hex:\n");

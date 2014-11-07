@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.94 20140516";
+static const char * version_str = "0.96 20141006";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -64,6 +64,7 @@ static struct option long_options[] = {
     {"block", no_argument, 0, 'B'},
     {"count", required_argument, 0, 'c'},
     {"crypto", no_argument, 0, 'C'},
+    {"desc", no_argument, 0, 'd'},
     {"early", no_argument, 0, 'e'},
     {"fail", no_argument, 0, 'F'},
     {"help", no_argument, 0, 'h'},
@@ -76,6 +77,7 @@ static struct option long_options[] = {
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
     {"wait", no_argument, 0, 'w'},
+    {"zero", no_argument, 0, 'z'},
     {0, 0, 0, 0},
 };
 
@@ -84,6 +86,7 @@ struct opts_t {
     int block;
     int count;
     int crypto;
+    int desc;
     int early;
     int fail;
     int invert;
@@ -93,6 +96,7 @@ struct opts_t {
     int quick;
     int verbose;
     int wait;
+    int zero;
     const char * pattern_fn;
 };
 
@@ -114,6 +118,9 @@ usage()
           "    --count=OC|-c OC     OC is overwrite count field (from 1 "
           "(def) to 31)\n"
           "    --crypto|-C          do CRYPTOGRAPHIC ERASE sanitize\n"
+          "    --desc|-d            polling request sense sets 'desc' "
+          "field\n"
+          "                         (def: clear 'desc' field)\n"
           "    --early|-e           exit once sanitize started (IMMED set "
           "in cdb)\n"
           "                         user can monitor progress with REQUEST "
@@ -137,9 +144,11 @@ usage()
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string then exit\n"
           "    --wait|-w            wait for command to finish (could "
-          "take hours)\n\n"
+          "take hours)\n"
+          "    --zero|-z            use pattern of zeros for "
+          "OVERWRITE\n\n"
           "Performs a SCSI SANITIZE command.\n    <<<WARNING>>>: all data "
-          "on DEVICE will lost.\nDefault action is to give user time to "
+          "on DEVICE will be lost.\nDefault action is to give user time to "
           "reconsider; then execute SANITIZE\ncommand with IMMED bit set; "
           "then use REQUEST SENSE command every 60\nseconds to poll for a "
           "progress indication; then exit when there is no\nmore progress "
@@ -234,16 +243,181 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     return ret;
 }
 
+#define VPD_DEVICE_ID 0x83
+#define VPD_ASSOC_LU 0
+#define VPD_ASSOC_TPORT 1
+#define TPROTO_ISCSI 5
+
+static char *
+get_lu_name(const unsigned char * ucp, int u_len, char * b, int b_len)
+{
+    int len, off, sns_dlen, dlen, k;
+    unsigned char u_sns[512];
+    char * cp;
+
+    len = u_len - 4;
+    ucp += 4;
+    off = -1;
+    if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+                                8 /* SCSI name string (sns) */,
+                                3 /* UTF-8 */)) {
+        sns_dlen = ucp[off + 3];
+        memcpy(u_sns, ucp + off + 4, sns_dlen);
+        /* now want to check if this is iSCSI */
+        off = -1;
+        if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_TPORT,
+                                    8 /* SCSI name string (sns) */,
+                                    3 /* UTF-8 */)) {
+            if ((0x80 & ucp[1]) && (TPROTO_ISCSI == (ucp[0] >> 4))) {
+                snprintf(b, b_len, "%.*s", sns_dlen, u_sns);
+                return b;
+            }
+        }
+    } else
+        sns_dlen = 0;
+    if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+                                3 /* NAA */, 1 /* binary */)) {
+        dlen = ucp[off + 3];
+        if (! ((8 == dlen) || (16 ==dlen)))
+            return b;
+        cp = b;
+        for (k = 0; ((k < dlen) && (b_len > 1)); ++k) {
+            snprintf(cp, b_len, "%02x", ucp[off + 4 + k]);
+            cp += 2;
+            b_len -= 2;
+        }
+    } else if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+                                       2 /* EUI */, 1 /* binary */)) {
+        dlen = ucp[off + 3];
+        if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
+            return b;
+        cp = b;
+        for (k = 0; ((k < dlen) && (b_len > 1)); ++k) {
+            snprintf(cp, b_len, "%02x", ucp[off + 4 + k]);
+            cp += 2;
+            b_len -= 2;
+        }
+    } else if (sns_dlen > 0)
+        snprintf(b, b_len, "%.*s", sns_dlen, u_sns);
+    return b;
+}
+
+#define SAFE_STD_INQ_RESP_LEN 36
+#define VPD_SUPPORTED_VPDS 0x0
+#define VPD_UNIT_SERIAL_NUM 0x80
+#define VPD_DEVICE_ID 0x83
+
+static int
+print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
+{
+    int res, k, n, verb, pdt, has_sn, has_di;
+    unsigned char b[256];
+    char a[256];
+    char pdt_name[64];
+
+    verb = (verbose > 1) ? verbose - 1 : 0;
+    memset(sinq_resp, 0, max_rlen);
+    res = sg_ll_inquiry(fd, 0, 0 /* evpd */, 0 /* pg_op */, b,
+                        SAFE_STD_INQ_RESP_LEN, 1, verb);
+    if (res)
+        return res;
+    n = b[4] + 5;
+    if (n > SAFE_STD_INQ_RESP_LEN)
+        n = SAFE_STD_INQ_RESP_LEN;
+    memcpy(sinq_resp, b, (n < max_rlen) ? n : max_rlen);
+    if (n == SAFE_STD_INQ_RESP_LEN) {
+        pdt = b[0] & 0x1f;
+        printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
+               (const char *)(b + 8), (const char *)(b + 16),
+               (const char *)(b + 32),
+               sg_get_pdt_str(pdt, sizeof(pdt_name), pdt_name), pdt);
+        if (verbose)
+            printf("      PROTECT=%d\n", !!(b[5] & 1));
+        if (b[5] & 1)
+            printf("      << supports protection information>>\n");
+    } else {
+        fprintf(stderr, "Short INQUIRY response: %d bytes, expect at least "
+                "36\n", n);
+        return SG_LIB_CAT_OTHER;
+    }
+    res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
+                        SAFE_STD_INQ_RESP_LEN, 1, verb);
+    if (res) {
+        if (verbose)
+            fprintf(stderr, "VPD_SUPPORTED_VPDS gave res=%d\n", res);
+        return 0;
+    }
+    if (VPD_SUPPORTED_VPDS != b[1]) {
+        if (verbose)
+            fprintf(stderr, "VPD_SUPPORTED_VPDS corrupted\n");
+        return 0;
+    }
+    n = (b[2] << 8) + b[3];
+    if (n > (SAFE_STD_INQ_RESP_LEN - 4))
+        n = (SAFE_STD_INQ_RESP_LEN - 4);
+    for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
+        if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
+            if (has_di) {
+                if (verbose)
+                    fprintf(stderr, "VPD_SUPPORTED_VPDS dis-ordered\n");
+                return 0;
+            }
+            ++has_sn;
+        } else if (VPD_DEVICE_ID == b[4 + k]) {
+            ++has_di;
+            break;
+        }
+    }
+    if (has_sn) {
+        res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_UNIT_SERIAL_NUM, b,
+                            sizeof(b), 1, verb);
+        if (res) {
+            if (verbose)
+                fprintf(stderr, "VPD_UNIT_SERIAL_NUM gave res=%d\n", res);
+            return 0;
+        }
+        if (VPD_UNIT_SERIAL_NUM != b[1]) {
+            if (verbose)
+                fprintf(stderr, "VPD_UNIT_SERIAL_NUM corrupted\n");
+            return 0;
+        }
+        n = (b[2] << 8) + b[3];
+        if (n > (int)(sizeof(b) - 4))
+            n = (sizeof(b) - 4);
+        printf("      Unit serial number: %.*s\n", n, (const char *)(b + 4));
+    }
+    if (has_di) {
+        res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_DEVICE_ID, b,
+                            sizeof(b), 1, verb);
+        if (res) {
+            if (verbose)
+                fprintf(stderr, "VPD_DEVICE_ID gave res=%d\n", res);
+            return 0;
+        }
+        if (VPD_DEVICE_ID != b[1]) {
+            if (verbose)
+                fprintf(stderr, "VPD_DEVICE_ID corrupted\n");
+            return 0;
+        }
+        n = (b[2] << 8) + b[3];
+        if (n > (int)(sizeof(b) - 4))
+            n = (sizeof(b) - 4);
+        n = strlen(get_lu_name(b, n + 4, a, sizeof(a)));
+        if (n > 0)
+            printf("      LU name: %.*s\n", n, a);
+    }
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, res, c, infd, progress, vb, n, desc, resp_len;
+    int sg_fd, k, res, c, infd, progress, vb, n, resp_len;
     int got_stdin = 0;
     int param_lst_len = 0;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
-    char pdt_name[32];
     char b[80];
     unsigned char requestSenseBuff[DEF_REQS_RESP_LEN];
     unsigned char * wBuff = NULL;
@@ -251,7 +425,7 @@ main(int argc, char * argv[])
     struct opts_t opts;
     struct opts_t * op;
     struct stat a_stat;
-    struct sg_simple_inquiry_resp inq_out;
+    unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -259,7 +433,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ABc:CeFhi:IOp:QT:vVw", long_options,
+        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:QT:vVwz", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -281,6 +455,9 @@ main(int argc, char * argv[])
             break;
         case 'C':
             ++op->crypto;
+            break;
+        case 'd':
+            ++op->desc;
             break;
         case 'e':
             ++op->early;
@@ -328,6 +505,9 @@ main(int argc, char * argv[])
         case 'w':
             ++op->wait;
             break;
+        case 'z':
+            ++op->zero;
+            break;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
             usage();
@@ -360,34 +540,42 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->overwrite) {
-        if (NULL == op->pattern_fn) {
-            fprintf(stderr, "'--overwrite' requires '--pattern=PF' "
-                    "option\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
-        if (! got_stdin) {
-            memset(&a_stat, 0, sizeof(a_stat));
-            if (stat(op->pattern_fn, &a_stat) < 0) {
-                fprintf(stderr, "pattern file: unable to stat(%s): %s\n",
-                        op->pattern_fn, safe_strerror(errno));
-                return SG_LIB_FILE_ERROR;
+        if (op->zero) {
+            if (op->pattern_fn) {
+                fprintf(stderr, "confused: both '--pattern=PF' and '--zero' "
+                        "options\n");
+                return SG_LIB_SYNTAX_ERROR;
             }
-            if (op->ipl <= 0) {
-                op->ipl = (int)a_stat.st_size;
-                if (op->ipl > MAX_XFER_LEN) {
-                    fprintf(stderr, "pattern file length exceeds 65535 "
-                            "bytes, need '--ipl=LEN' option\n");
-                     return SG_LIB_FILE_ERROR;
+            op->ipl = 4;
+        } else {
+            if (NULL == op->pattern_fn) {
+                fprintf(stderr, "'--overwrite' requires '--pattern=PF' "
+                        "or '--zero' option\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
+            if (! got_stdin) {
+                memset(&a_stat, 0, sizeof(a_stat));
+                if (stat(op->pattern_fn, &a_stat) < 0) {
+                    fprintf(stderr, "pattern file: unable to stat(%s): %s\n",
+                            op->pattern_fn, safe_strerror(errno));
+                    return SG_LIB_FILE_ERROR;
+                }
+                if (op->ipl <= 0) {
+                    op->ipl = (int)a_stat.st_size;
+                    if (op->ipl > MAX_XFER_LEN) {
+                        fprintf(stderr, "pattern file length exceeds 65535 "
+                                "bytes, need '--ipl=LEN' option\n");
+                         return SG_LIB_FILE_ERROR;
+                    }
                 }
             }
+            if (op->ipl < 1) {
+                fprintf(stderr, "'--overwrite' requires '--ipl=LEN' "
+                        "option if can't get PF length\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         }
-        if (op->ipl < 1) {
-            fprintf(stderr, "'--overwrite' requires '--ipl=LEN' "
-                    "option if can't get PF length\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
@@ -397,18 +585,9 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    if (sg_simple_inquiry(sg_fd, &inq_out, 1, vb)) {
-            fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
-                    device_name);
-            ret = SG_LIB_CAT_OTHER;
-            goto err_out;
-    }
-    printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
-           inq_out.vendor, inq_out.product, inq_out.revision,
-           sg_get_pdt_str(inq_out.peripheral_type, sizeof(pdt_name),
-                          pdt_name),
-           inq_out.peripheral_type);
-
+    ret = print_dev_id(sg_fd, inq_resp, sizeof(inq_resp), op->verbose);
+    if (ret)
+        goto err_out;
 
     if (op->overwrite) {
         param_lst_len = op->ipl + 4;
@@ -419,38 +598,44 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if (got_stdin) {
-            infd = STDIN_FILENO;
-            if (sg_set_binary_mode(STDIN_FILENO) < 0)
-                perror("sg_set_binary_mode");
+        if (op->zero) {
+            if (2 == op->zero)  /* treat -zz as fill with 0xff bytes */
+                memset(wBuff + 4, 0xff, op->ipl);
+            else
+                memset(wBuff + 4, 0, op->ipl);
         } else {
-            if ((infd = open(op->pattern_fn, O_RDONLY)) < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for reading", op->pattern_fn);
+            if (got_stdin) {
+                infd = STDIN_FILENO;
+                if (sg_set_binary_mode(STDIN_FILENO) < 0)
+                    perror("sg_set_binary_mode");
+            } else {
+                if ((infd = open(op->pattern_fn, O_RDONLY)) < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
+                             "reading", op->pattern_fn);
+                    perror(ebuff);
+                    ret = SG_LIB_FILE_ERROR;
+                    goto err_out;
+                } else if (sg_set_binary_mode(infd) < 0)
+                    perror("sg_set_binary_mode");
+            }
+            res = read(infd, wBuff + 4, op->ipl);
+            if (res < 0) {
+                snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
+                         op->pattern_fn);
                 perror(ebuff);
+                if (! got_stdin)
+                    close(infd);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
-            } else if (sg_set_binary_mode(infd) < 0)
-                perror("sg_set_binary_mode");
-        }
-        res = read(infd, wBuff + 4, op->ipl);
-        if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
-                     op->pattern_fn);
-            perror(ebuff);
+            }
+            if (res < op->ipl) {
+                fprintf(stderr, "tried to read %d bytes from %s, got %d "
+                        "bytes\n", op->ipl, op->pattern_fn, res);
+                fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
+            }
             if (! got_stdin)
                 close(infd);
-            ret = SG_LIB_FILE_ERROR;
-            goto err_out;
         }
-        if (res < op->ipl) {
-            fprintf(stderr, "tried to read %d bytes from %s, got %d "
-                    "bytes\n", op->ipl, op->pattern_fn, res);
-            fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
-        }
-        if (! got_stdin)
-            close(infd);
-
         wBuff[0] = op->count & 0x1f;;
         if (op->test)
             wBuff[0] |= ((op->test & 0x3) << 5);
@@ -482,10 +667,10 @@ main(int argc, char * argv[])
     }
 
     if ((0 == ret) && (0 == op->early) && (0 == op->wait)) {
-        for (k = 0, desc = 1 ;; ++k) {
+        for (k = 0 ;; ++k) {
             sleep_for(POLL_DURATION_SECS);
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
+            res = sg_ll_request_sense(sg_fd, op->desc, requestSenseBuff,
                                       sizeof(requestSenseBuff), 1, vb);
             if (res) {
                 ret = res;
@@ -493,10 +678,10 @@ main(int argc, char * argv[])
                     fprintf(stderr, "Request Sense command not supported\n");
                 else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                     fprintf(stderr, "bad field in Request Sense cdb\n");
-                    if (1 == desc) {
+                    if (1 == op->desc) {
                         fprintf(stderr, "Descriptor type sense may not be "
                                 "supported, try again with fixed type\n");
-                        desc = 0;
+                        op->desc = 0;
                         continue;
                     }
                 } else {

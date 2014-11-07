@@ -1,17 +1,18 @@
-.TH SG_SES "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_SES "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
 [\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR]
-[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-enumerate\fR] [\fI\-\-filter\fR]
-[\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-enumerate\fR]
+[\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
-[\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-nickname=SEN\fR]
-[\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-nickname=SEN\fR] [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR]
+[\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-warn\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -36,7 +37,8 @@ to flash on a disk carrier in an array) is typically done using a
 read\-modify\-write cycle. See the section on CHANGING STATE below.
 .PP
 There is a web page discussing this utility at
-http://sg.danny.cz/sg/sg_ses.html .
+http://sg.danny.cz/sg/sg_ses.html . Support for downloading microcode to
+a SES device has been placed in a separate utility called sg_ses_microcode.
 .PP
 In the following sections "page" refers to a diagnostic page, either
 fetched with a SCSI RECEIVE DIAGNOSTIC RESULTS command or sent to the
@@ -87,7 +89,7 @@ detected.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=@\fIFN\fR
 reads one or more data strings from the file called \fIFN\fR, limit 2048
-bytes. Othewise this option is the same as the previous item that reads
+bytes. Otherwise this option is the same as the previous item that reads
 from stdin.
 .TP
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
@@ -96,15 +98,28 @@ Descriptor page. This is a medium level indexing alternative to the low
 level \fI\-\-index=\fR options. If the descriptor name contains a space then
 \fIDN\fR needs to be surrounded by quotes (single or double) or the space
 escaped (e.g. preceded by a backslash). See the DESCRIPTOR NAME, DEVICE SLOT
-NAME AND SAS ADDRESS section below.
+NUMBER AND SAS ADDRESS section below.
 .TP
-\fB\-x\fR, \fB\-\-dev\-slot\-num\fR=\fISN\fR
+\fB\-x\fR, \fB\-\-dev\-slot\-num\fR=\fISN\fR, \fB\-\-dsn\fR=\fISN\fR
 where \fISN\fR is a device slot number found in the Additional Element Status
 page. Only entries for FCP and SAS devices (with EIP=1) have device slot
-numbers. \fISN\fR must be a number in the range 0 to 255 (inclusive). This is
-a medium level indexing alternative to the low level \fI\-\-index=\fR
-options. See the DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS section
-below.
+numbers. \fISN\fR must be a number in the range 0 to 255 (inclusive). 255 is
+used to indicate there is no corresponding device slot. This is a medium level
+indexing alternative to the low level \fI\-\-index=\fR options. See the
+DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
+.TP
+\fB\-E\fR, \fB\-\-eiioe\fR=\fIA_F\fR
+\fIA_F\fR is either the string 'auto' or 'force'. There was some fuzziness
+in the interpretation of the 'element index' field in the Additional Element
+Status page between SES\-2 and SES\-3. The EIIOE bit was introduced to
+resolve the problem but not all enclosures have caught up.
+Using '\-\-eiioe=force' will decode this page as if the EIIOE bit is set.
+Using '\-\-eiioe=auto' will decode this page as if the EIIOE bit is set if
+the first element index in this page is 1 (in other words a heuristic to
+guess whether the EIIOE bit should be set or not).
+.br
+If the enclosure sets the EIIOE bit then this option has no effect. It is
+recommended that HP JBOD users set --eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known page names and SES elements when this option is given
@@ -172,13 +187,31 @@ group elements from the Element Descriptor, Enclosure Status and Additional
 Element Status pages. If this option is given twice then elements from the
 Threshold In page are also grouped. The order is dictated by the Configuration
 page. All elements are output unless one of the indexing options is given,
-in which case only the matching element and its associateds are output. The
-\fI\-\-filter\fR option can be added to reduce the amount of output generated
-by this option. See the INDEXES and DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS
-ADDRESS sections below.
+in which case only the matching element and its associated fields are output.
+The \fI\-\-filter\fR option can be added to reduce the amount of output
+generated by this option. See the INDEXES and DESCRIPTOR NAME, DEVICE SLOT
+NUMBER AND SAS ADDRESS sections below.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 This option is equivalent to \fI\-\-enumerate\fR. See that option.
+.TP
+\fB\-M\fR, \fB\-\-mask\fR
+When modifying elements, the default action is a read (status element),
+mask, modify (based on \fI\-\-clear=STR\fR or \fI\-\-set=STR\fR) then write
+back as the control element. The mask step is new in sg_ses version 1.98
+and is based on what is allowable (and in the same location) in draft SES\-3
+revision 6. Those masks may evolve, as they have in the past. This option
+re\-instates the previous logic which was to ignore the mask step. The
+default action (i.e. without this option) is to perform the mask step in
+the read\-mask\-modify\-write sequence.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+\fILEN\fR is placed in the ALLOCATION LENGTH field of the SCSI RECEIVE
+DIAGNOSTIC RESULTS commands sent by the utility. It represents the maximum
+size of data the SES device can return (in bytes). It cannot exceed 65535
+and defaults to 65532 (bytes). Some systems may not permit such large sizes
+hence the need for this option. If \fILEN\fR is set to 0 then the default
+size is used.
 .TP
 \fB\-n\fR, \fB\-\-nickname\fR=\fISEN\fR
 where \fISEN\fR is the new Subenclosure Nickname. Only the first 32
@@ -204,13 +237,27 @@ later invocation using the \fI\-\-data=\fR option. A page less its first
 4 bytes (page code and length) is output. When used twice (e.g. \fI\-rr\fR)
 the full page contents is output in binary to stdout.
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
+.TP
 \fB\-A\fR, \fB\-\-sas\-addr\fR=\fISA\fR
-where \fISA\fR is a SAS address found in the Additional Element Status page.
-Only entries for SAS devices (with device slot or array device slot elements)
-have SAS addresses. \fISA\fR is a hex number that is up to 8 digits long. It
-may have a leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a
-medium level indexing alternative to the low level \fI\-\-index=\fR options.
-See the DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS section below.
+this is an indexing method for SAS end devices (e.g. SAS disks). The utility
+will try to find the element or slot in the Additional Element Status page
+whose SAS address matches \fISA\fR. For a SAS disk or tape that SAS address
+is its target port identifier for the port connected to that element or slot.
+Most SAS disks and tapes have two such target ports, usually numbered
+consecutively.
+.br
+SATA devices in a SAS enclosure often receive "manufactured" target port
+identifiers from a SAS expander; typically will a SAS address close to
+but different from the SAS address of the expander itself. Note that this
+manufactured target port identifier is different from a SATA disk's WWN.
+.br
+\fISA\fR is a hex number that is up to 8 digits long. It may have a
+leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a medium level
+ indexing alternative to the low level \fI\-\-index=\fR options.
+See the DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
 .TP
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
 Used to set an element field in the Enclosure Control or Threshold Out page.
@@ -228,6 +275,13 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.TP
+\fB\-w\fR, \fB\-\-warn\fR
+warn about certain irregularities with warnings sent to stderr. The join
+is a complex operation that relies on information from several pages to be
+synchronized. The quality of SES devices vary and to be fair, the
+descriptions from T10 drafts and standards have been tweaked several
+times (see the EIIOE bit) in order to clear up confusion.
 .SH INDEXES
 An enclosure can have information about its disk and tape drives plus other
 supporting components like power supplies spread across several pages.
@@ -235,7 +289,7 @@ Addressing a specific element (overall or individual) within a page is
 complicated. This section describes low level indexing (i.e. choosing a
 single element (or a group of related elements) from a large number of
 elements). If available, the medium level indexing described in the
-following section (DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS)
+following section (DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS)
 might be simpler to use.
 .PP
 The Configuration page is key to low level indexing: it contains a list
@@ -293,7 +347,7 @@ output (e.g. only showing the element associated with the second 12 volt
 power supply). They may also be used together with with the
 \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options which
 are described in the STR section below.
-.SH DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS
+.SH DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS
 The three options: \fI\-\-descriptor=DN\fR, \fI\-\-dev\-slot\-num=SN\fR
 and \fI\-\-sas\-addr=SA\fR allow medium level indexing, as an alternative
 to the low level \fI\-\-index=\fR options. Only one of the three options
@@ -332,11 +386,12 @@ is usually in the range 0 to 3, the <start_bit> must be in the range 0 to
 number of bits are read in the left to right sense of the element tables
 shown in the various SES draft documents. For example the 8 bits of
 byte 2 would be represented as 2:7:8 with the most significant bit being
-2:7 and the least sugnificant bit being 2:0 .
+2:7 and the least significant bit being 2:0 .
 .PP
 The <value> is optional but is ignored if provided to \fI\-\-get=STR\fR.
 For \fI\-\-set=STR\fR the default <value> is 1 while for \fI\-\-clear=STR\fR
-the default value is 0 .
+the default value is 0 . <value> is assumed to be decimal, hexadecimal
+values can be given in the normal fashion.
 .PP
 The supported list of <acronym>s can be viewed by using the
 \fI\-\-enumerate\fR option twice (or "\-ee").
@@ -514,5 +569,5 @@ Copyright \(co 2004\-2014 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_safte, sg_senddiag, sg3_utils (in sg3_utils package);
+.B sg_inq, sg_safte, sg_senddiag, sg_ses_microcode, sg3_utils (sg3_utils);
 .B safte\-monitor (Internet)

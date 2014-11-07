@@ -35,7 +35,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.9 20140515";
+static const char * version_str = "1.10 20140625";
 
 
 #define MAX_XFER_LEN 10000
@@ -133,9 +133,9 @@ scsi_failed_segment_details(unsigned char *rcBuff, unsigned int rcBuffLen)
     }
     len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
           rcBuff[3];
-    if (len + 3 > rcBuffLen) {
-        pr2serr("  <<report too long for internal buffer, output "
-                "truncated\n");
+    if (len + 4 > rcBuffLen) {
+        pr2serr("  <<report len %d > %d too long for internal buffer, output "
+                "truncated\n", len, rcBuffLen);
     }
     if (len < 52) {
         pr2serr("  <<no segment details, response data length %d\n", len);
@@ -154,14 +154,14 @@ scsi_copy_status(unsigned char *rcBuff, unsigned int rcBuffLen)
     unsigned int len;
 
     if (rcBuffLen < 4) {
-        pr2serr("  <<not enough data to procedd report>>\n");
+        pr2serr("  <<not enough data to proceed report>>\n");
         return;
     }
     len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
           rcBuff[3];
-    if (len > rcBuffLen) {
-        pr2serr("  <<report too long for internal buffer, output "
-                "truncated\n");
+    if (len + 4 > rcBuffLen) {
+        pr2serr("  <<report len %d > %d too long for internal buffer, output "
+                "truncated\n", len, rcBuffLen);
     }
     printf("Receive copy results (copy status):\n");
     printf("    Held data discarded: %s\n", rcBuff[4] & 0x80 ? "Yes":"No");
@@ -193,9 +193,9 @@ scsi_operating_parameters(unsigned char *rcBuff, unsigned int rcBuffLen)
 
     len = (rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
           rcBuff[3];
-    if (len > rcBuffLen) {
-        pr2serr("  <<report too long for internal buffer, output "
-                "truncated\n");
+    if (len + 4 > rcBuffLen) {
+        pr2serr("  <<report len %d > %d too long for internal buffer, output "
+                "truncated\n", len, rcBuffLen);
     }
     printf("Receive copy results (report operating parameters):\n");
     printf("    Supports no list identifier (SNLID): %s\n",

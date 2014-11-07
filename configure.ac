@@ -1,4 +1,4 @@
-AC_INIT(sg3_utils, 1.38, dgilbert@interlog.com)
+AC_INIT(sg3_utils, 1.40, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE
 AM_MAINTAINER_MODE
@@ -36,28 +36,36 @@ AC_DEFINE_UNQUOTED(SG_LIB_BUILD_HOST, "${host}", [sg3_utils Build Host])
 case "${host}" in
         *-*-linux-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-linux*)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-freebsd*|*-*-kfreebsd*-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['-lcam']);;
         *-*-solaris*)
 		AC_DEFINE_UNQUOTED(SG_LIB_SOLARIS, 1, [sg3_utils on Solaris])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']);;
         *-*-osf*)
 		AC_DEFINE_UNQUOTED(SG_LIB_OSF1, 1, [sg3_utils on Tru64 UNIX])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-cygwin*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
+                AC_SUBST([os_cflags], ['-Wno-char-subscripts'])
                 AC_SUBST([os_libs], ['']) ;;
         *-*-mingw*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
 		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']) ;;
         *)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [assume sg3_utils on linux])
+                AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']) ;;
 esac
 

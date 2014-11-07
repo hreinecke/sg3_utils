@@ -46,7 +46,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.08 20140515";
+static const char * version_str = "1.09 20140816";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -105,9 +105,12 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
 {
     int res, ret;
     int extend = 0;
+    /* Following for ATA READ/WRITE MULTIPLE (EXT) cmds, normally 0 */
+    int multiple_count = 0;
     int protocol = 3;   /* non-data */
+    int t_type = 0;     /* 0 -> 512 byte blocks, 1 -> device's LB size */
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
-    int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
+    int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks (if t_type=0) */
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
     int got_ard = 0;    /* got ATA result descriptor */
@@ -134,8 +137,8 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
         aptCmdBlk[10] = (lba >> 8) & 0xff;
         aptCmdBlk[12] = (lba >> 16) & 0xff;
         aptCmdBlk[7] = (lba >> 24) & 0xff;
-        aptCmdBlk[1] = (protocol << 1) | extend;
-        aptCmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
+        aptCmdBlk[1] = (multiple_count << 5) | (protocol << 1) | extend;
+        aptCmdBlk[2] = (ck_cond << 5) | (t_type << 4)| (t_dir << 3) |
                        (byte_block << 2) | t_length;
         res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
@@ -149,8 +152,8 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
         apt12CmdBlk[5] = lba & 0xff;
         apt12CmdBlk[6] = (lba >> 8) & 0xff;
         apt12CmdBlk[7] = (lba >> 16) & 0xff;
-        apt12CmdBlk[1] = (protocol << 1);
-        apt12CmdBlk[2] = (ck_cond << 5) | (t_dir << 3) |
+        apt12CmdBlk[1] = (multiple_count << 5) | (protocol << 1);
+        apt12CmdBlk[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
         res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,

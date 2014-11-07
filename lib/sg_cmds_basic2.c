@@ -262,7 +262,7 @@ int
 sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, k, sense_cat, resid;
     unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] =
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -295,6 +295,8 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "mode sense (6)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
+    destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -315,7 +317,16 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         }
         ret = 0;
     }
-    destruct_scsi_pt_obj(ptvp);
+
+    if (resid > 0) {
+        if (resid > mx_resp_len) {
+            fprintf(sg_warnings_strm, "mode sense(6): resid (%d) should "
+                    "never exceed requested len=%d\n", resid, mx_resp_len);
+            return ret ? ret : SG_LIB_CAT_MALFORMED;
+        }
+        /* zero unfilled section of response buffer */
+        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+    }
     return ret;
 }
 
@@ -326,7 +337,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                    int sub_pg_code, void * resp, int mx_resp_len,
                    int noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, k, sense_cat, resid;
     unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] =
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -360,6 +371,8 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "mode sense (10)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
+    destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -380,7 +393,16 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         }
         ret = 0;
     }
-    destruct_scsi_pt_obj(ptvp);
+
+    if (resid > 0) {
+        if (resid > mx_resp_len) {
+            fprintf(sg_warnings_strm, "mode sense(10): resid (%d) should "
+                    "never exceed requested len=%d\n", resid, mx_resp_len);
+            return ret ? ret : SG_LIB_CAT_MALFORMED;
+        }
+        /* zero unfilled section of response buffer */
+        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+    }
     return ret;
 }
 
@@ -678,7 +700,7 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
                 int mx_resp_len, int noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, k, sense_cat, resid;
     unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] =
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -715,6 +737,8 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "log sense", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
+    destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -735,7 +759,16 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
         }
         ret = 0;
     }
-    destruct_scsi_pt_obj(ptvp);
+
+    if (resid > 0) {
+        if (resid > mx_resp_len) {
+            fprintf(sg_warnings_strm, "log sense: resid (%d) should "
+                    "never exceed requested len=%d\n", resid, mx_resp_len);
+            return ret ? ret : SG_LIB_CAT_MALFORMED;
+        }
+        /* zero unfilled section of response buffer */
+        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+    }
     return ret;
 }
 

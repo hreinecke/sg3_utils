@@ -50,7 +50,7 @@ do numeric scan (i.e. sg0, sg1...) [default]
 use a read/write flag when opening sg device (default is read\-only)
 .TP
 \fB\-x\fR
-extra information output about queuing
+extra information output about queueing
 .SH NOTES
 This utility was written at a time when hotplugging of SCSI devices
 was not supported in Linux. It used a simple algorithm to scan sg

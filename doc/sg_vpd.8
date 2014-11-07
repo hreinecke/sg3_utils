@@ -1,12 +1,12 @@
-.TH SG_VPD "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_VPD "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
 .B sg_vpd
-[\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-all\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-ident\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
 [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -16,7 +16,8 @@ are fetched with a SCSI INQUIRY command.
 .PP
 Alternatively the \fI\-\-inhex=FN\fR option can be given. In this case
 \fIFN\fR is assumed to be a file name ('\-' for stdin) containing ASCII
-hexadecimal representing a VPD page response.
+hexadecimal representing a VPD page response. If the \fI\-\-raw\fR option
+is also given then binary input is assumed (rather than ASCII hexadecimal).
 .PP
 Probably the most important page is the Device Identification
 VPD page (page number: 0x83). Since SPC\-3, support for this page
@@ -33,6 +34,19 @@ VPD pages" (0x0) VPD page is fetched and decoded.
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
 option name.
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+decode all VPD pages. When used with \fIDEVICE\fR the pages to be decoded
+are found in the "Supported VPD pages" VPD page.
+.br
+If this option is used with the \fI\-\-inhex=FN\fR option then the file
+\fIFN\fR is assumed to contain 1 or more VPD pages (in ASCII hex or binary).
+Decoding continues until the file is exhausted (or an error occurs). Sanity
+checks are aplied on each VPD page's length and the ascending order of VPD
+page numbers (required by SPC\-4) so bad data may be detected.
+.br
+If the \fI\-\-page=PG\fR option is also given then no VPD page whose page
+number is greater than \fIPG\fR (or its numeric equivalent) is decoded.
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 list the names of the known VPD pages, first the standard pages (i.e.
@@ -54,7 +68,9 @@ times, see section on the ATA information vpd page.
 .br
 To generate output suitable for placing in a file that can be used by a
 later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
-option (e.g. 'sg_vpd \-p di -HHHH /dev/sg3 > dev_id.hex').
+option (e.g. 'sg_vpd \-p di \-HHHH /dev/sg3 > dev_id.hex'). The
+reason '\-HHHH' is used is to flag that unadorned hexadecimal (without other
+text or address offsets) is sent to stdout.
 .TP
 \fB\-i\fR, \fB\-\-ident\fR
 decode the device identification (0x83) VPD page. When used once this option
@@ -241,6 +257,29 @@ Search for the name (and acronym) of all pages that share VPD page number
      oi         0xb0      OSD information
 .br
      sad        0xb0      Sequential access device capabilities (SSC)
+.PP
+Some examples follow using the "\-\-all" option. Send an ASCII hexadecimal
+representation of all VPD pages to a file:
+.PP
+   # sg_vpd \-\-all \-HHHH /dev/sg3 > all_vpds.hex
+.PP
+At some later time that file could be decoded with:
+.PP
+   # sg_vpd \-\-all \-\-inhex=all_vpds.hex
+.PP
+To do the equivalent as the previous example but use a file containing
+binary:
+.PP
+   # sg_vpd \-\-all \-\-raw /dev/sg3 > all_vpds.bin
+.br
+   # sg_vpd \-\-all \-\-raw \-\-inhex=all_vpds.bin
+.PP
+Notice that "\-\-raw" must be given with the second (\-\-inhex) invocation
+to alert the utility that all_vpds.bin contains binary as it assumes ASCII
+hexadecimal by default. Next we only decode T10 specified VPD pages
+excluding vendor specific VPD pages that start at page number 0xc0:
+.PP
+   # sg_vpd \-\-all \-\-page=0xbf \-\-raw \-\-inhex=all_vpds.bin
 .PP
 Further examples can be found on the http://sg.danny.cz/sg/sg3_utils.html
 web page.

@@ -28,7 +28,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.23 20140518";    /* spc4r37 + sbc4r01 */
+static const char * version_str = "1.26 20141007";    /* spc4r37 + sbc4r02 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1018,11 +1018,11 @@ show_page_name(int pg_code, int subpg_code,
     if (0x15 == pg_code) {
         switch (inq_dat->peripheral_type) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_RBC:
-            if (0 == subpg_code) {
-                printf("%sBackground scan results (sbc-3)\n", b);
+            if (0 == subpg_code) {  /* introduced: SBC-3 */
+                printf("%sBackground scan results\n", b);
                 return;
-            } else if (1 == subpg_code) {
-                printf("%sPending defects (sbc-4)\n", b);
+            } else if (1 == subpg_code) {  /* introduced: SBC-4 */
+                printf("%sPending defects\n", b);
                 return;
             }
             break;
@@ -1041,21 +1041,21 @@ show_page_name(int pg_code, int subpg_code,
         /* disk (direct access) type devices */
         {
             switch (pg_code) {
-            case FORMAT_STATUS_LPAGE:
-                printf("%sFormat status (sbc-2)\n", b);
+            case FORMAT_STATUS_LPAGE:   /* introduced: SBC-2 */
+                printf("%sFormat status\n", b);
                 break;
-            case LB_PROV_LPAGE:                 /* 0xc */
-                printf("%sLogical block provisioning (sbc-3)\n", b);
+            case LB_PROV_LPAGE:          /* 0xc  introduced: SBC-3 */
+                printf("%sLogical block provisioning\n", b);
                 break;
             /* case 0x15:       has subpage in sbc4 */
-            case SOLID_STATE_MEDIA_LPAGE:       /* 0x11 */
-                printf("%sSolid state media (sbc-3)\n", b);
+            case SOLID_STATE_MEDIA_LPAGE:       /* 0x11  introduced: SBC-3 */
+                printf("%sSolid state media\n", b);
                 break;
-            case SAT_ATA_RESULTS_LPAGE:
-                printf("%sATA pass-through results (sat-2)\n", b);
+            case SAT_ATA_RESULTS_LPAGE:         /* introduced: SAT-2 */
+                printf("%sATA pass-through results (sat)\n", b);
                 break;
-            case 0x17:
-                printf("%sNon-volatile cache (sbc-2)\n", b);
+            case 0x17:          /* introduced: SBC-2 */
+                printf("%sNon-volatile cache\n", b);
                 break;
             case 0x30:
                 printf("%sPerformance counters (Hitachi)\n", b);
@@ -1076,72 +1076,75 @@ show_page_name(int pg_code, int subpg_code,
         /* tape (streaming) and printer (obsolete) devices */
         {
             switch (pg_code) {
-            case 0xc:
-                printf("%sSequential access device (ssc-2)\n", b);
+            case 0xc:           /* introduced: SSC-2 */
+                printf("%sSequential access device\n", b);
                 break;
-            case 0x11:
-                printf("%sDT Device status (ssc-3)\n", b);
+            case 0x11:          /* introduced: SSC-3 */
+                printf("%sDT Device status\n", b);
                 break;
-            case 0x12:
-                printf("%sTape alert response (ssc-3)\n", b);
+            case 0x12:          /* introduced: SSC-3 */
+                printf("%sTape alert response\n", b);
                 break;
-            case 0x13:
-                printf("%sRequested recovery (ssc-3)\n", b);
+            case 0x13:          /* introduced: SSC-3 */
+                printf("%sRequested recovery\n", b);
                 break;
-            case 0x14:
-                printf("%sDevice statistics (ssc-3)\n", b);
+            case 0x14:          /* introduced: SSC-3 */
+                printf("%sDevice statistics\n", b);
                 break;
-            case 0x16:
-                printf("%sTape diagnostic (ssc-3)\n", b);
+            case 0x16:          /* introduced: SSC-3 */
+                printf("%sTape diagnostic\n", b);
                 break;
-            case 0x17:
-                printf("%sVolume statistics (ssc-4)\n", b);
+            case 0x17:          /* introduced: SSC-4 */
+                printf("%sVolume statistics\n", b);
                 break;
-            case 0x1b:
-                printf("%sData compression (ssc-4)\n", b);
+            case 0x1b:          /* introduced: SSC-4 */
+                printf("%sData compression\n", b);
                 break;
-            case 0x2d:
-                printf("%sCurrent service information (ssc-3)\n", b);
+            case 0x2d:          /* introduced: SSC-3 */
+                printf("%sCurrent service information\n", b);
                 break;
-            case TAPE_ALERT_LPAGE:
-                printf("%sTapeAlert (ssc-2)\n", b);
+            case TAPE_ALERT_LPAGE:      /* introduced: SSC-2 */
+                printf("%sTapeAlert\n", b);
                 break;
             case 0x30:
-                printf("%sTape usage (IBM specific)\n", b);
+                printf("%sTape usage (LTO-5 and 6 specific)\n", b);
                 break;
             case 0x31:
-                printf("%sTape capacity (IBM specific)\n", b);
+                printf("%sTape capacity (LTO-5 and 6 specific)\n", b);
                 break;
             case 0x32:
-                printf("%sData compression (IBM specific)\n", b);
+                printf("%sData compression (LTO-5 specific, LTO-6 use "
+                       "0x1b)\n", b);
                 break;
-            case 0x33:
-                printf("%sWrite errors (IBM specific)\n", b);
+            case 0x33:  /* in LTO-6 this is 'Device Wellness' page */
+                printf("%sWrite errors (LTO-5 specific)\n", b);
                 break;
-            case 0x34:
-                printf("%sRead forward errors (IBM specific)\n", b);
+            case 0x34:  /* in LTO-6 this is Performance data page */
+                printf("%sRead forward errors (LTO-5 specific)\n", b);
                 break;
+            /* case 0x35:  in LTO-6 this is DT Device Error page */
             case 0x37:
-                printf("%sPerformance characteristics (IBM specific)\n", b);
+                printf("%sPerformance characteristics (LTO-5 specific)\n", b);
                 break;
             case 0x38:
-                printf("%sBlocks/bytes transferred (IBM specific)\n", b);
+                printf("%sBlocks/bytes transferred (LTO-5 specific)\n", b);
                 break;
             case 0x39:
-                printf("%sHost port 0 interface errors (IBM specific)\n", b);
+                printf("%sHost port 0 interface errors (LTO-5 specific)\n", b);
                 break;
             case 0x3a:
-                printf("%sDrive control verification (IBM specific)\n", b);
+                printf("%sDrive control verification (LTO-5 specific)\n", b);
                 break;
             case 0x3b:
-                printf("%sHost port 1 interface errors (IBM specific)\n", b);
+                printf("%sHost port 1 interface errors (LTO-5 specific)\n", b);
                 break;
             case 0x3c:
-                printf("%sDrive usage information (IBM specific)\n", b);
+                printf("%sDrive usage information (LTO-5 specific)\n", b);
                 break;
             case 0x3d:
-                printf("%sSubsystem statistics (IBM specific)\n", b);
+                printf("%sSubsystem statistics (LTO-5 specific)\n", b);
                 break;
+            /* case 0x3e:   in LTO-6 this is Device Status page */
             default:
                 done = 0;
                 break;
@@ -1235,7 +1238,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[0] = '\0';
 }
 
-/* BUFF_OVER_UNDER_LPAGE [0x1] */
+/* BUFF_OVER_UNDER_LPAGE [0x1]  introduced: SPC-2 */
 static void
 show_buffer_under_over_run_page(unsigned char * resp, int len,
                                 const struct opts_t * op)
@@ -1247,7 +1250,7 @@ show_buffer_under_over_run_page(unsigned char * resp, int len,
     char pcb_str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Buffer over-run/under-run page  (spc-2) [0x1]\n");
+        printf("Buffer over-run/under-run page  [0x1]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -1362,7 +1365,7 @@ skip:
 }
 
 /* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
-/* [0x2, 0x3, 0x4, 0x5] */
+/* [0x2, 0x3, 0x4, 0x5]  introduced: SPC-3 */
 static void
 show_error_counter_page(unsigned char * resp, int len,
                         const struct opts_t * op)
@@ -1375,17 +1378,17 @@ show_error_counter_page(unsigned char * resp, int len,
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
         switch(pg_code) {
         case WRITE_ERR_LPAGE:
-            printf("Write error counter page  (spc-3) [0x%x]\n", pg_code);
+            printf("Write error counter page  [0x%x]\n", pg_code);
             break;
         case READ_ERR_LPAGE:
-            printf("Read error counter page  (spc-3) [0x%x]\n", pg_code);
+            printf("Read error counter page  [0x%x]\n", pg_code);
             break;
         case READ_REV_ERR_LPAGE:
-            printf("Read Reverse error counter page  (spc-3) [0x%x]\n",
+            printf("Read Reverse error counter page  [0x%x]\n",
                    pg_code);
             break;
         case VERIFY_ERR_LPAGE:
-            printf("Verify error counter page  (spc-3) [0x%x]\n", pg_code);
+            printf("Verify error counter page  [0x%x]\n", pg_code);
             break;
         default:
             pr2serr("expecting error counter page, got page = 0x%x\n",
@@ -1436,7 +1439,7 @@ skip:
     }
 }
 
-/* NON_MEDIUM_LPAGE [0x6] */
+/* NON_MEDIUM_LPAGE [0x6]  introduced: SPC-2 */
 static void
 show_non_medium_error_page(unsigned char * resp, int len,
                            const struct opts_t * op)
@@ -1446,7 +1449,7 @@ show_non_medium_error_page(unsigned char * resp, int len,
     char pcb_str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Non-medium error page  (spc-2) [0x6]\n");
+        printf("Non-medium error page  [0x6]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -1489,7 +1492,7 @@ skip:
     }
 }
 
-/* PCT_LPAGE [0x1a] */
+/* PCT_LPAGE [0x1a]  introduced: SPC-4 */
 static void
 show_power_condition_transitions_page(unsigned char * resp, int len,
                                       const struct opts_t * op)
@@ -1499,7 +1502,7 @@ show_power_condition_transitions_page(unsigned char * resp, int len,
     char pcb_str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Power condition transitions page  (spc-4) [0x1a]\n");
+        printf("Power condition transitions page  [0x1a]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -1547,7 +1550,7 @@ skip:
     }
 }
 
-/* Tape usage: Vendor specific (IBM): 0x30 */
+/* Tape usage: Vendor specific (LTO-5 and LTO-6): 0x30 */
 static void
 show_tape_usage_log_page(unsigned char * resp, int len,
                          const struct opts_t * op)
@@ -1565,7 +1568,7 @@ show_tape_usage_log_page(unsigned char * resp, int len,
         return;
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Tape usage page  (IBM specific) [0x30]\n");
+        printf("Tape usage page  (LTO-5 and LTO-6 specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = (ucp[0] << 8) + ucp[1];
         pcb = ucp[2];
@@ -1827,7 +1830,7 @@ skip_para:
     }
 }
 
-/* LAST_N_ERR_LPAGE [0x7] */
+/* LAST_N_ERR_LPAGE [0x7]  introduced: SPC-2 */
 static void
 show_last_n_error_page(unsigned char * resp, int len,
                        const struct opts_t * op)
@@ -1843,7 +1846,7 @@ show_last_n_error_page(unsigned char * resp, int len,
         return;
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Last n error events page  (spc-2) [0x7]\n");
+        printf("Last n error events page  [0x7]\n");
     for (k = num; k > 0; k -= pl, ucp += pl) {
         if (k < 3) {
             printf("short Last n error events page\n");
@@ -1884,7 +1887,7 @@ show_last_n_error_page(unsigned char * resp, int len,
     }
 }
 
-/* LAST_N_DEFERRED_LPAGE [0xb] */
+/* LAST_N_DEFERRED_LPAGE [0xb]  introduced: SPC-2 */
 static void
 show_last_n_deferred_error_page(unsigned char * resp, int len,
                                 const struct opts_t * op)
@@ -1900,7 +1903,7 @@ show_last_n_deferred_error_page(unsigned char * resp, int len,
         return;
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Last n deferred errors page  (spc-2) [0xb]\n");
+        printf("Last n deferred errors page  [0xb]\n");
     for (k = num; k > 0; k -= pl, ucp += pl) {
         if (k < 3) {
             printf("short Last n deferred errors page\n");
@@ -1949,7 +1952,7 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
-/* SELF_TEST_LPAGE [0x10] */
+/* SELF_TEST_LPAGE [0x10]  introduced: SPC-3 */
 static void
 show_self_test_page(unsigned char * resp, int len, const struct opts_t * op)
 {
@@ -1967,7 +1970,7 @@ show_self_test_page(unsigned char * resp, int len, const struct opts_t * op)
         return;
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Self-test results page  (spc-3) [0x10]\n");
+        printf("Self-test results page  [0x10]\n");
     for (k = 0, ucp = resp + 4; k < 20; ++k, ucp += 20 ) {
         pcb = ucp[2];
         pl = ucp[3] + 4;
@@ -2019,7 +2022,7 @@ show_self_test_page(unsigned char * resp, int len, const struct opts_t * op)
     }
 }
 
-/* TEMPERATURE_LPAGE [0xd] */
+/* TEMPERATURE_LPAGE [0xd]  introduced: SPC-3 */
 static void
 show_temperature_page(unsigned char * resp, int len,
                       const struct opts_t * op, int show_extra)
@@ -2036,7 +2039,7 @@ show_temperature_page(unsigned char * resp, int len,
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
         if (show_extra)
-            printf("Temperature page  (spc-3) [0xd]\n");
+            printf("Temperature page  [0xd]\n");
     }
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
@@ -2094,7 +2097,7 @@ show_temperature_page(unsigned char * resp, int len,
     }
 }
 
-/* START_STOP_LPAGE [0xe] */
+/* START_STOP_LPAGE [0xe]  introduced: SPC-3 */
 static void
 show_start_stop_page(unsigned char * resp, int len, const struct opts_t * op)
 {
@@ -2110,7 +2113,7 @@ show_start_stop_page(unsigned char * resp, int len, const struct opts_t * op)
         return;
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Start-stop cycle counter page  (spc-3) [0xe]\n");
+        printf("Start-stop cycle counter page  [0xe]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
             pr2serr("short Start-stop cycle counter page\n");
@@ -2208,7 +2211,7 @@ show_start_stop_page(unsigned char * resp, int len, const struct opts_t * op)
     }
 }
 
-/* APP_CLIENT_LPAGE [0xf] */
+/* APP_CLIENT_LPAGE [0xf]  introduced: SPC-3 */
 static void
 show_app_client_page(unsigned char * resp, int len, const struct opts_t * op)
 {
@@ -2223,7 +2226,7 @@ show_app_client_page(unsigned char * resp, int len, const struct opts_t * op)
         return;
     }
     if (op->do_verbose || ((op->do_raw == 0) && (op->do_hex == 0)))
-        printf("Application client page  (spc-3) [0xf]\n");
+        printf("Application client page  [0xf]\n");
     if (0 == op->filter_given) {
         if ((len > 128) && (0 == op->do_hex)) {
             dStrHex((const char *)resp, 64, 1);
@@ -2263,7 +2266,7 @@ show_app_client_page(unsigned char * resp, int len, const struct opts_t * op)
     }
 }
 
-/* IE_LPAGE [0x2f] */
+/* IE_LPAGE [0x2f]  introduced: SPC-3 */
 static void
 show_ie_page(unsigned char * resp, int len, const struct opts_t * op,
              int full)
@@ -2281,7 +2284,7 @@ show_ie_page(unsigned char * resp, int len, const struct opts_t * op,
     }
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
         if (full)
-            printf("Informational Exceptions page  (spc-3) [0x2f]\n");
+            printf("Informational Exceptions page  [0x2f]\n");
     }
     for (k = num; k > 0; k -= extra, ucp += extra) {
         if (k < 3) {
@@ -2552,8 +2555,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
-            /* attached device type. In SAS-1.1 case 2 was an edge expander;
-             * in SAS-2 case 3 is marked as obsolete. */
+            /* attached SAS device type. In SAS-1.1 case 2 was an edge
+             * expander; in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "SAS or SATA device"); break;
@@ -2561,7 +2564,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 3: snprintf(s, sz, "expander device (fanout)"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
-            printf("    attached device type: %s\n", s);
+            /* the word 'SAS' in following added in spl4r01 */
+            printf("    attached SAS device type: %s\n", s);
             t = 0xf & vcp[4];
             switch (t) {
             case 0: snprintf(s, sz, "unknown"); break;
@@ -2736,7 +2740,7 @@ skip:
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f */
+/* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f  introduced: SPC-4 */
 static int
 show_stats_perform_page(unsigned char * resp, int len,
                         const struct opts_t * op)
@@ -2760,10 +2764,9 @@ show_stats_perform_page(unsigned char * resp, int len,
                 printf("log_subpage=0x%x\n", subpg_code);
         } else {
             if (0 == subpg_code)
-                printf("General Statistics and Performance  (spc-4) "
-                       "[0x19]\n");
+                printf("General Statistics and Performance  [0x19]\n");
             else
-                printf("Group Statistics and Performance (%d)  (spc-4) "
+                printf("Group Statistics and Performance (%d)  "
                        "[0x19,0x%x]\n", subpg_code, subpg_code);
         }
     }
@@ -3100,7 +3103,7 @@ show_stats_perform_page(unsigned char * resp, int len,
 }
 
 /* Returns 1 if processed page, 0 otherwise */
-/* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20] */
+/* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20]  introduced: SPC-4 */
 static int
 show_cache_stats_page(unsigned char * resp, int len,
                       const struct opts_t * op)
@@ -3127,7 +3130,7 @@ show_cache_stats_page(unsigned char * resp, int len,
             if (subpg_code > 0)
                 printf("log_subpage=0x%x\n", subpg_code);
         } else
-            printf("Cache memory statistics page  (spc-4) [0x19,0x20]\n");
+            printf("Cache memory statistics page  [0x19,0x20]\n");
     }
 
     for (k = num; k > 0; k -= extra, ucp += extra) {
@@ -3249,7 +3252,7 @@ show_cache_stats_page(unsigned char * resp, int len,
     return 1;
 }
 
-/* FORMAT_STATUS_LPAGE [0x8] */
+/* FORMAT_STATUS_LPAGE [0x8]  introduced: SBC-2 */
 static void
 show_format_status_page(unsigned char * resp, int len,
                         const struct opts_t * op)
@@ -3261,7 +3264,7 @@ show_format_status_page(unsigned char * resp, int len,
     char pcb_str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Format status page  (sbc-2) [0x8]\n");
+        printf("Format status page  [0x8]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -3335,7 +3338,7 @@ skip:
     }
 }
 
-/* Non-volatile cache page [0x17] */
+/* Non-volatile cache page [0x17]  introduced: SBC-2 */
 static void
 show_non_volatile_cache_page(unsigned char * resp, int len,
                              const struct opts_t * op)
@@ -3345,7 +3348,7 @@ show_non_volatile_cache_page(unsigned char * resp, int len,
     char pcb_str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Non-volatile cache page  (sbc-2) [0x17]\n");
+        printf("Non-volatile cache page  [0x17]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -3423,7 +3426,7 @@ skip:
     }
 }
 
-/* LB_PROV_LPAGE [0xc] */
+/* LB_PROV_LPAGE [0xc]  introduced: SBC-3 */
 static void
 show_lb_provisioning_page(unsigned char * resp, int len,
                           const struct opts_t * op)
@@ -3434,7 +3437,7 @@ show_lb_provisioning_page(unsigned char * resp, int len,
     char str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Logical block provisioning page (sbc-3) [0xc]\n");
+        printf("Logical block provisioning page  [0xc]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -3513,7 +3516,7 @@ skip:
     }
 }
 
-/* SOLID_STATE_MEDIA_LPAGE [0x11] */
+/* SOLID_STATE_MEDIA_LPAGE [0x11]  introduced: SBC-3 */
 static void
 show_solid_state_media_page(unsigned char * resp, int len,
                             const struct opts_t * op)
@@ -3523,7 +3526,7 @@ show_solid_state_media_page(unsigned char * resp, int len,
     char str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Solid state media page (sbc-3) [0x11]\n");
+        printf("Solid state media page  [0x11]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -3799,7 +3802,7 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
-/* Background scan results [0x15,0] for disk */
+/* Background scan results [0x15,0] for disk  introduced: SBC-3 */
 static void
 show_background_scan_results_page(unsigned char * resp, int len,
                                   const struct opts_t * op)
@@ -3809,7 +3812,7 @@ show_background_scan_results_page(unsigned char * resp, int len,
     char str[PCB_STR_LEN];
 
     if (op->do_verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Background scan results page (sbc-3) [0x15]\n");
+        printf("Background scan results page  [0x15]\n");
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
@@ -4340,7 +4343,7 @@ static void
 show_tape_diag_data_page(unsigned char * resp, int len,
                          const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int k, num, pl, pc, pcb;
     unsigned int v;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
@@ -4387,12 +4390,30 @@ show_tape_diag_data_page(unsigned char * resp, int len,
         printf("    Hours since last clean: %u\n", v);
         printf("    Operation code: 0x%x\n", ucp[28]);
         printf("    Service action: 0x%x\n", ucp[29] & 0xf);
-        printf("    Medium id number (in hex):\n");
+        // Check Medium id number for all zeros
         // ssc4r03.pdf does not define this field, why? xxxxxx
-        dStrHex((const char *)(ucp + 32), 32, 0);
+        for (k = 32; k < 64; ++k) {
+            if(ucp[k])
+                break;
+        }
+        if (64 == k)
+            printf("    Medium id number is 32 bytes of zero\n");
+        else {
+            printf("    Medium id number (in hex):\n");
+            dStrHex((const char *)(ucp + 32), 32, 0);
+        }
         printf("    Timestamp origin: 0x%x\n", ucp[64] & 0xf);
-        printf("    Timestamp:\n");
-        dStrHex((const char *)(ucp + 66), 6, 1);
+        // Check Timestamp for all zeros
+        for (k = 66; k < 72; ++k) {
+            if(ucp[k])
+                break;
+        }
+        if (72 == k)
+            printf("    Timestamp is all zeros:\n");
+        else {
+            printf("    Timestamp:\n");
+            dStrHex((const char *)(ucp + 66), 6, 1);
+        }
         if (pl > 72) {
             printf("    Vendor specific:\n");
             dStrHex((const char *)(ucp + 72), pl - 72, 0);
@@ -5033,8 +5054,8 @@ show_ascii_page(unsigned char * resp, int len,
     subpg_code = spf ? resp[1] : 0;
 
     if ((SUPP_PAGES_LPAGE != pg_code ) && (SUPP_SPGS_SUBPG == subpg_code)) {
-        printf("Supported subpages for log page=0x%x  (spc-4) [0x%x, 0x%x]"
-               "\n", pg_code, pg_code, subpg_code);
+        printf("Supported subpages for log page=0x%x  [0x%x, 0x%x]\n",
+               pg_code, pg_code, subpg_code);      /* introduced: SPC-4 */
         for (k = 0; k < num; k += 2)
             show_page_name((int)resp[4 + k], (int)resp[4 + k + 1],
                            inq_dat);
@@ -5043,13 +5064,13 @@ show_ascii_page(unsigned char * resp, int len,
     switch (pg_code) {
     case SUPP_PAGES_LPAGE:      /* 0x0 */
         if (spf) {
-            printf("Supported log pages and subpages  (spc-4) [0x%x, 0x%x]:"
-                   "\n", pg_code, subpg_code);
+            printf("Supported log pages and subpages  [0x%x, 0x%x]:\n",
+                   pg_code, subpg_code);           /* introduced: SPC-4 */
             for (k = 0; k < num; k += 2)
                 show_page_name((int)resp[4 + k], (int)resp[4 + k + 1],
                                inq_dat);
         } else {
-            printf("Supported log pages  (spc-2) [0x0]:\n");
+            printf("Supported log pages  [0x0]:\n");  /* introduced: SPC-2 */
             for (k = 0; k < num; ++k)
                 show_page_name((int)resp[4 + k], 0, inq_dat);
         }

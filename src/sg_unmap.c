@@ -30,7 +30,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.06 20140318";
+static const char * version_str = "1.07 20140423";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -108,6 +108,7 @@ usage()
           );
 }
 
+#if 0
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
  * only confuse things here, so use this local trimmed version */
 static int64_t
@@ -135,14 +136,15 @@ get_llnum(const char * buf)
     else
         return -1LL;
 }
+#endif
 
 /* Read numbers (up to 64 bits in size) from command line (comma (or
  * (single) space) separated list). Assumed decimal unless prefixed
  * by '0x', '0X' or contains trailing 'h' or 'H' (which indicate hex).
  * Returns 0 if ok, or 1 if error. */
 static int
-build_lba_arr(const char * inp, uint64_t * lba_arr,
-              int * lba_arr_len, int max_arr_len)
+build_lba_arr(const char * inp, uint64_t * lba_arr, int * lba_arr_len,
+              int max_arr_len)
 {
     int in_len, k;
     const char * lcp;
@@ -161,13 +163,13 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
         pr2serr("'--lba' cannot be read from stdin\n");
         return 1;
     } else {        /* list of numbers (default decimal) on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
+        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxXiIkKmMgGtTpP, ");
         if (in_len != k) {
             pr2serr("build_lba_arr: error at pos %d\n", k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
-            ll = get_llnum(lcp);
+            ll = sg_get_llnum(lcp);
             if (-1 != ll) {
                 lba_arr[k] = (uint64_t)ll;
                 cp = (char *)strchr(lcp, ',');
@@ -219,13 +221,13 @@ build_num_arr(const char * inp, uint32_t * num_arr,
         pr2serr("'--len' cannot be read from stdin\n");
         return 1;
     } else {        /* list of numbers (default decimal) on command line */
-        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
+        k = strspn(inp, "0123456789aAbBcCdDeEfFhHxXiIkKmMgGtTpP, ");
         if (in_len != k) {
             pr2serr("build_num_arr: error at pos %d\n", k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
-            ll = get_llnum(lcp);
+            ll = sg_get_llnum(lcp);
             if (-1 != ll) {
                 if (ll > UINT32_MAX) {
                     pr2serr("build_num_arr: number exceeds 32 bits at pos "
@@ -305,14 +307,14 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
         in_len -= m;
         if ('#' == *lcp)
             continue;
-        k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxX ,\t");
+        k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxXiIkKmMgGtTpP ,\t");
         if ((k < in_len) && ('#' != lcp[k])) {
             pr2serr("build_joint_arr: syntax error at line %d, pos %d\n",
                     j + 1, m + k + 1);
             return 1;
         }
         for (k = 0; k < 1024; ++k) {
-            ll = get_llnum(lcp);
+            ll = sg_get_llnum(lcp);
             if (-1 != ll) {
                 ind = ((off + k) >> 1);
                 bit0 = 0x1 & (off + k);

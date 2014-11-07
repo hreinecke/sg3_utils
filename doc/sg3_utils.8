@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG3_UTILS "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -16,7 +16,13 @@ The names of all utilities start with "sg" and most start with "sg_" often
 followed by the name, or a shortening of the name, of the SCSI command that
 they send. For example the "sg_verify" utility sends the SCSI VERIFY
 command. A mapping between SCSI commands and the sg3_utils utilities that
-issue them is shown in the COVERAGE file.
+issue them is shown in the COVERAGE file. The sg_raw utility can be used to
+send an arbitrary SCSI command (supplied on the command line) to the
+given \fIDEVICE\fR.
+.PP
+sg_decode_sense can be used to decode SCSI sense data given on the command
+line or in a file. sg_raw \-vvv will output the T10 name of a given SCSI
+CDB which is most often 16 bytes or less in length.
 .PP
 SCSI draft standards can be found at http://www.t10.org . The standards
 themselves can be purchased from ANSI and other standards organizations.
@@ -71,11 +77,11 @@ is tightly bound to Linux and hence is not ported to other OSes. A more
 generic utility (than sg_dd) called ddpt in a package of the same name has
 been ported to other OSes.
 .SH LINUX DEVICE NAMING
-Normal disk block devices have names like /dev/sda, /dev/sdb,
-/dev/sdc, etc. SCSI disks in Linux have always had names like that but
-in recent Linux kernels (e.g. lk 2.6 series) it is becoming more common
-for almost all disks to be named like that. Partitions within a disk
-are specified by a number appended to the device name, starting at
+Most disk block devices have names like /dev/sda, /dev/sdb, /dev/sdc, etc.
+SCSI disks in Linux have always had names like that but in recent Linux
+kernels it has become more common for many other disks (including SATA
+disks and USB storage devices) to be named like that. Partitions within a
+disk are specified by a number appended to the device name, starting at
 1 (e.g. /dev/sda1 ).
 .PP
 Tape drives are named /dev/st<num> or /dev/nst<num> where <num> starts
@@ -98,6 +104,8 @@ and alternate device names.
 Prior to the Linux kernel 2.6 series these utilities could only use
 generic device names (e.g. /dev/sg1 ). In almost all cases in the Linux
 kernel 2.6 series, any device name can be used by these utilities.
+.PP
+Very little has changed in Linux device naming in the lk 3 series.
 .SH WINDOWS DEVICE NAMING
 Storage and related devices can have several device names in Windows.
 Probably the most common in the volume name (e.g. "D:"). There are also
@@ -228,7 +236,7 @@ requested command.
 .TP
 .B 10
 the \fIDEVICE\fR reports a "copy aborted". This implies another command or
-device problem has stopped and copy operation. The EXTENDED COPY family of
+device problem has stopped a copy operation. The EXTENDED COPY family of
 commands (including WRITE USING TOKEN) may return this sense key.
 .TP
 .B 11
@@ -411,13 +419,19 @@ in the C programming language. The second hexadecimal representation is a
 trailing "h" or "H" as found in (storage) standards. When hex numbers are
 given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
+.SH MICROCODE AND FIRMWARE
+There are two standardized methods for downloading microcode (i.e. device
+firmware) to a SCSI device. The more general way is with the SCSI WRITE
+BUFFER command, see the sg_write_buffer utility. SCSI enclosures have
+their own method based on the Download microcode control/status diagnostic
+page, see the sg_ses_microcode utility.
 .SH SCRIPTS, EXAMPLES and UTILS
 There are several bash shell scripts in the 'scripts' subdirectory that
-invoke compiled utilities (e.g. sg_readcap). The scripts start with 'scsi_'
-rather than 'sg_'. One purpose of these scripts is to call the same
-utility (e.g. sg_readcap) on multiple disks. Most of the basic compiled
-utilities only allow one device as an argument. Some distributions
-install these scripts in a visible directory (e.g. /usr/src/bin). Some of
+invoke compiled utilities (e.g. sg_readcap). Several of the scripts start
+with 'scsi_' rather than 'sg_'. One purpose of these scripts is to call the
+same utility (e.g. sg_readcap) on multiple devices. Most of the basic
+compiled utilities only allow one device as an argument. Some distributions
+install these scripts in a more visible directory (e.g. /usr/bin). Some of
 these scripts have man page entries. See the README file in the 'scripts'
 subdirectory.
 .PP

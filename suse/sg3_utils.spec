@@ -24,7 +24,7 @@
 
 Name:           sg3_utils
 %define lname	libsgutils2-2
-Version:        1.38
+Version:        1.40
 Release:        0
 Summary:        A collection of tools that send SCSI commands to devices
 License:        GPL-2.0+ and BSD-3-Clause

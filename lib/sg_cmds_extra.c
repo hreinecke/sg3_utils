@@ -1883,7 +1883,7 @@ sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
     if (anchor)
         uCmdBlk[1] |= 0x1;
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
-    uCmdBlk[7] = group_num & 0x1f;
+    uCmdBlk[6] = group_num & 0x1f;
     uCmdBlk[7] = (param_len >> 8) & 0xff;
     uCmdBlk[8] = param_len & 0xff;
     if (NULL == sg_warnings_strm)
