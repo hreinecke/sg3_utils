@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.11 20141030";
+static const char * version_str = "1.11 20141110";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -317,9 +317,11 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         else if (2 == do_hex)
             dWordHex((const unsigned short *)inBuff, 256, 0,
                      sg_is_big_endian());
-        else            /* '-HHH' output suitable for "hdparm --Istdin" */
+        else if (3 == do_hex) /* '-HHH' suitable for "hdparm --Istdin" */
             dWordHex((const unsigned short *)inBuff, 256, -2,
                      sg_is_big_endian());
+        else     /* '-HHHH' hex bytes only */
+            dStrHex((const char *)inBuff, 512, -1);
     }
     return 0;
 }

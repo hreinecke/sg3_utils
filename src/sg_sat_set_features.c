@@ -46,19 +46,20 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.09 20141030";
+static const char * version_str = "1.10 20141106";
 
 static struct option long_options[] = {
-        {"count", required_argument, 0, 'c'},
-        {"ck_cond", no_argument, 0, 'C'},
-        {"feature", required_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"len", required_argument, 0, 'l'},
-        {"lba", required_argument, 0, 'L'},
-        {"readonly", no_argument, 0, 'r'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+    {"count", required_argument, 0, 'c'},
+    {"ck_cond", no_argument, 0, 'C'},
+    {"extended", no_argument, 0, 'e'},
+    {"feature", required_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"len", required_argument, 0, 'l'},
+    {"lba", required_argument, 0, 'L'},
+    {"readonly", no_argument, 0, 'r'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 
@@ -66,17 +67,18 @@ static void
 usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_sat_set_features [--count=CO] [--ck_cond] [--feature=FEA] "
-          "[--help]\n"
-          "                           [--lba=LBA] [--len=16|12] [--readonly] "
-          "[--verbose]\n"
-          "                           [--version] DEVICE\n"
+          "sg_sat_set_features [--count=CO] [--ck_cond] [--extended] "
+          "[--feature=FEA]\n"
+          "                           [--help] [--lba=LBA] [--len=16|12] "
+          "[--readonly]\n"
+          "                           [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --count=CO | -c CO      count field contents (def: 0)\n"
           "    --ck_cond | -C          set ck_cond field in pass-through "
           "(def: 0)\n"
-          "    --feature=FEA|-f FEA     feature field contents\n"
-          "                             (def: 0 (which is reserved))\n"
+          "    --extended | -e         enable extended lba values\n"
+          "    --feature=FEA|-f FEA    feature field contents\n"
+          "                            (def: 0 (which is reserved))\n"
           "    --help | -h             output this usage message\n"
           "    --lba=LBA | -L LBA      LBA field contents (def: 0)\n"
           "                            meaning depends on sub-command "
@@ -100,11 +102,10 @@ usage()
 }
 
 static int
-do_set_features(int sg_fd, int feature, int count, unsigned int lba,
-                int cdb_len, int ck_cond, int verbose)
+do_set_features(int sg_fd, int feature, int count, uint64_t lba,
+                int cdb_len, int ck_cond, int extend, int verbose)
 {
     int res, ret;
-    int extend = 0;
     /* Following for ATA READ/WRITE MULTIPLE (EXT) cmds, normally 0 */
     int multiple_count = 0;
     int protocol = 3;   /* non-data */
@@ -137,6 +138,8 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
         aptCmdBlk[10] = (lba >> 8) & 0xff;
         aptCmdBlk[12] = (lba >> 16) & 0xff;
         aptCmdBlk[7] = (lba >> 24) & 0xff;
+        aptCmdBlk[9] = (lba >> 32) & 0xff;
+        aptCmdBlk[11] = (lba >> 40) & 0xff;
         aptCmdBlk[1] = (multiple_count << 5) | (protocol << 1) | extend;
         aptCmdBlk[2] = (ck_cond << 5) | (t_type << 4)| (t_dir << 3) |
                        (byte_block << 2) | t_length;
@@ -277,12 +280,13 @@ do_set_features(int sg_fd, int feature, int count, unsigned int lba,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, k, ret, res;
+    int sg_fd, c, ret, res;
     const char * device_name = NULL;
     int count = 0;
+    int extend = 0;
     int rdonly = 0;
     int feature = 0;
-    unsigned int lba = 0;
+    uint64_t lba = 0;
     int verbose = 0;
     int ck_cond = 0;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
@@ -290,7 +294,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "c:Cf:hl:L:rvV", long_options,
+        c = getopt_long(argc, argv, "c:Cef:hl:L:rvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -305,6 +309,9 @@ main(int argc, char * argv[])
             break;
         case 'C':
             ck_cond = 1;
+            break;
+        case 'e':
+            extend = 1;
             break;
         case 'f':
             feature = sg_get_num(optarg);
@@ -324,13 +331,14 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
-        case 'L':       /* up to 26 bits, allow for 32 bits (less -1) */
-            k = sg_get_num(optarg);
-            if (-1 == k) {
+        case 'L':       /* up to 32 bits, allow for 48 bits (less -1) */
+            lba = sg_get_llnum(optarg);
+            if ((uint64_t)-1 == lba) {
                 fprintf(stderr, "bad argument for '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            lba = (unsigned int)k;
+            if (lba > 0xffffffff)
+                extend = 1;
             break;
         case 'r':
             ++rdonly;
@@ -381,7 +389,7 @@ main(int argc, char * argv[])
     }
 
     ret = do_set_features(sg_fd, feature, count, lba, cdb_len, ck_cond,
-                          verbose);
+                          extend, verbose);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.07 20141019";  /* spc4r37a, sbc4r02 */
+const char * sg_lib_version_str = "2.08 20141110";  /* spc4r37a, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -511,7 +511,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140516 */
+ * The following should match asc-num.txt dated 20140924 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -612,6 +612,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x09,0x02,"Focus servo failure"},
     {0x09,0x03,"Spindle servo failure"},
     {0x09,0x04,"Head select fault"},
+    {0x09,0x05,"Vibration induced tracking error"},
     {0x0A,0x00,"Error log overflow"},
     {0x0B,0x00,"Warning"},
     {0x0B,0x01,"Warning - specified temperature exceeded"},
@@ -639,6 +640,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0C,0x0D,"Write error - not enough unsolicited data"},
     {0x0C,0x0E,"Multiple write errors"},
     {0x0C,0x0F,"Defects in error window"},
+    {0x0C,0x10,"Incomplete multiple atomic write operations"},
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
     {0x0D,0x02,"Copy target device not reachable"},
