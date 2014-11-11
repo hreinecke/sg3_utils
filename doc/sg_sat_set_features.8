@@ -1,12 +1,13 @@
-.TH SG_SAT_SET_FEATURES "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_SAT_SET_FEATURES "8" "November 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_sat_set_features \- use ATA SET FEATURES command via a SCSI to ATA
 Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_set_features
-[\fI\-\-count=CO\fR] [\fI\-\-ck_cond\fR] [\fI\-\-feature=FEA\fR]
-[\fI\-\-help\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-len=\fR{16|12}]
-[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-count=CO\fR] [\fI\-\-ck_cond\fR] [\fI--extended\fR]
+[\fI\-\-feature=FEA\fR] [\fI\-\-help\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-len=\fR{16|12}] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -43,6 +44,11 @@ default setting is clear (i.e. 0). When set the SATL should yield a
 sense buffer containing a ATA Result descriptor irrespective of whether
 the ATA command succeeded or failed. When clear the SATL should only yield
 a sense buffer containing a ATA Result descriptor if the ATA command failed.
+.TP
+\fB\-e\fR, \fB\-\-extended\fR
+allow for extended LBA numbers (i.e. larger than 32 bits).
+This value is enabled automatically for large LBA numbers, but can be
+enabled explicitly even for low LBA numbers with this option.
 .TP
 \fB\-f\fR, \fB\-\-feature\fR=\fIFEA\fR
 the value \fIFEA\fR is placed in the "feature" field in the ATA SET

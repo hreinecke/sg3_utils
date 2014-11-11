@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "0.95 20141029";  /* spc4r37 + sbc4r02 */
+static const char * version_str = "0.96 20141110";  /* spc4r37 + sbc4r03 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -1171,6 +1171,13 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
+            if (strncmp((const char *)ip, "eui.", 4) ||
+                strncmp((const char *)ip, "naa.", 4) ||
+                strncmp((const char *)ip, "iqn.", 4)) {
+                pr2serr("      << expected name string prefix>>\n");
+                dStrHexErr((const char *)ip, i_len, -1);
+                break;
+            }
             /* does %s print out UTF-8 ok??
              * Seems to depend on the locale. Looks ok here with my
              * locale setting: en_AU.UTF-8
@@ -1218,7 +1225,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
     switch (desig_type) {
     case 0: /* vendor specific */
         k = 0;
-        if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+        if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
             for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
                 ;
             if (k >= i_len)
@@ -1443,6 +1450,13 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
         if (3 != c_set) {
             pr2serr("      << expected UTF-8 code_set>>\n");
             dStrHexErr((const char *)ip, i_len, 0);
+            break;
+        }
+        if (strncmp((const char *)ip, "eui.", 4) ||
+            strncmp((const char *)ip, "naa.", 4) ||
+            strncmp((const char *)ip, "iqn.", 4)) {
+            pr2serr("      << expected name string prefix>>\n");
+            dStrHexErr((const char *)ip, i_len, -1);
             break;
         }
         printf("      SCSI name string:\n");
@@ -2297,8 +2311,9 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
             dStrHex((const char *)ucp, bump, 1);
         else {
             switch (proto) {
-            case TPROTO_SAS:    /* for SSP, added spl3r2 */
-                printf("    pwr_d_s=%d\n", !!(ucp[3] & 0x1));
+            case TPROTO_SAS:    /* page added in spl3r02 */
+                printf("    power disable supported (pwr_d_s)=%d\n",
+                       !!(ucp[3] & 0x1));       /* added spl3r03 */
                 pidp = ucp + 8;
                 for (j = 0; j < desc_len; j += 4, pidp += 4)
                     printf("      phy id=%d, ssp persistent capable=%d\n",

@@ -1,0 +1,114 @@
+.TH SG_SAT_READ_GPLOG "8" "November 2014" "sg3_utils\-1.40" SG3_UTILS
+.SH NAME
+sg_sat_read_gplog \- use ATA READ LOG EXT command via a SCSI to ATA
+Translation (SAT) layer
+.SH SYNOPSIS
+.B sg_sat_read_gplog
+[\fI\-\-ck_cond\fR] [\fI\-\-count=CO\fR] [\fI\-\-dma\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-len=\fR{16|12}] [\fI\-\-log=\fRLA]
+[\fI\-\-page=\fRPN] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+This utility sends an ATA READ LOG EXT or an ATA READ LOG DMA EXT command to
+the \fIDEVICE\fR. This command is used to read the general purpose log
+of (S)ATA disks (not ATAPI devices such as DVD driver). Rather than send the
+READ LOG (DMA) EXT command directly to the device it is sent via a SCSI
+transport which is assumed to contain a SCSI to ATA Translation (SAT)
+Layer (SATL). The SATL may be in an operating system driver, in host bus
+adapter (HBA) firmware or in some external enclosure.
+.PP
+This utility does not currently attempt to decode the response from the
+ATA disk, rather it outputs the response in ASCII hexadecimal grouped in
+16 bit words. Following ATA conventions those words are decoded little
+endian (note that SCSI commands use a big endian representation). In the
+future this utility may attempt to decode some log pages, perhaps using
+the \fI\-\-decode\fR option.
+.PP
+The SAT\-2 standard (SAT ANSI INCITS 465-2010, prior draft: sat2r09.pdf at
+www.t10.org) defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16
+byte "cdb" and the other with a 12 byte cdb. This utility defaults to using
+the 16 byte cdb variant.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-C\fR, \fB\-\-ck_cond\fR
+sets the CK_COND bit in the ATA PASS\-THROUGH SCSI cdb. The
+default setting is clear (i.e. 0). When set the SATL should yield a
+sense buffer containing a ATA Result descriptor irrespective of whether
+the ATA command succeeded or failed. When clear the SATL should only yield
+a sense buffer containing a ATA Result descriptor if the ATA command failed.
+.TP
+\fB\-c\fR, \fB\-\-count\fR=\fICO\fR
+the number \fICO\fR is placed in the "count" field in the ATA READ
+LOG EXT command. This specified the number of 512-byte blocks of
+data to be read from the specified log.
+.TP
+\fB\-d\fR, \fB\-\-dma\fR
+use the ATA READ LOG DMA EXT command instead of ATA READ LOG EXT command.
+Some devices require this to return valid log data.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+outputs the usage message summarizing command line options then exits.
+Ignores \fIDEVICE\fR if given.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+when given once, the response is output in ASCII hexadecimal bytes. When
+given twice, then the response is grouped into 16 bit words using ATA
+conventions (i.e. little endian); this is the default output (i.e. when
+this option is not given). When given thrice (i.e. '\-HHH') the output
+is in hex, grouped in 16 bit words (without a leading offset and trailing
+ASCII on each line), in a format that is acceptable for 'hdparm \-\-Istdin'
+to process.
+.TP
+\fB\-L\fR, \fB\-\-log\fR=\fILA\fR
+the number \fILA\fR is known as the "log address" in the ATA standards and
+is placed in bits 7:0 of the "lba" field of the ATA READ LOG (DMA) EXT
+command. This specifies the log to be returned (See ATA-ACS for a detailed
+list of available log addresses). The default value placed in the "lba
+field is 0, returning the directory of available logs. The maximum value
+allowed for \fILOG\fR is 0xff.
+.TP
+\fB\-p\fR, \fB\-\-page\fR=\fIPN\fR
+the number \fIPN\fR is the page number (within the log address) and is
+placed in bits 32:16 of the "lba" field of the ATA READ LOG (DMA) EXT
+command. The default value placed in the "lba" field is 0. The maximum value
+allowed for \fILOG\fR is 0xffff.
+.TP
+\fB\-l\fR, \fB\-\-len\fR={16|12}
+this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
+The argument can either be 16 or 12. The default is 16. Some SCSI
+transports cannot convey SCSI commands longer than 12 bytes.
+.TP
+\fB\-r\fR, \fB\-\-readonly\fR
+causes the \fIDEVICE\fR to be opened with the read\-only flag (O_RDONLY in
+Unix). The default action is to open \fIDEVICE\fR with the read\-write
+flag (O_RDWR in Unix). In some cases sending power management commands to
+ATA disks are defeated by OS actions on the close() if the \fIDEVICE\fR was
+opened with the read\-write flag (e.g. the OS might think it needs to
+flush something to disk).
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increases the level or verbosity.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print out version string
+.SH NOTES
+Prior to Linux kernel 2.6.29 USB mass storage limited sense data to 18 bytes
+which made the \fB\-\-ck_cond\fR option yield strange (truncated) results.
+.SH EXIT STATUS
+The exit status of sg_sat_read_gplog is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHOR
+Written by Hannes Reinecke and Douglas Gilbert
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2014 Hannes Reinecke, SUSE Linux GmbH
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_sat_identify(sg3_utils), sg_inq(sg3_utils), sdparm(sdparm),
+.B hdparm(hdparm)

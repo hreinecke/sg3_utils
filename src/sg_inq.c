@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.42 20141016";    /* SPC-4 rev 37 */
+static const char * version_str = "1.43 20141107";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1520,7 +1520,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         switch (desig_type) {
         case 0: /* vendor specific */
             k = 0;
-            if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
                     ;
                 if (k >= i_len)
@@ -1834,6 +1834,8 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
         }
         switch (desig_type) {
         case 0: /* vendor specific */
+            if (i_len > 128)
+                break;
             printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
             if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
@@ -1972,6 +1974,16 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 }
                 break;
             }
+            if (strncmp((const char *)ip, "eui.", 4) ||
+                strncmp((const char *)ip, "naa.", 4) ||
+                strncmp((const char *)ip, "iqn.", 4)) {
+                if (verbose) {
+                    pr2serr("      << expected name string prefix>>\n");
+                    dStrHexErr((const char *)ip, i_len, -1);
+                }
+                break;
+            }
+
             printf("SCSI_IDENT_%s_NAME=%.*s\n", assoc_str, i_len,
                    (const char *)ip);
             break;
