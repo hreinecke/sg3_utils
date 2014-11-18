@@ -105,22 +105,22 @@ printtype ()
   local type=$1
 
   case "$type" in
-    0) echo "Direct-Access    " ;;
+    0) echo "Direct-Access" ;;
     1) echo "Sequential-Access" ;;
-    2) echo "Printer          " ;;
-    3) echo "Processor        " ;;
-    4) echo "WORM             " ;;
-    5) echo "CD-ROM           " ;;
-    6) echo "Scanner          " ;;
-    7) echo "Optical Device   " ;;
-    8) echo "Medium Changer   " ;;
-    9) echo "Communications   " ;;
-    10) echo "Unknown          " ;;
-    11) echo "Unknown          " ;;
-    12) echo "RAID             " ;;
-    13) echo "Enclosure        " ;;
+    2) echo "Printer" ;;
+    3) echo "Processor" ;;
+    4) echo "WORM" ;;
+    5) echo "CD-ROM" ;;
+    6) echo "Scanner" ;;
+    7) echo "Optical Device" ;;
+    8) echo "Medium Changer" ;;
+    9) echo "Communications" ;;
+    10) echo "Unknown" ;;
+    11) echo "Unknown" ;;
+    12) echo "RAID" ;;
+    13) echo "Enclosure" ;;
     14) echo "Direct-Access-RBC" ;;
-    *) echo "Unknown          " ;;
+    *) echo "Unknown" ;;
   esac
 }
 
@@ -158,7 +158,7 @@ $SCSIDEV"
 	ILVL=$(cat ${SCSIPATH}/device/scsi_level)
 	type=$(cat ${SCSIPATH}/device/type)
 	ITYPE=$(printtype $type)
-	SCSITMP=$(printf '  Type:   %-16s                ANSI SCSI revision: %02d' "$ITYPE" "$((ILVL - 1))")
+	SCSITMP=$(printf '  Type:   %-17s                ANSI SCSI revision: %02d' "$ITYPE" "$((ILVL - 1))")
 	SCSISTR="$SCSISTR
 $SCSITMP"
       fi
@@ -287,7 +287,7 @@ testonline ()
     return 1
   fi
   TMPSTR=`echo "$SCSISTR" | sed -n 's/.*Type: *\(.*\) *ANSI.*/\1/p'`
-  if [ $TMPSTR != $TYPE ] ; then
+  if [ "$TMPSTR" != "$TYPE" ] ; then
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${TMPSTR} \nto: $TYPE ${norm} \n\n\n"
     return 1
   fi
