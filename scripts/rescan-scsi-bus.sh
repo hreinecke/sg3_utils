@@ -936,6 +936,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo " -f      flush failed multipath devices     [default: disabled]"
     echo " -h      help: print this usage message then exit"
     echo " -i      issue a FibreChannel LIP reset     [default: disabled]"
+    echo " -I SECS issue a FibreChannel LIP reset and wait for SECS seconds [default: disabled]"
     echo " -l      activates scanning for LUNs 0--7   [default: 0]"
     echo " -L NUM  activates scanning for LUNs 0--NUM [default: 0]"
     echo " -r      enables removing of devices        [default: disabled]"
@@ -953,6 +954,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--hosts=LIST:    Scan only host(s) in LIST"
     echo "--ids=LIST:      Scan only target ID(s) in LIST"
     echo "--issue-lip:     same as -i"
+    echo "--issue-lip-wait=SECS:     same as -I"
     echo "--largelun:      Tell kernel to support LUNs > 7 even on SCSI2 devs"
     echo "--luns=LIST:     Scan only lun(s) in LIST"  
     echo "--nooptscan:     don't stop looking for LUNs is 0 is not found"
@@ -1014,6 +1016,7 @@ optscan=1
 sync=1
 existing_targets=1
 mp_enable=
+lipreset=-1
 declare -i scan_flags=0
 
 # Scan options
@@ -1031,7 +1034,8 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     c) opt_channelsearch="0 1" ;;
     r) remove=1 ;;
     s) resize=1 ;;
-    i) lipreset=1 ;;
+    i) lipreset=0 ;;
+    I) shift; lipreset=$opt ;;
     u) update=1 ;;
     -alltargets)  existing_targets=;;
     -flush)       flush=1 ;;
@@ -1044,7 +1048,8 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     -luns=*)  arg=${opt#-luns=};        lunsearch=`expandlist $arg` ;; 
     -color) setcolor ;;
     -nooptscan) optscan=0 ;;
-    -issue-lip) lipreset=1 ;;
+    -issue-lip) lipreset=0 ;;
+    -issue-lip-wait) lipreset=${opt#-issue-lip-wait=};;
     -sync) sync=2 ;;
     -nosync) sync=0 ;;
     -multipath) mp_enable=1 ;;
@@ -1120,9 +1125,10 @@ else
   if test -e /sys/class/fc_host/host$host ; then
     # It's pointless to do a target scan on FC
     issue_lip=/sys/class/fc_host/host$host/issue_lip
-    if test -e $issue_lip -a -n "$lipreset" ; then
+    if test -e $issue_lip -a $lipreset -ge 0 ; then
       echo 1 > $issue_lip 2> /dev/null;
       udevadm_settle
+      [ $lipreset -gt 0 ] && sleep $lipreset
     fi
     channelsearch=
     idsearch=
