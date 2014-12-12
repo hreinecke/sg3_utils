@@ -231,6 +231,9 @@ testonline ()
 {
   : testonline
   RC=0
+  # Set default values
+  IPTYPE=0x1f
+  IPQUAL=3
   if test ! -x /usr/bin/sg_turs; then return 0; fi
   sgdevice
   if test -z "$SGDEV"; then return 0; fi
@@ -256,6 +259,10 @@ testonline ()
   RC=0
   # OK, device online, compare INQUIRY string
   INQ=`sg_inq $sg_len_arg /dev/$SGDEV 2>/dev/null`
+  if [ -z "$INQ" ] ; then
+    echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}INQUIRY failed${norm}    \n\n\n"
+    return 2
+  fi
   IVEND=`echo "$INQ" | grep 'Vendor identification:' | sed 's/^[^:]*: \(.*\)$/\1/'`
   IPROD=`echo "$INQ" | grep 'Product identification:' | sed 's/^[^:]*: \(.*\)$/\1/'`
   IPREV=`echo "$INQ" | grep 'Product revision level:' | sed 's/^[^:]*: \(.*\)$/\1/'`
@@ -263,6 +270,8 @@ testonline ()
   IPTYPE=`echo "$INQ" | sed -n 's/.* Device_type=\([0-9]*\) .*/\1/p'`
   IPQUAL=`echo "$INQ" | sed -n 's/ *PQual=\([0-9]*\)  Device.*/\1/p'`
   if [ "$IPQUAL" != 0 ] ; then
+    [ -z "$IPQUAL" ] && IPQUAL=3
+    [ -z "$IPTYPE" ] && IPTYPE=0x1f
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}LU not available (PQual $IPQUAL)${norm}    \n\n\n"
     return 2
   fi
