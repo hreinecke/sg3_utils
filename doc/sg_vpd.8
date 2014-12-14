@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_VPD "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
@@ -37,7 +37,9 @@ option name.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
 decode all VPD pages. When used with \fIDEVICE\fR the pages to be decoded
-are found in the "Supported VPD pages" VPD page.
+are found in the "Supported VPD pages" VPD page. Pages that cannot be
+decoded are displayed in hex; add the \fI\-\-long\fR option to have ASCII
+displayed to the right of each line of hex.
 .br
 If this option is used with the \fI\-\-inhex=FN\fR option then the file
 \fIFN\fR is assumed to contain 1 or more VPD pages (in ASCII hex or binary).
