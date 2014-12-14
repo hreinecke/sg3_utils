@@ -105,6 +105,7 @@ extern "C" {
 #define TPROTO_ATA 8
 #define TPROTO_UAS 9            /* USB attached SCSI */
 #define TPROTO_SOP 0xa          /* SCSI over PCIe */
+#define TPROTO_PCIE 0xb         /* includes NVMe */
 #define TPROTO_NONE 0xf
 
 
@@ -209,6 +210,13 @@ void sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
 /* Yield string associated with peripheral device type (pdt). Returns
  * 'buff'. If 'pdt' out of range yields "bad pdt" string. */
 char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
+
+/* Some lesser used PDTs share a lot in common with a more used PDT.
+ * Examples are PDT_ADC decaying to PDT_TAPE and PDT_ZBC to PDT_DISK.
+ * If such a lesser used 'pdt' is given to this function, then it will
+ * return the more used PDT (i.e. "decays to"); otherwise 'pdt' is returned.
+ * Valid for 'pdt' 0 to 31, for other values returns 'pdt'. */
+int sg_lib_pdt_decay(int pdt);
 
 /* Yield string associated with transport protocol identifier (tpi). Returns
  *    'buff'. If 'tpi' out of range yields "bad tpi" string. */

@@ -446,6 +446,14 @@ sg_get_pdt_str(int pdt, int buff_len, char * buff)
     return buff;
 }
 
+int
+sg_lib_pdt_decay(int pdt)
+{
+    if ((pdt < 0) || (pdt > 31))
+        return pdt;
+    return sg_lib_pdt_decay_arr[pdt];
+}
+
 char *
 sg_get_trans_proto_str(int tpi, int buff_len, char * buff)
 {

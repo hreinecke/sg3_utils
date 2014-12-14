@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.99 20141028";    /* ses3r07 */
+static const char * version_str = "2.00 20141117";    /* ses3r07 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -402,6 +402,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"dnr", DEVICE_ETC, 2, 6, 1, "do not remove"},
     {"dnr", ARRAY_DEV_ETC, 2, 6, 1, "do not remove"},
     {"fail", SAS_CONNECTOR_ETC, 3, 6, 1, NULL},
+    {"failure", ENCLOSURE_ETC, 3, 1, 1, NULL},
     {"fault", DEVICE_ETC, 3, 5, 1, NULL},
     {"fault", ARRAY_DEV_ETC, 3, 5, 1, NULL},
     {"hotspare", ARRAY_DEV_ETC, 1, 5, 1, NULL},
@@ -445,6 +446,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"speed_code", COOLING_ETC, 3, 2, 3,
      "0: leave; 1: lowest... 7: highest"},
     {"swap", -1, 0, 4, 1, NULL},               /* Reset swap */
+    {"warning", ENCLOSURE_ETC, 3, 0, 1, NULL},
     {NULL, 0, 0, 0, 0, NULL},
 };
 

@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.43 20141107";    /* SPC-4 rev 37 */
+static const char * version_str = "1.44 20141210";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1974,9 +1974,11 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 }
                 break;
             }
-            if (strncmp((const char *)ip, "eui.", 4) ||
-                strncmp((const char *)ip, "naa.", 4) ||
-                strncmp((const char *)ip, "iqn.", 4)) {
+            if (! (strncmp((const char *)ip, "eui.", 4) ||
+                   strncmp((const char *)ip, "EUI.", 4) ||
+                   strncmp((const char *)ip, "naa.", 4) ||
+                   strncmp((const char *)ip, "NAA.", 4) ||
+                   strncmp((const char *)ip, "iqn.", 4))) {
                 if (verbose) {
                     pr2serr("      << expected name string prefix>>\n");
                     dStrHexErr((const char *)ip, i_len, -1);
@@ -2441,7 +2443,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
                 printf("reserved [%u]\n", u);
                 break;
             }
-            printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* sbc4r01 */
+            printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);   /* sbc4r04 */
             printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             break;

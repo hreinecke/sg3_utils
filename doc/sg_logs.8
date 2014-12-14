@@ -1,20 +1,20 @@
-.TH SG_LOGS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_LOGS "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
 [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
-[\fI\-\-filter=PARC\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
-[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR]
-[\fI\-\-page=PG[,SPG]\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
-[\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-reset\fR]
-[\fI\-\-select\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
+[\fI\-\-enumerate\fR] [\fI\-\-filter=FI\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-in=FN\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR]
+[\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-reset\fR] [\fI\-\-select\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
 [\fI\-\-transport\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-f=PARC\fR]
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-e\fR] [\fI\-f=FI\fR]
 [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
-[\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG[,SPG]\fR] [\fI\-paramp=PP\fR]
+[\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
 [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
 [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
 [\fI\-x\fR] \fIDEVICE\fR
@@ -23,8 +23,8 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 .PP
 This utility sends a SCSI LOG SENSE command to the \fIDEVICE\fR and then
 outputs the response. The LOG SENSE command is used to fetch log pages. Known
-log pages are decoded by default. When the \fI\-\-reset\fR and/or
-\fI\-\-select\fR option is given then a SCSI LOG SELECT command is issued.
+log pages cab be decoded. When the \fI\-\-reset\fR and/or \fI\-\-select\fR
+option is given then a SCSI LOG SELECT command is issued.
 .PP
 In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
 LOG SELECT command. At the same time a page code field was introduced to the
@@ -38,10 +38,11 @@ old command line syntax outlines the second group of options.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
-outputs all the log pages supported by the device. This requires a two stage
-process: first the "supported log pages" log page is fetched, then for each
-entry in the response, the corresponding log page is fetched and displayed.
-When used twice (e.g. '\-aa') all log pages and subpages are fetched.
+outputs all the log pages supported by the \fIDEVICE\fR. This requires a two
+stage process: first the "supported log pages" log page is fetched, then for
+each entry in the response, the corresponding log page is fetched and
+displayed. When used twice (e.g. '\-aa') all log pages and subpages are
+fetched.
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
 shorten the amount of output for some log pages. For example the Tape
@@ -61,17 +62,35 @@ accepts 0, 1, 2 or 3 for the \fIPC\fR argument:
 .br
 The default value is 1 (i.e. current cumulative values).
 .TP
-\fB\-f\fR, \fB\-\-filter\fR=\fIPARC\fR
-only output the log parameter whose parameter code (a number between 0 and
-65535) matches \fIPARC\fR. \fIPARC\fR is assumed to be decimal unless a
-hexadecimal indication is given (e.g. a leading '0x' or a trailing 'h').
+\fB\-e\fR, \fB\-\-enumerate\fR
+this option is used to output information held in internal tables about
+known log pages. The \fIDEVICE\fR if given is ignored. When given
+once (i.e. '\-e') all known pages sorted in ascending acronym order are
+listed. When given twice, vendor pages are excluded. When given three
+times, all all known pages sorted in ascending numeric order are listed;
+when given four times, vendor pages are excluded from the numeric order.
+.br
+The \fI\-\-filter=FI\fR and \fI\-\-verbose\fR options modify the output
+of the enumeration.
+.TP
+\fB\-f\fR, \fB\-\-filter\fR=\fIFI\fR
+\fIFI\fR is either a parameter code when \fIDEVICE\fR is given, or a
+peripheral device type (pdt) (or other) if \fI\-\-enumerate\fR is given.
+.br
+In the parameter code case \fIFI\fR is a value between 0 and 65535 (0xffff)
+and only the parameter section matching that code is output.
 The \fB\-\-hex\fR option outputs log parameter in hexadecimal rather than
 decoding it. If the \fB\-\-hex\fR option is used twice then the leading
-address on each kine of hex is removed. If the \fB\-\-raw\fR option is
+address on each line of hex is removed. If the \fB\-\-raw\fR option is
 given then the log parameter is output in binary.
-.br
 Most log pages contain one or more log parameters. Examples of those that
 don't are those pages that list supported log pages.
+.br
+In the \fI\-\-enumerate\fR case, when \fIFI\fR >= zero it is taken as a
+pdt value and only log pages associated with that pdt plus generic pages
+listed in SPC are enumerated. If \fIFI\fR is \-1 then the filter does
+nothing which is the same as not giving this option; when \fIFI\fR is \-2
+then only generic pages listed in SPC are enumerated.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -79,16 +98,29 @@ print out the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 The default action is to decode known mode page numbers (and subpage numbers)
 into text. When this option is used once, the response is output in
-hexadecimal.
+hexadecimal. When used twice, each line of hex has the ASCII equivalent shown
+to the right. When used three times, the hex has no leading address nor
+trailing ASCII making it suitable to be placed in a file (or piped). That
+file might later be used by another invocation using the \fI\-\-in=FN\fR
+option.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
+This option may be used in two different contexts. One is with the
+\fI\-\-select\fR to send a LOG SELECT command to the given \fIDEVICE\fR;
+see the LOG SELECT section below.
+.br
+The other context is with no \fIDEVICE\fR argument given in which case
+the contents of \fIFN\fR are decoded as if it were the response of a LOG
+SENSE command (i.e. a log page). For decoding the page and subpage numbers
+are taken from \fIFN\fR while the device type is either generic (i.e. from
+SPC) or the value given by \fI\-\-filter=FI\fR.
+.br
 \fIFN\fR is treated as a file name (or '\-' for stdin) which contains ASCII
-hexadecimal or binary representing a log page that will be sent as parameter
-data of a LOG SELECT command. The hexadecimal should be arranged as 1 or 2
-digits representing a byte each of which is whitespace or comma separated.
-Anything from and including a hash mark to the end of line is ignored. If the
-\fI\-\-raw\fR option is also given then \fIFN\fR is treated as binary. See
-the LOG SELECT section.
+hexadecimal or binary representing a log page. The hexadecimal should be
+arranged as 1 or 2 digits representing a byte each of which is whitespace or
+comma separated. Anything from and including a hash mark to the end of line
+is ignored. If the \fI\-\-raw\fR option is also given then \fIFN\fR is
+treated as binary.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 lists the names of all logs sense pages supported by this device. This is
@@ -127,12 +159,16 @@ dependent. It will assume a PDT of 0 (i.e. a disk).
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
 .TP
-\fB\-p\fR, \fB\-\-page\fR=\fIPG[,SPG]\fR
-log page code to access. \fIPG\fR is expected to be a decimal number between
-0 and 63 inclusive. A hexadecimal number can be specified by a leading "0x"
-or a trailing "h" so the valid range is 0x to 0x3f. Common log page codes are
-listed below. Optionally \fISPG\fR, a subpage code, can be given. \fISPG\fR
-is expected to be a decimal or hex number between 0 and 255 inclusive.
+\fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
+log page code to access. \fIPG\fR is either an acronym, a page number, or
+a page, subpage pair. Available acronyms can be listed with the
+\fI\-\-enumerate\fR option. Page (0 to 63) and subpage (0 to 255) numbers
+are comma separated. They are decimal unless a hexadecimal indication is
+given. A hexadecimal number can be specified by a leading "0x" or a
+trailing "h".
+.br
+A few acronyms specify a range of subpage values in which case the acronym
+may be followed by a comma then a subpage number.
 .TP
 \fB\-P\fR, \fB\-\-paramp\fR=\fIPP\fR
 \fIPP\fR is the parameter pointer value to place in a field of that name in
@@ -196,7 +232,9 @@ outputs the transport ('Protocol specific port') log page. Equivalent to
 setting '\-\-page=18h'.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
-increase level of verbosity.
+increase level of verbosity. When used with \fI\-\-enumerate\fR, in the
+list of log pages names that are known, those that have no associated
+decode logic are followed by "[hex only]".
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
@@ -247,68 +285,10 @@ The smartmontools package provides much of the information found with
 sg_logs in a form suitable for monitoring the health of SCSI disks and
 tape drives.
 .PP
-Here is a list of log pages that are decoded by this utility. [The code
-values can be given to '\-\-page=' as is, with a trailing "h" instead of
-the leading "0x", or as their decimal equivalents.]:
-.PP
-0x0       Supported log pages
-.br
-0x0,0xff  Supported log pages and subpages
-.br
-0x1       Buffer over\-run/under\-run
-.br
-0x2       Write error counter
-.br
-0x3       Read error counter
-.br
-0x4       Read reverse error counter
-.br
-0x5       Verify error counter
-.br
-0x6       Non\-medium error
-.br
-0x7       Last n error events
-.br
-0x8       Format status (sbc\-2)
-.br
-0xb       Last n deferred errors or asynchronous events
-.br
-0xc       Logical block provisioning (sbc\-3) or
-.br
-          Sequential access device (ssc\-2)
-.br
-0xd       Temperature
-.br
-0xe       Start\-stop cycle counter
-.br
-0xf       Application client
-.br
-0x10      Self\-test results
-.br
-0x11      Solid state media
-.br
-0x15      Background scan results (sbc\-3)
-.br
-0x16      ATA pass\-through results (sat\-3)
-.br
-0x17      Non\-volatile cache (sbc\-3)
-.br
-0x18      Protocol specific port (SAS transport)
-.br
-0x19      General statistics and performance
-.br
-0x1a      Power condition transitions
-.br
-0x2f      Informational exceptions
-.br
-0x37      Seagate cache (vendor, disk)
-.br
-0x3e      Seagate factory (vendor, disk)
-.PP
-In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
-generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
-and DVD drives) can also be specified. For example "sg_logs \-a /dev/sda"
-will work in the 2.6 series kernels.
+The simplest way to find which log pages can be decoded by this utility is
+to use the \fI\-\-enumerate\fR option. Some page names are known but there
+is no decode logic; such cases have "[hex only]" after the log page name
+when the \fI\-\-verbose\fR option is given with \fI\-\-enumerate\fR.
 .SH EXIT STATUS
 The exit status of sg_logs is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -331,6 +311,10 @@ Equivalent to '\-\-all \-\-all' in the main description.
 .TP
 \fB\-c\fR=\fIPC\fR
 Equivalent to \fI\-\-control=PC\fR in the main description.
+.TP
+\fB\-e\fR
+enumerate internal tables to show information about known log pages.
+Equivalent to \fI\-\-enumerate\fR in the main description.
 .TP
 \fB\-h\fR
 suppresses decoding of known log sense pages and prints out the
@@ -365,11 +349,11 @@ Equivalent to \fI\-\-name\fR in the main description.
 \fB\-N\fR
 switch to the newer style options.
 .TP
-\fB\-p\fR=\fIPG[,SPG]\fR
-\fIPG\fR is the log page code to access. Should be a hexadecimal number
-between 0 and 3f inclusive. If given \fISPG\fR is the log subpage code.
-\fISPG\fR should be a hexadecimal number between 0 and ff inclusive. The
-subpage code of 'ff' can be thought of as a wildcard.
+\fB\-p\fR=\fIPG\fR
+log page code to access. \fIPG\fR is either an acronym, a page number, or
+a page, subpage pair. Available acronyms can be listed with the
+\fI\-\-enumerate\fR option. Page (0 to 3f) and subpage (0 to ff) numbers
+are comma separated. The numbers are assumed to be hexadecimal.
 .TP
 \fB\-paramp\fR=\fIPP\fR
 \fIPP\fR is the parameter pointer value (in hex) to place in command.

@@ -17,7 +17,19 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.08 20141110";  /* spc4r37a, sbc4r02 */
+const char * sg_lib_version_str = "2.09 20141207";  /* spc4r37a, sbc4r02 */
+
+
+/* indexed by pdt; those that map to own index do not decay */
+int sg_lib_pdt_decay_arr[32] = {
+    PDT_DISK, PDT_TAPE, PDT_TAPE /* printer */, PDT_PROCESSOR,
+    PDT_DISK /* WO */, PDT_MMC, PDT_SCANNER, PDT_DISK /* optical */,
+    PDT_MCHANGER, PDT_COMMS, 0xa, 0xb,
+    PDT_SAC, PDT_SES, PDT_DISK /* rbc */, PDT_OCRW,
+    PDT_BCC, PDT_OSD, PDT_TAPE /* adc */, PDT_SMD,
+    PDT_DISK /* zbc */, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, PDT_WLUN, PDT_UNKNOWN
+};
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -158,6 +170,8 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x92, PDT_TAPE, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
+    {0x94, PDT_ZBC, "Zoning out"},  /* new sbc4r04, has service actions */
+    {0x95, PDT_ZBC, "Zoning in"},   /* new sbc4r04, has service actions */
     {0x9c, 0, "Write atomic(16)"},
     {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
     {0x9e, 0, "Service action in(16)"},
@@ -441,7 +455,23 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x8f7f, 0, "Perform task management function (osd)"},
     {0xffff, 0, NULL},
 };
-#else
+
+/* Zoning out [0x94] service actions */
+struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
+    {0x1, PDT_ZBC, "Close zone"},
+    {0x2, PDT_ZBC, "Finish zone"},
+    {0x3, PDT_ZBC, "Open zone"},
+    {0x4, PDT_ZBC, "Reset write pointer"},
+    {0xffff, 0, NULL},
+};
+
+/* Zoning in [0x95] service actions */
+struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
+    {0x0, PDT_ZBC, "Report zones"},
+    {0xffff, 0, NULL},
+};
+
+#else   /* SG_SCSI_STRINGS */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
@@ -507,7 +537,15 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xffff, 0, NULL},
 };
 
-#endif
+struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
+    {0xffff, 0, NULL},
+};
+
+#endif  /* SG_SCSI_STRINGS */
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
@@ -1265,7 +1303,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x74,0x79,"Security conflict in translated device"},
     {0, 0, NULL}
 };
-#else
+
+#else   /* SG_SCSI_STRINGS */
+
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
     {0, 0, 0, NULL}

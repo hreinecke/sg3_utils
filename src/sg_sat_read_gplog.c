@@ -48,7 +48,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.09 20141110";
+static const char * version_str = "1.10 20141213";
 
 struct opts_t {
     int cdb_len;
@@ -429,7 +429,7 @@ main(int argc, char * argv[])
     }
 
     n = op->count * 512;
-    inbuff = malloc(n);
+    inbuff = (unsigned char *)malloc(n);
     if (!inbuff) {
         pr2serr("Cannot allocate output buffer of size %d\n", n);
         return SG_LIB_CAT_OTHER;

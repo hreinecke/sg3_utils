@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "0.96 20141110";  /* spc4r37 + sbc4r03 */
+static const char * version_str = "0.98 20141210";  /* spc4r37 + sbc4r03 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -1171,9 +1171,11 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            if (strncmp((const char *)ip, "eui.", 4) ||
-                strncmp((const char *)ip, "naa.", 4) ||
-                strncmp((const char *)ip, "iqn.", 4)) {
+            if (! (strncmp((const char *)ip, "eui.", 4) ||
+                   strncmp((const char *)ip, "EUI.", 4) ||
+                   strncmp((const char *)ip, "naa.", 4) ||
+                   strncmp((const char *)ip, "NAA.", 4) ||
+                   strncmp((const char *)ip, "iqn.", 4))) {
                 pr2serr("      << expected name string prefix>>\n");
                 dStrHexErr((const char *)ip, i_len, -1);
                 break;
@@ -1452,9 +1454,11 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
             dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        if (strncmp((const char *)ip, "eui.", 4) ||
-            strncmp((const char *)ip, "naa.", 4) ||
-            strncmp((const char *)ip, "iqn.", 4)) {
+        if (! (strncmp((const char *)ip, "eui.", 4) ||
+               strncmp((const char *)ip, "EUI.", 4) ||
+               strncmp((const char *)ip, "naa.", 4) ||
+               strncmp((const char *)ip, "NAA.", 4) ||
+               strncmp((const char *)ip, "iqn.", 4))) {
             pr2serr("      << expected name string prefix>>\n");
             dStrHexErr((const char *)ip, i_len, -1);
             break;
@@ -2089,7 +2093,8 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         desc_type = sg_get_unaligned_be16(ucp);
         desc_len = sg_get_unaligned_be16(ucp + 2);
         if (verbose)
-            printf("Descriptor type=%d, len %d\n", desc_type, desc_len);
+            printf("Descriptor type=%d [0x%x] , len %d\n", desc_type,
+                   desc_type, desc_len);
         bump = 4 + desc_len;
         if ((k + bump) > len) {
             pr2serr("Third-party Copy VPD page, short descriptor length=%d, "
@@ -2335,6 +2340,7 @@ static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
+    unsigned char b[4];
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
@@ -2371,7 +2377,9 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Optimal unmap granularity: %u\n", u);
             printf("  Unmap granularity alignment valid: %u\n",
                    !!(buff[32] & 0x80));
-            u = sg_get_unaligned_be32(buff + 32);
+            memcpy(b, buff + 32, 4);
+            b[0] &= 0x7f;       /* mask off top bit */
+            u = sg_get_unaligned_be32(b);
             printf("  Unmap granularity alignment: %u\n", u);
             /* added in sbc3r26 */
             printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
@@ -2384,6 +2392,13 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Atomic alignment: %u\n", u);
             u = sg_get_unaligned_be32(buff + 52);
             printf("  Atomic transfer length granularity: %u\n", u);
+        }
+        if (len > 56) {     /* added in sbc4r04 */
+            u = sg_get_unaligned_be32(buff + 56);
+            printf("  Maximum atomic transfer length with atomic boundary: "
+                   "%u\n", u);
+            u = sg_get_unaligned_be32(buff + 60);
+            printf("  Maximum atomic boundary size: %u\n", u);
         }
         break;
     case PDT_TAPE: case PDT_MCHANGER:
@@ -2472,7 +2487,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
-        printf("  HAW_ZBC=%d\n", !!(buff[8] & 0x10));       /* sbc4r01 */
+        printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);       /* sbc4r04 */
         printf("  FUAB=%d\n", !!(buff[8] & 0x2));
         printf("  VBULS=%d\n", !!(buff[8] & 0x1));
         break;
