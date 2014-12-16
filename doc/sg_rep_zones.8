@@ -1,4 +1,4 @@
-.TH SG_REP_ZONES "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_REP_ZONES "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES command
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ sg_rep_zones \- send SCSI REPORT ZONES command
 .PP
 Sends a SCSI REPORT ZONES command to \fIDEVICE\fR and outputs the data
 returned. This command is found in the ZBC draft standard, revision
-1c (zbc\-r01c.pdf).
+2 (zbc\-r02.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -69,4 +69,4 @@ Copyright \(co 2014 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_reset_wp(sg3_utils)
+.B sg_reset_wp,sg_zone(sg3_utils)

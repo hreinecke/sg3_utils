@@ -19,7 +19,7 @@ bin_PROGRAMS = \
 	sg_sat_set_features sg_scan sg_senddiag sg_ses sg_ses_microcode \
 	sg_start sg_stpg sg_sync sg_test_rwbuf sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_wr_mode sg_xcopy
+	sg_wr_mode sg_xcopy sg_zone
 
 distclean-local:
 	rm -f sg_scan.c
@@ -42,7 +42,7 @@ bin_PROGRAMS = \
 	sg_sat_read_gplog sg_sat_set_features sg_scan sg_senddiag sg_ses \
 	sg_ses_microcode sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_wr_mode
+	sg_wr_mode sg_zone
 
 distclean-local:
 	rm -f sg_scan.c
@@ -65,7 +65,7 @@ bin_PROGRAMS = \
 	sg_sat_read_gplog sg_sat_set_features sg_scan sg_senddiag sg_ses \
 	sg_ses_microcode sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_wr_mode
+	sg_wr_mode sg_zone
 
 distclean-local:
 	rm -f sg_scan.c
@@ -88,7 +88,7 @@ bin_PROGRAMS = \
 	sg_sat_read_gplog sg_sat_set_features sg_senddiag sg_ses \
 	sg_ses_microcode sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_wr_mode
+	sg_wr_mode sg_zone
 
 endif
 
@@ -105,7 +105,7 @@ bin_PROGRAMS = \
 	sg_sat_read_gplog sg_sat_set_features sg_senddiag sg_ses \
 	sg_ses_microcode sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_wr_mode
+	sg_wr_mode sg_zone
 
 endif
 
@@ -122,7 +122,7 @@ bin_PROGRAMS = \
 	sg_sat_read_gplog sg_sat_set_features sg_senddiag sg_ses \
 	sg_ses_microcode sg_start sg_stpg sg_sync sg_turs sg_unmap sg_verify \
 	sg_vpd sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_wr_mode
+	sg_wr_mode sg_zone
 
 endif
 
@@ -320,3 +320,6 @@ sg_write_verify_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_sat_read_gplog_SOURCES = sg_sat_read_gplog.c
 sg_sat_read_gplog_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_zone_SOURCES = sg_zone.c
+sg_zone_LDADD = ../lib/libsgutils2.la @os_libs@

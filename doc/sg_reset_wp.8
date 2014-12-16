@@ -1,26 +1,26 @@
-.TH SG_RESET_WP "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_RESET_WP "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_reset_wp \- send SCSI RESET WRITE POINTER command
 .SH SYNOPSIS
 .B sg_reset_wp
-[\fI\-\-help\fR] [\fI\-\-reset\-all\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-zone=ID\fR] \fIDEVICE\fR
+[\fI\-\-all\fR] [\fI\-\-help\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-zone=ID\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Sends a SCSI RESET WRITE POINTER command to the \fIDEVICE\fR. This command
-is found in the ZBC draft standard revision 1c (zbc\-r01c.pdf).
+is found in the ZBC draft standard revision 2 (zbc\-r02.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-a\fR, \fB\-\-all\fR
+sets the ALL field in the cdb. This causes a reset write pointer operation of
+all open zones and full zones. When this option is given then the
+\fI\-\-zone=ID\fR option is ignored. Either this option or the
+\fI\-\-zone=ID\fR option is required.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
-.TP
-\fB\-R\fR, \fB\-\-reset\-all\fR
-sets the RESET ALL field in the cdb. This causes a reset write pointer
-operation of all open zones and full zones. When this option is given then
-the \fI\-\-zone=ID\fR option is ignored. Either this option or the
-\fI\-\-zone=ID\fR option is required.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -32,7 +32,7 @@ print the version string and then exit.
 where \fIID\fR is placed in the cdb's ZONE ID field. A zone id is a zone
 start logical block address (LBA). This causes a reset write pointer
 operation on the zone identified by the ZONE ID field. The default value is
-0. Either this option or the \fI\-\-reset\-all\fR option is required.
+0. Either this option or the \fI\-\-all\fR option is required.
 \fIID\fR is assumed to be in decimal unless prefixed with '0x' or has a
 trailing 'h' which indicate hexadecimal.
 .SH EXIT STATUS
@@ -48,4 +48,4 @@ Copyright \(co 2014 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_rep_zones(sg3_utils)
+.B sg_rep_zones,sg_zone(sg3_utils)

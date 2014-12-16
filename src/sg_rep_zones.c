@@ -20,6 +20,7 @@
 #include "config.h"
 #endif
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
@@ -28,17 +29,17 @@
  *
  *
  * This program issues the SCSI REPORT ZONES command to the given SCSI device
- * and decodes the response. Based on zbc-r01c.pdf
+ * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.03 20141028";
+static const char * version_str = "1.04 20141215";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
 
-#define SERVICE_ACTION_IN_16_CMD 0x9e
-#define SERVICE_ACTION_IN_16_CMDLEN 16
-#define REPORT_ZONES_SA 0x14
+#define SG_ZONING_IN_CMDLEN 16
+
+#define REPORT_ZONES_SA 0x0
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
@@ -111,9 +112,9 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int report_opts, void * resp,
                    int mx_resp_len, int * residp, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rzCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] =
-          {SERVICE_ACTION_IN_16_CMD, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0,
-           0, 0, 0, 0,  0, 0, 0, 0};
+    unsigned char rzCmdBlk[SG_ZONING_IN_CMDLEN] =
+          {SG_ZONING_IN, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+           0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
@@ -122,7 +123,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int report_opts, void * resp,
     rzCmdBlk[14] = report_opts & 0xf;
     if (verbose) {
         pr2serr("    Report zones cdb: ");
-        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
+        for (k = 0; k < SG_ZONING_IN_CMDLEN; ++k)
             pr2serr("%02x ", rzCmdBlk[k]);
         pr2serr("\n");
     }

@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.00 20141117";    /* ses3r07 */
+static const char * version_str = "2.00 20141215";    /* ses3r08 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1912,7 +1912,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         b = ((statp[3] >> 2) & 0x3f);
         if (nofilter || (0x1 & statp[2]) || a || b)
             printf("%sWarning indication=%d, Requested power off "
-                   "duration=%d\n", pad, !!(statp[2] & 0x2), b);
+                   "duration=%d\n", pad, !!(statp[2] & 0x1), b);
         if (nofilter || (0x3 & statp[3]))
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
@@ -2470,6 +2470,8 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
         } else
             printf("%sunrecognised descriptor type [%d]\n", pad, desc_type);
         break;
+    case TPROTO_PCIE:
+        // added in ses3r08, still looking at this one
     default:
         printf("%sTransport protocol: %s not decoded\n", pad,
                sg_get_trans_proto_str((0xf & ucp[0]), sizeof(b), b));
@@ -3154,6 +3156,8 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
             }
         }
         break;
+    case TPROTO_PCIE:
+        // added in ses3r08, still looking at this one
     default:
         ;
     }

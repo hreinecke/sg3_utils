@@ -46,11 +46,6 @@
 
 #define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d  /* corresponding ASC is 0 */
 
-/* The following two opcodes were renamed to 'Third party copy out/in' in
- * spc4r34 */
-#define SG_THIRD_PARTY_COPY_OUT SG_EXTENDED_COPY
-#define SG_THIRD_PARTY_COPY_IN SG_RECEIVE_COPY
-
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
@@ -1230,8 +1225,8 @@ static struct op_code2sa_t op_code2sa_arr[] = {
     {SG_SERVICE_ACTION_BIDI, sg_lib_serv_bidi_arr, NULL},
     {SG_PERSISTENT_RESERVE_IN, sg_lib_pr_in_arr, "Persistent reserve in"},
     {SG_PERSISTENT_RESERVE_OUT, sg_lib_pr_out_arr, "Persistent reserve out"},
-    {SG_THIRD_PARTY_COPY_OUT, sg_lib_xcopy_sa_arr, NULL},
-    {SG_THIRD_PARTY_COPY_IN, sg_lib_rec_copy_sa_arr, NULL},
+    {SG_3PARTY_COPY_OUT, sg_lib_xcopy_sa_arr, NULL},
+    {SG_3PARTY_COPY_IN, sg_lib_rec_copy_sa_arr, NULL},
     {SG_READ_BUFFER, sg_lib_read_buff_arr, "Read buffer"},
     {SG_WRITE_BUFFER, sg_lib_write_buff_arr, "Write buffer"},
     {SG_SANITIZE, sg_lib_sanitize_sa_arr, "Sanitize"},
