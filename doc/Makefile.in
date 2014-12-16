@@ -271,7 +271,7 @@ top_srcdir = @top_srcdir@
 @OS_FREEBSD_TRUE@	sg_sat_read_gplog.8 sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 \
 @OS_FREEBSD_TRUE@	sg_ses_microcode.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_turs.8 \
 @OS_FREEBSD_TRUE@	sg_unmap.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
-@OS_FREEBSD_TRUE@	sg_write_same.8 sg_write_verify.8 sg_wr_mode.8
+@OS_FREEBSD_TRUE@	sg_write_same.8 sg_write_verify.8 sg_wr_mode.8 sg_zone.8
 
 
 # sg_dd, sg_emc_trespass(?), sginfo, sg_map26, sg_map, sgm_dd, sgp_dd,
@@ -296,7 +296,7 @@ top_srcdir = @top_srcdir@
 @OS_LINUX_TRUE@	sg_scan.8 sg_senddiag.8 sg_ses.8 sg_ses_microcode.8 sg_start.8 \
 @OS_LINUX_TRUE@	sg_stpg.8 sg_sync.8 sg_test_rwbuf.8 sg_turs.8 sg_unmap.8 sg_verify.8 \
 @OS_LINUX_TRUE@	sg_vpd.8 sg_write_buffer.8 sg_write_long.8 sg_write_same.8 \
-@OS_LINUX_TRUE@	sg_write_verify.8 sg_wr_mode.8 sg_xcopy.8
+@OS_LINUX_TRUE@	sg_write_verify.8 sg_wr_mode.8 sg_xcopy.8 sg_zone.8
 
 @OS_OSF_TRUE@man_MANS = \
 @OS_OSF_TRUE@	sg3_utils.8 sg_decode_sense.8 \
@@ -312,7 +312,7 @@ top_srcdir = @top_srcdir@
 @OS_OSF_TRUE@	sg_sat_read_gplog.8 sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 \
 @OS_OSF_TRUE@	sg_ses_microcode.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_turs.8 \
 @OS_OSF_TRUE@	sg_unmap.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
-@OS_OSF_TRUE@	sg_write_same.8 sg_write_verify.8 sg_wr_mode.8
+@OS_OSF_TRUE@	sg_write_same.8 sg_write_verify.8 sg_wr_mode.8 sg_zone.8
 
 @OS_SOLARIS_TRUE@man_MANS = \
 @OS_SOLARIS_TRUE@	sg3_utils.8 sg_decode_sense.8 \
@@ -328,7 +328,7 @@ top_srcdir = @top_srcdir@
 @OS_SOLARIS_TRUE@	sg_sat_read_gplog.8 sg_sat_set_features.8 sg_senddiag.8 sg_ses.8 \
 @OS_SOLARIS_TRUE@	sg_ses_microcode.8 sg_start.8 sg_stpg.8 sg_sync.8 sg_turs.8 \
 @OS_SOLARIS_TRUE@	sg_unmap.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 sg_write_long.8 \
-@OS_SOLARIS_TRUE@	sg_write_same.8 sg_write_verify.8 sg_wr_mode.8
+@OS_SOLARIS_TRUE@	sg_write_same.8 sg_write_verify.8 sg_wr_mode.8 sg_zone.8
 
 @OS_WIN32_CYGWIN_TRUE@man_MANS = \
 @OS_WIN32_CYGWIN_TRUE@	sg3_utils.8 sg_decode_sense.8 \
@@ -344,7 +344,8 @@ top_srcdir = @top_srcdir@
 @OS_WIN32_CYGWIN_TRUE@	sg_sat_read_gplog.8 sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_ses.8 sg_ses_microcode.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_WIN32_CYGWIN_TRUE@	sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_WIN32_CYGWIN_TRUE@	sg_write_long.8 sg_write_same.8 sg_write_verify.8 sg_wr_mode.8
+@OS_WIN32_CYGWIN_TRUE@	sg_write_long.8 sg_write_same.8 sg_write_verify.8 sg_wr_mode.8 \
+@OS_WIN32_CYGWIN_TRUE@	sg_zone.8
 
 @OS_WIN32_MINGW_TRUE@man_MANS = \
 @OS_WIN32_MINGW_TRUE@	sg3_utils.8 sg_decode_sense.8 \
@@ -360,7 +361,8 @@ top_srcdir = @top_srcdir@
 @OS_WIN32_MINGW_TRUE@	sg_sat_read_gplog.8 sg_sat_set_features.8 sg_scan.8 sg_senddiag.8 \
 @OS_WIN32_MINGW_TRUE@	sg_ses.8 sg_ses_microcode.8 sg_start.8 sg_stpg.8 sg_sync.8 \
 @OS_WIN32_MINGW_TRUE@	sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 sg_write_buffer.8 \
-@OS_WIN32_MINGW_TRUE@	sg_write_long.8 sg_write_same.8 sg_write_verify.8 sg_wr_mode.8
+@OS_WIN32_MINGW_TRUE@	sg_write_long.8 sg_write_same.8 sg_write_verify.8 sg_wr_mode.8 \
+@OS_WIN32_MINGW_TRUE@	sg_zone.8
 
 all: all-am
 

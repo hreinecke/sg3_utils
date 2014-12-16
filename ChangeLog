@@ -2,7 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20141214] [svn: r621]
+Changelog for sg3_utils-1.41 [20141215] [svn: r622]
+  - sg_zone: new utility for open, close and finish
+    zone commands introduced in zbc0r02
+  - sg_rep_zones and sg_reset_wp: change opcodes as
+    indicated by zbc0r02
   - sg_logs: add --enumerate and acronyms
     - allow decode from hex or binary in file
   - sg_lib interface: add sg_lib_pdt_decay(), TPROTO_PCIE
@@ -12,9 +16,8 @@ Changelog for sg3_utils-1.41 [20141214] [svn: r621]
   - sg_vpd: add atomic boundary values (sbc4r04)
     - block limits VPD page: fix unmap granularity
       alignment value
-  - sg_ses: add failure and warning acronyms to enclosure
-    element
-  - zoning: new opcodes and service actions support
+  - sg_ses: enclosure element: add failure and warning
+    acronyms, fix warning indication output
 
 Changelog for sg3_utils-1.40 [20141110] [svn: r620]
   - sg_write_verify: new utility for WRITE AND VERIFY

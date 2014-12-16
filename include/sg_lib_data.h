@@ -21,7 +21,8 @@
 extern "C" {
 #endif
 
-/* Commands with service actions that change the command name */
+/* Operation codes with associated service actions that change or qualify
+ * the command name */
 #define SG_EXTENDED_COPY 0x83 /* since spc4r34 became next entry */
 #define SG_3PARTY_COPY_OUT 0x83 /* new in spc4r34: Third party copy out */
 #define SG_RECEIVE_COPY 0x84  /* since spc4r34 became next entry */
