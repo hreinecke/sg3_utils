@@ -1171,9 +1171,11 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            if (strncmp((const char *)ip, "eui.", 4) &&
-                strncmp((const char *)ip, "naa.", 4) &&
-                strncmp((const char *)ip, "iqn.", 4)) {
+            if (! (strncmp((const char *)ip, "eui.", 4) ||
+                   strncmp((const char *)ip, "EUI.", 4) ||
+                   strncmp((const char *)ip, "naa.", 4) ||
+                   strncmp((const char *)ip, "NAA.", 4) ||
+                   strncmp((const char *)ip, "iqn.", 4))) {
                 pr2serr("      << expected name string prefix>>\n");
                 dStrHexErr((const char *)ip, i_len, -1);
                 break;
@@ -1452,9 +1454,11 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
             dStrHexErr((const char *)ip, i_len, 0);
             break;
         }
-        if (strncmp((const char *)ip, "eui.", 4) ||
-            strncmp((const char *)ip, "naa.", 4) ||
-            strncmp((const char *)ip, "iqn.", 4)) {
+        if (! (strncmp((const char *)ip, "eui.", 4) ||
+               strncmp((const char *)ip, "EUI.", 4) ||
+               strncmp((const char *)ip, "naa.", 4) ||
+               strncmp((const char *)ip, "NAA.", 4) ||
+               strncmp((const char *)ip, "iqn.", 4))) {
             pr2serr("      << expected name string prefix>>\n");
             dStrHexErr((const char *)ip, i_len, -1);
             break;

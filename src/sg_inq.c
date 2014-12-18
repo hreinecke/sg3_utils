@@ -2000,9 +2000,11 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 }
                 break;
             }
-            if (strncmp((const char *)ip, "eui.", 4) &&
-                strncmp((const char *)ip, "naa.", 4) &&
-                strncmp((const char *)ip, "iqn.", 4)) {
+            if (! (strncmp((const char *)ip, "eui.", 4) ||
+                   strncmp((const char *)ip, "EUI.", 4) ||
+                   strncmp((const char *)ip, "naa.", 4) ||
+                   strncmp((const char *)ip, "NAA.", 4) ||
+                   strncmp((const char *)ip, "iqn.", 4))) {
                 if (verbose) {
                     pr2serr("      << expected name string prefix>>\n");
                     dStrHexErr((const char *)ip, i_len, -1);
