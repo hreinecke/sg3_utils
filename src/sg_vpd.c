@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "0.94 20141006";  /* spc4r37 + sbc4r02 */
+static const char * version_str = "0.98 20141210";  /* spc4r37 + sbc4r03 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -112,6 +112,7 @@ int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
 #define VPD_SUP_BLOCK_LENS 0xb4 /* SBC-4 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
 #define VPD_BLOCK_DEV_C_EXTENS 0xb5 /* SBC-4 */
+#define VPD_ZBC_DEV_CHARS 0xb6  /* ZBC */
 #define VPD_NO_RATHER_STD_INQ -2      /* request for standard inquiry */
 
 /* Device identification VPD page associations */
@@ -218,6 +219,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, "tas", "TapeAlert supported flags (SSC)"},
     {VPD_3PARTY_COPY, 0, -1, "tpc", "Third party copy"},
+    {VPD_ZBC_DEV_CHARS, 0, -1, "zbdc", "Zoned block device characteristics"},
+        /* Use pdt of -1 since this page both for pdt=0 and pdt=0x14 */
     {0, 0, 0, NULL, NULL},
 };
 
@@ -1168,6 +1171,15 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
+            if (! (strncmp((const char *)ip, "eui.", 4) ||
+                   strncmp((const char *)ip, "EUI.", 4) ||
+                   strncmp((const char *)ip, "naa.", 4) ||
+                   strncmp((const char *)ip, "NAA.", 4) ||
+                   strncmp((const char *)ip, "iqn.", 4))) {
+                pr2serr("      << expected name string prefix>>\n");
+                dStrHexErr((const char *)ip, i_len, -1);
+                break;
+            }
             /* does %s print out UTF-8 ok??
              * Seems to depend on the locale. Looks ok here with my
              * locale setting: en_AU.UTF-8
@@ -1215,7 +1227,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
     switch (desig_type) {
     case 0: /* vendor specific */
         k = 0;
-        if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+        if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
             for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
                 ;
             if (k >= i_len)
@@ -1440,6 +1452,15 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
         if (3 != c_set) {
             pr2serr("      << expected UTF-8 code_set>>\n");
             dStrHexErr((const char *)ip, i_len, 0);
+            break;
+        }
+        if (! (strncmp((const char *)ip, "eui.", 4) ||
+               strncmp((const char *)ip, "EUI.", 4) ||
+               strncmp((const char *)ip, "naa.", 4) ||
+               strncmp((const char *)ip, "NAA.", 4) ||
+               strncmp((const char *)ip, "iqn.", 4))) {
+            pr2serr("      << expected name string prefix>>\n");
+            dStrHexErr((const char *)ip, i_len, -1);
             break;
         }
         printf("      SCSI name string:\n");
@@ -2072,7 +2093,8 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         desc_type = sg_get_unaligned_be16(ucp);
         desc_len = sg_get_unaligned_be16(ucp + 2);
         if (verbose)
-            printf("Descriptor type=%d, len %d\n", desc_type, desc_len);
+            printf("Descriptor type=%d [0x%x] , len %d\n", desc_type,
+                   desc_type, desc_len);
         bump = 4 + desc_len;
         if ((k + bump) > len) {
             pr2serr("Third-party Copy VPD page, short descriptor length=%d, "
@@ -2294,8 +2316,9 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
             dStrHex((const char *)ucp, bump, 1);
         else {
             switch (proto) {
-            case TPROTO_SAS:    /* for SSP, added spl3r2 */
-                printf("    pwr_d_s=%d\n", !!(ucp[3] & 0x1));
+            case TPROTO_SAS:    /* page added in spl3r02 */
+                printf("    power disable supported (pwr_d_s)=%d\n",
+                       !!(ucp[3] & 0x1));       /* added spl3r03 */
                 pidp = ucp + 8;
                 for (j = 0; j < desc_len; j += 4, pidp += 4)
                     printf("      phy id=%d, ssp persistent capable=%d\n",
@@ -2317,6 +2340,7 @@ static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
+    unsigned char b[4];
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
@@ -2353,7 +2377,9 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Optimal unmap granularity: %u\n", u);
             printf("  Unmap granularity alignment valid: %u\n",
                    !!(buff[32] & 0x80));
-            u = sg_get_unaligned_be32(buff + 32);
+            memcpy(b, buff + 32, 4);
+            b[0] &= 0x7f;       /* mask off top bit */
+            u = sg_get_unaligned_be32(b);
             printf("  Unmap granularity alignment: %u\n", u);
             /* added in sbc3r26 */
             printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
@@ -2366,6 +2392,13 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf("  Atomic alignment: %u\n", u);
             u = sg_get_unaligned_be32(buff + 52);
             printf("  Atomic transfer length granularity: %u\n", u);
+        }
+        if (len > 56) {     /* added in sbc4r04 */
+            u = sg_get_unaligned_be32(buff + 56);
+            printf("  Maximum atomic transfer length with atomic boundary: "
+                   "%u\n", u);
+            u = sg_get_unaligned_be32(buff + 60);
+            printf("  Maximum atomic boundary size: %u\n", u);
         }
         break;
     case PDT_TAPE: case PDT_MCHANGER:
@@ -2454,7 +2487,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
-        printf("  HAW_ZBC=%d\n", !!(buff[8] & 0x10));       /* sbc4r01 */
+        printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);       /* sbc4r04 */
         printf("  FUAB=%d\n", !!(buff[8] & 0x2));
         printf("  VBULS=%d\n", !!(buff[8] & 0x1));
         break;
@@ -2756,6 +2789,43 @@ decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
         dStrHexErr((const char *)b, len, 0);
         break;
     }
+}
+
+/* VPD_ZBC_DEV_CHARS  sbc or zbc */
+static void
+decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
+{
+    uint32_t u;
+
+    if (do_hex) {
+        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 64) {
+        pr2serr("Zoned block device characteristics VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    printf("  URSWRZ type: %d\n", !!(b[4] & 0x1));
+    u = sg_get_unaligned_be32(b + 8);
+    printf("  Optimal number of open sequential write preferred zones: ");
+    if (0xffffffff == u)
+        printf("0xffffffff\n");
+    else
+        printf("%" PRIu32 "\n", u);
+    u = sg_get_unaligned_be32(b + 12);
+    printf("  Optimal number of non-sequentially written sequential write "
+           "preferred zones: ");
+    if (0xffffffff == u)
+        printf("0xffffffff\n");
+    else
+        printf("%" PRIu32 "\n", u);
+    u = sg_get_unaligned_be32(b + 16);
+    printf("  Maximum number of open sequential write required: ");
+    if (0xffffffff == u)
+        printf("0xffffffff\n");
+    else
+        printf("%" PRIu32 "\n", u);
 }
 
 /* Returns 0 if successful */
@@ -3348,6 +3418,34 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
                 decode_b5_vpd(rp, len, op->do_hex, pdt);
+            }
+            return 0;
+        } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3))
+            printf("VPD page=0xb5\n");
+        break;
+    case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (0 == res) {
+            pdt = rp[0] & 0x1f;
+            if (allow_name) {
+                switch (pdt) {
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                    printf("Zoned block device characteristics VPD page "
+                           "(SBC, ZBC):\n");
+                    break;
+                default:
+                    printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                    break;
+                }
+            }
+            if (op->do_raw)
+                dStrRaw((const char *)rp, len);
+            else {
+                if (vb || long_notquiet)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_zbdc_vpd(rp, len, op->do_hex);
             }
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3))

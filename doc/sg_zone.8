@@ -1,0 +1,59 @@
+.TH SG_ZONE "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
+.SH NAME
+sg_zone \- send SCSI OPEN, CLOSE or FINISH ZONE command
+.SH SYNOPSIS
+.B sg_zone
+[\fI\-\-all\fR] [\fI\-\-close\fR] [\fI\-\-finish\fR] [\fI\-\-help\fR]
+[\fI\-\-open\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-zone=ID\fR]
+\fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI OPEN ZONE, CLOSE ZONE or FINISH ZONE command to the \fIDEVICE\fR.
+These commands are found in the ZBC draft standard revision 2 (zbc\-r02.pdf).
+.PP
+One and only one of the \fI\-\-open\fR, \fI\-\-close\fR and \fI\-\-finish\fR
+options can be chosen.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+sets the ALL field in the cdb.
+.TP
+\fB\-c\fR, \fB\-\-close\fR
+causes the CLOSE ZONE command to be sent to the \fIDEVICE\fR.
+.TP
+\fB\-f\fR, \fB\-\-finish\fR
+causes the FINISH ZONE command to be sent to the \fIDEVICE\fR.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-o\fR, \fB\-\-open\fR
+causes the OPEN ZONE command to be sent to the \fIDEVICE\fR.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.TP
+\fB\-z\fR, \fB\-\-zone\fR=\fIID\fR
+where \fIID\fR is placed in the cdb's ZONE ID field. A zone id is a zone
+start logical block address (LBA). The default value is 0. \fIID\fR is
+assumed to be in decimal unless prefixed with '0x' or has a trailing 'h'
+which indicate hexadecimal.
+.SH EXIT STATUS
+The exit status of sg_zone is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2014 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_rep_zones,sg_reset_wp(sg3_utils)

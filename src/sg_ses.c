@@ -29,7 +29,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.98 20141027";    /* ses3r06 */
+static const char * version_str = "2.00 20141215";    /* ses3r08 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -402,6 +402,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"dnr", DEVICE_ETC, 2, 6, 1, "do not remove"},
     {"dnr", ARRAY_DEV_ETC, 2, 6, 1, "do not remove"},
     {"fail", SAS_CONNECTOR_ETC, 3, 6, 1, NULL},
+    {"failure", ENCLOSURE_ETC, 3, 1, 1, NULL},
     {"fault", DEVICE_ETC, 3, 5, 1, NULL},
     {"fault", ARRAY_DEV_ETC, 3, 5, 1, NULL},
     {"hotspare", ARRAY_DEV_ETC, 1, 5, 1, NULL},
@@ -427,7 +428,8 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"missing", ARRAY_DEV_ETC, 2, 4, 1, NULL},
     {"ok", ARRAY_DEV_ETC, 1, 7, 1, NULL},
     {"on", POWER_SUPPLY_ETC, 3, 5, 1, "0: turn (remain) off; 1: turn on"},
-    {"overcurrent", SAS_CONNECTOR_ETC, 3, 5, 1, NULL},
+    {"overcurrent", POWER_SUPPLY_ETC, 2, 1, 1, "DC overcurrent"},
+    {"overcurrent", SAS_CONNECTOR_ETC, 3, 5, 1, NULL},  /* added ses3r07 */
     {"locate", DEVICE_ETC, 2, 1, 1, NULL},
     {"locate", ARRAY_DEV_ETC, 2, 1, 1, NULL},
     {"pow_cycle", ENCLOSURE_ETC, 2, 7, 2,
@@ -444,6 +446,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"speed_code", COOLING_ETC, 3, 2, 3,
      "0: leave; 1: lowest... 7: highest"},
     {"swap", -1, 0, 4, 1, NULL},               /* Reset swap */
+    {"warning", ENCLOSURE_ETC, 3, 0, 1, NULL},
     {NULL, 0, 0, 0, 0, NULL},
 };
 
@@ -1909,7 +1912,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         b = ((statp[3] >> 2) & 0x3f);
         if (nofilter || (0x1 & statp[2]) || a || b)
             printf("%sWarning indication=%d, Requested power off "
-                   "duration=%d\n", pad, !!(statp[2] & 0x2), b);
+                   "duration=%d\n", pad, !!(statp[2] & 0x1), b);
         if (nofilter || (0x3 & statp[3]))
             printf("%sFailure requested=%d, Warning requested=%d\n",
                    pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
@@ -2014,7 +2017,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
                !!(statp[1] & 0x40));
         break;
-    case SAS_CONNECTOR_ETC:
+    case SAS_CONNECTOR_ETC:     /* OC (overcurrent) added in ses3r07 */
         printf("%sIdent=%d, %s\n", pad, !!(statp[1] & 0x80),
                find_sas_connector_type((statp[1] & 0x7f), bb, sizeof(bb)));
         printf("%sConnector physical link=0x%x, Fail=%d, OC=%d\n", pad,
@@ -2467,6 +2470,8 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
         } else
             printf("%sunrecognised descriptor type [%d]\n", pad, desc_type);
         break;
+    case TPROTO_PCIE:
+        // added in ses3r08, still looking at this one
     default:
         printf("%sTransport protocol: %s not decoded\n", pad,
                sg_get_trans_proto_str((0xf & ucp[0]), sizeof(b), b));
@@ -3151,6 +3156,8 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
             }
         }
         break;
+    case TPROTO_PCIE:
+        // added in ses3r08, still looking at this one
     default:
         ;
     }

@@ -33,7 +33,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.04 20140807";
+static const char * version_str = "1.05 20141107";
 
 
 #define ME "sg_write_verify: "
@@ -52,65 +52,65 @@ static const char * version_str = "1.04 20140807";
 
 
 static struct option long_options[] = {
-        {"16", no_argument, 0, 'S'},
-        {"bytchk", required_argument, 0, 'b'},
-        {"dpo", no_argument, 0, 'd'},
-        {"group", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"ilen", required_argument, 0, 'I'},
-        {"in", required_argument, 0, 'i'},
-        {"lba", required_argument, 0, 'l'},
-        {"num", required_argument, 0, 'n'},
-        {"repeat", no_argument, 0, 'R'},
-        {"timeout", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"wrprotect", required_argument, 0, 'w'},
-        {0, 0, 0, 0},
+    {"16", no_argument, 0, 'S'},
+    {"bytchk", required_argument, 0, 'b'},
+    {"dpo", no_argument, 0, 'd'},
+    {"group", required_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"ilen", required_argument, 0, 'I'},
+    {"in", required_argument, 0, 'i'},
+    {"lba", required_argument, 0, 'l'},
+    {"num", required_argument, 0, 'n'},
+    {"repeat", no_argument, 0, 'R'},
+    {"timeout", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"wrprotect", required_argument, 0, 'w'},
+    {0, 0, 0, 0},
 };
 
 
 static void
 usage()
 {
- fprintf(stderr, "Usage: "
-         "sg_write_verify [--16] [--bytchk=BC] [--dpo] [--group=GN] "
-         "[--help]\n"
-         "                       [--ilen=IL] [--in=IF] --lba=LBA "
-         "[--num=NUM]\n"
-         "                       [--repeat] [--timeout=TO] [--verbose] "
-         "[--version]\n"
-         "                       [--wrprotect=WPR] DEVICE\n"
-         "  where:\n"
-         "    --16|-S              do WRITE AND VERIFY(16) (default: 10)\n"
-         "    --bytchk=BC|-b BC    set BYTCHK field (default: 0)\n"
-         "    --dpo|-d             set DPO bit (default: 0)\n"
-         "    --group=GN|-g GN     GN is group number (default: 0)\n"
-         "    --help|-h            print out usage message\n"
-         "    --ilen=IL| -I IL     input (file) length in bytes, becomes "
-         "data-out\n"
-         "                         buffer length (def: deduced from IF "
-         "size)\n"
-         "    --in=IF|-i IF        IF is a file containing the data to "
-         "be written\n"
-         "    --lba=LBA|-l LBA     LBA of the first block to write "
-         "and verify;\n"
-         "                         no default, must be given\n"
-         "    --num=NUM|-n NUM     number of logical blocks to write and "
-         "verify\n"
-         "    --repeat|-R          while IF still has data to read, send "
-         "another\n"
-         "                         command, bumping LBA with up to NUM "
-         "blocks again\n"
-         "    --timeout=TO|-t TO   command timeout in seconds (def: 60)\n"
-         "    --verbose|-v         increase verbosity\n"
-         "    --version|-V         print version string then exit\n"
-         "    --wrprotect|-w WPR   WPR is the WRPROTECT field value "
-         "(def: 0)\n\n"
-         "Performs a SCSI WRITE AND VERIFY (10 or 16) command on DEVICE, "
-         "startings\nat LBA for NUM logical blocks. More commands performed "
-         "only if '--repeat'\noption given. Data to be written is fetched "
-         "from the IF file.\n"
+    fprintf(stderr, "Usage: "
+            "sg_write_verify [--16] [--bytchk=BC] [--dpo] [--group=GN] "
+            "[--help]\n"
+            "                       [--ilen=IL] [--in=IF] --lba=LBA "
+            "[--num=NUM]\n"
+            "                       [--repeat] [--timeout=TO] [--verbose] "
+            "[--version]\n"
+            "                       [--wrprotect=WPR] DEVICE\n"
+            "  where:\n"
+            "    --16|-S              do WRITE AND VERIFY(16) (default: 10)\n"
+            "    --bytchk=BC|-b BC    set BYTCHK field (default: 0)\n"
+            "    --dpo|-d             set DPO bit (default: 0)\n"
+            "    --group=GN|-g GN     GN is group number (default: 0)\n"
+            "    --help|-h            print out usage message\n"
+            "    --ilen=IL| -I IL     input (file) length in bytes, becomes "
+            "data-out\n"
+            "                         buffer length (def: deduced from IF "
+            "size)\n"
+            "    --in=IF|-i IF        IF is a file containing the data to "
+            "be written\n"
+            "    --lba=LBA|-l LBA     LBA of the first block to write "
+            "and verify;\n"
+            "                         no default, must be given\n"
+            "    --num=NUM|-n NUM     number of logical blocks to write and "
+            "verify\n"
+            "    --repeat|-R          while IF still has data to read, send "
+            "another\n"
+            "                         command, bumping LBA with up to NUM "
+            "blocks again\n"
+            "    --timeout=TO|-t TO   command timeout in seconds (def: 60)\n"
+            "    --verbose|-v         increase verbosity\n"
+            "    --version|-V         print version string then exit\n"
+            "    --wrprotect|-w WPR   WPR is the WRPROTECT field value "
+            "(def: 0)\n\n"
+            "Performs a SCSI WRITE AND VERIFY (10 or 16) command on DEVICE, "
+            "startings\nat LBA for NUM logical blocks. More commands "
+            "performed only if '--repeat'\noption given. Data to be written "
+            "is fetched from the IF file.\n"
          );
 }
 

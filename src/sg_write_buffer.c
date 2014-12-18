@@ -26,7 +26,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.17 20140928";    /* spc4r37 */
+static const char * version_str = "1.18 20141107";    /* spc4r37 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -110,8 +110,9 @@ usage()
             "    --verbose|-v           increase verbosity\n"
             "    --version|-V           print version string and exit\n\n"
             "Performs one or more SCSI WRITE BUFFER commands. Use '-m xxx' "
-            "to list\navailable modes. Numbers given in options are decimal "
-            "unless they have\na hex indicator.\n"
+            "to list\navailable modes. A chunk size of 4 KB ('--bpw=4k') "
+            "seems to work well.\nExample: sg_write_buffer -b 4k -I xxx.lod "
+            "-m 7 /dev/sg3\n"
           );
 
 }

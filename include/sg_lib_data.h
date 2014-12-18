@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2012 Douglas Gilbert.
+ * Copyright (c) 2007-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,9 +21,12 @@
 extern "C" {
 #endif
 
-/* Commands with service actions that change the command name */
-#define SG_EXTENDED_COPY 0x83 /* since spc4r34 called: Third party copy out */
-#define SG_RECEIVE_COPY 0x84  /* since spc4r34 called: Third party copy in */
+/* Operation codes with associated service actions that change or qualify
+ * the command name */
+#define SG_EXTENDED_COPY 0x83 /* since spc4r34 became next entry */
+#define SG_3PARTY_COPY_OUT 0x83 /* new in spc4r34: Third party copy out */
+#define SG_RECEIVE_COPY 0x84  /* since spc4r34 became next entry */
+#define SG_3PARTY_COPY_IN 0x84 /* new in spc4r34: Third party copy in */
 #define SG_MAINTENANCE_IN 0xa3
 #define SG_MAINTENANCE_OUT 0xa4
 #define SG_PERSISTENT_RESERVE_IN 0x5e
@@ -37,6 +40,8 @@ extern "C" {
 #define SG_SERVICE_ACTION_OUT_16 0x9f
 #define SG_VARIABLE_LENGTH_CMD 0x7f
 #define SG_WRITE_BUFFER 0x3b
+#define SG_ZONING_OUT 0x94
+#define SG_ZONING_IN 0x95
 
 
 
@@ -78,11 +83,14 @@ extern struct sg_lib_value_name_t sg_lib_serv_bidi_arr[];
 extern struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[];
 extern struct sg_lib_value_name_t sg_lib_variable_length_arr[];
+extern struct sg_lib_value_name_t sg_lib_zoning_out_arr[];
+extern struct sg_lib_value_name_t sg_lib_zoning_in_arr[];
 extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
 extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
 extern const char * sg_lib_sense_key_desc[];
 extern const char * sg_lib_pdt_strs[];
 extern const char * sg_lib_transport_proto_strs[];
+extern int sg_lib_pdt_decay_arr[];
 
 
 #ifdef __cplusplus
