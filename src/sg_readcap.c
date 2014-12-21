@@ -27,9 +27,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "3.92 20140515";
+static const char * version_str = "3.93 20141220";
 
 #define ME "sg_readcap: "
 
@@ -37,20 +38,21 @@ static const char * version_str = "3.92 20140515";
 #define RCAP16_REPLY_LEN 32
 
 static struct option long_options[] = {
-        {"brief", 0, 0, 'b'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"lba", 1, 0, 'L'},
-        {"long", 0, 0, 'l'},
-        {"16", 0, 0, 'l'},
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
-        {"pmi", 0, 0, 'p'},
-        {"raw", 0, 0, 'r'},
-        {"readonly", 0, 0, 'R'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {0, 0, 0, 0},
+    {"brief", 0, 0, 'b'},
+    {"help", 0, 0, 'h'},
+    {"hex", 0, 0, 'H'},
+    {"lba", 1, 0, 'L'},
+    {"long", 0, 0, 'l'},
+    {"16", 0, 0, 'l'},
+    {"new", 0, 0, 'N'},
+    {"old", 0, 0, 'O'},
+    {"pmi", 0, 0, 'p'},
+    {"raw", 0, 0, 'r'},
+    {"readonly", 0, 0, 'R'},
+    {"verbose", 0, 0, 'v'},
+    {"version", 0, 0, 'V'},
+    {"zbc", 0, 0, 'z'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {
@@ -64,18 +66,22 @@ struct opts_t {
     int o_readonly;
     int do_verbose;
     int do_version;
+    int do_zbc;
     uint64_t llba;
     const char * device_name;
     int opt_new;
 };
 
-static void usage()
+
+static void
+usage()
 {
-    fprintf(stderr, "Usage: sg_readcap [--brief] [--help] [--hex] "
-            "[--lba=LBA] [--long] [--16]\n"
+    fprintf(stderr,
+            "Usage: sg_readcap [--brief] [--help] [--hex] [--lba=LBA] "
+            "[--long] [--16]\n"
             "                  [--pmi] [--raw] [--readonly] [--verbose] "
             "[--version]\n"
-            "                  DEVICE\n"
+            "                  [--zbc] DEVICE\n"
             "  where:\n"
             "    --brief|-b      brief, two hex numbers: number of blocks "
             "and block size\n"
@@ -97,15 +103,17 @@ static void usage()
             "    --readonly|-R    open DEVICE read-only (def: RCAP(16) "
             "read-write)\n"
             "    --verbose|-v    increase verbosity\n"
-            "    --version|-V    print version string and exit\n\n"
+            "    --version|-V    print version string and exit\n"
+            "    --zbc|-z        show rc_basis ZBC field (implies --16)\n\n"
             "Perform a SCSI READ CAPACITY (10 or 16) command\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     fprintf(stderr, "Usage:  sg_readcap [-16] [-b] [-h] [-H] [-lba=LBA] "
-            "[-pmi] [-r] [-R] [-v] [-V]\n"
-            "                   DEVICE\n"
+            "[-pmi] [-r] [-R]\n"
+            "                   [-v] [-V] [-z] DEVICE\n"
             "  where:\n"
             "    -16    use READ CAPACITY (16) cdb (def: use "
             "10 byte cdb)\n"
@@ -123,11 +131,13 @@ static void usage_old()
             "    -r     output response in binary to stdout\n"
             "    -R     open DEVICE read-only (def: RCAP(16) read-write)\n"
             "    -v     increase verbosity\n"
-            "    -V     print version string and exit\n\n"
-            "Perform a SCSI READ CAPACITY command\n");
+            "    -V     print version string and exit\n"
+            "    -z     show rc_basis ZBC field (implies -16)\n\n"
+            "Perform a SCSI READ CAPACITY (10 or 16) command\n");
 }
 
-static void usage_for(const struct opts_t * op)
+static void
+usage_for(const struct opts_t * op)
 {
     if (op->opt_new)
         usage();
@@ -135,7 +145,8 @@ static void usage_for(const struct opts_t * op)
         usage_old();
 }
 
-static int process_cl_new(struct opts_t * op, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c;
     int a_one = 0;
@@ -144,7 +155,7 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "16bhHlL:NOprRvV", long_options,
+        c = getopt_long(argc, argv, "16bhHlL:NOprRvVz", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -203,6 +214,9 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'V':
             ++op->do_version;
             break;
+        case 'z':
+            ++op->do_zbc;
+            break;
         default:
             fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
             if (op->do_help)
@@ -227,7 +241,8 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * op, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen, num;
     const char * cp;
@@ -284,6 +299,9 @@ static int process_cl_old(struct opts_t * op, int argc, char * argv[])
                 case 'V':
                     ++op->do_version;
                     break;
+                case 'z':
+                    ++op->do_zbc;
+                    break;
                 default:
                     jmp_out = 1;
                     break;
@@ -324,7 +342,8 @@ static int process_cl_old(struct opts_t * op, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * op, int argc, char * argv[])
+static int
+process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -344,7 +363,8 @@ static int process_cl(struct opts_t * op, int argc, char * argv[])
     return res;
 }
 
-static void dStrRaw(const char* str, int len)
+static void
+dStrRaw(const char* str, int len)
 {
     int k;
 
@@ -352,12 +372,31 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-int main(int argc, char * argv[])
+static const char *
+rc_basis_str(int rc_basis, char * b, int blen)
 {
-    int sg_fd, k, res, prot_en, p_type, lbppbe, rw_0_flag;
+    switch (rc_basis) {
+    case 0:
+        snprintf(b, blen, "last contiguous that's not seq write required");
+        break;
+    case 1:
+        snprintf(b, blen, "last LBA on device");
+        break;
+    default:
+        snprintf(b, blen, "reserved (0x%x)", rc_basis);
+        break;
+    }
+    return b;
+}
+
+
+int
+main(int argc, char * argv[])
+{
+    int sg_fd, res, prot_en, p_type, lbppbe, rw_0_flag;
     uint64_t llast_blk_addr;
     int ret = 0;
-    unsigned int last_blk_addr, block_size;
+    uint32_t last_blk_addr, block_size;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
     char b[80];
     struct opts_t opts;
@@ -388,6 +427,10 @@ int main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         }
     }
+    if (op->do_zbc) {
+        if (! op->do_long)
+            ++op->do_long;
+    }
 
     memset(resp_buff, 0, sizeof(resp_buff));
 
@@ -415,27 +458,29 @@ int main(int argc, char * argv[])
             if (op->do_hex || op->do_raw) {
                 if (op->do_raw)
                     dStrRaw((const char *)resp_buff, RCAP_REPLY_LEN);
+                else if (op->do_hex > 2)
+                    dStrHex((const char *)resp_buff, RCAP_REPLY_LEN, -1);
                 else
                     dStrHex((const char *)resp_buff, RCAP_REPLY_LEN, 1);
                 goto good;
             }
-            last_blk_addr = ((resp_buff[0] << 24) | (resp_buff[1] << 16) |
-                             (resp_buff[2] << 8) | resp_buff[3]);
+            last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
             if (0xffffffff != last_blk_addr) {
-                block_size = ((resp_buff[4] << 24) | (resp_buff[5] << 16) |
-                             (resp_buff[6] << 8) | resp_buff[7]);
+                block_size = sg_get_unaligned_be32(resp_buff + 4);
                 if (op->do_brief) {
-                    printf("0x%x 0x%x\n", last_blk_addr + 1, block_size);
+                    printf("0x%" PRIx32 " 0x%" PRIx32 "\n",
+                           last_blk_addr + 1, block_size);
                     goto good;
                 }
                 printf("Read Capacity results:\n");
                 if (op->do_pmi)
                     printf("   PMI mode: given lba=0x%" PRIx64 ", last lba "
-                           "before delay=0x%x\n", op->llba, last_blk_addr);
+                           "before delay=0x%" PRIx32 "\n", op->llba,
+                           last_blk_addr);
                 else
-                    printf("   Last logical block address=%u (0x%x), Number "
-                           "of blocks=%u\n", last_blk_addr, last_blk_addr,
-                           last_blk_addr + 1);
+                    printf("   Last logical block address=%" PRIu32 " (0x%"
+                           PRIx32 "), Number of blocks=%" PRIu32 "\n",
+                           last_blk_addr, last_blk_addr, last_blk_addr + 1);
                 printf("   Logical block length=%u bytes\n", block_size);
                 if (! op->do_pmi) {
                     uint64_t total_sz = last_blk_addr + 1;
@@ -486,18 +531,17 @@ int main(int argc, char * argv[])
             if (op->do_hex || op->do_raw) {
                 if (op->do_raw)
                     dStrRaw((const char *)resp_buff, RCAP16_REPLY_LEN);
+                else if (op->do_hex > 2)
+                    dStrHex((const char *)resp_buff, RCAP16_REPLY_LEN, -1);
                 else
                     dStrHex((const char *)resp_buff, RCAP16_REPLY_LEN, 1);
                 goto good;
             }
-            for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
-                llast_blk_addr <<= 8;
-                llast_blk_addr |= resp_buff[k];
-            }
-            block_size = ((resp_buff[8] << 24) | (resp_buff[9] << 16) |
-                          (resp_buff[10] << 8) | resp_buff[11]);
+            llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);
+            block_size = sg_get_unaligned_be32(resp_buff + 8);
             if (op->do_brief) {
-                printf("0x%" PRIx64 " 0x%x\n", llast_blk_addr + 1, block_size);
+                printf("0x%" PRIx64 " 0x%" PRIx32 "\n", llast_blk_addr + 1,
+                       block_size);
                 goto good;
             }
             prot_en = !!(resp_buff[12] & 0x1);
@@ -509,6 +553,12 @@ int main(int argc, char * argv[])
                 printf(" [type %d protection]\n", p_type + 1);
             else
                 printf("\n");
+            if (op->do_zbc) {
+                int rc_basis = (resp_buff[12] >> 4) & 0x3;
+
+                printf("   ZBC's rc_basis=%d [%s]\n", rc_basis,
+                       rc_basis_str(rc_basis, b, sizeof(b)));
+            }
             printf("   Logical block provisioning: lbpme=%d, lbprz=%d\n",
                    !!(resp_buff[14] & 0x80), !!(resp_buff[14] & 0x40));
             if (op->do_pmi)
@@ -519,7 +569,7 @@ int main(int argc, char * argv[])
                 printf("   Last logical block address=%" PRIu64 " (0x%"
                        PRIx64 "), Number of logical blocks=%" PRIu64 "\n",
                        llast_blk_addr, llast_blk_addr, llast_blk_addr + 1);
-            printf("   Logical block length=%u bytes\n", block_size);
+            printf("   Logical block length=%" PRIu32 " bytes\n", block_size);
             lbppbe = resp_buff[13] & 0xf;
             printf("   Logical blocks per physical block exponent=%d",
                    lbppbe);

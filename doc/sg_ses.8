@@ -156,8 +156,10 @@ option. And like this option it has a "given twice" form: '\-ee'.
 \fB\-H\fR, \fB\-\-hex\fR
 If the \fI\-\-get=STR\fR option is given then output the value found (if
 any) in hexadecimal, with a leading "0x". Otherwise output the response
-in hexadecimal. Ignored when all elements from several pages are being
-accessed.
+in hexadecimal; with trailing ASCII if given once, without it if given
+twice, and simple hex if given three or more times. Ignored when all
+elements from several pages are being accessed. Also see the \fI\-\-raw\fR
+option which may be used with this option..
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIIIA\fR
 where \fIIIA\fR is either an individual index (II) or an Element type

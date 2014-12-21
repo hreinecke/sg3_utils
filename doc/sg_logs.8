@@ -160,15 +160,16 @@ dependent. It will assume a PDT of 0 (i.e. a disk).
 switch to older style options.
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
-log page code to access. \fIPG\fR is either an acronym, a page number, or
-a page, subpage pair. Available acronyms can be listed with the
+log page name/number to access. \fIPG\fR is either an acronym, a page number,
+or a page, subpage number pair. Available acronyms can be listed with the
 \fI\-\-enumerate\fR option. Page (0 to 63) and subpage (0 to 255) numbers
 are comma separated. They are decimal unless a hexadecimal indication is
 given. A hexadecimal number can be specified by a leading "0x" or a
 trailing "h".
 .br
 A few acronyms specify a range of subpage values in which case the acronym
-may be followed by a comma then a subpage number.
+may be followed by a comma then a subpage number. This method can also be
+used to fetch the Supported subpages log page (e.g. \-\-page=temp,0xff).
 .TP
 \fB\-P\fR, \fB\-\-paramp\fR=\fIPP\fR
 \fIPP\fR is the parameter pointer value to place in a field of that name in

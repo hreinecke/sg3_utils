@@ -1882,6 +1882,11 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 }
                 break;
             }
+            /*
+             * Unfortunately, there are some (broken) implementations
+             * which return _several_ NAA descriptors.
+             * So add a suffix to differentiate between them.
+             */
             naa = (ip[0] >> 4) & 0xff;
             if ((naa < 2) || (naa > 6) || (4 == naa)) {
                 if (verbose) {
@@ -1891,15 +1896,36 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 break;
             }
             if (6 != naa) {
+                const char *suffix;
+
                 if (8 != i_len) {
                     if (verbose) {
-                        pr2serr("      << unexpected NAA 2 identifier "
-                                "length: 0x%x>>\n", i_len);
+                        pr2serr("      << unexpected NAA %d identifier "
+                                "length: 0x%x>>\n", naa, i_len);
                         dStrHexErr((const char *)ip, i_len, 0);
                     }
                     break;
                 }
-                printf("SCSI_IDENT_%s_NAA=", assoc_str);
+                if (naa != 2 && naa != 3 && naa != 5) {
+                    if (verbose) {
+                        pr2serr("      << unexpected NAA format %d>>\n", naa);
+                        dStrHexErr((const char *)ip, i_len, 0);
+                    }
+                    break;
+                }
+                switch (naa) {
+                    case 5:
+                        suffix="REG";
+                        break;
+                    case 2:
+                        suffix="EXT";
+                        break;
+                    case 3:
+                    default:
+                        suffix="LOCAL";
+                        break;
+                }
+                printf("SCSI_IDENT_%s_NAA_%s=", assoc_str, suffix);
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
@@ -1912,7 +1938,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                     }
                     break;
                 }
-                printf("SCSI_IDENT_%s_NAA=", assoc_str);
+                printf("SCSI_IDENT_%s_NAA_REGEXT=", assoc_str);
                 for (m = 0; m < 16; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");

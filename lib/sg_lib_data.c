@@ -1383,6 +1383,7 @@ const char * sg_lib_transport_proto_strs[] =
     "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",
     "SCSI over PCI Express (SOP)",
-    "Oxb", "Oxc", "Oxd", "Oxe",
+    "PCIe",                             /* added in spc5r01 */
+    "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };
