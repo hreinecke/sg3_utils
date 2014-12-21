@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.27 20141214";    /* spc4r37a + sbc4r04 */
+static const char * version_str = "1.28 20141219";    /* spc5r00 + sbc4r04 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -137,6 +137,7 @@ struct opts_t {
     int dev_pdt;
     const char * device_name;
     const char * in_fn;
+    const char * pg_arg;
     const struct log_elem * lep;
 };
 
@@ -678,10 +679,7 @@ usage_for(int hval, const struct opts_t * op)
 static int
 process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
-    int c, n, nn;
-    char * cp;
-    const struct log_elem * lep;
-    char b[80];
+    int c, n;
 
     while (1) {
         int option_index = 0;
@@ -767,56 +765,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->opt_new = 0;
             return 0;
         case 'p':
-            if (isalpha(optarg[0])) {
-                if (strlen(optarg) >= (sizeof(b) - 1)) {
-                    pr2serr("argument to '--page=' is too long\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                strcpy(b, optarg);
-                cp = strchr(b, ',');
-                if (cp)
-                    *cp = '\0';
-                lep = acron_search(b);
-                if (NULL == lep) {
-                    pr2serr("bad argument to '--page=' no acronyn match to "
-                            "'%s'\n", b);
-                    pr2serr("  Try using '-e' or'-ee' to see available "
-                            "acronyns\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                op->lep = lep;
-                op->pg_code = lep->pg_code;
-                if (cp) {
-                    nn = sg_get_num_nomult(cp + 1);
-                    if ((nn < 0) || (nn > 255)) {
-                        pr2serr("Bad second value in argument to "
-                                "'--page='\n");
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                    op->subpg_code = nn;
-                } else
-                    op->subpg_code = lep->subpg_code;
-            } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
-                cp = strchr(optarg, ',');
-                n = sg_get_num_nomult(optarg);
-                if ((n < 0) || (n > 63)) {
-                    pr2serr("Bad argument to '--page='\n");
-                    usage(1);
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                if (cp) {
-                    nn = sg_get_num_nomult(cp + 1);
-                    if ((nn < 0) || (nn > 255)) {
-                        pr2serr("Bad second value in argument to "
-                                "'--page='\n");
-                        usage(1);
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                } else
-                    nn = 0;
-                op->pg_code = n;
-                op->subpg_code = nn;
-            }
+            op->pg_arg = optarg;
             break;
         case 'P':
             n = sg_get_num(optarg);
@@ -1012,7 +961,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                         return SG_LIB_SYNTAX_ERROR;
                     }
                     strcpy(b, ccp);
-                    xp = strchr(b, ',');
+                    xp = (char *)strchr(b, ',');
                     if (xp)
                         *xp = '\0';
                     lep = acron_search(b);
@@ -1480,9 +1429,12 @@ show_supported_pgs_sub_lpage(const uint8_t * resp, int len,
     const struct log_elem * lep;
     char b[64];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Supported log pages and subpages  [0x%x, 0xff]:\n",
-               op->pg_code);
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (op->pg_code > 0)
+            printf("Supported subpages  [0x%x, 0xff]:\n", op->pg_code);
+        else
+            printf("Supported log pages and subpages  [0x0, 0xff]:\n");
+    }
     num = len - 4;
     ucp = &resp[0] + 4;
     for (k = 0; k < num; k += 2) {
@@ -5412,6 +5364,67 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }
 
+static int
+decode_pg_arg(struct opts_t * op)
+{
+    int n, nn;
+    const struct log_elem * lep;
+    char * cp;
+    char b[80];
+
+    if (isalpha(op->pg_arg[0])) {
+        if (strlen(op->pg_arg) >= (sizeof(b) - 1)) {
+            pr2serr("argument to '--page=' is too long\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        strcpy(b, op->pg_arg);
+        cp = (char *)strchr(b, ',');
+        if (cp)
+            *cp = '\0';
+        lep = acron_search(b);
+        if (NULL == lep) {
+            pr2serr("bad argument to '--page=' no acronyn match to "
+                    "'%s'\n", b);
+            pr2serr("  Try using '-e' or'-ee' to see available "
+                    "acronyns\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        op->lep = lep;
+        op->pg_code = lep->pg_code;
+        if (cp) {
+            nn = sg_get_num_nomult(cp + 1);
+            if ((nn < 0) || (nn > 255)) {
+                pr2serr("Bad second value in argument to "
+                        "'--page='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->subpg_code = nn;
+        } else
+            op->subpg_code = lep->subpg_code;
+    } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
+        cp = (char *)strchr(op->pg_arg, ',');
+        n = sg_get_num_nomult(op->pg_arg);
+        if ((n < 0) || (n > 63)) {
+            pr2serr("Bad argument to '--page='\n");
+            usage(1);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (cp) {
+            nn = sg_get_num_nomult(cp + 1);
+            if ((nn < 0) || (nn > 255)) {
+                pr2serr("Bad second value in argument to "
+                        "'--page='\n");
+                usage(1);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else
+            nn = 0;
+        op->pg_code = n;
+        op->subpg_code = nn;
+    }
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -5465,6 +5478,9 @@ main(int argc, char * argv[])
                         op->in_fn, in_len);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if (op->pg_arg && (0 == op->do_brief))
+                pr2serr(">>> --page=%s option is being ignored, using values "
+                        "in file: %s\n", op->pg_arg, op->in_fn);
             for (ucp = rsp_buff, k = 0; k < in_len; ucp += n, k += n) {
                 pg_code = ucp[0] & 0x3f;
                 subpg_code = (ucp[0] & 0x40) ? ucp[1] : 0;
@@ -5536,6 +5552,17 @@ main(int argc, char * argv[])
         if (f2hex_arr(op->in_fn, op->do_raw, 0, rsp_buff, &in_len,
                       sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
+    }
+    if (op->pg_arg) {
+        if (op->do_all) {
+            if (0 == op->do_brief)
+                pr2serr(">>> warning: --page=%s ignored when --all given\n",
+                        op->pg_arg);
+        } else {
+            res = decode_pg_arg(op);
+            if (res)
+                return res;
+        }
     }
 
 #ifdef SG_LIB_WIN32

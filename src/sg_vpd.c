@@ -2810,20 +2810,20 @@ decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
     u = sg_get_unaligned_be32(b + 8);
     printf("  Optimal number of open sequential write preferred zones: ");
     if (0xffffffff == u)
-        printf("0xffffffff\n");
+        printf("not reported\n");
     else
         printf("%" PRIu32 "\n", u);
     u = sg_get_unaligned_be32(b + 12);
     printf("  Optimal number of non-sequentially written sequential write "
            "preferred zones: ");
     if (0xffffffff == u)
-        printf("0xffffffff\n");
+        printf("not reported\n");
     else
         printf("%" PRIu32 "\n", u);
     u = sg_get_unaligned_be32(b + 16);
-    printf("  Maximum number of open sequential write required: ");
+    printf("  Maximum number of open sequential write required zones: ");
     if (0xffffffff == u)
-        printf("0xffffffff\n");
+        printf("no limit\n");
     else
         printf("%" PRIu32 "\n", u);
 }

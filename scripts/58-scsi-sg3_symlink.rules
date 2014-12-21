@@ -11,19 +11,30 @@ ENV{DM_MULTIPATH_DEVICE_PATH}=="1", GOTO="sg3_utils_symlink_end"
 # 0: vpd page 0x80 identifier
 ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}"
 ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}-part%n"
-# 1: NAA identifier (prefix 3)
-ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA}"
-ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA}-part%n"
-# 2: EUI-64 identifer (prefix 2)
+# NAA identifier (prefix 3)
+# 1: IEEE Registered Extended first
+ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_REGEXT}"
+ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{DEVTYPE}=="partition",
+# SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_REGEXT}-part%n"
+# 2: IEEE Registered
+ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_REG}"
+ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_REG}-part%n"
+# 3: IEEE Extended
+ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_EXT}"
+ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_EXT}-part%n"
+# 4: EUI-64 identifer (prefix 2)
 ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-2$env{SCSI_IDENT_LUN_EUI64}"
 ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-2$env{SCSI_IDENT_LUN_EUI64}-part%n"
-# 3: SCSI name identifier (prefix 8)
+# 5: SCSI name identifier (prefix 8)
 ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}"
 ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}-part%n"
-# 4: T10 Vendor identifer (prefix 1)
+# 6: T10 Vendor identifer (prefix 1)
 ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}"
 ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}-part%n"
-# 5: Vendor-specific identifier (prefix 0)
+# 7: IEEE Locally assigned
+ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_LOCAL}"
+ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_LOCAL}-part%n"
+# 8: Vendor-specific identifier (prefix 0)
 ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}"
 ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}-part%n"
 
