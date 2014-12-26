@@ -23,7 +23,7 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 .PP
 This utility sends a SCSI LOG SENSE command to the \fIDEVICE\fR and then
 outputs the response. The LOG SENSE command is used to fetch log pages. Known
-log pages cab be decoded. When the \fI\-\-reset\fR and/or \fI\-\-select\fR
+log pages can be decoded. When the \fI\-\-reset\fR and/or \fI\-\-select\fR
 option is given then a SCSI LOG SELECT command is issued.
 .PP
 In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
@@ -64,11 +64,12 @@ The default value is 1 (i.e. current cumulative values).
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 this option is used to output information held in internal tables about
-known log pages. The \fIDEVICE\fR if given is ignored. When given
-once (i.e. '\-e') all known pages sorted in ascending acronym order are
-listed. When given twice, vendor pages are excluded. When given three
-times, all all known pages sorted in ascending numeric order are listed;
-when given four times, vendor pages are excluded from the numeric order.
+known log pages including their names and acronyms. If given \fIDEVICE\fR
+is ignored. When given once (e.g. '\-e') all known pages are listed, sorted
+in ascending acronym order. When given twice, vendor pages are excluded.
+When given three times, all known pages are listed, sorted in ascending
+numeric order listed; when given four times, vendor pages are excluded from
+the numeric order.
 .br
 The \fI\-\-filter=FI\fR and \fI\-\-verbose\fR options modify the output
 of the enumeration.
@@ -234,8 +235,8 @@ setting '\-\-page=18h'.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level of verbosity. When used with \fI\-\-enumerate\fR, in the
-list of log pages names that are known, those that have no associated
-decode logic are followed by "[hex only]".
+list of known log page names, those that have no associated decode logic
+are followed by "[hex only]".
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.

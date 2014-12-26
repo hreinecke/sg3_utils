@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.09 20141207";  /* spc4r37a, sbc4r02 */
+const char * sg_lib_version_str = "2.10 20141225";  /* spc5r00a, sbc4r02 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -549,7 +549,7 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140924 */
+ * The following should match asc-num.txt dated 20141224 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -885,6 +885,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x0A,"Partition or collection contains user objects"},
     {0x2C,0x0B,"Not reserved"},
     {0x2C,0x0C,"ORWRITE generation does not match"},
+    {0x2C,0x0D,"Reset write pointer not allowed"},
+    {0x2C,0x0E,"Zone is offline"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2E,0x01,"Command timeout before processing"},
@@ -1088,6 +1090,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x0b,"Insufficient power for operation"},
     {0x55,0x0c,"Insufficient resources to create rod"},
     {0x55,0x0d,"Insufficient resources to create rod token"},
+    {0x55,0x0e,"Insufficient zone resources"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
@@ -1345,9 +1348,9 @@ const char * sg_lib_sense_key_desc[] = {
 const char * sg_lib_pdt_strs[] = {
     /* 0 */ "disk",
     "tape",
-    "printer",
+    "printer",                  /* obsolete, spc5r01 */
     "processor",        /* often SAF-TE device, copy manager */
-    "write once optical disk",
+    "write once optical disk",  /* obsolete, spc5r01 */
     /* 5 */ "cd/dvd",
     "scanner",                  /* obsolete */
     "optical memory device",
@@ -1362,7 +1365,7 @@ const char * sg_lib_pdt_strs[] = {
     /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
-    "security manager device",
+    "security manager device",  /* obsolete, spc5r01 */
     "zoned block commands",
     "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
@@ -1373,7 +1376,7 @@ const char * sg_lib_pdt_strs[] = {
 const char * sg_lib_transport_proto_strs[] =
 {
     "Fibre Channel Protocol for SCSI (FCP-4)",
-    "SCSI Parallel Interface (SPI-5)",
+    "SCSI Parallel Interface (SPI-5)",  /* obsolete in spc5r01 */
     "Serial Storage Architecture SCSI-3 Protocol (SSA-S3P)",
     "Serial Bus Protocol for IEEE 1394 (SBP-3)",
     "SCSI RDMA Protocol (SRP)",
@@ -1383,7 +1386,7 @@ const char * sg_lib_transport_proto_strs[] =
     "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",
     "SCSI over PCI Express (SOP)",
-    "PCIe",                             /* added in spc5r01 */
+    "PCIe",                             /* added in spc5r<x> ?? */
     "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };

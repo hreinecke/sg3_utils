@@ -62,7 +62,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "0.46 20140625";
+static const char * version_str = "0.46 20141224";
 
 #define ME "sg_xcopy: "
 
@@ -286,12 +286,12 @@ find_bsg_major(void)
         return;
     }
     while ((cp = fgets(b, sizeof(b), fp))) {
-        if ((1 == sscanf(b, "%s", a)) &&
+        if ((1 == sscanf(b, "%126s", a)) &&
             (0 == memcmp(a, "Character", 9)))
             break;
     }
     while (cp && (cp = fgets(b, sizeof(b), fp))) {
-        if (2 == sscanf(b, "%d %s", &n, a)) {
+        if (2 == sscanf(b, "%d %126s", &n, a)) {
             if (0 == strcmp("bsg", a)) {
                 bsg_major = n;
                 break;

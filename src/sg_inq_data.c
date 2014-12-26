@@ -48,8 +48,8 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-4 revision 36 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20140517 */
+/* table from SPC-5 revision 00+ [sorted numerically (from Annex E.9)] */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20141221 */
 
 
 #ifdef SG_SCSI_STRINGS
@@ -190,6 +190,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x463, "SPC-4 T10/BSR INCITS 513 revision 23"},
     {0x466, "SPC-4 T10/BSR INCITS 513 revision 36"},
     {0x468, "SPC-4 T10/BSR INCITS 513 revision 37"},
+    {0x469, "SPC-4 T10/BSR INCITS 513 revision 37a"},
     {0x480, "SMC-3 (no version claimed)"},
     {0x482, "SMC-3 T10/1730-D revision 15"},
     {0x482, "SMC-3 T10/1730-D revision 16"},
@@ -223,6 +224,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x5e0, "SFSC (no version claimed)"},
     {0x600, "SBC-4 (no version claimed)"},
     {0x620, "ZBC (no version claimed)"},
+    {0x622, "ZBC BSR INCITS 536 revision 02"},
+    {0x640, "ADC-4 (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
     {0x83b, "SSA-TL2 T10/1147-D revision 05b"},
     {0x83c, "SSA-TL2 ANSI INCITS 308-1998"},
@@ -287,6 +290,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa44, "FCP-4 T10/1828-D revision 02"},
     {0xa45, "FCP-4 T10/1828-D revision 02b"},
     {0xa46, "FCP-4 ANSI INCITS 481-2012"},
+    {0xa60, "ADT-3 (no version claimed)"},
     {0xaa0, "SPI (no version claimed)"},
     {0xab9, "SPI T10/0855-D revision 15a"},
     {0xaba, "SPI ANSI INCITS 253-1995"},
@@ -476,7 +480,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1ec8, "SAT-2 T10/1826-D revision 09"},
     {0x1eca, "SAT-2 ANSI INCITS 465-2010"},
     {0x1ee0, "SAT-3 (no version claimed)"},
-    {0x1ee2, "SAT-3 T10/2126-D revision 4"},
+    {0x1ee2, "SAT-3 T10/BSR INCITS 517 revision 4"},
+    {0x1ee4, "SAT-3 T10/BSR INCITS 517 revision 7"},
     {0x1f00, "SAT-4 (no version claimed)"},
     {0x20a0, "SPL (no version claimed)"},
     {0x20a3, "SPL T10/2124-D revision 6a"},
