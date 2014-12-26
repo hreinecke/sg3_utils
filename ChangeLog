@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20141220] [svn: r623]
+Changelog for sg3_utils-1.41 [20141225] [svn: r624]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -14,6 +14,7 @@ Changelog for sg3_utils-1.41 [20141220] [svn: r623]
   - sg_inq+sg_vpd: fix SCSI name string decoding in
     device identification VPD page (0x83)
   - sg_inq: improve NAA handling in dev_id VPD page
+    - update version descriptor list to 20141221
   - sg_vpd: add atomic boundary values (sbc4r04)
     - block limits VPD page: fix unmap granularity
       alignment value
@@ -24,6 +25,7 @@ Changelog for sg3_utils-1.41 [20141220] [svn: r623]
     - additional element status dpage: add PCIe/NVMe
   - rescan-scsi-bus.sh: add --issue-lip-wait option and
     improve error handling
+  - sg_lib_data: sync asc/ascq codes with T10 20141224
 
 Changelog for sg3_utils-1.40 [20141110] [svn: r620]
   - sg_write_verify: new utility for WRITE AND VERIFY

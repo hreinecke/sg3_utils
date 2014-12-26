@@ -59,7 +59,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "5.81 20140917";
+static const char * version_str = "5.81 20141224";
 
 
 #define ME "sg_dd: "
@@ -260,12 +260,12 @@ find_bsg_major(void)
         return;
     }
     while ((cp = fgets(b, sizeof(b), fp))) {
-        if ((1 == sscanf(b, "%s", a)) &&
+        if ((1 == sscanf(b, "%126s", a)) &&
             (0 == memcmp(a, "Character", 9)))
             break;
     }
     while (cp && (cp = fgets(b, sizeof(b), fp))) {
-        if (2 == sscanf(b, "%d %s", &n, a)) {
+        if (2 == sscanf(b, "%d %126s", &n, a)) {
             if (0 == strcmp("bsg", a)) {
                 bsg_major = n;
                 break;
