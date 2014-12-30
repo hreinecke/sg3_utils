@@ -53,7 +53,7 @@
 #endif
 
 
-static const char * version_str = "4.91 20140425";
+static const char * version_str = "4.92 20141227";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -514,7 +514,7 @@ main(int argc, char * argv[])
         }
         /* perhaps use posix_memalign() instead */
         if (op->do_dio)    /* align to page boundary */
-            rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
+            rbBuff= (unsigned char *)(((uintptr_t)rawp + psz - 1) &
                                       (~(psz - 1)));
         else
             rbBuff = (unsigned char *)rawp;

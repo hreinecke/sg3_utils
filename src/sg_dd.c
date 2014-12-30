@@ -59,7 +59,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "5.81 20141224";
+static const char * version_str = "5.82 20141226";
 
 
 #define ME "sg_dd: "
@@ -1869,7 +1869,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "Not enough user memory for raw\n");
             return SG_LIB_CAT_OTHER;
         }
-        wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
+        wrkPos = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
                                    (~(psz - 1)));
 #endif
     } else {
