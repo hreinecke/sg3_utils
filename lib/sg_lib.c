@@ -1469,12 +1469,12 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
         break;
     case SG_LIB_CAT_OTHER:              /* 99 */
         n = snprintf(buff, buff_len, "Some other error/warning has occurred");
-        if (verbose && (n < (buff_len - 1)))
+        if ((0 == verbose) && (n < (buff_len - 1)))
             snprintf(buff + n, buff_len - n, ", possible transport of driver "
                      "issue");
     default:
         n = snprintf(buff, buff_len, "Sense category: %d", sense_cat);
-        if (verbose && (n < (buff_len - 1)))
+        if ((0 == verbose) && (n < (buff_len - 1)))
             snprintf(buff + n, buff_len - n, ", try '-v' option for more "
                      "information");
         break;

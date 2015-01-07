@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2012 Douglas Gilbert.
+ * Copyright (c) 2006-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.04 20120920";
+static char * version_str = "1.05 20150105";
 
 
 #define MAX_LINE_LEN 1024
@@ -41,14 +41,19 @@ static struct option long_options[] = {
 static void usage()
 {
     fprintf(stderr, "Usage: "
-          "sg_chk_asc [--help] [--verbose] [--version] <asc_ascq_file>\n"
-          "  where: --help|-h          print out usage message\n"
-          "         --verbose|-v       increase verbosity\n"
-          "         --version|-V       print version string and exit\n\n"
-          "Checks asc/ascq codes in <asc_ascq_file> against the sg3_utils "
-          "library.\nThe additional sense code (asc_ascq) can be found at\n"
-          "www.t10.org/lists/asc-num.txt .\n"
-          );
+            "sg_chk_asc [--help] [--offset=POS] [--verbose] [--version]\n"
+            "                  <asc_ascq_file>\n"
+            "  where:\n"
+            "    --help|-h          print out usage message\n"
+            "    --offset=POS|-o POS    line position in file where "
+            "text starts\n"
+            "                           origin 0 (def: 24 (was 25))\n"
+            "    --verbose|-v       increase verbosity\n"
+            "    --version|-V       print version string and exit\n\n"
+            "Checks asc/ascq codes in <asc_ascq_file> against the sg3_utils "
+            "library.\nThe additional sense code (asc_ascq) can be found at\n"
+            "www.t10.org/lists/asc-num.txt .\n"
+           );
 
 }
 
@@ -56,6 +61,7 @@ int main(int argc, char * argv[])
 {
     int k, j, res, c, num, len, asc, ascq;
     FILE * fp;
+    int offset = 24;
     int verbose = 0;
     char file_name[256];
     char line[MAX_LINE_LEN];
@@ -69,7 +75,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hvV", long_options,
+        c = getopt_long(argc, argv, "ho:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -79,6 +85,13 @@ int main(int argc, char * argv[])
         case '?':
             usage();
             return 0;
+        case 'o':
+            offset = sg_get_num(optarg);
+            if (offset < 0) {
+                fprintf(stderr, "bad argument to --offset\n");
+                return 1;
+            }
+            break;
         case 'v':
             ++verbose;
             break;
@@ -144,7 +157,7 @@ if (0xd == b[num - 2]) {
 }
 printf("\"%s\",\n", b);
 #endif
-        strncpy(b , line + 25, sizeof(b) - 1);
+        strncpy(b , line + offset, sizeof(b) - 1);
         b[sizeof(b) - 1] = '\0';
         num = strlen(b);
         if (0xd == b[num - 2]) {
