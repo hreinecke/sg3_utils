@@ -2,11 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20141230] [svn: r625]
+Changelog for sg3_utils-1.41 [20150105] [svn: r626]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
     indicated in zbc-r02
+  - sg_read_buffer: add READ BUFFER(16) support (spc5r02)
   - sg_logs: add --enumerate and acronyms
     - allow decode from hex or binary in file
   - sg_lib interface: add sg_lib_pdt_decay(), TPROTO_PCIE
@@ -25,7 +26,7 @@ Changelog for sg3_utils-1.41 [20141230] [svn: r625]
     - additional element status dpage: add PCIe/NVMe
   - rescan-scsi-bus.sh: add --issue-lip-wait option and
     improve error handling
-  - sg_lib_data: sync asc/ascq codes with T10 20141224
+  - sg_lib_data: sync asc/ascq codes with T10 20150103
 
 Changelog for sg3_utils-1.40 [20141110] [svn: r620]
   - sg_write_verify: new utility for WRITE AND VERIFY

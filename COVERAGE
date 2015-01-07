@@ -43,7 +43,8 @@ READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ BLOCK LIMITS   sg_read_block_limits, ++
-READ BUFFER         sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
+READ BUFFER(10)     sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
+READ BUFFER(16)     sg_read_buffer
 READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
 READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), smartmontools, ++
@@ -128,4 +129,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-18th December 2014
+7th January 2015
