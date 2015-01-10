@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2014 Douglas Gilbert.
+ * Copyright (c) 1999-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,6 +21,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -534,7 +535,7 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
  * This function returns the (byte) offset of the start of the first mode
  * page. Set mode_sense_6 to 1 for MODE SENSE (6) and 0 for MODE SENSE (10).
  * Returns >= 0 is successful or -1 if failure. If there is a failure
- * a message is written to err_buff. */
+ * a message is written to err_buff if err_buff_len > 0. */
 int
 sg_mode_page_offset(const unsigned char * resp, int resp_len,
                     int mode_sense_6, char * err_buff, int err_buff_len)
@@ -545,7 +546,7 @@ sg_mode_page_offset(const unsigned char * resp, int resp_len,
 
     if ((NULL == resp) || (resp_len < 4) ||
         ((! mode_sense_6) && (resp_len < 8))) {
-        if (err_buff_len > 0)
+        if ((err_buff_len > 0) && err_buff)
             snprintf(err_buff, err_buff_len, "given response length too "
                      "short: %d\n", resp_len);
         return -1;
@@ -555,19 +556,19 @@ sg_mode_page_offset(const unsigned char * resp, int resp_len,
         bd_len = resp[3];
         offset = bd_len + MODE6_RESP_HDR_LEN;
     } else {
-        calc_len = (resp[0] << 8) + resp[1] + 2;
-        bd_len = (resp[6] << 8) + resp[7];
+        calc_len = sg_get_unaligned_be16(resp) + 2;
+        bd_len = sg_get_unaligned_be16(resp + 6);
         /* LongLBA doesn't change this calculation */
         offset = bd_len + MODE10_RESP_HDR_LEN;
     }
     if ((offset + 2) > resp_len) {
-        if (err_buff_len > 0)
+        if ((err_buff_len > 0) && err_buff)
             snprintf(err_buff, err_buff_len, "given response length "
                      "too small, offset=%d given_len=%d bd_len=%d\n",
                      offset, resp_len, bd_len);
         offset = -1;
     } else if ((offset + 2) > calc_len) {
-        if (err_buff_len > 0)
+        if ((err_buff_len > 0) && err_buff)
             snprintf(err_buff, err_buff_len, "calculated response "
                      "length too small, offset=%d calc_len=%d bd_len=%d\n",
                      offset, calc_len, bd_len);
@@ -625,7 +626,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
         return res;
     n = buff[0];
     if (reported_len)
-        *reported_len = mode6 ? (n + 1) : ((n << 8) + buff[1] + 2);
+        *reported_len = mode6 ? (n + 1) : (sg_get_unaligned_be16(buff) + 2);
     resp_mode6 = mode6;
     if (flexible) {
         if (mode6 && (n < 3)) {
@@ -650,7 +651,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
         fprintf(sg_warnings_strm, ">>> msense(%d) but resp[0]=%d "
                 "so switch response processing\n", (mode6 ? 6 : 10),
                 buff[0]);
-    calc_len = resp_mode6 ? (buff[0] + 1) : ((buff[0] << 8) + buff[1] + 2);
+    calc_len = resp_mode6 ? (buff[0] + 1) : (sg_get_unaligned_be16(buff) + 2);
     if (calc_len > MODE_RESP_ARB_LEN)
         calc_len = MODE_RESP_ARB_LEN;
     offset = sg_mode_page_offset(buff, calc_len, resp_mode6,

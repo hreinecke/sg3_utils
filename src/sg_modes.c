@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2014 D. Gilbert
+ *  Copyright (C) 2000-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.44 20140708";
+static const char * version_str = "1.45 20150110";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -533,6 +533,8 @@ static struct page_code_desc pc_desc_common[] = {
     {0x9, 0x0, "Peripheral device (obsolete)"},
     {0xa, 0x0, "Control"},
     {0xa, 0x1, "Control extension"},
+    {0xa, 0x3, "Command duration limit A"},
+    {0xa, 0x4, "Command duration limit B"},
     {0x15, 0x0, "Extended"},
     {0x16, 0x0, "Extended device-type specific"},
     {0x18, 0x0, "Protocol specific lu"},
@@ -915,6 +917,10 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
                 dStrRaw((const char *)rbuf, len);
                 continue;
             }
+            if (op->do_hex > 2) {
+                dStrHex((const char *)rbuf, len, -1);
+                continue;
+            }
             if (0 == header) {
                 printf("Discovered mode pages:\n");
                 header = 1;
@@ -1057,7 +1063,7 @@ main(int argc, char * argv[])
     }
     inq_pdt = inq_out.peripheral_type;
     inq_byte6 = inq_out.byte_6;
-    if (0 == op->do_raw)
+    if ((0 == op->do_raw) && (op->do_hex < 3))
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
                inq_out.vendor, inq_out.product, inq_out.revision,
                sg_get_pdt_str(inq_pdt, sizeof(pdt_name), pdt_name), inq_pdt);
@@ -1144,7 +1150,9 @@ main(int argc, char * argv[])
                     resp_mode6 = 1;
             }
         }
-        if ((! op->do_raw) && (1 != op->do_hex)) {
+        if (op->do_raw || (1 == op->do_hex) || (op->do_hex > 2))
+            ;
+        else {
             if (resp_mode6 == op->do_six)
                 printf("Mode parameter header from MODE SENSE(%s):\n",
                        (op->do_six ? "6" : "10"));
@@ -1172,10 +1180,10 @@ main(int argc, char * argv[])
             pr2serr("Invalid block descriptor length=%d, ignore\n", bd_len);
             bd_len = 0;
         }
-        if (op->do_raw) {
+        if (op->do_raw || (op->do_hex > 2)) {
             if (1 == op->do_raw)
                 dStrRaw((const char *)rsp_buff, md_len);
-            else {
+            else if (op->do_raw > 1) {
                 ucp = rsp_buff + bd_len + headerlen;
                 md_len -= bd_len + headerlen;
                 spf = ((ucp[0] & 0x40) ? 1 : 0);
@@ -1183,7 +1191,8 @@ main(int argc, char * argv[])
                 len = (len < md_len) ? len : md_len;
                 for (k = 0; k < len; ++k)
                     printf("%02x\n", ucp[k]);
-            }
+            } else
+                dStrHex((const char *)rsp_buff, md_len, -1);
             goto finish;
         }
         if (1 == op->do_hex) {
