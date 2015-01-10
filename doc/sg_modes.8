@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_MODES "8" "January 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
@@ -94,8 +94,13 @@ print out the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 The default action is to decode known mode page numbers (and subpage
 numbers) into text. When this option is used once, the response is output
-in hexadecimal. When this option is used twice, mode page numbers and
-page control values are output in hex.
+in hexadecimal to stdout. When this option is used twice, mode page numbers
+and page control values are output in hex.
+.br
+When this option is used three times, the full response to the MODE SENSE
+command is output in hex to stdout without any decoding. This form can
+be redirected to a file (or piped) and then used 'sdparm \-\-inhex=' to
+decode.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 lists all common page and subpage codes and their names that are found in
@@ -269,7 +274,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2014 Douglas Gilbert
+Copyright \(co 2000\-2015 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

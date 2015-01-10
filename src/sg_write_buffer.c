@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2015 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -13,6 +13,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -21,12 +23,13 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#include "sg_unaligned.h"
 
 /*
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.18 20141107";    /* spc4r37 */
+static const char * version_str = "1.19 20150108";    /* spc5r02 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -191,24 +194,28 @@ print_modes(void)
  * -1 -> other failure */
 static int
 sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
-                      int buffer_offset, void * paramp, int param_len,
-                      int noisy, int verbose)
+                      uint32_t buffer_offset, void * paramp,
+                      uint32_t param_len, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char wbufCmdBlk[WRITE_BUFFER_CMDLEN] =
+    uint8_t wbufCmdBlk[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    wbufCmdBlk[1] = (unsigned char)(mode & 0x1f);
-    wbufCmdBlk[1] |= (unsigned char)((m_specific & 0x7) << 5);
-    wbufCmdBlk[2] = (unsigned char)(buffer_id & 0xff);
-    wbufCmdBlk[3] = (unsigned char)((buffer_offset >> 16) & 0xff);
-    wbufCmdBlk[4] = (unsigned char)((buffer_offset >> 8) & 0xff);
-    wbufCmdBlk[5] = (unsigned char)(buffer_offset & 0xff);
-    wbufCmdBlk[6] = (unsigned char)((param_len >> 16) & 0xff);
-    wbufCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
-    wbufCmdBlk[8] = (unsigned char)(param_len & 0xff);
+    if (buffer_offset > 0xffffff) {
+        pr2serr("%s: buffer_offset value too large for 24 bits\n", __func__);
+        return -1;
+    }
+    if (param_len > 0xffffff) {
+        pr2serr("%s: param_len value too large for 24 bits\n", __func__);
+        return -1;
+    }
+    wbufCmdBlk[1] = (uint8_t)(mode & 0x1f);
+    wbufCmdBlk[1] |= (uint8_t)((m_specific & 0x7) << 5);
+    wbufCmdBlk[2] = (uint8_t)(buffer_id & 0xff);
+    sg_put_unaligned_be24(buffer_offset, wbufCmdBlk + 3);
+    sg_put_unaligned_be24(param_len, wbufCmdBlk + 6);
     if (verbose) {
         pr2serr("    Write buffer cmd: ");
         for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
@@ -224,14 +231,14 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        pr2serr("write buffer: out of memory\n");
+        pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, wbufCmdBlk, sizeof(wbufCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "write buffer", res, 0, sense_b,
+    ret = sg_cmds_process_resp(ptvp, "Write buffer", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
