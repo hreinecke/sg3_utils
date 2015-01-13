@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2014 D. Gilbert
+ *  Copyright (C) 2000-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.28 20141219";    /* spc5r00 + sbc4r04 */
+static const char * version_str = "1.29 20150111";    /* spc5r02 + sbc4r04 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -3516,14 +3516,37 @@ show_format_status_page(const uint8_t * resp, int len,
         }
         counter = 1;
         switch (pc) {
-        case 0: printf("  Format data out:\n");
+        case 0:
+            if (pl < 5)
+                printf("  Format data out: <empty>\n");
+            else {
+                for (all_ff = 1, j = 4; j < pl; ++j) {
+                    if (0xff != ucp[j]) {
+                        all_ff = 0;
+                        break;
+                    }
+                }
+                if (all_ff)
+                    printf("  Format data out: <not available>\n");
+                else {
+                    printf("  Format data out:\n");
+                    dStrHex((const char *)ucp + 4, pl - 4, 0);
+                }
+            }
             counter = 0;
-            dStrHex((const char *)ucp, pl, 0);
             break;
-        case 1: printf("  Grown defects during certification"); break;
-        case 2: printf("  Total blocks reassigned during format"); break;
-        case 3: printf("  Total new blocks reassigned"); break;
-        case 4: printf("  Power on minutes since format"); break;
+        case 1:
+            printf("  Grown defects during certification");
+            break;
+        case 2:
+            printf("  Total blocks reassigned during format");
+            break;
+        case 3:
+            printf("  Total new blocks reassigned");
+            break;
+        case 4:
+            printf("  Power on minutes since format");
+            break;
         default:
             printf("  Unknown Format status code = 0x%x\n", pc);
             counter = 0;
