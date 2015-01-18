@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_VPD "8" "January 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
@@ -25,8 +25,8 @@ has been flagged as mandatory. This page can be fetched by
 using the \fI\-\-ident\fR option.
 .PP
 The reference document used for interpreting VPD pages (and the INQUIRY
-standard response) is T10/1713\-D Revision 37 (SPC\-4, 17 May 2014)
-found at http://www.t10.org .
+standard response) is T10/BSR INCITS 502 Revision 02 which is draft
+SPC\-5 revision 02, 7 January 2015). It can be found at http://www.t10.org .
 .PP
 When no options are given, other than a \fIDEVICE\fR, then the "Supported
 VPD pages" (0x0) VPD page is fetched and decoded.
@@ -290,7 +290,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2014 Douglas Gilbert
+Copyright \(co 2006\-2015 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

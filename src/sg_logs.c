@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.29 20150111";    /* spc5r02 + sbc4r04 */
+static const char * version_str = "1.30 20150113";    /* spc5r02 + sbc4r04 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -213,6 +213,10 @@ static bool show_cache_stats_page(const uint8_t * resp, int len,
                                   const struct opts_t * op);
 static bool show_power_condition_transitions_page(const uint8_t * resp,
                                  int len, const struct opts_t * op);
+static bool show_environmental_reporting_page(const uint8_t * resp, int len,
+                                              const struct opts_t * op);
+static bool show_environmental_limits_page(const uint8_t * resp, int len,
+                                           const struct opts_t * op);
 static bool show_data_compression_lpage(const uint8_t * resp, int len,
                                         const struct opts_t * op);
 static bool show_tape_alert_ssc_page(const uint8_t * resp, int len,
@@ -257,10 +261,10 @@ static struct log_elem log_arr[] = {
      show_sequential_access_page},      /* 0xc, 0x0  SSC */
     {TEMPERATURE_LPAGE, 0, 0, -1, 0, "Temperature", "temp",
      show_temperature_page},            /* 0xd, 0x0 */
-    {TEMPERATURE_LPAGE, 0x1, 0, -1, 0, "Environmental reporting", "enr",
-     NULL},                             /* 0xd, 0x1 */
-    {TEMPERATURE_LPAGE, 0x2, 0, -1, 0, "Environmental limits", "enl",
-     NULL},                             /* 0xd, 0x2 */
+    {TEMPERATURE_LPAGE, ENV_REPORTING_SUBPG, 0, -1, 0,  /* 0xd, 0x1 */
+     "Environmental reporting", "enr", show_environmental_reporting_page},
+    {TEMPERATURE_LPAGE, ENV_LIMITS_SUBPG, 0, -1, 0,     /* 0xd, 0x2 */
+     "Environmental limits", "enl", show_environmental_limits_page},
     {START_STOP_LPAGE, 0, 0, -1, 0, "Start-stop cycle counter", "sscc",
      show_start_stop_page},             /* 0xe, 0x0 */
     {0xe, 0x1, 0, 0, 0, "Utilization", "util",
@@ -1761,6 +1765,192 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             printf("  Reserved [0x%x]", pc);
         }
         printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        if (op->do_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+static char *
+temperature_str(int8_t t, bool reporting, char * b, int blen)
+{
+    if (-128 == t) {
+        if (reporting)
+            snprintf(b, blen, "not available");
+        else
+            snprintf(b, blen, "no limit");
+    } else
+        snprintf(b, blen, "%d C", t);
+    return b;
+}
+
+static char *
+humidity_str(uint8_t h, bool reporting, char * b, int blen)
+{
+    if (255 == h) {
+        if (reporting)
+            snprintf(b, blen, "not available");
+        else
+            snprintf(b, blen, "no limit");
+    } else if (h <= 100)
+        snprintf(b, blen, "%u %%", h);
+    else
+        snprintf(b, blen, "reserved value [%u]", h);
+    return b;
+}
+
+/* ENV_REPORTING_SUBPG [0xd,0x1]  introduced: SPC-5 (rev 02) */
+static bool
+show_environmental_reporting_page(const uint8_t * resp, int len,
+                                  const struct opts_t * op)
+{
+    int num, pl, pc, pcb, blen;
+    const uint8_t * ucp;
+    char pcb_str[PCB_STR_LEN];
+    char b[32];
+
+    blen = sizeof(b);
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Environmental reporting page  [0xd,0x1]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        if (pc < 0x100) {
+            if (pl < 12)  {
+                printf("  <<expect parameter 0x%x to be at least 12 bytes "
+                       "long, got %d, skip>>\n", pc, pl);
+                goto skip;
+            }
+            printf("  Temperature: %s\n",
+                   temperature_str(ucp[5], true, b, blen));
+            printf("  Lifetime maximum temperature: %s\n",
+                   temperature_str(ucp[6], true, b, blen));
+            printf("  Lifetime minimum temperature: %s\n",
+                   temperature_str(ucp[7], true, b, blen));
+            printf("  Maximum temperature since power on: %s\n",
+                   temperature_str(ucp[8], true, b, blen));
+            printf("  Minimum temperature since power on: %s\n",
+                   temperature_str(ucp[9], true, b, blen));
+        } else if (pc < 0x200) {
+            printf("  Relative humidity: %s\n",
+                   humidity_str(ucp[5], true, b, blen));
+            printf("  Lifetime maximum relative humidity: %s\n",
+                   humidity_str(ucp[6], true, b, blen));
+            printf("  Lifetime minimum relative humidity: %s\n",
+                   humidity_str(ucp[7], true, b, blen));
+            printf("  Maximum relative humidity since power on: %s\n",
+                   humidity_str(ucp[8], true, b, blen));
+            printf("  Minimum relative humidity since power on: %s\n",
+                   humidity_str(ucp[9], true, b, blen));
+        } else
+            printf("  <<unexpect parameter code 0x%x\n", pc);
+        if (op->do_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+/* ENV_LIMITS_SUBPG [0xd,0x2]  introduced: SPC-5 (rev 02) */
+static bool
+show_environmental_limits_page(const uint8_t * resp, int len,
+                               const struct opts_t * op)
+{
+    int num, pl, pc, pcb, blen;
+    const uint8_t * ucp;
+    char pcb_str[PCB_STR_LEN];
+    char b[32];
+
+    blen = sizeof(b);
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Environmental limits page  [0xd,0x2]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        if (pc < 0x100) {
+            if (pl < 12)  {
+                printf("  <<expect parameter 0x%x to be at least 12 bytes "
+                       "long, got %d, skip>>\n", pc, pl);
+                goto skip;
+            }
+            printf("  High critical temperature limit trigger: %s\n",
+                   temperature_str(ucp[4], false, b, blen));
+            printf("  High critical temperature limit reset: %s\n",
+                   temperature_str(ucp[5], false, b, blen));
+            printf("  Low critical temperature limit reset: %s\n",
+                   temperature_str(ucp[6], false, b, blen));
+            printf("  Low critical temperature limit trigger: %s\n",
+                   temperature_str(ucp[7], false, b, blen));
+            printf("  High operating temperature limit trigger: %s\n",
+                   temperature_str(ucp[8], false, b, blen));
+            printf("  High operating temperature limit reset: %s\n",
+                   temperature_str(ucp[9], false, b, blen));
+            printf("  Low operating temperature limit reset: %s\n",
+                   temperature_str(ucp[10], false, b, blen));
+            printf("  Low operating temperature limit trigger: %s\n",
+                   temperature_str(ucp[11], false, b, blen));
+        } else if (pc < 0x200) {
+            printf("  High critical relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[4], false, b, blen));
+            printf("  High critical relative humidity limit reset: %s\n",
+                   humidity_str(ucp[5], false, b, blen));
+            printf("  Low critical relative humidity limit reset: %s\n",
+                   humidity_str(ucp[6], false, b, blen));
+            printf("  Low critical relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[7], false, b, blen));
+            printf("  High operating relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[8], false, b, blen));
+            printf("  High operating relative humidity limit reset: %s\n",
+                   humidity_str(ucp[9], false, b, blen));
+            printf("  Low operating relative humidity limit reset: %s\n",
+                   humidity_str(ucp[10], false, b, blen));
+            printf("  Low operating relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[11], false, b, blen));
+        } else
+            printf("  <<unexpect parameter code 0x%x\n", pc);
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
