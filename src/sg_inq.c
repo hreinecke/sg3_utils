@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2014 D. Gilbert
+*  Copyright (C) 2000-2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.44 20141210";    /* SPC-4 rev 37 */
+static const char * version_str = "1.45 20150119";    /* SPC-5 rev 02 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2955,6 +2955,13 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     if (page != rp[1]) {
         pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
                 "response\n");
+        return SG_LIB_CAT_MALFORMED;
+    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
+        /* could be a Unit Serial number VPD page with a very long
+         * length of 4+514 bytes; more likely standard response for
+         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
+        pr2serr("invalid Unit Serial Number VPD response; probably a "
+                "STANDARD INQUIRY response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (mxlen < 0)

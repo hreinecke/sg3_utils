@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.00 20150113";  /* spc5r02 + sbc4r03 */
+static const char * version_str = "1.01 20150119";  /* spc5r02 + sbc4r03 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -597,6 +597,13 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
             pr2serr("First %d bytes of bad response\n", n);
             dStrHexErr((const char *)rp, n, 0);
         }
+        return SG_LIB_CAT_MALFORMED;
+    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
+        /* could be a Unit Serial number VPD page with a very long
+         * length of 4+514 bytes; more likely standard response for
+         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
+        pr2serr("invalid Unit Serial Number VPD response; probably a "
+                "STANDARD INQUIRY response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (mxlen < 0)
