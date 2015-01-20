@@ -48,7 +48,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.21 20140516";
+static const char * version_str = "1.22 20141227";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -659,7 +659,7 @@ int main(int argc, char * argv[])
                 return SG_LIB_CAT_OTHER;
             }
             /* perhaps use posix_memalign() instead */
-            wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
+            wrkPos = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         } else if (do_mmap) {
             wrkPos = (unsigned char *)mmap(NULL, bs * bpt,

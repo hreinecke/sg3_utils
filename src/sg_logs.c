@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2014 D. Gilbert
+ *  Copyright (C) 2000-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.27 20141214";    /* spc4r37a + sbc4r04 */
+static const char * version_str = "1.30 20150113";    /* spc5r02 + sbc4r04 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -137,6 +137,7 @@ struct opts_t {
     int dev_pdt;
     const char * device_name;
     const char * in_fn;
+    const char * pg_arg;
     const struct log_elem * lep;
 };
 
@@ -212,6 +213,10 @@ static bool show_cache_stats_page(const uint8_t * resp, int len,
                                   const struct opts_t * op);
 static bool show_power_condition_transitions_page(const uint8_t * resp,
                                  int len, const struct opts_t * op);
+static bool show_environmental_reporting_page(const uint8_t * resp, int len,
+                                              const struct opts_t * op);
+static bool show_environmental_limits_page(const uint8_t * resp, int len,
+                                           const struct opts_t * op);
 static bool show_data_compression_lpage(const uint8_t * resp, int len,
                                         const struct opts_t * op);
 static bool show_tape_alert_ssc_page(const uint8_t * resp, int len,
@@ -256,10 +261,10 @@ static struct log_elem log_arr[] = {
      show_sequential_access_page},      /* 0xc, 0x0  SSC */
     {TEMPERATURE_LPAGE, 0, 0, -1, 0, "Temperature", "temp",
      show_temperature_page},            /* 0xd, 0x0 */
-    {TEMPERATURE_LPAGE, 0x1, 0, -1, 0, "Environmental reporting", "enr",
-     NULL},                             /* 0xd, 0x1 */
-    {TEMPERATURE_LPAGE, 0x2, 0, -1, 0, "Environmental limits", "enl",
-     NULL},                             /* 0xd, 0x2 */
+    {TEMPERATURE_LPAGE, ENV_REPORTING_SUBPG, 0, -1, 0,  /* 0xd, 0x1 */
+     "Environmental reporting", "enr", show_environmental_reporting_page},
+    {TEMPERATURE_LPAGE, ENV_LIMITS_SUBPG, 0, -1, 0,     /* 0xd, 0x2 */
+     "Environmental limits", "enl", show_environmental_limits_page},
     {START_STOP_LPAGE, 0, 0, -1, 0, "Start-stop cycle counter", "sscc",
      show_start_stop_page},             /* 0xe, 0x0 */
     {0xe, 0x1, 0, 0, 0, "Utilization", "util",
@@ -678,10 +683,7 @@ usage_for(int hval, const struct opts_t * op)
 static int
 process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
-    int c, n, nn;
-    char * cp;
-    const struct log_elem * lep;
-    char b[80];
+    int c, n;
 
     while (1) {
         int option_index = 0;
@@ -767,56 +769,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->opt_new = 0;
             return 0;
         case 'p':
-            if (isalpha(optarg[0])) {
-                if (strlen(optarg) >= (sizeof(b) - 1)) {
-                    pr2serr("argument to '--page=' is too long\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                strcpy(b, optarg);
-                cp = strchr(b, ',');
-                if (cp)
-                    *cp = '\0';
-                lep = acron_search(b);
-                if (NULL == lep) {
-                    pr2serr("bad argument to '--page=' no acronyn match to "
-                            "'%s'\n", b);
-                    pr2serr("  Try using '-e' or'-ee' to see available "
-                            "acronyns\n");
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                op->lep = lep;
-                op->pg_code = lep->pg_code;
-                if (cp) {
-                    nn = sg_get_num_nomult(cp + 1);
-                    if ((nn < 0) || (nn > 255)) {
-                        pr2serr("Bad second value in argument to "
-                                "'--page='\n");
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                    op->subpg_code = nn;
-                } else
-                    op->subpg_code = lep->subpg_code;
-            } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
-                cp = strchr(optarg, ',');
-                n = sg_get_num_nomult(optarg);
-                if ((n < 0) || (n > 63)) {
-                    pr2serr("Bad argument to '--page='\n");
-                    usage(1);
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-                if (cp) {
-                    nn = sg_get_num_nomult(cp + 1);
-                    if ((nn < 0) || (nn > 255)) {
-                        pr2serr("Bad second value in argument to "
-                                "'--page='\n");
-                        usage(1);
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                } else
-                    nn = 0;
-                op->pg_code = n;
-                op->subpg_code = nn;
-            }
+            op->pg_arg = optarg;
             break;
         case 'P':
             n = sg_get_num(optarg);
@@ -1012,7 +965,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                         return SG_LIB_SYNTAX_ERROR;
                     }
                     strcpy(b, ccp);
-                    xp = strchr(b, ',');
+                    xp = (char *)strchr(b, ',');
                     if (xp)
                         *xp = '\0';
                     lep = acron_search(b);
@@ -1480,9 +1433,12 @@ show_supported_pgs_sub_lpage(const uint8_t * resp, int len,
     const struct log_elem * lep;
     char b[64];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Supported log pages and subpages  [0x%x, 0xff]:\n",
-               op->pg_code);
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+        if (op->pg_code > 0)
+            printf("Supported subpages  [0x%x, 0xff]:\n", op->pg_code);
+        else
+            printf("Supported log pages and subpages  [0x0, 0xff]:\n");
+    }
     num = len - 4;
     ucp = &resp[0] + 4;
     for (k = 0; k < num; k += 2) {
@@ -1809,6 +1765,192 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             printf("  Reserved [0x%x]", pc);
         }
         printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        if (op->do_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+static char *
+temperature_str(int8_t t, bool reporting, char * b, int blen)
+{
+    if (-128 == t) {
+        if (reporting)
+            snprintf(b, blen, "not available");
+        else
+            snprintf(b, blen, "no limit");
+    } else
+        snprintf(b, blen, "%d C", t);
+    return b;
+}
+
+static char *
+humidity_str(uint8_t h, bool reporting, char * b, int blen)
+{
+    if (255 == h) {
+        if (reporting)
+            snprintf(b, blen, "not available");
+        else
+            snprintf(b, blen, "no limit");
+    } else if (h <= 100)
+        snprintf(b, blen, "%u %%", h);
+    else
+        snprintf(b, blen, "reserved value [%u]", h);
+    return b;
+}
+
+/* ENV_REPORTING_SUBPG [0xd,0x1]  introduced: SPC-5 (rev 02) */
+static bool
+show_environmental_reporting_page(const uint8_t * resp, int len,
+                                  const struct opts_t * op)
+{
+    int num, pl, pc, pcb, blen;
+    const uint8_t * ucp;
+    char pcb_str[PCB_STR_LEN];
+    char b[32];
+
+    blen = sizeof(b);
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Environmental reporting page  [0xd,0x1]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        if (pc < 0x100) {
+            if (pl < 12)  {
+                printf("  <<expect parameter 0x%x to be at least 12 bytes "
+                       "long, got %d, skip>>\n", pc, pl);
+                goto skip;
+            }
+            printf("  Temperature: %s\n",
+                   temperature_str(ucp[5], true, b, blen));
+            printf("  Lifetime maximum temperature: %s\n",
+                   temperature_str(ucp[6], true, b, blen));
+            printf("  Lifetime minimum temperature: %s\n",
+                   temperature_str(ucp[7], true, b, blen));
+            printf("  Maximum temperature since power on: %s\n",
+                   temperature_str(ucp[8], true, b, blen));
+            printf("  Minimum temperature since power on: %s\n",
+                   temperature_str(ucp[9], true, b, blen));
+        } else if (pc < 0x200) {
+            printf("  Relative humidity: %s\n",
+                   humidity_str(ucp[5], true, b, blen));
+            printf("  Lifetime maximum relative humidity: %s\n",
+                   humidity_str(ucp[6], true, b, blen));
+            printf("  Lifetime minimum relative humidity: %s\n",
+                   humidity_str(ucp[7], true, b, blen));
+            printf("  Maximum relative humidity since power on: %s\n",
+                   humidity_str(ucp[8], true, b, blen));
+            printf("  Minimum relative humidity since power on: %s\n",
+                   humidity_str(ucp[9], true, b, blen));
+        } else
+            printf("  <<unexpect parameter code 0x%x\n", pc);
+        if (op->do_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("\n        <%s>\n", pcb_str);
+        } else
+            printf("\n");
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+/* ENV_LIMITS_SUBPG [0xd,0x2]  introduced: SPC-5 (rev 02) */
+static bool
+show_environmental_limits_page(const uint8_t * resp, int len,
+                               const struct opts_t * op)
+{
+    int num, pl, pc, pcb, blen;
+    const uint8_t * ucp;
+    char pcb_str[PCB_STR_LEN];
+    char b[32];
+
+    blen = sizeof(b);
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Environmental limits page  [0xd,0x2]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        if (pc < 0x100) {
+            if (pl < 12)  {
+                printf("  <<expect parameter 0x%x to be at least 12 bytes "
+                       "long, got %d, skip>>\n", pc, pl);
+                goto skip;
+            }
+            printf("  High critical temperature limit trigger: %s\n",
+                   temperature_str(ucp[4], false, b, blen));
+            printf("  High critical temperature limit reset: %s\n",
+                   temperature_str(ucp[5], false, b, blen));
+            printf("  Low critical temperature limit reset: %s\n",
+                   temperature_str(ucp[6], false, b, blen));
+            printf("  Low critical temperature limit trigger: %s\n",
+                   temperature_str(ucp[7], false, b, blen));
+            printf("  High operating temperature limit trigger: %s\n",
+                   temperature_str(ucp[8], false, b, blen));
+            printf("  High operating temperature limit reset: %s\n",
+                   temperature_str(ucp[9], false, b, blen));
+            printf("  Low operating temperature limit reset: %s\n",
+                   temperature_str(ucp[10], false, b, blen));
+            printf("  Low operating temperature limit trigger: %s\n",
+                   temperature_str(ucp[11], false, b, blen));
+        } else if (pc < 0x200) {
+            printf("  High critical relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[4], false, b, blen));
+            printf("  High critical relative humidity limit reset: %s\n",
+                   humidity_str(ucp[5], false, b, blen));
+            printf("  Low critical relative humidity limit reset: %s\n",
+                   humidity_str(ucp[6], false, b, blen));
+            printf("  Low critical relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[7], false, b, blen));
+            printf("  High operating relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[8], false, b, blen));
+            printf("  High operating relative humidity limit reset: %s\n",
+                   humidity_str(ucp[9], false, b, blen));
+            printf("  Low operating relative humidity limit reset: %s\n",
+                   humidity_str(ucp[10], false, b, blen));
+            printf("  Low operating relative humidity limit trigger: %s\n",
+                   humidity_str(ucp[11], false, b, blen));
+        } else
+            printf("  <<unexpect parameter code 0x%x\n", pc);
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -3564,14 +3706,37 @@ show_format_status_page(const uint8_t * resp, int len,
         }
         counter = 1;
         switch (pc) {
-        case 0: printf("  Format data out:\n");
+        case 0:
+            if (pl < 5)
+                printf("  Format data out: <empty>\n");
+            else {
+                for (all_ff = 1, j = 4; j < pl; ++j) {
+                    if (0xff != ucp[j]) {
+                        all_ff = 0;
+                        break;
+                    }
+                }
+                if (all_ff)
+                    printf("  Format data out: <not available>\n");
+                else {
+                    printf("  Format data out:\n");
+                    dStrHex((const char *)ucp + 4, pl - 4, 0);
+                }
+            }
             counter = 0;
-            dStrHex((const char *)ucp, pl, 0);
             break;
-        case 1: printf("  Grown defects during certification"); break;
-        case 2: printf("  Total blocks reassigned during format"); break;
-        case 3: printf("  Total new blocks reassigned"); break;
-        case 4: printf("  Power on minutes since format"); break;
+        case 1:
+            printf("  Grown defects during certification");
+            break;
+        case 2:
+            printf("  Total blocks reassigned during format");
+            break;
+        case 3:
+            printf("  Total new blocks reassigned");
+            break;
+        case 4:
+            printf("  Power on minutes since format");
+            break;
         default:
             printf("  Unknown Format status code = 0x%x\n", pc);
             counter = 0;
@@ -5412,6 +5577,67 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }
 
+static int
+decode_pg_arg(struct opts_t * op)
+{
+    int n, nn;
+    const struct log_elem * lep;
+    char * cp;
+    char b[80];
+
+    if (isalpha(op->pg_arg[0])) {
+        if (strlen(op->pg_arg) >= (sizeof(b) - 1)) {
+            pr2serr("argument to '--page=' is too long\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        strcpy(b, op->pg_arg);
+        cp = (char *)strchr(b, ',');
+        if (cp)
+            *cp = '\0';
+        lep = acron_search(b);
+        if (NULL == lep) {
+            pr2serr("bad argument to '--page=' no acronyn match to "
+                    "'%s'\n", b);
+            pr2serr("  Try using '-e' or'-ee' to see available "
+                    "acronyns\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        op->lep = lep;
+        op->pg_code = lep->pg_code;
+        if (cp) {
+            nn = sg_get_num_nomult(cp + 1);
+            if ((nn < 0) || (nn > 255)) {
+                pr2serr("Bad second value in argument to "
+                        "'--page='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->subpg_code = nn;
+        } else
+            op->subpg_code = lep->subpg_code;
+    } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
+        cp = (char *)strchr(op->pg_arg, ',');
+        n = sg_get_num_nomult(op->pg_arg);
+        if ((n < 0) || (n > 63)) {
+            pr2serr("Bad argument to '--page='\n");
+            usage(1);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (cp) {
+            nn = sg_get_num_nomult(cp + 1);
+            if ((nn < 0) || (nn > 255)) {
+                pr2serr("Bad second value in argument to "
+                        "'--page='\n");
+                usage(1);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else
+            nn = 0;
+        op->pg_code = n;
+        op->subpg_code = nn;
+    }
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -5465,6 +5691,9 @@ main(int argc, char * argv[])
                         op->in_fn, in_len);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if (op->pg_arg && (0 == op->do_brief))
+                pr2serr(">>> --page=%s option is being ignored, using values "
+                        "in file: %s\n", op->pg_arg, op->in_fn);
             for (ucp = rsp_buff, k = 0; k < in_len; ucp += n, k += n) {
                 pg_code = ucp[0] & 0x3f;
                 subpg_code = (ucp[0] & 0x40) ? ucp[1] : 0;
@@ -5536,6 +5765,17 @@ main(int argc, char * argv[])
         if (f2hex_arr(op->in_fn, op->do_raw, 0, rsp_buff, &in_len,
                       sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
+    }
+    if (op->pg_arg) {
+        if (op->do_all) {
+            if (0 == op->do_brief)
+                pr2serr(">>> warning: --page=%s ignored when --all given\n",
+                        op->pg_arg);
+        } else {
+            res = decode_pg_arg(op);
+            if (res)
+                return res;
+        }
     }
 
 #ifdef SG_LIB_WIN32

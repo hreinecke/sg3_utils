@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Douglas Gilbert.
+ * Copyright (c) 2006-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "0.98 20141210";  /* spc4r37 + sbc4r03 */
+static const char * version_str = "1.01 20150119";  /* spc5r02 + sbc4r03 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -394,8 +394,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                 if (1 == sscanf(carry_over, "%x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
-                    pr2serr("f2hex_arr: carry_over error ['%s'] around line "
-                            "%d\n", carry_over, j + 1);
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
                     goto bad;
                 }
                 lcp = line + 1;
@@ -415,7 +415,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
         if ((k < in_len) && ('#' != lcp[k])) {
-            pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                     j + 1, m + k + 1);
             goto bad;
         }
@@ -423,12 +423,12 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
                  ++k, lcp += 2) {
                 if (1 != sscanf(lcp, "%2x", &h)) {
-                    pr2serr("f2hex_arr: bad hex number in line %d, "
-                            "pos %d\n", j + 1, (int)(lcp - line + 1));
+                    pr2serr("%s: bad hex number in line %d, pos %d\n",
+                            __func__, j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
                 if ((off + k) >= max_arr_len) {
-                    pr2serr("f2hex_arr: array length exceeded\n");
+                    pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
                 mp_arr[off + k] = h;
@@ -440,8 +440,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        pr2serr("f2hex_arr: hex number larger than "
-                                "0xff in line %d, pos %d\n", j + 1,
+                        pr2serr("%s: hex number larger than 0xff in line "
+                                "%d, pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
                         goto bad;
                     }
@@ -450,7 +450,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        pr2serr("f2hex_arr: array length exceeded\n");
+                        pr2serr("%s: array length exceeded\n", __func__);
                         goto bad;
                     }
                     mp_arr[off + k] = h;
@@ -465,8 +465,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         --k;
                         break;
                     }
-                    pr2serr("f2hex_arr: error in line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
             }
@@ -597,6 +597,13 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
             pr2serr("First %d bytes of bad response\n", n);
             dStrHexErr((const char *)rp, n, 0);
         }
+        return SG_LIB_CAT_MALFORMED;
+    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
+        /* could be a Unit Serial number VPD page with a very long
+         * length of 4+514 bytes; more likely standard response for
+         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
+        pr2serr("invalid Unit Serial Number VPD response; probably a "
+                "STANDARD INQUIRY response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (mxlen < 0)
@@ -1720,6 +1727,10 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
             case 5:
                 printf(" [protection types 2 and 3 supported]\n");
                 break;
+            case 6:
+                printf(" [see Supported block lengths and protection types "
+                       "VPD page]\n");
+                break;
             case 7:
                 printf(" [protection types 1, 2 and 3 supported]\n");
                 break;
@@ -1742,10 +1753,12 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         printf("  CRD_SUP=%d\n", !!(b[6] & 0x4));
         printf("  NV_SUP=%d\n", !!(b[6] & 0x2));
         printf("  V_SUP=%d\n", !!(b[6] & 0x1));
+        printf("  NO_PI_CHK=%d\n", !!(b[7] & 0x10));    /* spc5r02 */
         printf("  P_I_I_SUP=%d\n", !!(b[7] & 0x10));
         printf("  LUICLR=%d\n", !!(b[7] & 0x1));
         printf("  R_SUP=%d\n", !!(b[8] & 0x10));
-        printf("  CBCS=%d\n", !!(b[8] & 0x1));
+        printf("  HSSRELEF=%d\n", !!(b[8] & 0x2));      /* spc5r02 */
+        printf("  CBCS=%d\n", !!(b[8] & 0x1));  /* obsolete in spc5r01 */
         printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
         printf("  Extended self-test completion minutes=%d\n",
                sg_get_unaligned_be16(b + 10));
@@ -1764,6 +1777,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
            !!(b[5] & 0x4), !!(b[5] & 0x2), !!(b[5] & 0x1));
     printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
            !!(b[6] & 0x8), !!(b[6] & 0x4), !!(b[6] & 0x2), !!(b[6] & 0x1));
+    /* CBCS, capability-based command security, obsolete in spc5r01 */
     printf("  P_I_I_SUP=%d LUICLR=%d R_SUP=%d CBCS=%d\n",
            !!(b[7] & 0x10), !!(b[7] & 0x1), !!(b[8] & 0x10), !!(b[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
@@ -2007,12 +2021,14 @@ static struct tpc_desc_type tpc_desc_arr[] = {
     {0xe, "stream -> stream&application_client"},
     {0xf, "stream -> discard&application_client"},
     {0x10, "filemark -> tape"},
-    {0x11, "space -> tape"},
-    {0x12, "locate -> tape"},
+    {0x11, "space -> tape"},            /* obsolete: spc5r02 */
+    {0x12, "locate -> tape"},           /* obsolete: spc5r02 */
     {0x13, "<i>tape -> <i>tape"},
     {0x14, "register persistent reservation key"},
     {0x15, "third party persistent reservation source I_T nexus"},
     {0x16, "<i>block -> <i>block"},
+    {0x17, "positioning -> tape"},      /* this and next added spc5r02 */
+    {0x18, "<loi>tape -> <loi>tape"},   /* loi: logical object identifier */
     {0xbe, "ROD <- block range(n)"},
     {0xbf, "ROD <- block range(1)"},
     {0xe0, "CSCD: FC N_Port_Name"},
@@ -2068,6 +2084,32 @@ get_tpc_rod_name(uint32_t rod_type)
     for (rtp = tpc_rod_arr; rtp->name; ++rtp) {
         if (rod_type == rtp->type)
             return rtp->name;
+    }
+    return "";
+}
+
+struct cscd_desc_id_t {
+    uint16_t id;
+    const char * name;
+};
+
+static struct cscd_desc_id_t cscd_desc_id_arr[] = {
+    /* only values higher than 0x7ff are listed */
+    {0xc000, "copy src or dst null LU, pdt=0"},
+    {0xc001, "copy src or dst null LU, pdt=1"},
+    {0xf800, "copy src or dst in ROD token"},
+    {0xffff, "copy src or dst is copy manager LU"},
+    {0x0, NULL},
+};
+
+static const char *
+get_cscd_desc_id_name(uint16_t cscd_desc_id)
+{
+    const struct cscd_desc_id_t * cdip;
+
+    for (cdip = cscd_desc_id_arr; cdip->name; ++cdip) {
+        if (cscd_desc_id == cdip->id)
+            return cdip->name;
     }
     return "";
 }
@@ -2157,10 +2199,14 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
                 }
                 break;
             case 0x000C:
-                printf(" Supported CSCD IDs:\n");
+                printf(" Supported CSCD IDs (above 0x7ff):\n");
                 for (j = 0; j < sg_get_unaligned_be16(ucp + 4); j += 2) {
                     u = sg_get_unaligned_be16(ucp + 6 + j);
-                    printf("  0x%04x\n", u);
+                    cp = get_cscd_desc_id_name(u);
+                    if (strlen(cp) > 0)
+                        printf("  %s [0x%04x]\n", cp, u);
+                    else
+                        printf("  0x%04x\n", u);
                 }
                 break;
             case 0x0106:
@@ -2810,20 +2856,20 @@ decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
     u = sg_get_unaligned_be32(b + 8);
     printf("  Optimal number of open sequential write preferred zones: ");
     if (0xffffffff == u)
-        printf("0xffffffff\n");
+        printf("not reported\n");
     else
         printf("%" PRIu32 "\n", u);
     u = sg_get_unaligned_be32(b + 12);
     printf("  Optimal number of non-sequentially written sequential write "
            "preferred zones: ");
     if (0xffffffff == u)
-        printf("0xffffffff\n");
+        printf("not reported\n");
     else
         printf("%" PRIu32 "\n", u);
     u = sg_get_unaligned_be32(b + 16);
-    printf("  Maximum number of open sequential write required: ");
+    printf("  Maximum number of open sequential write required zones: ");
     if (0xffffffff == u)
-        printf("0xffffffff\n");
+        printf("no limit\n");
     else
         printf("%" PRIu32 "\n", u);
 }

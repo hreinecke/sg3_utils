@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_WRITE_SAME "8" "January 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -210,12 +210,12 @@ Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
 .PP
-In Linux at this time the sg driver does not support cdb sizes greater than
-16 bytes. [This restriction will be removed in lk 3.17 .] Hence a device
-node like /dev/sg1 which is associated with the sg driver will fail with
-this utility if the \fI\-\-32\fR option is given (or implied by other
-options). The bsg driver with device nodes like /dev/bsg/6:0:0:1 does
-support cdb sizes greater than 16 bytes.
+In Linux, prior to lk 3.17, the sg driver did not support cdb sizes greater
+than 16 bytes. Hence a device node like /dev/sg1 which is associated with
+the sg driver would fail with this utility if the \fI\-\-32\fR option was
+given (or implied by other options). The bsg driver with device nodes like
+/dev/bsg/6:0:0:1 does support cdb sizes greater than 16 bytes since its
+introduction in lk 2.6.28 .
 .SH EXIT STATUS
 The exit status of sg_write_same is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -307,7 +307,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2014 Douglas Gilbert
+Copyright \(co 2009\-2015 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

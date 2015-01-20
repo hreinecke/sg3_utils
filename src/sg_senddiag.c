@@ -27,7 +27,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.44 20140919";
+static const char * version_str = "0.45 20141219";
 
 #define ME "sg_senddiag: "
 
@@ -675,8 +675,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "unable to allocate %d bytes\n", op->maxlen);
             return SG_LIB_CAT_OTHER;
         }
-        if (build_diag_page(op->raw_arg, read_in, &read_in_len,
-                            sizeof(read_in))) {
+        if (build_diag_page(op->raw_arg, read_in, &read_in_len, op->maxlen)) {
             if (op->opt_new) {
                 printf("Bad sequence after '--raw=' option\n");
                 usage();

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <getopt.h>
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -27,7 +28,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-#define SG_RAW_VERSION "0.4.11 (2014-10-18)"
+#define SG_RAW_VERSION "0.4.12 (2014-12-27)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -300,7 +301,7 @@ my_memalign(int length, unsigned char ** wrkBuffp)
             return NULL;
         } else if (wrkBuffp)
             *wrkBuffp = wrkBuff;
-        return (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
+        return (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
                                  (~(psz - 1)));
     }
 #endif

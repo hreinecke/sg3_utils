@@ -29,7 +29,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.27 20140607";
+static const char * version_str = "1.28 20141225";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -256,7 +256,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                 case 1:
                     printf("%sREPORT LUNS %s\n", l_leadin, b);
                     break;
-                case 2:
+                case 2:         /* obsolete in spc5r01 */
                     printf("%sACCESS CONTROLS %s\n", l_leadin, b);
                     break;
                 case 3:
@@ -264,6 +264,9 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                     break;
                 case 4:
                     printf("%sSECURITY PROTOCOL %s\n", l_leadin, b);
+                    break;
+                case 5:
+                    printf("%sMANAGEMENT PROTOCOL %s\n", l_leadin, b);
                     break;
                 default:
                     if (do_hex)

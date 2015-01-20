@@ -33,7 +33,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.05 20141107";
+static const char * version_str = "1.06 20141217";
 
 
 #define ME "sg_write_verify: "
@@ -96,8 +96,8 @@ usage()
             "    --lba=LBA|-l LBA     LBA of the first block to write "
             "and verify;\n"
             "                         no default, must be given\n"
-            "    --num=NUM|-n NUM     number of logical blocks to write and "
-            "verify\n"
+            "    --num=NUM|-n NUM     logical blocks to write and verify "
+            "(def: 1)\n"
             "    --repeat|-R          while IF still has data to read, send "
             "another\n"
             "                         command, bumping LBA with up to NUM "

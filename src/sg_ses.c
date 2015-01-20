@@ -22,6 +22,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
 /*
@@ -29,7 +30,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.00 20141215";    /* ses3r08 */
+static const char * version_str = "2.00 20141219";    /* ses3r08 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1362,7 +1363,7 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
                              rsp_buff_size, 1, op->verbose);
     if (0 == res) {
-        rsp_len = (rsp_buff[2] << 8) + rsp_buff[3] + 4;
+        rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {
             if (rsp_buff_size > 8) /* tried to get more than header */
                 pr2serr("<<< warning response buffer too small [%d but need "
@@ -1414,7 +1415,7 @@ static void
 ses_configuration_sdg(const unsigned char * resp, int resp_len)
 {
     int j, k, el, num_subs, sum_elem_types;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const unsigned char * text_ucp;
@@ -1428,9 +1429,8 @@ ses_configuration_sdg(const unsigned char * resp, int resp_len)
     last_ucp = resp + resp_len - 1;
     printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     printf("  enclosure descriptor list\n");
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
@@ -1491,13 +1491,13 @@ truncated:
  * if there is a problem */
 static int
 populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
-                           unsigned int * generationp,
+                           uint32_t * generationp,
                            struct enclosure_info * primary_ip,
                            struct opts_t * op)
 {
     int resp_len, k, el, num_subs, sum_type_dheaders, res, n;
     int ret = 0;
-    unsigned int gen_code;
+    uint32_t gen_code;
     unsigned char * resp;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -1522,8 +1522,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
     num_subs = resp[1] + 1;
     sum_type_dheaders = 0;
     last_ucp = resp + resp_len - 1;
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
+    gen_code = sg_get_unaligned_be32(resp + 4);
     if (generationp)
         *generationp = gen_code;
     ucp = resp + 8;
@@ -1674,10 +1673,27 @@ find_sas_connector_type(int conn_type, char * buff, int buff_len)
         snprintf(buff, buff_len, "Micro SAS/SATA plug (SFF-8486) "
                  "[max 2 phys]");
         break;
+    case 0x28:
+        snprintf(buff, buff_len, "12 Gb/s SAS drive backplane receptacle "
+                 "(SFF-8680) [max 2 phys]");
+        break;
+    case 0x29:
+        snprintf(buff, buff_len, "12 Gb/s SAS drive plug (SFF-8680) [max 2 "
+                 "phys]");
+        break;
+    case 0x2a:
+        snprintf(buff, buff_len, "Multifunction 12 Gb/s 6x unshielded "
+                 "receptacle (SFF-8639)");
+        break;
+    case 0x2b:
+        snprintf(buff, buff_len, "Multifunction 12 Gb/s 6x unshielded plug "
+                 "(SFF-8639)");
+        break;
     case 0x2f:
         snprintf(buff, buff_len, "SAS virtual connector [max 1 phy]");
         break;
-    case 0x3f: snprintf(buff, buff_len, "Vendor specific internal connector");
+    case 0x3f:
+        snprintf(buff, buff_len, "Vendor specific internal connector");
         break;
     default:
         if (conn_type < 0x10)
@@ -1843,7 +1859,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                    !!(statp[2] & 0x1));
         break;
     case NV_CACHE_ETC:     /* Non volatile cache */
-        res = (statp[2] << 8) + statp[3];
+        res = sg_get_unaligned_be16(statp + 2);
         printf("%sIdent=%d, Fail=%d, Size multiplier=%d, Non volatile cache "
                "size=0x%x\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
                (statp[1] & 0x3), res);
@@ -1859,7 +1875,7 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
             break;
         case 1:
             printf("%sByte offset=%d, bit number=%d\n", pad,
-                   (statp[2] << 8) + statp[3], (statp[1] & 7));
+                   sg_get_unaligned_be16(statp + 2), (statp[1] & 7));
             break;
         case 2:
         case 3:
@@ -1892,11 +1908,20 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         }
         break;
     case DISPLAY_ETC:   /* Display (ses2r15) */
-        if (nofilter || (0xc0 & statp[1]))
-            printf("%sIdent=%d, Fail=%d, Display mode status=%d, Display "
-                   "character status=0x%x\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), (statp[1] & 0x3),
-                   ((statp[2] << 8) & statp[3]));
+        if (nofilter || (0xc0 & statp[1])) {
+            int dms = statp[1] & 0x3;
+            uint16_t dcs;
+
+            printf("%sIdent=%d, Fail=%d, Display mode status=%d", pad,
+                   !!(statp[1] & 0x80), !!(statp[1] & 0x40), dms);
+            if ((1 == dms) || (2 == dms)) {
+                dcs = sg_get_unaligned_be16(statp + 2);
+                printf(", Display character status=0x%x", dcs);
+                if (statp[2] && (0 == statp[3]))
+                    printf(" ['%c']", statp[2]);
+            }
+            printf("\n");
+        }
         break;
     case KEY_PAD_ETC:   /* Key pad entry */
         if (nofilter || (0xc0 & statp[1]))
@@ -1946,10 +1971,10 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         }
 #ifdef SG_LIB_MINGW
         printf("%sVoltage: %g volts\n", pad,
-               ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
 #else
         printf("%sVoltage: %.2f volts\n", pad,
-               ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
 #endif
         break;
     case CURR_SENSOR_ETC:   /* Current sensor */
@@ -1959,10 +1984,10 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                     !!(statp[1] & 0x8), !!(statp[1] & 0x2));
 #ifdef SG_LIB_MINGW
         printf("%sCurrent: %g amps\n", pad,
-               ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
 #else
         printf("%sCurrent: %.2f amps\n", pad,
-               ((int)(short)((statp[2] << 8) + statp[3]) / 100.0));
+               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
 #endif
         break;
     case SCSI_TPORT_ETC:   /* SCSI target port */
@@ -2039,11 +2064,11 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
  * Display enclosure status diagnostic page. */
 static void
 ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
-                  unsigned int ref_gen_code, const unsigned char * resp,
+                  uint32_t ref_gen_code, const unsigned char * resp,
                   int resp_len, const struct opts_t * op)
 {
     int j, k, elem_ind, match_ind_th, got1;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     char b[64];
@@ -2057,8 +2082,7 @@ ses_enc_status_dp(const struct type_desc_hdr_t * tdhp, int num_telems,
     last_ucp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
+    gen_code = sg_get_unaligned_be32(resp + 4);
     printf("  generation code: 0x%x\n", gen_code);
     if (ref_gen_code != gen_code) {
         pr2serr("  <<state of enclosure changed, please try again>>\n");
@@ -2176,11 +2200,11 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
 /* DPC_THRESHOLD [0x5] */
 static void
 ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
-                  unsigned int ref_gen_code, const unsigned char * resp,
+                  uint32_t ref_gen_code, const unsigned char * resp,
                   int resp_len, const struct opts_t * op)
 {
     int j, k, elem_ind, match_ind_th, got1;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     char b[64];
@@ -2192,9 +2216,8 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     last_ucp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     if (ref_gen_code != gen_code) {
         pr2serr("  <<state of enclosure changed, please try again>>\n");
         return;
@@ -2239,11 +2262,11 @@ truncated:
  * elements. */
 static void
 ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
-                     unsigned int ref_gen_code, const unsigned char * resp,
+                     uint32_t ref_gen_code, const unsigned char * resp,
                      int resp_len, const struct opts_t * op)
 {
     int j, k, desc_len, elem_ind, match_ind_th, got1;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const struct type_desc_hdr_t * tp;
@@ -2255,9 +2278,8 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     last_ucp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     if (ref_gen_code != gen_code) {
         pr2serr("  <<state of enclosure changed, please try again>>\n");
         return;
@@ -2267,7 +2289,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     for (k = 0, got1 = 0, tp = tdhp; k < num_telems; ++k, ++tp) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        desc_len = (ucp[2] << 8) + ucp[3] + 4;
+        desc_len = sg_get_unaligned_be16(ucp + 2) + 4;
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
@@ -2281,7 +2303,7 @@ ses_element_desc_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
         }
         for (ucp += desc_len, j = 0, elem_ind = 0; j < tp->num_elements;
              ++j, ucp += desc_len, ++elem_ind) {
-            desc_len = (ucp[2] << 8) + ucp[3] + 4;
+            desc_len = sg_get_unaligned_be16(ucp + 2) + 4;
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (elem_ind != op->ind_indiv))
@@ -2329,8 +2351,10 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
                        int elem_type, const struct opts_t * op)
 {
     int ports, phys, j, m, desc_type, eip_offset, print_sas_addr, saddr_nz;
-    const unsigned char * per_ucp;
     int nofilter = ! op->do_filter;
+    uint16_t pcie_vid;
+    int pcie_pt, psn_valid, bdf_valid, cid_valid;
+    const unsigned char * per_ucp;
     char b[64];
 
     if (op->inner_hex) {
@@ -2470,8 +2494,54 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
         } else
             printf("%sunrecognised descriptor type [%d]\n", pad, desc_type);
         break;
-    case TPROTO_PCIE:
-        // added in ses3r08, still looking at this one
+    case TPROTO_PCIE: /* added in ses3r08 */
+        printf("%sTransport protocol: PCIe\n", pad);
+        if (0 == eip_offset) {
+            printf("%sfor this protocol EIP must be set (it isn't)\n", pad);
+            break;
+        }
+        if (len < 6)
+            break;
+        pcie_pt = (ucp[5] >> 5) & 0x7;
+        if (1 == pcie_pt)
+            printf("%sPCIe protocol type: NVMe\n", pad);
+        else {
+            printf("%sTransport protocol: PCIe subprotocol=0x%x not "
+                   "decoded\n", pad, pcie_pt);
+            if (op->verbose)
+                dStrHex((const char *)ucp, len, 0);
+            break;
+        }
+        phys = ucp[4];
+        printf("%snumber of ports: %d, not all ports: %d", pad, phys,
+               ucp[5] & 1);
+        printf(", device slot number: %d\n", ucp[7]);
+
+        pcie_vid = sg_get_unaligned_le16(ucp + 10);
+        printf("%svendor id: 0x%" PRIx16 "%s\n", pad, pcie_vid,
+               (0xffff == pcie_vid) ? " (not reported)" : "");
+        printf("%sserial number: %.20s\n", pad, ucp + 12);
+        printf("%smodel number: %.40s\n", pad, ucp + 32);
+        per_ucp = ucp + 72;
+        for (j = 0; j < phys; ++j, per_ucp += 8) {
+            printf("%sport index: %d\n", pad, j);
+            psn_valid = !!(0x4 & per_ucp[0]);
+            bdf_valid = !!(0x2 & per_ucp[0]);
+            cid_valid = !!(0x1 & per_ucp[0]);
+            printf("%s  PSN_VALID=%d, BDF_VALID=%d, CID_VALID=%d\n", pad,
+                   psn_valid, bdf_valid, cid_valid);
+            if (cid_valid)
+                printf("%s  controller id: 0x%" PRIx16 "\n", pad,
+                       sg_get_unaligned_le16(per_ucp + 1));
+            if (bdf_valid)
+                printf("%s  bus number: 0x%x, device number: 0x%x, "
+                       "function number: 0x%x\n", pad, per_ucp[4],
+                       (per_ucp[5] >> 3) & 0x1f, 0x7 & per_ucp[5]);
+            if (psn_valid)
+                printf("%s  physical slot number: 0x%" PRIx16 "\n", pad,
+                       0x1fff & sg_get_unaligned_le16(per_ucp + 6));
+        }
+        break;
     default:
         printf("%sTransport protocol: %s not decoded\n", pad,
                sg_get_trans_proto_str((0xf & ucp[0]), sizeof(b), b));
@@ -2486,12 +2556,12 @@ additional_elem_helper(const char * pad, const unsigned char * ucp, int len,
  * to "additional" to allow for SAS expander and SATA devices */
 static void
 ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
-                        unsigned int ref_gen_code, const unsigned char * resp,
+                        uint32_t ref_gen_code, const unsigned char * resp,
                         int resp_len, const struct opts_t * op)
 {
     int j, k, desc_len, elem_type, invalid, el_num, eip, ind, match_ind_th;
     int elem_count, ei, eiioe, my_eiioe_force, num_elems, skip;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const struct type_desc_hdr_t * tp;
@@ -2501,9 +2571,8 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     if (resp_len < 4)
         goto truncated;
     last_ucp = resp + resp_len - 1;
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     if (ref_gen_code != gen_code) {
         pr2serr("  <<state of enclosure changed, please try again>>\n");
         return;
@@ -2595,7 +2664,7 @@ static void
 ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
 {
     int k, el, num_subs;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
@@ -2606,14 +2675,13 @@ ses_subenc_help_sdg(const unsigned char * resp, int resp_len)
     last_ucp = resp + resp_len - 1;
     printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        el = (ucp[2] << 8) + ucp[3] + 4;
+        el = sg_get_unaligned_be16(ucp + 2) + 4;
         printf("   subenclosure identifier: %d\n", ucp[1]);
         if (el > 4)
             printf("    %.*s\n", el - 4, ucp + 4);
@@ -2631,7 +2699,7 @@ static void
 ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
 {
     int k, j, el, num_subs;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
@@ -2640,16 +2708,14 @@ ses_subenc_string_sdg(const unsigned char * resp, int resp_len)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_ucp = resp + resp_len - 1;
-    printf("  number of secondary subenclosures: %d\n",
-            num_subs - 1);
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    printf("  number of secondary subenclosures: %d\n", num_subs - 1);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += el) {
         if ((ucp + 3) > last_ucp)
             goto truncated;
-        el = (ucp[2] << 8) + ucp[3] + 4;
+        el = sg_get_unaligned_be16(ucp + 2) + 4;
         printf("   subenclosure identifier: %d\n", ucp[1]);
         if (el > 4) {
             /* dStrHex((const char *)(ucp + 4), el - 4, 0); */
@@ -2674,7 +2740,7 @@ static void
 ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
 {
     int k, el, num_subs;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
 
@@ -2685,9 +2751,8 @@ ses_subenc_nickname_sdg(const unsigned char * resp, int resp_len)
     last_ucp = resp + resp_len - 1;
     printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     ucp = resp + 8;
     el = 40;
     for (k = 0; k < num_subs; ++k, ucp += el) {
@@ -2771,7 +2836,7 @@ static void
 ses_download_code_sdg(const unsigned char * resp, int resp_len)
 {
     int k, num_subs;
-    unsigned int gen_code;
+    uint32_t gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
     const char * cp;
@@ -2783,9 +2848,8 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len)
     last_ucp = resp + resp_len - 1;
     printf("  number of secondary subenclosures: %d\n",
             num_subs - 1);
-    gen_code = (resp[4] << 24) | (resp[5] << 16) |
-               (resp[6] << 8) | resp[7];
-    printf("  generation code: 0x%x\n", gen_code);
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
     ucp = resp + 8;
     for (k = 0; k < num_subs; ++k, ucp += 16) {
         if ((ucp + 3) > last_ucp)
@@ -2801,10 +2865,10 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len)
             printf("     download microcode status: 0x%x [additional "
                    "status: 0x%x]\n", ucp[2], ucp[3]);
         printf("     download microcode maximum size: %d bytes\n",
-               (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7]);
+               sg_get_unaligned_be32(ucp + 4));
         printf("     download microcode expected buffer id: 0x%x\n", ucp[11]);
         printf("     download microcode expected buffer id offset: %d\n",
-               (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15]);
+               sg_get_unaligned_be32(ucp + 12));
     }
     return;
 truncated:
@@ -2970,7 +3034,7 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
 {
     int j, resp_len, res;
     int ret = 0;
-    unsigned int ref_gen_code;
+    uint32_t ref_gen_code;
     unsigned char *  resp;
     const char * cp;
     struct enclosure_info primary_info;
@@ -2995,12 +3059,16 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
             dStrRaw((const char *)resp, resp_len);
         }
     } else if (op->do_hex) {
-        if (cp)
-            printf("Response in hex from diagnostic page: %s\n", cp);
-        else
-            printf("Response in hex from unknown diagnostic page "
-                   "[0x%x]\n", op->page_code);
-        dStrHex((const char *)resp, resp_len, 0);
+        if (op->do_hex > 2)
+            dStrHex((const char *)resp, resp_len, -1);
+         else {
+            if (cp)
+                printf("Response in hex from diagnostic page: %s\n", cp);
+            else
+                printf("Response in hex from unknown diagnostic page "
+                       "[0x%x]\n", op->page_code);
+            dStrHex((const char *)resp, resp_len, (2 == op->do_hex));
+        }
     } else {
         memset(&primary_info, 0, sizeof(primary_info));
         switch (op->page_code) {
@@ -3157,7 +3225,8 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
         }
         break;
     case TPROTO_PCIE:
-        // added in ses3r08, still looking at this one
+        jrp->dev_slot_num = ae_ucp[7];
+        break;
     default:
         ;
     }
@@ -3172,7 +3241,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, desc_len, dn_len;
     int et4aes, broken_ei, ei2, got1, jr_max_ind, mlen;
-    unsigned int ref_gen_code, gen_code;
+    uint32_t ref_gen_code, gen_code;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
     unsigned char * es_ucp;
@@ -3213,8 +3282,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
         pr2serr("Enclosure Status response too short\n");
         return -1;
     }
-    gen_code = (enc_stat_rsp[4] << 24) | (enc_stat_rsp[5] << 16) |
-               (enc_stat_rsp[6] << 8) | enc_stat_rsp[7];
+    gen_code = sg_get_unaligned_be32(enc_stat_rsp + 4);
     if (ref_gen_code != gen_code) {
         pr2serr("%s", enc_state_changed);
         return -1;
@@ -3232,8 +3300,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
             pr2serr("Element Descriptor response too short\n");
             return -1;
         }
-        gen_code = (elem_desc_rsp[4] << 24) | (elem_desc_rsp[5] << 16) |
-                   (elem_desc_rsp[6] << 8) | elem_desc_rsp[7];
+        gen_code = sg_get_unaligned_be32(elem_desc_rsp + 4);
         if (ref_gen_code != gen_code) {
             pr2serr("%s", enc_state_changed);
             return -1;
@@ -3260,8 +3327,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
                 pr2serr("Additional Element Status response too short\n");
                 return -1;
             }
-            gen_code = (add_elem_rsp[4] << 24) | (add_elem_rsp[5] << 16) |
-                       (add_elem_rsp[6] << 8) | add_elem_rsp[7];
+            gen_code = sg_get_unaligned_be32(add_elem_rsp + 4);
             if (ref_gen_code != gen_code) {
                 pr2serr("%s", enc_state_changed);
                 return -1;
@@ -3299,8 +3365,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
                 pr2serr("Threshold In response too short\n");
                 return -1;
             }
-            gen_code = (threshold_rsp[4] << 24) | (threshold_rsp[5] << 16) |
-                       (threshold_rsp[6] << 8) | threshold_rsp[7];
+            gen_code = sg_get_unaligned_be32(threshold_rsp + 4);
             if (ref_gen_code != gen_code) {
                 pr2serr("%s", enc_state_changed);
                 return -1;
@@ -3335,7 +3400,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
         es_ucp += 4;
         jrp->elem_descp = ed_ucp;
         if (ed_ucp)
-            ed_ucp += (ed_ucp[2] << 8) + ed_ucp[3] + 4;
+            ed_ucp += sg_get_unaligned_be16(ed_ucp + 2) + 4;
         jrp->add_elem_statp = NULL;
         jrp->thresh_inp = t_ucp;
         jrp->dev_slot_num = -1;
@@ -3360,7 +3425,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
             es_ucp += 4;
             jrp->elem_descp = ed_ucp;
             if (ed_ucp)
-                ed_ucp += (ed_ucp[2] << 8) + ed_ucp[3] + 4;
+                ed_ucp += sg_get_unaligned_be16(ed_ucp + 2) + 4;
             jrp->thresh_inp = t_ucp;
             jrp->dev_slot_num = -1;
             /* assume sas_addr[8] zeroed since it's static file scope */
@@ -3517,7 +3582,7 @@ try_again:
         if (op->desc_name) {
             if (NULL == ed_ucp)
                 continue;
-            desc_len = (ed_ucp[2] << 8) + ed_ucp[3];
+            desc_len = sg_get_unaligned_be16(ed_ucp + 2);
             /* some element descriptor strings have a trailing NULL and
              * count it in their length; adjust */
             if ('\0' == ed_ucp[4 + desc_len - 1])
@@ -3543,7 +3608,7 @@ try_again:
             continue;   /* when '-ff' and status!=OK, skip */
         cp = find_element_tname(jrp->etype, b, sizeof(b));
         if (ed_ucp) {
-            desc_len = (ed_ucp[2] << 8) + ed_ucp[3] + 4;
+            desc_len = sg_get_unaligned_be16(ed_ucp + 2) + 4;
             if (desc_len > 4)
                 printf("%.*s [%d,%d]  Element type: %s\n", desc_len - 4,
                        (const char *)(ed_ucp + 4), jrp->el_ind_th,
@@ -3753,7 +3818,7 @@ cgs_enc_ctl_stat(int sg_fd, const struct join_row_t * jrp,
         jrp->enc_statp[0] |= 0x80;  /* set SELECT bit */
         if (op->byte1_given)
             enc_stat_rsp[1] = op->byte1;
-        len = (enc_stat_rsp[2] << 8) + enc_stat_rsp[3] + 4;
+        len = sg_get_unaligned_be16(enc_stat_rsp + 2) + 4;
         ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
         if (ret) {
             pr2serr("couldn't send Enclosure Control page\n");
@@ -3808,7 +3873,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
                        jrp->thresh_inp + s_byte, s_bit, n_bits);
         if (op->byte1_given)
             threshold_rsp[1] = op->byte1;
-        len = (threshold_rsp[2] << 8) + threshold_rsp[3] + 4;
+        len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
         ret = do_senddiag(sg_fd, 1, threshold_rsp, len, 1, op->verbose);
         if (ret) {
             pr2serr("couldn't send Threshold Out page\n");
@@ -3911,7 +3976,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             ed_ucp = jrp->elem_descp;
             if (NULL == ed_ucp)
                 continue;
-            desc_len = (ed_ucp[2] << 8) + ed_ucp[3];
+            desc_len = sg_get_unaligned_be16(ed_ucp + 2);
             /* some element descriptor strings have a trailing NULL and
              * count it; adjust */
             if ('\0' == ed_ucp[4 + desc_len - 1])
@@ -3987,10 +4052,11 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
         return -1;
     }
     if (op->verbose) {
-        unsigned int gc;
+        uint32_t gc;
 
-        gc = (b[4] << 24) + (b[5] << 16) + (b[6] << 8) + b[7];
-        pr2serr("set_nickname: generation code from status page: %u\n", gc);
+        gc = sg_get_unaligned_be32(b + 4);
+        pr2serr("set_nickname: generation code from status page: %" PRIu32
+                "\n", gc);
     }
     b[0] = (unsigned char)DPC_SUBENC_NICKNAME;  /* just in case */
     b[1] = (unsigned char)op->seid;
@@ -4174,7 +4240,7 @@ main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (! (op->do_raw || have_cgs)) {
+    if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
         if (sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->dev_name);
             ret = SG_LIB_CAT_OTHER;

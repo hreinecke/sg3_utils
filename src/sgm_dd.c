@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static const char * version_str = "1.39 20140516 shared_mmap";
+static const char * version_str = "1.40 20141226 shared_mmap";
 #else
-static const char * version_str = "1.39 20140516";
+static const char * version_str = "1.40 20141226";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -1296,7 +1296,7 @@ main(int argc, char * argv[])
                 return SG_LIB_FILE_ERROR;
             }
             /* perhaps use posix_memalign() instead */
-            wrkPos = (unsigned char *)(((unsigned long)wrkBuff + psz - 1) &
+            wrkPos = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         }
         else {

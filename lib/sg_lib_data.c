@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2014 Douglas Gilbert.
+ * Copyright (c) 2007-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.09 20141207";  /* spc4r37a, sbc4r02 */
+const char * sg_lib_version_str = "2.11 20150115";  /* spc5r02, sbc4r02 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -105,7 +105,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x39, 0, "Compare"},               /* obsolete in SPC-4 r11 */
     {0x3a, 0, "Copy and verify"},       /* obsolete in SPC-4 r11 */
     {0x3b, 0, "Write buffer"},
-    {0x3c, 0, "Read buffer"},
+    {0x3c, 0, "Read buffer(10)"},
     {0x3d, 0, "Update block"},
     {0x3e, 0, "Read long(10)"},  /* SBC-3 r31 recommends Read long(16) */
     {0x3f, 0, "Write long(10)"}, /* SBC-3 r31 recommends Write long(16) */
@@ -170,8 +170,9 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x92, PDT_TAPE, "Locate(16)"},
     {0x93, 0, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
-    {0x94, PDT_ZBC, "Zoning out"},  /* new sbc4r04, has service actions */
-    {0x95, PDT_ZBC, "Zoning in"},   /* new sbc4r04, has service actions */
+    {0x94, PDT_ZBC, "ZBC out"},  /* new sbc4r04, has service actions */
+    {0x95, PDT_ZBC, "ZBC in"},   /* new sbc4r04, has service actions */
+    {0x9b, 0, "Read buffer(16)"},       /* added spc5r02 */
     {0x9c, 0, "Write atomic(16)"},
     {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
     {0x9e, 0, "Service action in(16)"},
@@ -549,7 +550,7 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140924 */
+ * The following should match asc-num.txt dated 20150103 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -662,6 +663,14 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x07,"Warning - degraded power to non-volatile cache"},
     {0x0B,0x08,"Warning - power loss expected"},
     {0x0B,0x09,"Warning - device statistics notification active"},
+    {0x0B,0x0A,"Warning - high critical temperature limit exceeded"},
+    {0x0B,0x0B,"Warning - low critical temperature limit exceeded"},
+    {0x0B,0x0C,"Warning - high operating temperature limit exceeded"},
+    {0x0B,0x0D,"Warning - low operating temperature limit exceeded"},
+    {0x0B,0x0E,"Warning - high critical humidity limit exceeded"},
+    {0x0B,0x0F,"Warning - low critical humidity limit exceeded"},
+    {0x0B,0x10,"Warning - high operating humidity limit exceeded"},
+    {0x0B,0x11,"Warning - low operating humidity limit exceeded"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -830,6 +839,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x26,0x10,"Data decryption key fail limit reached"},
     {0x26,0x11,"Incomplete key-associated data set"},
     {0x26,0x12,"Vendor specific key reference not found"},
+    {0x26,0x13,"Application tag mode page is invalid"},
     {0x27,0x00,"Write protected"},
     {0x27,0x01,"Hardware write protected"},
     {0x27,0x02,"Logical unit software write protected"},
@@ -885,6 +895,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x0A,"Partition or collection contains user objects"},
     {0x2C,0x0B,"Not reserved"},
     {0x2C,0x0C,"ORWRITE generation does not match"},
+    {0x2C,0x0D,"Reset write pointer not allowed"},
+    {0x2C,0x0E,"Zone is offline"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2E,0x01,"Command timeout before processing"},
@@ -1088,6 +1100,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x0b,"Insufficient power for operation"},
     {0x55,0x0c,"Insufficient resources to create rod"},
     {0x55,0x0d,"Insufficient resources to create rod token"},
+    {0x55,0x0e,"Insufficient zone resources"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
@@ -1345,9 +1358,9 @@ const char * sg_lib_sense_key_desc[] = {
 const char * sg_lib_pdt_strs[] = {
     /* 0 */ "disk",
     "tape",
-    "printer",
+    "printer",                  /* obsolete, spc5r01 */
     "processor",        /* often SAF-TE device, copy manager */
-    "write once optical disk",
+    "write once optical disk",  /* obsolete, spc5r01 */
     /* 5 */ "cd/dvd",
     "scanner",                  /* obsolete */
     "optical memory device",
@@ -1362,7 +1375,7 @@ const char * sg_lib_pdt_strs[] = {
     /* 0x10 */ "bridge controller commands",
     "object based storage",
     "automation/driver interface",
-    "security manager device",
+    "security manager device",  /* obsolete, spc5r01 */
     "zoned block commands",
     "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
@@ -1373,7 +1386,7 @@ const char * sg_lib_pdt_strs[] = {
 const char * sg_lib_transport_proto_strs[] =
 {
     "Fibre Channel Protocol for SCSI (FCP-4)",
-    "SCSI Parallel Interface (SPI-5)",
+    "SCSI Parallel Interface (SPI-5)",  /* obsolete in spc5r01 */
     "Serial Storage Architecture SCSI-3 Protocol (SSA-S3P)",
     "Serial Bus Protocol for IEEE 1394 (SBP-3)",
     "SCSI RDMA Protocol (SRP)",
@@ -1383,6 +1396,7 @@ const char * sg_lib_transport_proto_strs[] =
     "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",
     "SCSI over PCI Express (SOP)",
-    "Oxb", "Oxc", "Oxd", "Oxe",
+    "PCIe",                             /* added in spc5r<x> ?? */
+    "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };

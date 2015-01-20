@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2014 D. Gilbert
+*  Copyright (C) 2000-2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.44 20141210";    /* SPC-4 rev 37 */
+static const char * version_str = "1.45 20150119";    /* SPC-5 rev 02 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1882,6 +1882,11 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 }
                 break;
             }
+            /*
+             * Unfortunately, there are some (broken) implementations
+             * which return _several_ NAA descriptors.
+             * So add a suffix to differentiate between them.
+             */
             naa = (ip[0] >> 4) & 0xff;
             if ((naa < 2) || (naa > 6) || (4 == naa)) {
                 if (verbose) {
@@ -1891,15 +1896,36 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 break;
             }
             if (6 != naa) {
+                const char *suffix;
+
                 if (8 != i_len) {
                     if (verbose) {
-                        pr2serr("      << unexpected NAA 2 identifier "
-                                "length: 0x%x>>\n", i_len);
+                        pr2serr("      << unexpected NAA %d identifier "
+                                "length: 0x%x>>\n", naa, i_len);
                         dStrHexErr((const char *)ip, i_len, 0);
                     }
                     break;
                 }
-                printf("SCSI_IDENT_%s_NAA=", assoc_str);
+                if (naa != 2 && naa != 3 && naa != 5) {
+                    if (verbose) {
+                        pr2serr("      << unexpected NAA format %d>>\n", naa);
+                        dStrHexErr((const char *)ip, i_len, 0);
+                    }
+                    break;
+                }
+                switch (naa) {
+                    case 5:
+                        suffix="REG";
+                        break;
+                    case 2:
+                        suffix="EXT";
+                        break;
+                    case 3:
+                    default:
+                        suffix="LOCAL";
+                        break;
+                }
+                printf("SCSI_IDENT_%s_NAA_%s=", assoc_str, suffix);
                 for (m = 0; m < 8; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
@@ -1912,7 +1938,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                     }
                     break;
                 }
-                printf("SCSI_IDENT_%s_NAA=", assoc_str);
+                printf("SCSI_IDENT_%s_NAA_REGEXT=", assoc_str);
                 for (m = 0; m < 16; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
@@ -2929,6 +2955,13 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     if (page != rp[1]) {
         pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
                 "response\n");
+        return SG_LIB_CAT_MALFORMED;
+    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
+        /* could be a Unit Serial number VPD page with a very long
+         * length of 4+514 bytes; more likely standard response for
+         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
+        pr2serr("invalid Unit Serial Number VPD response; probably a "
+                "STANDARD INQUIRY response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (mxlen < 0)

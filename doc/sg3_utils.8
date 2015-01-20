@@ -1,10 +1,11 @@
-.TH SG3_UTILS "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG3_UTILS "8" "January 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
+[\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -330,6 +331,13 @@ Some options are used uniformly in most of the utilities in this
 package. Those options are listed below. Note that there are some
 exceptions.
 .TP
+\fB\-e\fR, \fB\-\-enumerate\fR
+some utilities (e.g. sg_ses and sg_vpd) store a lot of information in
+internal tables. This option will output that information in some readable
+form (e.g. sorted by an acronym or by page number) then exit. Note that
+with this option \fIDEVICE\fR is ignored (as are most other options) and no
+SCSI IO takes place, so the invoker does not need any elevated permissions.
+.TP
 \fB\-h\fR, \fB\-?\fR, \fB\-\-help\fR
 output the usage message then exit. In a few older utilities the '\-h'
 option requests hexadecimal output. In these cases the '\-?' option will
@@ -337,7 +345,9 @@ output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 for SCSI commands that yield a non\-trivial response, print out that
-response in ASCII hexadecimal.
+response in ASCII hexadecimal. To produce hexadecimal that can be parsed
+by other utilities (e.g. without a relative address to the left and without
+trailing ASCII) use this option three or four times.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
@@ -355,9 +365,12 @@ disables any "double fetch" strategy that may have otherwise been used.
 \fB\-r\fR, \fB\-\-raw\fR
 for SCSI commands that yield a non\-trivial response, output that response
 in binary to stdout. If any error messages or warning are produced they are
-usually sent to stderr. Some utilities that consume data to send to the
-device along with the SCSI command, use this option to provide that data
-or indicate that it can be read from stdin.
+usually sent to stderr so as to not interfere with the output from this
+option.
+.br
+Some utilities that consume data to send to the \fIDEVICE\fR along with the
+SCSI command, use this option. This option may indicate that binary data
+can be read from stdin or a nominated file.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Can be used multiple
@@ -455,7 +468,7 @@ CREDITS file and individual source files (in the 'src' directory).
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 1999\-2014 Douglas Gilbert
+Copyright \(co 1999\-2015 Douglas Gilbert
 .br
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files

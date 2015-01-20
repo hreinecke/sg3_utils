@@ -1,4 +1,4 @@
-.TH SCSI_LOGGING_LEVEL "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SCSI_LOGGING_LEVEL "8" "January 2014" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 scsi_logging_level \- access Linux SCSI logging level information
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ or changed (e.g. with \fI\-\-set\fR). Superuser permissions will
 typically be required to set the logging level.
 .PP
 One of these options: \fI\-\-create\fR, \fI\-\-get\fR or \fI\-\-set\fR
-is required. Only one can be given.
+is required. Only one of them can be given.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -96,7 +96,8 @@ requires root permissions:
 .PP
 So as to not interfere with other SCSI subsystem upper level drivers (ULDs)
 which most likely will be active at the same time, the Linux sg driver uses
-SCSI_LOG_TIMEOUT. To see full debugging and trace from the sg driver use:
+SCSI_LOG_TIMEOUT for logging purposes. To see full debugging and trace from
+the sg driver use:
 .PP
   scsi_logging_level \-s \-T 7
 .PP

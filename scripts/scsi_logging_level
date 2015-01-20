@@ -6,6 +6,7 @@
 # (C) Copyright IBM Corp. 2006
 #
 # Modified by D. Gilbert to replace the use of sysctl [20080218]
+# Lat change: D. Gilbert 20150219
 ###############################################################################
 
 
@@ -90,14 +91,11 @@ EOF
 
 check_level()
 {
-    if [ `echo -n $1 | tr --complement [:digit:] 'a' | grep -s 'a'` ]
-    then
-	invalid_cmdline "log level '$1' out of range [0, 7]"
-    fi
-	
-    if [ $1 -lt 0 -o $1 -gt 7 ]
-    then
-	invalid_cmdline "log level '$1' out of range [0, 7]"
+    num=$(($1))
+    if [ $num != "$1" ] ; then
+        invalid_cmdline "log level '$1' not a number"
+    elif [ $num -lt 0  ] || [ $num -gt 7 ] ; then
+        invalid_cmdline "log level '$1' out of range, expect '0' to '7'"
     fi
 }
 
@@ -105,53 +103,53 @@ check_level()
 check_cmdline()
 {
     while true ; do
-	case "$1" in
-	    -a|--all)	_ALL=$2; check_level $2
-			shift 2;;
-	    -c|--create) CREATE=1;
-			shift 1;;
-	    -g|--get)	GET=1
-			shift 1;;
-	    -h|--help) printhelp
-			exit 0;;
-	    -s|--set)	SET=1
-			shift 1;;
-	    -v|--version) printversion
-			exit 0;;
-	    -E|--error)	_ERROR=$2; check_level $2
-			shift 2;;
-	    -T|--timeout) _TIMEOUT=$2; check_level $2
-			shift 2;;
-	    -S|--scan)	_SCAN=$2; check_level $2
-			shift 2;;
-	    -M|--midlevel) _ML=$2; check_level $2
-			shift 2;;
-	    --mlqueue)	_MLQUEUE=$2; check_level $2
-			shift 2;;
-	    --mlcomplete) _MLCOMPLETE=$2; check_level $2
-			shift 2;;
-	    -L|--lowlevel) _LL=$2; check_level $2
-			shift 2;;
-	    --llqueue)	_LLQUEUE=$2; check_level $2
-			shift 2;;
-	    --llcomplete) _LLCOMPLETE=$2; check_level $2
-			shift 2;;
-	    -H|--highlevel) _HL=$2; check_level $2
-			shift 2;;
-	    --hlqueue)	_HLQUEUE=$2; check_level $2
-			shift 2;;
-	    --hlcomplete) _HLCOMPLETE=$2; check_level $2
-			shift 2;;
-	    -I|--ioctl) _IOCTL=$2; check_level $2
-			shift 2;;
-	    --) shift; break;;
-	    *) echo "Internal error!" ; exit 1;;
-	esac
+        case "$1" in
+            -a|--all)   _ALL=$2; check_level $2
+                        shift 2;;
+            -c|--create) CREATE=1;
+                        shift 1;;
+            -g|--get)   GET=1
+                        shift 1;;
+            -h|--help) printhelp
+                        exit 0;;
+            -s|--set)   SET=1
+                        shift 1;;
+            -v|--version) printversion
+                        exit 0;;
+            -E|--error) _ERROR=$2; check_level $2
+                        shift 2;;
+            -T|--timeout) _TIMEOUT=$2; check_level $2
+                        shift 2;;
+            -S|--scan)  _SCAN=$2; check_level $2
+                        shift 2;;
+            -M|--midlevel) _ML=$2; check_level $2
+                        shift 2;;
+            --mlqueue)  _MLQUEUE=$2; check_level $2
+                        shift 2;;
+            --mlcomplete) _MLCOMPLETE=$2; check_level $2
+                        shift 2;;
+            -L|--lowlevel) _LL=$2; check_level $2
+                        shift 2;;
+            --llqueue)  _LLQUEUE=$2; check_level $2
+                        shift 2;;
+            --llcomplete) _LLCOMPLETE=$2; check_level $2
+                        shift 2;;
+            -H|--highlevel) _HL=$2; check_level $2
+                        shift 2;;
+            --hlqueue)  _HLQUEUE=$2; check_level $2
+                        shift 2;;
+            --hlcomplete) _HLCOMPLETE=$2; check_level $2
+                        shift 2;;
+            -I|--ioctl) _IOCTL=$2; check_level $2
+                        shift 2;;
+            --) shift; break;;
+            *) echo "Internal error!" ; exit 1;;
+        esac
     done
 
     if [ -n "$*" ]
     then
-	invalid_cmdline invalid parameter $*
+        invalid_cmdline invalid parameter $*
     fi
 
     if [ $GET = "1" -a $SET = "1" ]
@@ -164,7 +162,7 @@ check_cmdline()
     then
         invalid_cmdline options \'-c\', \'-g\' and \'-s\' are mutual exclusive
     fi
-    
+
     LOG_ERROR=${_ERROR:-${_ALL:-0}}
     LOG_TIMEOUT=${_TIMEOUT:-${_ALL:-0}}
     LOG_SCAN=${_SCAN:-${_ALL:-0}}
@@ -180,8 +178,8 @@ check_cmdline()
 invalid_cmdline()
 {
         echo "$SCRIPTNAME: $*"
-	echo "$SCRIPTNAME: Try '$SCRIPTNAME --help' for more information."
-	exit 1
+        echo "$SCRIPTNAME: Try '$SCRIPTNAME --help' for more information."
+        exit 1
 }
 
 get_logging_level()
@@ -191,9 +189,9 @@ get_logging_level()
     LEVEL=`cat /proc/sys/dev/scsi/logging_level`
     if [ $? != 0 ]
     then
- 	echo "$SCRIPTNAME: could not read scsi logging level" \
+        echo "$SCRIPTNAME: could not read scsi logging level" \
              "(kernel probably without SCSI_LOGGING support)"
- 	exit 1
+        exit 1
     fi
 }
 
@@ -231,9 +229,9 @@ set_logging_level()
     echo $LEVEL > /proc/sys/dev/scsi/logging_level
     if [ $? != 0 ]
     then
- 	echo "$SCRIPTNAME: could not write scsi logging level $LEVEL" \
- 	     "(kernel probably without SCSI_LOGGING support)"
- 	exit 1
+        echo "$SCRIPTNAME: could not write scsi logging level $LEVEL"
+        echo "  kernel does not have SCSI_LOGGING support or needs superuser"
+        exit 1
     fi
 }
 create_logging_level()
