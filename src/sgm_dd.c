@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2014 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2015 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -65,9 +65,9 @@
 /* #define SG_WANT_SHARED_MMAP_IO 1 */
 
 #ifdef SG_WANT_SHARED_MMAP_IO
-static const char * version_str = "1.40 20141226 shared_mmap";
+static const char * version_str = "1.41 20150129 shared_mmap";
 #else
-static const char * version_str = "1.40 20141226";
+static const char * version_str = "1.41 20150129";
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -556,7 +556,8 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     }
 
 #if 1
-    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) && (EINTR == errno))
+    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         sleep(1);
     if (res < 0) {
         perror(ME "SG_IO error (sg_read)");
@@ -564,7 +565,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     }
 #else
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -574,7 +575,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     }
 
     while (((res = read(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         perror("reading (rd) on sg device, error");
@@ -662,7 +663,8 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
 
 #if 1
-    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) && (EINTR == errno))
+    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         sleep(1);
     if (res < 0) {
         perror(ME "SG_IO error (sg_write)");
@@ -670,7 +672,7 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
 #else
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -680,7 +682,7 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
 
     while (((res = read(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         perror("writing (rd) on sg device, error");
@@ -1353,7 +1355,7 @@ main(int argc, char * argv[])
         }
         else {
             while (((res = read(infd, wrkPos, blocks * blk_sz)) < 0) &&
-                   (EINTR == errno))
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "read(unix): count=%d, res=%d\n",
@@ -1415,8 +1417,8 @@ main(int argc, char * argv[])
         else if (FT_DEV_NULL == out_type)
             out_full += blocks; /* act as if written out without error */
         else {
-            while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0)
-                   && (EINTR == errno))
+            while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0) &&
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "write(unix): count=%d, res=%d\n",
