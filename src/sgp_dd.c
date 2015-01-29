@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2014 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2015 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -56,7 +56,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "5.48 20141226";
+static const char * version_str = "5.49 20150129";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -653,8 +653,8 @@ normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding in_mutex */
-    while (((res = read(clp->infd, rep->buffp,
-                        blocks * clp->bs)) < 0) && (EINTR == errno))
+    while (((res = read(clp->infd, rep->buffp, blocks * clp->bs)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (clp->in_flags.coe) {
@@ -699,8 +699,8 @@ normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding out_mutex */
-    while (((res = write(clp->outfd, rep->buffp,
-                 rep->num_blks * clp->bs)) < 0) && (EINTR == errno))
+    while (((res = write(clp->outfd, rep->buffp, rep->num_blks * clp->bs))
+            < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (clp->out_flags.coe) {
@@ -998,7 +998,8 @@ sg_start_io(Rq_elem * rep)
     }
 
     while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
-                         sizeof(struct sg_io_hdr))) < 0) && (EINTR == errno))
+                         sizeof(struct sg_io_hdr))) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -1029,7 +1030,8 @@ sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
     io_hdr.pack_id = (int)rep->blk;
 
     while (((res = read(wr ? rep->outfd : rep->infd, &io_hdr,
-                        sizeof(struct sg_io_hdr))) < 0) && (EINTR == errno))
+                        sizeof(struct sg_io_hdr))) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         perror("finishing io on sg device, error");

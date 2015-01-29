@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2014 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2015 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -59,7 +59,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "5.82 20141226";
+static const char * version_str = "5.83 20150129";
 
 
 #define ME "sg_dd: "
@@ -615,7 +615,8 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             fprintf(stderr, "%02x ", rdCmd[k]);
         fprintf(stderr, "\n");
     }
-    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) && (EINTR == errno))
+    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -1005,7 +1006,8 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
             fprintf(stderr, "%02x ", wrCmd[k]);
         fprintf(stderr, "\n");
     }
-    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) && (EINTR == errno))
+    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -1941,7 +1943,7 @@ main(int argc, char * argv[])
             }
         } else {
             while (((res = read(infd, wrkPos, blocks * blk_sz)) < 0) &&
-                   (EINTR == errno))
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "read(unix): count=%d, res=%d\n",
@@ -1968,8 +1970,8 @@ main(int argc, char * argv[])
             break;      /* nothing read so leave loop */
 
         if (out2f[0]) {
-            while (((res = write(out2fd, wrkPos, blocks * blk_sz)) < 0)
-                   && (EINTR == errno))
+            while (((res = write(out2fd, wrkPos, blocks * blk_sz)) < 0) &&
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "write to of2: count=%d, res=%d\n",
@@ -2095,8 +2097,8 @@ main(int argc, char * argv[])
         } else if (FT_DEV_NULL & out_type)
             out_full += blocks; /* act as if written out without error */
         else {
-            while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0)
-                   && (EINTR == errno))
+            while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0) &&
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "write(unix): count=%d, res=%d\n",
@@ -2164,7 +2166,7 @@ main(int argc, char * argv[])
         else {
             /* ... try writing to extend ofile to length prior to error */
             while (((res = write(outfd, zeros_buff, penult_blocks * blk_sz))
-                    < 0) && (EINTR == errno))
+                    < 0) && ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "write(unix, sparse after error): count=%d, "

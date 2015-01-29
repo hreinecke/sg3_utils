@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.45 20150119";    /* SPC-5 rev 02 */
+static const char * version_str = "1.46 20150123";    /* SPC-5 rev 02 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -859,7 +859,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         if ('#' == *lcp)
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k])) {
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
                     j + 1, m + k + 1);
             goto bad;
@@ -906,7 +906,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                     if ('\0' == *lcp)
                         break;
                 } else {
-                    if ('#' == *lcp) {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
                         --k;
                         break;
                     }

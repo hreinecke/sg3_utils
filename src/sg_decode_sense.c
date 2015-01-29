@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2014 Douglas Gilbert.
+ * Copyright (c) 2010-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
 #include "sg_lib.h"
 
 
-static const char * version_str = "1.06 20140117";
+static const char * version_str = "1.07 20150123";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -288,7 +288,7 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
         if ('#' == *lcp)
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k])) {
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             fprintf(stderr, "f2hex_arr: syntax error at line %d, pos %d\n",
                     j + 1, m + k + 1);
             goto bad;
@@ -335,7 +335,7 @@ f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
                     if ('\0' == *lcp)
                         break;
                 } else {
-                    if ('#' == *lcp) {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
                         --k;
                         break;
                     }

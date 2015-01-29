@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.30 20150113";    /* spc5r02 + sbc4r04 */
+static const char * version_str = "1.32 20150127";    /* spc5r03 + sbc4r04 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1218,7 +1218,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         if ('#' == *lcp)
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k])) {
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
                     j + 1, m + k + 1);
             goto bad;
@@ -1265,7 +1265,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                     if ('\0' == *lcp)
                         break;
                 } else {
-                    if ('#' == *lcp) {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
                         --k;
                         break;
                     }
@@ -1365,17 +1365,18 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
     return 0;
 }
 
+/* DS made obsolete in spc4r03; TMC and ETC made obsolete in spc5r03. */
 static void
 get_pcb_str(int pcb, char * outp, int maxoutlen)
 {
     char buff[PCB_STR_LEN];
     int n;
 
-    n = sprintf(buff, "du=%d [ds=%d] tsd=%d etc=%d ", ((pcb & 0x80) ? 1 : 0),
+    n = sprintf(buff, "du=%d [ds=%d] tsd=%d [etc=%d] ", ((pcb & 0x80) ? 1 : 0),
                 ((pcb & 0x40) ? 1 : 0), ((pcb & 0x20) ? 1 : 0),
                 ((pcb & 0x10) ? 1 : 0));
     if (pcb & 0x10)
-        n += sprintf(buff + n, "tmc=%d ", ((pcb & 0xc) >> 2));
+        n += sprintf(buff + n, "[tmc=%d] ", ((pcb & 0xc) >> 2));
 #if 1
     n += sprintf(buff + n, "format+linking=%d  [0x%.2x]", pcb & 3,
                  pcb);
