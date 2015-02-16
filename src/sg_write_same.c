@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2014 Douglas Gilbert.
+ * Copyright (c) 2009-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.07 20141021";
+static const char * version_str = "1.08 20150216";
 
 
 #define ME "sg_write_same: "
@@ -107,8 +107,9 @@ usage()
             "    --10|-R              do WRITE SAME(10) (even if '--unmap' "
             "is given)\n"
             "    --16|-S              do WRITE SAME(16) (def: 10 unless "
-            "'--unmap' given\n"
-            "                         or LBA+NUM needs more than 32 bits)\n"
+            "'--unmap' given,\n"
+            "                         LBA+NUM > 32 bits, or NUM > 65535; "
+            "then def 16)\n"
             "    --32|-T              do WRITE SAME(32) (def: 10 or 16)\n"
             "    --anchor|-a          set anchor field in cdb\n"
             "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
@@ -119,12 +120,13 @@ usage()
             "DEVICE\n"
             "    --lba=LBA|-l LBA     LBA is the logical block address to "
             "start (def: 0)\n"
-            "    --lbdata|-L          set LBDATA bit\n"
+            "    --lbdata|-L          set LBDATA bit (obsolete)\n"
             "    --ndob|-N            set 'no data-out buffer' bit\n"
             "    --num=NUM|-n NUM     NUM is number of logical blocks to "
             "write (def: 1)\n"
-            "                         [Beware NUM==0 means rest of device]\n"
-            "    --pbdata|-P          set PBDATA bit\n"
+            "                         [Beware NUM==0 may mean rest of "
+            "device]\n"
+            "    --pbdata|-P          set PBDATA bit (obsolete)\n"
             "    --timeout=TO|-t TO    command timeout (unit: seconds) (def: "
             "60)\n"
             "    --unmap|-U           set UNMAP bit\n"
@@ -156,9 +158,18 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
         if ((op->numblocks > 0xffff) || (llba > ULONG_MAX) ||
             op->ndob || (op->unmap && (0 == op->want_ws10))) {
             cdb_len = WRITE_SAME16_LEN;
-            if (op->verbose)
-                fprintf(stderr, "do_write_same: use WRITE SAME(16) instead "
-                        "of 10 byte cdb\n");
+            if (op->verbose) {
+                const char * cp = "use WRITE SAME(16) instead of 10 byte "
+                                  "cdb";
+
+                if (op->numblocks > 0xffff)
+                    fprintf(stderr, "%s since blocks exceed 65535\n", cp);
+                else if (llba > ULONG_MAX)
+                    fprintf(stderr, "%s since LBA may exceed 32 bits\n", cp);
+                else
+                    fprintf(stderr, "%s due to ndob or unmap settings\n",
+                            cp);
+            }
         }
     }
     if (act_cdb_lenp)
@@ -462,7 +473,7 @@ main(int argc, char * argv[])
 
     if ((! if_given) && (! lba_given) && (! num_given)) {
         fprintf(stderr, "As a precaution, one of '--in=', '--lba=' or "
-		"'--num=' is required\n");
+                "'--num=' is required\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 

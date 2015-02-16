@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.02 20150123";  /* spc5r02 + sbc4r03 */
+static const char * version_str = "1.03 20150212";  /* spc5r02 + sbc4r05 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -2612,6 +2612,7 @@ decode_sup_block_lens_vpd(unsigned char * buff, int len)
         u = sg_get_unaligned_be32(ucp);
         printf("  Logical block length: %u\n", u);
         printf("    P_I_I_SUP: %d\n", !!(ucp[4] & 0x40));
+        printf("    NO_PI_CHK: %d\n", !!(ucp[4] & 0x8));  /* sbc4r05 */
         printf("    GRD_CHK: %d\n", !!(ucp[4] & 0x4));
         printf("    APP_CHK: %d\n", !!(ucp[4] & 0x2));
         printf("    REF_CHK: %d\n", !!(ucp[4] & 0x1));

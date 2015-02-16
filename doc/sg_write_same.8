@@ -1,11 +1,11 @@
-.TH SG_WRITE_SAME "8" "January 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_WRITE_SAME "8" "February 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
 .B sg_write_same
 [\fI\-\-10\fR] [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-anchor\fR]
 [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR]
-[\fI\-\-lbdata\fR] [\fI\-\-pbdata\fR] [\fI\-\-num=NUM\fR] [\fI\-\-ndob\fR]
+[\fI\-\-lbdata\fR] [\fI\-\-num=NUM\fR] [\fI\-\-ndob\fR] [\fI\-\-pbdata\fR]
 [\fI\-\-timeout=TO\fR] [\fI\-\-unmap\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR] [\fI\-\-xferlen=LEN\fR]
 \fIDEVICE\fR
@@ -14,11 +14,6 @@ sg_write_same \- send SCSI WRITE SAME command
 Send the SCSI WRITE SAME (10, 16 or 32 byte) command to \fIDEVICE\fR. This
 command writes the given block \fINUM\fR times to consecutive blocks on
 the \fIDEVICE\fR starting at logical block address \fILBA\fR.
-.PP
-SBC\-3 revision 35d introduced a "no data-out buffer" (NDOB) bit which, if
-set, bypasses the requirement to send a single block of data to the
-\fIDEVICE\fR together with the command. Only WRITE SAME (16 and 32 byte)
-support the NDOB bit.
 .PP
 The length of the block to be written multiple times is obtained from either
 the \fILEN\fR argument, or the length of the given input file \fIIF\fR,
@@ -36,6 +31,12 @@ or the \fI\-\-unmap\fR option is given then WRITE SAME(16) is sent.
 The \fI\-\-10\fR, \fI\-\-16\fR and \fI\-\-32\fR options are mutually
 exclusive.
 .PP
+SBC\-3 revision 35d introduced a "no data-out buffer" (NDOB) bit which, if
+set, bypasses the requirement to send a single block of data to the
+\fIDEVICE\fR together with the command. Only WRITE SAME (16 and 32 byte)
+support the NDOB bit. If given, a user block of zeros is assumed; if
+required, protection information of 0xffs is assumed.
+.PP
 In SBC\-3 revision 26 the UNMAP and ANCHOR bits were added to the
 WRITE SAME (10) command. Since the UNMAP bit has been in WRITE SAME (16)
 and WRITE SAME (32) since SBC\-3 revision 18, the lower of the two (i.e.
@@ -43,17 +44,16 @@ WRITE SAME (16)) is the default when the \fI\-\-unmap\fR option is given.
 To send WRITE SAME (10) use the \fI\-\-10\fR option.
 .PP
 .B Take care:
-The WRITE SAME(10, 16 and 32) commands interpret a \fINUM\fR of zero
-as write to the end of \fIDEVICE\fR. This utility defaults \fINUM\fR to
-1 . The WRITE SAME commands have no IMMED bit so if \fINUM\fR is
-large (or zero) then an invocation of this utility could take a long
-time, potentially as long as a FORMAT UNIT command. In such situations
-the command timeout value \fITO\fR may need to be increased from its
-default value of 60 seconds. In SBC\-3 revision 26 the WSNZ (write same
-no zero) bit was added to the Block Limits VPD page [0xB0]. If set the
-WRITE SAME commands will not accept a \fINUM\fR of zero. The same
-SBC\-3 revision added the "Maximum Write Same Length" field to the Block
-Limits VPD page.
+The WRITE SAME(10, 16 and 32) commands may interpret a \fINUM\fR of zero as
+write to the end of \fIDEVICE\fR. This utility defaults \fINUM\fR to 1 .
+The WRITE SAME commands have no IMMED bit so if \fINUM\fR is large (or
+zero) then an invocation of this utility could take a long time, potentially
+as long as a FORMAT UNIT command. In such situations the command timeout
+value \fITO\fR may need to be increased from its default value of 60
+seconds. In SBC\-3 revision 26 the WSNZ (write same no zero) bit was added
+to the Block Limits VPD page [0xB0]. If set the WRITE SAME commands will not
+accept a \fINUM\fR of zero. The same SBC\-3 revision added the "Maximum
+Write Same Length" field to the Block Limits VPD page.
 .PP
 The Logical Block Provisioning VPD page [0xB2] contains the LBWS and
 LBW10 bits. If LBWS is set then WRITE SAME (16) supports the UNMAP bit.
@@ -108,7 +108,8 @@ in use. Assumed to be in decimal unless prefixed with '0x' or has a
 trailing 'h'.
 .TP
 \fB\-L\fR, \fB\-\-lbdata\fR
-sets the LBDATA bit in the WRITE SAME cdb.
+sets the LBDATA bit in the WRITE SAME cdb. This bit was made obsolete in
+sbc3r32 in September 2012.
 .TP
 \fB\-N\fR, \fB\-\-ndob\fR
 sets the NDOB bit in the WRITE SAME (16 and 32 byte) commands. Default is to
@@ -118,12 +119,17 @@ and \fI\-\-xferlen=LEN\fR can only be given if \fILEN\fR is 0 .
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the
 data out buffer to. The default value for \fINUM\fR is 1. The value corresponds
-to the 'Number of logical blocks' field in the WRITE SAME cdb. Note that a
-value of 0 in \fINUM\fR is interpreted as write the data out buffer on every
-block starting at \fILBA\fR to the end of the \fIDEVICE\fR.
+to the 'Number of logical blocks' field in the WRITE SAME cdb.
+.br
+Note that a value of 0 in \fINUM\fR may be interpreted as write the data out
+buffer on every block starting at \fILBA\fR to the end of the \fIDEVICE\fR.
+If the WSNZ bit (introduced in sbc3r26, January 2011) in the Block Limits VPD
+page is set then the value of 0 is disallowed, yielding an Invalid request
+sense key.
 .TP
 \fB\-P\fR, \fB\-\-pbdata\fR
-sets the PBDATA bit in the WRITE SAME cdb.
+sets the PBDATA bit in the WRITE SAME cdb. This bit was made obsolete in
+sbc3r32 in September 2012.
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
 where \fITO\fR is the command timeout value in seconds. The default value is
