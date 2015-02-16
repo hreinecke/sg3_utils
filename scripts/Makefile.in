@@ -256,23 +256,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@OS_FREEBSD_TRUE@bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-@OS_FREEBSD_TRUE@	      scsi_satl scsi_start scsi_stop scsi_temperature
-
-@OS_LINUX_TRUE@bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-@OS_LINUX_TRUE@	      scsi_satl scsi_start scsi_stop scsi_temperature
-
-@OS_OSF_TRUE@bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-@OS_OSF_TRUE@	      scsi_satl scsi_start scsi_stop scsi_temperature
-
-@OS_SOLARIS_TRUE@bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-@OS_SOLARIS_TRUE@	      scsi_satl scsi_start scsi_stop scsi_temperature
-
-@OS_WIN32_CYGWIN_TRUE@bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-@OS_WIN32_CYGWIN_TRUE@	      scsi_satl scsi_start scsi_stop scsi_temperature
-
-@OS_WIN32_MINGW_TRUE@bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-@OS_WIN32_MINGW_TRUE@	      scsi_satl scsi_start scsi_stop scsi_temperature
+bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
+	      scsi_satl scsi_start scsi_stop scsi_temperature
 
 all: all-am
 

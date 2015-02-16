@@ -78,290 +78,35 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@bin_PROGRAMS = sg_compare_and_write$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_decode_sense$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_format$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_get_config$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_get_lba_status$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ident$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_inq$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_logs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_luns$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_modes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_opcodes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_persist$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_prevent$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_raw$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rdac$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_readcap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_read_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_read_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_reassign$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_referrals$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rep_zones$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_requests$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_reset_wp$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_rtpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_safte$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sanitize$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_read_gplog$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_scan$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_senddiag$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ses$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_ses_microcode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_start$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_stpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_sync$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_turs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_unmap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_vpd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_same$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_write_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_wr_mode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_TRUE@	sg_zone$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@bin_PROGRAMS = sg_compare_and_write$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_decode_sense$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_format$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_get_config$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_get_lba_status$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ident$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_inq$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_logs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_luns$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_modes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_opcodes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_persist$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_prevent$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_raw$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rdac$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_readcap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_read_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_read_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_reassign$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_referrals$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rep_zones$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_requests$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_reset_wp$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_rtpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_safte$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sanitize$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_read_gplog$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_scan$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_senddiag$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ses$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_ses_microcode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_start$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_stpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_sync$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_turs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_unmap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_vpd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_same$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_write_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_wr_mode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_FALSE@@OS_WIN32_CYGWIN_TRUE@	sg_zone$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@bin_PROGRAMS = sg_compare_and_write$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_decode_sense$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_format$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_get_config$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_get_lba_status$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ident$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_inq$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_logs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_luns$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_modes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_opcodes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_persist$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_prevent$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_raw$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rdac$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_readcap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_read_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_read_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_reassign$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_referrals$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rep_zones$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_requests$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_reset_wp$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_rtpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_safte$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sanitize$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_read_gplog$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_senddiag$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ses$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_ses_microcode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_start$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_stpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_sync$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_turs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_unmap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_vpd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_same$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_write_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_wr_mode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_FALSE@@OS_SOLARIS_TRUE@	sg_zone$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@bin_PROGRAMS = sg_compare_and_write$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_decode_sense$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_format$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_get_config$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_get_lba_status$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ident$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_inq$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_logs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_luns$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_modes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_opcodes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_persist$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_prevent$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_raw$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rdac$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_readcap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_read_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_read_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_reassign$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_referrals$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rep_zones$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_requests$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_reset_wp$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_rtpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_safte$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sanitize$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_read_gplog$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_senddiag$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ses$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_ses_microcode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_start$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_stpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_sync$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_turs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_unmap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_vpd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_same$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_write_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_wr_mode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_FALSE@@OS_OSF_TRUE@	sg_zone$(EXEEXT)
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@bin_PROGRAMS = sg_compare_and_write$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_copy_results$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_dd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_decode_sense$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_emc_trespass$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_format$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_get_config$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_get_lba_status$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_ident$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sginfo$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_inq$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_logs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_luns$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_map26$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_map$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sgm_dd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_modes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_opcodes$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sgp_dd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_persist$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_prevent$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_raw$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rbuf$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rdac$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_read$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_readcap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_read_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_read_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reassign$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_referrals$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rep_zones$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_requests$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reset$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_reset_wp$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_rtpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_safte$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sanitize$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_read_gplog$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_scan$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_senddiag$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_ses$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_ses_microcode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_start$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_stpg$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_sync$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_test_rwbuf$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_turs$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_unmap$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_vpd$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_long$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_same$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_write_verify$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_wr_mode$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_xcopy$(EXEEXT) \
-@OS_FREEBSD_FALSE@@OS_LINUX_TRUE@	sg_zone$(EXEEXT)
-@OS_FREEBSD_TRUE@bin_PROGRAMS = sg_compare_and_write$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_decode_sense$(EXEEXT) sg_format$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_get_config$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_inq$(EXEEXT) sg_logs$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_prevent$(EXEEXT) sg_raw$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_rdac$(EXEEXT) sg_readcap$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_read_block_limits$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_read_buffer$(EXEEXT) sg_read_long$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_reassign$(EXEEXT) sg_referrals$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_rep_zones$(EXEEXT) sg_requests$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sanitize$(EXEEXT) sg_sat_identify$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_phy_event$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_read_gplog$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_sat_set_features$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_ses_microcode$(EXEEXT) sg_start$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_stpg$(EXEEXT) sg_sync$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_turs$(EXEEXT) sg_unmap$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_write_buffer$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_write_verify$(EXEEXT) sg_wr_mode$(EXEEXT) \
-@OS_FREEBSD_TRUE@	sg_zone$(EXEEXT)
+bin_PROGRAMS = sg_compare_and_write$(EXEEXT) sg_decode_sense$(EXEEXT) \
+	sg_format$(EXEEXT) sg_get_config$(EXEEXT) \
+	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) sg_inq$(EXEEXT) \
+	sg_logs$(EXEEXT) sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
+	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) sg_prevent$(EXEEXT) \
+	sg_raw$(EXEEXT) sg_rdac$(EXEEXT) sg_read_block_limits$(EXEEXT) \
+	sg_read_buffer$(EXEEXT) sg_read_long$(EXEEXT) \
+	sg_readcap$(EXEEXT) sg_reassign$(EXEEXT) sg_referrals$(EXEEXT) \
+	sg_rep_zones$(EXEEXT) sg_requests$(EXEEXT) \
+	sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) sg_rtpg$(EXEEXT) \
+	sg_safte$(EXEEXT) sg_sanitize$(EXEEXT) \
+	sg_sat_identify$(EXEEXT) sg_sat_phy_event$(EXEEXT) \
+	sg_sat_read_gplog$(EXEEXT) sg_sat_set_features$(EXEEXT) \
+	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) sg_ses_microcode$(EXEEXT) \
+	sg_start$(EXEEXT) sg_stpg$(EXEEXT) sg_sync$(EXEEXT) \
+	sg_turs$(EXEEXT) sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
+	sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) sg_write_buffer$(EXEEXT) \
+	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
+	sg_write_verify$(EXEEXT) sg_zone$(EXEEXT) $(am__EXEEXT_1) \
+	$(am__EXEEXT_2) $(am__EXEEXT_3)
+@OS_LINUX_TRUE@am__append_1 = \
+@OS_LINUX_TRUE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
+@OS_LINUX_TRUE@	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
+
+@OS_LINUX_TRUE@am__append_2 = sg_scan_linux.c
+@OS_WIN32_MINGW_TRUE@am__append_3 = sg_scan
+@OS_WIN32_MINGW_TRUE@am__append_4 = sg_scan_win32.c
+@OS_WIN32_CYGWIN_TRUE@am__append_5 = sg_scan
+@OS_WIN32_CYGWIN_TRUE@am__append_6 = sg_scan_win32.c
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
@@ -373,197 +118,211 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
+@OS_LINUX_TRUE@am__EXEEXT_1 = sg_copy_results$(EXEEXT) sg_dd$(EXEEXT) \
+@OS_LINUX_TRUE@	sg_emc_trespass$(EXEEXT) sg_map$(EXEEXT) \
+@OS_LINUX_TRUE@	sg_map26$(EXEEXT) sg_rbuf$(EXEEXT) \
+@OS_LINUX_TRUE@	sg_read$(EXEEXT) sg_reset$(EXEEXT) \
+@OS_LINUX_TRUE@	sg_scan$(EXEEXT) sg_test_rwbuf$(EXEEXT) \
+@OS_LINUX_TRUE@	sg_xcopy$(EXEEXT) sginfo$(EXEEXT) \
+@OS_LINUX_TRUE@	sgm_dd$(EXEEXT) sgp_dd$(EXEEXT)
+@OS_WIN32_MINGW_TRUE@am__EXEEXT_2 = sg_scan$(EXEEXT)
+@OS_WIN32_CYGWIN_TRUE@am__EXEEXT_3 = sg_scan$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_sg_compare_and_write_OBJECTS = sg_compare_and_write.$(OBJEXT)
-sg_compare_and_write_OBJECTS = $(am_sg_compare_and_write_OBJECTS)
+sg_compare_and_write_SOURCES = sg_compare_and_write.c
+sg_compare_and_write_OBJECTS = sg_compare_and_write.$(OBJEXT)
 sg_compare_and_write_DEPENDENCIES = ../lib/libsgutils2.la
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-am_sg_copy_results_OBJECTS = sg_copy_results.$(OBJEXT)
-sg_copy_results_OBJECTS = $(am_sg_copy_results_OBJECTS)
+sg_copy_results_SOURCES = sg_copy_results.c
+sg_copy_results_OBJECTS = sg_copy_results.$(OBJEXT)
 sg_copy_results_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_dd_OBJECTS = sg_dd.$(OBJEXT)
-sg_dd_OBJECTS = $(am_sg_dd_OBJECTS)
+sg_dd_SOURCES = sg_dd.c
+sg_dd_OBJECTS = sg_dd.$(OBJEXT)
 sg_dd_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_decode_sense_OBJECTS = sg_decode_sense.$(OBJEXT)
-sg_decode_sense_OBJECTS = $(am_sg_decode_sense_OBJECTS)
+sg_decode_sense_SOURCES = sg_decode_sense.c
+sg_decode_sense_OBJECTS = sg_decode_sense.$(OBJEXT)
 sg_decode_sense_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_emc_trespass_OBJECTS = sg_emc_trespass.$(OBJEXT)
-sg_emc_trespass_OBJECTS = $(am_sg_emc_trespass_OBJECTS)
+sg_emc_trespass_SOURCES = sg_emc_trespass.c
+sg_emc_trespass_OBJECTS = sg_emc_trespass.$(OBJEXT)
 sg_emc_trespass_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_format_OBJECTS = sg_format.$(OBJEXT)
-sg_format_OBJECTS = $(am_sg_format_OBJECTS)
+sg_format_SOURCES = sg_format.c
+sg_format_OBJECTS = sg_format.$(OBJEXT)
 sg_format_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_get_config_OBJECTS = sg_get_config.$(OBJEXT)
-sg_get_config_OBJECTS = $(am_sg_get_config_OBJECTS)
+sg_get_config_SOURCES = sg_get_config.c
+sg_get_config_OBJECTS = sg_get_config.$(OBJEXT)
 sg_get_config_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_get_lba_status_OBJECTS = sg_get_lba_status.$(OBJEXT)
-sg_get_lba_status_OBJECTS = $(am_sg_get_lba_status_OBJECTS)
+sg_get_lba_status_SOURCES = sg_get_lba_status.c
+sg_get_lba_status_OBJECTS = sg_get_lba_status.$(OBJEXT)
 sg_get_lba_status_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_ident_OBJECTS = sg_ident.$(OBJEXT)
-sg_ident_OBJECTS = $(am_sg_ident_OBJECTS)
+sg_ident_SOURCES = sg_ident.c
+sg_ident_OBJECTS = sg_ident.$(OBJEXT)
 sg_ident_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_inq_OBJECTS = sg_inq.$(OBJEXT) sg_inq_data.$(OBJEXT)
 sg_inq_OBJECTS = $(am_sg_inq_OBJECTS)
 sg_inq_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_logs_OBJECTS = sg_logs.$(OBJEXT)
-sg_logs_OBJECTS = $(am_sg_logs_OBJECTS)
+sg_logs_SOURCES = sg_logs.c
+sg_logs_OBJECTS = sg_logs.$(OBJEXT)
 sg_logs_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_luns_OBJECTS = sg_luns.$(OBJEXT)
-sg_luns_OBJECTS = $(am_sg_luns_OBJECTS)
+sg_luns_SOURCES = sg_luns.c
+sg_luns_OBJECTS = sg_luns.$(OBJEXT)
 sg_luns_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_map_OBJECTS = sg_map.$(OBJEXT)
-sg_map_OBJECTS = $(am_sg_map_OBJECTS)
+sg_map_SOURCES = sg_map.c
+sg_map_OBJECTS = sg_map.$(OBJEXT)
 sg_map_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_map26_OBJECTS = sg_map26.$(OBJEXT)
-sg_map26_OBJECTS = $(am_sg_map26_OBJECTS)
+sg_map26_SOURCES = sg_map26.c
+sg_map26_OBJECTS = sg_map26.$(OBJEXT)
 sg_map26_DEPENDENCIES =
-am_sg_modes_OBJECTS = sg_modes.$(OBJEXT)
-sg_modes_OBJECTS = $(am_sg_modes_OBJECTS)
+sg_modes_SOURCES = sg_modes.c
+sg_modes_OBJECTS = sg_modes.$(OBJEXT)
 sg_modes_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_opcodes_OBJECTS = sg_opcodes.$(OBJEXT)
-sg_opcodes_OBJECTS = $(am_sg_opcodes_OBJECTS)
+sg_opcodes_SOURCES = sg_opcodes.c
+sg_opcodes_OBJECTS = sg_opcodes.$(OBJEXT)
 sg_opcodes_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_persist_OBJECTS = sg_persist.$(OBJEXT)
-sg_persist_OBJECTS = $(am_sg_persist_OBJECTS)
+sg_persist_SOURCES = sg_persist.c
+sg_persist_OBJECTS = sg_persist.$(OBJEXT)
 sg_persist_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_prevent_OBJECTS = sg_prevent.$(OBJEXT)
-sg_prevent_OBJECTS = $(am_sg_prevent_OBJECTS)
+sg_prevent_SOURCES = sg_prevent.c
+sg_prevent_OBJECTS = sg_prevent.$(OBJEXT)
 sg_prevent_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_raw_OBJECTS = sg_raw.$(OBJEXT)
-sg_raw_OBJECTS = $(am_sg_raw_OBJECTS)
+sg_raw_SOURCES = sg_raw.c
+sg_raw_OBJECTS = sg_raw.$(OBJEXT)
 sg_raw_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_rbuf_OBJECTS = sg_rbuf.$(OBJEXT)
-sg_rbuf_OBJECTS = $(am_sg_rbuf_OBJECTS)
+sg_rbuf_SOURCES = sg_rbuf.c
+sg_rbuf_OBJECTS = sg_rbuf.$(OBJEXT)
 sg_rbuf_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_rdac_OBJECTS = sg_rdac.$(OBJEXT)
-sg_rdac_OBJECTS = $(am_sg_rdac_OBJECTS)
+sg_rdac_SOURCES = sg_rdac.c
+sg_rdac_OBJECTS = sg_rdac.$(OBJEXT)
 sg_rdac_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_read_OBJECTS = sg_read.$(OBJEXT)
-sg_read_OBJECTS = $(am_sg_read_OBJECTS)
+sg_read_SOURCES = sg_read.c
+sg_read_OBJECTS = sg_read.$(OBJEXT)
 sg_read_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_read_block_limits_OBJECTS = sg_read_block_limits.$(OBJEXT)
-sg_read_block_limits_OBJECTS = $(am_sg_read_block_limits_OBJECTS)
+sg_read_block_limits_SOURCES = sg_read_block_limits.c
+sg_read_block_limits_OBJECTS = sg_read_block_limits.$(OBJEXT)
 sg_read_block_limits_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_read_buffer_OBJECTS = sg_read_buffer.$(OBJEXT)
-sg_read_buffer_OBJECTS = $(am_sg_read_buffer_OBJECTS)
+sg_read_buffer_SOURCES = sg_read_buffer.c
+sg_read_buffer_OBJECTS = sg_read_buffer.$(OBJEXT)
 sg_read_buffer_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_read_long_OBJECTS = sg_read_long.$(OBJEXT)
-sg_read_long_OBJECTS = $(am_sg_read_long_OBJECTS)
+sg_read_long_SOURCES = sg_read_long.c
+sg_read_long_OBJECTS = sg_read_long.$(OBJEXT)
 sg_read_long_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_readcap_OBJECTS = sg_readcap.$(OBJEXT)
-sg_readcap_OBJECTS = $(am_sg_readcap_OBJECTS)
+sg_readcap_SOURCES = sg_readcap.c
+sg_readcap_OBJECTS = sg_readcap.$(OBJEXT)
 sg_readcap_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_reassign_OBJECTS = sg_reassign.$(OBJEXT)
-sg_reassign_OBJECTS = $(am_sg_reassign_OBJECTS)
+sg_reassign_SOURCES = sg_reassign.c
+sg_reassign_OBJECTS = sg_reassign.$(OBJEXT)
 sg_reassign_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_referrals_OBJECTS = sg_referrals.$(OBJEXT)
-sg_referrals_OBJECTS = $(am_sg_referrals_OBJECTS)
+sg_referrals_SOURCES = sg_referrals.c
+sg_referrals_OBJECTS = sg_referrals.$(OBJEXT)
 sg_referrals_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_rep_zones_OBJECTS = sg_rep_zones.$(OBJEXT)
-sg_rep_zones_OBJECTS = $(am_sg_rep_zones_OBJECTS)
+sg_rep_zones_SOURCES = sg_rep_zones.c
+sg_rep_zones_OBJECTS = sg_rep_zones.$(OBJEXT)
 sg_rep_zones_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_requests_OBJECTS = sg_requests.$(OBJEXT)
-sg_requests_OBJECTS = $(am_sg_requests_OBJECTS)
+sg_requests_SOURCES = sg_requests.c
+sg_requests_OBJECTS = sg_requests.$(OBJEXT)
 sg_requests_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_reset_OBJECTS = sg_reset.$(OBJEXT)
-sg_reset_OBJECTS = $(am_sg_reset_OBJECTS)
+sg_reset_SOURCES = sg_reset.c
+sg_reset_OBJECTS = sg_reset.$(OBJEXT)
 sg_reset_DEPENDENCIES =
-am_sg_reset_wp_OBJECTS = sg_reset_wp.$(OBJEXT)
-sg_reset_wp_OBJECTS = $(am_sg_reset_wp_OBJECTS)
+sg_reset_wp_SOURCES = sg_reset_wp.c
+sg_reset_wp_OBJECTS = sg_reset_wp.$(OBJEXT)
 sg_reset_wp_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_rmsn_OBJECTS = sg_rmsn.$(OBJEXT)
-sg_rmsn_OBJECTS = $(am_sg_rmsn_OBJECTS)
+sg_rmsn_SOURCES = sg_rmsn.c
+sg_rmsn_OBJECTS = sg_rmsn.$(OBJEXT)
 sg_rmsn_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_rtpg_OBJECTS = sg_rtpg.$(OBJEXT)
-sg_rtpg_OBJECTS = $(am_sg_rtpg_OBJECTS)
+sg_rtpg_SOURCES = sg_rtpg.c
+sg_rtpg_OBJECTS = sg_rtpg.$(OBJEXT)
 sg_rtpg_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_safte_OBJECTS = sg_safte.$(OBJEXT)
-sg_safte_OBJECTS = $(am_sg_safte_OBJECTS)
+sg_safte_SOURCES = sg_safte.c
+sg_safte_OBJECTS = sg_safte.$(OBJEXT)
 sg_safte_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_sanitize_OBJECTS = sg_sanitize.$(OBJEXT)
-sg_sanitize_OBJECTS = $(am_sg_sanitize_OBJECTS)
+sg_sanitize_SOURCES = sg_sanitize.c
+sg_sanitize_OBJECTS = sg_sanitize.$(OBJEXT)
 sg_sanitize_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_sat_identify_OBJECTS = sg_sat_identify.$(OBJEXT)
-sg_sat_identify_OBJECTS = $(am_sg_sat_identify_OBJECTS)
+sg_sat_identify_SOURCES = sg_sat_identify.c
+sg_sat_identify_OBJECTS = sg_sat_identify.$(OBJEXT)
 sg_sat_identify_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_sat_phy_event_OBJECTS = sg_sat_phy_event.$(OBJEXT)
-sg_sat_phy_event_OBJECTS = $(am_sg_sat_phy_event_OBJECTS)
+sg_sat_phy_event_SOURCES = sg_sat_phy_event.c
+sg_sat_phy_event_OBJECTS = sg_sat_phy_event.$(OBJEXT)
 sg_sat_phy_event_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_sat_read_gplog_OBJECTS = sg_sat_read_gplog.$(OBJEXT)
-sg_sat_read_gplog_OBJECTS = $(am_sg_sat_read_gplog_OBJECTS)
+sg_sat_read_gplog_SOURCES = sg_sat_read_gplog.c
+sg_sat_read_gplog_OBJECTS = sg_sat_read_gplog.$(OBJEXT)
 sg_sat_read_gplog_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_sat_set_features_OBJECTS = sg_sat_set_features.$(OBJEXT)
-sg_sat_set_features_OBJECTS = $(am_sg_sat_set_features_OBJECTS)
+sg_sat_set_features_SOURCES = sg_sat_set_features.c
+sg_sat_set_features_OBJECTS = sg_sat_set_features.$(OBJEXT)
 sg_sat_set_features_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_scan_OBJECTS = sg_scan.$(OBJEXT)
+am__sg_scan_SOURCES_DIST = sg_scan_linux.c sg_scan_win32.c
+@OS_LINUX_TRUE@am__objects_1 = sg_scan_linux.$(OBJEXT)
+@OS_WIN32_MINGW_TRUE@am__objects_2 = sg_scan_win32.$(OBJEXT)
+@OS_WIN32_CYGWIN_TRUE@am__objects_3 = sg_scan_win32.$(OBJEXT)
+am_sg_scan_OBJECTS = $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3)
 sg_scan_OBJECTS = $(am_sg_scan_OBJECTS)
 sg_scan_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_senddiag_OBJECTS = sg_senddiag.$(OBJEXT)
-sg_senddiag_OBJECTS = $(am_sg_senddiag_OBJECTS)
+sg_senddiag_SOURCES = sg_senddiag.c
+sg_senddiag_OBJECTS = sg_senddiag.$(OBJEXT)
 sg_senddiag_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_ses_OBJECTS = sg_ses.$(OBJEXT)
-sg_ses_OBJECTS = $(am_sg_ses_OBJECTS)
+sg_ses_SOURCES = sg_ses.c
+sg_ses_OBJECTS = sg_ses.$(OBJEXT)
 sg_ses_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_ses_microcode_OBJECTS = sg_ses_microcode.$(OBJEXT)
-sg_ses_microcode_OBJECTS = $(am_sg_ses_microcode_OBJECTS)
+sg_ses_microcode_SOURCES = sg_ses_microcode.c
+sg_ses_microcode_OBJECTS = sg_ses_microcode.$(OBJEXT)
 sg_ses_microcode_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_start_OBJECTS = sg_start.$(OBJEXT)
-sg_start_OBJECTS = $(am_sg_start_OBJECTS)
+sg_start_SOURCES = sg_start.c
+sg_start_OBJECTS = sg_start.$(OBJEXT)
 sg_start_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_stpg_OBJECTS = sg_stpg.$(OBJEXT)
-sg_stpg_OBJECTS = $(am_sg_stpg_OBJECTS)
+sg_stpg_SOURCES = sg_stpg.c
+sg_stpg_OBJECTS = sg_stpg.$(OBJEXT)
 sg_stpg_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_sync_OBJECTS = sg_sync.$(OBJEXT)
-sg_sync_OBJECTS = $(am_sg_sync_OBJECTS)
+sg_sync_SOURCES = sg_sync.c
+sg_sync_OBJECTS = sg_sync.$(OBJEXT)
 sg_sync_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_test_rwbuf_OBJECTS = sg_test_rwbuf.$(OBJEXT)
-sg_test_rwbuf_OBJECTS = $(am_sg_test_rwbuf_OBJECTS)
+sg_test_rwbuf_SOURCES = sg_test_rwbuf.c
+sg_test_rwbuf_OBJECTS = sg_test_rwbuf.$(OBJEXT)
 sg_test_rwbuf_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_turs_OBJECTS = sg_turs.$(OBJEXT)
-sg_turs_OBJECTS = $(am_sg_turs_OBJECTS)
+sg_turs_SOURCES = sg_turs.c
+sg_turs_OBJECTS = sg_turs.$(OBJEXT)
 sg_turs_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_unmap_OBJECTS = sg_unmap.$(OBJEXT)
-sg_unmap_OBJECTS = $(am_sg_unmap_OBJECTS)
+sg_unmap_SOURCES = sg_unmap.c
+sg_unmap_OBJECTS = sg_unmap.$(OBJEXT)
 sg_unmap_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_verify_OBJECTS = sg_verify.$(OBJEXT)
-sg_verify_OBJECTS = $(am_sg_verify_OBJECTS)
+sg_verify_SOURCES = sg_verify.c
+sg_verify_OBJECTS = sg_verify.$(OBJEXT)
 sg_verify_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_vpd_OBJECTS = sg_vpd.$(OBJEXT) sg_vpd_vendor.$(OBJEXT)
 sg_vpd_OBJECTS = $(am_sg_vpd_OBJECTS)
 sg_vpd_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_wr_mode_OBJECTS = sg_wr_mode.$(OBJEXT)
-sg_wr_mode_OBJECTS = $(am_sg_wr_mode_OBJECTS)
+sg_wr_mode_SOURCES = sg_wr_mode.c
+sg_wr_mode_OBJECTS = sg_wr_mode.$(OBJEXT)
 sg_wr_mode_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_write_buffer_OBJECTS = sg_write_buffer.$(OBJEXT)
-sg_write_buffer_OBJECTS = $(am_sg_write_buffer_OBJECTS)
+sg_write_buffer_SOURCES = sg_write_buffer.c
+sg_write_buffer_OBJECTS = sg_write_buffer.$(OBJEXT)
 sg_write_buffer_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_write_long_OBJECTS = sg_write_long.$(OBJEXT)
-sg_write_long_OBJECTS = $(am_sg_write_long_OBJECTS)
+sg_write_long_SOURCES = sg_write_long.c
+sg_write_long_OBJECTS = sg_write_long.$(OBJEXT)
 sg_write_long_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_write_same_OBJECTS = sg_write_same.$(OBJEXT)
-sg_write_same_OBJECTS = $(am_sg_write_same_OBJECTS)
+sg_write_same_SOURCES = sg_write_same.c
+sg_write_same_OBJECTS = sg_write_same.$(OBJEXT)
 sg_write_same_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_write_verify_OBJECTS = sg_write_verify.$(OBJEXT)
-sg_write_verify_OBJECTS = $(am_sg_write_verify_OBJECTS)
+sg_write_verify_SOURCES = sg_write_verify.c
+sg_write_verify_OBJECTS = sg_write_verify.$(OBJEXT)
 sg_write_verify_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_xcopy_OBJECTS = sg_xcopy.$(OBJEXT)
-sg_xcopy_OBJECTS = $(am_sg_xcopy_OBJECTS)
+sg_xcopy_SOURCES = sg_xcopy.c
+sg_xcopy_OBJECTS = sg_xcopy.$(OBJEXT)
 sg_xcopy_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_zone_OBJECTS = sg_zone.$(OBJEXT)
-sg_zone_OBJECTS = $(am_sg_zone_OBJECTS)
+sg_zone_SOURCES = sg_zone.c
+sg_zone_OBJECTS = sg_zone.$(OBJEXT)
 sg_zone_DEPENDENCIES = ../lib/libsgutils2.la
-am_sginfo_OBJECTS = sginfo.$(OBJEXT)
-sginfo_OBJECTS = $(am_sginfo_OBJECTS)
+sginfo_SOURCES = sginfo.c
+sginfo_OBJECTS = sginfo.$(OBJEXT)
 sginfo_DEPENDENCIES = ../lib/libsgutils2.la
-am_sgm_dd_OBJECTS = sgm_dd.$(OBJEXT)
-sgm_dd_OBJECTS = $(am_sgm_dd_OBJECTS)
+sgm_dd_SOURCES = sgm_dd.c
+sgm_dd_OBJECTS = sgm_dd.$(OBJEXT)
 sgm_dd_DEPENDENCIES = ../lib/libsgutils2.la
-am_sgp_dd_OBJECTS = sgp_dd.$(OBJEXT)
-sgp_dd_OBJECTS = $(am_sgp_dd_OBJECTS)
+sgp_dd_SOURCES = sgp_dd.c
+sgp_dd_OBJECTS = sgp_dd.$(OBJEXT)
 sgp_dd_DEPENDENCIES = ../lib/libsgutils2.la
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -599,59 +358,38 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(sg_compare_and_write_SOURCES) $(sg_copy_results_SOURCES) \
-	$(sg_dd_SOURCES) $(sg_decode_sense_SOURCES) \
-	$(sg_emc_trespass_SOURCES) $(sg_format_SOURCES) \
-	$(sg_get_config_SOURCES) $(sg_get_lba_status_SOURCES) \
-	$(sg_ident_SOURCES) $(sg_inq_SOURCES) $(sg_logs_SOURCES) \
-	$(sg_luns_SOURCES) $(sg_map_SOURCES) $(sg_map26_SOURCES) \
-	$(sg_modes_SOURCES) $(sg_opcodes_SOURCES) \
-	$(sg_persist_SOURCES) $(sg_prevent_SOURCES) $(sg_raw_SOURCES) \
-	$(sg_rbuf_SOURCES) $(sg_rdac_SOURCES) $(sg_read_SOURCES) \
-	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
-	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
-	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
-	$(sg_rep_zones_SOURCES) $(sg_requests_SOURCES) \
-	$(sg_reset_SOURCES) $(sg_reset_wp_SOURCES) $(sg_rmsn_SOURCES) \
-	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
-	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
-	$(sg_sat_read_gplog_SOURCES) $(sg_sat_set_features_SOURCES) \
-	$(sg_scan_SOURCES) $(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
-	$(sg_ses_microcode_SOURCES) $(sg_start_SOURCES) \
-	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
-	$(sg_turs_SOURCES) $(sg_unmap_SOURCES) $(sg_verify_SOURCES) \
-	$(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
-	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
-	$(sg_write_same_SOURCES) $(sg_write_verify_SOURCES) \
-	$(sg_xcopy_SOURCES) $(sg_zone_SOURCES) $(sginfo_SOURCES) \
-	$(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
-DIST_SOURCES = $(sg_compare_and_write_SOURCES) \
-	$(sg_copy_results_SOURCES) $(sg_dd_SOURCES) \
-	$(sg_decode_sense_SOURCES) $(sg_emc_trespass_SOURCES) \
-	$(sg_format_SOURCES) $(sg_get_config_SOURCES) \
-	$(sg_get_lba_status_SOURCES) $(sg_ident_SOURCES) \
-	$(sg_inq_SOURCES) $(sg_logs_SOURCES) $(sg_luns_SOURCES) \
-	$(sg_map_SOURCES) $(sg_map26_SOURCES) $(sg_modes_SOURCES) \
-	$(sg_opcodes_SOURCES) $(sg_persist_SOURCES) \
-	$(sg_prevent_SOURCES) $(sg_raw_SOURCES) $(sg_rbuf_SOURCES) \
-	$(sg_rdac_SOURCES) $(sg_read_SOURCES) \
-	$(sg_read_block_limits_SOURCES) $(sg_read_buffer_SOURCES) \
-	$(sg_read_long_SOURCES) $(sg_readcap_SOURCES) \
-	$(sg_reassign_SOURCES) $(sg_referrals_SOURCES) \
-	$(sg_rep_zones_SOURCES) $(sg_requests_SOURCES) \
-	$(sg_reset_SOURCES) $(sg_reset_wp_SOURCES) $(sg_rmsn_SOURCES) \
-	$(sg_rtpg_SOURCES) $(sg_safte_SOURCES) $(sg_sanitize_SOURCES) \
-	$(sg_sat_identify_SOURCES) $(sg_sat_phy_event_SOURCES) \
-	$(sg_sat_read_gplog_SOURCES) $(sg_sat_set_features_SOURCES) \
-	$(sg_scan_SOURCES) $(sg_senddiag_SOURCES) $(sg_ses_SOURCES) \
-	$(sg_ses_microcode_SOURCES) $(sg_start_SOURCES) \
-	$(sg_stpg_SOURCES) $(sg_sync_SOURCES) $(sg_test_rwbuf_SOURCES) \
-	$(sg_turs_SOURCES) $(sg_unmap_SOURCES) $(sg_verify_SOURCES) \
-	$(sg_vpd_SOURCES) $(sg_wr_mode_SOURCES) \
-	$(sg_write_buffer_SOURCES) $(sg_write_long_SOURCES) \
-	$(sg_write_same_SOURCES) $(sg_write_verify_SOURCES) \
-	$(sg_xcopy_SOURCES) $(sg_zone_SOURCES) $(sginfo_SOURCES) \
-	$(sgm_dd_SOURCES) $(sgp_dd_SOURCES)
+SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
+	sg_decode_sense.c sg_emc_trespass.c sg_format.c \
+	sg_get_config.c sg_get_lba_status.c sg_ident.c \
+	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
+	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
+	sg_rbuf.c sg_rdac.c sg_read.c sg_read_block_limits.c \
+	sg_read_buffer.c sg_read_long.c sg_readcap.c sg_reassign.c \
+	sg_referrals.c sg_rep_zones.c sg_requests.c sg_reset.c \
+	sg_reset_wp.c sg_rmsn.c sg_rtpg.c sg_safte.c sg_sanitize.c \
+	sg_sat_identify.c sg_sat_phy_event.c sg_sat_read_gplog.c \
+	sg_sat_set_features.c $(sg_scan_SOURCES) sg_senddiag.c \
+	sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c sg_sync.c \
+	sg_test_rwbuf.c sg_turs.c sg_unmap.c sg_verify.c \
+	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
+	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
+DIST_SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
+	sg_decode_sense.c sg_emc_trespass.c sg_format.c \
+	sg_get_config.c sg_get_lba_status.c sg_ident.c \
+	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
+	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
+	sg_rbuf.c sg_rdac.c sg_read.c sg_read_block_limits.c \
+	sg_read_buffer.c sg_read_long.c sg_readcap.c sg_reassign.c \
+	sg_referrals.c sg_rep_zones.c sg_requests.c sg_reset.c \
+	sg_reset_wp.c sg_rmsn.c sg_rtpg.c sg_safte.c sg_sanitize.c \
+	sg_sat_identify.c sg_sat_phy_event.c sg_sat_read_gplog.c \
+	sg_sat_set_features.c $(am__sg_scan_SOURCES_DIST) \
+	sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c \
+	sg_sync.c sg_test_rwbuf.c sg_turs.c sg_unmap.c sg_verify.c \
+	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
+	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -795,137 +533,81 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+sg_scan_SOURCES = $(am__append_2) $(am__append_4) $(am__append_6)
 
 # For C++/clang testing
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu89 (gnu90 is the same)
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
-AM_CFLAGS = -iquote ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W @os_cflags@
-# AM_CFLAGS = -iquote ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W @os_cflags@ -pedantic -std=c11
-# AM_CFLAGS = -iquote ../include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -W @os_cflags@ -pedantic -std=c++11
-sg_dd_SOURCES = sg_dd.c
+AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
+AM_CFLAGS = -Wall -W @os_cflags@
+# AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11
+# AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c++11
+sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_dd_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_decode_sense_SOURCES = sg_decode_sense.c
 sg_decode_sense_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_emc_trespass_SOURCES = sg_emc_trespass.c
 sg_emc_trespass_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_format_SOURCES = sg_format.c
 sg_format_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_get_config_SOURCES = sg_get_config.c
 sg_get_config_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_get_lba_status_SOURCES = sg_get_lba_status.c
 sg_get_lba_status_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_ident_SOURCES = sg_ident.c
 sg_ident_LDADD = ../lib/libsgutils2.la @os_libs@
-sginfo_SOURCES = sginfo.c
 sginfo_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_inq_SOURCES = sg_inq.c sg_inq_data.c
 sg_inq_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_logs_SOURCES = sg_logs.c
 sg_logs_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_luns_SOURCES = sg_luns.c
 sg_luns_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_map26_SOURCES = sg_map26.c
 sg_map26_LDADD = @os_libs@
-sg_map_SOURCES = sg_map.c
 sg_map_LDADD = ../lib/libsgutils2.la @os_libs@
-sgm_dd_SOURCES = sgm_dd.c
 sgm_dd_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_modes_SOURCES = sg_modes.c
 sg_modes_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_opcodes_SOURCES = sg_opcodes.c
 sg_opcodes_LDADD = ../lib/libsgutils2.la @os_libs@
-sgp_dd_SOURCES = sgp_dd.c
 sgp_dd_LDADD = ../lib/libsgutils2.la @os_libs@ -lpthread
-sg_persist_SOURCES = sg_persist.c
 sg_persist_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_prevent_SOURCES = sg_prevent.c
 sg_prevent_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_raw_SOURCES = sg_raw.c
 sg_raw_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_rbuf_SOURCES = sg_rbuf.c
 sg_rbuf_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_rdac_SOURCES = sg_rdac.c
 sg_rdac_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_read_SOURCES = sg_read.c
 sg_read_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_readcap_SOURCES = sg_readcap.c
 sg_readcap_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_read_block_limits_SOURCES = sg_read_block_limits.c
 sg_read_block_limits_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_read_buffer_SOURCES = sg_read_buffer.c
 sg_read_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_read_long_SOURCES = sg_read_long.c
 sg_read_long_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_reassign_SOURCES = sg_reassign.c
 sg_reassign_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_requests_SOURCES = sg_requests.c
 sg_requests_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_referrals_SOURCES = sg_referrals.c
 sg_referrals_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_reset_SOURCES = sg_reset.c
+sg_rep_zones_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_reset_LDADD = @os_libs@
-sg_rmsn_SOURCES = sg_rmsn.c
+sg_reset_wp_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_rmsn_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_rtpg_SOURCES = sg_rtpg.c
 sg_rtpg_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_safte_SOURCES = sg_safte.c
 sg_safte_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_sanitize_SOURCES = sg_sanitize.c
 sg_sanitize_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_sat_identify_SOURCES = sg_sat_identify.c
 sg_sat_identify_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_sat_phy_event_SOURCES = sg_sat_phy_event.c
 sg_sat_phy_event_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_sat_set_features_SOURCES = sg_sat_set_features.c
+sg_sat_read_gplog_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_sat_set_features_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_scan_SOURCES = sg_scan.c
+
+# sg_scan_SOURCES list is already set above in the platform-specific sections
 sg_scan_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_senddiag_SOURCES = sg_senddiag.c
 sg_senddiag_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_ses_SOURCES = sg_ses.c
 sg_ses_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_ses_microcode_SOURCES = sg_ses_microcode.c
 sg_ses_microcode_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_start_SOURCES = sg_start.c
 sg_start_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_stpg_SOURCES = sg_stpg.c
 sg_stpg_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_sync_SOURCES = sg_sync.c
 sg_sync_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_test_rwbuf_SOURCES = sg_test_rwbuf.c
 sg_test_rwbuf_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_turs_SOURCES = sg_turs.c
 sg_turs_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_unmap_SOURCES = sg_unmap.c
 sg_unmap_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_verify_SOURCES = sg_verify.c
 sg_verify_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_vpd_SOURCES = sg_vpd.c sg_vpd_vendor.c
 sg_vpd_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_write_buffer_SOURCES = sg_write_buffer.c
 sg_write_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_write_long_SOURCES = sg_write_long.c
 sg_write_long_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_write_same_SOURCES = sg_write_same.c
 sg_write_same_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_wr_mode_SOURCES = sg_wr_mode.c
-sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_xcopy_SOURCES = sg_xcopy.c
-sg_xcopy_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_copy_results_SOURCES = sg_copy_results.c
-sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_compare_and_write_SOURCES = sg_compare_and_write.c
-sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_rep_zones_SOURCES = sg_rep_zones.c
-sg_rep_zones_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_reset_wp_SOURCES = sg_reset_wp.c
-sg_reset_wp_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_write_verify_SOURCES = sg_write_verify.c
 sg_write_verify_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_sat_read_gplog_SOURCES = sg_sat_read_gplog.c
-sg_sat_read_gplog_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_zone_SOURCES = sg_zone.c
+sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_xcopy_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_zone_LDADD = ../lib/libsgutils2.la @os_libs@
 all: all-am
 
@@ -1306,7 +988,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_phy_event.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_read_gplog.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_set_features.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan_linux.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan_win32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_senddiag.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses_microcode.Po@am__quote@
@@ -1476,7 +1159,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-@OS_LINUX_FALSE@@OS_WIN32_CYGWIN_FALSE@@OS_WIN32_MINGW_FALSE@distclean-local:
 clean: clean-am
 
 clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
@@ -1485,7 +1167,7 @@ distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-local distclean-tags
+	distclean-tags
 
 dvi: dvi-am
 
@@ -1552,36 +1234,17 @@ uninstall-am: uninstall-binPROGRAMS
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
 	clean-binPROGRAMS clean-generic clean-libtool cscopelist-am \
 	ctags ctags-am distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-local distclean-tags distdir dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-binPROGRAMS install-data install-data-am install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-ps install-ps-am \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-binPROGRAMS
+	distclean-libtool distclean-tags distdir dvi dvi-am html \
+	html-am info info-am install install-am install-binPROGRAMS \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS
 
-
-@OS_LINUX_TRUE@distclean-local:
-@OS_LINUX_TRUE@	rm -f sg_scan.c
-
-@OS_LINUX_TRUE@sg_scan.c : sg_scan.c.linux
-@OS_LINUX_TRUE@	cp sg_scan.c.linux sg_scan.c
-
-@OS_WIN32_MINGW_TRUE@distclean-local:
-@OS_WIN32_MINGW_TRUE@	rm -f sg_scan.c
-
-@OS_WIN32_MINGW_TRUE@sg_scan.c : sg_scan.c.win32
-@OS_WIN32_MINGW_TRUE@	cp sg_scan.c.win32 sg_scan.c
-
-@OS_WIN32_CYGWIN_TRUE@distclean-local:
-@OS_WIN32_CYGWIN_TRUE@	rm -f sg_scan.c
-
-@OS_WIN32_CYGWIN_TRUE@sg_scan.c : sg_scan.c.win32
-@OS_WIN32_CYGWIN_TRUE@	cp sg_scan.c.win32 sg_scan.c
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
