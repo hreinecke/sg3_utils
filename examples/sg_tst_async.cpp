@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Douglas Gilbert.
+ * Copyright (c) 2014-2015 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,6 +48,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <limits.h>
+#include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <sys/ioctl.h>
@@ -57,7 +58,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.08 20141028";
+static const char * version_str = "1.10 20150214";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -105,7 +106,7 @@ using namespace std::chrono;
 #define DEF_TIMEOUT_MS 20000    /* 20 seconds */
 #define DEF_LB_SZ 512
 #define DEF_BLOCKING 0
-#define DEF_DIRECT 0
+#define DEF_DIRECT 0		/* 1: direct_io, 2: mmap IO */
 #define DEF_NO_XFER 0
 #define DEF_LBA 1000
 
@@ -129,7 +130,8 @@ static mutex rand_lba_mutex;
 static atomic<int> async_starts(0);
 static atomic<int> async_finishes(0);
 static atomic<int> ebusy_count(0);
-static atomic<int> eagain_count(0);
+static atomic<int> start_eagain_count(0);
+static atomic<int> fin_eagain_count(0);
 static atomic<int> uniq_pack_id(1);
 
 static int page_size = 4096;   /* rough guess, will ask sysconf() */
@@ -145,7 +147,7 @@ enum myQDiscipline {MYQD_LOW,   /* favour completions over new cmds */
 
 struct opts_t {
     vector<const char *> dev_names;
-    bool direct;
+    int direct;
     int maxq_per_thread;
     int num_per_thread;
     bool block;
@@ -154,6 +156,7 @@ struct opts_t {
     vector<unsigned int> hi_lbas; /* only used when hi_lba=-1 */
     int lb_sz;
     bool no_xfer;
+    int stats;
     int verbose;
     int wait_ms;
     command2execute c2e;
@@ -201,49 +204,76 @@ private:
     default_random_engine dre;
 };
 
+static struct option long_options[] = {
+        {"direct", no_argument, 0, 'd'},
+        {"force", no_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"lba", required_argument, 0, 'l'},
+        {"maxqpt", required_argument, 0, 'M'},
+        {"numpt", required_argument, 0, 'n'},
+        {"noxfer", no_argument, 0, 'N'},
+        {"qat", required_argument, 0, 'q'},
+        {"qfav", required_argument, 0, 'Q'},
+        {"read", no_argument, 0, 'R'},
+        {"szlb", required_argument, 0, 's'},
+        {"stats", no_argument, 0, 'S'},
+        {"tnum", required_argument, 0, 't'},
+        {"tur", no_argument, 0, 'T'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"wait", required_argument, 0, 'w'},
+        {"write", no_argument, 0, 'W'},
+        {0, 0, 0, 0},
+};
+
 
 static void
 usage(void)
 {
-    printf("Usage: %s [-d] [-f] [-h] [-l <lba+>] [-M <maxq_per_thr>]\n"
-           "                    [-n <n_per_thr>] [-N] [-q 0|1] [-Q 0|1|2] "
-           "[-R]\n"
-           "                    [-s <lb_sz>] [-t <num_thrs>] [-T] [-v] "
-           "[-V]\n"
-           "                    [-w <wait_ms>] [-W] <sg_disk_device>*\n",
+    printf("Usage: %s [--direct] [--force] [--help] [--lba=LBA+] "
+           "[--maxqpt=QPT]\n"
+           "                    [--numpt=NPT] [--noxfer] [--qat=AT] "
+           "[-qfav=FAV]\n"
+           "                    [--read] [--szlb=LB] [--stats] [--tnum=NT] "
+           "[--tur]\n"
+           "                    [--verbose] [--version] [--wait=MS] "
+           "[--write]\n"
+           "                    <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
-    printf("    -d                do direct_io (def: indirect)\n");
-    printf("    -f                force: any sg device (def: only scsi_debug "
+    printf("    --direct|-d     do direct_io (def: indirect)\n");
+    printf("    --force|-f      force: any sg device (def: only scsi_debug "
            "owned)\n");
-    printf("                      WARNING: <lba> written to if '-W' given\n");
-    printf("    -h                print this usage message then exit\n");
-    printf("    -l <lba>          logical block to access (def: %u)\n",
+    printf("                    WARNING: <lba> written to if '-W' given\n");
+    printf("    --help|-h       print this usage message then exit\n");
+    printf("    --lba=LBA|-l LBA    logical block to access (def: %u)\n",
            DEF_LBA);
-    printf("    -l <lba,hi_lba>    logical block range (inclusive), if "
-           "hi_lba=-1\n"
-           "                       assume last block on device\n");
-    printf("    -M <maxq_per_thr>    maximum commands queued per thread "
+    printf("    --lba=LBA,HI_LBA|-l LBA,HI_LBA    logical block range "
+           "(inclusive)\n"
+           "                          if hi_lba=-1 assume last block on "
+           "device\n");
+    printf("    --maxqpt=QPT|-M QPT    maximum commands queued per thread "
            "(def:%d)\n", MAX_Q_PER_FD);
-    printf("    -n <n_per_thr>    number of commands per thread "
+    printf("    --numpt=NPT|-n NPT    number of commands per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
-    printf("    -N                no data xfer (def: xfer on READ and "
+    printf("    --noxfer|-N             no data xfer (def: xfer on READ and "
            "WRITE)\n");
-    printf("    -q 0|1            0: blk q_at_head; 1: q_at_tail\n");
-    printf("    -Q 0|1|2          0: favour completions (smaller q), 1: "
-           "medium,\n"
-           "                      2: favour submissions (larger q, "
+    printf("    --qat=AT|-q AT       AT=0: q_at_head; AT=1: q_at_tail\n");
+    printf("    --qfav=FAV|-Q FAV    FAV=0: favour completions (smaller q),\n"
+           "                         FAV=1: medium,\n"
+           "                         FAV=2: favour submissions (larger q, "
            "default)\n");
-    printf("    -s <lb_sz>        logical block size (def: 512)\n");
-    printf("    -R                do READs (def: TUR)\n");
-    printf("    -t <num_thrs>     number of threads (def: %d)\n",
+    printf("    --read|-R       do READs (def: TUR)\n");
+    printf("    --szlb=LB|-s LB    logical block size (def: 512)\n");
+    printf("    --stats|-S      show more statistics on completion\n");
+    printf("    --tnum=NT|-t NT    number of threads (def: %d)\n",
            DEF_NUM_THREADS);
-    printf("    -T                do TEST UNIT READYs (default is TURs)\n");
-    printf("    -v                increase verbosity\n");
-    printf("    -V                print version number then exit\n");
-    printf("    -w <wait_ms>      >0: poll(<wait_ms>); =0: poll(0); (def: "
+    printf("    --tur|-T        do TEST UNIT READYs (default is TURs)\n");
+    printf("    --verbose|-v    increase verbosity\n");
+    printf("    --version|-V    print version number then exit\n");
+    printf("    --wait=MS|-w MS    >0: poll(<wait_ms>); =0: poll(0); (def: "
            "%d)\n", DEF_WAIT_MS);
-    printf("    -W                do WRITEs (def: TUR)\n\n");
+    printf("    --write|-W      do WRITEs (def: TUR)\n\n");
     printf("Multiple threads send READ(16), WRITE(16) or TEST UNIT READY "
            "(TUR) SCSI\ncommands. There can be 1 or more <sg_disk_device>s "
            "and each thread takes\nthe next in a round robin fashion. "
@@ -317,7 +347,8 @@ get_urandom_uint(void)
 /* Returns 0 if command injected okay, else -1 */
 static int
 start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
-              unsigned char * lbp, int xfer_bytes, int flags)
+              unsigned char * lbp, int xfer_bytes, int flags,
+              unsigned int & eagains)
 {
     struct sg_io_hdr pt;
     unsigned char turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
@@ -368,6 +399,11 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
     for (int k = 0; write(sg_fd, &pt, sizeof(pt)) < 0; ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
+            this_thread::yield();
+            continue;
+        }
+        if (EAGAIN == errno) {
+            ++eagains;
             this_thread::yield();
             continue;
         }
@@ -477,7 +513,8 @@ work_thread(int id, struct opts_t * op)
 {
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
-    unsigned int thr_eagain_count = 0;
+    unsigned int thr_start_eagain_count = 0;
+    unsigned int thr_fin_eagain_count = 0;
     unsigned int seed = 0;
     unsigned int hi_lba;
     int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
@@ -576,7 +613,7 @@ work_thread(int id, struct opts_t * op)
             } else
                 lba = 0;
             if (start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp, op->lb_sz,
-                              sg_flags)) {
+                              sg_flags, thr_start_eagain_count)) {
                 err = "start_sg3_cmd()";
                 break;
             }
@@ -643,7 +680,7 @@ work_thread(int id, struct opts_t * op)
 
         while (num_to_read-- > 0) {
             if (finish_sg3_cmd(sg_fd, op->c2e, pack_id, op->wait_ms,
-                               thr_eagain_count)) {
+                               thr_fin_eagain_count)) {
                 err = "finish_sg3_cmd()";
                 if (ruip && (pack_id > 0)) {
                     auto q = pi_2_lba.find(pack_id);
@@ -714,7 +751,8 @@ work_thread(int id, struct opts_t * op)
                    id, k);
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
-    eagain_count += thr_eagain_count;
+    start_eagain_count += thr_start_eagain_count;
+    fin_eagain_count += thr_fin_eagain_count;
 }
 
 #define INQ_REPLY_LEN 96
@@ -857,7 +895,7 @@ do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
 int
 main(int argc, char * argv[])
 {
-    int k, n, res;
+    int k, n, c, res;
     int force = 0;
     int64_t ll;
     int num_threads = DEF_NUM_THREADS;
@@ -869,7 +907,8 @@ main(int argc, char * argv[])
     const char * dev_name;
 
     op = &opts;
-    op->direct = !! DEF_DIRECT;
+    memset(op, 0, sizeof(opts));
+    op->direct = DEF_DIRECT;
     op->lba = DEF_LBA;
     op->hi_lba = 0;
     op->lb_sz = DEF_LB_SZ;
@@ -884,24 +923,34 @@ main(int argc, char * argv[])
     op->myqd = MYQD_HIGH;
     page_size = sysconf(_SC_PAGESIZE);
 
-    for (k = 1; k < argc; ++k) {
-        if (0 == memcmp("-d", argv[k], 2))
+    while (1) {
+        int option_index = 0;
+
+        c = getopt_long(argc, argv, "dfhl:M:n:Nq:Q:Rs:St:TvVw:W",
+                        long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+        case 'd':
             op->direct = true;
-        else if (0 == memcmp("-f", argv[k], 2))
-            ++force;
-        else if (0 == memcmp("-h", argv[k], 2)) {
+            break;
+        case 'f':
+            force = true;
+            break;
+        case 'h':
+        case '?':
             usage();
             return 0;
-        } else if (0 == memcmp("-l", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k])) {
-                ll = sg_get_llnum(argv[k]);
+        case 'l':
+            if (isdigit(*optarg)) {
+                ll = sg_get_llnum(optarg);
                 if (-1 == ll) {
                     pr2serr_lk("could not decode lba\n");
                     return 1;
                 } else
                     op->lba = (uint64_t)ll;
-                cp = strchr(argv[k], ',');
+                cp = strchr(optarg, ',');
                 if (cp) {
                     if (0 == strcmp("-1", cp + 1))
                         op->hi_lba = UINT_MAX;
@@ -915,98 +964,124 @@ main(int argc, char * argv[])
                             op->hi_lba = (unsigned int)ll;
                     }
                 }
-            } else
-                break;
-        } else if (0 == memcmp("-M", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k])) {
-                n = atoi(argv[k]);
+            } else {
+                pr2serr_lk("--lba= expects a number\n");
+                return 1;
+            }
+            break;
+        case 'M':
+            if (isdigit(*optarg)) {
+                n = atoi(optarg);
                 if ((n < 1) || (n > MAX_Q_PER_FD)) {
                     pr2serr_lk("-M expects a value from 1 to %d\n",
                                MAX_Q_PER_FD);
                     return 1;
                 }
                 op->maxq_per_thread = n;
-            } else
-                break;
-        } else if (0 == memcmp("-n", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k]))
-                op->num_per_thread = sg_get_num(argv[k]);
-            else
-                break;
-        } else if (0 == memcmp("-N", argv[k], 2))
+            } else {
+                pr2serr_lk("--maxqpt= expects a number\n");
+                return 1;
+            }
+            break;
+        case 'n':
+            if (isdigit(*optarg))
+                op->num_per_thread = sg_get_num(optarg);
+            else {
+                pr2serr_lk("--numpt= expects a number\n");
+                return 1;
+            }
+            break;
+        case 'N':
             op->no_xfer = true;
-        else if (0 == memcmp("-q", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k])) {
-                n = atoi(argv[k]);
+            break;
+        case 'q':
+            if (isdigit(*optarg)) {
+                n = atoi(optarg);
                 if (0 == n)
                     op->blqd = BLQ_AT_HEAD;
                 else if (1 == n)
                     op->blqd = BLQ_AT_TAIL;
-            } else
-                break;
-        } else if (0 == memcmp("-Q", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k])) {
-                n = atoi(argv[k]);
+            } else {
+                pr2serr_lk("--qat= expects a number: 0 or 1\n");
+                return 1;
+            }
+            break;
+        case 'Q':
+            if (isdigit(*optarg)) {
+                n = atoi(optarg);
                 if (0 == n)
                     op->myqd = MYQD_LOW;
                 else if (1 == n)
                     op->myqd = MYQD_MEDIUM;
                 else if (2 == n)
                     op->myqd = MYQD_HIGH;
-            } else
-                break;
-        } else if (0 == memcmp("-R", argv[k], 2))
+            } else {
+                pr2serr_lk("--qfav= expects a number: 0, 1 or 2\n");
+                return 1;
+            }
+            break;
+        case 'R':
             op->c2e = SCSI_READ16;
-        else if (0 == memcmp("-s", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k])) {
-                op->lb_sz = atoi(argv[k]);
+            break;
+        case 's':
+            if (isdigit(*optarg)) {
+                op->lb_sz = atoi(optarg);
                 if (op->lb_sz < 256) {
                     cerr << "Strange lb_sz, using 256" << endl;
                     op->lb_sz = 256;
                 }
-            } else
-                break;
-        } else if (0 == memcmp("-t", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && isdigit(*argv[k]))
-                num_threads = atoi(argv[k]);
-            else
-                break;
-        } else if (0 == memcmp("-T", argv[k], 2))
+            } else {
+                pr2serr_lk("--szlb= expects a number\n");
+                return 1;
+            }
+            break;
+        case 'S':
+            ++op->stats;
+            break;
+        case 't':
+            if (isdigit(*optarg))
+                num_threads = atoi(optarg);
+            else {
+                pr2serr_lk("--tnum= expects a number\n");
+                return 1;
+            }
+            break;
+        case 'T':
             op->c2e = SCSI_TUR;
-        else if (0 == memcmp("-vvvv", argv[k], 5))
-            op->verbose += 4;
-        else if (0 == memcmp("-vvv", argv[k], 4))
-            op->verbose += 3;
-        else if (0 == memcmp("-vv", argv[k], 3))
-            op->verbose += 2;
-        else if (0 == memcmp("-v", argv[k], 2))
+            break;
+        case 'v':
             ++op->verbose;
-        else if (0 == memcmp("-V", argv[k], 2)) {
-            printf("%s version: %s\n", util_name, version_str);
+            break;
+        case 'V':
+            pr2serr_lk("version: %s\n", version_str);
             return 0;
-        } else if (0 == memcmp("-w", argv[k], 2)) {
-            ++k;
-            if ((k < argc) && (isdigit(*argv[k]) || ('-' == *argv[k]))) {
-                if ('-' == *argv[k])
-                    op->wait_ms = - atoi(argv[k] + 1);
+        case 'w':
+            if ((isdigit(*optarg) || ('-' == *optarg))) {
+                if ('-' == *optarg)
+                    op->wait_ms = - atoi(optarg + 1);
                 else
-                    op->wait_ms = atoi(argv[k]);
-            } else
-                break;
-        } else if (0 == memcmp("-W", argv[k], 2))
+                    op->wait_ms = atoi(optarg);
+            } else {
+                pr2serr_lk("--wait= expects a number\n");
+                return 1;
+            }
+            break;
+        case 'W':
             op->c2e = SCSI_WRITE16;
-        else if (*argv[k] == '-') {
-            pr2serr_lk("Unrecognized switch: %s\n", argv[k]);
+            break;
+        default:
+            pr2serr_lk("unrecognised option code 0x%x ??\n", c);
+            usage();
             return 1;
-        } else
-            op->dev_names.push_back(argv[k]);
+        }
     }
+    if (optind < argc) {
+        if (optind < argc) {
+            for (; optind < argc; ++optind)
+                op->dev_names.push_back(argv[optind]);
+        }
+    }
+
     if (0 == op->dev_names.size()) {
         usage();
         return 1;
@@ -1112,13 +1187,16 @@ main(int argc, char * argv[])
             }
         }
 
-        if (op->verbose) {
+        if (op->verbose || op->stats) {
             cout << "Number of async_starts: " << async_starts.load() << endl;
             cout << "Number of async_finishes: " << async_finishes.load() <<
                     endl;
             cout << "Last pack_id: " << n << endl;
             cout << "Number of EBUSYs: " << ebusy_count.load() << endl;
-            cout << "Number of EAGAINs: " << eagain_count.load() << endl;
+            cout << "Number of start EAGAINs: " << start_eagain_count.load()
+                 << endl;
+            cout << "Number of finish EAGAINs: " << fin_eagain_count.load()
+                 << endl;
         }
     }
     catch(system_error& e)  {

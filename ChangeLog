@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150203] [svn: r633]
+Changelog for sg3_utils-1.41 [20150216] [svn: r634]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -30,7 +30,9 @@ Changelog for sg3_utils-1.41 [20150203] [svn: r633]
     improve error handling
   - sg_modes: make '-HHH' output suitable as input to
     'sdparm --inhex='
+  - sg_write_same: cleanup, mainly man page
   - scsi_logging_level: replace use of tr command
+  - examples/sg_tst_async: cleanup
   - examples/sg-simple_aio.c: remove
   - sg_lib_data: sync asc/ascq codes with T10 20150103
 
