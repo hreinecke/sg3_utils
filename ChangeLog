@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150216] [svn: r634]
+Changelog for sg3_utils-1.41 [20150216] [svn: r635]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -35,6 +35,7 @@ Changelog for sg3_utils-1.41 [20150216] [svn: r634]
   - examples/sg_tst_async: cleanup
   - examples/sg-simple_aio.c: remove
   - sg_lib_data: sync asc/ascq codes with T10 20150103
+  - Makefile cleanup
 
 Changelog for sg3_utils-1.40 [20141110] [svn: r620]
   - sg_write_verify: new utility for WRITE AND VERIFY
