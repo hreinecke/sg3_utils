@@ -1,4 +1,4 @@
-.TH SG_WRITE_BUFFER "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "February 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_write_buffer \- send SCSI WRITE BUFFER commands
 .SH SYNOPSIS
@@ -6,7 +6,7 @@ sg_write_buffer \- send SCSI WRITE BUFFER commands
 [\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
 [\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
 [\fI\-\-raw\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -86,6 +86,11 @@ If not given the byte offset defaults to 0 (i.e. the start of the file).
 so the values 0 to 7 are accepted. This field was introduced in SPC\-4
 revision 32 and can be used to specify additional events that activate
 deferred microcode (when \fIMO\fR is 0xD).
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
+\fITO\fR is the command timeout (in seconds) for each WRITE BUFFER command
+issued by this utility. Its default value is 300 seconds (5 minutes) and
+should only be altered if this is not sufficient.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -180,8 +185,6 @@ command (or a sequence of them) fails due to device vendor verification
 checks then it should respond with a sense key of ILLEGAL REQUEST and
 an additional sense code of COMMAND SEQUENCE ERROR.
 .PP
-Each WRITE BUFFER command is assigned a timeout of 120 seconds.
-.PP
 All numbers given with options are assumed to be decimal.
 Alternatively numerical values can be given in hexadecimal preceded by
 either "0x" or "0X" (or has a trailing "h" or "H").
@@ -204,7 +207,7 @@ Written by Luben Tuikov and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2014 Luben Tuikov and Douglas Gilbert
+Copyright \(co 2006\-2015 Luben Tuikov and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

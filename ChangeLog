@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150216] [svn: r636]
+Changelog for sg3_utils-1.41 [20150217] [svn: r637]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -11,6 +11,7 @@ Changelog for sg3_utils-1.41 [20150216] [svn: r636]
   - sg_logs: add --enumerate and acronyms
     - allow decode from hex or binary in file
     - decode environmental reporting + limits lpages
+  - sg_write_buffer: add --timeout=TO option
   - sg_lib interface: add sg_lib_pdt_decay(), TPROTO_PCIE
     plus support for zoning service actions
   - sg_inq+sg_vpd: fix SCSI name string decoding in
