@@ -68,6 +68,9 @@ Ingo van Lil <inguin at gmx dot de>
 James Bottomley <jejb at parisc-linux dot org> co-author of blk512-linux
         that has become sg_format [20050201]
 
+Jan Engelhardt <jengelh at inai dot de>
+        autotools clean-up [20150216]
+
 Joe Krahn <krahn at niehs dot nih dot gov> help with int64_t cleanup
         [20071219]
 
@@ -132,4 +135,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-10th November 2014
+17th February 2015
