@@ -731,7 +731,7 @@ findremapped()
       incrchgd "$hctl"
     fi
   done < $tmpfile
-  rm $tmpfile 2&>1 /dev/null
+  [ -f $tmpfile ] && rm $tmpfile
 
   if test -n "$mp_enable" -a -n "$mpaths" ; then
     echo "Updating multipath device mappings"
