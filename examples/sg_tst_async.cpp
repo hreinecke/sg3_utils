@@ -58,7 +58,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.10 20150214";
+static const char * version_str = "1.11 20150227";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -106,7 +106,7 @@ using namespace std::chrono;
 #define DEF_TIMEOUT_MS 20000    /* 20 seconds */
 #define DEF_LB_SZ 512
 #define DEF_BLOCKING 0
-#define DEF_DIRECT 0		/* 1: direct_io, 2: mmap IO */
+#define DEF_DIRECT 0            /* 1: direct_io [future maybe 2: mmap IO] */
 #define DEF_NO_XFER 0
 #define DEF_LBA 1000
 
@@ -933,7 +933,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'd':
-            op->direct = true;
+            op->direct = 1;
             break;
         case 'f':
             force = true;

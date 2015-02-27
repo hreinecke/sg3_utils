@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2014 Douglas Gilbert.
+ * Copyright (c) 1999-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1472,6 +1472,7 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
         if ((0 == verbose) && (n < (buff_len - 1)))
             snprintf(buff + n, buff_len - n, ", possible transport of driver "
                      "issue");
+        break;
     default:
         n = snprintf(buff, buff_len, "Sense category: %d", sense_cat);
         if ((0 == verbose) && (n < (buff_len - 1)))
