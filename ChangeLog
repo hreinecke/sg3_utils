@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150227] [svn: r638]
+Changelog for sg3_utils-1.41 [20150311] [svn: r639]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -27,6 +27,8 @@ Changelog for sg3_utils-1.41 [20150227] [svn: r638]
   - sg_ses: enclosure element: add failure and warning
     acronyms, fix warning indication output
     - additional element status dpage: add PCIe/NVMe
+    - handle element descriptor names that count
+      multiple trailing NULLs
   - rescan-scsi-bus.sh: add --issue-lip-wait option and
     improve error handling
   - sg_modes: make '-HHH' output suitable as input to
