@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_XCOPY "8" "March 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -102,6 +102,10 @@ if given must be the same as \fIBS\fR given to 'bs=' option.
 sets the SCSI EXTENDED COPY command parameter list field called LIST ID
 USAGE to 0 if the argument is 'hold', to 2 if the argument is 'discard',
 or to '3' if the argument is 'disable'.
+.br
+If the device has the ability to hold data (as indicated by "held data
+limit" being greater than zero) then \fIid_usage\fR defaults to 'hold'
+otherwise it defaults to 'discard'.
 .TP
 \fBif\fR=\fIIFILE\fR
 read from \fIIFILE\fR instead of stdin. If \fIIFILE\fR is '\-' then stdin
@@ -112,6 +116,12 @@ is given.
 where \fIFLAGS\fR is a comma separated list of one or more flags outlined
 below.  These flags are associated with \fIIFILE\fR and are ignored when
 \fIIFILE\fR is stdin.
+.TP
+\fBlist_id\fR=\fIID\fR
+sets the SCSI EXTENDED COPY command parameter list field called LIST
+IDENTIFIER to \fIID\fR. \fIID\fR should be a value between 0 and
+255 (inclusive). \fIID\fR usually defaults to 1 unless
+\fIid_usage=disable\fR in which case it defaults to 0.
 .TP
 \fBobs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
@@ -128,11 +138,6 @@ unless 'oflag=append' or \fISEEK\fR is given.
 where \fIFLAGS\fR is a comma separated list of one or more flags outlined
 below.  These flags are associated with \fIOFILE\fR and are ignored when
 \fIOFILE\fR is /dev/null, '.' (period), or stdout.
-.TP
-\fBlist_id\fR=\fIID\fR
-sets the SCSI EXTENDED COPY command parameter list field called LIST
-IDENTIFIER to \fIID\fR. \fIID\fR should be a value between 0 and
-255 (inclusive) and the default value is 1.
 .TP
 \fBprio\fR=\fIPRIO\fR
 sets the SCSI EXTENDED COPY command parameter list field called PRIORITY
@@ -335,7 +340,7 @@ Written by Hannes Reinecke and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2014 Hannes Reinecke and Douglas Gilbert
+Copyright \(co 2000\-2015 Hannes Reinecke and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
