@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
@@ -420,9 +421,10 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "test unit ready", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (res == -ENXIO)
+            ret = SG_LIB_CAT_NOT_READY;
+    } else if (-2 == ret) {
         if (progress) {
             int slen = get_scsi_pt_sense_len(ptvp);
 
