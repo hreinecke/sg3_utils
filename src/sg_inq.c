@@ -2661,8 +2661,8 @@ decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
                 "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
         return;
     }
-    printf("  Software Version: %d.%d.%d\n", buff[8], buff[9], buff[10]);
-    printf("  Software Date: %02x/%02x/%02x\n", buff[11], buff[12], buff[13]);
+    printf("  Software Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
+    printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
     printf("  Features:");
     if (buff[14] & 0x01)
         printf(" Dual Active,");
@@ -2671,12 +2671,74 @@ decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
     if (buff[14] & 0x04)
         printf(" Multiple Sub-enclosures,");
     if (buff[14] & 0x08)
-        printf(" DCE/DRM,");
+        printf(" DCE/DRM/DSS/DVE,");
     if (buff[14] & 0x10)
-        printf(" AVT,");
+        printf(" Asymmetric Logical Unit Access,");
     printf("\n");
     printf("  Max. #of LUNS: %d\n", buff[15]);
     return;
+}
+
+static void
+decode_rdac_vpd_c9_rtpg_data(unsigned char aas, unsigned char vendor)
+{
+    printf("  Asymmetric Access State:");
+    switch(aas & 0x0F) {
+        case 0x0:
+            printf(" Active/Optimized");
+            break;
+        case 0x1:
+            printf(" Active/Non-Optimized");
+            break;
+        case 0x2:
+            printf(" Standby");
+            break;
+        case 0x3:
+            printf(" Unavailable");
+            break;
+        case 0xE:
+            printf(" Offline");
+            break;
+        case 0xF:
+            printf(" Transitioning");
+            break;
+        default:
+            printf(" (unknown)");
+            break;
+    }
+    printf("\n");
+
+    printf("  Vendor Specific Field:");
+    switch(vendor) {
+        case 0x01:
+            printf(" Operating normally");
+            break;
+        case 0x02:
+            printf(" Non-responsive to queries");
+            break;
+        case 0x03:
+            printf(" Controller being held in reset");
+            break;
+        case 0x04:
+            printf(" Performing controller firmware download (1st controller)");
+            break;
+        case 0x05:
+            printf(" Performing controller firmware download (2nd controller)");
+            break;
+        case 0x06:
+            printf(" Quiesced as a result of an administrative request");
+            break;
+        case 0x07:
+            printf(" Service mode as a result of an administrative request");
+            break;
+        case 0xFF:
+            printf(" Details are not available");
+            break;
+        default:
+            printf(" (unknown)");
+            break;
+    }
+    printf("\n");
 }
 
 static void
@@ -2698,14 +2760,18 @@ decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
     if (buff[7] != '1') {
         pr2serr("Invalid page version '%c' (should be 1)\n", buff[7]);
     }
-    printf("  AVT:");
-    if (buff[8] & 0x80) {
-        printf(" Enabled");
-        if (buff[8] & 0x40)
-            printf(" (Allow reads on sector 0)");
-        printf("\n");
+    if ( (buff[8] & 0xE0) == 0xE0 ) {
+        printf("  IOShipping (ALUA): Enabled\n");
     } else {
-        printf(" Disabled\n");
+        printf("  AVT:");
+        if (buff[8] & 0x80) {
+            printf(" Enabled");
+            if (buff[8] & 0x40)
+                printf(" (Allow reads on sector 0)");
+            printf("\n");
+        } else {
+            printf(" Disabled\n");
+        }
     }
     printf("  Volume Access via: ");
     if (buff[8] & 0x01)
@@ -2713,17 +2779,72 @@ decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
     else
         printf("alternate controller\n");
 
-    printf("  Path priority: %d ", buff[9] & 0xf);
-    switch(buff[9] & 0xf) {
-        case 0x1:
-            printf("(preferred path)\n");
-            break;
-        case 0x2:
-            printf("(secondary path)\n");
-            break;
-        default:
-            printf("(unknown)\n");
-            break;
+    if (buff[8] & 0x08) {
+        printf("  Path priority: %d ", buff[15] & 0xf);
+        switch(buff[15] & 0xf) {
+            case 0x1:
+                printf("(preferred path)\n");
+                break;
+            case 0x2:
+                printf("(secondary path)\n");
+                break;
+            default:
+                printf("(unknown)\n");
+                break;
+        }
+
+        printf("  Preferred Path Auto Changeable:");
+        switch(buff[14] & 0x3C) {
+            case 0x14:
+                printf(" No (User Disabled and Host Type Restricted)\n");
+                break;
+            case 0x18:
+                printf(" No (User Disabled)\n");
+                break;
+            case 0x24:
+                printf(" No (Host Type Restricted)\n");
+                break;
+            case 0x28:
+                printf(" Yes\n");
+                break;
+            default:
+                printf(" (Unknown)\n");
+                break;
+        }
+
+        printf("  Implicit Failback:");
+        switch(buff[14] & 0x03) {
+            case 0x1:
+                printf(" Disabled\n");
+                break;
+            case 0x2:
+                printf(" Enabled\n");
+                break;
+            default:
+                printf(" (Unknown)\n");
+                break;
+        }
+    } else {
+        printf("  Path priority: %d ", buff[9] & 0xf);
+        switch(buff[9] & 0xf) {
+            case 0x1:
+                printf("(preferred path)\n");
+                break;
+            case 0x2:
+                printf("(secondary path)\n");
+                break;
+            default:
+                printf("(unknown)\n");
+                break;
+        }
+    }
+
+    if (buff[8] & 0x80) {
+        printf(" Target Port Group Data (This controller):\n");
+        decode_rdac_vpd_c9_rtpg_data(buff[10], buff[11]);
+
+        printf(" Target Port Group Data (Alternate controller):\n");
+        decode_rdac_vpd_c9_rtpg_data(buff[12], buff[13]);
     }
 
     return;

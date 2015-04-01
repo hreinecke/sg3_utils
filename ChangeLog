@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150311] [svn: r639]
+Changelog for sg3_utils-1.41 [20150401] [svn: r640]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -17,6 +17,7 @@ Changelog for sg3_utils-1.41 [20150311] [svn: r639]
   - sg_inq+sg_vpd: fix SCSI name string decoding in
     device identification VPD page (0x83)
     - increase sanity on Unit Serial number VPD page
+    - improve rdac vpd page reporting (vendor)
   - sg_inq: improve NAA handling in dev_id VPD page
     - update version descriptor list to 20141221
   - sg_vpd: add atomic boundary values (sbc4r04)
@@ -31,8 +32,12 @@ Changelog for sg3_utils-1.41 [20150311] [svn: r639]
       multiple trailing NULLs
   - rescan-scsi-bus.sh: add --issue-lip-wait option and
     improve error handling
+    - improve dm-multipath handling
   - sg_modes: make '-HHH' output suitable as input to
     'sdparm --inhex='
+  - sg_rdac: add '-6' option for mode sense/select(6)
+    - add support for reporting more SCSI transports
+      and accessing rdac extended mode page 2c
   - sg_write_same: cleanup, mainly man page
   - scsi_logging_level: replace use of tr command
   - examples/sg_tst_async: cleanup
