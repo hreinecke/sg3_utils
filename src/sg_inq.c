@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.46 20150123";    /* SPC-5 rev 02 */
+static const char * version_str = "1.46 20150407";    /* SPC-5 rev 02 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2720,10 +2720,12 @@ decode_rdac_vpd_c9_rtpg_data(unsigned char aas, unsigned char vendor)
             printf(" Controller being held in reset");
             break;
         case 0x04:
-            printf(" Performing controller firmware download (1st controller)");
+            printf(" Performing controller firmware download (1st "
+                   "controller)");
             break;
         case 0x05:
-            printf(" Performing controller firmware download (2nd controller)");
+            printf(" Performing controller firmware download (2nd "
+                   "controller)");
             break;
         case 0x06:
             printf(" Quiesced as a result of an administrative request");

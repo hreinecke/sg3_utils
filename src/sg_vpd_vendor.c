@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Douglas Gilbert.
+ * Copyright (c) 2006-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -786,8 +786,8 @@ decode_rdac_vpd_c3(unsigned char * buff, int len)
     printf("  UTM: %s\n", buff[11] & 0x80?"enabled":"disabled");
     if ((buff[11] & 0x80))
         printf("    UTM LUN: %02x\n", buff[11] & 0x7f);
-    printf("  Persistent Reservations Bus Reset Support: %s\n", buff[12] & 0x01?"enabled":"disabled");
-
+    printf("  Persistent Reservations Bus Reset Support: %s\n",
+           (buff[12] & 0x01) ? "enabled" : "disabled");
     return;
 }
 

@@ -627,6 +627,7 @@ enumerate_lpages(const struct opts_t * op)
         printf("Known log pages in acronym order:\n");
         for (lepp = lep_arr, j = 0; (*lepp)->pg_code >=0; ++lepp, ++j)
             enumerate_helper(*lepp, j, op);
+        free(lep_arr);
     } else {    /* -eee, -eeee numeric sort (as per table) */
         printf("Known log pages in numerical order:\n");
         for (lep = log_arr, j = 0; lep->pg_code >=0; ++lep, ++j)
@@ -926,7 +927,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             if (plen <= 0)
                 continue;
             if (0 == strncmp("c=", cp, 2)) {
-                num = sscanf(cp + 2, "%x", &u);
+                num = sscanf(cp + 2, "%6x", &u);
                 if ((1 != num) || (u > 3)) {
                     pr2serr("Bad page control after '-c=' option [0..3]\n");
                     usage_old();
@@ -945,7 +946,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("i=", cp, 2))
                 op->in_fn = cp + 2;
             else if (0 == strncmp("m=", cp, 2)) {
-                num = sscanf(cp + 2, "%d", &n);
+                num = sscanf(cp + 2, "%8d", &n);
                 if ((1 != num) || (n < 0) || (n > MX_ALLOC_LEN)) {
                     pr2serr("Bad maximum response length after '-m=' "
                             "option\n");
@@ -991,7 +992,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 } else {
                     /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
                     if (NULL == strchr(cp + 2, ',')) {
-                        num = sscanf(cp + 2, "%x", &u);
+                        num = sscanf(cp + 2, "%6x", &u);
                         if ((1 != num) || (u > 63)) {
                             pr2serr("Bad page code value after '-p=' "
                                     "option\n");
@@ -999,7 +1000,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                             return SG_LIB_SYNTAX_ERROR;
                         }
                         op->pg_code = u;
-                    } else if (2 == sscanf(cp + 2, "%x,%x", &u, &uu)) {
+                    } else if (2 == sscanf(cp + 2, "%4x,%4x", &u, &uu)) {
                         if (uu > 255) {
                             pr2serr("Bad sub page code value after '-p=' "
                                     "option\n");
@@ -1016,7 +1017,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     }
                 }
             } else if (0 == strncmp("paramp=", cp, 7)) {
-                num = sscanf(cp + 7, "%x", &u);
+                num = sscanf(cp + 7, "%8x", &u);
                 if ((1 != num) || (u > 0xffff)) {
                     pr2serr("Bad parameter pointer after '-paramp=' "
                             "option\n");
@@ -1195,7 +1196,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if (isxdigit(line[0])) {
                 carry_over[1] = line[0];
                 carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%x", &h))
+                if (1 == sscanf(carry_over, "%4x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
                     pr2serr("f2hex_arr: carry_over error ['%s'] around line "
@@ -1242,7 +1243,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             off += k;
         } else {
             for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
+                if (1 == sscanf(lcp, "%4x", &h)) {
                     if (h > 0xff) {
                         pr2serr("f2hex_arr: hex number larger than "
                                 "0xff in line %d, pos %d\n", j + 1,
