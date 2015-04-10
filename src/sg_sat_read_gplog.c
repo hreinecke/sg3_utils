@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Hannes Reinecke, SUSE Linux GmbH.
+ * Copyright (c) 2014-2015 Hannes Reinecke, SUSE Linux GmbH.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -48,7 +48,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.10 20141213";
+static const char * version_str = "1.11 20150410";
 
 struct opts_t {
     int cdb_len;
@@ -439,7 +439,8 @@ main(int argc, char * argv[])
                                      op->verbose)) < 0) {
         pr2serr("error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = SG_LIB_FILE_ERROR;
+        goto fini;
     }
 
     ret = do_read_gplog(sg_fd, ata_cmd, inbuff, op);
@@ -448,7 +449,9 @@ main(int argc, char * argv[])
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
     }
+fini:
+    free(inbuff);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

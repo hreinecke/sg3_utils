@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.03 20150212";  /* spc5r02 + sbc4r05 */
+static const char * version_str = "1.04 20150407";  /* spc5r02 + sbc4r05 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -391,7 +391,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if (isxdigit(line[0])) {
                 carry_over[1] = line[0];
                 carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%x", &h))
+                if (1 == sscanf(carry_over, "%4x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
                     pr2serr("%s: carry_over error ['%s'] around line %d\n",
@@ -438,7 +438,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             off += k;
         } else {
             for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
+                if (1 == sscanf(lcp, "%10x", &h)) {
                     if (h > 0xff) {
                         pr2serr("%s: hex number larger than 0xff in line "
                                 "%d, pos %d\n", __func__, j + 1,
@@ -1946,7 +1946,7 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
                        value / 1000, value % 1000,
                        power_unit_arr[(ucp[1] & 0x7) - 1]);
             else
-                printf("    Maximum power consumption: %d %s\n",
+                printf("    Maximum power consumption: %u %s\n",
                        value, power_unit_arr[ucp[1] & 0x7]);
         }
     }
@@ -2217,7 +2217,7 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
                 u = sg_get_unaligned_be32(ucp + 20);
                 printf("  Maximum Token Lifetime: %u seconds\n", u);
                 u = sg_get_unaligned_be32(ucp + 24);
-                printf("  Maximum Token inactivity timeout: %d\n", u);
+                printf("  Maximum Token inactivity timeout: %u\n", u);
                 decode_rod_descriptor(ucp + 48,
                                       sg_get_unaligned_be16(ucp + 46));
                 break;
@@ -2497,7 +2497,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         else if ((u < 0x401) || (0xffff == u))
             printf("  Reserved [0x%x]\n", u);
         else
-            printf("  Nominal rotation rate: %d rpm\n", u);
+            printf("  Nominal rotation rate: %u rpm\n", u);
         u = buff[6];
         k = sizeof(product_type_arr) / sizeof(product_type_arr[0]);
         if (u < k)

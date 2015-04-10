@@ -25,7 +25,7 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "1.07 20150401";
+static const char * version_str = "1.08 20150407";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -130,11 +130,14 @@ static int fail_all_paths(int fd, int use_6_byte)
                 rdac_common = &rdac_page->attr;
         } else {
                 memcpy(fail_paths_pg, mode10_hdr, 8);
-                rdac_page_exp = (struct rdac_expanded_page *)(fail_paths_pg + 8);
+                rdac_page_exp = (struct rdac_expanded_page *)
+                                (fail_paths_pg + 8);
                 rdac_page_exp->page_code = RDAC_CONTROLLER_PAGE | 0x40;
                 rdac_page_exp->subpage_code = 0x1;
-                rdac_page_exp->page_length[0] = EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
-                rdac_page_exp->page_length[1] = EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
+                rdac_page_exp->page_length[0] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
+                rdac_page_exp->page_length[1] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
                 rdac_common = &rdac_page_exp->attr;
         }
 
@@ -192,11 +195,14 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
                 rdac_page->lun_table[lun] = 0x81;
         } else {
                 memcpy(fail_paths_pg, mode10_hdr, 8);
-                rdac_page_exp = (struct rdac_expanded_page *)(fail_paths_pg + 8);
+                rdac_page_exp = (struct rdac_expanded_page *)
+                                (fail_paths_pg + 8);
                 rdac_page_exp->page_code = RDAC_CONTROLLER_PAGE | 0x40;
                 rdac_page_exp->subpage_code = 0x1;
-                rdac_page_exp->page_length[0] = EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
-                rdac_page_exp->page_length[1] = EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
+                rdac_page_exp->page_length[0] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
+                rdac_page_exp->page_length[1] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
                 rdac_common = &rdac_page_exp->attr;
                 memset(rdac_page_exp->lun_table, 0x0, 256);
                 rdac_page_exp->lun_table[lun] = 0x81;
@@ -321,8 +327,10 @@ static void print_rdac_mode( unsigned char *ptr, int subpg)
         }
         printf("  Quiescence timeout: %d\n", rdac_ptr->quiescence);
         printf("  RDAC option 0x%x\n", rdac_ptr->options);
-        printf("    ALUA: %s\n", (rdac_ptr->options & 0x4 ? "Enabled" : "Disabled" ));
-        printf("    Force Quiescence: %s\n", (rdac_ptr->options & 0x2 ? "Enabled" : "Disabled" ));
+        printf("    ALUA: %s\n", (rdac_ptr->options & 0x4 ? "Enabled" :
+                                                            "Disabled" ));
+        printf("    Force Quiescence: %s\n", (rdac_ptr->options & 0x2 ?
+                                              "Enabled" : "Disabled" ));
         printf ("  LUN Table: (p = preferred, a = alternate, u = utm lun)\n");
         printf("         0 1 2 3 4 5 6 7  8 9 a b c d e f\n");
         for (k = 0; k < lun_table_len; k += 16) {
@@ -434,15 +442,16 @@ int main(int argc, char * argv[])
         } else if (fail_path) {
                 res = fail_this_path(fd, lun, use_6_byte);
         } else {
-                if (use_6_byte) {
-                        res = sg_ll_mode_sense6(fd, /*DBD*/ 0, /* page control */0,
-                                        0x2c, 0, rsp_buff, 252,
-                                        1, do_verbose);
-                } else {
-                        res = sg_ll_mode_sense10(fd, /*llbaa*/ 0, /*DBD*/ 0, /* page control */0,
-                                        0x2c, 0x1, rsp_buff, 308,
-                                        1, do_verbose);
-                }
+                if (use_6_byte)
+                        res = sg_ll_mode_sense6(fd, /* DBD */ 0, /* PC */0,
+                                                0x2c, 0, rsp_buff, 252,
+                                                1, do_verbose);
+                else
+                        res = sg_ll_mode_sense10(fd, /* llbaa */ 0,
+                                                 /* DBD */ 0,
+                                                 /* page control */0,
+                                                 0x2c, 0x1, rsp_buff, 308,
+                                                 1, do_verbose);
 
                 if (!res) {
                         if (do_verbose)

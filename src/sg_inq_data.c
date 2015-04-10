@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2014 D. Gilbert
+*  Copyright (C) 2000-2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -49,7 +49,7 @@ struct sg_version_descriptor {
 };
 
 /* table from SPC-5 revision 00+ [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20141221 */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20150126 */
 
 
 #ifdef SG_SCSI_STRINGS
@@ -75,6 +75,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x92, "SAM-4 ISO/IEC 14776-414"},
     {0xa0, "SAM-5 (no version claimed)"},
     {0xa2, "SAM-5 T10/2104-D revision 4"},
+    {0xa4, "SAM-5 T10/2104-D revision 20"},
     {0x120, "SPC (no version claimed)"},
     {0x13b, "SPC T10/0995-D revision 11a"},
     {0x13c, "SPC ANSI INCITS 301-1997"},
@@ -175,6 +176,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x403, "SSC-3 T10/1611-D revision 04a"},
     {0x407, "SSC-3 T10/1611-D revision 05"},
     {0x409, "SSC-3 ANSI INCITS 467-2011"},
+    {0x40b, "SSC-3 ISO/IEC 14776-333:2013"},
     {0x420, "MMC-5 (no version claimed)"},
     {0x42f, "MMC-5 T10/1675-D revision 03"},
     {0x431, "MMC-5 T10/1675-D revision 03b"},
@@ -345,6 +347,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc4e, "SAS-2.1 ANSI INCITS 478-2011"},
     {0xc4f, "SAS-2.1 ANSI INCITS 478-2011 w/ Amnd 1 ANSI INCITS "
             "478/AM1-2014"},
+    {0xc52, "SAS-2.1 ISO/IEC 14776-153"},
     {0xc60, "SAS-3 (no version claimed)"},
     {0xc63, "SAS-3 T10/BSR INCITS 519 revision 05a"},
     {0xc65, "SAS-3 T10/BSR INCITS 519 revision 06"},
@@ -470,6 +473,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1743, "UAS T10/2095-D revision 02"},
     {0x1747, "UAS T10/2095-D revision 04"},
     {0x1748, "UAS ANSI INCITS 471-2010"},
+    {0x1749, "UAS ISO/IEC 14776-251:2014"},
     {0x1780, "UAS-2 (no version claimed)"},
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
@@ -500,9 +504,11 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x21e0, "SOP (no version claimed)"},
     {0x21e4, "SOP T10/BSR INCITS 489 revision 4"},
     {0x21e6, "SOP T10/BSR INCITS 489 revision 5"},
+    {0x21e8, "SOP ANSI INCITS 489-2014"},
     {0x2200, "PQI (no version claimed)"},
     {0x2204, "PQI T10/BSR INCITS 490 revision 6"},
     {0x2206, "PQI T10/BSR INCITS 490 revision 7"},
+    {0x2208, "PQI ANSI INCITS 490-2014"},
     {0x2220, "SOP-2 (no version claimed)"},
     {0x2240, "PQI-2 (no version claimed)"},
     {0xffc0, "IEEE 1667 (no version claimed)"},
