@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150410] [svn: r641]
+Changelog for sg3_utils-1.41 [20150428] [svn: r642]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -25,6 +25,7 @@ Changelog for sg3_utils-1.41 [20150410] [svn: r641]
       alignment value; spc5r02 additions
   - sg_readcap: add support for ZBC's rc_basis field
   - sg_senddiag: fix bug with --raw option
+    - add support for -HHH for output suitable for --raw
   - sg_ses: enclosure element: add failure and warning
     acronyms, fix warning indication output
     - additional element status dpage: add PCIe/NVMe
@@ -44,6 +45,7 @@ Changelog for sg3_utils-1.41 [20150410] [svn: r641]
   - examples/sg-simple_aio.c: remove
   - sg_lib_data: sync asc/ascq codes with T10 20150406
   - Makefile cleanup
+  - autogen.sh: upgrade to buildconf 20091223 version
 
 Changelog for sg3_utils-1.40 [20141110] [svn: r620]
   - sg_write_verify: new utility for WRITE AND VERIFY
