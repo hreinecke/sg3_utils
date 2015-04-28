@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2014 D. Gilbert
+*  Copyright (C) 2003-2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -27,7 +27,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "0.45 20141219";
+static const char * version_str = "0.46 20150427";
 
 #define ME "sg_senddiag: "
 
@@ -89,13 +89,15 @@ usage()
            "    --extdur|-e     duration of an extended self-test (from mode "
            "page 0xa)\n"
            "    --help|-h       print usage message then exit\n"
-           "    --hex|-H        output in hex\n"
+           "    --hex|-H        output RDR in hex; twice: plus ASCII; thrice: "
+           "suitable\n"
+           "                    for '--raw=-' with later invocation\n"
            "    --list|-l       list supported page codes (with or without "
            "DEVICE)\n"
            "    --maxlen=LEN|-m LEN    parameter list length or maximum "
            "allocation\n"
            "                           length (default: 4096 bytes)\n"
-           "    --page=PG|-p PG    do RECEIVE DIAGNOSTIC RESULTS only, set "
+           "    --page=PG|-P PG    do RECEIVE DIAGNOSTIC RESULTS only, set "
            "PCV\n"
            "    --pf|-p         set PF bit (def: 0)\n"
            "    --raw=H,H...|-r H,H...    sequence of hex bytes to form "
@@ -786,7 +788,10 @@ main(int argc, char * argv[])
                                         ((pg >= 0x0) ? pg : 0), rsp_buff,
                                         rsp_buff_size, 1, op->do_verbose)) {
                 rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
-                if (pg < 0x1) {
+                if (op->do_hex > 1)
+                    dStrHex((const char *)rsp_buff, rsp_len,
+                            (2 == op->do_hex) ? 0 : -1);
+                else if (pg < 0x1) {
                     printf("Supported diagnostic pages response:\n");
                     if (op->do_hex)
                         dStrHex((const char *)rsp_buff, rsp_len, 1);
