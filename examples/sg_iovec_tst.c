@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,7 +14,7 @@
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 2003-2007 D. Gilbert
+*  Copyright (C) 2003-2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,7 +25,7 @@
    normal file. The purpose is to test the sg_iovec mechanism within the
    sg_io_hdr structure.
 
-   Version 0.12 (20070121)
+   Version 0.13 (20150204)
 */
 
 
@@ -38,15 +39,32 @@
 
 struct sg_iovec iovec[IOVEC_ELEMS];
 
+
+static void
+usage(void)
+{
+    printf("Usage: sg_iovec_tst [-a] [-b=bs] -c=num [-e=es] [-h]\n"
+           "                    <generic_device> <output_filename>\n");
+    printf("  where: -a       async sg use (def: use ioctl(SGIO) )\n");
+    printf("         -b=bs    block size (default 512 Bytes)\n");
+    printf("         -c=num   count of blocks to transfer\n");
+    printf("         -e=es    iovec element size (def: 509)\n");
+    printf("         -h       this usage message\n");
+    printf(" reads from <generic_device> and sends to "
+           "<output_filename>\nUses iovec (a scatter list) in linear "
+           "mode\n");
+}
+
 /* Returns 0 if everything ok */
-int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
-            int bs)
+static int sg_read(int sg_fd, unsigned char * buff, int num_blocks,
+                   int from_block, int bs, int elem_size, int async)
 {
     unsigned char rdCmd[10] = {READ_10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
+    struct pollfd a_poll;
     int dxfer_len = bs * num_blocks;
-    int k, pos, rem;
+    int k, pos, rem, res;
 
     rdCmd[2] = (unsigned char)((from_block >> 24) & 0xff);
     rdCmd[3] = (unsigned char)((from_block >> 16) & 0xff);
@@ -57,11 +75,11 @@ int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
 
     for (k = 0, pos = 0, rem = dxfer_len; k < IOVEC_ELEMS; ++k) {
         iovec[k].iov_base = buff + pos;
-        iovec[k].iov_len = (rem > A_PRIME) ? A_PRIME : rem;
-        if (rem <= A_PRIME)
+        iovec[k].iov_len = (rem > elem_size) ? elem_size : rem;
+        if (rem <= elem_size)
             break;
-        pos += A_PRIME;
-        rem -= A_PRIME;
+        pos += elem_size;
+        rem -= elem_size;
     }
     if (k >= IOVEC_ELEMS) {
         fprintf(stderr, "Can't fit dxfer_len=%d bytes in iovec\n", dxfer_len);
@@ -80,7 +98,39 @@ int sg_read(int sg_fd, unsigned char * buff, int num_blocks, int from_block,
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = from_block;
 
-    if (ioctl(sg_fd, SG_IO, &io_hdr)) {
+    if (async) {
+        res = write(sg_fd, &io_hdr, sizeof(io_hdr));
+        if (res < 0) {
+            perror("write(<sg_device>), error");
+            return -1;
+        } else if (res < (int)sizeof(io_hdr)) {
+            fprintf(stderr, "write(<sg_device>) returned %d, expected %d\n",
+                    res, (int)sizeof(io_hdr));
+            return -1;
+        }
+        a_poll.fd = sg_fd;
+        a_poll.events = POLLIN;
+        a_poll.revents = 0;
+        res = poll(&a_poll, 1, 2000 /* millisecs */ );
+        if (res < 0) {
+            perror("poll error on <sg_device>");
+            return -1;
+        }
+        if (0 == (POLLIN & a_poll.revents)) {
+            fprintf(stderr, "strange, poll() completed without data to "
+                    "read\n");
+            return -1;
+        }
+        res = read(sg_fd, &io_hdr, sizeof(io_hdr));
+        if (res < 0) {
+            perror("read(<sg_device>), error");
+            return -1;
+        } else if (res < (int)sizeof(io_hdr)) {
+            fprintf(stderr, "read(<sg_device>) returned %d, expected %d\n",
+                    res, (int)sizeof(io_hdr));
+            return -1;
+        }
+    } else if (ioctl(sg_fd, SG_IO, &io_hdr)) {
         perror("reading (SG_IO) on sg device, error");
         return -1;
     }
@@ -106,15 +156,19 @@ int main(int argc, char * argv[])
 {
     int sg_fd, fd, res, j, m, dxfer_len;
     unsigned int k, num;
+    int do_async = 0;
     int do_help = 0;
     int blk_size = 512;
+    int elem_size = A_PRIME;
     int count = 0;
     char * sg_file_name = 0;
     char * out_file_name = 0;
     unsigned char * buffp;
 
     for (j = 1; j < argc; ++j) {
-        if (0 == strncmp("-b=", argv[j], 3)) {
+        if (0 == strcmp("-a", argv[j]))
+            do_async = 1;
+        else if (0 == strncmp("-b=", argv[j], 3)) {
             m = 3;
             num = sscanf(argv[j] + m, "%d", &blk_size);
             if ((1 != num) || (blk_size <= 0)) {
@@ -122,8 +176,7 @@ int main(int argc, char * argv[])
                 sg_file_name = 0;
                 break;
             }
-        }
-        else if (0 == strncmp("-c=", argv[j], 3)) {
+        } else if (0 == strncmp("-c=", argv[j], 3)) {
             m = 3;
             num = sscanf(argv[j] + m, "%d", &count);
             if (1 != num) {
@@ -131,31 +184,49 @@ int main(int argc, char * argv[])
                 sg_file_name = 0;
                 break;
             }
-        }
-        else if (0 == strcmp("-h", argv[j]))
+        } else if (0 == strncmp("-e=", argv[j], 3)) {
+            m = 3;
+            num = sscanf(argv[j] + m, "%d", &elem_size);
+            if (1 != num) {
+                printf("Couldn't decode number after '-e' switch\n");
+                sg_file_name = 0;
+                break;
+            }
+        } else if (0 == strcmp("-h", argv[j]))
             do_help = 1;
         else if (*argv[j] == '-') {
             printf("Unrecognized switch: %s\n", argv[j]);
             sg_file_name = 0;
             break;
-        }
-        else if (NULL == sg_file_name)
+        } else if (NULL == sg_file_name)
             sg_file_name = argv[j];
         else
             out_file_name = argv[j];
     }
-    if ((NULL == sg_file_name) || (NULL == out_file_name) || (0 == count)) {
-        printf("Usage: sg_iovec_tst [-h] [-b=num] -c=num <generic_device> "
-               "<output_filename>\n");
-        printf("  where: -h       this usage message\n");
-        printf("         -b=num   block size (default 512 Bytes)\n");
-        printf("         -c=num   count of blocks to transfer\n");
-        printf(" reads from <generic_device> and sends to "
-               "<output_filename>\n");
+    if (do_help) {
+        usage();
+        return 0;
+    }
+    if (NULL == sg_file_name) {
+        printf(">>> need sg node name (e.g. /dev/sg3)\n\n");
+        usage();
+        return 1;
+    }
+    if (NULL == out_file_name) {
+        printf(">>> need out filename (to place what is fetched by READ\n\n");
+        usage();
+        return 1;
+    }
+    if (0 == count) {
+        printf(">>> need count of blocks to READ\n\n");
+        usage();
         return 1;
     }
 
-    sg_fd = open(sg_file_name, O_RDONLY);
+    if (do_async)
+        sg_fd = open(sg_file_name, O_RDWR);
+    else
+        sg_fd = open(sg_file_name, O_RDONLY);
     if (sg_fd < 0) {
         perror(ME "sg device node open error");
         return 1;
@@ -174,12 +245,15 @@ int main(int argc, char * argv[])
     dxfer_len = count * blk_size;
     buffp = (unsigned char *)malloc(dxfer_len);
     if (buffp) {
-        if (0 == sg_read(sg_fd, buffp, count, 0, blk_size)) {
+        if (0 == sg_read(sg_fd, buffp, count, 0, blk_size, elem_size,
+                         do_async)) {
             if (write(fd, buffp, dxfer_len) < 0)
                 perror(ME "output write failed");
         }
         free(buffp);
-    }
+    } else
+        fprintf(stderr, "user space malloc for %d bytes failed\n",
+                dxfer_len);
     res = close(fd);
     if (res < 0) {
         perror(ME "output file close error");

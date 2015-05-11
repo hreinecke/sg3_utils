@@ -141,8 +141,8 @@ clean POSIX compliant C code with Linux specific system calls and structures
 removed and placed in Linux specific files in the lib directory. A small
 number of utilities in the src directory do contain Linux specific logic
 and are not ported to other OSes (e.g. sg_dd). One utility, sg_scan, has
-two separate implementations, one for Linux (sg_scan.c.linux) and one for
-Windows (sg_scan.c.win32). The src-lib directory split approach allows
+two separate implementations, one for Linux (sg_scan_linux.c) and one for
+Windows (sg_scan_win32.c). The src-lib directory split approach allows
 FreeBSD, Solaris, Tru64 and Windows specific code to be isolated to a few
 files in the lib directory whose interfaces match those of the Linux
 specific code.
@@ -412,4 +412,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-26th December 2014
+10th April 2015
