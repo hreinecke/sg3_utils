@@ -232,7 +232,7 @@ testonline ()
   : testonline
   RC=0
   # Set default values
-  IPTYPE=0x1f
+  IPTYPE=31
   IPQUAL=3
   if test ! -x /usr/bin/sg_turs; then return 0; fi
   sgdevice
@@ -271,7 +271,7 @@ testonline ()
   IPQUAL=`echo "$INQ" | sed -n 's/ *PQual=\([0-9]*\)  Device.*/\1/p'`
   if [ "$IPQUAL" != 0 ] ; then
     [ -z "$IPQUAL" ] && IPQUAL=3
-    [ -z "$IPTYPE" ] && IPTYPE=0x1f
+    [ -z "$IPTYPE" ] && IPTYPE=31
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}LU not available (PQual $IPQUAL)${norm}    \n\n\n"
     return 2
   fi
