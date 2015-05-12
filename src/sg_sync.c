@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.11 20140516";
+static const char * version_str = "1.12 20150511";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -116,7 +116,7 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
         fprintf(stderr, "    synchronize cache(16) cdb: ");
         for (k = 0; k < SYNCHRONIZE_CACHE16_CMDLEN; ++k)
             fprintf(stderr, "%02x ", scCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+        fprintf(stderr, "\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {

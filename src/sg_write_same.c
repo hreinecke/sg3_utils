@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.08 20150216";
+static const char * version_str = "1.09 20150511";
 
 
 #define ME "sg_write_same: "
@@ -271,7 +271,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "Write same(%d): out of memory\n", cdb_len);
+        fprintf(stderr, "Write same(%d): out of memory\n", cdb_len);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, wsCmdBlk, cdb_len);

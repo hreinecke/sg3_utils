@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.13 20150410";  /* spc5r02, sbc4r02 */
+const char * sg_lib_version_str = "2.14 20150429";  /* spc5r02, sbc4r02 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -550,7 +550,7 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20150406 */
+ * The following should match asc-num.txt dated 20150423 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -689,6 +689,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0C,0x0F,"Defects in error window"},
     {0x0C,0x10,"Incomplete multiple atomic write operations"},
     {0x0C,0x11,"Write error - recovery scan needed"},
+    {0x0C,0x12,"Write error - insufficient zone resources"},
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
     {0x0D,0x02,"Copy target device not reachable"},

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2012 Douglas Gilbert.
+ * Copyright (c) 1999-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -21,7 +22,27 @@
 #include "sg_io_linux.h"
 
 
-/* Version 1.04 20120914 */
+/* Version 1.05 20150511 */
+
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 
 void
@@ -46,13 +67,11 @@ static const char * linux_host_bytes[] = {
 void
 sg_print_host_status(int host_status)
 {
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "Host_status=0x%02x ", host_status);
+    pr2ws("Host_status=0x%02x ", host_status);
     if ((host_status < 0) || (host_status >= LINUX_HOST_BYTES_SZ))
-        fprintf(sg_warnings_strm, "is invalid ");
+        pr2ws("is invalid ");
     else
-        fprintf(sg_warnings_strm, "[%s] ", linux_host_bytes[host_status]);
+        pr2ws("[%s] ", linux_host_bytes[host_status]);
 }
 
 static const char * linux_driver_bytes[] = {
@@ -87,10 +106,8 @@ sg_print_driver_status(int driver_status)
     sugg = (driver_status & SG_LIB_SUGGEST_MASK) >> 4;
     if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
         sugg_cp = linux_driver_suggests[sugg];
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "Driver_status=0x%02x", driver_status);
-    fprintf(sg_warnings_strm, " [%s, %s] ", driv_cp, sugg_cp);
+    pr2ws("Driver_status=0x%02x", driver_status);
+    pr2ws(" [%s, %s] ", driv_cp, sugg_cp);
 }
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
@@ -103,18 +120,16 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
     int done_leadin = 0;
     int done_sense = 0;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     scsi_status &= 0x7e; /*sanity */
     if ((0 == scsi_status) && (0 == host_status) && (0 == driver_status))
         return 1;       /* No problems */
     if (0 != scsi_status) {
         if (leadin)
-            fprintf(sg_warnings_strm, "%s: ", leadin);
+            pr2ws("%s: ", leadin);
         done_leadin = 1;
-        fprintf(sg_warnings_strm, "SCSI status: ");
+        pr2ws("SCSI status: ");
         sg_print_scsi_status(scsi_status);
-        fprintf(sg_warnings_strm, "\n");
+        pr2ws("\n");
         if (sense_buffer && ((scsi_status == SAM_STAT_CHECK_CONDITION) ||
                              (scsi_status == SAM_STAT_COMMAND_TERMINATED))) {
             /* SAM_STAT_COMMAND_TERMINATED is obsolete */
@@ -124,26 +139,26 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
     }
     if (0 != host_status) {
         if (leadin && (! done_leadin))
-            fprintf(sg_warnings_strm, "%s: ", leadin);
+            pr2ws("%s: ", leadin);
         if (done_leadin)
-            fprintf(sg_warnings_strm, "plus...: ");
+            pr2ws("plus...: ");
         else
             done_leadin = 1;
         sg_print_host_status(host_status);
-        fprintf(sg_warnings_strm, "\n");
+        pr2ws("\n");
     }
     if (0 != driver_status) {
         if (done_sense &&
             (SG_LIB_DRIVER_SENSE == (SG_LIB_DRIVER_MASK & driver_status)))
             return 0;
         if (leadin && (! done_leadin))
-            fprintf(sg_warnings_strm, "%s: ", leadin);
+            pr2ws("%s: ", leadin);
         if (done_leadin)
-            fprintf(sg_warnings_strm, "plus...: ");
+            pr2ws("plus...: ");
         else
             done_leadin = 1;
         sg_print_driver_status(driver_status);
-        fprintf(sg_warnings_strm, "\n");
+        pr2ws("\n");
         if (sense_buffer && (! done_sense) &&
             (SG_LIB_DRIVER_SENSE == (SG_LIB_DRIVER_MASK & driver_status)))
             sg_print_sense(0, sense_buffer, sb_len, raw_sinfo);

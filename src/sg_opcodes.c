@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2014 D. Gilbert
+ *  Copyright (C) 2004-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,7 +26,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.42 20140904";    /* spc4r37 */
+static const char * version_str = "0.43 20150511";    /* spc4r37 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -952,8 +952,7 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "Report Supported Operation Codes: out "
-                "of memory\n");
+        fprintf(stderr, "Report Supported Operation Codes: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rsocCmdBlk, sizeof(rsocCmdBlk));
@@ -1008,8 +1007,8 @@ do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "Report Supported Task Management "
-                "Functions: out of memory\n");
+        fprintf(stderr, "Report Supported Task Management Functions: out of "
+                "memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rstmfCmdBlk, sizeof(rstmfCmdBlk));

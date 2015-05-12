@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.04 20150407";  /* spc5r02 + sbc4r05 */
+static const char * version_str = "1.05 20150529";  /* spc5r02 + sbc4r05 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -280,7 +280,10 @@ usage()
             "                       number unless hex indicator "
             "is given (e.g. '0x83')\n"
             "    --quiet|-q      suppress some output when decoding\n"
-            "    --raw|-r        output page in binary\n"
+            "    --raw|-r        output page in binary; if --inhex=FN is "
+            "also\n"
+            "                    given, FN is in binary (else FN is in "
+            "hex)\n"
             "    --vendor=VP | -M VP    vendor/product abbreviation [or "
             "number]\n"
             "    --verbose|-v    increase verbosity\n"

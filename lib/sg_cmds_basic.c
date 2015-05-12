@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2014 Douglas Gilbert.
+ * Copyright (c) 1999-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #include "sg_lib.h"
@@ -26,8 +27,13 @@
 #include "config.h"
 #endif
 
+/* Needs to be after config.h */
+#ifdef SG_LIB_LINUX
+#include <errno.h>
+#endif
 
-static const char * version_str = "1.69 20141006";
+
+static const char * version_str = "1.70 20150511";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -55,11 +61,37 @@ sg_cmds_version()
     return version_str;
 }
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 /* Returns file descriptor >= 0 if successful. If error in Unix returns
    negated errno. */
 int
 sg_cmds_open_device(const char * device_name, int read_only, int verbose)
 {
+    /* The following 2 lines are temporary. It is to avoid a NULL pointer
+     * crash when an old utility is used with a newer library built after
+     * the sg_warnings_strm cleanup */
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
+
     return scsi_pt_open_device(device_name, read_only, verbose);
 }
 
@@ -114,12 +146,12 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     if (verbose || n) {
         sg_get_sense_str(leadin, sbp, slen, (verbose > 1),
                          sizeof(b), b);
-        fprintf(sg_warnings_strm, "%s", b);
+        pr2ws("%s", b);
         if ((mx_di_len > 0) && (resid > 0)) {
             got = mx_di_len - resid;
             if ((verbose > 2) || check_data_in || (got > 0))
-                fprintf(sg_warnings_strm, "    pass-through requested %d "
-                        "bytes (data-in) but got %d bytes\n", mx_di_len, got);
+                pr2ws("    pass-through requested %d bytes (data-in) but "
+                      "got %d bytes\n", mx_di_len, got);
         }
     }
     if (o_sense_cat)
@@ -146,24 +178,36 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     int got, cat, duration, slen, resid, resp_code, sstat;
     char b[1024];
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (NULL == leadin)
         leadin = "";
     if (pt_res < 0) {
+#ifdef SG_LIB_LINUX
+        if (verbose)
+            pr2ws("%s: pass through os error: %s\n", leadin,
+                  safe_strerror(-pt_res));
+        if ((-ENXIO == pt_res) && o_sense_cat) {
+            if (verbose > 2)
+                pr2ws("map ENXIO to SG_LIB_CAT_NOT_READY\n");
+            *o_sense_cat = SG_LIB_CAT_NOT_READY;
+            return -2;
+        } else if (noisy && (0 == verbose))
+            pr2ws("%s: pass through os error: %s\n", leadin,
+                  safe_strerror(-pt_res));
+#else
         if (noisy || verbose)
-            fprintf(sg_warnings_strm, "%s: pass through os error: %s\n",
-                    leadin, safe_strerror(-pt_res));
+            pr2ws("%s: pass through os error: %s\n", leadin,
+                  safe_strerror(-pt_res));
+#endif
         return -1;
     } else if (SCSI_PT_DO_BAD_PARAMS == pt_res) {
-        fprintf(sg_warnings_strm, "%s: bad pass through setup\n", leadin);
+        pr2ws("%s: bad pass through setup\n", leadin);
         return -1;
     } else if (SCSI_PT_DO_TIMEOUT == pt_res) {
-        fprintf(sg_warnings_strm, "%s: pass through timeout\n", leadin);
+        pr2ws("%s: pass through timeout\n", leadin);
         return -1;
     }
     if ((verbose > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
-        fprintf(sg_warnings_strm, "      duration=%d ms\n", duration);
+        pr2ws("      duration=%d ms\n", duration);
     resid = (mx_di_len > 0) ? get_scsi_pt_resid(ptvp) : 0;
     slen = get_scsi_pt_sense_len(ptvp);
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
@@ -184,9 +228,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         if (mx_di_len > 0) {
             got = mx_di_len - resid;
             if ((verbose > 1) && (resid > 0))
-                fprintf(sg_warnings_strm, "    %s: pass-through requested "
-                        "%d bytes (data-in) but got %d bytes\n", leadin,
-                        mx_di_len, got);
+                pr2ws("    %s: pass-through requested %d bytes (data-in) "
+                      "but got %d bytes\n", leadin, mx_di_len, got);
             return got;
         } else
             return 0;
@@ -199,7 +242,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         if (verbose || noisy) {
             sg_get_scsi_status_str(sstat, sizeof(b), b);
-            fprintf(sg_warnings_strm, "%s: scsi status: %s\n", leadin, b);
+            pr2ws("%s: scsi status: %s\n", leadin, b);
         }
         return -1;
     case SCSI_PT_RESULT_SENSE:
@@ -208,7 +251,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     case SCSI_PT_RESULT_TRANSPORT_ERR:
         if (verbose || noisy) {
             get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
-            fprintf(sg_warnings_strm, "%s: transport: %s\n", leadin, b);
+            pr2ws("%s: transport: %s\n", leadin, b);
         }
         if ((SAM_STAT_CHECK_CONDITION == get_scsi_pt_status_response(ptvp))
             && (slen > 0))
@@ -219,12 +262,11 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     case SCSI_PT_RESULT_OS_ERR:
         if (verbose || noisy) {
             get_scsi_pt_os_err_str(ptvp, sizeof(b), b);
-            fprintf(sg_warnings_strm, "%s: os: %s\n", leadin, b);
+            pr2ws("%s: os: %s\n", leadin, b);
         }
         return -1;
     default:
-        fprintf(sg_warnings_strm, "%s: unknown pass through result "
-                "category (%d)\n", leadin, cat);
+        pr2ws("%s: unknown pass through result category (%d)\n", leadin, cat);
         return -1;
     }
 }
@@ -249,13 +291,11 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
     /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
     inqCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     inqCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    inquiry cdb: ");
+        pr2ws("    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", inqCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", inqCmdBlk[k]);
+        pr2ws("\n");
     }
     if (resp && (mx_resp_len > 0)) {
         up = (unsigned char *)resp;
@@ -265,7 +305,7 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "inquiry: out of memory\n");
+        pr2ws("inquiry: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
@@ -290,16 +330,15 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
         }
     } else if (ret < 4) {
         if (verbose)
-            fprintf(sg_warnings_strm, "inquiry: got too few "
-                    "bytes (%d)\n", ret);
+            pr2ws("inquiry: got too few bytes (%d)\n", ret);
         ret = SG_LIB_CAT_MALFORMED;
     } else
         ret = 0;
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            fprintf(sg_warnings_strm, "inquiry: resid (%d) should never "
-                    "exceed requested len=%d\n", resid, mx_resp_len);
+            pr2ws("inquiry: resid (%d) should never exceed requested "
+                  "len=%d\n", resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -327,19 +366,17 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
         inq_data->peripheral_type = 0x1f;
     }
     inqCmdBlk[4] = (unsigned char)sizeof(inq_resp);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    inquiry cdb: ");
+        pr2ws("    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", inqCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", inqCmdBlk[k]);
+        pr2ws("\n");
     }
     memset(inq_resp, 0, sizeof(inq_resp));
     inq_resp[0] = 0x7f; /* defensive prefill */
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "inquiry: out of memory\n");
+        pr2ws("inquiry: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
@@ -362,8 +399,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
         }
     } else if (ret < 4) {
         if (verbose)
-            fprintf(sg_warnings_strm, "inquiry: got too few "
-                    "bytes (%d)\n", ret);
+            pr2ws("inquiry: got too few bytes (%d)\n", ret);
         ret = SG_LIB_CAT_MALFORMED;
     } else
         ret = 0;
@@ -400,18 +436,16 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    test unit ready cdb: ");
+        pr2ws("    test unit ready cdb: ");
         for (k = 0; k < TUR_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", turCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", turCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "test unit ready: out of memory\n");
+        pr2ws("test unit ready: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, turCmdBlk, sizeof(turCmdBlk));
@@ -470,23 +504,21 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
 
     if (desc)
         rsCmdBlk[1] |= 0x1;
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xff) {
-        fprintf(sg_warnings_strm, "mx_resp_len cannot exceed 255\n");
+        pr2ws("mx_resp_len cannot exceed 255\n");
         return -1;
     }
     rsCmdBlk[4] = mx_resp_len & 0xff;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    Request Sense cmd: ");
+        pr2ws("    Request Sense cmd: ");
         for (k = 0; k < REQUEST_SENSE_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", rsCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", rsCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "request sense: out of memory\n");
+        pr2ws("request sense: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rsCmdBlk, sizeof(rsCmdBlk));
@@ -510,8 +542,8 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
     } else {
         if ((mx_resp_len >= 8) && (ret < 8)) {
             if (verbose)
-                fprintf(sg_warnings_strm, "    request sense: got %d "
-                        "bytes in response, too short\n", ret);
+                pr2ws("    request sense: got %d bytes in response, too "
+                      "short\n", ret);
             ret = -1;
         } else
             ret = 0;
@@ -537,18 +569,16 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
     rlCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
     rlCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
     rlCmdBlk[9] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    report luns cdb: ");
+        pr2ws("    report luns cdb: ");
         for (k = 0; k < REPORT_LUNS_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", rlCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", rlCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "report luns: out of memory\n");
+        pr2ws("report luns: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rlCmdBlk, sizeof(rlCmdBlk));

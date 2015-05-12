@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.41 [20150428] [svn: r643]
+Changelog for sg3_utils-1.41 [20150511] [svn: r644]
   - sg_zone: new utility for open, close and finish
     zone commands introduced in zbc-r02
   - sg_rep_zones and sg_reset_wp: change opcodes as
@@ -14,6 +14,9 @@ Changelog for sg3_utils-1.41 [20150428] [svn: r643]
   - sg_write_buffer: add --timeout=TO option
   - sg_lib interface: add sg_lib_pdt_decay(), TPROTO_PCIE
     plus support for zoning service actions
+  - sg_lib: in Linux blocked devices yield ENXIO from
+    ioctl(SG_IO), map to SG_LIB_CAT_NOT_READY
+    - clean up sg_warnings_stream handling
   - sg_inq+sg_vpd: fix SCSI name string decoding in
     device identification VPD page (0x83)
     - increase sanity on Unit Serial number VPD page
@@ -38,12 +41,12 @@ Changelog for sg3_utils-1.41 [20150428] [svn: r643]
     'sdparm --inhex='
   - sg_rdac: add '-6' option for mode sense/select(6)
     - add support for reporting more SCSI transports
-      and accessing rdac extended mode page 2c
+      and accessing rdac extended mode page 0x2c
   - sg_write_same: cleanup, mainly man page
   - scsi_logging_level: replace use of tr command
   - examples/sg_tst_async: cleanup
   - examples/sg-simple_aio.c: remove
-  - sg_lib_data: sync asc/ascq codes with T10 20150406
+  - sg_lib_data: sync asc/ascq codes with T10 20150423
   - Makefile cleanup
   - autogen.sh: upgrade to buildconf 20091223 version
 
