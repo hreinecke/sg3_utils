@@ -1,14 +1,15 @@
 /*
- * Copyright (c) 2005-2013 Douglas Gilbert.
+ * Copyright (c) 2005-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.12 20130919 */
+/* sg_pt_freebsd version 1.13 20150511 */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -71,6 +72,26 @@ struct sg_pt_base {
     struct sg_pt_freebsd_scsi impl;
 };
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
@@ -93,8 +114,6 @@ scsi_pt_open_flags(const char * device_name,
     struct cam_device* cam_dev;
     int k;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     // Search table for a free entry
     for (k = 0; k < FREEBSD_MAXDEV; k++)
         if (! devicetable[k])
@@ -104,8 +123,7 @@ scsi_pt_open_flags(const char * device_name,
     // of "file descriptors" already allocated.
     if (k == FREEBSD_MAXDEV) {
         if (verbose)
-            fprintf(sg_warnings_strm, "too many open file descriptors "
-                    "(%d)\n", FREEBSD_MAXDEV);
+            pr2ws("too many open file descriptors (%d)\n", FREEBSD_MAXDEV);
         errno = EMFILE;
         return -1;
     }
@@ -123,7 +141,7 @@ scsi_pt_open_flags(const char * device_name,
     if (cam_get_device(device_name, fdchan->devname, DEV_IDLEN,
                        &(fdchan->unitnum)) == -1) {
         if (verbose)
-            fprintf(sg_warnings_strm, "bad device name structure\n");
+            pr2ws("bad device name structure\n");
         errno = EINVAL;
         return -1;
     }
@@ -131,8 +149,7 @@ scsi_pt_open_flags(const char * device_name,
     if (! (cam_dev = cam_open_spec_device(fdchan->devname,
                                           fdchan->unitnum, O_RDWR, NULL))) {
         if (verbose)
-            fprintf(sg_warnings_strm, "cam_open_spec_device: %s\n",
-                    cam_errbuf);
+            pr2ws("cam_open_spec_device: %s\n", cam_errbuf);
         errno = EPERM;    /* permissions or no CAM */
         return -1;
     }
@@ -171,6 +188,12 @@ struct sg_pt_base *
 construct_scsi_pt_obj()
 {
     struct sg_pt_freebsd_scsi * ptp;
+
+    /* The following 2 lines are temporary. It is to avoid a NULL pointer
+     * crash when an old utility is used with a newer library built after
+     * the sg_warnings_strm cleanup */
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
 
     ptp = (struct sg_pt_freebsd_scsi *)
                 calloc(1, sizeof(struct sg_pt_freebsd_scsi));
@@ -314,43 +337,41 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
     union ccb *ccb;
     int len, timout_ms;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     ptp->os_err = 0;
     if (ptp->in_err) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Replicated or unused set_scsi_pt...\n");
+            pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (NULL == ptp->cdb) {
         if (verbose)
-            fprintf(sg_warnings_strm, "No command (cdb) given\n");
+            pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
     if ((fd < 0) || (fd >= FREEBSD_MAXDEV)) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Bad file descriptor\n");
+            pr2ws("Bad file descriptor\n");
         ptp->os_err = ENODEV;
         return -ptp->os_err;
     }
     fdchan = devicetable[fd];
     if (NULL == fdchan) {
         if (verbose)
-            fprintf(sg_warnings_strm, "File descriptor closed??\n");
+            pr2ws("File descriptor closed??\n");
         ptp->os_err = ENODEV;
         return -ptp->os_err;
     }
     if (NULL == fdchan->cam_dev) {
         if (verbose)
-            fprintf(sg_warnings_strm, "No open CAM device\n");
+            pr2ws("No open CAM device\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
     if (NULL == ptp->ccb) {     /* re-use if we have one already */
         if (! (ccb = cam_getccb(fdchan->cam_dev))) {
             if (verbose)
-                fprintf(sg_warnings_strm, "cam_getccb: failed\n");
+                pr2ws("cam_getccb: failed\n");
             ptp->os_err = ENOMEM;
             return -ptp->os_err;
         }

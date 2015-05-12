@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "January 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SG3_UTILS "8" "May 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -204,9 +204,10 @@ syntax error. Either illegal command line options, options with bad
 arguments or a combination of options that is not permitted.
 .TP
 .B 2
-the \fIDEVICE\fR reports that it is not ready for the operation
-requested. The device may be in the process of becoming ready (e.g.
-spinning up but not at speed) so the utility may work after a wait.
+the \fIDEVICE\fR reports that it is not ready for the operation requested.
+The \fIDEVICE\fR may be in the process of becoming ready (e.g.  spinning up
+but not at speed) so the utility may work after a wait. In Linux the
+\fIDEVICE\fR may be temporarily blocked while error recovery is taking place.
 .TP
 .B 3
 the \fIDEVICE\fR reports a medium or hardware error (or a blank check). For

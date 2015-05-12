@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.47 20150421";    /* SPC-5 rev 02 */
+static const char * version_str = "1.48 20150511";    /* SPC-5 rev 02 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1839,7 +1839,17 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
             printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
             if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
-                printf("%.*s\n", k, ip);
+                /* udev-conformant character encoding */
+                for (m = 0; m < k; ++m) {
+                    if ((ip[m] >= '0' && ip[m] <= '9') ||
+                        (ip[m] >= 'A' && ip[m] <= 'Z') ||
+                        (ip[m] >= 'a' && ip[m] <= 'z') ||
+                        strchr("#+-.:=@_", ip[m]) != NULL)
+                        printf("%c", ip[m]);
+                    else
+                        printf("\\x%02x", ip[m]);
+                }
+                printf("\n");
             } else {
                 for (m = 0; m < i_len; ++m)
                     printf("%02x", (unsigned int)ip[m]);
@@ -1850,7 +1860,17 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
             printf("SCSI_IDENT_%s_T10=", assoc_str);
             if ((2 == c_set) || (3 == c_set)) {
                 k = encode_whitespaces(ip, i_len);
-                printf("%.*s\n", k, ip);
+                /* udev-conformant character encoding */
+                for (m = 0; m < k; ++m) {
+                    if ((ip[m] >= '0' && ip[m] <= '9') ||
+                        (ip[m] >= 'A' && ip[m] <= 'Z') ||
+                        (ip[m] >= 'a' && ip[m] <= 'z') ||
+                        strchr("#+-.:=@_", ip[m]) != NULL)
+                        printf("%c", ip[m]);
+                    else
+                        printf("\\x%02x", ip[m]);
+                }
+                printf("\n");
                 if (!memcmp(ip, "ATA_", 4)) {
                     printf("SCSI_IDENT_%s_ATA=%.*s\n", assoc_str,
                            k - 4, ip + 4);

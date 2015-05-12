@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2013 Douglas Gilbert.
+ * Copyright (c) 2008-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #define __STDC_FORMAT_MACROS 1
@@ -35,6 +36,25 @@
 #define SET_STREAMING_CMD 0xb6
 #define SET_STREAMING_CMDLEN 12
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 /* Invokes a SCSI SET CD SPEED command (MMC).
  * Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> command not supported,
@@ -51,8 +71,6 @@ sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     scsCmdBlk[1] |= (rot_control & 0x3);
     scsCmdBlk[2] = (drv_read_speed >> 8) & 0xff;
     scsCmdBlk[3] = drv_read_speed & 0xff;
@@ -60,14 +78,14 @@ sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
     scsCmdBlk[5] = drv_write_speed & 0xff;
 
     if (verbose) {
-        fprintf(sg_warnings_strm, "    set cd speed cdb: ");
+        pr2ws("    set cd speed cdb: ");
         for (k = 0; k < SET_CD_SPEED_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", scsCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", scsCmdBlk[k]);
+        pr2ws("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "set cd speed: out of memory\n");
+        pr2ws("set cd speed: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, scsCmdBlk, sizeof(scsCmdBlk));
@@ -115,37 +133,34 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if ((rt < 0) || (rt > 3)) {
-        fprintf(sg_warnings_strm, "Bad rt value: %d\n", rt);
+        pr2ws("Bad rt value: %d\n", rt);
         return -1;
     }
     gcCmdBlk[1] = (rt & 0x3);
     if ((starting < 0) || (starting > 0xffff)) {
-        fprintf(sg_warnings_strm, "Bad starting field number: 0x%x\n",
-                starting);
+        pr2ws("Bad starting field number: 0x%x\n", starting);
         return -1;
     }
     gcCmdBlk[2] = (unsigned char)((starting >> 8) & 0xff);
     gcCmdBlk[3] = (unsigned char)(starting & 0xff);
     if ((mx_resp_len < 0) || (mx_resp_len > 0xffff)) {
-        fprintf(sg_warnings_strm, "Bad mx_resp_len: 0x%x\n", starting);
+        pr2ws("Bad mx_resp_len: 0x%x\n", starting);
         return -1;
     }
     gcCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     gcCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
 
     if (verbose) {
-        fprintf(sg_warnings_strm, "    Get Configuration cdb: ");
+        pr2ws("    Get Configuration cdb: ");
         for (k = 0; k < GET_CONFIG_CMD_LEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", gcCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", gcCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "get configuration: out of memory\n");
+        pr2ws("get configuration: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, gcCmdBlk, sizeof(gcCmdBlk));
@@ -183,8 +198,8 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;
-            fprintf(sg_warnings_strm, "    get configuration: response%s\n",
-                    (len > 256 ? ", first 256 bytes" : ""));
+            pr2ws("    get configuration: response%s\n",
+                  (len > 256 ? ", first 256 bytes" : ""));
             dStrHexErr((const char *)resp, (len > 256 ? 256 : len), -1);
         }
         ret = 0;
@@ -208,10 +223,8 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if ((data_type < 0) || (data_type > 0x1f)) {
-        fprintf(sg_warnings_strm, "Bad data_type value: %d\n", data_type);
+        pr2ws("Bad data_type value: %d\n", data_type);
         return -1;
     }
     gpCmdBlk[1] = (data_type & 0x1f);
@@ -220,27 +233,27 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
     gpCmdBlk[4] = (unsigned char)((starting_lba >> 8) & 0xff);
     gpCmdBlk[3] = (unsigned char)(starting_lba & 0xff);
     if ((max_num_desc < 0) || (max_num_desc > 0xffff)) {
-        fprintf(sg_warnings_strm, "Bad max_num_desc: 0x%x\n", max_num_desc);
+        pr2ws("Bad max_num_desc: 0x%x\n", max_num_desc);
         return -1;
     }
     gpCmdBlk[8] = (unsigned char)((max_num_desc >> 8) & 0xff);
     gpCmdBlk[9] = (unsigned char)(max_num_desc & 0xff);
     if ((ttype < 0) || (ttype > 0xff)) {
-        fprintf(sg_warnings_strm, "Bad type: 0x%x\n", ttype);
+        pr2ws("Bad type: 0x%x\n", ttype);
         return -1;
     }
     gpCmdBlk[10] = (unsigned char)ttype;
 
     if (verbose) {
-        fprintf(sg_warnings_strm, "    Get Performance cdb: ");
+        pr2ws("    Get Performance cdb: ");
         for (k = 0; k < GET_PERFORMANCE_CMD_LEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", gpCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", gpCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "get performance: out of memory\n");
+        pr2ws("get performance: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, gpCmdBlk, sizeof(gpCmdBlk));
@@ -278,8 +291,8 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;
-            fprintf(sg_warnings_strm, "    get performance:: response%s\n",
-                    (len > 256 ? ", first 256 bytes" : ""));
+            pr2ws("    get performance:: response%s\n",
+                  (len > 256 ? ", first 256 bytes" : ""));
             dStrHexErr((const char *)resp, (len > 256 ? 256 : len), -1);
         }
         ret = 0;
@@ -306,23 +319,20 @@ sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
     ssCmdBlk[8] = type;
     ssCmdBlk[9] = (param_len >> 8) & 0xff;
     ssCmdBlk[10] = param_len & 0xff;
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    set streaming cdb: ");
+        pr2ws("    set streaming cdb: ");
         for (k = 0; k < SET_STREAMING_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", ssCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", ssCmdBlk[k]);
+        pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
-            fprintf(sg_warnings_strm, "    set streaming "
-                    "parameter list:\n");
+            pr2ws("    set streaming parameter list:\n");
             dStrHexErr((const char *)paramp, param_len, -1);
         }
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "set streaming: out of memory\n");
+        pr2ws("set streaming: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, ssCmdBlk, sizeof(ssCmdBlk));
