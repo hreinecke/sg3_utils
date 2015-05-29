@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_PERSIST "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -34,10 +34,10 @@ sub\-command of the PRIN command. Other PRIN sub\-commands are
 READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
-should be aware of what they are doing. The relevant sections of the
-SCSI Primary Commands document (i.e. SPC\-4 whose most recent draft is
-revision 20 dated 22 May 2009) are sections 5.7 (titled "Reservations"),
-6.13 (for the PRIN command) and 6.14 (for the PROUT command). To safeguard
+should be aware of what they are doing. The relevant sections of the SCSI
+Primary Commands document (i.e. SPC\-4 whose most recent draft is revision
+37 dated 17 May 2014) are sections 5.12 (titled "Reservations"),
+6.15 (for the PRIN command) and 6.16 (for the PROUT command). To safeguard
 against accidental use, the \fI\-\-out\fR option must be given when a
 PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
 .PP
@@ -87,7 +87,8 @@ output a usage message.
 \fB\-H\fR, \fB\-\-hex\fR
 the response to a valid PRIN sub\-command will be output in hexadecimal.
 By default (i.e. without this option) if the PRIN sub\-command is recognised
-then the response will be decoded as per SPC\-4.
+then the response will be decoded as per SPC\-4. May be used more than
+once for more hex and less text.
 .TP
 \fB\-i\fR, \fB\-\-in\fR
 specify that a SCSI PERSISTENT RESERVE IN command is required. This
@@ -148,7 +149,7 @@ exclusive access \- registrants only, 7\-> write exclusive \- all registrants,
 8\-> exclusive access \- all registrants. Default value is 0 (which is
 an invalid type). Each "persistent reservation type" is explained in more
 detail in a subsection of that name in the read reservation section of
-the PRIN command (section 6.13.3.4 of SPC\-4 revision 9).
+the PRIN command (section 6.15.3.3 of SPC\-4 revision 37).
 .TP
 \fB\-s\fR, \fB\-\-read\-full\-status\fR
 Read Full Status is a sub\-command of the PRIN command. For each registration
@@ -159,6 +160,12 @@ information. TransportIDs, if supplied in the response, are decoded.
 Read Keys is a sub\-command of the PRIN command. Lists all the reservation
 keys registered (i.e. registrations) with the given SCSI device. This is
 the default sub\-command for the SCSI PRIN command.
+.TP
+\fB\-y\fR, \fB\-\-readonly\fR
+Open \fIDEVICE\fR read\-only. May be useful with PRIN commands if there are
+unwanted side effects with the default read\-write open. When given twice
+is interpreted as forcing a read\-write open thus overriding the
+SG_PERSIST_IN_RDONLY environment variable if present.
 .TP
 \fB\-r\fR, \fB\-\-read\-reservation\fR
 Read Reservation is a sub\-command of the PRIN command. List information
@@ -256,8 +263,8 @@ output usage message. Ignore all other parameters.
 .SH TRANSPORT IDs
 TransportIDs are used in persistent reservations to identify initiators.
 The format of a TransportID differs depending on the type of transport
-being used. Their format is described in SPC\-4 (in draft revision
-20 see section 7.5.4).
+being used. Their format is described in SPC\-4 (in draft revision 37 see
+section 7.6.4).
 .PP
 A TransportID is required for the PROUT 'register and move' sub\-command and
 the PROUT 'register' sub\-command can have zero, one or more TransportIDs.
@@ -271,13 +278,14 @@ form is an iSCSI qualified name. Apart from "iqn" the other transport
 specific leadin string may be given in upper case (e.g. "FCP,").
 .PP
 The "fcp," form should be followed by 16 ASCII hex digits that represent an
-initiator's N_PORT_NAME. The "spi," form should be followed
-by "<scsi_address>,<relative_target_port_identifier>" (both decimal numbers).
-The "sbp," form should be followed by 16 ASCII hex digits that represent an
-initiator's EUI\-64 name. The "srp," form should be followed by 32 ASCII hex
-digits that represent an initiator port identifier. The "sas," form should be
-followed by 16 ASCII hex digits that represent an initiator's port SAS
-address. The "sop," form takes a hex number that represents a routing id.
+initiator's N_PORT_NAME (e.g. "fcp,10000000C9F3A571"). The "spi," form shoul
+be followed by "<scsi_address>,<relative_target_port_identifier>" (both
+decimal numbers). The "sbp," form should be followed by 16 ASCII hex digits
+that represent an initiator's EUI\-64 name. The "srp," form should be
+followed by 32 ASCII hex digits that represent an initiator port identifier.
+The "sas," form should be followed by 16 ASCII hex digits that represent an
+initiator's port SAS address (e.g. "sas,5000c50005b32001"). The "sop," form
+takes a hex number that represents a routing id.
 .PP
 There are two iSCSI qualified name forms. The shorter form contains the
 iSCSI name of the initiator
@@ -311,6 +319,11 @@ the PROUT register and ignore existing key sub\-command. In SPC\-4 that
 is disallowed yielding a CHECK CONDITION status with and ILLEGAL REQUEST
 sense key and an additional sense code set to INVALID FIELD IN PARAMETER
 LIST.
+.SH ENVIRONMENT VARIABLES
+Currently there is one recognised environment variable: SG_PERSIST_IN_RDONLY.
+If present and only if a PRIN command has been selected then the
+given \fIDEVICE\fR is opened read\-only (e.g. in Unix that is with the
+O_RDONLY flag). See the \fI\-\-readonly\fR option.
 .SH NOTES
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series any SCSI device
@@ -394,7 +407,7 @@ examples sub\-directory of the sg3_utils package. There is also a
 simple test script called sg_persist_tst.sh in the same directory.
 .PP
 The above sequence of commands was tested successfully on a Seagate Savvio
-10K.3 disk which has a SAS interface.
+10K.3 disk and a 1200 SSD both of which have SAS interfaces.
 .SH EXIT STATUS
 The exit status of sg_persist is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

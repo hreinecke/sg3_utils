@@ -1,0 +1,36 @@
+# SCSI-ID mappings for sg3_utils
+
+ACTION=="remove", GOTO="sg3_utils_id_end"
+
+SUBSYSTEM!="block", GOTO="sg3_utils_id_end"
+
+# Import values for partitions
+ENV{DEVTYPE}=="partition", IMPORT{parent}="SCSI_*", ENV{ID_SCSI}="1"
+# SCSI INQUIRY values
+KERNEL=="sd*[!0-9]|sr*", IMPORT{program}="/usr/bin/sg_inq --export $tempnode", ENV{ID_SCSI}="1"
+# scsi_id compat mappings
+ENV{SCSI_VENDOR}=="?*", ENV{ID_VENDOR}="$env{SCSI_VENDOR}"
+ENV{SCSI_VENDOR_ENC}=="?*", ENV{ID_VENDOR_ENC}="$env{SCSI_VENDOR_ENC}"
+ENV{SCSI_MODEL}=="?*", ENV{ID_MODEL}="$env{SCSI_MODEL}"
+ENV{SCSI_MODEL_ENC}=="?*", ENV{ID_MODEL_ENC}="$env{SCSI_MODEL_ENC}"
+ENV{SCSI_REVISION}=="?*", ENV{ID_REVISION}="$env{SCSI_REVISION}"
+ENV{SCSI_TYPE}=="?*", ENV{ID_TYPE}="$env{SCSI_TYPE}"
+# SCSI EVPD page 0x80 values
+KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --page=sn $tempnode"
+# SCSI EVPD page 0x83 values
+KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --page=di $tempnode"
+
+# ID_WWN compat mapping
+ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{ID_WWN}!="?*", ENV{ID_WWN}="0x$env{SCSI_IDENT_LUN_NAA}"
+ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{ID_WWN_WITH_EXTENSION}!="?*", ENV{ID_WWN_WITH_EXTENSION}="0x$env{SCSI_IDENT_LUN_NAA}"
+
+# ata_id compability
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_ATA}=="?*", ENV{ID_BUS}="ata", ENV{ID_ATA}="1", ENV{ID_SERIAL}="$env{SCSI_IDENT_LUN_ATA}"
+ENV{ID_SERIAL_SHORT}!="?*", ENV{SCSI_VENDOR}=="ATA", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_VENDOR}"
+# Compat ID_SERIAL setting
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA}"
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="2$env{SCSI_IDENT_LUN_EUI64}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_EUI64}"
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="8$env{SCSI_IDENT_LUN_NAME}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAME}"
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="1$env{SCSI_IDENT_LUN_T10}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_T10}"
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_VENDOR}"
+LABEL="sg3_utils_id_end"

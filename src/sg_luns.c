@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -28,11 +29,10 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.24 20131029";
+static const char * version_str = "1.27 20140607";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
-
 
 
 static struct option long_options[] = {
@@ -42,9 +42,11 @@ static struct option long_options[] = {
 #ifdef SG_LIB_LINUX
         {"linux", no_argument, 0, 'l'},
 #endif
+        {"lu_cong", no_argument, 0, 'L'},
         {"maxlen", required_argument, 0, 'm'},
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
         {"select", required_argument, 0, 's'},
         {"test", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
@@ -52,27 +54,47 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 static void
 usage()
 {
 #ifdef SG_LIB_LINUX
-    fprintf(stderr, "Usage: "
+    pr2serr("Usage: "
             "sg_luns    [--decode] [--help] [--hex] [--linux] "
-            "[--maxlen=LEN]\n"
-            "                  [--quiet] [--raw] [--select=SR] "
-            "[--verbose]\n"
-            "                  [--version] DEVICE\n");
+            "[--lu_cong]\n"
+            "                  [--maxlen=LEN] [--quiet] [--raw] "
+            "[--readonly]\n"
+            "                  [--select=SR] [--verbose] [--version] "
+            "DEVICE\n");
 #else
-    fprintf(stderr, "Usage: "
-            "sg_luns    [--decode] [--help] [--hex] [--maxlen=LEN] "
-            "[--quiet]\n"
-            "                  [--raw] [--select=SR] [--verbose] "
-            "[--version]\n"
-            "                  DEVICE\n");
+    pr2serr("Usage: "
+            "sg_luns    [--decode] [--help] [--hex] [--lu_cong] "
+            "[--maxlen=LEN]\n"
+            "                  [--quiet] [--raw] [--readonly] "
+            "[--select=SR]\n"
+            "                  [--verbose] [--version] DEVICE\n");
 #endif
-    fprintf(stderr,
-            "     or\n"
-            "       sg_luns    --test=ALUN [--hex] [--verbose]\n"
+    pr2serr("     or\n"
+            "       sg_luns    --test=ALUN [--hex] [--lu_cong] [--verbose]\n"
             "  where:\n"
             "    --decode|-d        decode all luns into component parts\n"
             "    --help|-h          print out usage message\n"
@@ -80,41 +102,51 @@ usage()
             "twice\n"
             "                       shows decoded values in hex\n");
 #ifdef SG_LIB_LINUX
-    fprintf(stderr,
-            "    --linux|-l         show Linux integer lun after T10 "
+    pr2serr("    --linux|-l         show Linux integer lun after T10 "
             "representation\n");
 #endif
-    fprintf(stderr,
+    pr2serr("    --lu_cong          decode as if LU_CONG is set; used "
+            "twice:\n"
+            "                       decode as if LU_CONG is clear\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n"
             "    --quiet|-q         output only ASCII hex lun values\n"
             "    --raw|-r           output response in binary\n"
+            "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
             "    --select=SR|-s SR    select report SR (def: 0)\n"
             "                          0 -> luns apart from 'well "
             "known' lus\n"
             "                          1 -> only 'well known' "
             "logical unit numbers\n"
             "                          2 -> all luns\n"
+            "                          0x10 -> administrative luns\n"
+            "                          0x11 -> admin luns + "
+            "non-conglomerate luns\n"
+            "                          0x12 -> admin lun + its "
+            "subsidiary luns\n"
             "    --test=ALUN|-t ALUN    decode ALUN and ignore most other "
             "options\n"
             "                           and DEVICE (apart from '-H')\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
-            "Performs a SCSI REPORT LUNS command. When the --test=ALUN "
-            "option is\ngiven, decodes ALUN rather than sending a "
-            "REPORT LUNS command.\n", DEF_RLUNS_BUFF_LEN );
+            "Performs a SCSI REPORT LUNS command or decodes the given ALUN. "
+            "When SR is\n0x10 or 0x11 DEVICE must be LUN 0 or REPORT LUNS "
+            "well known logical unit;\nwhen SR is 0x12 DEVICE must be an "
+            "administrative logical unit. When the\n--test=ALUN option is "
+            "given, decodes ALUN rather than sending a REPORT\nLUNS "
+            "command.\n", DEF_RLUNS_BUFF_LEN );
 }
 
 /* Decoded according to SAM-5 rev 10. Note that one draft: BCC rev 0,
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
-decode_lun(const char * leadin, const unsigned char * lunp, int do_hex,
-           int verbose)
+decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
+           int do_hex, int verbose)
 {
     int k, j, x, a_method, bus_id, target, lun, len_fld, e_a_method;
-    int next_level;
+    int next_level, lu_cong_admin;
     unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
                                  0xff, 0xff, 0xff, 0xff};
     char l_leadin[128];
@@ -125,39 +157,71 @@ decode_lun(const char * leadin, const unsigned char * lunp, int do_hex,
         printf("%sLogical unit not specified\n", leadin);
         return;
     }
+    lu_cong_admin = lu_cong;
     memset(l_leadin, 0, sizeof(l_leadin));
     for (k = 0; k < 4; ++k, lunp += 2) {
         next_level = 0;
         strncpy(l_leadin, leadin, sizeof(l_leadin) - 3);
         if (k > 0) {
-            printf("%s>>%s level addressing:\n", l_leadin,
-                   ((1 == k) ? "Second" : ((2 == k) ? "Third" : "Fourth")));
+            if (lu_cong) {
+                lu_cong_admin = 0;
+                if ((0 == lunp[0]) && (0 == lunp[1])) {
+                    printf("%s>>>> Administrative LU\n", l_leadin);
+                    if (do_hex || verbose)
+                         printf("        since Subsidiary element is "
+                                "0x0000\n");
+                    break;
+                } else
+                    printf("%s>>Subsidiary element:\n", l_leadin);
+            } else
+                printf("%s>>%s level addressing:\n", l_leadin, ((1 == k) ?
+                         "Second" : ((2 == k) ? "Third" : "Fourth")));
+            strcat(l_leadin, "  ");
+        } else if (lu_cong) {
+            printf("%s>>Administrative element:\n", l_leadin);
             strcat(l_leadin, "  ");
         }
         a_method = (lunp[0] >> 6) & 0x3;
         switch (a_method) {
         case 0:         /* peripheral device addressing method */
-            bus_id = lunp[0] & 0x3f;
-            snprintf(b, sizeof(b), "%sPeripheral device addressing: ",
-                     l_leadin);
-            if ((0 == bus_id) && (0 == verbose)) {
+            if (lu_cong) {
+                snprintf(b, sizeof(b), "%sSimple lu addressing: ",
+                         l_leadin);
+                x = ((lunp[0] & 0x3f) << 8) + lunp[1];
                 if (do_hex)
-                    printf("%slun=0x%02x\n", b, lunp[1]);
+                    printf("%s0x%04x\n", b, x);
                 else
-                    printf("%slun=%d\n", b, lunp[1]);
+                    printf("%s%d\n", b, x);
+                if (lu_cong_admin)
+                    next_level = 1;
             } else {
-                if (do_hex)
-                    printf("%sbus_id=0x%02x, %s=0x%02x\n", b, bus_id,
-                           (bus_id ? "target" : "lun"), lunp[1]);
-                else
-                    printf("%sbus_id=%d, %s=%d\n", b, bus_id,
-                           (bus_id ? "target" : "lun"), lunp[1]);
+                bus_id = lunp[0] & 0x3f;
+                snprintf(b, sizeof(b), "%sPeripheral device addressing: ",
+                         l_leadin);
+                if ((0 == bus_id) && (0 == verbose)) {
+                    if (do_hex)
+                        printf("%slun=0x%02x\n", b, lunp[1]);
+                    else
+                        printf("%slun=%d\n", b, lunp[1]);
+                } else {
+                    if (do_hex)
+                        printf("%sbus_id=0x%02x, %s=0x%02x\n", b, bus_id,
+                               (bus_id ? "target" : "lun"), lunp[1]);
+                    else
+                        printf("%sbus_id=%d, %s=%d\n", b, bus_id,
+                               (bus_id ? "target" : "lun"), lunp[1]);
+                }
+                if (bus_id)
+                    next_level = 1;
             }
-            if (bus_id)
-                next_level = 1;
             break;
         case 1:         /* flat space addressing method */
             lun = ((lunp[0] & 0x3f) << 8) + lunp[1];
+            if (lu_cong) {
+                printf("%sSince LU_CONG=1, unexpected Flat space "
+                       "addressing: lun=0x%04x\n", l_leadin, lun);
+                break;
+            }
             if (do_hex)
                 printf("%sFlat space addressing: lun=0x%04x\n", l_leadin,
                        lun);
@@ -168,6 +232,12 @@ decode_lun(const char * leadin, const unsigned char * lunp, int do_hex,
             target = (lunp[0] & 0x3f);
             bus_id = (lunp[1] >> 5) & 0x7;
             lun = lunp[1] & 0x1f;
+            if (lu_cong) {
+                printf("%sSince LU_CONG=1, unexpected lu addressing: "
+                       "bus_id=0x%x, target=0x%02x, lun=0x%02x\n", l_leadin,
+                       bus_id, target, lun);
+                break;
+            }
             if (do_hex)
                 printf("%sLogical unit addressing: bus_id=0x%x, "
                        "target=0x%02x, lun=0x%02x\n", l_leadin, bus_id,
@@ -219,9 +289,9 @@ decode_lun(const char * leadin, const unsigned char * lunp, int do_hex,
                 }
                 if (do_hex)
                     printf("%sLong extended flat space addressing: "
-                           "lun=010x%" PRIx64 "\n", l_leadin, ull);
+                           "lun=0x%010" PRIx64 "\n", l_leadin, ull);
                 else
-                    printf("%sLong extended flat space  addressing: "
+                    printf("%sLong extended flat space addressing: "
                            "lun=%" PRIu64 "\n", l_leadin, ull);
             } else if ((3 == len_fld) && (0xf == e_a_method))
                 printf("%sLogical unit _not_ specified addressing\n",
@@ -338,9 +408,12 @@ main(int argc, char * argv[])
 #ifdef SG_LIB_LINUX
     int do_linux = 0;
 #endif
+    int lu_cong = 0;
+    int lu_cong_given = 0;
     int maxlen = 0;
     int do_quiet = 0;
     int do_raw = 0;
+    int o_readonly = 0;
     int select_rep = 0;
     int verbose = 0;
 #ifdef SG_LIB_LINUX
@@ -353,6 +426,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const char * cp;
     unsigned char lun_arr[8];
+    struct sg_simple_inquiry_resp sir;
     unsigned char * reportLunsBuff = NULL;
     int ret = 0;
 
@@ -360,10 +434,10 @@ main(int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG_LIB_LINUX
-        c = getopt_long(argc, argv, "dhHlm:qrs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHlLm:qrRs:t:vV", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "dhHm:qrs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHLm:qrRs:t:vV", long_options,
                         &option_index);
 #endif
         if (c == -1)
@@ -385,11 +459,15 @@ main(int argc, char * argv[])
             ++do_linux;
             break;
 #endif
+        case 'L':
+            ++lu_cong;
+            ++lu_cong_given;
+            break;
         case 'm':
             maxlen = sg_get_num(optarg);
             if ((maxlen < 0) || (maxlen > MAX_RLUNS_BUFF_LEN)) {
-                fprintf(stderr, "argument to '--maxlen' should be %d or "
-                        "less\n", MAX_RLUNS_BUFF_LEN);
+                pr2serr("argument to '--maxlen' should be %d or less\n",
+                        MAX_RLUNS_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -399,10 +477,13 @@ main(int argc, char * argv[])
         case 'r':
             ++do_raw;
             break;
+        case 'R':
+            ++o_readonly;
+            break;
         case 's':
-           if ((1 != sscanf(optarg, "%d", &select_rep)) ||
-               (select_rep < 0) || (select_rep > 255)) {
-                fprintf(stderr, "bad argument to '--select'\n");
+           select_rep = sg_get_num(optarg);
+           if ((select_rep < 0) || (select_rep > 255)) {
+                pr2serr("bad argument to '--select', expect 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -413,10 +494,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -428,8 +509,7 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -444,8 +524,8 @@ main(int argc, char * argv[])
             uint64_t ull;
 
             if (1 != sscanf(cp + 1, " %" SCNu64, &ull)) {
-                fprintf(stderr, "Unable to read Linux style LUN integer "
-                        "given to --test=\n");
+                pr2serr("Unable to read Linux style LUN integer given to "
+                        "--test=\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             linux2t10_lun(ull, lun_arr);
@@ -477,8 +557,8 @@ main(int argc, char * argv[])
                 }
             }
             if (0 == k) {
-                fprintf(stderr, "expected a hex number, optionally prefixed "
-                        "by '0x'\n");
+                pr2serr("expected a hex number, optionally prefixed by "
+                        "'0x'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         }
@@ -517,11 +597,11 @@ main(int argc, char * argv[])
         }
 #endif
         printf("Decoded LUN:\n");
-        decode_lun("  ", lun_arr, do_hex, verbose);
+        decode_lun("  ", lun_arr, (lu_cong % 2), do_hex, verbose);
         return 0;
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -533,18 +613,29 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
+    }
+    if (decode && (! lu_cong_given)) {
+        /* check if LU_CONG set in standard INQUIRY response */
+        res = sg_simple_inquiry(sg_fd, &sir, 0, verbose);
+        ret = res;
+        if (res) {
+            pr2serr("fetching standard INQUIRY response failed\n");
+            goto the_end;
+        }
+        lu_cong = !!(0x40 & sir.byte_1);
+        if (verbose && lu_cong)
+            pr2serr("LU_CONG bit set in standard INQUIRY response\n");
     }
 
     if (0 == maxlen)
         maxlen = DEF_RLUNS_BUFF_LEN;
     reportLunsBuff = (unsigned char *)calloc(1, maxlen);
     if (NULL == reportLunsBuff) {
-        fprintf(stderr, "unable to malloc %d bytes\n", maxlen);
+        pr2serr("unable to malloc %d bytes\n", maxlen);
         return SG_LIB_CAT_OTHER;
     }
     trunc = 0;
@@ -573,11 +664,11 @@ main(int argc, char * argv[])
         if ((list_len + 8) > maxlen) {
             luns = ((maxlen - 8) / 8);
             trunc = 1;
-            fprintf(stderr, "  <<too many luns for internal buffer, will "
-                    "show %d lun%s>>\n", luns, ((1 == luns) ? "" : "s"));
+            pr2serr("  <<too many luns for internal buffer, will show %d "
+                    "lun%s>>\n", luns, ((1 == luns) ? "" : "s"));
         }
         if (verbose > 1) {
-            fprintf(stderr, "\nOutput response in hex\n");
+            pr2serr("\nOutput response in hex\n");
             dStrHexErr((const char *)reportLunsBuff,
                        (trunc ? maxlen : list_len + 8), 1);
         }
@@ -602,20 +693,21 @@ main(int argc, char * argv[])
 #endif
             printf("\n");
             if (decode)
-                decode_lun("      ", reportLunsBuff + off, do_hex,
-                           verbose);
+                decode_lun("      ", reportLunsBuff + off, (lu_cong % 2),
+                           do_hex, verbose);
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Report Luns command not supported (support "
-                "mandatory in SPC-3)\n");
+        pr2serr("Report Luns command not supported (support mandatory in "
+                "SPC-3)\n");
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Report Luns, aborted command\n");
+        pr2serr("Report Luns, aborted command\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Report Luns command has bad field in cdb\n");
+        pr2serr("Report Luns command has bad field in cdb\n");
     else {
-        fprintf(stderr, "Report Luns command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        pr2serr("Report Luns command: %s\n", b);
     }
 
 the_end:
@@ -623,7 +715,7 @@ the_end:
         free(reportLunsBuff);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

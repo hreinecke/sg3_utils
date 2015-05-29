@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG3_UTILS "8" "June 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -16,7 +16,9 @@ The names of all utilities start with "sg" and most start with "sg_" often
 followed by the name, or a shortening of the name, of the SCSI command that
 they send. For example the "sg_verify" utility sends the SCSI VERIFY
 command. A mapping between SCSI commands and the sg3_utils utilities that
-issue them is shown in the COVERAGE file.
+issue them is shown in the COVERAGE file. The sg_raw utility can be used to
+send an arbitrary SCSI command (supplied on the command line) to the
+given \fIDEVICE\fR.
 .PP
 SCSI draft standards can be found at http://www.t10.org . The standards
 themselves can be purchased from ANSI and other standards organizations.
@@ -217,10 +219,19 @@ reset) potentially before the current SCSI command was sent. The requested
 command has not been executed by the device. Note that unit attention
 conditions are usually only reported once by a device.
 .TP
+.B 7
+the \fIDEVICE\fR reports a "data protect" sense key. This implies some
+mechanism has blocked writes (or possibly all access to the media).
+.TP
 .B 9
 the \fIDEVICE\fR reports an illegal request with an additional sense code
 of "invalid command operation code" which means that it doesn't support the
 requested command.
+.TP
+.B 10
+the \fIDEVICE\fR reports a "copy aborted". This implies another command or
+device problem has stopped a copy operation. The EXTENDED COPY family of
+commands (including WRITE USING TOKEN) may return this sense key.
 .TP
 .B 11
 the \fIDEVICE\fR reports an aborted command. In some cases aborted
@@ -239,7 +250,8 @@ permission problems. Adding the '\-v' option may give more information.
 .B 20
 the \fIDEVICE\fR reports it has a check condition but "no sense"
 and non\-zero information in its additional sense codes. Some polling
-commands (e.g. REQUEST SENSE) can receive this response.
+commands (e.g. REQUEST SENSE) can receive this response. There may
+be useful information in the sense data such as a progress indication.
 .TP
 .B 21
 the \fIDEVICE\fR reports a "recovered error". The requested command
@@ -247,8 +259,22 @@ was successful. Most likely a utility will report a recovered error
 to stderr and continue, probably leaving the utility with an exit
 status of 0 .
 .TP
+.B 24
+the \fIDEVICE\fR reports a SCSI status of "reservation conflict". This
+means access to the \fIDEVICE\fR with the current command has been blocked
+because another machine (HBA or SCSI "initiator") holds a reservation on
+this \fIDEVICE\fR. On modern SCSI systems this is related to the use of
+the PERSISTENT RESERVATION family of commands.
+.TP
 .B 33
 the command sent to \fIDEVICE\fR has timed out.
+.TP
+.B 40
+the command sent to \fIDEVICE\fR has received an "aborted command" sense
+key with an additional sense code of 0x10. This group is related to
+problems with protection information (PI or DIF). For example this error
+may occur when reading a block on a drive that has never been written (or
+is unmapped) if that drive was formatted with type 1, 2 or 3 protection.
 .TP
 .B 97
 a SCSI command response failed sanity checks.
@@ -389,11 +415,11 @@ given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
 .SH SCRIPTS, EXAMPLES and UTILS
 There are several bash shell scripts in the 'scripts' subdirectory that
-invoke compiled utilities (e.g. sg_readcap). The scripts start with 'scsi_'
-rather than 'sg_'. One purpose of these scripts is to call the same
-utility (e.g. sg_readcap) on multiple disks. Most of the basic compiled
-utilities only allow one device as an argument. Some distributions
-install these scripts in a visible directory (e.g. /usr/src/bin). Some of
+invoke compiled utilities (e.g. sg_readcap). Several of the scripts start
+with 'scsi_' rather than 'sg_'. One purpose of these scripts is to call the
+same utility (e.g. sg_readcap) on multiple devices. Most of the basic
+compiled utilities only allow one device as an argument. Some distributions
+install these scripts in a more visible directory (e.g. /usr/bin). Some of
 these scripts have man page entries. See the README file in the 'scripts'
 subdirectory.
 .PP

@@ -1,4 +1,4 @@
-.TH SCSI_LOGGING_LEVEL "8" "May 2013" "sg3_utils\-1.36" SG3_UTILS
+.TH SCSI_LOGGING_LEVEL "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 scsi_logging_level \- access Linux SCSI logging level information
 .SH SYNOPSIS
@@ -88,6 +88,21 @@ The \fI\-\-get\fR and \fI\-\-set\fR options access the
 .SH EXIT STATUS
 The exit status of this script is 0 when it is successful. Any other
 exit status indicates that an error has occurred.
+.SH EXAMPLES
+The following will set SCSI_LOG_ERROR to level 5 in the Linux kernel. It
+requires root permissions:
+.PP
+  scsi_logging_level \-s \-E 5
+.PP
+So as to not interfere with other SCSI subsystem upper level drivers (ULDs)
+which most likely will be active at the same time, the Linux sg driver uses
+SCSI_LOG_TIMEOUT. To see full debugging and trace from the sg driver use:
+.PP
+  scsi_logging_level \-s \-T 7
+.PP
+The output from the sg driver caused by this will go to the system
+logs (e.g. /var/log/syslog). To reduce the amount of output use a number
+lower than 7. Using 0 will turn off the tracing and debug.
 .SH AUTHORS
 Written by IBM. Small alterations by Douglas Gilbert.
 .SH "REPORTING BUGS"

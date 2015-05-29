@@ -30,7 +30,7 @@ const char * sg_ansi_version_arr[] =
     "SPC-2",
     "SPC-3",
     "SPC-4",
-    "reserved [7h]",
+    "SPC-5",
     "ecma=1, [8h]",
     "ecma=1, [9h]",
     "ecma=1, [Ah]",
@@ -49,7 +49,8 @@ struct sg_version_descriptor {
 };
 
 /* table from SPC-4 revision 36 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20140320 */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20140517 */
+
 
 #ifdef SG_SCSI_STRINGS
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
@@ -188,6 +189,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x462, "SPC-4 T10/BSR INCITS 513 revision 18"},
     {0x463, "SPC-4 T10/BSR INCITS 513 revision 23"},
     {0x466, "SPC-4 T10/BSR INCITS 513 revision 36"},
+    {0x468, "SPC-4 T10/BSR INCITS 513 revision 37"},
     {0x480, "SMC-3 (no version claimed)"},
     {0x482, "SMC-3 T10/1730-D revision 15"},
     {0x482, "SMC-3 T10/1730-D revision 16"},
@@ -337,6 +339,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc4a, "SAS-2.1 T10/2125-D revision 06"},
     {0xc4b, "SAS-2.1 T10/2125-D revision 07"},
     {0xc4e, "SAS-2.1 ANSI INCITS 478-2011"},
+    {0xc4f, "SAS-2.1 ANSI INCITS 478-2011 w/ Amnd 1 ANSI INCITS "
+            "478/AM1-2014"},
     {0xc60, "SAS-3 (no version claimed)"},
     {0xc63, "SAS-3 T10/BSR INCITS 519 revision 05a"},
     {0xc65, "SAS-3 T10/BSR INCITS 519 revision 06"},
@@ -486,6 +490,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20c8, "SPL-2 ANSI INCITS 505-2013"},
     {0x20e0, "SPL-3 (no version claimed)"},
     {0x20e4, "SPL-3 T10/BSR INCITS 492 revision 6"},
+    {0x20e6, "SPL-3 T10/BSR INCITS 492 revision 7"},
     {0x2100, "SPL-4 (no version claimed)"},
     {0x21e0, "SOP (no version claimed)"},
     {0x21e4, "SOP T10/BSR INCITS 489 revision 4"},

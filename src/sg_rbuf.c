@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2013 D. Gilbert
+ *  Copyright (C) 1999-2014 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -39,6 +39,8 @@
 
 #define RB_MODE_DESC 3
 #define RB_MODE_DATA 2
+#define RB_MODE_ECHO_DESC 0xb
+#define RB_MODE_ECHO_DATA 0xa
 #define RB_DESC_LEN 4
 #define RB_DEF_SIZE (200*1024*1024)
 #define RB_OPCODE 0x3C
@@ -51,26 +53,28 @@
 #endif
 
 
-static const char * version_str = "4.90 20131014";
+static const char * version_str = "4.91 20140425";
 
 static struct option long_options[] = {
-        {"buffer", 1, 0, 'b'},
-        {"dio", 0, 0, 'd'},
-        {"help", 0, 0, 'h'},
-        {"mmap", 0, 0, 'm'},
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
-        {"quick", 0, 0, 'q'},
-        {"size", 1, 0, 's'},
-        {"time", 0, 0, 't'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"buffer", required_argument, 0, 'b'},
+        {"dio", no_argument, 0, 'd'},
+        {"echo", no_argument, 0, 'e'},
+        {"help", no_argument, 0, 'h'},
+        {"mmap", no_argument, 0, 'm'},
+        {"new", no_argument, 0, 'N'},
+        {"old", no_argument, 0, 'O'},
+        {"quick", no_argument, 0, 'q'},
+        {"size", required_argument, 0, 's'},
+        {"time", no_argument, 0, 't'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
 struct opts_t {
     int do_buffer;
     int do_dio;
+    int do_echo;
     int do_help;
     int do_mmap;
     int do_quick;
@@ -86,13 +90,15 @@ struct opts_t {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: sg_rbuf [--buffer=EACH] [--dio] [--help] "
-            "[--mmap] [--quick]\n"
-            "               [--size=OVERALL] [--time] [--verbose] "
-            "[--version] DEVICE\n");
+    fprintf(stderr, "Usage: sg_rbuf [--buffer=EACH] [--dio] [--echo] "
+            "[--help] [--mmap]\n"
+            "               [--quick] [--size=OVERALL] [--time] [--verbose] "
+            "[--version]\n"
+            "               DEVICE\n");
     fprintf(stderr, "  where:\n"
             "    --buffer=EACH|-b EACH    buffer size to use (in bytes)\n"
             "    --dio|-d        requests dio ('-q' overrides it)\n"
+            "    --echo|-e       use echo buffer (def: use data mode)\n"
             "    --help|-h       print usage message then exit\n"
             "    --mmap|-m       requests mmap-ed IO (overrides -q, -d)\n"
             "    --quick|-q      quick, don't xfer to user space\n");
@@ -102,8 +108,8 @@ usage()
             "    --time|-t       time the data transfer\n"
             "    --verbose|-v    increase verbosity (more debug)\n"
             "    --version|-V    print version string then exit\n\n"
-            "Use SCSI READ BUFFER command (data mode, buffer id 0) "
-            "repeatedly\n");
+            "Use SCSI READ BUFFER command (data or echo buffer mode, buffer "
+            "id 0)\nrepeatedly\n");
 }
 
 static void
@@ -114,6 +120,7 @@ usage_old()
     printf("  where:\n");
     printf("    -b=EACH_KIB    num is buffer size to use (in KiB)\n");
     printf("    -d       requests dio ('-q' overrides it)\n");
+    printf("    -e       use echo buffer (def: use data mode)\n");
     printf("    -m       requests mmap-ed IO (overrides -q, -d)\n");
     printf("    -q       quick, don't xfer to user space\n");
     printf("    -s=OVERALL_MIB    num is total size to read (in MiB) "
@@ -122,8 +129,8 @@ usage_old()
     printf("    -t       time the data transfer\n");
     printf("    -v       increase verbosity (more debug)\n");
     printf("    -V       print version string then exit\n\n");
-    printf("Use SCSI READ BUFFER command (data mode, buffer id 0) "
-           "repeatedly\n");
+    printf("Use SCSI READ BUFFER command (data or echo buffer mode, buffer "
+           "id 0)\nrepeatedly\n");
 }
 
 static void
@@ -144,7 +151,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:dhmNOqs:tvV", long_options,
+        c = getopt_long(argc, argv, "b:dehmNOqs:tvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -161,6 +168,9 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;
         case 'd':
             ++optsp->do_dio;
+            break;
+        case 'e':
+            ++optsp->do_echo;
             break;
         case 'h':
         case '?':
@@ -236,6 +246,9 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 switch (*cp) {
                 case 'd':
                     ++optsp->do_dio;
+                    break;
+                case 'e':
+                    ++optsp->do_echo;
                     break;
                 case 'h':
                 case '?':
@@ -349,45 +362,46 @@ main(int argc, char * argv[])
     int clear = 1;
 #endif
     struct opts_t opts;
+    struct opts_t * op;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
 #else
     psz = 4096;     /* give up, pick likely figure */
 #endif
-    memset(&opts, 0, sizeof(opts));
-    res = process_cl(&opts, argc, argv);
+    op = &opts;
+    memset(op, 0, sizeof(opts));
+    res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
-    if (opts.do_help) {
-        usage_for(&opts);
+    if (op->do_help) {
+        usage_for(op);
         return 0;
     }
-    if (opts.do_version) {
+    if (op->do_version) {
         fprintf(stderr, "Version string: %s\n", version_str);
         return 0;
     }
 
-    if (NULL == opts.device_name) {
+    if (NULL == op->device_name) {
         fprintf(stderr, "No DEVICE argument given\n");
-        usage_for(&opts);
+        usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (opts.do_buffer > 0)
-        buf_size = opts.do_buffer;
-    if (opts.do_size > 0)
-        total_size = opts.do_size;
+    if (op->do_buffer > 0)
+        buf_size = op->do_buffer;
+    if (op->do_size > 0)
+        total_size = op->do_size;
 
-    sg_fd = open(opts.device_name, O_RDONLY | O_NONBLOCK);
+    sg_fd = open(op->device_name, O_RDONLY | O_NONBLOCK);
     if (sg_fd < 0) {
         perror("device open error");
         return SG_LIB_FILE_ERROR;
     }
-    /* Don't worry, being very careful not to write to a none-sg file ... */
-    if (opts.do_mmap) {
-        opts.do_dio = 0;
-        opts.do_quick = 0;
+    if (op->do_mmap) {
+        op->do_dio = 0;
+        op->do_quick = 0;
     }
     if (NULL == (rawp = malloc(512))) {
         printf("out of memory (query)\n");
@@ -397,7 +411,7 @@ main(int argc, char * argv[])
 
     memset(rbCmdBlk, 0, RB_CMD_LEN);
     rbCmdBlk[0] = RB_OPCODE;
-    rbCmdBlk[1] = RB_MODE_DESC; /* data mode, buffer id 0 */
+    rbCmdBlk[1] = op->do_echo ? RB_MODE_ECHO_DESC : RB_MODE_DESC;
     rbCmdBlk[8] = RB_DESC_LEN;
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
@@ -409,8 +423,9 @@ main(int argc, char * argv[])
     io_hdr.cmdp = rbCmdBlk;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-    if (opts.do_verbose) {
-        fprintf(stderr, "    Read buffer cdb: ");
+    if (op->do_verbose) {
+        fprintf(stderr, "    Read buffer (%sdescriptor) cdb: ",
+                (op->do_echo ? "echo " : ""));
         for (k = 0; k < RB_CMD_LEN; ++k)
             fprintf(stderr, "%02x ", rbCmdBlk[k]);
         fprintf(stderr, "\n");
@@ -423,27 +438,33 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    if (opts.do_verbose > 2)
+    if (op->do_verbose > 2)
         fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
     /* now for the error processing */
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr,
-                        opts.do_verbose > 1);
+                        op->do_verbose > 1);
         /* fall through */
     case SG_LIB_CAT_CLEAN:
         break;
     default: /* won't bother decoding other categories */
         sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr,
-                        opts.do_verbose > 1);
+                        op->do_verbose > 1);
         if (rawp) free(rawp);
         return (res >= 0) ? res : SG_LIB_CAT_OTHER;
     }
 
-    buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
-    printf("READ BUFFER reports: buffer capacity=%d, offset boundary=%d\n",
-           buf_capacity, (int)rbBuff[0]);
+    if (op->do_echo) {
+        buf_capacity = (((0x1f & rbBuff[2]) << 8) | rbBuff[3]);
+        printf("READ BUFFER reports: echo buffer capacity=%d\n",
+               buf_capacity);
+    } else {
+        buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
+        printf("READ BUFFER reports: buffer capacity=%d, offset "
+               "boundary=%d\n", buf_capacity, (int)rbBuff[0]);
+    }
 
     if (0 == buf_size)
         buf_size = buf_capacity;
@@ -458,23 +479,23 @@ main(int argc, char * argv[])
         rawp = NULL;
     }
 
-    if (! opts.do_dio) {
+    if (! op->do_dio) {
         k = buf_size;
-        if (opts.do_mmap && (0 != (k % psz)))
+        if (op->do_mmap && (0 != (k % psz)))
             k = ((k / psz) + 1) * psz;  /* round up to page size */
         res = ioctl(sg_fd, SG_SET_RESERVED_SIZE, &k);
         if (res < 0)
             perror("SG_SET_RESERVED_SIZE error");
     }
 
-    if (opts.do_mmap) {
+    if (op->do_mmap) {
         rbBuff = (unsigned char *)mmap(NULL, buf_size, PROT_READ, MAP_SHARED,
                                        sg_fd, 0);
         if (MAP_FAILED == rbBuff) {
             if (ENOMEM == errno) {
                 fprintf(stderr, "mmap() out of memory, try a smaller "
                        "buffer size than %d bytes\n", buf_size);
-                if (opts.opt_new)
+                if (op->opt_new)
                     fprintf(stderr, "    [with '--buffer=EACH' where EACH "
                             "is in bytes]\n");
                 else
@@ -486,13 +507,13 @@ main(int argc, char * argv[])
         }
     }
     else { /* non mmap-ed IO */
-        rawp = (unsigned char *)malloc(buf_size + (opts.do_dio ? psz : 0));
+        rawp = (unsigned char *)malloc(buf_size + (op->do_dio ? psz : 0));
         if (NULL == rawp) {
             printf("out of memory (data)\n");
             return SG_LIB_CAT_OTHER;
         }
         /* perhaps use posix_memalign() instead */
-        if (opts.do_dio)    /* align to page boundary */
+        if (op->do_dio)    /* align to page boundary */
             rbBuff= (unsigned char *)(((unsigned long)rawp + psz - 1) &
                                       (~(psz - 1)));
         else
@@ -500,7 +521,7 @@ main(int argc, char * argv[])
     }
 
     num = total_size / buf_size;
-    if (opts.do_time) {
+    if (op->do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
@@ -509,7 +530,7 @@ main(int argc, char * argv[])
     for (k = 0; k < num; ++k) {
         memset(rbCmdBlk, 0, RB_CMD_LEN);
         rbCmdBlk[0] = RB_OPCODE;
-        rbCmdBlk[1] = RB_MODE_DATA;
+        rbCmdBlk[1] = op->do_echo ? RB_MODE_ECHO_DATA : RB_MODE_DATA;
         rbCmdBlk[6] = 0xff & (buf_size >> 16);
         rbCmdBlk[7] = 0xff & (buf_size >> 8);
         rbCmdBlk[8] = 0xff & buf_size;
@@ -523,20 +544,21 @@ main(int argc, char * argv[])
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = buf_size;
-        if (! opts.do_mmap)
+        if (! op->do_mmap)
             io_hdr.dxferp = rbBuff;
         io_hdr.cmdp = rbCmdBlk;
         io_hdr.sbp = sense_buffer;
         io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
         io_hdr.pack_id = k;
-        if (opts.do_mmap)
+        if (op->do_mmap)
             io_hdr.flags |= SG_FLAG_MMAP_IO;
-        else if (opts.do_dio)
+        else if (op->do_dio)
             io_hdr.flags |= SG_FLAG_DIRECT_IO;
-        else if (opts.do_quick)
+        else if (op->do_quick)
             io_hdr.flags |= SG_FLAG_NO_DXFER;
-        if (opts.do_verbose > 1) {
-            fprintf(stderr, "    Read buffer cdb: ");
+        if (op->do_verbose > 1) {
+            fprintf(stderr, "    Read buffer (%sdata) cdb: ",
+                    (op->do_echo ? "echo " : ""));
             for (j = 0; j < RB_CMD_LEN; ++j)
                 fprintf(stderr, "%02x ", rbCmdBlk[j]);
             fprintf(stderr, "\n");
@@ -546,7 +568,7 @@ main(int argc, char * argv[])
             if (ENOMEM == errno) {
                 fprintf(stderr, "SG_IO data: out of memory, try a smaller "
                        "buffer size than %d bytes\n", buf_size);
-                if (opts.opt_new)
+                if (op->opt_new)
                     fprintf(stderr, "    [with '--buffer=EACH' where EACH "
                             "is in bytes]\n");
                 else
@@ -558,7 +580,7 @@ main(int argc, char * argv[])
             return SG_LIB_CAT_OTHER;
         }
 
-        if (opts.do_verbose > 2)
+        if (op->do_verbose > 2)
             fprintf(stderr, "      duration=%u ms\n",
                     io_hdr.duration);
         /* now for the error processing */
@@ -568,15 +590,15 @@ main(int argc, char * argv[])
             break;
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr,
-                            opts.do_verbose > 1);
+                            op->do_verbose > 1);
             break;
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ BUFFER data error", &io_hdr,
-                            opts.do_verbose > 1);
+                            op->do_verbose > 1);
             if (rawp) free(rawp);
             return (res >= 0) ? res : SG_LIB_CAT_OTHER;
         }
-        if (opts.do_dio &&
+        if (op->do_dio &&
             ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
             dio_incomplete = 1;    /* flag that dio not done (completely) */
 
@@ -591,7 +613,7 @@ main(int argc, char * argv[])
         }
 #endif
     }
-    if ((opts.do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+    if ((op->do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
         double a, b;
 
@@ -607,10 +629,12 @@ main(int argc, char * argv[])
         b = (double)buf_size * num;
         printf("time to read data from buffer was %d.%06d secs",
                (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-        if ((a > 0.00001) && (b > 511))
-            printf(", %.2f MB/sec\n", b / (a * 1000000.0));
-        else
-            printf("\n");
+        if (a > 0.00001) {
+            if (b > 511)
+                printf(", %.2f MB/sec", b / (a * 1000000.0));
+            printf(", %.2f IOPS", num / a);
+        }
+        printf("\n");
     }
     if (dio_incomplete)
         printf(">> direct IO requested but not done\n");

@@ -27,7 +27,7 @@
 #endif
 
 
-static const char * version_str = "1.66 20140222";
+static const char * version_str = "1.68 20140604";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -94,7 +94,11 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
     case SG_LIB_CAT_ABORTED_COMMAND:
+    case SG_LIB_CAT_COPY_ABORTED:
+    case SG_LIB_CAT_DATA_PROTECT:
+    case SG_LIB_CAT_PROTECTION:
     case SG_LIB_CAT_NO_SENSE:
+    case SG_LIB_CAT_MISCOMPARE:
         n = 0;
         break;
     case SG_LIB_CAT_RECOVERED:
@@ -102,6 +106,7 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
         ++check_data_in;
         /* drop through */
     case SG_LIB_CAT_UNIT_ATTENTION:
+    case SG_LIB_CAT_SENSE:
     default:
         n = noisy;
         break;
@@ -126,8 +131,8 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
  * call to the pass-through. pt_res is returned from do_scsi_pt(). If valid
  * sense data is found it is decoded and output to sg_warnings_strm (def:
  * stderr); depending on the 'noisy' and 'verbose' settings. Returns -2 for
- * sense data (may not be fatal), -1 for failed, 0, or a positive number. If
- * 'mx_di_len > 0' then asks pass-through for resid and returns
+ * "sense" category (may not be fatal), -1 for failed, 0, or a positive
+ * number. If 'mx_di_len > 0' then asks pass-through for resid and returns
  * (mx_di_len - resid); otherwise returns 0. So for data-in it should return
  * the actual number of bytes received. For data-out (to device) or no data
  * call with 'mx_di_len' set to 0 or less. If -2 returned then sense category
@@ -138,7 +143,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, int mx_di_len, const unsigned char * sbp,
                      int noisy, int verbose, int * o_sense_cat)
 {
-    int got, cat, duration, slen, resid, resp_code;
+    int got, cat, duration, slen, resid, resp_code, sstat;
     char b[1024];
 
     if (NULL == sg_warnings_strm)
@@ -178,7 +183,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         if (mx_di_len > 0) {
             got = mx_di_len - resid;
-            if (verbose && (resid > 0))
+            if ((verbose > 1) && (resid > 0))
                 fprintf(sg_warnings_strm, "    %s: pass-through requested "
                         "%d bytes (data-in) but got %d bytes\n", leadin,
                         mx_di_len, got);
@@ -186,9 +191,14 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         } else
             return 0;
     case SCSI_PT_RESULT_STATUS: /* other than GOOD and CHECK CONDITION */
+        sstat = get_scsi_pt_status_response(ptvp);
+        if ((SAM_STAT_RESERVATION_CONFLICT == sstat) && o_sense_cat) {
+            /* treat this SCSI status as "sense" category */
+            *o_sense_cat = SG_LIB_CAT_RES_CONFLICT;
+            return -2;
+        }
         if (verbose || noisy) {
-            sg_get_scsi_status_str(get_scsi_pt_status_response(ptvp),
-                                   sizeof(b), b);
+            sg_get_scsi_status_str(sstat, sizeof(b), b);
             fprintf(sg_warnings_strm, "%s: scsi status: %s\n", leadin, b);
         }
         return -1;
@@ -219,10 +229,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     }
 }
 
-/* Invokes a SCSI INQUIRY command and yields the response
- * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other errors */
+/* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
+ * successful, various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
               int mx_resp_len, int noisy, int verbose)
@@ -271,17 +279,12 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else if (ret < 4) {
@@ -296,9 +299,8 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
 }
 
 /* Yields most of first 36 bytes of a standard INQUIRY (evpd==0) response.
- * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other errors */
+ * Returns 0 when successful, various SG_LIB_CAT_* positive values or
+ * -1 -> other errors */
 int
 sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                   int noisy, int verbose)
@@ -340,17 +342,12 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else if (ret < 4) {
@@ -361,10 +358,10 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     } else
         ret = 0;
 
-    if (0 == ret) {
+    if (inq_data && (0 == ret)) {
         inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
         inq_data->peripheral_type = inq_resp[0] & 0x1f;
-        inq_data->rmb = (inq_resp[1] & 0x80) ? 1 : 0;
+        inq_data->byte_1 = inq_resp[1];
         inq_data->version = inq_resp[2];
         inq_data->byte_3 = inq_resp[3];
         inq_data->byte_5 = inq_resp[5];
@@ -382,9 +379,8 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
  * 'pack_id' is just for diagnostics, safe to set to 0.
  * Looks for progress indicator if 'progress' non-NULL;
  * if found writes value [0..65535] else write -1.
- * Return of 0 -> success, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY ->
- * device not ready, -1 -> other failure */
+ * Returns 0 when successful, various SG_LIB_CAT_* positive values or
+ * -1 -> other errors */
 int
 sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
                                int noisy, int verbose)
@@ -424,19 +420,12 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
                 *progress = -1;
         }
         switch (sense_cat) {
-        case SG_LIB_CAT_UNIT_ATTENTION:
-        case SG_LIB_CAT_NOT_READY:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else
@@ -448,9 +437,8 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
 
 /* Invokes a SCSI TEST UNIT READY command.
  * 'pack_id' is just for diagnostics, safe to set to 0.
- * Return of 0 -> success, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_ABORTED_COMMAND, SG_LIB_CAT_NOT_READY ->
- * device not ready, -1 -> other failure */
+ * Returns 0 when successful, various SG_LIB_CAT_* positive values or
+ * -1 -> other errors */
 int
 sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
 {
@@ -458,10 +446,8 @@ sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
                                           verbose);
 }
 
-/* Invokes a SCSI REQUEST SENSE command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Request Sense not supported??,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
+/* Invokes a SCSI REQUEST SENSE command. Returns 0 when successful, various
+ * SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
                     int noisy, int verbose)
@@ -503,18 +489,12 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
-        case SG_LIB_CAT_NOT_READY:      /* shouldn't happen ?? */
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else {
@@ -531,10 +511,7 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
 }
 
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> Report Luns not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
                   int noisy, int verbose)
@@ -574,18 +551,12 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
         ;
     else if (-2 == ret) {
         switch (sense_cat) {
-        case SG_LIB_CAT_INVALID_OP:
-        case SG_LIB_CAT_ILLEGAL_REQ:
-        case SG_LIB_CAT_ABORTED_COMMAND:
-        case SG_LIB_CAT_NOT_READY:      /* shouldn't happen ?? */
-            ret = sense_cat;
-            break;
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
             ret = 0;
             break;
         default:
-            ret = -1;
+            ret = sense_cat;
             break;
         }
     } else

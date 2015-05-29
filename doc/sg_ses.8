@@ -1,17 +1,17 @@
-.TH SG_SES "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_SES "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
 [\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR]
-[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-enumerate\fR] [\fI\-\-filter\fR]
-[\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-enumerate\fR]
+[\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
 [\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-nickname=SEN\fR]
 [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR]
+[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -105,6 +105,19 @@ numbers. \fISN\fR must be a number in the range 0 to 255 (inclusive). This is
 a medium level indexing alternative to the low level \fI\-\-index=\fR
 options. See the DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS section
 below.
+.TP
+\fB\-E\fR, \fB\-\-eiioe\fR=\fIA_F\fR
+\fIA_F\fR is either the string 'auto' or 'force'. There was some fuzziness
+in the interpretation of the 'element index' field in the Additional Element
+Status page between SES\-2 and SES\-3. The EIIOE bit was introduced to
+resolve the problem but not all enclosures have caught up.
+Using '\-\-eiioe=force' will decode this page as if the EIIOE bit is set.
+Using '\-\-eiioe=auto' will decode this page as if the EIIOE bit is set if
+the first element index in this page is 1 (in other words a heuristic to
+guess whether the EIIOE bit should be set or not).
+.br
+If the enclosure sets the EIIOE bit then this option has no effect. It is
+recommended that HP JBOD users set --eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known page names and SES elements when this option is given
@@ -204,12 +217,26 @@ later invocation using the \fI\-\-data=\fR option. A page less its first
 4 bytes (page code and length) is output. When used twice (e.g. \fI\-rr\fR)
 the full page contents is output in binary to stdout.
 .TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
+.TP
 \fB\-A\fR, \fB\-\-sas\-addr\fR=\fISA\fR
-where \fISA\fR is a SAS address found in the Additional Element Status page.
-Only entries for SAS devices (with device slot or array device slot elements)
-have SAS addresses. \fISA\fR is a hex number that is up to 8 digits long. It
-may have a leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a
-medium level indexing alternative to the low level \fI\-\-index=\fR options.
+this is an indexing method for SAS end devices (e.g. SAS disks). The utility
+will try to find the element or slot in the Additional Element Status page
+whose SAS address matches \fISA\fR. For a SAS disk or tape that SAS address
+is its target port identifier for the port connected to that element or slot.
+Most SAS disks and tapes have two such target ports, usually numbered
+consecutively.
+.br
+SATA devices in a SAS enclosure often receive "manufactured" target port
+identifiers from a SAS expander; typically will a SAS address close to
+but different from the SAS address of the expander itself. Note that this
+manufactured target port identifier is different from a SATA disk's WWN.
+.br
+\fISA\fR is a hex number that is up to 8 digits long. It may have a
+leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a medium level
+ indexing alternative to the low level \fI\-\-index=\fR options.
 See the DESCRIPTOR NAME, DEVICE SLOT NAME AND SAS ADDRESS section below.
 .TP
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2014 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.18 20131214";
+static const char * version_str = "1.19 20140515";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -48,6 +48,7 @@ static struct option long_options[] = {
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"raw", 0, 0, 'r'},
+        {"readonly", 0, 0, 'R'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -57,14 +58,15 @@ static void usage()
 {
     fprintf(stderr, "Usage: "
           "sg_rtpg   [--decode] [--extended] [--help] [--hex] [--raw] "
-          "[--verbose] [--version]\n"
-          "                 DEVICE\n"
+          "[--readonly]\n"
+          "                 [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --decode|-d        decode status and asym. access state\n"
           "    --extended|-e      use extended header parameter data format\n"
           "    --help|-h          print out usage message\n"
           "    --hex|-H           print out response in hex\n"
           "    --raw|-r           output response in binary to stdout\n"
+          "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
           "    --verbose|-v       increase verbosity\n"
           "    --version|-V       print version string and exit\n\n"
           "Performs a SCSI REPORT TARGET PORT GROUPS command\n"
@@ -138,6 +140,7 @@ int main(int argc, char * argv[])
     int decode = 0;
     int hex = 0;
     int raw = 0;
+    int o_readonly = 0;
     int verbose = 0;
     int extended = 0;
     const char * device_name = NULL;
@@ -146,7 +149,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dehHrvV", long_options,
+        c = getopt_long(argc, argv, "dehHrRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -167,6 +170,9 @@ int main(int argc, char * argv[])
             break;
         case 'r':
             raw = 1;
+            break;
+        case 'R':
+            ++o_readonly;
             break;
         case 'v':
             ++verbose;
@@ -206,7 +212,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
         fprintf(stderr, "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -256,8 +262,9 @@ int main(int argc, char * argv[])
         for (k = ucp - reportTgtGrpBuff; k < report_len;
              k += off, ucp += off) {
 
-            printf("  target port group id : 0x%x , Pref=%d\n",
-                   (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
+            printf("  target port group id : 0x%x , Pref=%d, Rtpg_fmt=%d\n",
+                   (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80),
+                   (ucp[0] >> 4) & 0x07);
             printf("    target port group asymmetric access state : ");
             printf("0x%02x", ucp[0] & 0x0f);
             if (decode)
@@ -298,14 +305,11 @@ int main(int argc, char * argv[])
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         fprintf(stderr, "bad field in Report Target Port Groups cdb "
                 "including unsupported service action\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Report Target Port Groups, unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Report Target Port Groups, aborted command\n");
     else {
-        fprintf(stderr, "Report Target Port Groups command failed\n");
-        if (0 == verbose)
-            fprintf(stderr, "    try '-v' for more information\n");
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Report Target Port Groups: %s\n", b);
     }
 
 err_out:

@@ -1,12 +1,12 @@
-.TH SG_VPD "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_VPD "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
 .B sg_vpd
 [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR]
 [\fI\-\-inhex=FN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -24,7 +24,7 @@ has been flagged as mandatory. This page can be fetched by
 using the \fI\-\-ident\fR option.
 .PP
 The reference document used for interpreting VPD pages (and the INQUIRY
-standard response) is T10/1713\-D Revision 36q (SPC\-4, 12 February 2014)
+standard response) is T10/1713\-D Revision 37 (SPC\-4, 17 May 2014)
 found at http://www.t10.org .
 .PP
 When no options are given, other than a \fIDEVICE\fR, then the "Supported
@@ -40,7 +40,9 @@ those defined by T10), then the vendor specific pages. Each group is sorted
 in abbreviation order. The \fIDEVICE\fR and most other options are ignored
 and this utility exits after listing the VPD page names. May be used together
 with \fI\-\-page=PG\fR where \fIPG\fR is numeric. If so, it searches for the
-summary lines of all VPD pages whose number matches \fIPG\fR.
+summary lines of all VPD pages whose number matches \fIPG\fR. May be used
+with \fI\-\-vendor=VP\fR to restrict output to known vendor specific pages
+for vendor/product \fIVP\fR.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options then exits.
@@ -89,13 +91,13 @@ badly (and do not support VPD pages) then the safest value to use for
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 where \fIPG\fR is the VPD page to be decoded or output. The \fIPG\fR argument
-can either be an abbreviation, a number or a pair or numbers separated by a
-comma. The VPD page abbreviations can be seen by using the \fI\-\-enumerate\fR
-option. If a number is given it is assumed to be decimal unless it has a
-hexadecimal indicator which is either a leading '0x' or a trailing 'h'. If
-one number is given then it is assumed to be a VPD page number. If two
-numbers are given the second number indicates which vendor specific VPD page
-to decode when several pages share the same VPD page number. If this option
+can either be an abbreviation, a number or a pair or numbers/abbreviations
+separated by a comma. The VPD page abbreviations can be seen by using the
+\fI\-\-enumerate\fR option. If a number is given it is assumed to be decimal
+unless it has a hexadecimal indicator which is either a leading '0x' or a
+trailing 'h'. If one number is given then it is assumed to be a VPD page
+number. If two numbers (or abbreviations) are given then the second one is
+the same as \fIVP\fR (see the \fI\-\-vendor=VP\fR option). If this option
 is not given (nor '\-i', '\-l' nor '\-V') then the "Supported VPD pages" (0x0)
 VPD page is fetched and decoded. If \fIPG\fR is '\-1' or 'sinq' then the
 standard INQUIRY response is output. This option may also be used with the
@@ -111,6 +113,18 @@ used. The binary is sent to stdout, and errors are sent to stderr.
 .br
 if used with \fI\-\-inhex=FN\fR then the contents of \fIFN\fR is treated as
 binary.
+.TP
+\fB\-M\fR, \fB\-\-vendor\fR=\fIVP\fR
+where \fIVP\fR is a vendor (e.g. "sea" for Seagate) or vendor/product
+acronym (e.g. "hp3par" for the 3PAR array from HP). Many vendors have re-used
+the numbers at the beginning of the vendor specific VPD page range (e.g.
+page 0xc0) and this option is a way of selecting only those which are of
+interest. Using a \fIVP\fR of "xxx" will list the available acronyms.
+.br
+If this option is used with \fI\-\-page=PG\fR and \fIPG\fR is an acronym
+then this option is ignored. If \fIPG\fR is a number (e.g. 0xc0) then
+\fIVP\fR is used to choose the which vendor specific page (e.g. sharing
+page number 0xc0) to decode.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
@@ -148,6 +162,9 @@ a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
 and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
 will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
 device names may be used as well (e.g. "/dev/st0m").
+.PP
+The \fIDEVICE\fR is opened with a read\-only flag (e.g. in Unix with the
+O_RDONLY flag).
 .SH EXIT STATUS
 The exit status of sg_vpd is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

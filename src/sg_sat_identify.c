@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2013 Douglas Gilbert.
+ * Copyright (c) 2006-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -45,7 +45,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.09 20130507";
+static const char * version_str = "1.10 20140515";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -56,6 +56,7 @@ static struct option long_options[] = {
         {"ident", no_argument, 0, 'i'},
         {"packet", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -67,8 +68,8 @@ static void usage()
           "sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
           "[--ident]\n"
           "                       [--len=16|12] [--packet] [--raw] "
-          "[--verbose]\n"
-          "                       [--version] DEVICE\n"
+          "[--readonly]\n"
+          "                       [--verbose] [--version] DEVICE\n"
           "  where:\n"
           "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
           "    --extend|-e      sets extend bit in cdb (def: 0)\n"
@@ -82,6 +83,7 @@ static void usage()
           "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
           "DEVICE) command\n"
           "    --raw|-r         output response in binary to stdout\n"
+          "    --readonly|-R    open DEVICE read-only (def: read-write)\n"
           "    --verbose|-v     increase verbosity\n"
           "    --version|-V     print version string and exit\n\n"
           "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
@@ -221,9 +223,19 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                             "hardware error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
-                fprintf(stderr, "Aborted command: try again with%s '-p' "
-                        "option\n", (do_packet ? "out" : ""));
-                return SG_LIB_CAT_ABORTED_COMMAND;
+                if (0x10 == ssh.asc) {
+                    fprintf(stderr, "Aborted command: protection "
+                            "information\n");
+                    return SG_LIB_CAT_PROTECTION;
+                } else {
+                    fprintf(stderr, "Aborted command: try again with%s '-p' "
+                            "option\n", (do_packet ? "out" : ""));
+                    return SG_LIB_CAT_ABORTED_COMMAND;
+                }
+            case SPC_SK_DATA_PROTECT:
+                fprintf(stderr, "ATA PASS-THROUGH (%d): data protect, read "
+                            "only media?\n", cdb_len);
+                return SG_LIB_CAT_DATA_PROTECT;
             default:
                 if (verbose < 2)
                     fprintf(stderr, "ATA PASS-THROUGH (%d), some sense "
@@ -240,8 +252,13 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
-        fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
-        return SG_LIB_CAT_MALFORMED;
+        if (SAM_STAT_RESERVATION_CONFLICT == res) {
+            fprintf(stderr, "SCSI status: RESERVATION CONFLICT\n");
+            return SG_LIB_CAT_RES_CONFLICT;
+        } else {
+            fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
+            return SG_LIB_CAT_MALFORMED;
+        }
     } else {
         fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
         if (verbose < 2)
@@ -313,6 +330,7 @@ int main(int argc, char * argv[])
     int do_hex = 0;
     int do_indent = 0;
     int do_raw = 0;
+    int o_readonly = 0;
     int verbose = 0;
     int ck_cond = 0;   /* set to 1 to read register(s) back */
     int extend = 0;    /* set to 1 to send 48 bit LBA with command */
@@ -321,7 +339,7 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cehHil:prvV", long_options,
+        c = getopt_long(argc, argv, "cehHil:prRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -355,6 +373,9 @@ int main(int argc, char * argv[])
             break;
         case 'r':
             ++do_raw;
+            break;
+        case 'R':
+            ++o_readonly;
             break;
         case 'v':
             ++verbose;
@@ -394,8 +415,7 @@ int main(int argc, char * argv[])
         }
     }
 
-    if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */,
-                                     verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose)) < 0) {
         fprintf(stderr, "error opening file: %s: %s\n",
                 device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;

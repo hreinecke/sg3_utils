@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2013 D. Gilbert
+   *  Copyright (C) 2004-2014 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.18 20130507";
+static const char * version_str = "1.19 20140516";
 
 #define MAX_XFER_LEN 10000
 
@@ -90,6 +90,7 @@ process_read_long(int sg_fd, int do_16, int pblock, int correct,
 {
     int offset, res;
     const char * ten_or;
+    char b[80];
 
     if (do_16)
         res = sg_ll_read_long16(sg_fd, pblock, correct, llba, data_out,
@@ -101,32 +102,13 @@ process_read_long(int sg_fd, int do_16, int pblock, int correct,
     switch (res) {
     case 0:
         break;
-    case SG_LIB_CAT_NOT_READY:
-        fprintf(stderr, "  SCSI READ LONG (%s) failed, device not ready\n",
-                ten_or);
-        break;
-    case SG_LIB_CAT_UNIT_ATTENTION:
-        fprintf(stderr, "  SCSI READ LONG (%s) failed, unit attention\n",
-                ten_or);
-        break;
-    case SG_LIB_CAT_ABORTED_COMMAND:
-        fprintf(stderr, "  SCSI READ LONG (%s) failed, aborted command\n",
-                ten_or);
-        break;
-    case SG_LIB_CAT_INVALID_OP:
-        fprintf(stderr, "  SCSI READ LONG (%s) command not supported\n",
-                ten_or);
-        break;
-    case SG_LIB_CAT_ILLEGAL_REQ:
-        fprintf(stderr, "  SCSI READ LONG (%s) command, bad field in cdb\n",
-                ten_or);
-        break;
     case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
         fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
                 ">>>\n", xfer_len - offset);
         break;
     default:
-        fprintf(stderr, "  SCSI READ LONG (%s) command error\n", ten_or);
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "  SCSI READ LONG (%s): %s\n", ten_or, b);
         break;
     }
     return res;

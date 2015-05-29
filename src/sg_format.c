@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2013  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2014  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.23 20130730";
+static const char * version_str = "1.26 20140516";
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
 #define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
@@ -86,6 +86,7 @@ static struct option long_options[] = {
         {"fmtpinfo", required_argument, 0, 'f'},
         {"format", no_argument, 0, 'F'},
         {"help", no_argument, 0, 'h'},
+        {"ip_def", no_argument, 0, 'I'},
         {"long", no_argument, 0, 'l'},
         {"pinfo", no_argument, 0, 'p'},
         {"pfu", required_argument, 0, 'P'},
@@ -109,12 +110,12 @@ usage()
         printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
                "[--early]\n"
                "                 [--fmtpinfo=FPI] [--format] [--help] "
-               "[--long] [--pfu=PFU]\n"
-               "                 [--pie=PIE] [--pinfo] [--poll=PT] "
-               "[--resize] [--rto_req]\n"
-               "                 [--security] [--six] [--size=SIZE] "
-               "[--verbose] [--version]\n"
-               "                 [--wait] DEVICE\n"
+               "[--ip_def] [--long]\n"
+               "                 [--pfu=PFU] [--pie=PIE] [--pinfo] "
+               "[--poll=PT] [--resize]\n"
+               "                 [--rto_req] [--security] [--six] "
+               "[--size=SIZE] [--verbose]\n"
+               "                 [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -132,6 +133,7 @@ usage()
                "    --format|-F     format unit (default: report current "
                "count and size)\n"
                "    --help|-h       prints out this usage message\n"
+               "    --ip_def|-I     initialization pattern: default\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
                "32 bit lbas)\n"
                "    --pfu=PFU|-P PFU    Protection Field Usage value "
@@ -175,65 +177,50 @@ usage()
 /* Return 0 on success, else see sg_ll_format_unit() */
 static int
 scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
-            int dcrt, int pie, int si, int early, int pt, int verbose)
+            int dcrt, int pie, int ip_def, int sec_init, int early, int pt,
+            int verbose)
 {
         int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
-        int resp_len;
+        int resp_len, ip_desc;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
         unsigned char fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
         unsigned char reqSense[MAX_BUFF_SZ];
+        char b[80];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
         longlist = (pie > 0);
+        ip_desc = (ip_def || sec_init);
         off = longlist ? LO_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
-        fmt_pl[0] = pf_usage & 0x7;  /* protection_field_usage (bits 2-0) */
-        fmt_pl[1] = (immed ? 0x2 : 0); /* fov=0, [dpry,dcrt,stpf,ip=0] */
+        fmt_pl[0] = pf_usage & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
+        fmt_pl[1] = (immed ? 0x2 : 0); /* FOV=0, [DPRY,DCRT,STPF,IP=0] */
         if (dcrt)
-                fmt_pl[1] |= 0xa0;     /* fov=1, dcrt=1 */
-        if (si) {
-                fmt_pl[1] |= 0x88;     /* fov=1, ip=1 */
-                fmt_pl[off + 0] = 0x20;     /* si=1 in init. pattern desc */
+                fmt_pl[1] |= 0xa0;     /* FOV=1, DCRT=1 */
+        if (ip_desc) {
+                fmt_pl[1] |= 0x88;     /* FOV=1, IP=1 */
+                if (sec_init)
+                        fmt_pl[off + 0] = 0x20; /* SI=1 in IP desc */
         }
         if (longlist)
-                fmt_pl[3] = (pie & 0xf);    /* protection interval exponent */
+                fmt_pl[3] = (pie & 0xf);    /* PROTECTION_INTERVAL_EXPONENT */
+        /* with the long parameter list header, P_I_INFORMATION is always 0 */
 
-        need_hdr = (immed || cmplst || dcrt || si || (pf_usage > 0) ||
+        need_hdr = (immed || cmplst || dcrt || ip_desc || (pf_usage > 0) ||
                     (pie > 0));
         fmt_pl_sz = 0;
         if (need_hdr)
-                fmt_pl_sz = off + (si ? INIT_PATTERN_DESC_SZ : 0);
+                fmt_pl_sz = off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0);
 
-        res = sg_ll_format_unit(fd, fmtpinfo, longlist, need_hdr /*fmtdata*/,
-                                cmplst, 0 /* dlist_format */,
+        res = sg_ll_format_unit(fd, fmtpinfo, longlist, need_hdr /* FMTDATA*/,
+                                cmplst, 0 /* DEFECT_LIST_FORMAT */,
                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
                                 fmt_pl, fmt_pl_sz, 1, verbose);
-        switch (res) {
-        case 0:
-                break;
-        case SG_LIB_CAT_NOT_READY:
-                fprintf(stderr, "Format command, device not ready\n");
-                break;
-        case SG_LIB_CAT_INVALID_OP:
-                fprintf(stderr, "Format command not supported\n");
-                break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "Format command, illegal parameter\n");
-                break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, "Format command, unit attention\n");
-                break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-                fprintf(stderr, "Format command, aborted command\n");
-                break;
-        default:
-                fprintf(stderr, "Format command failed\n");
-                break;
-        }
-        if (res)
+        if (res) {
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Format command: %s\n", b);
                 return res;
-
+        }
         if (! immed)
                 return 0;
 
@@ -300,19 +287,8 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                       1, verbose);
             if (res) {
                 ret = res;
-                if (SG_LIB_CAT_INVALID_OP == res)
-                    fprintf(stderr, "Request Sense command not supported\n");
-                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                    fprintf(stderr, "bad field in Request Sense cdb\n");
-                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                    fprintf(stderr, "Request Sense, aborted command\n");
-                else {
-                    fprintf(stderr, "Request Sense command unexpectedly "
-                            "failed\n");
-                    if (0 == verbose)
-                        fprintf(stderr, "    try the '-v' option for "
-                                "more information\n");
-                }
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "Request Sense command: %s\n", b);
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
@@ -352,6 +328,7 @@ print_read_cap(int fd, int do_16, int verbose)
         unsigned char resp_buff[RCAP_REPLY_LEN];
         unsigned int last_blk_addr, block_size;
         uint64_t llast_blk_addr;
+        char b[80];
 
         if (do_16) {
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
@@ -411,18 +388,8 @@ print_read_cap(int fd, int do_16, int verbose)
                         return (int)block_size;
                 }
         }
-        if (SG_LIB_CAT_NOT_READY == res)
-                fprintf(stderr, "READ CAPACITY (%d): device not ready\n",
-                        (do_16 ? 16 : 10));
-        else if (SG_LIB_CAT_INVALID_OP == res)
-                fprintf(stderr, "READ CAPACITY (%d) not supported\n",
-                        (do_16 ? 16 : 10));
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                fprintf(stderr, "bad field in READ CAPACITY (%d) "
-                        "cdb\n", (do_16 ? 16 : 10));
-        else if (verbose)
-                fprintf(stderr, "READ CAPACITY (%d) failed "
-                        "[res=%d]\n", (do_16 ? 16 : 10), res);
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "READ CAPACITY (%d): %s\n", (do_16 ? 16 : 10), b);
         return -1;
 }
 
@@ -437,6 +404,7 @@ main(int argc, char **argv)
         int64_t blk_count = 0;  /* -c value */
         int blk_size = 0;     /* -s value */
         int format = 0;         /* -F */
+        int ip_def = 0;         /* -I */
         int resize = 0;         /* -r */
         int verbose = 0;        /* -v */
         int fwait = 0;          /* -w */
@@ -455,6 +423,7 @@ main(int argc, char **argv)
         int early = 0;
         const char * device_name = NULL;
         char pdt_name[64];
+        char b[80];
         struct sg_simple_inquiry_resp inq_out;
         int ret = 0;
 
@@ -462,7 +431,7 @@ main(int argc, char **argv)
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhlpP:q:rRs:SvVwx:6",
+                c = getopt_long(argc, argv, "c:C:Def:FhIlpP:q:rRs:SvVwx:6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -509,6 +478,9 @@ main(int argc, char **argv)
                 case 'h':
                         usage();
                         return 0;
+                case 'I':
+                        ip_def = 1;
+                        break;
                 case 'l':
                         long_lba = 1;
                         do_rcap16 = 1;
@@ -588,6 +560,11 @@ main(int argc, char **argv)
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
+        if (ip_def && do_si) {
+                fprintf(stderr, "'--ip_def' and '--security' contradict, "
+                        "choose one\n");
+                return SG_LIB_SYNTAX_ERROR;
+        }
         if (resize) {
                 if (format) {
                         fprintf(stderr, "both '--format' and '--resize'"
@@ -664,22 +641,7 @@ again_with_long_lba:
                                          MAX_BUFF_SZ, 1, verbose);
         ret = res;
         if (res) {
-                if (SG_LIB_CAT_NOT_READY == res)
-                        fprintf(stderr, "MODE SENSE (%d) command, device "
-                                "not ready\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                        fprintf(stderr, "MODE SENSE (%d) command, unit "
-                                "attention\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                        fprintf(stderr, "MODE SENSE (%d) command, aborted "
-                                "command\n", (mode6 ? 6 : 10));
-                else if (SG_LIB_CAT_INVALID_OP == res) {
-                        fprintf(stderr, "MODE SENSE (%d) command is not "
-                                "supported\n", (mode6 ? 6 : 10));
-                        fprintf(stderr, "    try again %s the '--six' "
-                                "option\n", (mode6 ? "without" : "with"));
-
-                } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+                if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                         if (long_lba && (! mode6))
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [longlba flag not supported?]"
@@ -688,12 +650,14 @@ again_with_long_lba:
                                 fprintf(stderr, "bad field in MODE SENSE "
                                         "(%d) [mode_page %d not supported?]"
                                         "\n", (mode6 ? 6 : 10), mode_page);
-                } else
-                        fprintf(stderr, "MODE SENSE (%d) command failed\n",
-                                (mode6 ? 6 : 10));
-                        if (0 == verbose)
-                                fprintf(stderr, "    try '-v' for more "
-                                        "information\n");
+                } else {
+                        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                        fprintf(stderr, "MODE SENSE (%d) command: %s\n",
+                                (mode6 ? 6 : 10), b);
+                }
+                if (0 == verbose)
+                        fprintf(stderr, "    try '-v' for more "
+                                "information\n");
                 goto out;
         }
         if (mode6) {
@@ -839,24 +803,8 @@ again_with_long_lba:
                                                   dbuff, calc_len, 1, verbose);
                 ret = res;
                 if (res) {
-                        if (SG_LIB_CAT_NOT_READY == res)
-                                fprintf(stderr, "MODE SELECT command, "
-                                        "device not ready\n");
-                        else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                                fprintf(stderr, "MODE SELECT command, "
-                                        "unit attention\n");
-                        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                                fprintf(stderr, "MODE SELECT command, "
-                                        "aborted command\n");
-                        else if (SG_LIB_CAT_INVALID_OP == res)
-                                fprintf(stderr, "MODE SELECT (%d) command is "
-                                        "not supported\n", (mode6 ? 6 : 10));
-                        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                                fprintf(stderr, "bad field in MODE SELECT "
-                                        "(%d)\n", (mode6 ? 6 : 10));
-                        else
-                                fprintf(stderr, "MODE SELECT (%d) command "
-                                        "failed\n", (mode6 ? 6 : 10));
+                        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                        fprintf(stderr, "MODE SELECT command: %s\n", b);
                         if (0 == verbose)
                                 fprintf(stderr, "    try '-v' for "
                                         "more information\n");
@@ -889,16 +837,20 @@ again_with_long_lba:
 
         if (format)
 #if 1
+                printf("\nA FORMAT will commence in 15 seconds\n");
+                printf("    ALL data on %s will be DESTROYED\n", device_name);
+                printf("        Press control-C to abort\n");
+                sleep_for(5);
                 printf("\nA FORMAT will commence in 10 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
-                printf("A FORMAT will commence in 5 seconds\n");
+                printf("\nA FORMAT will commence in 5 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
                 res = scsi_format(fd, fmtpinfo, cmplst, pfu, ! fwait, dcrt,
-                                  pie, do_si, early, pt, verbose);
+                                  pie, ip_def, do_si, early, pt, verbose);
                 ret = res;
                 if (res) {
                         fprintf(stderr, "FORMAT failed\n");

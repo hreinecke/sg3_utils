@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.06 20130507";
+static const char * version_str = "1.07 20140516";
 
 #define ME "sg_prevent: "
 
@@ -139,23 +139,12 @@ int main(int argc, char * argv[])
     }
     res = sg_ll_prevent_allow(sg_fd, prevent, 1, verbose);
     ret = res;
-    if (0 == res)
-        ;
-    else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "Device not ready\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "Unit attention\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Aborted command\n");
-    else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Prevent allow medium removal command not "
-                "supported\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Prevent allow medium removal, bad field in "
-                "command\n");
-    else
-        fprintf(stderr, "Prevent allow medium removal command failed\n");
+    if (res) {
+        char b[80];
 
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Prevent allow medium removal: %s\n", b);
+    }
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         fprintf(stderr, "close error: %s\n", safe_strerror(-res));

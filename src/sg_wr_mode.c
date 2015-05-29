@@ -25,7 +25,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.12 20140110";
+static const char * version_str = "1.14 20140518";
 
 #define ME "sg_wr_mode: "
 
@@ -321,6 +321,7 @@ int main(int argc, char * argv[])
     unsigned char mask_in[MX_ALLOC_LEN];
     unsigned char ref_md[MX_ALLOC_LEN];
     char ebuff[EBUFF_SZ];
+    char b[80];
     struct sg_simple_inquiry_resp inq_data;
     int ret = 0;
 
@@ -459,28 +460,14 @@ int main(int argc, char * argv[])
                                  pg_code, sub_pg_code, ref_md, alloc_len, 1,
                                  verbose);
     ret = res;
-    if (SG_LIB_CAT_INVALID_OP == res) {
-        fprintf(stderr, "MODE SENSE (%d) not supported, try '--len=%d'\n",
-                (mode_6 ? 6 : 10), (mode_6 ? 10 : 6));
-        goto err_out;
-    } else if (SG_LIB_CAT_NOT_READY == res) {
-        fprintf(stderr, "MODE SENSE (%d) failed, device not ready\n",
-                (mode_6 ? 6 : 10));
-        goto err_out;
-    } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        fprintf(stderr, "MODE SENSE (%d) failed, unit attention\n",
-                (mode_6 ? 6 : 10));
-        goto err_out;
-    } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        fprintf(stderr, "MODE SENSE (%d) failed, aborted command\n",
-                (mode_6 ? 6 : 10));
-        goto err_out;
-    } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-        fprintf(stderr, "bad field in MODE SENSE (%d) command\n",
-                (mode_6 ? 6 : 10));
-        goto err_out;
-    } else if (0 != res) {
-        fprintf(stderr, "MODE SENSE (%d) failed\n", (mode_6 ? 6 : 10));
+    if (res) {
+        if (SG_LIB_CAT_INVALID_OP == res)
+            fprintf(stderr, "MODE SENSE (%d) not supported, try '--len=%d'\n",
+                    (mode_6 ? 6 : 10), (mode_6 ? 10 : 6));
+        else {
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), b);
+        }
         goto err_out;
     }
     off = sg_mode_page_offset(ref_md, alloc_len, mode_6, ebuff, EBUFF_SZ);
@@ -555,34 +542,15 @@ int main(int argc, char * argv[])
 
         memcpy(ref_md + off, read_in, read_in_len);
         if (mode_6)
-            res = sg_ll_mode_select6(sg_fd, 1, save, ref_md, md_len, 1,
-                                     verbose);
+            res = sg_ll_mode_select6(sg_fd, 1 /* PF */, save, ref_md, md_len,
+                                     1, verbose);
         else
-            res = sg_ll_mode_select10(sg_fd, 1, save, ref_md, md_len, 1,
-                                      verbose);
+            res = sg_ll_mode_select10(sg_fd, 1 /* PF */, save, ref_md,
+                                      md_len, 1, verbose);
         ret = res;
-        if (SG_LIB_CAT_INVALID_OP == res) {
-            fprintf(stderr, "MODE SELECT (%d) not supported\n",
-                    (mode_6 ? 6 : 10));
-            goto err_out;
-        } else if (SG_LIB_CAT_NOT_READY == res) {
-            fprintf(stderr, "MODE SELECT (%d) failed, device not ready\n",
-                    (mode_6 ? 6 : 10));
-            goto err_out;
-        } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-            fprintf(stderr, "MODE SELECT (%d) failed, unit attention\n",
-                    (mode_6 ? 6 : 10));
-            goto err_out;
-        } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-            fprintf(stderr, "MODE SELECT (%d) failed, aborted command\n",
-                    (mode_6 ? 6 : 10));
-            goto err_out;
-        } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-            fprintf(stderr, "bad field in MODE SELECT (%d) command\n",
-                    (mode_6 ? 6 : 10));
-            goto err_out;
-        } else if (0 != res) {
-            fprintf(stderr, "MODE SELECT (%d) failed\n", (mode_6 ? 6 : 10));
+        if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, verbose);
+            fprintf(stderr, "MODE SELECT (%d): %s\n", (mode_6 ? 6 : 10), b);
             goto err_out;
         }
     } else {

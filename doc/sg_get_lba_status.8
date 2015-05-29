@@ -1,11 +1,11 @@
-.TH SG_GET_LBA_STATUS "8" "January 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_get_lba_status \- send SCSI GET LBA STATUS command
 .SH SYNOPSIS
 .B sg_get_lba_status
 [\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -54,6 +54,10 @@ enough space for the response header and one LBA status descriptor.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout).
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Additional output

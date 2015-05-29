@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2013 Douglas Gilbert.
+ * Copyright (c) 2009-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.02 20130507";
+static const char * version_str = "1.03 20140516";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -175,14 +175,11 @@ main(int argc, char * argv[])
       if (m != 0)
         fprintf(stderr, ", %d MB", m);
       fprintf(stderr, "\n");
-    } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Read block limits not supported\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "Read block limits, aborted command\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Read block limits command has bad field in cdb\n");
-    else {
-        fprintf(stderr, "Read block limits command failed\n");
+    } else {
+        char b[80];
+
+        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        fprintf(stderr, "Read block limits: %s\n", b);
         if (0 == verbose)
             fprintf(stderr, "    try '-v' option for more information\n");
     }

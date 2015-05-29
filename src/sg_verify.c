@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2013 Douglas Gilbert.
+ * Copyright (c) 2004-2014 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.20 20130825";    /* sbc3r34 */
+static const char * version_str = "1.21 20140516";    /* sbc4r01 */
 
 #define ME "sg_verify: "
 
@@ -359,20 +359,10 @@ main(int argc, char * argv[])
                                  (unsigned int)lba, num, ref_data,
                                  ndo, &info, !quiet, verbose);
         if (0 != res) {
+            char b[80];
+
             ret = res;
             switch (res) {
-            case SG_LIB_CAT_NOT_READY:
-                fprintf(stderr, "%s failed, device not ready\n", vc);
-                break;
-            case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, "%s, unit attention\n", vc);
-                break;
-            case SG_LIB_CAT_ABORTED_COMMAND:
-                fprintf(stderr, "%s, aborted command\n", vc);
-                break;
-            case SG_LIB_CAT_INVALID_OP:
-                fprintf(stderr, "%s command not supported\n", vc);
-                break;
             case SG_LIB_CAT_ILLEGAL_REQ:
                 fprintf(stderr, "bad field in %s cdb, near lba=0x%" PRIx64
                         "\n", vc, lba);
@@ -394,8 +384,10 @@ main(int argc, char * argv[])
                     fprintf(stderr, "%s reported MISCOMPARE\n", vc);
                 break;
             default:
-                fprintf(stderr, "%s failed near lba=%" PRIu64 " [0x%" PRIx64
-                        "]\n", vc, lba, lba);
+                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                fprintf(stderr, "%s: %s\n", vc, b);
+                fprintf(stderr, "    failed near lba=%" PRIu64 " [0x%" PRIx64
+                        "]\n", lba, lba);
                 break;
             }
             break;

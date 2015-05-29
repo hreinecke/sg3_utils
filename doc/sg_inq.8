@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_INQ "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -48,7 +48,7 @@ If the \fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
 and the \fIDEVICE\fR is assumed to be ATA (or ATAPI).
 .PP
 The reference document used for interpreting an INQUIRY is T10/1713\-D
-Revision 36q (SPC\-4, 12 February 2014) found at http://www.t10.org .
+Revision 37 (SPC\-4, 17 May 2014) found at http://www.t10.org .
 Obsolete and reserved items in the standard INQUIRY response output are
 displayed in brackets. The reference document for the ATA IDENTIFY (PACKET)
 DEVICE command is ATA8\-ACS found at http://www.t13.org .
@@ -231,6 +231,9 @@ The number of bytes output by \fI\-\-hex\fR and \fI\-\-raw\fR is 36 bytes
 or the number given to \fI\-\-len=LEN\fR (or \fI\-\-maxlen=LEN\fR). That
 number is reduced if the "resid" returned by the HBA indicates less bytes
 were sent back from \fIDEVICE\fR.
+.PP
+The \fIDEVICE\fR is opened with a read\-only flag (e.g. in Unix with the
+O_RDONLY flag).
 .SH ATA DEVICES
 There are two major types of ATA devices: non\-packet devices (e.g. ATA
 disks) and packet devices (ATAPI). The majority of ATAPI devices are

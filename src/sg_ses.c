@@ -22,15 +22,16 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
 /*
  * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "1.84 20140110";    /* ses3r06 */
+static const char * version_str = "1.91 20140515";    /* ses3r06 */
 
-#define MX_ALLOC_LEN ((64 * 1024) - 1)  /* max allowable for big enclosures */
+#define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define MX_DATA_IN 2048
 #define MX_JOIN_ROWS 260
@@ -101,6 +102,8 @@ struct opts_t {
     int do_data;
     int dev_slot_num;
     int do_enumerate;
+    int eiioe_auto;
+    int eiioe_force;
     int do_filter;
     int do_help;
     int do_hex;
@@ -117,6 +120,7 @@ struct opts_t {
     int page_code;
     int page_code_given;
     int do_raw;
+    int o_readonly;
     int do_status;
     int verbose;
     int do_version;
@@ -469,6 +473,7 @@ static struct option long_options[] = {
     {"data", required_argument, 0, 'd'},
     {"descriptor", required_argument, 0, 'D'},
     {"dev-slot-num", required_argument, 0, 'x'},
+    {"eiioe", required_argument, 0, 'E'},
     {"enumerate", no_argument, 0, 'e'},
     {"filter", no_argument, 0, 'f'},
     {"get", required_argument, 0, 'G'},
@@ -483,6 +488,7 @@ static struct option long_options[] = {
     {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
     {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
     {"sas-addr", required_argument, 0, 'A'},
     {"set", required_argument, 0, 'S'},
     {"status", no_argument, 0, 's'},
@@ -525,8 +531,9 @@ usage(int help_num)
         pr2serr("Usage: "
             "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
             "              [--descriptor=DN] [--dev-slot-num=SN] "
-            "[--enumerate]\n"
-            "              [--filter] [--get=STR] [--help] [--hex]\n"
+            "[--eiioe=A_F]\n"
+            "              [--enumerate] [--filter] [--get=STR] [--help] "
+            "[--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] "
             "[--join] [--list]\n"
             "              [--maxlen=LEN] [--nickname=SEN] [--nickid=SEID] "
@@ -539,6 +546,10 @@ usage(int help_num)
             "    --descriptor=DN|-D DN    descriptor name, indexing method\n"
             "    --dev-slot-num=SN|-x SN    device slot number, indexing "
             "method\n"
+            "    --eiioe=A_F|-E A_F    where A_F is either 'auto' or 'force'."
+            "'force'\n"
+            "                          acts as if EIIOE is set, 'auto' tries "
+            "to guess\n"
             "    --enumerate|-e      enumerate page names + element types "
             "(ignore\n"
             "                        DEVICE). Use twice for clear,get,set "
@@ -605,6 +616,8 @@ usage(int help_num)
             "for '-d';\n"
             "                        when used twice outputs page in binary "
             "to stdout\n"
+            "    --readonly|-R       open DEVICE read-only (def: "
+            "read-write)\n"
             "    --status|-s         fetch status information (default "
             "action)\n"
             "    --verbose|-v        increase verbosity\n"
@@ -762,8 +775,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:efG:hHiI:jln:N:m:p:rsS:vVx:",
-                        long_options, &option_index);
+        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:p:rRsS:v"
+                        "Vx:", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -811,6 +824,17 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             break;
         case 'e':
             ++op->do_enumerate;
+            break;
+        case 'E':
+            if (0 == strcmp("auto", optarg))
+                ++op->eiioe_auto;
+            else if (0 == strcmp("force", optarg))
+                ++op->eiioe_force;
+            else {
+                pr2serr("--eiioe option expects 'auto' or 'force' as an "
+                        "argument\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'f':
             ++op->do_filter;
@@ -885,6 +909,9 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             break;
         case 'r':
             ++op->do_raw;
+            break;
+        case 'R':
+            ++op->o_readonly;
             break;
         case 's':
             ++op->do_status;
@@ -1144,10 +1171,8 @@ find_out_diag_page_desc(int page_num)
     return NULL;
 }
 
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> Send diagnostic not
- * supported, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failures */
+/* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
+ * failures */
 static int
 do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
             int noisy, int verbose)
@@ -1241,16 +1266,15 @@ active_et_aesp(int el_type)
         return 0;
 }
 
-/* Return of 0 -> success, SG_LIB_CAT_INVALID_OP -> command not supported,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -2 -> unexpected response, -1 -> other failure */
+/* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
+ * failures */
 static int
 do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
             int rsp_buff_size, const struct opts_t * op, int * rsp_lenp)
 {
     int rsp_len, res;
     const char * cp;
+    char b[80];
 
     memset(rsp_buff, 0, rsp_buff_size);
     if (rsp_lenp)
@@ -1297,24 +1321,8 @@ do_rec_diag(int sg_fd, int page_code, unsigned char * rsp_buff,
         else
             pr2serr("Attempt to fetch status diagnostic page [0x%x] failed\n",
                     page_code);
-        switch (res) {
-        case SG_LIB_CAT_NOT_READY:
-            pr2serr("    device no ready\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            pr2serr("    aborted command\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            pr2serr("    unit attention\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            pr2serr("    Receive diagnostic results command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            pr2serr("    Receive diagnostic results command, bad field in "
-                    "cdb\n");
-            break;
-        }
+        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+        pr2serr("    %s\n", b);
     }
     return res;
 }
@@ -2398,7 +2406,7 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                         int resp_len, const struct opts_t * op)
 {
     int j, k, desc_len, elem_type, invalid, el_num, eip, ind, match_ind_th;
-    int elem_count;
+    int elem_count, ei, eiioe, my_eiioe_force, num_elems, skip;
     unsigned int gen_code;
     const unsigned char * ucp;
     const unsigned char * last_ucp;
@@ -2418,22 +2426,45 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
     }
     printf("  additional element status descriptor list\n");
     ucp = resp + 8;
+    my_eiioe_force = op->eiioe_force;
     for (k = 0, tp = tdhp, elem_count = 0; k < num_telems; ++k, ++tp) {
         elem_type = tp->etype;
+        num_elems = tp->num_elements;
         if (! active_et_aesp(elem_type)) {
-            elem_count += tp->num_elements;
+            elem_count += num_elems;
             continue;   /* skip if not element type of interest */
         }
         if ((ucp + 1) > last_ucp)
             goto truncated;
 
-        /* if eip is 1, check that the element index (ucp[3]) is within the
-         * range for the element type (elem_type) because some element types
-         * are optional and might not be included in SES Page 0xA */
+        /* if eip is 1, do bounds check on the element index */
         if (ucp[0] & 0x10)  /* eip=1 */ {
-            if ((ucp[3] < elem_count) ||
-                (ucp[3] >= (elem_count + tp->num_elements))) {
-                elem_count += tp->num_elements;
+            ei = ucp[3];
+            skip = 0;
+            if ((0 == k) && op->eiioe_auto && (1 == ei)) {
+                /* heuristic: if first element index in this page is 1
+                 * then act as if the EIIOE bit is set. */
+                my_eiioe_force = 1;
+            }
+            eiioe = my_eiioe_force ? 1 : (ucp[2] & 1);
+            if (eiioe) {
+                if ((ei < (elem_count + k)) ||
+                    (ei > (elem_count + k + num_elems))) {
+                    elem_count += num_elems;
+                    skip = 1;
+                }
+            } else {
+                if ((ei < elem_count) || (ei > elem_count + num_elems)) {
+                    elem_count += num_elems;
+                    skip = 1;
+                }
+            }
+            if (skip) {
+                if (op->verbose > 2)
+                    pr2serr("skipping elem_type=0x%x, k=%d due to "
+                            "element_index=%d bounds\n  effective eiioe=%d, "
+                            "elem_count=%d, num_elems=%d\n", elem_type, k,
+                            ei, eiioe, elem_count, num_elems);
                 continue;
             }
         }
@@ -2442,11 +2473,12 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
                    find_element_tname(elem_type, b, sizeof(b)), tp->se_id, k);
         }
-        for (j = 0, el_num = 0; j < tp->num_elements;
-             ++j, ucp += desc_len, ++el_num) {
+        el_num = 0;
+        for (j = 0; j < num_elems; ++j, ucp += desc_len, ++el_num) {
             invalid = !!(ucp[0] & 0x80);
             desc_len = ucp[1] + 2;
             eip = ucp[0] & 0x10;
+            eiioe = eip ? (ucp[2] & 1) : 0;
             ind = eip ? ucp[3] : el_num;
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
@@ -2454,8 +2486,9 @@ ses_additional_elem_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                     continue;
             }
             if (eip)
-                printf("      Element index: %d  eiioe=%d\n", ind,
-                       (ucp[2] & 1));
+                printf("      Element index: %d  eiioe=%d%s\n", ind, eiioe,
+                       (((! eiioe) && my_eiioe_force) ?
+                        " but overridden" : ""));
             else
                 printf("      Element %d descriptor\n", ind);
             if (invalid && (0 == op->inner_hex))
@@ -3005,8 +3038,9 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
             /* only for device slot and array device slot elements */
             jrp->dev_slot_num = ae_ucp[7];
             if (ae_ucp[4] > 0) {        /* number of phys */
+                /* Use the first phy's "SAS ADDRESS" field */
                 for (m = 0; m < 8; ++m)
-                    jrp->sas_addr[m] = ae_ucp[20 + m];
+                    jrp->sas_addr[m] = ae_ucp[(4 + 4 + 12) + m];
             }
         }
         break;
@@ -3120,6 +3154,12 @@ join_work(int sg_fd, struct opts_t * op, int display)
             }
             ae_ucp = add_elem_rsp + 8;
             ae_last_ucp = add_elem_rsp + add_elem_rsp_len - 1;
+            if (op->eiioe_auto && (add_elem_rsp_len > 11)) {
+                /* heuristic: if first element index in this page is 1
+                 * then act as if the EIIOE bit is set. */
+                if ((ae_ucp[0] & 0x10) && (1 == ae_ucp[3]))
+                    op->eiioe_force = 1;
+            }
         } else {
             add_elem_rsp_len = 0;
             ae_ucp = NULL;
@@ -3167,6 +3207,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
 
     jrp = join_arr;
     tdhp = type_desc_hdr_arr;
+    jr_max_ind = 0;
     for (k = 0, ei = 0, ei2 = 0; k < num_t_hdrs; ++k, ++tdhp) {
         jrp->el_ind_th = k;
         jrp->el_ind_indiv = -1;
@@ -3212,13 +3253,13 @@ join_work(int sg_fd, struct opts_t * op, int display)
             if (t_ucp)
                 t_ucp += 4;
             jrp->add_elem_statp = NULL;
+            ++jr_max_ind;
         }
         if (jrp >= join_arr_lastp) {
             ++k;
             break;      /* leave last row all zeros */
         }
     }
-    jr_max_ind = k;
 
     broken_ei = 0;
     if (ae_ucp) {
@@ -3235,14 +3276,18 @@ join_work(int sg_fd, struct opts_t * op, int display)
                         break;
                     }
                     eip = !!(ae_ucp[0] & 0x10);
-                    eiioe = eip ? (ae_ucp[2] & 1) : 0;
+                    if (eip)
+                        eiioe = op->eiioe_force ? 1 : (ae_ucp[2] & 1);
+                    else
+                        eiioe = 0;
                     if (eip && eiioe) {
                         ei = ae_ucp[3];
                         jr2p = join_arr + ei;
                         if ((ei >= jr_max_ind) || (NULL == jr2p->enc_statp)) {
                             get_out = 1;
-                            pr2serr("join_work: oi=%d, ei=%d, eiioe=1 not in "
-                                    "join_arr\n", k, ei);
+                            pr2serr("join_work: oi=%d, ei=%d [max_ind=%d], "
+                                    "eiioe=1 not in join_arr\n", k, ei,
+                                    jr_max_ind);
                             break;
                         }
                         devslotnum_and_sasaddr(jr2p, ae_ucp);
@@ -3876,6 +3921,7 @@ main(int argc, char * argv[])
 {
     int sg_fd, res;
     char buff[128];
+    char b[80];
     int pd_type = 0;
     int have_cgs = 0;
     int ret = 0;
@@ -3938,7 +3984,16 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(op->dev_name, 0 /* rw */, op->verbose);
+#ifdef SG_LIB_WIN32
+#ifdef SG_LIB_WIN32_DIRECT
+    if (op->verbose > 4)
+        pr2serr("Initial win32 SPT interface state: %s\n",
+                scsi_pt_win32_spt_state() ? "direct" : "indirect");
+    if (op->maxlen >= 16384)
+        scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
+#endif
+#endif
+    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,
                 safe_strerror(-sg_fd));
@@ -4060,24 +4115,8 @@ main(int argc, char * argv[])
 
 err_out:
     if (0 == op->do_status) {
-        switch (ret) {
-        case SG_LIB_CAT_NOT_READY:
-            pr2serr("    device no ready\n");
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-            pr2serr("    aborted command\n");
-            break;
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            pr2serr("    unit attention\n");
-            break;
-        case SG_LIB_CAT_INVALID_OP:
-            pr2serr("    Send diagnostics command not supported\n");
-            break;
-        case SG_LIB_CAT_ILLEGAL_REQ:
-            pr2serr("    Send diagnostics command, bad field in cdb or "
-                    "parameter list\n");
-            break;
-        }
+        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose);
+        pr2serr("    %s\n", b);
     }
     if (ret && (0 == op->verbose))
         pr2serr("Problem detected, try again with --verbose option for more "
