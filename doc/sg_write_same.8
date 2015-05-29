@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "April 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_WRITE_SAME "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -211,10 +211,11 @@ suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
 .PP
 In Linux at this time the sg driver does not support cdb sizes greater than
-16 bytes. Hence a device node like /dev/sg1 which is associated with the
-sg driver will fail with this utility if the \fI\-\-32\fR option is
-given (or implied by other options). The bsg driver with device nodes like
-/dev/bsg/6:0:0:1 does support cdb sizes greater than 16 bytes.
+16 bytes. [This restriction will be removed in lk 3.17 .] Hence a device
+node like /dev/sg1 which is associated with the sg driver will fail with
+this utility if the \fI\-\-32\fR option is given (or implied by other
+options). The bsg driver with device nodes like /dev/bsg/6:0:0:1 does
+support cdb sizes greater than 16 bytes.
 .SH EXIT STATUS
 The exit status of sg_write_same is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.01 20140521";  /* spc4r37, sbc4r02 */
+const char * sg_lib_version_str = "2.08 20141110";  /* spc4r37a, sbc4r02 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -117,7 +117,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x51, PDT_MMC, "Read disk information"},
     {0x52, 0, "Xdread(10)"},            /* obsolete in SBC-3 r31 */
     {0x52, PDT_MMC, "Read track information"},
-    {0x53, 0, "Reserve track"},
+    {0x53, 0, "Xdwriteread(10)"},
     {0x54, 0, "Send OPC information"},
     {0x55, 0, "Mode select(10)"},
     {0x56, 0, "Reserve(10)"},           /* obsolete in SPC-4 r11 */
@@ -213,7 +213,8 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
+/* Read buffer [0x3c] service actions, need prefix */
+struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x0, 0, "combined header and data [or multiple modes]"},
     {0x2, 0, "data"},
     {0x3, 0, "descriptor"},
@@ -224,7 +225,8 @@ struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+/* Write buffer [0x3b] service actions, need prefix */
+struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
     {0x0, 0, "combined header and data [or multiple modes]"},
     {0x2, 0, "data"},
     {0x4, 0, "download microcode and activate"},
@@ -242,7 +244,8 @@ struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
+/* Maintenance in [0xa3] service actions */
+struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0x5, 0, "Report identifying information"},
                 /* was "Report device identifier" prior to spc4r07 */
     {0xa, 0, "Report target port groups"},
@@ -252,10 +255,12 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
     {0xe, 0, "Report priority"},
     {0xf, 0, "Report timestamp"},
     {0x10, 0, "Management protocol in"},
+    {0x1f, 0, "Maintenance in vendor specific"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
+/* Maintenance out [0xa4] service actions */
+struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
     {0x6, 0, "Set identifying information"},
                 /* was "Set device identifier" prior to spc4r07 */
     {0xa, 0, "Set target port groups"},
@@ -264,28 +269,33 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
     {0xe, 0, "Set priority"},
     {0xf, 0, "Set timestamp"},
     {0x10, 0, "Management protocol out"},
+    {0x1f, 0, "Maintenance out vendor specific"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = { /* opcode 0x48 */
-    {0x1, 0, "Sanitize, overwrite"},
-    {0x2, 0, "Sanitize, block erase"},
-    {0x3, 0, "Sanitize, cryptographic erase"},
-    {0x1f, 0, "Sanitize, exit failure mode"},
+/* Sanitize [0x48] service actions, need prefix */
+struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
+    {0x1, 0, "overwrite"},
+    {0x2, 0, "block erase"},
+    {0x3, 0, "cryptographic erase"},
+    {0x1f, 0, "exit failure mode"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
+/* Service action in(12) [0xab] service actions */
+struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = {
     {0x1, 0, "Read media serial number"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = { /* opcode 0xa9 */
+/* Service action out(12) [0xa9] service actions */
+struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
     {0xff, 0, "Impossible command name"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
+/* Service action in(16) [0x9e] service actions */
+struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x10, 0, "Read capacity(16)"},
     {0x11, 0, "Read long(16)"},
     {0x12, 0, "Get LBA status"},
@@ -294,41 +304,46 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
+/* Service action out(16) [0x9f] service actions */
+struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
     {0x11, 0, "Write long(16)"},
     {0x14, PDT_ZBC, "Reset write pointer"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
+/* Service action bidirectional [0x9d] service actions */
+struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
-    {0x0, 0, "Persistent reserve in, read keys"},
-    {0x1, 0, "Persistent reserve in, read reservation"},
-    {0x2, 0, "Persistent reserve in, report capabilities"},
-    {0x3, 0, "Persistent reserve in, read full status"},
+/* Persistent reserve in [0x5e] service actions, need prefix */
+struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
+    {0x0, 0, "read keys"},
+    {0x1, 0, "read reservation"},
+    {0x2, 0, "report capabilities"},
+    {0x3, 0, "read full status"},
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
-    {0x0, 0, "Persistent reserve out, register"},
-    {0x1, 0, "Persistent reserve out, reserve"},
-    {0x2, 0, "Persistent reserve out, release"},
-    {0x3, 0, "Persistent reserve out, clear"},
-    {0x4, 0, "Persistent reserve out, preempt"},
-    {0x5, 0, "Persistent reserve out, preempt and abort"},
-    {0x6, 0, "Persistent reserve out, register and ignore existing key"},
-    {0x7, 0, "Persistent reserve out, register and move"},
-    {0x8, 0, "Persistent reserve out, replace lost reservation"},
+/* Persistent reserve out [0x5f] service actions, need prefix */
+struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
+    {0x0, 0, "register"},
+    {0x1, 0, "reserve"},
+    {0x2, 0, "release"},
+    {0x3, 0, "clear"},
+    {0x4, 0, "preempt"},
+    {0x5, 0, "preempt and abort"},
+    {0x6, 0, "register and ignore existing key"},
+    {0x7, 0, "register and move"},
+    {0x8, 0, "replace lost reservation"},
     {0xffff, 0, NULL},
 };
 
-/* 'Extended copy' was renamed 'Third party copy in' in spc4r34 */
-/* LID1 is an abbreviation of List Identifier length of 1 byte */
-struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
+/* Third party copy in [0x83] service actions
+ * Opcode 'Receive copy results' was renamed 'Third party copy in' in spc4r34
+ * LID1 is an abbreviation of List Identifier length of 1 byte */
+struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {
     {0x0, 0, "Extended copy(LID1)"},
     {0x1, 0, "Extended copy(LID4)"},
     {0x10, 0, "Populate token"},
@@ -337,9 +352,10 @@ struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
     {0xffff, 0, NULL},
 };
 
-/* 'Receive copy results' was renamed 'Third party copy out' in spc4r34 */
-/* LID4 is an abbreviation of List Identifier length of 4 bytes */
-struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
+/* Third party copy out [0x84] service actions
+ * Opcode 'Extended copy' was renamed 'Third party copy out' in spc4r34
+ * LID4 is an abbreviation of List Identifier length of 4 bytes */
+struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = {
     {0x0, 0, "Receive copy status(LID1)"},
     {0x1, 0, "Receive copy data(LID1)"},
     {0x3, 0, "Receive copy operating parameters"},
@@ -351,6 +367,7 @@ struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
     {0xffff, 0, NULL},
 };
 
+/* Variable length cdb [0x7f] service actions (more than 16 bytes long) */
 struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x1, 0, "Rebuild(32)"},
     {0x2, 0, "Regenerate(32)"},
@@ -363,7 +380,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x9, 0, "Read(32)"},
     {0xa, 0, "Verify(32)"},
     {0xb, 0, "Write(32)"},
-    {0xc, 0, "Write an verify(32)"},
+    {0xc, 0, "Write and verify(32)"},
     {0xd, 0, "Write same(32)"},
     {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
     {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
@@ -494,7 +511,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20140516 */
+ * The following should match asc-num.txt dated 20140924 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -595,6 +612,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x09,0x02,"Focus servo failure"},
     {0x09,0x03,"Spindle servo failure"},
     {0x09,0x04,"Head select fault"},
+    {0x09,0x05,"Vibration induced tracking error"},
     {0x0A,0x00,"Error log overflow"},
     {0x0B,0x00,"Warning"},
     {0x0B,0x01,"Warning - specified temperature exceeded"},
@@ -622,6 +640,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0C,0x0D,"Write error - not enough unsolicited data"},
     {0x0C,0x0E,"Multiple write errors"},
     {0x0C,0x0F,"Defects in error window"},
+    {0x0C,0x10,"Incomplete multiple atomic write operations"},
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
     {0x0D,0x02,"Copy target device not reachable"},

@@ -1,12 +1,13 @@
-.TH SG_SENDDIAG "8" "December 2011" "sg3_utils\-1.33" SG3_UTILS
+.TH SG_SENDDIAG "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
 .B sg_senddiag
 [\fI\-\-doff\fR] [\fI\-\-extdur\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-list\fR] [\fI\-\-pf\fR] [\fI\-\-raw=H,H...\fR] [\fI\-\-raw=\-\fR]
-[\fI\-\-selftest=ST\fR] [\fI\-\-test\fR] [\fI\-\-uoff\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-pf\fR]
+[\fI\-\-raw=H,H...\fR] [\fI\-\-raw=\-\fR] [\fI\-\-selftest=ST\fR]
+[\fI\-\-test\fR] [\fI\-\-uoff\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .PP
 .B sg_senddiag
 [\fI\-doff\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-l\fR] [\fI\-pf\fR]
@@ -57,8 +58,23 @@ DIAGNOSTIC RESULTS command. When used in the absence of a \fI\-\-list\fR
 argument then a list of diagnostic page names and their numbers, known
 by this utility, are listed.
 .TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+where \fILEN\fR is the value placed in the parameter list length field of a
+SEND DIAGNOSTIC command or in the allocation length field of a RECEIVE
+DIAGNOSTIC RESULTS command. This only occurs when the other options imply
+there will be data sent or received by the command. The default value
+is 4096 bytes. \fILEN\fR cannot exceed 65535 or 0xffff in hexadecimal.
+.TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
+.TP
+\fB\-P\fR, \fB\-\-page\fR=\fIPG\fR
+where \fIPG\fR is the RECEIVE DIAGNOSTIC RESULTS command page code field.
+If this option is given the PCV bit in that command is set. When this option
+is given then no SEND DIAGNOSTIC command is sent (unlike \fI\-\-list\fR).
+If \fIPG\fR is 0 then the response is decoded as if it is the SPC Supported
+Diagnostic pages diagnostic page. Other \fIPG\fR values (i.e. 1 to 255)
+have their responses output in hex.
 .TP
 \fB\-p\fR, \fB\-\-pf\fR
 set Page Format (PF) bit. By default it is clear (i.e. 0) unless the
@@ -251,7 +267,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003\-2011 Douglas Gilbert
+Copyright \(co 2003\-2014 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

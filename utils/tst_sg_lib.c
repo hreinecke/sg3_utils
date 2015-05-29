@@ -119,6 +119,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     int ret = 0;
     char b[2048];
+    char bb[128];
 
     while (1) {
         int option_index = 0;
@@ -275,6 +276,8 @@ main(int argc, char * argv[])
             dStrHex(b, k, 0);
             dStrHex(b, k, 1);
             dStrHex(b, k, -1);
+            dStrHexStr(b, k, "dStrHexStr:^", 0, sizeof(bb), bb);
+            printf("%s", bb);
             printf("\n");
         }
     }

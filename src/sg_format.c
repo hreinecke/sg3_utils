@@ -13,23 +13,8 @@
  *   the Free Software Foundation; either version 2, or (at your option)
  *   any later version.
  *
- * http://www.t10.org/scsi-3.htm
- * http://www.tldp.org/HOWTO/SCSI-Generic-HOWTO
- *
- *
- *  List of some (older) disk manufacturers' block counts.
- *  These are not needed in newer disks which will automatically use
- *  the manufacturers' recommended block count if a count of -1 is given.
- *      Inquiry         Block Count (@512 byte blocks)
- *      ST150150N       8388315
- *      IBM_DCHS04F     8888543
- *      IBM_DGHS09Y     17916240
- *      ST336704FC      71132960
- *      ST318304FC      35145034  (Factory spec is 35885167 sectors)
- *      ST336605FC      ???
- *      ST336753FC      71132960  (Factory spec is 71687372 sectors)
- *  and a newer one:
- *      ST33000650SS    5860533168 (3 TB SAS disk)
+ * See http://www.t10.org for relevant standards and drafts. The most recent
+ * draft is SBC-4 revision 2.
  */
 
 #include <stdio.h>
@@ -47,13 +32,10 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.26 20140516";
+static const char * version_str = "1.30 20141006";
 
-#define RW_ERROR_RECOVERY_PAGE 1  /* every disk should have one */
-#define FORMAT_DEV_PAGE 3         /* Format Device Mode Page [now obsolete] */
-#define CONTROL_MODE_PAGE 0xa     /* alternative page all devices have?? */
 
-#define THIS_MPAGE_EXISTS RW_ERROR_RECOVERY_PAGE
+#define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
 
 #define SHORT_TIMEOUT           20   /* 20 seconds unless --wait given */
 #define FORMAT_TIMEOUT          (20 * 3600)       /* 20 hours ! */
@@ -88,6 +70,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"ip_def", no_argument, 0, 'I'},
         {"long", no_argument, 0, 'l'},
+        {"mode", required_argument, 0, 'M'},
         {"pinfo", no_argument, 0, 'p'},
         {"pfu", required_argument, 0, 'P'},
         {"pie", required_argument, 0, 'q'},
@@ -111,19 +94,19 @@ usage()
                "[--early]\n"
                "                 [--fmtpinfo=FPI] [--format] [--help] "
                "[--ip_def] [--long]\n"
-               "                 [--pfu=PFU] [--pie=PIE] [--pinfo] "
-               "[--poll=PT] [--resize]\n"
-               "                 [--rto_req] [--security] [--six] "
-               "[--size=SIZE] [--verbose]\n"
-               "                 [--version] [--wait] DEVICE\n"
+               "                 [--mode=MP] [--pfu=PFU] [--pie=PIE] "
+               "[--pinfo] [--poll=PT]\n"
+               "                 [--resize] [--rto_req] [--security] "
+               "[--six] [--size=SIZE]\n"
+               "                 [--verbose] [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
                "(default: 1)\n"
-               "    --count=COUNT|-c COUNT    number of blocks to "
-               "report after format or\n"
-               "                              resize. With format "
-               "defaults to same as current\n"
+               "    --count=COUNT|-c COUNT    number of blocks to report "
+               "after format or\n"
+               "                              resize. Format default is "
+               "same as current\n"
                "    --dcrt|-D       disable certification (doesn't "
                "verify media)\n"
                "    --early|-e      exit once format started (user can "
@@ -132,12 +115,14 @@ usage()
                "(default: 0)\n"
                "    --format|-F     format unit (default: report current "
                "count and size)\n"
+               "                    use thrice for FORMAT UNIT command "
+               "only\n"
                "    --help|-h       prints out this usage message\n"
                "    --ip_def|-I     initialization pattern: default\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
                "32 bit lbas)\n"
-               "    --pfu=PFU|-P PFU    Protection Field Usage value "
-               "(default: 0)\n"
+               "    --mode=MP|-M MP     mode page (def: 1 -> RW error "
+               "recovery mpage)\n"
                "    --pie=PIE|-q PIE    Protection Information Exponent "
                "(default: 0)\n"
                "    --pinfo|-p      set upper bit of FMTPINFO field\n"
@@ -156,11 +141,12 @@ usage()
                "    --six|-6        use 6 byte MODE SENSE/SELECT to probe "
                "disk\n"
                "                    (def: use 10 byte MODE SENSE/SELECT)\n"
-               "    --size=SIZE|-s SIZE    bytes per block, defaults to "
-               "DEVICE's current\n"
-               "                           block size. Only needed to "
-               "change current block\n"
-               "                           size\n"
+               "    --size=SIZE|-s SIZE    bytes per logical block, "
+               "defaults to DEVICE's\n"
+               "                           current logical block size. Only "
+               "needed to\n"
+               "                           change current logical block "
+               "size\n"
                "    --verbose|-v    increase verbosity\n"
                "    --version|-V    print version details and exit\n"
                "    --wait|-w       format command waits until format "
@@ -317,6 +303,180 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
         return 0;
 }
 
+#define VPD_DEVICE_ID 0x83
+#define VPD_ASSOC_LU 0
+#define VPD_ASSOC_TPORT 1
+#define TPROTO_ISCSI 5
+
+static char *
+get_lu_name(const unsigned char * ucp, int u_len, char * b, int b_len)
+{
+        int len, off, sns_dlen, dlen, k;
+        unsigned char u_sns[512];
+        char * cp;
+
+        len = u_len - 4;
+        ucp += 4;
+        off = -1;
+        if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+                                    8 /* SCSI name string (sns) */,
+                                    3 /* UTF-8 */)) {
+                sns_dlen = ucp[off + 3];
+                memcpy(u_sns, ucp + off + 4, sns_dlen);
+                /* now want to check if this is iSCSI */
+                off = -1;
+                if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_TPORT,
+                                            8 /* SCSI name string (sns) */,
+                                            3 /* UTF-8 */)) {
+                        if ((0x80 & ucp[1]) &&
+                            (TPROTO_ISCSI == (ucp[0] >> 4))) {
+                                snprintf(b, b_len, "%.*s", sns_dlen, u_sns);
+                                return b;
+                        }
+                }
+        } else
+                sns_dlen = 0;
+        if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+                                    3 /* NAA */, 1 /* binary */)) {
+                dlen = ucp[off + 3];
+                if (! ((8 == dlen) || (16 ==dlen)))
+                        return b;
+                cp = b;
+                for (k = 0; ((k < dlen) && (b_len > 1)); ++k) {
+                        snprintf(cp, b_len, "%02x", ucp[off + 4 + k]);
+                        cp += 2;
+                        b_len -= 2;
+                }
+        } else if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+                                           2 /* EUI */, 1 /* binary */)) {
+                dlen = ucp[off + 3];
+                if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
+                        return b;
+                cp = b;
+                for (k = 0; ((k < dlen) && (b_len > 1)); ++k) {
+                        snprintf(cp, b_len, "%02x", ucp[off + 4 + k]);
+                        cp += 2;
+                        b_len -= 2;
+                }
+        } else if (sns_dlen > 0)
+                snprintf(b, b_len, "%.*s", sns_dlen, u_sns);
+        return b;
+}
+
+#define SAFE_STD_INQ_RESP_LEN 36
+#define VPD_SUPPORTED_VPDS 0x0
+#define VPD_UNIT_SERIAL_NUM 0x80
+#define VPD_DEVICE_ID 0x83
+
+static int
+print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
+{
+        int res, k, n, verb, pdt, has_sn, has_di;
+        unsigned char b[256];
+        char a[256];
+        char pdt_name[64];
+
+        verb = (verbose > 1) ? verbose - 1 : 0;
+        memset(sinq_resp, 0, max_rlen);
+        res = sg_ll_inquiry(fd, 0, 0 /* evpd */, 0 /* pg_op */, b,
+                            SAFE_STD_INQ_RESP_LEN, 1, verb);
+        if (res)
+                return res;
+        n = b[4] + 5;
+        if (n > SAFE_STD_INQ_RESP_LEN)
+                n = SAFE_STD_INQ_RESP_LEN;
+        memcpy(sinq_resp, b, (n < max_rlen) ? n : max_rlen);
+        if (n == SAFE_STD_INQ_RESP_LEN) {
+                pdt = b[0] & 0x1f;
+                printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
+                       (const char *)(b + 8), (const char *)(b + 16),
+                       (const char *)(b + 32),
+                       sg_get_pdt_str(pdt, sizeof(pdt_name), pdt_name), pdt);
+                if (verbose)
+                        printf("      PROTECT=%d\n", !!(b[5] & 1));
+                if (b[5] & 1)
+                        printf("      << supports protection information>>"
+                               "\n");
+        } else {
+                fprintf(stderr, "Short INQUIRY response: %d bytes, expect at "
+                        "least " "36\n", n);
+                return SG_LIB_CAT_OTHER;
+        }
+        res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
+                            SAFE_STD_INQ_RESP_LEN, 1, verb);
+        if (res) {
+                if (verbose)
+                        fprintf(stderr, "VPD_SUPPORTED_VPDS gave res=%d\n",
+                                res);
+                return 0;
+        }
+        if (VPD_SUPPORTED_VPDS != b[1]) {
+                if (verbose)
+                        fprintf(stderr, "VPD_SUPPORTED_VPDS corrupted\n");
+                return 0;
+        }
+        n = (b[2] << 8) + b[3];
+        if (n > (SAFE_STD_INQ_RESP_LEN - 4))
+                n = (SAFE_STD_INQ_RESP_LEN - 4);
+        for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
+                if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
+                        if (has_di) {
+                                if (verbose)
+                                        fprintf(stderr, "VPD_SUPPORTED_VPDS "
+                                                "dis-ordered\n");
+                                return 0;
+                        }
+                        ++has_sn;
+                } else if (VPD_DEVICE_ID == b[4 + k]) {
+                        ++has_di;
+                        break;
+                }
+        }
+        if (has_sn) {
+                res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_UNIT_SERIAL_NUM,
+                                    b, sizeof(b), 1, verb);
+                if (res) {
+                        if (verbose)
+                                fprintf(stderr, "VPD_UNIT_SERIAL_NUM gave "
+                                        "res=%d\n", res);
+                        return 0;
+                }
+                if (VPD_UNIT_SERIAL_NUM != b[1]) {
+                        if (verbose)
+                                fprintf(stderr, "VPD_UNIT_SERIAL_NUM "
+                                        "corrupted\n");
+                        return 0;
+                }
+                n = (b[2] << 8) + b[3];
+                if (n > (int)(sizeof(b) - 4))
+                        n = (sizeof(b) - 4);
+                printf("      Unit serial number: %.*s\n", n,
+                       (const char *)(b + 4));
+        }
+        if (has_di) {
+                res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_DEVICE_ID, b,
+                                    sizeof(b), 1, verb);
+                if (res) {
+                        if (verbose)
+                                fprintf(stderr, "VPD_DEVICE_ID gave res=%d\n",
+                                        res);
+                        return 0;
+                }
+                if (VPD_DEVICE_ID != b[1]) {
+                        if (verbose)
+                                fprintf(stderr, "VPD_DEVICE_ID corrupted\n");
+                        return 0;
+                }
+                n = (b[2] << 8) + b[3];
+                if (n > (int)(sizeof(b) - 4))
+                        n = (sizeof(b) - 4);
+                n = strlen(get_lu_name(b, n + 4, a, sizeof(a)));
+                if (n > 0)
+                        printf("      LU name: %.*s\n", n, a);
+        }
+        return 0;
+}
+
 #define RCAP_REPLY_LEN 32
 
 /* Returns block size or -2 if do_16==0 and the number of blocks is too
@@ -397,9 +557,9 @@ print_read_cap(int fd, int do_16, int verbose)
 int
 main(int argc, char **argv)
 {
-        const int mode_page = THIS_MPAGE_EXISTS;        /* hopefully */
+        int mode_page = RW_ERROR_RECOVERY_PAGE;
         int fd, res, calc_len, bd_len, dev_specific_param;
-        int offset, j, bd_blk_len, prob, len;
+        int offset, j, bd_blk_len, prob, len, pdt;
         uint64_t ull;
         int64_t blk_count = 0;  /* -c value */
         int blk_size = 0;     /* -s value */
@@ -422,16 +582,15 @@ main(int argc, char **argv)
         int do_si = 0;
         int early = 0;
         const char * device_name = NULL;
-        char pdt_name[64];
         char b[80];
-        struct sg_simple_inquiry_resp inq_out;
+        unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
         int ret = 0;
 
         while (1) {
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhIlpP:q:rRs:SvVwx:6",
+                c = getopt_long(argc, argv, "c:C:Def:FhIlM:pP:q:rRs:SvVwx:6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -473,7 +632,7 @@ main(int argc, char **argv)
                         }
                         break;
                 case 'F':
-                        format = 1;
+                        ++format;
                         break;
                 case 'h':
                         usage();
@@ -484,6 +643,14 @@ main(int argc, char **argv)
                 case 'l':
                         long_lba = 1;
                         do_rcap16 = 1;
+                        break;
+                case 'M':
+                        mode_page = sg_get_num(optarg);
+                        if ((mode_page < 0) || ( mode_page > 62)) {
+                                fprintf(stderr, "bad argument to '--mode', "
+                                        "accepts 0 to 62 inclusive\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
                         break;
                 case 'p':
                         pinfo = 1;
@@ -603,25 +770,14 @@ main(int argc, char **argv)
                 return SG_LIB_FILE_ERROR;
         }
 
-        if (sg_simple_inquiry(fd, &inq_out, 1, verbose)) {
-                fprintf(stderr, "%s doesn't respond to a SCSI INQUIRY\n",
-                        device_name);
-                ret = SG_LIB_CAT_OTHER;
-                goto out;
-        }
-        printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
-               inq_out.vendor, inq_out.product, inq_out.revision,
-               sg_get_pdt_str(inq_out.peripheral_type, sizeof(pdt_name),
-                              pdt_name),
-               inq_out.peripheral_type);
-        if (verbose)
-                printf("      PROTECT=%d\n", !!(inq_out.byte_5 & 1));
-        if (inq_out.byte_5 & 1)
-                printf("      << supports protection information>>\n");
+        if (format > 2)
+                goto format_only;
 
-        if ((0 != inq_out.peripheral_type) &&
-            (7 != inq_out.peripheral_type) &&
-            (0xe != inq_out.peripheral_type)) {
+        ret = print_dev_id(fd, inq_resp, sizeof(inq_resp), verbose);
+        if (ret)
+            goto out;
+        pdt = 0x1f & inq_resp[0];
+        if ((0 != pdt) && (7 != pdt) && (0xe != pdt)) {
                 fprintf(stderr, "This format is only defined for disks "
                         "(using SBC-2 or RBC) and MO media\n");
                 ret = SG_LIB_CAT_MALFORMED;
@@ -835,7 +991,8 @@ again_with_long_lba:
                 goto out;
         }
 
-        if (format)
+        if (format) {
+format_only:
 #if 1
                 printf("\nA FORMAT will commence in 15 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n", device_name);
@@ -861,6 +1018,7 @@ again_with_long_lba:
 #else
                 fprintf(stderr, "FORMAT ignored, testing\n");
 #endif
+        }
 
 out:
         res = sg_cmds_close_device(fd);

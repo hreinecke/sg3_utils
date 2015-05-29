@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.39 20140527";    /* SPC-4 rev 37 */
+static const char * version_str = "1.43 20141107";    /* SPC-4 rev 37 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -935,7 +935,7 @@ static int
 pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
            int * residp, int noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, k, sense_cat, resid;
     unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * up;
@@ -970,8 +970,9 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
     if (residp)
-        *residp = get_scsi_pt_resid(ptvp);
+        *residp = resid;
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
@@ -992,6 +993,15 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
     } else
         ret = 0;
 
+    if (resid > 0) {
+        if (resid > mx_resp_len) {
+            pr2serr("INQUIRY resid (%d) should never exceed requested "
+                    "len=%d\n", resid, mx_resp_len);
+            return ret ? ret : SG_LIB_CAT_MALFORMED;
+        }
+        /* zero unfilled section of response buffer */
+        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+    }
     return ret;
 }
 
@@ -1510,7 +1520,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         switch (desig_type) {
         case 0: /* vendor specific */
             k = 0;
-            if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
                     ;
                 if (k >= i_len)
@@ -1824,6 +1834,8 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
         }
         switch (desig_type) {
         case 0: /* vendor specific */
+            if (i_len > 128)
+                break;
             printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
             if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
@@ -1962,6 +1974,16 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 }
                 break;
             }
+            if (strncmp((const char *)ip, "eui.", 4) ||
+                strncmp((const char *)ip, "naa.", 4) ||
+                strncmp((const char *)ip, "iqn.", 4)) {
+                if (verbose) {
+                    pr2serr("      << expected name string prefix>>\n");
+                    dStrHexErr((const char *)ip, i_len, -1);
+                }
+                break;
+            }
+
             printf("SCSI_IDENT_%s_NAME=%.*s\n", assoc_str, i_len,
                    (const char *)ip);
             break;
@@ -2274,11 +2296,15 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
             (buff[16] << 8) + buff[17]);
 }
 
+/* VPD_BLOCK_LIMITS sbc */
+/* Sequential access device characteristics,  ssc+smc */
+/* OSD information, osd */
 static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex)
 {
-    int pdt;
+    int pdt, m;
     unsigned int u;
+    uint64_t mwsl;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
@@ -2324,6 +2350,27 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
                 u = ((unsigned int)(buff[32] & 0x7f) << 24) |
                     (buff[33] << 16) | (buff[34] << 8) | buff[35];
                 printf("  Unmap granularity alignment: %u\n", u);
+            }
+            if (len > 43) {     /* added in sbc3r26 */
+                mwsl = 0;
+                for (m = 0; m < 8; ++m) {
+                    if (m > 0)
+                        mwsl <<= 8;
+                    mwsl |= buff[36 + m];
+                }
+                printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
+                       mwsl);
+            }
+            if (len > 44) {     /* added in sbc4r02 */
+                u = ((unsigned int)buff[44] << 24) | (buff[45] << 16) |
+                    (buff[46] << 8) | buff[47];
+                printf("  Maximum atomic transfer length: %u\n", u);
+                u = ((unsigned int)buff[48] << 24) | (buff[49] << 16) |
+                    (buff[50] << 8) | buff[51];
+                printf("  Atomic alignment: %u\n", u);
+                u = ((unsigned int)buff[52] << 24) | (buff[53] << 16) |
+                    (buff[54] << 8) | buff[55];
+                printf("  Atomic transfer length granularity: %u\n", u);
             }
             break;
         case PDT_TAPE: case PDT_MCHANGER:
@@ -3056,7 +3103,8 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                            "given standard INQUIRY response, stop\n", k);
                     break;
                 }
-            }
+            } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                break;
             else {
                 pr2serr("CmdDt INQUIRY on opcode=0x%.2x: failed\n", k);
                 break;
@@ -3117,8 +3165,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                 } else
                     printf("  Support field: %s\n", desc_p);
             }
-        }
-        else {
+        } else if (SG_LIB_CAT_ILLEGAL_REQ != res) {
             if (! op->do_raw) {
                 printf("CmdDt INQUIRY, opcode=0x%.2x:  [", op->page_num);
                 sg_get_opcode_name((unsigned char)op->page_num, 0,

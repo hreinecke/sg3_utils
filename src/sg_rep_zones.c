@@ -22,15 +22,16 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
  * This program issues the SCSI REPORT ZONES command to the given SCSI device
- * and decodes the response.
+ * and decodes the response. Based on zbc-r01c.pdf
  */
 
-static const char * version_str = "1.02 20140604";
+static const char * version_str = "1.03 20141028";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -97,7 +98,7 @@ usage()
             "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
             "    --report=OPT|-o OP    reporting option (def: 0)\n"
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
-            "                          must be a zone starting LBA\n"
+            "                          need not be a zone starting LBA\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI REPORT ZONES command.\n");
@@ -116,19 +117,8 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int report_opts, void * resp,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    /* assume zbc-r01a is wrong and that ZS LBA is an 8 byte field */
-    rzCmdBlk[2] = (zs_lba >> 56) & 0xff;
-    rzCmdBlk[3] = (zs_lba >> 48) & 0xff;
-    rzCmdBlk[4] = (zs_lba >> 40) & 0xff;
-    rzCmdBlk[5] = (zs_lba >> 32) & 0xff;
-    rzCmdBlk[6] = (zs_lba >> 24) & 0xff;
-    rzCmdBlk[7] = (zs_lba >> 16) & 0xff;
-    rzCmdBlk[8] = (zs_lba >> 8) & 0xff;
-    rzCmdBlk[9] = zs_lba & 0xff;
-    rzCmdBlk[10] = (mx_resp_len >> 24) & 0xff;
-    rzCmdBlk[11] = (mx_resp_len >> 16) & 0xff;
-    rzCmdBlk[12] = (mx_resp_len >> 8) & 0xff;
-    rzCmdBlk[13] = mx_resp_len & 0xff;
+    sg_put_unaligned_be64(zs_lba, rzCmdBlk + 2);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rzCmdBlk + 10);
     rzCmdBlk[14] = report_opts & 0xf;
     if (verbose) {
         pr2serr("    Report zones cdb: ");
@@ -216,6 +206,9 @@ zone_condition_str(int zc, char * b, int blen, int vb)
     if (NULL == b)
         return "zone_condition_str: NULL ptr)";
     switch (zc) {
+    case 0:
+        cp = "No write pointer";
+        break;
     case 1:
         cp = "Empty";
         break;
@@ -245,11 +238,18 @@ zone_condition_str(int zc, char * b, int blen, int vb)
     return b;
 }
 
+static const char * same_desc_arr[4] = {
+    "zone type and length may differ in each descriptor",
+    "zone type and length same in each descriptor",
+    "zone type and length same apart from length in last descriptor",
+    "Reserved",
+};
+
 
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, m, res, c, zl_len, len, zones, resid, rlen, zt, zc;
+    int sg_fd, k, res, c, zl_len, len, zones, resid, rlen, zt, zc, same;
     int do_hex = 0;
     int maxlen = 0;
     int do_raw = 0;
@@ -374,8 +374,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_CAT_MALFORMED;
             goto the_end;
         }
-        zl_len = (reportZonesBuff[0] << 24) + (reportZonesBuff[1] << 16) +
-                  (reportZonesBuff[2] << 8) + reportZonesBuff[3] + 64;
+        zl_len = sg_get_unaligned_be32(reportZonesBuff + 0) + 64;
         if (zl_len > rlen) {
             if (verbose)
                 pr2serr("zl_len available is %d, response length is %d\n",
@@ -399,7 +398,8 @@ main(int argc, char * argv[])
             ret = SG_LIB_CAT_MALFORMED;
             goto the_end;
         }
-        printf("  Same=%d\n\n", reportZonesBuff[4] & 1);
+        same = reportZonesBuff[4] & 3;
+        printf("  Same=%d: %s\n\n", same, same_desc_arr[same]);
         zones = (len - 64) / 64;
         for (k = 0, ucp = reportZonesBuff + 64; k < zones; ++k, ucp += 64) {
             printf(" Zone descriptor: %d\n", k);
@@ -413,17 +413,14 @@ main(int argc, char * argv[])
                    verbose));
             printf("   Zone condition: %s\n", zone_condition_str(zc, b,
                    sizeof(b), verbose));
+            printf("   Non_seq: %d\n", !!(ucp[1] & 0x2));
             printf("   Reset: %d\n", ucp[1] & 0x1);
-            printf("   Zone Length: 0x");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[8 + m]);
-            printf("\n   Zone start LBA: 0x");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[64 + m]);
-            printf("\n   Write pointer LBA: 0x");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[64 + m]);
-            printf("\n");
+            printf("   Zone Length: 0x%" PRIx64 "\n",
+                   sg_get_unaligned_be64(ucp + 8));
+            printf("   Zone start LBA: 0x%" PRIx64 "\n",
+                   sg_get_unaligned_be64(ucp + 16));
+            printf("   Write pointer LBA: 0x%" PRIx64 "\n",
+                   sg_get_unaligned_be64(ucp + 24));
         }
         if ((64 + (64 * zones)) < zl_len)
             printf("\n>>> Beware: Zone list truncated, may need another "

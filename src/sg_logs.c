@@ -28,7 +28,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.24 20140523";    /* spc4r37 + sbc4r01 */
+static const char * version_str = "1.26 20141007";    /* spc4r37 + sbc4r02 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2555,8 +2555,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
-            /* attached device type. In SAS-1.1 case 2 was an edge expander;
-             * in SAS-2 case 3 is marked as obsolete. */
+            /* attached SAS device type. In SAS-1.1 case 2 was an edge
+             * expander; in SAS-2 case 3 is marked as obsolete. */
             switch (t) {
             case 0: snprintf(s, sz, "no device attached"); break;
             case 1: snprintf(s, sz, "SAS or SATA device"); break;
@@ -2564,7 +2564,8 @@ show_sas_port_param(unsigned char * ucp, int param_len,
             case 3: snprintf(s, sz, "expander device (fanout)"); break;
             default: snprintf(s, sz, "reserved [%d]", t); break;
             }
-            printf("    attached device type: %s\n", s);
+            /* the word 'SAS' in following added in spl4r01 */
+            printf("    attached SAS device type: %s\n", s);
             t = 0xf & vcp[4];
             switch (t) {
             case 0: snprintf(s, sz, "unknown"); break;
@@ -4342,7 +4343,7 @@ static void
 show_tape_diag_data_page(unsigned char * resp, int len,
                          const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int k, num, pl, pc, pcb;
     unsigned int v;
     unsigned char * ucp;
     char str[PCB_STR_LEN];
@@ -4389,12 +4390,30 @@ show_tape_diag_data_page(unsigned char * resp, int len,
         printf("    Hours since last clean: %u\n", v);
         printf("    Operation code: 0x%x\n", ucp[28]);
         printf("    Service action: 0x%x\n", ucp[29] & 0xf);
-        printf("    Medium id number (in hex):\n");
+        // Check Medium id number for all zeros
         // ssc4r03.pdf does not define this field, why? xxxxxx
-        dStrHex((const char *)(ucp + 32), 32, 0);
+        for (k = 32; k < 64; ++k) {
+            if(ucp[k])
+                break;
+        }
+        if (64 == k)
+            printf("    Medium id number is 32 bytes of zero\n");
+        else {
+            printf("    Medium id number (in hex):\n");
+            dStrHex((const char *)(ucp + 32), 32, 0);
+        }
         printf("    Timestamp origin: 0x%x\n", ucp[64] & 0xf);
-        printf("    Timestamp:\n");
-        dStrHex((const char *)(ucp + 66), 6, 1);
+        // Check Timestamp for all zeros
+        for (k = 66; k < 72; ++k) {
+            if(ucp[k])
+                break;
+        }
+        if (72 == k)
+            printf("    Timestamp is all zeros:\n");
+        else {
+            printf("    Timestamp:\n");
+            dStrHex((const char *)(ucp + 66), 6, 1);
+        }
         if (pl > 72) {
             printf("    Vendor specific:\n");
             dStrHex((const char *)(ucp + 72), pl - 72, 0);

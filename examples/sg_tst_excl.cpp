@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Douglas Gilbert.
+ * Copyright (c) 2013-2014 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-static const char * version_str = "1.07 20131110";
+static const char * version_str = "1.09 20140828";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -72,6 +72,8 @@ static const char * util_name = "sg_tst_excl";
  *   g++ -Wall -std=c++11 -pthread -I ../include ../lib/sg_lib.o
  *     ../lib/sg_lib_data.o ../lib/sg_io_linux.o -o sg_tst_excl
  *     sg_tst_excl.cpp
+ * or use the C++ Makefile in that directory:
+ *   make -f Makefile.cplus sg_tst_excl
  *
  * Currently this utility is Linux only and assumes the SG_IO v3 interface
  * which is supported by sg and block devices (but not bsg devices which
@@ -210,17 +212,21 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
 
         // queue up two READ_16s to same LBA
         if (write(sg_fd, &pt, sizeof(pt)) < 0) {
-            console_mutex.lock();
-            perror("do_rd_inc_wr_twice: write(sg, READ_16)");
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror("do_rd_inc_wr_twice: write(sg, READ_16)");
+            }
             close(sg_fd);
             return -1;
         }
         pt2 = pt;
         if (write(sg_fd, &pt2, sizeof(pt2)) < 0) {
-            console_mutex.lock();
-            perror("do_rd_inc_wr_twice: write(sg, READ_16) 2");
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror("do_rd_inc_wr_twice: write(sg, READ_16) 2");
+            }
             close(sg_fd);
             return -1;
         }
@@ -236,9 +242,11 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 sleep(0);                   // process yield ??
         }
         if (res < 0) {
-            console_mutex.lock();
-            perror("do_rd_inc_wr_twice: read(sg, READ_16)");
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror("do_rd_inc_wr_twice: read(sg, READ_16)");
+            }
             close(sg_fd);
             return -1;
         }
@@ -249,15 +257,19 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             ok = 1;
             break;
         case SG_LIB_CAT_RECOVERED:
-            console_mutex.lock();
-            fprintf(stderr, "Recovered error on READ_16, continuing\n");
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "Recovered error on READ_16, continuing\n");
+            }
             ok = 1;
             break;
         default: /* won't bother decoding other categories */
-            console_mutex.lock();
-            sg_chk_n_print3("READ_16 command error", &pt, 1);
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                sg_chk_n_print3("READ_16 command error", &pt, 1);
+            }
             break;
         }
         if (ok) {
@@ -272,9 +284,11 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                     sleep(0);                   // process yield ??
             }
             if (res < 0) {
-                console_mutex.lock();
-                perror("do_rd_inc_wr_twice: read(sg, READ_16) 2");
-                console_mutex.unlock();
+                {
+                    lock_guard<mutex> lg(console_mutex);
+
+                    perror("do_rd_inc_wr_twice: read(sg, READ_16) 2");
+                }
                 close(sg_fd);
                 return -1;
             }
@@ -286,15 +300,20 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 ok = 1;
                 break;
             case SG_LIB_CAT_RECOVERED:
-                console_mutex.lock();
-                fprintf(stderr, "Recovered error on READ_16, continuing 2\n");
-                console_mutex.unlock();
+                {
+                    lock_guard<mutex> lg(console_mutex);
+
+                    fprintf(stderr, "Recovered error on READ_16, continuing "
+                            "2\n");
+                }
                 ok = 1;
                 break;
             default: /* won't bother decoding other categories */
-                console_mutex.lock();
-                sg_chk_n_print3("READ_16 command error 2", &pt, 1);
-                console_mutex.unlock();
+                {
+                    lock_guard<mutex> lg(console_mutex);
+
+                    sg_chk_n_print3("READ_16 command error 2", &pt, 1);
+                }
                 break;
             }
         }
@@ -333,9 +352,11 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         pt.pack_id = id;
 
         if (ioctl(sg_fd, SG_IO, &pt) < 0) {
-            console_mutex.lock();
-            perror("do_rd_inc_wr_twice: WRITE_16 SG_IO ioctl error");
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror("do_rd_inc_wr_twice: WRITE_16 SG_IO ioctl error");
+            }
             close(sg_fd);
             return -1;
         }
@@ -346,15 +367,19 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             ok = 1;
             break;
         case SG_LIB_CAT_RECOVERED:
-            console_mutex.lock();
-            fprintf(stderr, "Recovered error on WRITE_16, continuing\n");
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "Recovered error on WRITE_16, continuing\n");
+            }
             ok = 1;
             break;
         default: /* won't bother decoding other categories */
-            console_mutex.lock();
-            sg_chk_n_print3("WRITE_16 command error", &pt, 1);
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                sg_chk_n_print3("WRITE_16 command error", &pt, 1);
+            }
             break;
         }
         if (! ok) {
@@ -468,10 +493,12 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
     unsigned int thr_eagain_count = 0;
     int k, res;
 
-    console_mutex.lock();
-    cerr << "Enter work_thread id=" << id << " excl=" << excl << " block="
-         << block << endl;
-    console_mutex.unlock();
+    {
+        lock_guard<mutex> lg(console_mutex);
+
+        cerr << "Enter work_thread id=" << id << " excl=" << excl << " block="
+             << block << endl;
+    }
     for (k = 0; k < num; ++k) {
         res = do_rd_inc_wr_twice(dev_name, lba, block, excl, wait_ms, k,
                                  thr_ebusy_count, thr_eagain_count);
@@ -480,18 +507,22 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
         if (res)
             ++thr_odd_count;
     }
-    console_mutex.lock();
-    if (k < num)
-        cerr << "thread id=" << id << " FAILed at iteration: " << k << '\n';
-    else
-        cerr << "thread id=" << id << " normal exit" << '\n';
-    console_mutex.unlock();
+    {
+        lock_guard<mutex> lg(console_mutex);
 
-    odd_count_mutex.lock();
-    odd_count += thr_odd_count;
-    ebusy_count += thr_ebusy_count;
-    eagain_count += thr_eagain_count;
-    odd_count_mutex.unlock();
+        if (k < num)
+            cerr << "thread id=" << id << " FAILed at iteration: " << k <<
+                    '\n';
+        else
+            cerr << "thread id=" << id << " normal exit" << '\n';
+    }
+    {
+        lock_guard<mutex> lg(odd_count_mutex);
+
+        odd_count += thr_odd_count;
+        ebusy_count += thr_ebusy_count;
+        eagain_count += thr_eagain_count;
+    }
 }
 
 

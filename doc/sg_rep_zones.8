@@ -1,4 +1,4 @@
-.TH SG_REP_ZONES "8" "June 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_REP_ZONES "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES command
 .SH SYNOPSIS
@@ -10,8 +10,8 @@ sg_rep_zones \- send SCSI REPORT ZONES command
 .\" Add any additional description here
 .PP
 Sends a SCSI REPORT ZONES command to \fIDEVICE\fR and outputs the data
-returned. This command is found in the ZBC draft standard whose most
-recent revision is 1a.
+returned. This command is found in the ZBC draft standard, revision
+1c (zbc\-r01c.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -42,14 +42,14 @@ where \fIOPT\fR will become the contents of the REPORTING OPTION field
 in the cdb. The default value is 0 which means report a list or all zones.
 Some other values are 1 for list full zones; 2 for list all open zones; 3
 for list all empty zones; 4 for list all read only zones; 5 for list all
-offline zones; and 6 for list all zones with the RESET bit set.
+offline zones; 6 for list all zones with the RESET bit set; and 7 for list
+all zones with the NON_SEQ bit set.
 .TP
 \fB\-s\fR, \fB\-\-start\fR=\fILBA\fR
-where \fILBA\fR is a zone start logical block address (LBA) of the first
-zone to be reported. The default value is 0. \fILBA\fR must be a zone
-start LBA otherwise an ILLEGAL REQUEST sense key is returned. Assumed to be
-in decimal unless prefixed with '0x' or has a trailing 'h' which indicate
-hexadecimal.
+where \fILBA\fR is at the start or within the first zone to be reported. The
+default value is 0. If \fILBA\fR is not a zone start LBA then the preceding
+zone start LBA is used for reporting. Assumed to be in decimal unless
+prefixed with '0x' or has a trailing 'h' which indicate hexadecimal.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).

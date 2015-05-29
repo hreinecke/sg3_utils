@@ -25,7 +25,7 @@
  * This utility issues the SCSI READ BUFFER command to the given device.
  */
 
-static const char * version_str = "1.11 20140515";
+static const char * version_str = "1.12 20140919";
 
 
 static struct option long_options[] = {
@@ -64,11 +64,12 @@ usage()
           "    --readonly|-R       open DEVICE read-only (def: read-write)\n"
           "    --verbose|-v        increase verbosity\n"
           "    --version|-V        print version string and exit\n\n"
-          "Performs a SCSI READ BUFFER command. Numbers given in options are "
-          "decimal\nunless they have a hex indicator (e.g. a leading '0x').\n"
+          "Performs a SCSI READ BUFFER command. Use '-m xxx' to list "
+          "available\nmodes. Numbers given in options are decimal unless "
+          "they have a hex\nindicator (e.g. a leading '0x').\n"
           );
-
 }
+
 
 #define MODE_HEADER_DATA        0
 #define MODE_VENDOR             1

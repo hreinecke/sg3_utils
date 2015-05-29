@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "1.06 20140516";
+static const char * version_str = "1.07 20141021";
 
 
 #define ME "sg_write_same: "
@@ -461,8 +461,8 @@ main(int argc, char * argv[])
     vb = op->verbose;
 
     if ((! if_given) && (! lba_given) && (! num_given)) {
-        fprintf(stderr, "As a precaution require one of '--in=', '--lba=' "
-                "or '--num=' to be given\n");
+        fprintf(stderr, "As a precaution, one of '--in=', '--lba=' or "
+		"'--num=' is required\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 

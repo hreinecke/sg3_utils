@@ -26,7 +26,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.15 20140518";    /* spc4r37 */
+static const char * version_str = "1.18 20141107";    /* spc4r37 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -101,7 +101,7 @@ usage()
             "acronym\n"
             "                           (def: 0 -> 'combined header and "
             "data' (obs))\n"
-            "    --off=OFF|-o OFF       buffer offset (unit: bytes, def: 0)\n"
+            "    --offset=OFF|-o OFF    buffer offset (unit: bytes, def: 0)\n"
             "    --raw|-r               read from stdin (same as '-I -')\n"
             "    --skip=SKIP|-s SKIP    bytes in file FILE to skip before "
             "reading\n"
@@ -110,8 +110,9 @@ usage()
             "    --verbose|-v           increase verbosity\n"
             "    --version|-V           print version string and exit\n\n"
             "Performs one or more SCSI WRITE BUFFER commands. Use '-m xxx' "
-            "to list\navailable modes. Numbers given in options are decimal "
-            "unless they have\na hex indicator.\n"
+            "to list\navailable modes. A chunk size of 4 KB ('--bpw=4k') "
+            "seems to work well.\nExample: sg_write_buffer -b 4k -I xxx.lod "
+            "-m 7 /dev/sg3\n"
           );
 
 }
@@ -132,51 +133,54 @@ usage()
 #define MODE_DNLD_ERR_HISTORY   0x1C
 
 
-static struct mode_s {
+struct mode_s {
         const char *mode_string;
         int   mode;
         const char *comment;
-} modes[] = {
-        { "hd",         MODE_HEADER_DATA, "combined header and data "
-                "(obsolete)"},
-        { "vendor",     MODE_VENDOR,    "vendor specific"},
-        { "data",       MODE_DATA,      "data"},
-        { "dmc",        MODE_DNLD_MC,   "download microcode and activate"},
-        { "dmc_save",   MODE_DNLD_MC_SAVE, "download microcode, save and "
-                "activate"},
-        { "dmc_offs",   MODE_DNLD_MC_OFFS, "download microcode with offsets "
-                "and activate"},
-        { "dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
-                "offsets, save and\n\t\t\t\tactivate"},
-        { "echo",       MODE_ECHO_BUFFER, "write data to echo buffer"},
-        { "dmc_offs_ev_defer", MODE_DNLD_MC_EV_OFFS_DEFER, "download "
-                "microcode with offsets, select\n\t\t\t\tactivation event, "
-                "save and defer activation"},
-        { "dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
-                "with offsets, save and defer\n\t\t\t\tactivation"},
-        { "activate_mc", MODE_ACTIVATE_MC,
-                "activate deferred microcode"},
-        { "en_ex",      MODE_EN_EX_ECHO, "enable expander communications "
-                "protocol and echo\n\t\t\t\tbuffer (obsolete)"},
-        { "dis_ex",     MODE_DIS_EX, "disable expander communications "
-                "protocol\n\t\t\t\t(obsolete)"},
-        { "deh",        MODE_DNLD_ERR_HISTORY, "download application client "
-                "error history "},
 };
 
-#define NUM_MODES       ((int)(sizeof(modes)/sizeof(modes[0])))
+static struct mode_s mode_arr[] = {
+        {"hd",         MODE_HEADER_DATA, "combined header and data "
+                "(obsolete)"},
+        {"vendor",     MODE_VENDOR,    "vendor specific"},
+        {"data",       MODE_DATA,      "data"},
+        {"dmc",        MODE_DNLD_MC,   "download microcode and activate"},
+        {"dmc_save",   MODE_DNLD_MC_SAVE, "download microcode, save and "
+                "activate"},
+        {"dmc_offs",   MODE_DNLD_MC_OFFS, "download microcode with offsets "
+                "and activate"},
+        {"dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
+                "offsets, save and\n\t\t\t\tactivate"},
+        {"echo",       MODE_ECHO_BUFFER, "write data to echo buffer"},
+        {"dmc_offs_ev_defer", MODE_DNLD_MC_EV_OFFS_DEFER, "download "
+                "microcode with offsets, select\n\t\t\t\tactivation event, "
+                "save and defer activation"},
+        {"dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
+                "with offsets, save and\n\t\t\t\tdefer activation"},
+        {"activate_mc", MODE_ACTIVATE_MC, "activate deferred microcode"},
+        {"en_ex",      MODE_EN_EX_ECHO, "enable expander communications "
+                "protocol and\n\t\t\t\techo buffer (obsolete)"},
+        {"dis_ex",     MODE_DIS_EX, "disable expander communications "
+                "protocol\n\t\t\t\t(obsolete)"},
+        {"deh",        MODE_DNLD_ERR_HISTORY, "download application client "
+                "error history "},
+        {NULL, 0, NULL},
+};
 
 static void
 print_modes(void)
 {
-    int k;
+    const struct mode_s * mp;
 
     pr2serr("The modes parameter argument can be numeric (hex or decimal)\n"
             "or symbolic:\n");
-    for (k = 0; k < NUM_MODES; k++) {
-        pr2serr(" %2d (0x%02x)  %-18s%s\n", modes[k].mode, modes[k].mode,
-                modes[k].mode_string, modes[k].comment);
+    for (mp = mode_arr; mp->mode_string; ++mp) {
+        pr2serr(" %2d (0x%02x)  %-18s%s\n", mp->mode, mp->mode,
+                mp->mode_string, mp->comment);
     }
+    pr2serr("\nAdditionally '--bpw=<val>,act' does a activate deferred "
+            "microcode after\nsuccessful dmc_offs_defer and "
+            "dmc_offs_ev_defer mode downloads.\n");
 }
 
 /* <<<< This function will be moved to the library in the future >>> */
@@ -268,6 +272,7 @@ main(int argc, char * argv[])
     const char * file_name = NULL;
     unsigned char * dop = NULL;
     char * cp;
+    const struct mode_s * mp;
     char ebuff[EBUFF_SZ];
     int ret = 0;
 
@@ -325,13 +330,13 @@ main(int argc, char * argv[])
                 }
             } else {
                 len = strlen(optarg);
-                for (k = 0; k < NUM_MODES; ++k) {
-                    if (0 == strncmp(modes[k].mode_string, optarg, len)) {
-                        wb_mode = modes[k].mode;
+                for (mp = mode_arr; mp->mode_string; ++mp) {
+                    if (0 == strncmp(mp->mode_string, optarg, len)) {
+                        wb_mode = mp->mode;
                         break;
                     }
                 }
-                if (NUM_MODES == k) {
+                if (! mp->mode_string) {
                     print_modes();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -478,7 +483,12 @@ main(int argc, char * argv[])
                     if (verbose) {
                         pr2serr("tried to read %d bytes from %s, got %d "
                                 "bytes\n", wb_len, file_name, res);
-                        pr2serr("will write %d bytes\n", res);
+                        pr2serr("will write %d bytes", res);
+                        if ((bpw > 0) && (bpw < wb_len))
+                            pr2serr(", %d bytes per WRITE BUFFER command\n",
+                                    bpw);
+                        else
+                            pr2serr("\n");
                     }
                     wb_len = res;
                 }
@@ -507,8 +517,8 @@ main(int argc, char * argv[])
         if (bpw_then_activate) {
             if (verbose)
                 pr2serr("sending Activate deferred microcode [0xf]\n");
-            res = sg_ll_write_buffer_v2(sg_fd, 0xf, 0, 0, 0, NULL, 0, 1,
-                                        verbose);
+            res = sg_ll_write_buffer_v2(sg_fd, MODE_ACTIVATE_MC, 0, 0, 0,
+                                        NULL, 0, 1, verbose);
         }
     } else {
         if (verbose)

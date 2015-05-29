@@ -3,14 +3,15 @@
 sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
 .B sg_opcodes
-[\fI\-\-alpha\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-no-inquiry\fR]
-[\fI\-\-opcode=OP\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR]
-[\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-alpha\fR] [\fI\-\-compact\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR]
+[\fI\-\-repd\fR] [\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_opcodes
-[\fI\-a\fR] [\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-q\fR] [\fI\-R\fR] [\fI\-s=SA\fR]
-[\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
+[\fI\-a\fR] [\fI\-c\fR] [\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-q\fR] [\fI\-R\fR]
+[\fI\-s=SA\fR] [\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -46,6 +47,16 @@ this option is given the list of supported commands is sorted by
 name (alphabetically). When this option and the \fB\-\-unsorted\fR option are
 both _not_ given then the list of supported commands is sorted
 numerically (first by operation code and then by service action).
+.TP
+\fB\-c\fR, \fB\-\-compact\fR
+some command names, especially those associated with some service actions,
+are getting longer. This may cause line wrap in the one line per command
+mode on some terminals. When this option is given the opcode and service
+action fields are combined into a single field with the service action,
+prefixed by a comma shown directly after the opcode. If there is no service
+action associated with the command, then the comma and the service action
+are not shown after the opcode. The CDB size field is not shown when this
+option is given.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options

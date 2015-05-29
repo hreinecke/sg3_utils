@@ -2,6 +2,54 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.40 [20141110] [svn: r620]
+  - sg_write_verify: new utility for WRITE AND VERIFY
+  - sg_ses_microcode: new utility
+  - sg_sat_read_gplog: new utility
+  - sg_senddiag: add --maxlen= option
+  - sg_copy_results: correct response length calculations
+  - sg_format: make '-FFF' bypass mode sense/select
+    - add --mode=MP to supply alternate mode page,
+      default remains read-write error recovery mpage
+    - output unit serial number and LU name prior to
+  - sg_inq: expand Block limits VPD page output
+    - fix --cmddt output if not supported by device
+    - more sanity checks on vendor supplied fields
+  - sg_vpd: add --all option
+    - more TPC VPD page decoding
+    - add zoned block device characteristics page
+    - more sanity checks on vendor supplied fields
+  - sg_ses: fix problem with --index=sse (and ssc)
+    - mask status element before using as control
+    - defeat previous item with --mask (ignore) option
+    - SAS connector status element: add overcurrent bit
+    - handle element descriptor names that count a
+      trailing NULL
+    - add --warn option mainly for broken joins
+    - add optional descriptions to -ee output
+    - sync with ses3r07
+  - sg_sanitize: add --desc and --zero options
+    - output unit serial number and LU name prior to
+  - sg_rep_zones: corrections, sync with zbc-r01c
+  - sg_persist: split help into two pages, '-hh' for 2nd
+  - sg_logs: refine tape drive output
+  - sg_raw: with -vvv decode T10 CDB name
+    - do not output/print data-in if error
+  - sg_opcodes: add --compact field
+  - sg_senddiag: add --page=PG option
+  - sg_reset: add words for EAGAIN from reset ioctl
+  - sg_sat_*: mention t_type and multiple_count fields
+  - win32: sg_scan: handle larger configurations
+  - sg_lib: trim trailing spaces in dStrHex() and friends
+  - sg_lib_data: sync asc/ascq codes with T10 20140924
+    - clean up service action string functions
+    - sg_ll_unmap_v2(): fix group number
+    - sg_ll_inquiry(), sg_ll_mode_sense*(),
+      sg_ll_log_sense(): use resid to clear unfilled
+      data-in buffer
+  - sg_unaligned.h: add header for building parameters
+  - examples/sg_tst_async: new Linux sg test utility
+
 Changelog for sg3_utils-1.39 [20140612] [svn: r588]
   - sg_rep_zones: new utility for ZBC REPORT ZONES
   - sg_reset_wp: new utility, ZBC RESET WRITE POINTER

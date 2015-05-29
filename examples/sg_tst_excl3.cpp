@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Douglas Gilbert.
+ * Copyright (c) 2013-2014 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.04 20131110";
+static const char * version_str = "1.05 20140828";
 static const char * util_name = "sg_tst_excl3";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -140,6 +140,7 @@ usage(void)
            "value is even.\n");
 }
 
+/* Assumed a lock (mutex) held when pt_err() is called */
 static int
 pt_err(int res)
 {
@@ -154,6 +155,7 @@ pt_err(int res)
     return -1;
 }
 
+/* Assumed a lock (mutex) held when pt_cat_no_good() is called */
 static int
 pt_cat_no_good(int cat, struct sg_pt_base * ptp, const unsigned char * sbp)
 {
@@ -235,9 +237,11 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
     if (sg_fd < 0) {
         snprintf(ebuff, EBUFF_SZ,
                  "do_rd_inc_wr_twice: error opening file: %s", dev_name);
-        console_mutex.lock();
-        perror(ebuff);
-        console_mutex.unlock();
+        {
+            lock_guard<mutex> lg(console_mutex);
+
+            perror(ebuff);
+        }
         return -1;
     }
 
@@ -250,18 +254,22 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         set_scsi_pt_data_in(ptp, lb, READ16_REPLY_LEN);
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
-            console_mutex.lock();
-            fprintf(stderr, "READ_16 do_scsi_pt() submission error\n");
-            res = pt_err(res);
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "READ_16 do_scsi_pt() submission error\n");
+                res = pt_err(res);
+            }
             goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
         if (SCSI_PT_RESULT_GOOD != cat) {
-            console_mutex.lock();
-            fprintf(stderr, "READ_16 do_scsi_pt() category problem\n");
-            console_mutex.unlock();
-            res = pt_cat_no_good(cat, ptp, sense_buffer);
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "READ_16 do_scsi_pt() category problem\n");
+                res = pt_cat_no_good(cat, ptp, sense_buffer);
+            }
             goto err;
         }
 
@@ -292,18 +300,22 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         set_scsi_pt_data_out(ptp, lb, WRITE16_REPLY_LEN);
         res = do_scsi_pt(ptp, sg_fd, 20 /* secs timeout */, 1);
         if (res) {
-            console_mutex.lock();
-            fprintf(stderr, "WRITE_16 do_scsi_pt() submission error\n");
-            res = pt_err(res);
-            console_mutex.unlock();
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "WRITE_16 do_scsi_pt() submission error\n");
+                res = pt_err(res);
+            }
             goto err;
         }
         cat = get_scsi_pt_result_category(ptp);
         if (SCSI_PT_RESULT_GOOD != cat) {
-            console_mutex.lock();
-            fprintf(stderr, "WRITE_16 do_scsi_pt() category problem\n");
-            console_mutex.unlock();
-            res = pt_cat_no_good(cat, ptp, sense_buffer);
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "WRITE_16 do_scsi_pt() category problem\n");
+                res = pt_cat_no_good(cat, ptp, sense_buffer);
+            }
             goto err;
         }
     }
@@ -397,10 +409,12 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
     int k, res;
     int reader = ((id > 0) || (all_readers));
 
-    console_mutex.lock();
-    cerr << "Enter work_thread id=" << id << " excl=" << excl << " block="
-         << block << " reader=" << reader << endl;
-    console_mutex.unlock();
+    {
+        lock_guard<mutex> lg(console_mutex);
+
+        cerr << "Enter work_thread id=" << id << " excl=" << excl << " block="
+             << block << " reader=" << reader << endl;
+    }
     for (k = 0; k < num; ++k) {
         res = do_rd_inc_wr_twice(dev_name, reader, lba, block, excl,
                                  wait_ms, thr_ebusy_count);
@@ -409,17 +423,22 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
         if (res)
             ++thr_odd_count;
     }
-    console_mutex.lock();
-    if (k < num)
-        cerr << "thread id=" << id << " FAILed at iteration: " << k << '\n';
-    else
-        cerr << "thread id=" << id << " normal exit" << '\n';
-    console_mutex.unlock();
+    {
+        lock_guard<mutex> lg(console_mutex);
 
-    odd_count_mutex.lock();
-    odd_count += thr_odd_count;
-    ebusy_count += thr_ebusy_count;
-    odd_count_mutex.unlock();
+        if (k < num)
+            cerr << "thread id=" << id << " FAILed at iteration: " << k
+                 << '\n';
+        else
+            cerr << "thread id=" << id << " normal exit" << '\n';
+    }
+
+    {
+        lock_guard<mutex> lg(odd_count_mutex);
+
+        odd_count += thr_odd_count;
+        ebusy_count += thr_ebusy_count;
+    }
 }
 
 
