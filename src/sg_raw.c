@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2014 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2015 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -534,17 +534,17 @@ main(int argc, char *argv[])
         break;
     case SCSI_PT_RESULT_TRANSPORT_ERR:
         get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
-        fprintf(sg_warnings_strm, ">>> transport error: %s\n", b);
+        fprintf(stderr, ">>> transport error: %s\n", b);
         ret = SG_LIB_CAT_OTHER;
         break;
     case SCSI_PT_RESULT_OS_ERR:
         get_scsi_pt_os_err_str(ptvp, sizeof(b), b);
-        fprintf(sg_warnings_strm, ">>> os error: %s\n", b);
+        fprintf(stderr, ">>> os error: %s\n", b);
         ret = SG_LIB_CAT_OTHER;
         break;
     default:
-        fprintf(sg_warnings_strm, ">>> unknown pass through result "
-                "category (%d)\n", res_cat);
+        fprintf(stderr, ">>> unknown pass through result category (%d)\n",
+                res_cat);
         ret = SG_LIB_CAT_OTHER;
         break;
     }

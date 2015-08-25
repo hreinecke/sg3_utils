@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2014 Douglas Gilbert.
+ * Copyright (c) 1999-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -48,6 +48,25 @@
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 #ifdef __GNUC__
 static int my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
@@ -103,6 +122,8 @@ get_value_name(const struct sg_lib_value_name_t * arr, int value,
     return NULL;
 }
 
+/* If this function is not called, sg_warnings_strm will be NULL and all users
+ * (mainly fprintf() ) need to check and substitute stderr as required */
 void
 sg_set_warnings_strm(FILE * warnings_strm)
 {
@@ -120,16 +141,14 @@ sg_print_command(const unsigned char * command)
     sg_get_command_name(command, 0, CMD_NAME_LEN, buff);
     buff[CMD_NAME_LEN - 1] = '\0';
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "%s [", buff);
+    pr2ws("%s [", buff);
     if (SG_VARIABLE_LENGTH_CMD == command[0])
         sz = command[7] + 8;
     else
         sz = sg_get_command_size(command[0]);
     for (k = 0; k < sz; ++k)
-        fprintf(sg_warnings_strm, "%02x ", command[k]);
-    fprintf(sg_warnings_strm, "]\n");
+        pr2ws("%02x ", command[k]);
+    pr2ws("]\n");
 }
 
 void
@@ -174,9 +193,7 @@ sg_print_scsi_status(int scsi_status)
 
     sg_get_scsi_status_str(scsi_status, sizeof(buff) - 1, buff);
     buff[sizeof(buff) - 1] = '\0';
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "%s ", buff);
+    pr2ws("%s ", buff);
 }
 
 /* Get sense key from sense buffer. If successful returns a sense key value
@@ -1077,9 +1094,7 @@ sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
     char b[2048];
 
     sg_get_sense_str(leadin, sense_buffer, sb_len, raw_sinfo, sizeof(b), b);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-    fprintf(sg_warnings_strm, "%s", b);
+    pr2ws("%s", b);
 }
 
 /* See description in sg_lib.h header file */
@@ -1472,6 +1487,7 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
         if ((0 == verbose) && (n < (buff_len - 1)))
             snprintf(buff + n, buff_len - n, ", possible transport of driver "
                      "issue");
+        break;
     default:
         n = snprintf(buff, buff_len, "Sense category: %d", sense_cat);
         if ((0 == verbose) && (n < (buff_len - 1)))
@@ -1905,9 +1921,7 @@ sg_get_num(const char * buf)
             }
             return -1;
         default:
-            if (NULL == sg_warnings_strm)
-                sg_warnings_strm = stderr;
-            fprintf(sg_warnings_strm, "unrecognized multiplier\n");
+            pr2ws("unrecognized multiplier\n");
             return -1;
         }
     }
@@ -2058,9 +2072,7 @@ sg_get_llnum(const char * buf)
             }
             return -1LL;
         default:
-            if (NULL == sg_warnings_strm)
-                sg_warnings_strm = stderr;
-            fprintf(sg_warnings_strm, "unrecognized multiplier\n");
+            pr2ws("unrecognized multiplier\n");
             return -1LL;
         }
     }

@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.30 20150113";    /* spc5r02 + sbc4r04 */
+static const char * version_str = "1.32 20150127";    /* spc5r03 + sbc4r04 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -627,6 +627,7 @@ enumerate_lpages(const struct opts_t * op)
         printf("Known log pages in acronym order:\n");
         for (lepp = lep_arr, j = 0; (*lepp)->pg_code >=0; ++lepp, ++j)
             enumerate_helper(*lepp, j, op);
+        free(lep_arr);
     } else {    /* -eee, -eeee numeric sort (as per table) */
         printf("Known log pages in numerical order:\n");
         for (lep = log_arr, j = 0; lep->pg_code >=0; ++lep, ++j)
@@ -926,7 +927,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             if (plen <= 0)
                 continue;
             if (0 == strncmp("c=", cp, 2)) {
-                num = sscanf(cp + 2, "%x", &u);
+                num = sscanf(cp + 2, "%6x", &u);
                 if ((1 != num) || (u > 3)) {
                     pr2serr("Bad page control after '-c=' option [0..3]\n");
                     usage_old();
@@ -945,7 +946,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("i=", cp, 2))
                 op->in_fn = cp + 2;
             else if (0 == strncmp("m=", cp, 2)) {
-                num = sscanf(cp + 2, "%d", &n);
+                num = sscanf(cp + 2, "%8d", &n);
                 if ((1 != num) || (n < 0) || (n > MX_ALLOC_LEN)) {
                     pr2serr("Bad maximum response length after '-m=' "
                             "option\n");
@@ -991,7 +992,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 } else {
                     /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
                     if (NULL == strchr(cp + 2, ',')) {
-                        num = sscanf(cp + 2, "%x", &u);
+                        num = sscanf(cp + 2, "%6x", &u);
                         if ((1 != num) || (u > 63)) {
                             pr2serr("Bad page code value after '-p=' "
                                     "option\n");
@@ -999,7 +1000,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                             return SG_LIB_SYNTAX_ERROR;
                         }
                         op->pg_code = u;
-                    } else if (2 == sscanf(cp + 2, "%x,%x", &u, &uu)) {
+                    } else if (2 == sscanf(cp + 2, "%4x,%4x", &u, &uu)) {
                         if (uu > 255) {
                             pr2serr("Bad sub page code value after '-p=' "
                                     "option\n");
@@ -1016,7 +1017,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     }
                 }
             } else if (0 == strncmp("paramp=", cp, 7)) {
-                num = sscanf(cp + 7, "%x", &u);
+                num = sscanf(cp + 7, "%8x", &u);
                 if ((1 != num) || (u > 0xffff)) {
                     pr2serr("Bad parameter pointer after '-paramp=' "
                             "option\n");
@@ -1195,7 +1196,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if (isxdigit(line[0])) {
                 carry_over[1] = line[0];
                 carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%x", &h))
+                if (1 == sscanf(carry_over, "%4x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
                     pr2serr("f2hex_arr: carry_over error ['%s'] around line "
@@ -1218,7 +1219,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         if ('#' == *lcp)
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k])) {
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
                     j + 1, m + k + 1);
             goto bad;
@@ -1242,7 +1243,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             off += k;
         } else {
             for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
+                if (1 == sscanf(lcp, "%4x", &h)) {
                     if (h > 0xff) {
                         pr2serr("f2hex_arr: hex number larger than "
                                 "0xff in line %d, pos %d\n", j + 1,
@@ -1265,7 +1266,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                     if ('\0' == *lcp)
                         break;
                 } else {
-                    if ('#' == *lcp) {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
                         --k;
                         break;
                     }
@@ -1365,17 +1366,18 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
     return 0;
 }
 
+/* DS made obsolete in spc4r03; TMC and ETC made obsolete in spc5r03. */
 static void
 get_pcb_str(int pcb, char * outp, int maxoutlen)
 {
     char buff[PCB_STR_LEN];
     int n;
 
-    n = sprintf(buff, "du=%d [ds=%d] tsd=%d etc=%d ", ((pcb & 0x80) ? 1 : 0),
+    n = sprintf(buff, "du=%d [ds=%d] tsd=%d [etc=%d] ", ((pcb & 0x80) ? 1 : 0),
                 ((pcb & 0x40) ? 1 : 0), ((pcb & 0x20) ? 1 : 0),
                 ((pcb & 0x10) ? 1 : 0));
     if (pcb & 0x10)
-        n += sprintf(buff + n, "tmc=%d ", ((pcb & 0xc) >> 2));
+        n += sprintf(buff + n, "[tmc=%d] ", ((pcb & 0xc) >> 2));
 #if 1
     n += sprintf(buff + n, "format+linking=%d  [0x%.2x]", pcb & 3,
                  pcb);

@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 #include "sg_lib.h"
@@ -67,6 +68,26 @@
 #define INQUIRY_RESP_INITIAL_LEN 36
 
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
@@ -89,24 +110,22 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
     scCmdBlk[4] = (lba >> 8) & 0xff;
     scCmdBlk[5] = lba & 0xff;
     scCmdBlk[6] = group & 0x1f;
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (count > 0xffff) {
-        fprintf(sg_warnings_strm, "count too big\n");
+        pr2ws("count too big\n");
         return -1;
     }
     scCmdBlk[7] = (count >> 8) & 0xff;
     scCmdBlk[8] = count & 0xff;
 
     if (verbose) {
-        fprintf(sg_warnings_strm, "    synchronize cache(10) cdb: ");
+        pr2ws("    synchronize cache(10) cdb: ");
         for (k = 0; k < SYNCHRONIZE_CACHE_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", scCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", scCmdBlk[k]);
+        pr2ws("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "synchronize cache(10): out of memory\n");
+        pr2ws("synchronize cache(10): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, scCmdBlk, sizeof(scCmdBlk));
@@ -162,17 +181,15 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
     rcCmdBlk[11] = (mx_resp_len >> 16) & 0xff;
     rcCmdBlk[12] = (mx_resp_len >> 8) & 0xff;
     rcCmdBlk[13] = mx_resp_len & 0xff;
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    read capacity (16) cdb: ");
+        pr2ws("    read capacity (16) cdb: ");
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", rcCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", rcCmdBlk[k]);
+        pr2ws("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "read capacity (16): out of memory\n");
+        pr2ws("read capacity (16): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
@@ -219,17 +236,15 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
         rcCmdBlk[4] = (lba >> 8) & 0xff;
         rcCmdBlk[5] = lba & 0xff;
     }
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    read capacity (10) cdb: ");
+        pr2ws("    read capacity (10) cdb: ");
         for (k = 0; k < READ_CAPACITY_10_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", rcCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", rcCmdBlk[k]);
+        pr2ws("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "read capacity (10): out of memory\n");
+        pr2ws("read capacity (10): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
@@ -273,21 +288,19 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
     modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
     modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
     modesCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xff) {
-        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
+        pr2ws("mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_strm, "    mode sense (6) cdb: ");
+        pr2ws("    mode sense (6) cdb: ");
         for (k = 0; k < MODE_SENSE6_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", modesCmdBlk[k]);
+        pr2ws("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "mode sense (6): out of memory\n");
+        pr2ws("mode sense (6): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
@@ -312,8 +325,8 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            fprintf(sg_warnings_strm, "    mode sense (6): response%s\n",
-                    (ret > 256 ? ", first 256 bytes" : ""));
+            pr2ws("    mode sense (6): response%s\n",
+                  (ret > 256 ? ", first 256 bytes" : ""));
             dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
@@ -321,8 +334,8 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            fprintf(sg_warnings_strm, "mode sense(6): resid (%d) should "
-                    "never exceed requested len=%d\n", resid, mx_resp_len);
+            pr2ws("mode sense(6): resid (%d) should never exceed requested "
+                  "len=%d\n", resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -349,21 +362,19 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
     modesCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     modesCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xffff) {
-        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
+        pr2ws("mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_strm, "    mode sense (10) cdb: ");
+        pr2ws("    mode sense (10) cdb: ");
         for (k = 0; k < MODE_SENSE10_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", modesCmdBlk[k]);
+        pr2ws("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "mode sense (10): out of memory\n");
+        pr2ws("mode sense (10): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
@@ -388,8 +399,8 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            fprintf(sg_warnings_strm, "    mode sense (10): response%s\n",
-                    (ret > 256 ? ", first 256 bytes" : ""));
+            pr2ws("    mode sense (10): response%s\n",
+                  (ret > 256 ? ", first 256 bytes" : ""));
             dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
@@ -397,8 +408,8 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            fprintf(sg_warnings_strm, "mode sense(10): resid (%d) should "
-                    "never exceed requested len=%d\n", resid, mx_resp_len);
+            pr2ws("mode sense(10): resid (%d) should never exceed requested "
+                  "len=%d\n", resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -421,26 +432,24 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
 
     modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
     modesCmdBlk[4] = (unsigned char)(param_len & 0xff);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (param_len > 0xff) {
-        fprintf(sg_warnings_strm, "mode select (6): param_len too big\n");
+        pr2ws("mode select (6): param_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_strm, "    mode select (6) cdb: ");
+        pr2ws("    mode select (6) cdb: ");
         for (k = 0; k < MODE_SELECT6_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", modesCmdBlk[k]);
+        pr2ws("\n");
     }
     if (verbose > 1) {
-        fprintf(sg_warnings_strm, "    mode select (6) parameter list\n");
+        pr2ws("    mode select (6) parameter list\n");
         dStrHexErr((const char *)paramp, param_len, -1);
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "mode select (6): out of memory\n");
+        pr2ws("mode select (6): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
@@ -483,26 +492,24 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
     modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
     modesCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
     modesCmdBlk[8] = (unsigned char)(param_len & 0xff);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (param_len > 0xffff) {
-        fprintf(sg_warnings_strm, "mode select (10): param_len too big\n");
+        pr2ws("mode select (10): param_len too big\n");
         return -1;
     }
     if (verbose) {
-        fprintf(sg_warnings_strm, "    mode select (10) cdb: ");
+        pr2ws("    mode select (10) cdb: ");
         for (k = 0; k < MODE_SELECT10_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", modesCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", modesCmdBlk[k]);
+        pr2ws("\n");
     }
     if (verbose > 1) {
-        fprintf(sg_warnings_strm, "    mode select (10) parameter list\n");
+        pr2ws("    mode select (10) parameter list\n");
         dStrHexErr((const char *)paramp, param_len, -1);
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "mode select (10): out of memory\n");
+        pr2ws("mode select (10): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
@@ -609,8 +616,6 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
         *reported_len = 0;
     if (mx_mpage_len < 4)
         return 0;
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     memset(ebuff, 0, sizeof(ebuff));
     /* first try to find length of current page response */
     memset(buff, 0, MODE10_RESP_HDR_LEN);
@@ -632,8 +637,8 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
         if (mode6 && (n < 3)) {
             resp_mode6 = 0;
             if (verbose)
-                fprintf(sg_warnings_strm, ">>> msense(6) but resp[0]=%d so "
-                        "try msense(10) response processing\n", n);
+                pr2ws(">>> msense(6) but resp[0]=%d so try msense(10) "
+                      "response processing\n", n);
         }
         if ((0 == mode6) && (n > 5)) {
             if ((n > 11) && (0 == (n % 2)) && (0 == buff[4]) &&
@@ -641,16 +646,15 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
                 buff[1] = n;
                 buff[0] = 0;
                 if (verbose)
-                    fprintf(sg_warnings_strm, ">>> msense(10) but resp[0]=%d "
-                            "and not msense(6) response so fix length\n", n);
+                    pr2ws(">>> msense(10) but resp[0]=%d and not msense(6) "
+                          "response so fix length\n", n);
             } else
                 resp_mode6 = 1;
         }
     }
     if (verbose && (resp_mode6 != mode6))
-        fprintf(sg_warnings_strm, ">>> msense(%d) but resp[0]=%d "
-                "so switch response processing\n", (mode6 ? 6 : 10),
-                buff[0]);
+        pr2ws(">>> msense(%d) but resp[0]=%d so switch response "
+              "processing\n", (mode6 ? 6 : 10), buff[0]);
     calc_len = resp_mode6 ? (buff[0] + 1) : (sg_get_unaligned_be16(buff) + 2);
     if (calc_len > MODE_RESP_ARB_LEN)
         calc_len = MODE_RESP_ARB_LEN;
@@ -658,8 +662,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
                                  ebuff, EBUFF_SZ);
     if (offset < 0) {
         if (('\0' != ebuff[0]) && (verbose > 0))
-            fprintf(sg_warnings_strm, "sg_get_mode_page_controls: %s\n",
-                    ebuff);
+            pr2ws("sg_get_mode_page_controls: %s\n", ebuff);
         return SG_LIB_CAT_MALFORMED;
     }
     xfer_len = calc_len - offset;
@@ -707,10 +710,8 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (mx_resp_len > 0xffff) {
-        fprintf(sg_warnings_strm, "mx_resp_len too big\n");
+        pr2ws("mx_resp_len too big\n");
         return -1;
     }
     logsCmdBlk[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
@@ -721,15 +722,15 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     logsCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
     logsCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
     if (verbose) {
-        fprintf(sg_warnings_strm, "    log sense cdb: ");
+        pr2ws("    log sense cdb: ");
         for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", logsCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", logsCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "log sense: out of memory\n");
+        pr2ws("log sense: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, logsCmdBlk, sizeof(logsCmdBlk));
@@ -763,8 +764,8 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            fprintf(sg_warnings_strm, "log sense: resid (%d) should "
-                    "never exceed requested len=%d\n", resid, mx_resp_len);
+            pr2ws("log sense: resid (%d) should never exceed requested "
+                  "len=%d\n", resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -786,10 +787,8 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (param_len > 0xffff) {
-        fprintf(sg_warnings_strm, "log select: param_len too big\n");
+        pr2ws("log select: param_len too big\n");
         return -1;
     }
     logsCmdBlk[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
@@ -798,19 +797,19 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
     logsCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
     logsCmdBlk[8] = (unsigned char)(param_len & 0xff);
     if (verbose) {
-        fprintf(sg_warnings_strm, "    log select cdb: ");
+        pr2ws("    log select cdb: ");
         for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", logsCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", logsCmdBlk[k]);
+        pr2ws("\n");
     }
     if ((verbose > 1) && (param_len > 0)) {
-        fprintf(sg_warnings_strm, "    log select parameter list\n");
+        pr2ws("    log select parameter list\n");
         dStrHexErr((const char *)paramp, param_len, -1);
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "log select: out of memory\n");
+        pr2ws("log select: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, logsCmdBlk, sizeof(logsCmdBlk));
@@ -860,18 +859,16 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
     ssuBlk[3] = pc_mod__fl_num & 0xf;  /* bits 2 and 3 are reserved in MMC */
     ssuBlk[4] = ((power_cond & 0xf) << 4) | (noflush__fl ? 0x4 : 0) |
                  (loej ? 0x2 : 0) | (start ? 0x1 : 0);
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if (verbose) {
-        fprintf(sg_warnings_strm, "    Start stop unit command:");
+        pr2ws("    Start stop unit command:");
         for (k = 0; k < (int)sizeof(ssuBlk); ++k)
-                fprintf (sg_warnings_strm, " %02x", ssuBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+                pr2ws(" %02x", ssuBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "start stop unit: out of memory\n");
+        pr2ws("start stop unit: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, ssuBlk, sizeof(ssuBlk));
@@ -911,24 +908,21 @@ sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     if ((prevent < 0) || (prevent > 3)) {
-        fprintf(sg_warnings_strm, "prevent argument should be 0, 1, 2 or 3\n");
+        pr2ws("prevent argument should be 0, 1, 2 or 3\n");
         return -1;
     }
     pCmdBlk[4] |= (prevent & 0x3);
     if (verbose) {
-        fprintf(sg_warnings_strm, "    Prevent allow medium removal cdb: ");
+        pr2ws("    Prevent allow medium removal cdb: ");
         for (k = 0; k < PREVENT_ALLOW_CMDLEN; ++k)
-            fprintf(sg_warnings_strm, "%02x ", pCmdBlk[k]);
-        fprintf(sg_warnings_strm, "\n");
+            pr2ws("%02x ", pCmdBlk[k]);
+        pr2ws("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "prevent allow medium removal: out of "
-                "memory\n");
+        pr2ws("prevent allow medium removal: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, pCmdBlk, sizeof(pCmdBlk));

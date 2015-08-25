@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2010 Douglas Gilbert.
+ * Copyright (c) 2005-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,13 +19,12 @@
 #include <io/cam/scsi_all.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 
 #include "sg_pt.h"
 #include "sg_lib.h"
-
-/* Changed to use struct sg_pt_base 20070403 */
 
 
 #define OSF1_MAXDEV 64
@@ -63,6 +62,26 @@ struct sg_pt_base {
     struct sg_pt_osf1_scsi impl;
 };
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
@@ -83,9 +102,6 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     struct osf1_dev_channel *fdchan;
     int fd, k;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-
     if (!camopened) {
         camfd = open(cam_dev, O_RDWR, 0);
         if (camfd < 0)
@@ -100,8 +116,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 
     if (k == OSF1_MAXDEV) {
         if (verbose)
-            fprintf(sg_warnings_strm, "too many open devices "
-                    "(%d)\n", OSF1_MAXDEV);
+            pr2ws("too many open devices (%d)\n", OSF1_MAXDEV);
         errno=EMFILE;
         return -1;
     }
@@ -299,9 +314,6 @@ release_sim(struct sg_pt_base *vp, int device_fd, int verbose) {
     CCB_RELSIM relsim;
     int retval;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-
     bzero(&uagt, sizeof(uagt));
     bzero(&relsim, sizeof(relsim));
 
@@ -318,7 +330,7 @@ release_sim(struct sg_pt_base *vp, int device_fd, int verbose) {
     retval = ioctl(camfd, UAGT_CAM_IO, &uagt);
     if (retval < 0) {
         if (verbose)
-            fprintf(sg_warnings_strm, "CAM ioctl error (Release SIM Queue)\n");
+            pr2ws("CAM ioctl error (Release SIM Queue)\n");
     }
     return retval;
 }
@@ -334,36 +346,34 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
     unsigned char sensep[ADDL_SENSE_LENGTH];
 
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     ptp->os_err = 0;
     if (ptp->in_err) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Replicated or unused set_scsi_pt...\n");
+            pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (NULL == ptp->cdb) {
         if (verbose)
-            fprintf(sg_warnings_strm, "No command (cdb) given\n");
+            pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
     if ((device_fd < 0) || (device_fd >= OSF1_MAXDEV)) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Bad file descriptor\n");
+            pr2ws("Bad file descriptor\n");
         ptp->os_err = ENODEV;
         return -ptp->os_err;
     }
     fdchan = devicetable[device_fd];
     if (NULL == fdchan) {
         if (verbose)
-            fprintf(sg_warnings_strm, "File descriptor closed??\n");
+            pr2ws("File descriptor closed??\n");
         ptp->os_err = ENODEV;
         return -ptp->os_err;
     }
     if (0 == camopened) {
         if (verbose)
-            fprintf(sg_warnings_strm, "No open CAM device\n");
+            pr2ws("No open CAM device\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
@@ -391,7 +401,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 
     if (ioctl(camfd, UAGT_CAM_IO, &uagt) < 0) {
         if (verbose)
-            fprintf(sg_warnings_strm, "CAN I/O Error\n");
+            pr2ws("CAN I/O Error\n");
         ptp->os_err = EIO;
         return -ptp->os_err;
     }

@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2014 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2015 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -62,13 +62,7 @@
 #include "sg_io_linux.h"
 
 
-/* #define SG_WANT_SHARED_MMAP_IO 1 */
-
-#ifdef SG_WANT_SHARED_MMAP_IO
-static const char * version_str = "1.40 20141226 shared_mmap";
-#else
-static const char * version_str = "1.40 20141226";
-#endif
+static const char * version_str = "1.41 20150215";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -95,14 +89,6 @@ static const char * version_str = "1.40 20141226";
 #define SAI_READ_CAPACITY_16  0x10
 #endif
 
-#ifdef SG_WANT_SHARED_MMAP_IO
-#ifndef SG_FLAG_SHARED_MMAP_IO
-#define SG_FLAG_SHARED_MMAP_IO 8
-#endif
-#ifndef SG_INFO_SHARED_MMAP_IO
-#define SG_INFO_SHARED_MMAP_IO 8
-#endif
-#endif
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
@@ -137,11 +123,6 @@ static int start_tm_valid = 0;
 static struct timeval start_tm;
 static int blk_sz = 0;
 
-#ifdef SG_WANT_SHARED_MMAP_IO
-static int shared_mm_req = 0;
-static int shared_mm_done = 0;
-#endif
-
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 struct flags_t {
@@ -152,9 +133,6 @@ struct flags_t {
     int dsync;
     int excl;
     int fua;
-#ifdef SG_WANT_SHARED_MMAP_IO
-    int smmap;
-#endif
 };
 
 
@@ -316,11 +294,7 @@ usage()
            "                treated as /dev/null\n"
            "    oflag       comma separated list from: [append,dio,direct,"
            "dpo,dsync,\n"
-#ifdef SG_WANT_SHARED_MMAP_IO
-           "                excl,fua,null,smmap]\n"
-#else
            "                excl,fua,null]\n"
-#endif
            "    seek        block position to start writing to OFILE\n"
            "    skip        block position to start reading from IFILE\n"
            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
@@ -556,7 +530,8 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     }
 
 #if 1
-    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) && (EINTR == errno))
+    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         sleep(1);
     if (res < 0) {
         perror(ME "SG_IO error (sg_read)");
@@ -564,7 +539,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     }
 #else
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -574,7 +549,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     }
 
     while (((res = read(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         perror("reading (rd) on sg device, error");
@@ -611,11 +586,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
  * -2 -> recoverable (ENOMEM), -1 -> unrecoverable error */
 static int
 sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
-         int bs, int cdbsz, int fua, int dpo, int do_mmap,
-#ifdef SG_WANT_SHARED_MMAP_IO
-         int mmap_shareable,
-#endif
-         int * diop)
+         int bs, int cdbsz, int fua, int dpo, int do_mmap, int * diop)
 {
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
@@ -634,23 +605,13 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     io_hdr.cmdp = wrCmd;
     io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
     io_hdr.dxfer_len = bs * blocks;
-#ifdef SG_WANT_SHARED_MMAP_IO
-    if (mmap_shareable || (! do_mmap))
-#else
     if (! do_mmap)
-#endif
         io_hdr.dxferp = buff;
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = (int)to_block;
-#ifdef SG_WANT_SHARED_MMAP_IO
-    if (mmap_shareable) {
-        io_hdr.flags |= SG_FLAG_SHARED_MMAP_IO;
-        ++shared_mm_req;
-    } else
-#endif
-    /* nasty conditional split */ if (do_mmap)
+    if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
     else if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
@@ -662,7 +623,8 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
 
 #if 1
-    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) && (EINTR == errno))
+    while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         sleep(1);
     if (res < 0) {
         perror(ME "SG_IO error (sg_write)");
@@ -670,7 +632,7 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
 #else
     while (((res = write(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -680,7 +642,7 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
 
     while (((res = read(sg_fd, &io_hdr, sizeof(io_hdr))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
         perror("writing (rd) on sg device, error");
@@ -706,10 +668,6 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
         return res;
     }
-#ifdef SG_WANT_SHARED_MMAP_IO
-    if ((mmap_shareable) && (SG_INFO_SHARED_MMAP_IO & io_hdr.info))
-        ++shared_mm_done;
-#endif
     if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         *diop = 0;      /* flag that dio not done (completely) */
@@ -750,10 +708,6 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->fua = 1;
         else if (0 == strcmp(cp, "null"))
             ;
-#ifdef SG_WANT_SHARED_MMAP_IO
-        else if (0 == strcmp(cp, "smmap"))
-            fp->smmap = 1;
-#endif
         else {
             fprintf(stderr, "unrecognised flag: %s\n", cp);
             return 1;
@@ -808,9 +762,6 @@ main(int argc, char * argv[])
     size_t psz;
     struct flags_t in_flags;
     struct flags_t out_flags;
-#ifdef SG_WANT_SHARED_MMAP_IO
-    int mmap_shareable = 0;
-#endif
     int ret = 0;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
@@ -921,7 +872,7 @@ main(int argc, char * argv[])
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
         else if ((0 == strncmp(key, "--help", 7)) ||
-                 (0 == strcmp(key, "-?"))) {
+                 (0 == strcmp(key, "-h")) || (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
         } else if ((0 == strncmp(key, "--vers", 6)) ||
@@ -1028,11 +979,7 @@ main(int argc, char * argv[])
                 perror(ebuff);
                 return SG_LIB_FILE_ERROR;
             }
-#ifdef SG_WANT_SHARED_MMAP_IO
-            mmap_shareable = 1;
-#endif
-        }
-        else {
+        } else {
             flags = O_RDONLY;
             if (in_flags.direct)
                 flags |= O_DIRECT;
@@ -1284,10 +1231,6 @@ main(int argc, char * argv[])
 
     if (wrkMmap) {
         wrkPos = wrkMmap;
-#ifdef SG_WANT_SHARED_MMAP_IO
-        if (! (mmap_shareable && out_flags.smmap &&  (FT_SG == out_type)))
-            mmap_shareable = 0;
-#endif
     } else {
         if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
             wrkBuff = (unsigned char *)malloc(blk_sz * bpt + psz);
@@ -1322,13 +1265,8 @@ main(int argc, char * argv[])
     }
     req_count = dd_count;
 
-#ifdef SG_WANT_SHARED_MMAP_IO
-    if (verbose && (dd_count > 0) && (0 == out_flags.dio) &&
-        (FT_SG == in_type) && (FT_SG == out_type) && (! mmap_shareable))
-#else
     if (verbose && (dd_count > 0) && (0 == out_flags.dio) &&
         (FT_SG == in_type) && (FT_SG == out_type))
-#endif
         fprintf(stderr, "Since both 'if' and 'of' are sg devices, only do "
                 "mmap-ed transfers on 'if'\n");
 
@@ -1353,7 +1291,7 @@ main(int argc, char * argv[])
         }
         else {
             while (((res = read(infd, wrkPos, blocks * blk_sz)) < 0) &&
-                   (EINTR == errno))
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "read(unix): count=%d, res=%d\n",
@@ -1384,11 +1322,7 @@ main(int argc, char * argv[])
             int dio_res = out_flags.dio;
 
             ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz, scsi_cdbsz_out,
-                           out_flags.fua, out_flags.dpo, do_mmap,
-#ifdef SG_WANT_SHARED_MMAP_IO
-                           mmap_shareable,
-#endif
-                           &dio_res);
+                           out_flags.fua, out_flags.dpo, do_mmap, &dio_res);
             if ((SG_LIB_CAT_UNIT_ATTENTION == ret) ||
                 (SG_LIB_CAT_ABORTED_COMMAND == ret)) {
                 fprintf(stderr, "Unit attention or aborted command, "
@@ -1396,11 +1330,7 @@ main(int argc, char * argv[])
                 dio_res = out_flags.dio;
                 ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz,
                                scsi_cdbsz_out, out_flags.fua, out_flags.dpo,
-                               do_mmap,
-#ifdef SG_WANT_SHARED_MMAP_IO
-                               mmap_shareable,
-#endif
-                               &dio_res);
+                               do_mmap, &dio_res);
             }
             if (0 != ret) {
                 fprintf(stderr, "sg_write failed, seek=%" PRId64 "\n", seek);
@@ -1415,8 +1345,8 @@ main(int argc, char * argv[])
         else if (FT_DEV_NULL == out_type)
             out_full += blocks; /* act as if written out without error */
         else {
-            while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0)
-                   && (EINTR == errno))
+            while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0) &&
+                   ((EINTR == errno) || (EAGAIN == errno)))
                 ;
             if (verbose > 2)
                 fprintf(stderr, "write(unix): count=%d, res=%d\n",
@@ -1479,11 +1409,5 @@ main(int argc, char * argv[])
     if (num_dio_not_done)
         fprintf(stderr, ">> dio requested but _not_ done %d times\n",
                 num_dio_not_done);
-#ifdef SG_WANT_SHARED_MMAP_IO
-    if ((verbose > 0) && out_flags.smmap && (shared_mm_req > 0)) {
-        fprintf(stderr, ">> shared_mm_req=%d,  shared_mm_done=%d\n",
-                shared_mm_req, shared_mm_done);
-    }
-#endif
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

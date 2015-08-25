@@ -3,7 +3,7 @@
  *
  * Retrieve / set RDAC options.
  *
- * Copyright (C) 2006-2007 Hannes Reinecke <hare@suse.de>
+ * Copyright (C) 2006-2015 Hannes Reinecke <hare@suse.de>
  *
  * Based on sg_modes.c and sg_emc_trespass.c; credits from there apply.
  *
@@ -25,13 +25,21 @@
 #include "sg_cmds_basic.h"
 
 
-static const char * version_str = "1.06 20130507";
+static const char * version_str = "1.08 20150407";
 
 unsigned char mode6_hdr[] = {
-    75, /* Length */
+    0x75, /* Length */
     0, /* medium */
     0, /* params */
     8, /* Block descriptor length */
+};
+
+unsigned char mode10_hdr[] = {
+    0x01, 0x18, /* Length */
+    0, /* medium */
+    0, /* params */
+    0, 0, /* reserved */
+    0, 0, /* block descriptor length */
 };
 
 unsigned char block_descriptor[] = {
@@ -41,20 +49,33 @@ unsigned char block_descriptor[] = {
     0, 0x02, 0, /* 512 byte blocks */
 };
 
-struct rdac_legacy_page {
-    unsigned char  page_code;
-    unsigned char  page_length;
-    char           current_serial[16];
-    char           alternate_serial[16];
+struct rdac_page_common {
+    unsigned char  current_serial[16];
+    unsigned char  alternate_serial[16];
     unsigned char  current_mode_msb;
     unsigned char  current_mode_lsb;
     unsigned char  alternate_mode_msb;
     unsigned char  alternate_mode_lsb;
     unsigned char  quiescence;
     unsigned char  options;
+};
+
+struct rdac_legacy_page {
+    unsigned char  page_code;
+    unsigned char  page_length;
+    struct rdac_page_common attr;
     unsigned char  lun_table[32];
     unsigned char  lun_table_exp[32];
     unsigned short reserved;
+};
+
+struct rdac_expanded_page {
+    unsigned char  page_code;
+    unsigned char  subpage_code;
+    unsigned char  page_length[2];
+    struct rdac_page_common attr;
+    unsigned char  lun_table[256];
+    unsigned char  reserved[2];
 };
 
 static int do_verbose = 0;
@@ -83,31 +104,56 @@ static void dump_mode_page( unsigned char *page, int len )
 #define RDAC_CONTROLLER_PAGE_LEN 0x68
 #define LEGACY_PAGE 0x00
 #define EXPANDED_LUN_SPACE_PAGE 0x01
+#define EXPANDED_LUN_SPACE_PAGE_LEN 0x128
 #define RDAC_FAIL_ALL_PATHS 0x1
 #define RDAC_FAIL_SELECTED_PATHS 0x2
 #define RDAC_FORCE_QUIESCENCE 0x2
 #define RDAC_QUIESCENCE_TIME 10
 
-static int fail_all_paths(int fd)
+static int fail_all_paths(int fd, int use_6_byte)
 {
-        unsigned char fail_paths_pg[118];
+        unsigned char fail_paths_pg[308];
         struct rdac_legacy_page *rdac_page;
+        struct rdac_expanded_page *rdac_page_exp;
+        struct rdac_page_common *rdac_common = NULL;
+
         int res;
         char b[80];
 
-        memset(fail_paths_pg, 0, 118);
-        memcpy(fail_paths_pg, mode6_hdr, 4);
-        memcpy(fail_paths_pg + 4, block_descriptor, 8);
-        rdac_page = (struct rdac_legacy_page *)(fail_paths_pg + 4 + 8);
-        rdac_page->page_code = RDAC_CONTROLLER_PAGE | 0x40;
-        rdac_page->page_length = RDAC_CONTROLLER_PAGE_LEN;
-        rdac_page->quiescence = RDAC_QUIESCENCE_TIME;
-        rdac_page->options = RDAC_FORCE_QUIESCENCE;
-        rdac_page->current_mode_lsb = RDAC_FAIL_ALL_PATHS;
+        memset(fail_paths_pg, 0, 308);
+        if (use_6_byte) {
+                memcpy(fail_paths_pg, mode6_hdr, 4);
+                memcpy(fail_paths_pg + 4, block_descriptor, 8);
+                rdac_page = (struct rdac_legacy_page *)(fail_paths_pg + 4 + 8);
+                rdac_page->page_code = RDAC_CONTROLLER_PAGE;
+                rdac_page->page_length = RDAC_CONTROLLER_PAGE_LEN;
+                rdac_common = &rdac_page->attr;
+        } else {
+                memcpy(fail_paths_pg, mode10_hdr, 8);
+                rdac_page_exp = (struct rdac_expanded_page *)
+                                (fail_paths_pg + 8);
+                rdac_page_exp->page_code = RDAC_CONTROLLER_PAGE | 0x40;
+                rdac_page_exp->subpage_code = 0x1;
+                rdac_page_exp->page_length[0] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
+                rdac_page_exp->page_length[1] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
+                rdac_common = &rdac_page_exp->attr;
+        }
 
-        res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
-                                 fail_paths_pg, 118,
-                                 1, (do_verbose ? 2 : 0));
+        rdac_common->current_mode_lsb =  RDAC_FAIL_ALL_PATHS;
+        rdac_common->quiescence = RDAC_QUIESCENCE_TIME;
+        rdac_common->options = RDAC_FORCE_QUIESCENCE;
+
+        if (use_6_byte) {
+                res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
+                                        fail_paths_pg, 118,
+                                        1, (do_verbose ? 2 : 0));
+        } else {
+                res = sg_ll_mode_select10(fd, 1 /* pf */, 0 /* sp */,
+                                        fail_paths_pg, 308,
+                                        1, (do_verbose ? 2: 0));
+        }
 
         switch (res) {
         case 0:
@@ -123,28 +169,58 @@ static int fail_all_paths(int fd)
         return res;
 }
 
-static int fail_this_path(int fd, int lun)
+static int fail_this_path(int fd, int lun, int use_6_byte)
 {
-        unsigned char fail_paths_pg[118];
+        unsigned char fail_paths_pg[308];
         struct rdac_legacy_page *rdac_page;
+        struct rdac_expanded_page *rdac_page_exp;
+        struct rdac_page_common *rdac_common = NULL;
         int res;
         char b[80];
 
-        memset(fail_paths_pg, 0, 118);
-        memcpy(fail_paths_pg, mode6_hdr, 4);
-        memcpy(fail_paths_pg + 4, block_descriptor, 8);
-        rdac_page = (struct rdac_legacy_page *)(fail_paths_pg + 4 + 8);
-        rdac_page->page_code = RDAC_CONTROLLER_PAGE | 0x40;
-        rdac_page->page_length = RDAC_CONTROLLER_PAGE_LEN;
-        rdac_page->current_mode_lsb =  RDAC_FAIL_SELECTED_PATHS;
-        rdac_page->quiescence = RDAC_QUIESCENCE_TIME;
-        rdac_page->options = RDAC_FORCE_QUIESCENCE;
-        memset(rdac_page->lun_table, 0x0, 32);
-        rdac_page->lun_table[lun] = 0x81;
+        if (use_6_byte && lun > 32) {
+                fprintf(stderr, "must use 10 byte cdb to fail luns over 32\n");
+                return -1;
+        }
 
-        res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
-                                 fail_paths_pg, 118,
-                                 1, (do_verbose ? 2 : 0));
+        memset(fail_paths_pg, 0, 308);
+        if (use_6_byte) {
+                memcpy(fail_paths_pg, mode6_hdr, 4);
+                memcpy(fail_paths_pg + 4, block_descriptor, 8);
+                rdac_page = (struct rdac_legacy_page *)(fail_paths_pg + 4 + 8);
+                rdac_page->page_code = RDAC_CONTROLLER_PAGE;
+                rdac_page->page_length = RDAC_CONTROLLER_PAGE_LEN;
+                rdac_common = &rdac_page->attr;
+                memset(rdac_page->lun_table, 0x0, 32);
+                rdac_page->lun_table[lun] = 0x81;
+        } else {
+                memcpy(fail_paths_pg, mode10_hdr, 8);
+                rdac_page_exp = (struct rdac_expanded_page *)
+                                (fail_paths_pg + 8);
+                rdac_page_exp->page_code = RDAC_CONTROLLER_PAGE | 0x40;
+                rdac_page_exp->subpage_code = 0x1;
+                rdac_page_exp->page_length[0] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
+                rdac_page_exp->page_length[1] =
+                                EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
+                rdac_common = &rdac_page_exp->attr;
+                memset(rdac_page_exp->lun_table, 0x0, 256);
+                rdac_page_exp->lun_table[lun] = 0x81;
+        }
+
+        rdac_common->current_mode_lsb =  RDAC_FAIL_SELECTED_PATHS;
+        rdac_common->quiescence = RDAC_QUIESCENCE_TIME;
+        rdac_common->options = RDAC_FORCE_QUIESCENCE;
+
+        if (use_6_byte) {
+                res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
+                                        fail_paths_pg, 118,
+                                        1, (do_verbose ? 2 : 0));
+        } else {
+                res = sg_ll_mode_select10(fd, 1 /* pf */, 0 /* sp */,
+                                        fail_paths_pg, 308,
+                                        1, (do_verbose ? 2: 0));
+        }
 
         switch (res) {
         case 0:
@@ -161,16 +237,29 @@ static int fail_this_path(int fd, int lun)
         return res;
 }
 
-static void print_rdac_mode( unsigned char *ptr )
+static void print_rdac_mode( unsigned char *ptr, int subpg)
 {
-        struct rdac_legacy_page *rdac_ptr;
-        int i, k, bd_len;
+        struct rdac_legacy_page *legacy;
+        struct rdac_expanded_page *expanded;
+        struct rdac_page_common *rdac_ptr = NULL;
+        unsigned char * lun_table = NULL;
+        int i, k, bd_len, lun_table_len;
 
-        bd_len = ptr[3];
+        if (subpg == 1) {
+                bd_len = ptr[7];
+                expanded = (struct rdac_expanded_page *)(ptr + 8 + bd_len);
+                rdac_ptr = &expanded->attr;
+                lun_table = expanded->lun_table;
+                lun_table_len = 256;
+        } else {
+                bd_len = ptr[3];
+                legacy = (struct rdac_legacy_page *)(ptr + 4 + bd_len);
+                rdac_ptr = &legacy->attr;
+                lun_table = legacy->lun_table;
+                lun_table_len = 32;
+        }
 
-        rdac_ptr = (struct rdac_legacy_page *)(ptr + 4 + bd_len);
-
-        printf("RDAC Legacy page\n");
+        printf("RDAC %s page\n", (subpg == 1) ? "Expanded" : "Legacy");
         printf("  Controller serial: %s\n",
                rdac_ptr->current_serial);
         printf("  Alternate controller serial: %s\n",
@@ -211,9 +300,6 @@ static void print_rdac_mode( unsigned char *ptr )
         case 0x01:
                 printf("alternate controller present; ");
                 break;
-        case 0x02:
-                printf("active/active mode; ");
-                break;
         default:
                 printf("(Unknown status 0x%x); ",
                        rdac_ptr->alternate_mode_msb);
@@ -229,7 +315,10 @@ static void print_rdac_mode( unsigned char *ptr )
         case 0x2:
                 printf("Dual active mode\n");
                 break;
-        case 0x04:
+        case 0x3:
+                printf("Not present\n");
+                break;
+        case 0x4:
                 printf("held in reset\n");
                 break;
         default:
@@ -238,11 +327,16 @@ static void print_rdac_mode( unsigned char *ptr )
         }
         printf("  Quiescence timeout: %d\n", rdac_ptr->quiescence);
         printf("  RDAC option 0x%x\n", rdac_ptr->options);
-        printf ("  LUN Table:\n");
-        for (k = 0; k < 32; k += 8) {
-                printf("    %x:",k / 8);
-                for (i = 0; i < 8; i++) {
-                        switch (rdac_ptr->lun_table[k + i]) {
+        printf("    ALUA: %s\n", (rdac_ptr->options & 0x4 ? "Enabled" :
+                                                            "Disabled" ));
+        printf("    Force Quiescence: %s\n", (rdac_ptr->options & 0x2 ?
+                                              "Enabled" : "Disabled" ));
+        printf ("  LUN Table: (p = preferred, a = alternate, u = utm lun)\n");
+        printf("         0 1 2 3 4 5 6 7  8 9 a b c d e f\n");
+        for (k = 0; k < lun_table_len; k += 16) {
+                printf("    0x%x:",k / 16);
+                for (i = 0; i < 16; i++) {
+                        switch (lun_table[k + i]) {
                         case 0x0:
                                 printf(" x");
                                 break;
@@ -259,6 +353,9 @@ static void print_rdac_mode( unsigned char *ptr )
                                 printf(" ?");
                                 break;
                         }
+                        if (i == 7) {
+                                printf(" ");
+                        }
                 }
                 printf("\n");
         }
@@ -266,8 +363,9 @@ static void print_rdac_mode( unsigned char *ptr )
 
 static void usage()
 {
-    printf("Usage:  sg_rdac [-a] [-f=LUN] [-v] [-V] DEVICE\n"
+    printf("Usage:  sg_rdac [-6] [-a] [-f=LUN] [-v] [-V] DEVICE\n"
            "  where:\n"
+           "    -6        use 6 byte cdbs for mode sense/select\n"
            "    -a        transfer all devices to the controller\n"
            "              serving DEVICE.\n"
            "    -f=LUN    transfer the device at LUN to the\n"
@@ -288,6 +386,7 @@ int main(int argc, char * argv[])
         int fail_all = 0;
         int fail_path = 0;
         int ret = 0;
+        int use_6_byte = 0;
 
         if (argc < 2) {
                 usage ();
@@ -304,6 +403,9 @@ int main(int argc, char * argv[])
                 }
                 else if (!strcmp(*argptr, "-a")) {
                         ++fail_all;
+                }
+                else if (!strcmp(*argptr, "-6")) {
+                        use_6_byte = 1;
                 }
                 else if (!strcmp(*argptr, "-V")) {
                         fprintf(stderr, "sg_rdac version: %s\n", version_str);
@@ -336,18 +438,25 @@ int main(int argc, char * argv[])
         }
 
         if (fail_all) {
-                res = fail_all_paths(fd);
+                res = fail_all_paths(fd, use_6_byte);
         } else if (fail_path) {
-                res = fail_this_path(fd, lun);
+                res = fail_this_path(fd, lun, use_6_byte);
         } else {
-                res = sg_ll_mode_sense6(fd, /*DBD*/ 0, /* page control */0,
-                                        0x2c, 0, rsp_buff, 252,
-                                        1, do_verbose);
+                if (use_6_byte)
+                        res = sg_ll_mode_sense6(fd, /* DBD */ 0, /* PC */0,
+                                                0x2c, 0, rsp_buff, 252,
+                                                1, do_verbose);
+                else
+                        res = sg_ll_mode_sense10(fd, /* llbaa */ 0,
+                                                 /* DBD */ 0,
+                                                 /* page control */0,
+                                                 0x2c, 0x1, rsp_buff, 308,
+                                                 1, do_verbose);
 
                 if (!res) {
                         if (do_verbose)
                                 dump_mode_page(rsp_buff, rsp_buff[0]);
-                        print_rdac_mode(rsp_buff);
+                        print_rdac_mode(rsp_buff, !use_6_byte);
                 } else {
                         if (SG_LIB_CAT_INVALID_OP == res)
                                 fprintf(stderr, ">>>>>> try again without "

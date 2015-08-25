@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.01 20150119";  /* spc5r02 + sbc4r03 */
+static const char * version_str = "1.05 20150529";  /* spc5r02 + sbc4r05 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -280,7 +280,10 @@ usage()
             "                       number unless hex indicator "
             "is given (e.g. '0x83')\n"
             "    --quiet|-q      suppress some output when decoding\n"
-            "    --raw|-r        output page in binary\n"
+            "    --raw|-r        output page in binary; if --inhex=FN is "
+            "also\n"
+            "                    given, FN is in binary (else FN is in "
+            "hex)\n"
             "    --vendor=VP | -M VP    vendor/product abbreviation [or "
             "number]\n"
             "    --verbose|-v    increase verbosity\n"
@@ -391,7 +394,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if (isxdigit(line[0])) {
                 carry_over[1] = line[0];
                 carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%x", &h))
+                if (1 == sscanf(carry_over, "%4x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
                     pr2serr("%s: carry_over error ['%s'] around line %d\n",
@@ -414,7 +417,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         if ('#' == *lcp)
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k])) {
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                     j + 1, m + k + 1);
             goto bad;
@@ -438,7 +441,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             off += k;
         } else {
             for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
+                if (1 == sscanf(lcp, "%10x", &h)) {
                     if (h > 0xff) {
                         pr2serr("%s: hex number larger than 0xff in line "
                                 "%d, pos %d\n", __func__, j + 1,
@@ -461,7 +464,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                     if ('\0' == *lcp)
                         break;
                 } else {
-                    if ('#' == *lcp) {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
                         --k;
                         break;
                     }
@@ -1946,7 +1949,7 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
                        value / 1000, value % 1000,
                        power_unit_arr[(ucp[1] & 0x7) - 1]);
             else
-                printf("    Maximum power consumption: %d %s\n",
+                printf("    Maximum power consumption: %u %s\n",
                        value, power_unit_arr[ucp[1] & 0x7]);
         }
     }
@@ -2217,7 +2220,7 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
                 u = sg_get_unaligned_be32(ucp + 20);
                 printf("  Maximum Token Lifetime: %u seconds\n", u);
                 u = sg_get_unaligned_be32(ucp + 24);
-                printf("  Maximum Token inactivity timeout: %d\n", u);
+                printf("  Maximum Token inactivity timeout: %u\n", u);
                 decode_rod_descriptor(ucp + 48,
                                       sg_get_unaligned_be16(ucp + 46));
                 break;
@@ -2497,7 +2500,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         else if ((u < 0x401) || (0xffff == u))
             printf("  Reserved [0x%x]\n", u);
         else
-            printf("  Nominal rotation rate: %d rpm\n", u);
+            printf("  Nominal rotation rate: %u rpm\n", u);
         u = buff[6];
         k = sizeof(product_type_arr) / sizeof(product_type_arr[0]);
         if (u < k)
@@ -2612,6 +2615,7 @@ decode_sup_block_lens_vpd(unsigned char * buff, int len)
         u = sg_get_unaligned_be32(ucp);
         printf("  Logical block length: %u\n", u);
         printf("    P_I_I_SUP: %d\n", !!(ucp[4] & 0x40));
+        printf("    NO_PI_CHK: %d\n", !!(ucp[4] & 0x8));  /* sbc4r05 */
         printf("    GRD_CHK: %d\n", !!(ucp[4] & 0x4));
         printf("    APP_CHK: %d\n", !!(ucp[4] & 0x2));
         printf("    REF_CHK: %d\n", !!(ucp[4] & 0x1));

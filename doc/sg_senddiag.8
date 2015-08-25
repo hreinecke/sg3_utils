@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_SENDDIAG "8" "April 2015" "sg3_utils\-1.41" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -49,6 +49,15 @@ print usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 outputs response from RECEIVE DIAGNOSTIC RESULTS in hex rather than decode it.
+Only the Supported Diagnostic Pages diagnostic page (i.e. page_code=0) is
+decoded; other pages (e.g. those used by SES) are output in hex.
+.br
+If \fI\-\-hex\fR is used once, the hex output has a relative address at the
+start of each line. If \fI\-\-hex\fR is used twice, then ASCII is shown to
+the right of each line of hex. If \fI\-\-hex\fR is used three time or more,
+only the hex is output, in two character pairs (i.e. a byte) space separated
+and up to 16 bytes per line. This latter form, if placed in a file or piped
+through to another invocation, is suitable for the \fI\-\-raw=\-\fR option.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 when a \fIDEVICE\fR is also given lists the names of all diagnostic pages
@@ -267,7 +276,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003\-2014 Douglas Gilbert
+Copyright \(co 2003\-2015 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

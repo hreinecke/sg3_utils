@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.00 20141219";    /* ses3r08 */
+static const char * version_str = "2.01 20150311";    /* ses3r08 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -3583,9 +3583,9 @@ try_again:
             if (NULL == ed_ucp)
                 continue;
             desc_len = sg_get_unaligned_be16(ed_ucp + 2);
-            /* some element descriptor strings have a trailing NULL and
-             * count it in their length; adjust */
-            if ('\0' == ed_ucp[4 + desc_len - 1])
+            /* some element descriptor strings have trailing NULLs and
+             * count them in their length; adjust */
+            while (desc_len && ('\0' == ed_ucp[4 + desc_len - 1]))
                 --desc_len;
             if (desc_len != dn_len)
                 continue;
@@ -3977,9 +3977,9 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             if (NULL == ed_ucp)
                 continue;
             desc_len = sg_get_unaligned_be16(ed_ucp + 2);
-            /* some element descriptor strings have a trailing NULL and
-             * count it; adjust */
-            if ('\0' == ed_ucp[4 + desc_len - 1])
+            /* some element descriptor strings have trailing NULLs and
+             * count them; adjust */
+            while (desc_len && ('\0' == ed_ucp[4 + desc_len - 1]))
                 --desc_len;
             if (desc_len != dn_len)
                 continue;

@@ -29,7 +29,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.19 20150108";    /* spc5r02 */
+static const char * version_str = "1.20 20150217";    /* spc5r02 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -38,7 +38,7 @@ static const char * version_str = "1.19 20150108";    /* spc5r02 */
 #define WRITE_BUFFER_CMD 0x3b
 #define WRITE_BUFFER_CMDLEN 10
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
-#define DEF_PT_TIMEOUT 120       /* 120 seconds, 2 minutes */
+#define DEF_PT_TIMEOUT 300      /* 300 seconds, 5 minutes */
 
 static struct option long_options[] = {
         {"bpw", required_argument, 0, 'b'},
@@ -51,6 +51,7 @@ static struct option long_options[] = {
         {"raw", no_argument, 0, 'r'},
         {"skip", required_argument, 0, 's'},
         {"specific", required_argument, 0, 'S'},
+        {"timeout", required_argument, 0, 't' },
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -85,8 +86,8 @@ usage()
             "                       [--length=LEN] [--mode=MO] "
             "[--offset=OFF] [--raw]\n"
             "                       [--skip=SKIP] [--specific=MS] "
-            "[--verbose] [--version]\n"
-            "                       DEVICE\n"
+            "[--timeout=TO]\n"
+            "                       [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --bpw=CS|-b CS         CS is chunk size: bytes per write "
             "buffer\n"
@@ -110,6 +111,8 @@ usage()
             "reading\n"
             "    --specific=MS|-S MS    mode specific value; 3 bit field "
             "(0 to 7)\n"
+            "    --timeout=TO|-t TO     command timeout in seconds (def: "
+            "300)\n"
             "    --verbose|-v           increase verbosity\n"
             "    --version|-V           print version string and exit\n\n"
             "Performs one or more SCSI WRITE BUFFER commands. Use '-m xxx' "
@@ -186,7 +189,7 @@ print_modes(void)
             "dmc_offs_ev_defer mode downloads.\n");
 }
 
-/* <<<< This function will be moved to the library in the future >>> */
+/* <<<< This function may be moved to the library in the future >>> */
 /* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
@@ -195,7 +198,7 @@ print_modes(void)
 static int
 sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
                       uint32_t buffer_offset, void * paramp,
-                      uint32_t param_len, int noisy, int verbose)
+                      uint32_t param_len, int to_secs, int noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     uint8_t wbufCmdBlk[WRITE_BUFFER_CMDLEN] =
@@ -237,7 +240,7 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
     set_scsi_pt_cdb(ptvp, wbufCmdBlk, sizeof(wbufCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, to_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, "Write buffer", res, 0, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
@@ -273,6 +276,7 @@ main(int argc, char * argv[])
     int wb_mode = 0;
     int wb_offset = 0;
     int wb_skip = 0;
+    int wb_timeout = DEF_PT_TIMEOUT;
     int wb_mspec = 0;
     int verbose = 0;
     const char * device_name = NULL;
@@ -286,7 +290,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:hi:I:l:m:o:rs:S:vV", long_options,
+        c = getopt_long(argc, argv, "b:hi:I:l:m:o:rs:S:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -367,9 +371,16 @@ main(int argc, char * argv[])
             }
             break;
         case 'S':
-           wb_mspec = sg_get_num(optarg);
-           if ((wb_mspec < 0) || (wb_mspec > 7)) {
+            wb_mspec = sg_get_num(optarg);
+            if ((wb_mspec < 0) || (wb_mspec > 7)) {
                 pr2serr("expected argument to '--specific' to be 0 to 7\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
+        case 't':
+            wb_timeout = sg_get_num(optarg);
+            if (wb_timeout < 0) {
+                pr2serr("Invalid argument to '--timeout'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -516,8 +527,8 @@ main(int argc, char * argv[])
                         " offset=%d, len=%d\n", wb_mode, wb_mspec, wb_id,
                         wb_offset + k, n);
             res = sg_ll_write_buffer_v2(sg_fd, wb_mode, wb_mspec, wb_id,
-                                        wb_offset + k, dop + k, n, 1,
-                                        verbose);
+                                        wb_offset + k, dop + k, n,
+                                        wb_timeout, 1, verbose);
             if (res)
                 break;
         }
@@ -525,7 +536,7 @@ main(int argc, char * argv[])
             if (verbose)
                 pr2serr("sending Activate deferred microcode [0xf]\n");
             res = sg_ll_write_buffer_v2(sg_fd, MODE_ACTIVATE_MC, 0, 0, 0,
-                                        NULL, 0, 1, verbose);
+                                        NULL, 0, wb_timeout, 1, verbose);
         }
     } else {
         if (verbose)
@@ -533,7 +544,8 @@ main(int argc, char * argv[])
                     "id=%d, offset=%d, len=%d\n", wb_mode, wb_mspec, wb_id,
                     wb_offset, wb_len);
         res = sg_ll_write_buffer_v2(sg_fd, wb_mode, wb_mspec, wb_id,
-                                    wb_offset, dop, wb_len, 1, verbose);
+                                    wb_offset, dop, wb_len, wb_timeout, 1,
+                                    verbose);
     }
     if (0 != res) {
         char b[80];

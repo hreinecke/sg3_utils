@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014 Douglas Gilbert.
+ * Copyright (c) 2011-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.96 20141006";
+static const char * version_str = "0.97 20150511";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -201,7 +201,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(sg_warnings_strm, "Sanitize: out of memory\n");
+        fprintf(stderr, "Sanitize: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, sanCmdBlk, sizeof(sanCmdBlk));

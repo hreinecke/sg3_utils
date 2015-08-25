@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.11 20150115";  /* spc5r02, sbc4r02 */
+const char * sg_lib_version_str = "2.14 20150429";  /* spc5r02, sbc4r02 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -550,7 +550,7 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20150103 */
+ * The following should match asc-num.txt dated 20150423 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -688,6 +688,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0C,0x0E,"Multiple write errors"},
     {0x0C,0x0F,"Defects in error window"},
     {0x0C,0x10,"Incomplete multiple atomic write operations"},
+    {0x0C,0x11,"Write error - recovery scan needed"},
+    {0x0C,0x12,"Write error - insufficient zone resources"},
     {0x0D,0x00,"Error detected by third party temporary initiator"},
     {0x0D,0x01,"Third party device failure"},
     {0x0D,0x02,"Copy target device not reachable"},
@@ -1008,6 +1010,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3F,0x14,"iSCSI IP address changed"},
     {0x3F,0x15,"Inspect referrals sense descriptors"},
     {0x3F,0x16,"Microcode has been changed without reset"},
+    {0x3F,0x17,"Zone transition to full"},
 
     /*
      * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
@@ -1101,6 +1104,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x0c,"Insufficient resources to create rod"},
     {0x55,0x0d,"Insufficient resources to create rod token"},
     {0x55,0x0e,"Insufficient zone resources"},
+    {0x55,0x0f,"Insufficient zone resources to complete write"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},

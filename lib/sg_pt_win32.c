@@ -1,15 +1,16 @@
 /*
- * Copyright (c) 2006-2014 Douglas Gilbert.
+ * Copyright (c) 2006-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.15 20140901 */
+/* sg_pt_win32 version 1.16 20150511 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
@@ -99,6 +100,26 @@ static int spt_direct = 1;
 static int spt_direct = 0;
 #endif
 
+#ifdef __GNUC__
+static int pr2ws(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2ws(const char * fmt, ...);
+#endif
+
+
+static int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 
 /* Request SPT direct interface when state_direct is 1, state_direct set
  * to 0 for the SPT indirect interface. */
@@ -146,8 +167,6 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     struct sg_pt_handle * shp;
     char buff[8];
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     share_mode = (O_EXCL & flags) ? 0 : (FILE_SHARE_READ | FILE_SHARE_WRITE);
     /* lock */
     for (k = 0; k < MAX_OPEN_SIMULT; k++)
@@ -155,8 +174,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
             break;
     if (k == MAX_OPEN_SIMULT) {
         if (verbose)
-            fprintf(sg_warnings_strm, "too many open handles "
-                    "(%d)\n", MAX_OPEN_SIMULT);
+            pr2ws("too many open handles (%d)\n", MAX_OPEN_SIMULT);
         return -EMFILE;
     } else
         handle_arr[k].in_use = 1;
@@ -190,8 +208,8 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
                              &adapter_num, &bus, &target, &lun);
                 if (num < 3) {
                     if (verbose)
-                        fprintf(sg_warnings_strm, "expected format like: "
-                                "'SCSI<port>:<bus>.<target>[.<lun>]'\n");
+                        pr2ws("expected format like: "
+                              "'SCSI<port>:<bus>.<target>[.<lun>]'\n");
                     shp->in_use = 0;
                     return -EINVAL;
                 }
@@ -218,8 +236,8 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
                          share_mode, NULL, OPEN_EXISTING, 0, NULL);
     if (shp->fh == INVALID_HANDLE_VALUE) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Windows CreateFile error=%u\n",
-                    (unsigned int)GetLastError());
+            pr2ws("Windows CreateFile error=%u\n",
+                  (unsigned int)GetLastError());
         shp->in_use = 0;
         return -ENODEV;
     }
@@ -244,8 +262,7 @@ scsi_pt_close_device(int device_fd)
         return -ENODEV;
     shp = handle_arr + index;
     if ((! CloseHandle(shp->fh)) && shp->verbose)
-        fprintf(sg_warnings_strm, "Windows CloseHandle error=%u\n",
-                (unsigned int)GetLastError());
+        pr2ws("Windows CloseHandle error=%u\n", (unsigned int)GetLastError());
     shp->bus = 0;
     shp->target = 0;
     shp->lun = 0;
@@ -260,6 +277,12 @@ construct_scsi_pt_obj()
 {
     struct sg_pt_win32_scsi * psp;
     struct sg_pt_base * vp = NULL;
+
+    /* The following 2 lines are temporary. It is to avoid a NULL pointer
+     * crash when an old utility is used with a newer library built after
+     * the sg_warnings_strm cleanup */
+    if (NULL == sg_warnings_strm)
+        sg_warnings_strm = stderr;
 
     psp = (struct sg_pt_win32_scsi *)calloc(sizeof(struct sg_pt_win32_scsi),
                                             1);
@@ -454,31 +477,29 @@ do_scsi_pt_direct(struct sg_pt_base * vp, int device_fd, int time_secs,
     BOOL status;
     DWORD returned;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     psp->os_err = 0;
     if (psp->in_err) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Replicated or unused set_scsi_pt...\n");
+            pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (0 == psp->swb_d.spt.CdbLength) {
         if (verbose)
-            fprintf(sg_warnings_strm, "No command (cdb) given\n");
+            pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
     index = device_fd - WIN32_FDOFFSET;
     if ((index < 0) || (index >= WIN32_FDOFFSET)) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Bad file descriptor\n");
+            pr2ws("Bad file descriptor\n");
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
     shp = handle_arr + index;
     if (0 == shp->in_use) {
         if (verbose)
-            fprintf(sg_warnings_strm, "File descriptor closed??\n");
+            pr2ws("File descriptor closed??\n");
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
@@ -490,20 +511,20 @@ do_scsi_pt_direct(struct sg_pt_base * vp, int device_fd, int time_secs,
     psp->swb_d.spt.TimeOutValue = time_secs;
     psp->swb_d.spt.DataTransferLength = psp->dxfer_len;
     if (verbose > 4) {
-        fprintf(stderr, " spt_direct, adapter: %s  Length=%d ScsiStatus=%d "
-                "PathId=%d TargetId=%d Lun=%d\n", shp->adapter,
-                (int)psp->swb_d.spt.Length,
-                (int)psp->swb_d.spt.ScsiStatus, (int)psp->swb_d.spt.PathId,
-                (int)psp->swb_d.spt.TargetId, (int)psp->swb_d.spt.Lun);
-        fprintf(stderr, "    CdbLength=%d SenseInfoLength=%d DataIn=%d "
-                "DataTransferLength=%u\n",
-                (int)psp->swb_d.spt.CdbLength,
-                (int)psp->swb_d.spt.SenseInfoLength,
-                (int)psp->swb_d.spt.DataIn,
-                (unsigned int)psp->swb_d.spt.DataTransferLength);
-        fprintf(stderr, "    TimeOutValue=%u SenseInfoOffset=%u\n",
-                (unsigned int)psp->swb_d.spt.TimeOutValue,
-                (unsigned int)psp->swb_d.spt.SenseInfoOffset);
+        pr2ws(" spt_direct, adapter: %s  Length=%d ScsiStatus=%d PathId=%d "
+              "TargetId=%d Lun=%d\n", shp->adapter,
+              (int)psp->swb_d.spt.Length, (int)psp->swb_d.spt.ScsiStatus,
+              (int)psp->swb_d.spt.PathId, (int)psp->swb_d.spt.TargetId,
+              (int)psp->swb_d.spt.Lun);
+        pr2ws("    CdbLength=%d SenseInfoLength=%d DataIn=%d "
+              "DataTransferLength=%u\n",
+              (int)psp->swb_d.spt.CdbLength,
+              (int)psp->swb_d.spt.SenseInfoLength,
+              (int)psp->swb_d.spt.DataIn,
+              (unsigned int)psp->swb_d.spt.DataTransferLength);
+        pr2ws("    TimeOutValue=%u SenseInfoOffset=%u\n",
+              (unsigned int)psp->swb_d.spt.TimeOutValue,
+              (unsigned int)psp->swb_d.spt.SenseInfoOffset);
     }
     psp->swb_d.spt.DataBuffer = psp->dxferp;
     status = DeviceIoControl(shp->fh, IOCTL_SCSI_PASS_THROUGH_DIRECT,
@@ -518,8 +539,7 @@ do_scsi_pt_direct(struct sg_pt_base * vp, int device_fd, int time_secs,
 
         u = (unsigned int)GetLastError();
         if (verbose)
-            fprintf(sg_warnings_strm, "Windows DeviceIoControl error=%u\n",
-                    u);
+            pr2ws("Windows DeviceIoControl error=%u\n", u);
         psp->transport_err = (int)u;
         psp->os_err = EIO;
         return 0;       /* let app find transport error */
@@ -553,32 +573,29 @@ do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
     BOOL status;
     DWORD returned;
 
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
     psp->os_err = 0;
     if (psp->in_err) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Replicated or unused "
-                    "set_scsi_pt...\n");
+            pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (0 == psp->swb_i.spt.CdbLength) {
         if (verbose)
-            fprintf(sg_warnings_strm, "No command (cdb) given\n");
+            pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
     index = device_fd - WIN32_FDOFFSET;
     if ((index < 0) || (index >= WIN32_FDOFFSET)) {
         if (verbose)
-            fprintf(sg_warnings_strm, "Bad file descriptor\n");
+            pr2ws("Bad file descriptor\n");
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
     shp = handle_arr + index;
     if (0 == shp->in_use) {
         if (verbose)
-            fprintf(sg_warnings_strm, "File descriptor closed??\n");
+            pr2ws("File descriptor closed??\n");
         psp->os_err = ENODEV;
         return -psp->os_err;
     }
@@ -588,15 +605,14 @@ do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
         struct sg_pt_win32_scsi * epsp;
 
         if (verbose > 4)
-            fprintf(sg_warnings_strm, "spt_indirect: dxfer_len (%d) too "
-                    "large for initial data\n  buffer (%d bytes), try "
-                    "enlarging\n", psp->dxfer_len,
-                    (int)sizeof(psp->swb_i.ucDataBuf));
+            pr2ws("spt_indirect: dxfer_len (%d) too large for initial data\n"
+                  "  buffer (%d bytes), try enlarging\n", psp->dxfer_len,
+                  (int)sizeof(psp->swb_i.ucDataBuf));
         epsp = (struct sg_pt_win32_scsi *)
                calloc(sizeof(struct sg_pt_win32_scsi) + extra, 1);
         if (NULL == epsp) {
-            fprintf(sg_warnings_strm, "do_scsi_pt: failed to enlarge data "
-                    "buffer to %d bytes\n", psp->dxfer_len);
+            pr2ws("do_scsi_pt: failed to enlarge data buffer to %d bytes\n",
+                  psp->dxfer_len);
             psp->os_err = ENOMEM;
             return -psp->os_err;
         }
@@ -614,22 +630,22 @@ do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
     psp->swb_i.spt.TimeOutValue = time_secs;
     psp->swb_i.spt.DataTransferLength = psp->dxfer_len;
     if (verbose > 4) {
-        fprintf(stderr, " spt_indirect, adapter: %s  Length=%d ScsiStatus=%d "
-                "PathId=%d TargetId=%d Lun=%d\n", shp->adapter,
-                (int)psp->swb_i.spt.Length,
-                (int)psp->swb_i.spt.ScsiStatus, (int)psp->swb_i.spt.PathId,
-                (int)psp->swb_i.spt.TargetId, (int)psp->swb_i.spt.Lun);
-        fprintf(stderr, "    CdbLength=%d SenseInfoLength=%d DataIn=%d "
-                "DataTransferLength=%u\n",
-                (int)psp->swb_i.spt.CdbLength,
-                (int)psp->swb_i.spt.SenseInfoLength,
-                (int)psp->swb_i.spt.DataIn,
-                (unsigned int)psp->swb_i.spt.DataTransferLength);
-        fprintf(stderr, "    TimeOutValue=%u DataBufferOffset=%u "
-                "SenseInfoOffset=%u\n",
-                (unsigned int)psp->swb_i.spt.TimeOutValue,
-                (unsigned int)psp->swb_i.spt.DataBufferOffset,
-                (unsigned int)psp->swb_i.spt.SenseInfoOffset);
+        pr2ws(" spt_indirect, adapter: %s  Length=%d ScsiStatus=%d PathId=%d "
+              "TargetId=%d Lun=%d\n", shp->adapter,
+              (int)psp->swb_i.spt.Length, (int)psp->swb_i.spt.ScsiStatus,
+              (int)psp->swb_i.spt.PathId, (int)psp->swb_i.spt.TargetId,
+              (int)psp->swb_i.spt.Lun);
+        pr2ws("    CdbLength=%d SenseInfoLength=%d DataIn=%d "
+              "DataTransferLength=%u\n",
+              (int)psp->swb_i.spt.CdbLength,
+              (int)psp->swb_i.spt.SenseInfoLength,
+              (int)psp->swb_i.spt.DataIn,
+              (unsigned int)psp->swb_i.spt.DataTransferLength);
+        pr2ws("    TimeOutValue=%u DataBufferOffset=%u "
+              "SenseInfoOffset=%u\n",
+              (unsigned int)psp->swb_i.spt.TimeOutValue,
+              (unsigned int)psp->swb_i.spt.DataBufferOffset,
+              (unsigned int)psp->swb_i.spt.SenseInfoOffset);
     }
     if ((psp->dxfer_len > 0) &&
         (SCSI_IOCTL_DATA_OUT == psp->swb_i.spt.DataIn))
@@ -646,8 +662,7 @@ do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
 
         u = (unsigned int)GetLastError();
         if (verbose)
-            fprintf(sg_warnings_strm, "Windows DeviceIoControl error=%u\n",
-                    u);
+            pr2ws("Windows DeviceIoControl error=%u\n", u);
         psp->transport_err = (int)u;
         psp->os_err = EIO;
         return 0;       /* let app find transport error */

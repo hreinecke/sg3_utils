@@ -26,7 +26,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 
-static const char * version_str = "1.45 20150110";
+static const char * version_str = "1.46 20150511";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -553,7 +553,8 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x5, 0x0, "Flexible geometry (obsolete)"},
     {0x7, 0x0, "Verify error recovery"},
     {0x8, 0x0, "Caching"},
-    {0xa, 0x02, "Application tag"},
+    {0xa, 0x2, "Application tag"},
+    {0xa, 0x5, "IO advice hints grouping"}, /* added sbc4r06 */
     {0xa, 0xf1, "Parallel ATA control (SAT)"},
     {0xa, 0xf2, "Reserved (SATA control) (SAT)"},
     {0xb, 0x0, "Medium types supported (obsolete)"},

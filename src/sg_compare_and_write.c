@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2014, Kaminario Technologies LTD
+*  Copyright (c) 2012-2015, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -51,7 +51,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.09 20140715";
+static const char * version_str = "1.10 20150511";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -356,8 +356,8 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         }
         ptvp = construct_scsi_pt_obj();
         if (NULL == ptvp) {
-                fprintf(sg_warnings_strm, "Could not construct scsit_pt_obj, "
-                        "out of " "memory\n");
+                fprintf(stderr, "Could not construct scsit_pt_obj, out of "
+                        "memory\n");
                 return -1;
         }
 
