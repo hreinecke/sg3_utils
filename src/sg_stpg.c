@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2004-2013 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
+* Copyright (c) 2004-2015 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.7 20130730";
+static const char * version_str = "1.8 20150721";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -273,8 +273,8 @@ encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
 
      for (i = 0, desc = buff + 4; i < numgrp; desc += 4, i++) {
           desc[0] = tgtState[i].current & 0x0f;
-          desc[2] = (tgtState[i].id >> 8) & 0x0f;
-          desc[3] = tgtState[i].id & 0x0f;
+          desc[2] = (tgtState[i].id >> 8) & 0xff;
+          desc[3] = tgtState[i].id & 0xff;
      }
 }
 
