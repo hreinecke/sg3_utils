@@ -24,9 +24,11 @@ ATTRS{idVendor}=="054c", ATTRS{idProduct}=="06a0", ENV{SG3_UTILS_DEVICE_IGNORE_S
 
 ENV{SG3_UTILS_DEVICE_IGNORE_SN_DI}=="1", GOTO="sg3_utils_sg_inq_sn_di_end"
 # SCSI EVPD page 0x80 values
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --page=sn $tempnode"
+KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/vpd_pg80 --raw", ENV{ID_SCSI_SN}="1"
+KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", ENV{ID_SCSI_SN}!="1", IMPORT{program}="/usr/bin/sg_inq --export --page=sn $tempnode", ENV{ID_SCSI_SN}="1"
 # SCSI EVPD page 0x83 values
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --page=di $tempnode"
+KERNEL=="sd*[!0-9]", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/vpd_pg83 --raw", ENV{ID_SCSI_DI}="1"
+KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", ENV{ID_SCSI_DI}!="1", IMPORT{program}="/usr/bin/sg_inq --export --page=di $tempnode", ENV{ID_SCSI_DI}="1"
 LABEL="sg3_utils_sg_inq_sn_di_end"
 
 # ID_WWN compat mapping
