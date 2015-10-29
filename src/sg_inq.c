@@ -1042,7 +1042,9 @@ dStrRaw(const char* str, int len)
  * whitespaces to a single "_"; convert non-printable characters to "."
  * and if there are no valid (i.e. printable) characters return 0.
  * Process 'str' in place (i.e. it's input and output) and return the
- * length of the output, excluding the trailing '\0'.
+ * length of the output, excluding the trailing '\0'. To cover any
+ * potential unicode string an intermediate zero is skipped; two
+ * consecutive zeroes indicate a string termination.
  */
 static int
 encode_whitespaces(unsigned char *str, int inlen)
@@ -1050,11 +1052,15 @@ encode_whitespaces(unsigned char *str, int inlen)
     int k, res;
     int j = 0;
     int valid = 0;
-    int outlen = inlen;
+    int outlen = inlen, zeroes = 0;
 
     /* Skip initial whitespaces */
     while (isblank(str[j]))
         j++;
+    /* Skip possible unicode prefix characters */
+    while (str[j] < 0x20)
+        j++;
+
     k = j;
     /* Strip trailing whitespaces */
     while ((outlen > k) &&
@@ -1068,17 +1074,52 @@ encode_whitespaces(unsigned char *str, int inlen)
                 str[res++] = '_';
                 valid++;
             }
-        } else if (! isprint(str[k]))
+            zeroes = 0;
+        } else if (! isprint(str[k])) {
+            if (str[k] == 0x00) {
+                /* Stop on more than one consecutive zero */
+                if (zeroes)
+                    break;
+                zeroes++;
+                continue;
+            }
             str[res++] = '.';
-        else {
+            zeroes = 0;
+        } else {
             str[res++] = str[k];
             valid++;
+            zeroes = 0;
         }
     }
     if (! valid)
         res = 0;
     if (res < inlen)
         str[res] = '\0';
+    return res;
+}
+
+static int
+encode_unicode(unsigned char *str, int inlen)
+{
+    int k = 0, res;
+    int zeroes = 0;
+
+    for (res = 0; k < inlen; ++k) {
+        if (str[k] == 0x00) {
+            if (zeroes) {
+                str[res++] = '\0';
+                break;
+            }
+            zeroes++;
+        } else {
+            zeroes = 0;
+            if (isprint(str[k]))
+                str[res++] = str[k];
+            else
+                str[res++] = ' ';
+        }
+    }
+
     return res;
 }
 
@@ -1834,23 +1875,26 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
         }
         switch (desig_type) {
         case 0: /* vendor specific */
-            if (i_len > 128)
+            if (i_len == 0 || i_len > 128)
                 break;
-            printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
             if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
                 /* udev-conformant character encoding */
-                for (m = 0; m < k; ++m) {
-                    if ((ip[m] >= '0' && ip[m] <= '9') ||
-                        (ip[m] >= 'A' && ip[m] <= 'Z') ||
-                        (ip[m] >= 'a' && ip[m] <= 'z') ||
-                        strchr("#+-.:=@_", ip[m]) != NULL)
-                        printf("%c", ip[m]);
-                    else
-                        printf("\\x%02x", ip[m]);
+                if (k > 0) {
+                    printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
+                    for (m = 0; m < k; ++m) {
+                        if ((ip[m] >= '0' && ip[m] <= '9') ||
+                            (ip[m] >= 'A' && ip[m] <= 'Z') ||
+                            (ip[m] >= 'a' && ip[m] <= 'z') ||
+                            strchr("#+-.:=@_", ip[m]) != NULL)
+                            printf("%c", ip[m]);
+                        else
+                            printf("\\x%02x", ip[m]);
+                    }
+                    printf("\n");
                 }
-                printf("\n");
             } else {
+                printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
                 for (m = 0; m < i_len; ++m)
                     printf("%02x", (unsigned int)ip[m]);
                 printf("\n");
@@ -2982,9 +3026,11 @@ std_inq_response(const struct opts_t * op, int act_len)
                 xtra_buff[i] = ' ';
         if (op->do_export) {
             len = encode_whitespaces((unsigned char *)xtra_buff, 8);
-            printf("SCSI_VENDOR=%s\n", xtra_buff);
-            encode_string(xtra_buff, &rp[8], 8);
-            printf("SCSI_VENDOR_ENC=%s\n", xtra_buff);
+            if (len > 0) {
+                printf("SCSI_VENDOR=%s\n", xtra_buff);
+                encode_string(xtra_buff, &rp[8], 8);
+                printf("SCSI_VENDOR_ENC=%s\n", xtra_buff);
+            }
         } else
             printf(" Vendor identification: %s\n", xtra_buff);
         if (act_len <= 16) {
@@ -2995,9 +3041,11 @@ std_inq_response(const struct opts_t * op, int act_len)
             xtra_buff[16] = '\0';
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff, 16);
-                printf("SCSI_MODEL=%s\n", xtra_buff);
-                encode_string(xtra_buff, &rp[16], 16);
-                printf("SCSI_MODEL_ENC=%s\n", xtra_buff);
+                if (len > 0) {
+                    printf("SCSI_MODEL=%s\n", xtra_buff);
+                    encode_string(xtra_buff, &rp[16], 16);
+                    printf("SCSI_MODEL_ENC=%s\n", xtra_buff);
+                }
             } else
                 printf(" Product identification: %s\n", xtra_buff);
         }
@@ -3009,7 +3057,8 @@ std_inq_response(const struct opts_t * op, int act_len)
             xtra_buff[4] = '\0';
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff, 4);
-                printf("SCSI_REVISION=%s\n", xtra_buff);
+                if (len > 0)
+                    printf("SCSI_REVISION=%s\n", xtra_buff);
             } else
                 printf(" Product revision level: %s\n", xtra_buff);
         }
@@ -3019,7 +3068,8 @@ std_inq_response(const struct opts_t * op, int act_len)
                    20);
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff, 20);
-                printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
+                if (len > 0)
+                    printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
                 printf(" Vendor specific: %s\n", xtra_buff);
         }
@@ -3033,7 +3083,8 @@ std_inq_response(const struct opts_t * op, int act_len)
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff,
                                          act_len - 96);
-                printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
+                if (len > 0)
+                    printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
                 printf(" Vendor specific: %s\n", xtra_buff);
         }
@@ -3464,6 +3515,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                     (1 == op->do_hex) ? 0 : -1);
         else {
             char obuff[DEF_ALLOC_LEN];
+            int k, m;
 
             memset(obuff, 0, sizeof(obuff));
             len -= 4;
@@ -3471,10 +3523,25 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                 len = sizeof(obuff) - 1;
             memcpy(obuff, rp + 4, len);
             if (op->do_export) {
-                len = encode_whitespaces((unsigned char *)obuff, len);
-                printf("SCSI_IDENT_SERIAL=%s\n", obuff);
+                k = encode_whitespaces((unsigned char *)obuff, len);
+                if (k > 0) {
+                    printf("SCSI_IDENT_SERIAL=");
+                    /* udev-conformant character encoding */
+                    for (m = 0; m < k; ++m) {
+                        if ((obuff[m] >= '0' && obuff[m] <= '9') ||
+                            (obuff[m] >= 'A' && obuff[m] <= 'Z') ||
+                            (obuff[m] >= 'a' && obuff[m] <= 'z') ||
+                            strchr("#+-.:=@_", obuff[m]) != NULL)
+                            printf("%c", obuff[m]);
+                        else
+                            printf("\\x%02x", obuff[m]);
+                    }
+                    printf("\n");
+                }
             } else {
-                printf("  Unit serial number: %s\n", obuff);
+                k = encode_unicode((unsigned char *)obuff, len);
+                if (k > 0)
+                    printf("  Unit serial number: %s\n", obuff);
             }
         }
         break;
