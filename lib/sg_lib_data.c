@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.14 20150429";  /* spc5r02, sbc4r02 */
+const char * sg_lib_version_str = "2.15 20151104";  /* spc5r06, sbc4r08 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -172,6 +172,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x93, PDT_TAPE, "Erase(16)"},
     {0x94, PDT_ZBC, "ZBC out"},  /* new sbc4r04, has service actions */
     {0x95, PDT_ZBC, "ZBC in"},   /* new sbc4r04, has service actions */
+    {0x9a, 0, "Write stream(16)"},      /* added sbc4r08 */
     {0x9b, 0, "Read buffer(16)"},       /* added spc5r02 */
     {0x9c, 0, "Write atomic(16)"},
     {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
@@ -270,6 +271,7 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0xe, 0, "Report priority"},
     {0xf, 0, "Report timestamp"},
     {0x10, 0, "Management protocol in"},
+    {0x1d, 0, "Report provisioning initialization pattern"},
     {0x1f, 0, "Maintenance in vendor specific"},
     {0xffff, 0, NULL},
 };
@@ -315,7 +317,9 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x11, 0, "Read long(16)"},
     {0x12, 0, "Get LBA status"},
     {0x13, 0, "Report referrals"},
-    {0x14, PDT_ZBC, "Report zones"},
+    {0x14, 0, "Stream control"},
+    {0x15, 0, "Background control"},
+    {0x16, 0, "Get stream status"},
     {0xffff, 0, NULL},
 };
 
@@ -399,6 +403,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xd, 0, "Write same(32)"},
     {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
     {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
+    {0x10, 0, "Write stream(32)"},   /* added sbc4r08 */
     {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
@@ -791,6 +796,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x20,0x0A,"Access denied - invalid proxy token"},
     {0x20,0x0B,"Access denied - ACL LUN conflict"},
     {0x20,0x0C,"Illegal command when not in append-only mode"},
+    {0x20,0x0D,"Not an administrative logical unit"},
+    {0x20,0x0E,"Not a subsidiary logical unit"},
     {0x21,0x00,"Logical block address out of range"},
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},
@@ -883,6 +890,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2A,0x0b,"Error history snapshot released"},
     {0x2A,0x14,"SA creation capabilities data has changed"},
     {0x2A,0x15,"Medium removal prevention preempted"},
+    {0x2A,0x16,"Zone reset write pointer recommended"},
     {0x2B,0x00,"Copy cannot execute since host cannot disconnect"},
     {0x2C,0x00,"Command sequence error"},
     {0x2C,0x01,"Too many windows specified"},
@@ -899,6 +907,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x0C,"ORWRITE generation does not match"},
     {0x2C,0x0D,"Reset write pointer not allowed"},
     {0x2C,0x0E,"Zone is offline"},
+    {0x2C,0x0F,"Stream not open"},
+    {0x2C,0x10,"Unwritten data in zone"},
+    {0x2C,0x11,"Descriptor format sense data required"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2E,0x01,"Command timeout before processing"},
@@ -1011,6 +1022,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3F,0x15,"Inspect referrals sense descriptors"},
     {0x3F,0x16,"Microcode has been changed without reset"},
     {0x3F,0x17,"Zone transition to full"},
+    {0x3F,0x18,"Bind completed"},
+    {0x3F,0x19,"Bind redirected"},
+    {0x3F,0x1A,"Subsidiary binding changed"},
 
     /*
      * ASC 0x40, 0x41 and 0x42 overridden by "additional2" array entries
@@ -1105,6 +1119,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x55,0x0d,"Insufficient resources to create rod token"},
     {0x55,0x0e,"Insufficient zone resources"},
     {0x55,0x0f,"Insufficient zone resources to complete write"},
+    {0x55,0x10,"Maximum number of streams open"},
+    {0x55,0x11,"Insufficient resources to bind"},
     {0x57,0x00,"Unable to recover table-of-contents"},
     {0x58,0x00,"Generation does not exist"},
     {0x59,0x00,"Updated block read"},
@@ -1244,6 +1260,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x67,0x09,"Multiply assigned logical unit"},
     {0x67,0x0A,"Set target port groups command failed"},
     {0x67,0x0B,"ATA device feature not enabled"},
+    {0x67,0x0C,"Command rejected"},
+    {0x67,0x0D,"Explicit bind not allowed"},
     {0x68,0x00,"Logical unit not configured"},
     {0x68,0x01,"Subsidiary logical unit not configured"},
     {0x69,0x00,"Data loss on logical unit"},
@@ -1265,6 +1283,9 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x6F,0x05,"Drive region must be permanent/region reset count error"},
     {0x6F,0x06,"Insufficient block count for binding nonce recording"},
     {0x6F,0x07,"Conflict in binding nonce recording"},
+    {0x6F,0x08,"Insufficient permission"},
+    {0x6F,0x09,"Invalid drive-host pairing server"},
+    {0x6F,0x0A,"Drive-host pairing suspended"},
     /*
      * ASC 0x70 overridden by an "additional2" array entry
      * so there is no need to have them here.

@@ -2,9 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.42 [20151029] [svn: r646]
+Changelog for sg3_utils-1.42 [20151116] [svn: r647]
   - sg_stpg: fix truncation of target port field
   - sg_inq: cope with unicode strings, udev fixes
+    - update version descriptor list to 20151101
+  - sg_ses: add more field acronyms
+  - sg_lib_data: sync asc/ascq codes with T10 20151101
 
 Changelog for sg3_utils-1.41 [20150511] [svn: r644]
   - sg_zone: new utility for open, close and finish
