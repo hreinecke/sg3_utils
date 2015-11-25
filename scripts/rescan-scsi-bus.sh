@@ -853,7 +853,7 @@ findmultipath()
   local found_dup=0
 
   # Need a sdev, and executable multipath and dmsetup command here
-  if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x $MULTIPATH ] ; then
+  if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x "$MULTIPATH" ] ; then
     return 1
   fi
 
@@ -890,7 +890,7 @@ findmultipath()
 reloadmpaths()
 {
   local mpath
-  if [ ! -x $MULTIPATH ] ; then
+  if [ ! -x "$MULTIPATH" ] ; then
     echo "no -x multipath"
     return
   fi
@@ -1186,7 +1186,7 @@ declare -i updated=0
 declare -i rmvd=0
 
 if [ -n "$flush" ] ; then
-  if [-x $MULTIPATH ] ; then
+  if [-x "$MULTIPATH" ] ; then
     flushmpaths 1
   fi
 fi
@@ -1255,8 +1255,10 @@ if test -n "$mp_enable" -a $rmvd_found -gt 0 ; then
   if test $found -gt 0 ; then
     /sbin/udevadm trigger --sysname-match=sd*
     udevadm_settle
-    echo "Trying to discover new multipath mappings for newly discovered devices... "
-    $MULTIPATH | grep "create:" 2> /dev/null
+    if [ -x "$MULTIPATH" ] ; then
+      echo "Trying to discover new multipath mappings for newly discovered devices... "
+      $MULTIPATH | grep "create:" 2> /dev/null
+    fi
   fi 
 fi
 
