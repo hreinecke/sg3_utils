@@ -1183,7 +1183,7 @@ declare -i updated=0
 declare -i rmvd=0
 
 if [ -n "$flush" ] ; then
-  if [-x $MULTIPATH ] ; then
+  if [ -x "$MULTIPATH" ] ; then
     flushmpaths 1
   fi
 fi
