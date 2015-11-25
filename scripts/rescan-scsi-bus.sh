@@ -703,9 +703,12 @@ findremapped()
   local mpath_uuid=
   local remapped=
   mpaths=""
-  local tmpfile="/tmp/rescan-scsi-bus-`date +s`"
+  local tmpfile=$(mktemp /tmp/rescan-scsi-bus.XXXXXXXX 2> /dev/null)
 
-  test -f $tmpfile && rm $tmpfile
+  if [ -z "$tmpfile" ] ; then
+    tmpfile="/tmp/rescan-scsi-bus.$$"
+    rm -f $tmpfile
+  fi
 
   # Get all of the ID_SERIAL attributes, after finding their sd node
   for hctl in $devs ; do
@@ -754,7 +757,7 @@ findremapped()
     echo "$SCSISTR"
     incrchgd "$hctl"
   done < $tmpfile
-  [ -f $tmpfile ] && rm $tmpfile
+  rm -f $tmpfile
 
   if test -n "$mp_enable" -a -n "$mpaths" ; then
     echo "Updating multipath device mappings"
