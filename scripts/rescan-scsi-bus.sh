@@ -850,7 +850,7 @@ findmultipath()
   local found_dup=0
 
   # Need a sdev, and executable multipath and dmsetup command here
-  if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x $MULTIPATH ] ; then
+  if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x "$MULTIPATH" ] ; then
     return 1
   fi
 
@@ -887,7 +887,7 @@ findmultipath()
 reloadmpaths()
 {
   local mpath
-  if [ ! -x $MULTIPATH ] ; then
+  if [ ! -x "$MULTIPATH" ] ; then
     echo "no -x multipath"
     return
   fi
