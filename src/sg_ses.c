@@ -30,7 +30,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.02 20151029";    /* ses3r08 */
+static const char * version_str = "2.03 20151126";    /* ses3r08->11 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -416,10 +416,14 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"disable_elm", COMM_PORT_ETC, 3, 0, 1, "disable communication port"},
     {"devoff", DEVICE_ETC, 3, 4, 1, NULL},     /* device off */
     {"devoff", ARRAY_DEV_ETC, 3, 4, 1, NULL},
-    {"dnr", DEVICE_ETC, 2, 6, 1, "do not remove"},
     {"disp_mode", DISPLAY_ETC, 1, 1, 2, NULL},
     {"disp_char", DISPLAY_ETC, 2, 7, 16, NULL},
     {"dnr", ARRAY_DEV_ETC, 2, 6, 1, "do not remove"},
+    {"dnr", COOLING_ETC, 1, 6, 1, "do not remove"},
+    {"dnr", DEVICE_ETC, 2, 6, 1, "do not remove"},
+    {"dnr", ENC_ELECTRONICS_ETC, 1, 5, 1, "do not remove"},
+    {"dnr", POWER_SUPPLY_ETC, 1, 6, 1, "do not remove"},
+    {"dnr", UI_POWER_SUPPLY_ETC, 3, 3, 1, "do not remove"},
     {"enable", SCSI_IPORT_ETC, 3, 0, 1, NULL},
     {"enable", SCSI_TPORT_ETC, 3, 0, 1, NULL},
     {"fail", AUD_ALARM_ETC, 1, 6, 1, NULL},
@@ -1909,10 +1913,12 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
     case POWER_SUPPLY_ETC:
-        if (nofilter || ((0x80 & statp[1]) || (0xe & statp[2])))
-            printf("%sIdent=%d, DC overvoltage=%d, DC undervoltage=%d, DC "
-                   "overcurrent=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[2] & 0x8), !!(statp[2] & 0x4), !!(statp[2] & 0x2));
+        if (nofilter || ((0xc0 & statp[1]) || (0xe & statp[2])))
+            printf("%sIdent=%d, Do not remove=%d, DC overvoltage=%d, "
+                   "DC undervoltage=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), !!(statp[2] & 0x8),
+                   !!(statp[2] & 0x4));
+            printf("%s DC overcurrent=%d\n", pad, !!(statp[2] & 0x2));
         if (nofilter || (0xf8 & statp[3]))
             printf("%sHot swap=%d, Fail=%d, Requested on=%d, Off=%d, "
                    "Overtmp fail=%d\n", pad, !!(statp[3] & 0x80),
@@ -1925,12 +1931,12 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
         break;
     case COOLING_ETC:
         if (nofilter || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
-            printf("%sIdent=%d, Hot swap=%d, Fail=%d, Requested on=%d, "
-                   "Off=%d\n", pad, !!(statp[1] & 0x80), !!(statp[3] & 0x80),
-                   !!(statp[3] & 0x40), !!(statp[3] & 0x20),
-                   !!(statp[3] & 0x10));
-        printf("%sActual speed=%d rpm, Fan %s\n", pad,
-               (((0x7 & statp[1]) << 8) + statp[2]) * 10,
+            printf("%sIdent=%d, Do not remove=%d, Hot swap=%d, Fail=%d, "
+                   "Requested on=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), !!(statp[3] & 0x80),
+                   !!(statp[3] & 0x40), !!(statp[3] & 0x20));
+        printf("%sOff=%d, Actual speed=%d rpm, Fan %s\n", pad,
+               !!(statp[3] & 0x10), (((0x7 & statp[1]) << 8) + statp[2]) * 10,
                actual_speed_desc[7 & statp[3]]);
         break;
     case TEMPERATURE_ETC:     /* temperature sensor */
@@ -1965,10 +1971,11 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                    !!(statp[3] & 0x2), !!(statp[3] & 0x1));
         break;
     case ENC_ELECTRONICS_ETC: /* enclosure services controller electronics */
-        if (nofilter || (0xc0 & statp[1]) || (0x1 & statp[2]) ||
+        if (nofilter || (0xe0 & statp[1]) || (0x1 & statp[2]) ||
             (0x80 & statp[3]))
-            printf("%sIdent=%d, Fail=%d, Report=%d, Hot swap=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
+            printf("%sIdent=%d, Fail=%d, Do not remove=%d, Report=%d, "
+                   "Hot swap=%d\n", pad, !!(statp[1] & 0x80),
+                   !!(statp[1] & 0x40), !!(statp[1] & 0x20),
                    !!(statp[2] & 0x1), !!(statp[3] & 0x80));
         break;
     case SCC_CELECTR_ETC:     /* SCC controller electronics */
@@ -2017,13 +2024,14 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
                    "%d\n", pad, !!(statp[2] & 0x80), !!(statp[2] & 0x40),
                    !!(statp[2] & 0x20), !!(statp[2] & 0x10),
                    !!(statp[2] & 0x8));
-        if (nofilter || ((0x7 & statp[2]) || (0xc3 & statp[3]))) {
+        if (nofilter || ((0x7 & statp[2]) || (0xe3 & statp[3]))) {
             printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Fail=%d, "
-                   "Batt fail=%d\n", pad, !!(statp[2] & 0x4),
+                   "Do not remove=%d\n", pad, !!(statp[2] & 0x4),
                    !!(statp[2] & 0x2), !!(statp[2] & 0x1),
                    !!(statp[3] & 0x80), !!(statp[3] & 0x40),
-                   !!(statp[3] & 0x2));
-            printf("%sBPF=%d\n", pad, !!(statp[3] & 0x1));
+                   !!(statp[3] & 0x20));
+            printf("%sBatt fail=%d, BPF=%d\n", pad, !!(statp[3] & 0x2),
+                   !!(statp[3] & 0x1));
         }
         break;
     case DISPLAY_ETC:   /* Display (ses2r15) */
@@ -2164,8 +2172,9 @@ enc_status_helper(const char * pad, const unsigned char * statp, int etype,
     case SAS_CONNECTOR_ETC:     /* OC (overcurrent) added in ses3r07 */
         printf("%sIdent=%d, %s\n", pad, !!(statp[1] & 0x80),
                find_sas_connector_type((statp[1] & 0x7f), bb, sizeof(bb)));
-        printf("%sConnector physical link=0x%x, Fail=%d, OC=%d\n", pad,
-               statp[2], !!(statp[3] & 0x40), !!(statp[3] & 0x20));
+        printf("%sConnector physical link=0x%x, Mated=%d, Fail=%d, OC=%d\n",
+               pad, statp[2], !!(statp[3] & 0x80), !!(statp[3] & 0x40),
+               !!(statp[3] & 0x20));
         break;
     default:
         if (etype < 0x80)

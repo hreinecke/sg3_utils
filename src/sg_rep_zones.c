@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Douglas Gilbert.
+ * Copyright (c) 2014-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.04 20141215";
+static const char * version_str = "1.05 20151126";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -49,6 +49,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"maxlen", required_argument, 0, 'm'},
+        {"partial", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"readonly", no_argument, 0, 'R'},
         {"report", required_argument, 0, 'o'},
@@ -83,8 +84,8 @@ static void
 usage()
 {
     pr2serr("Usage: "
-            "sg_rep_zones  [--help] [--hex] [--maxlen=LEN] [--raw]\n"
-            "                     [--readonly] [--report=OPT] "
+            "sg_rep_zones  [--help] [--hex] [--maxlen=LEN] [--partial]\n"
+            "                     [--raw] [--readonly] [--report=OPT] "
             "[--start=LBA]\n"
             "                     [--verbose] [--version] DEVICE\n");
     pr2serr("  where:\n"
@@ -95,9 +96,11 @@ usage()
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> 8192 bytes)\n"
+            "    --partial|-p       sets PARTIAL bit in cdb\n"
             "    --raw|-r           output response in binary\n"
             "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
-            "    --report=OPT|-o OP    reporting option (def: 0)\n"
+            "    --report=OPT|-o OP    reporting options (def: 0: all "
+            "zones)\n"
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
             "                          need not be a zone starting LBA\n"
             "    --verbose|-v       increase verbosity\n"
@@ -108,8 +111,9 @@ usage()
 /* Invokes a SCSI REPORT ZONES command (ZBC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int report_opts, void * resp,
-                   int mx_resp_len, int * residp, int noisy, int verbose)
+sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int partial, int report_opts,
+                   void * resp, int mx_resp_len, int * residp, int noisy,
+                   int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rzCmdBlk[SG_ZONING_IN_CMDLEN] =
@@ -120,7 +124,9 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int report_opts, void * resp,
 
     sg_put_unaligned_be64(zs_lba, rzCmdBlk + 2);
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rzCmdBlk + 10);
-    rzCmdBlk[14] = report_opts & 0xf;
+    rzCmdBlk[14] = report_opts & 0x3f;
+    if (partial)
+        rzCmdBlk[14] |= 0x80;
     if (verbose) {
         pr2serr("    Report zones cdb: ");
         for (k = 0; k < SG_ZONING_IN_CMDLEN; ++k)
@@ -216,6 +222,12 @@ zone_condition_str(int zc, char * b, int blen, int vb)
     case 2:
         cp = "Open";
         break;
+    case 3:
+        cp = "Explicit open";
+        break;
+    case 4:
+        cp = "Closed";
+        break;
     case 0xd:
         cp = "Read only";
         break;
@@ -239,11 +251,14 @@ zone_condition_str(int zc, char * b, int blen, int vb)
     return b;
 }
 
-static const char * same_desc_arr[4] = {
+static const char * same_desc_arr[16] = {
     "zone type and length may differ in each descriptor",
     "zone type and length same in each descriptor",
     "zone type and length same apart from length in last descriptor",
-    "Reserved",
+    "zone type for each descriptor may be different",
+    "Reserved [0x4]", "Reserved [0x5]", "Reserved [0x6]", "Reserved [0x7]",
+    "Reserved [0x8]", "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
+    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
 
@@ -253,6 +268,7 @@ main(int argc, char * argv[])
     int sg_fd, k, res, c, zl_len, len, zones, resid, rlen, zt, zc, same;
     int do_hex = 0;
     int maxlen = 0;
+    int do_partial = 0;
     int do_raw = 0;
     int o_readonly = 0;
     int reporting_opt = 0;
@@ -268,7 +284,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHm:o:rRs:vV", long_options,
+        c = getopt_long(argc, argv, "hHm:o:prRs:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -291,11 +307,14 @@ main(int argc, char * argv[])
             break;
         case 'o':
            reporting_opt = sg_get_num(optarg);
-           if ((reporting_opt < 0) || (reporting_opt > 15)) {
+           if ((reporting_opt < 0) || (reporting_opt > 63)) {
                 pr2serr("bad argument to '--report=OPT', expect 0 to "
-                        "15\n");
+                        "63\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'p':
+            ++do_partial;
             break;
         case 'r':
             ++do_raw;
@@ -365,8 +384,8 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    res = sg_ll_report_zones(sg_fd, st_lba, reporting_opt, reportZonesBuff,
-                             maxlen, &resid, 1, verbose);
+    res = sg_ll_report_zones(sg_fd, st_lba, do_partial, reporting_opt,
+                             reportZonesBuff, maxlen, &resid, 1, verbose);
     ret = res;
     if (0 == res) {
         rlen = maxlen - resid;
@@ -399,7 +418,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_CAT_MALFORMED;
             goto the_end;
         }
-        same = reportZonesBuff[4] & 3;
+        same = reportZonesBuff[4] & 0xf;
         printf("  Same=%d: %s\n\n", same, same_desc_arr[same]);
         zones = (len - 64) / 64;
         for (k = 0, ucp = reportZonesBuff + 64; k < zones; ++k, ucp += 64) {

@@ -1,4 +1,4 @@
-.TH SG_REP_ZONES "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_REP_ZONES "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES command
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ sg_rep_zones \- send SCSI REPORT ZONES command
 .PP
 Sends a SCSI REPORT ZONES command to \fIDEVICE\fR and outputs the data
 returned. This command is found in the ZBC draft standard, revision
-2 (zbc\-r02.pdf).
+4c (zbc\-r04c.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -29,6 +29,9 @@ output in hexadecimal with no leading address (on each line).
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
 the cdb's "allocation length" field. If not given (or \fILEN\fR is zero)
 then 8192 is used. The maximum allowed value of \fILEN\fR is 1048576.
+.TP
+\fB\-p\fR, \fB\-\-partial\fR
+set the PARTIAL bit in the cdb.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the SCSI response (i.e. the data-out buffer) in binary (to stdout).
@@ -64,7 +67,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014 Douglas Gilbert
+Copyright \(co 2014\-2015 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

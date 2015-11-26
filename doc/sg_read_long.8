@@ -1,4 +1,4 @@
-.TH SG_READ_LONG "8" "April 2010" "sg3_utils\-1.30" SG3_UTILS
+.TH SG_READ_LONG "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_read_long \- send a SCSI READ LONG command
 .SH SYNOPSIS
@@ -14,6 +14,11 @@ and ASCII to stdout or placed in a file. Note that the data returned includes
 the logical block data (typically 512 bytes for a disk) plus ECC
 information (whose format is proprietary) plus optionally other proprietary
 data.
+.PP
+In SBC\-4 revision 7 the SCSI READ LONG (10 and 16 byte) commands were made
+obsolete. In the same revision all uses of SCSI WRITE LONG (10 and 16 byte)
+commands were made obsolete apart from the case in which the WR_UNCOR bit is
+set.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -89,7 +94,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2010 Douglas Gilbert
+Copyright \(co 2004\-2015 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,7 +1,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2014 D. Gilbert
+*  Copyright (C) 1999 - 2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "3.93 20141220";
+static const char * version_str = "3.94 20151126";
 
 #define ME "sg_readcap: "
 
@@ -380,7 +380,7 @@ rc_basis_str(int rc_basis, char * b, int blen)
         snprintf(b, blen, "last contiguous that's not seq write required");
         break;
     case 1:
-        snprintf(b, blen, "last LBA on device");
+        snprintf(b, blen, "last LBA on logical unit");
         break;
     default:
         snprintf(b, blen, "reserved (0x%x)", rc_basis);

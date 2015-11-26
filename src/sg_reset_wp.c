@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Douglas Gilbert.
+ * Copyright (c) 2014-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,10 +29,10 @@
  *
  *
  * This program issues the SCSI RESET WRITE POINTER command to the given SCSI
- * device. Based on zbc-r02.pdf .
+ * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.02 20141215";
+static const char * version_str = "1.03 20151126";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
