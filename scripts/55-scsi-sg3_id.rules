@@ -15,10 +15,19 @@ ENV{SCSI_MODEL}=="?*", ENV{ID_MODEL}="$env{SCSI_MODEL}"
 ENV{SCSI_MODEL_ENC}=="?*", ENV{ID_MODEL_ENC}="$env{SCSI_MODEL_ENC}"
 ENV{SCSI_REVISION}=="?*", ENV{ID_REVISION}="$env{SCSI_REVISION}"
 ENV{SCSI_TYPE}=="?*", ENV{ID_TYPE}="$env{SCSI_TYPE}"
+
+# don't inquire sn and di on broken devices (https://bugzilla.suse.com/show_bug.cgi?id=840054)
+# unkown device
+ATTRS{idVendor}=="0aec", ATTRS{idProduct}=="3260", ENV{SG3_UTILS_DEVICE_IGNORE_SN_DI}="1"
+# Sony/JMicron port replicator
+ATTRS{idVendor}=="054c", ATTRS{idProduct}=="06a0", ENV{SG3_UTILS_DEVICE_IGNORE_SN_DI}="1"
+
+ENV{SG3_UTILS_DEVICE_IGNORE_SN_DI}=="1", GOTO="sg3_utils_sg_inq_sn_di_end"
 # SCSI EVPD page 0x80 values
 KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --page=sn $tempnode"
 # SCSI EVPD page 0x83 values
 KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", IMPORT{program}="/usr/bin/sg_inq --export --page=di $tempnode"
+LABEL="sg3_utils_sg_inq_sn_di_end"
 
 # ID_WWN compat mapping
 ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{ID_WWN}!="?*", ENV{ID_WWN}="0x$env{SCSI_IDENT_LUN_NAA_REGEXT}"
