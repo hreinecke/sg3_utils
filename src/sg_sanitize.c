@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 
-static const char * version_str = "0.97 20150511";
+static const char * version_str = "0.98 20151123";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -97,6 +97,7 @@ struct opts_t {
     int verbose;
     int wait;
     int zero;
+    int znr;
     const char * pattern_fn;
 };
 
@@ -111,7 +112,7 @@ usage()
           "[--overwrite]\n"
           "                   [--pattern=PF] [--quick] [--test=TE] "
           "[--verbose]\n"
-          "                   [--version] [--wait] DEVICE\n"
+          "                   [--version] [--wait] [--zero] [--znr] DEVICE\n"
           "  where:\n"
           "    --ause|-A            set AUSE bit in cdb\n"
           "    --block|-B           do BLOCK ERASE sanitize\n"
@@ -146,7 +147,8 @@ usage()
           "    --wait|-w            wait for command to finish (could "
           "take hours)\n"
           "    --zero|-z            use pattern of zeros for "
-          "OVERWRITE\n\n"
+          "OVERWRITE\n"
+          "    --znr|-Z             set ZNR (zone no reset) bit in cdb\n\n"
           "Performs a SCSI SANITIZE command.\n    <<<WARNING>>>: all data "
           "on DEVICE will be lost.\nDefault action is to give user time to "
           "reconsider; then execute SANITIZE\ncommand with IMMED bit set; "
@@ -184,6 +186,8 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         return SG_LIB_SYNTAX_ERROR;
     if (immed)
         sanCmdBlk[1] |= 0x80;
+    if (op->znr)	/* added sbc4r07 */
+        sanCmdBlk[1] |= 0x40;
     if (op->ause)
         sanCmdBlk[1] |= 0x20;
     sanCmdBlk[7] = ((param_lst_len >> 8) & 0xff);
@@ -433,7 +437,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:QT:vVwz", long_options,
+        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:QT:vVwzZ", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -507,6 +511,9 @@ main(int argc, char * argv[])
             break;
         case 'z':
             ++op->zero;
+            break;
+        case 'Z':
+            ++op->znr;
             break;
         default:
             fprintf(stderr, "unrecognised option code 0x%x ??\n", c);

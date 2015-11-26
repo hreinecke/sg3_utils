@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.15 20151104";  /* spc5r06, sbc4r08 */
+const char * sg_lib_version_str = "2.15 20151126";  /* spc5r06, sbc4r09 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -107,7 +107,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x3b, 0, "Write buffer"},
     {0x3c, 0, "Read buffer(10)"},
     {0x3d, 0, "Update block"},
-    {0x3e, 0, "Read long(10)"},  /* SBC-3 r31 recommends Read long(16) */
+    {0x3e, 0, "Read long(10)"},		/* obsolete in SBC-4 r7 */
     {0x3f, 0, "Write long(10)"}, /* SBC-3 r31 recommends Write long(16) */
     {0x40, 0, "Change definition"},     /* obsolete in SPC-4 r11 */
     {0x41, 0, "Write same(10)"}, /* SBC-3 r31 recommends Write same(16) */
@@ -172,7 +172,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x93, PDT_TAPE, "Erase(16)"},
     {0x94, PDT_ZBC, "ZBC out"},  /* new sbc4r04, has service actions */
     {0x95, PDT_ZBC, "ZBC in"},   /* new sbc4r04, has service actions */
-    {0x9a, 0, "Write stream(16)"},      /* added sbc4r08 */
+    {0x9a, 0, "Write stream(16)"},      /* added sbc4r07 */
     {0x9b, 0, "Read buffer(16)"},       /* added spc5r02 */
     {0x9c, 0, "Write atomic(16)"},
     {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
@@ -314,7 +314,7 @@ struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
 /* Service action in(16) [0x9e] service actions */
 struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x10, 0, "Read capacity(16)"},
-    {0x11, 0, "Read long(16)"},
+    {0x11, 0, "Read long(16)"},		/* obsolete in SBC-4 r7 */
     {0x12, 0, "Get LBA status"},
     {0x13, 0, "Report referrals"},
     {0x14, 0, "Stream control"},
@@ -403,7 +403,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xd, 0, "Write same(32)"},
     {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
     {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
-    {0x10, 0, "Write stream(32)"},   /* added sbc4r08 */
+    {0x10, 0, "Write stream(32)"},   /* added sbc4r07 */
     {0x1800, 0, "Receive credential"},
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},

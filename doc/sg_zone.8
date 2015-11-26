@@ -1,4 +1,4 @@
-.TH SG_ZONE "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_ZONE "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_zone \- send SCSI OPEN, CLOSE or FINISH ZONE command
 .SH SYNOPSIS
@@ -10,7 +10,8 @@ sg_zone \- send SCSI OPEN, CLOSE or FINISH ZONE command
 .\" Add any additional description here
 .PP
 Sends a SCSI OPEN ZONE, CLOSE ZONE or FINISH ZONE command to the \fIDEVICE\fR.
-These commands are found in the ZBC draft standard revision 2 (zbc\-r02.pdf).
+These commands are found in the ZBC draft standard revision
+4c (zbc\-r04c.pdf).
 .PP
 One and only one of the \fI\-\-open\fR, \fI\-\-close\fR and \fI\-\-finish\fR
 options can be chosen.
@@ -51,7 +52,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014 Douglas Gilbert
+Copyright \(co 2014\-2015 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

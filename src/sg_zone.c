@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Douglas Gilbert.
+ * Copyright (c) 2014-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,11 +28,11 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI RESET WRITE POINTER command to the given SCSI
- * device. Based on zbc-r02.pdf .
+ * This program issues a SCSI CLOSE ZONE, FINISH ZONE or OPEN ZONE command
+ * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.00 20141215";
+static const char * version_str = "1.01 20151126";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -111,7 +111,7 @@ usage()
  * -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, int noisy,
-                          int verbose)
+               int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char zoCmdBlk[SG_ZONING_OUT_CMDLEN] =

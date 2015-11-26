@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.32 20150127";    /* spc5r03 + sbc4r04 */
+static const char * version_str = "1.33 20151123";    /* spc5r03 + sbc4r05 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -62,9 +62,12 @@ static const char * version_str = "1.32 20150127";    /* spc5r03 + sbc4r04 */
 #define NOT_SPG_SUBPG 0x0
 #define SUPP_SPGS_SUBPG 0xff
 #define LOW_GRP_STATS_SUBPG 0x1
+#define PENDING_DEFECTS_SUBPG 0x1
+#define BACKGROUND_OP_SUBPG 0x2
 #define HIGH_GRP_STATS_SUBPG 0x1f
 #define CACHE_STATS_SUBPG 0x20
 #define ENV_REPORTING_SUBPG 0x1
+#define UTILIZATION_SUBPG 0x1
 #define ENV_LIMITS_SUBPG 0x2
 
 #define VENDOR_M 0x1000
@@ -155,10 +158,10 @@ struct log_elem {
                         /* Returns true if done */
 };
 
-static bool show_supported_pgs_lpage(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
-static bool show_supported_pgs_sub_lpage(const uint8_t * resp, int len,
-                                         const struct opts_t * op);
+static bool show_supported_pgs_page(const uint8_t * resp, int len,
+                                    const struct opts_t * op);
+static bool show_supported_pgs_sub_page(const uint8_t * resp, int len,
+                                        const struct opts_t * op);
 static bool show_buffer_over_under_run_page(const uint8_t * resp, int len,
                                             const struct opts_t * op);
 static bool show_error_counter_page(const uint8_t * resp, int len,
@@ -179,6 +182,8 @@ static bool show_temperature_page(const uint8_t * resp, int len,
                                   const struct opts_t * op);
 static bool show_start_stop_page(const uint8_t * resp, int len,
                                  const struct opts_t * op);
+static bool show_utilization_page(const uint8_t * resp, int len,
+                                  const struct opts_t * op);
 static bool show_app_client_page(const uint8_t * resp, int len,
                                  const struct opts_t * op);
 static bool show_self_test_page(const uint8_t * resp, int len,
@@ -193,6 +198,10 @@ static bool show_dt_device_status_page(const uint8_t * resp, int len,
                                        const struct opts_t * op);
 static bool show_background_scan_results_page(const uint8_t * resp, int len,
                                               const struct opts_t * op);
+static bool show_pending_defects_page(const uint8_t * resp, int len,
+                                      const struct opts_t * op);
+static bool show_background_op_page(const uint8_t * resp, int len,
+                                    const struct opts_t * op);
 static bool show_element_stats_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
 static bool show_ata_pt_results_page(const uint8_t * resp, int len,
@@ -217,26 +226,27 @@ static bool show_environmental_reporting_page(const uint8_t * resp, int len,
                                               const struct opts_t * op);
 static bool show_environmental_limits_page(const uint8_t * resp, int len,
                                            const struct opts_t * op);
-static bool show_data_compression_lpage(const uint8_t * resp, int len,
-                                        const struct opts_t * op);
+static bool show_data_compression_page(const uint8_t * resp, int len,
+                                       const struct opts_t * op);
 static bool show_tape_alert_ssc_page(const uint8_t * resp, int len,
                                      const struct opts_t * op);
 static bool show_ie_page(const uint8_t * resp, int len,
                          const struct opts_t * op);
-static bool show_tape_usage_lpage(const uint8_t * resp, int len,
-                                  const struct opts_t * op);
-static bool show_tape_capacity_lpage(const uint8_t * resp, int len,
+static bool show_tape_usage_page(const uint8_t * resp, int len,
+                                 const struct opts_t * op);
+static bool show_tape_capacity_page(const uint8_t * resp, int len,
                                      const struct opts_t * op);
 static bool show_seagate_cache_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
 static bool show_seagate_factory_page(const uint8_t * resp, int len,
                                       const struct opts_t * op);
 
+/* elements in page_number/subpage_number order */
 static struct log_elem log_arr[] = {
     {SUPP_PAGES_LPAGE, 0, 0, -1, 0, "Supported log pages", "sp",
-     show_supported_pgs_lpage},         /* 0, 0 */
+     show_supported_pgs_page},          /* 0, 0 */
     {SUPP_PAGES_LPAGE, SUPP_SPGS_SUBPG, 0, -1, 0, "Supported log pages and "
-     "subpages", "ssp", show_supported_pgs_sub_lpage}, /* 0, 0xff */
+     "subpages", "ssp", show_supported_pgs_sub_page}, /* 0, 0xff */
     {BUFF_OVER_UNDER_LPAGE, 0, 0, -1, 0, "Buffer over-run/under-run", "bou",
      show_buffer_over_under_run_page},  /* 0x1, 0x0 */
     {WRITE_ERR_LPAGE, 0, 0, -1, 0, "Write error", "we",
@@ -267,8 +277,8 @@ static struct log_elem log_arr[] = {
      "Environmental limits", "enl", show_environmental_limits_page},
     {START_STOP_LPAGE, 0, 0, -1, 0, "Start-stop cycle counter", "sscc",
      show_start_stop_page},             /* 0xe, 0x0 */
-    {0xe, 0x1, 0, 0, 0, "Utilization", "util",
-     NULL},                             /* 0xe, 0x1 SBC */    /* sbc4r04 */
+    {START_STOP_LPAGE, UTILIZATION_SUBPG, 0, 0, 0, "Utilization", "util",
+     show_utilization_page},            /* 0xe, 0x1 SBC */    /* sbc4r04 */
     {APP_CLIENT_LPAGE, 0, 0, -1, 0, "Application client", "ac",
      show_app_client_page},             /* 0xf, 0x0 */
     {SELF_TEST_LPAGE, 0, 0, -1, 0, "Self test results", "str",
@@ -287,12 +297,15 @@ static struct log_elem log_arr[] = {
      show_media_stats_page},            /* 0x14, 0x0  SMC */
     {BACKGROUND_SCAN_LPAGE, 0, 0, 0, 0, "Background scan results", "bsr",
      show_background_scan_results_page}, /* 0x15, 0x0  SBC */
+    {BACKGROUND_SCAN_LPAGE, BACKGROUND_OP_SUBPG, 0, 0, 0,
+     "Background operation", "bop", show_background_op_page},
+                                        /* 0x15, 0x2  SBC */
     {0x15, 0, 0, PDT_MCHANGER, 0, "Element statistics", "els",
-     show_element_stats_page},           /* 0x15, 0x0  SMC */
+     show_element_stats_page},          /* 0x15, 0x0  SMC */
     {0x15, 0, 0, PDT_ADC, 0, "Service buffers information", "sbi",
-     NULL},                              /* 0x15, 0x0  ADC */
-    {BACKGROUND_SCAN_LPAGE, 0x1, 0, 0, 0, "Pending defects", "pd",
-     NULL},                             /* 0x15, 0x1  SBC */
+     NULL},                             /* 0x15, 0x0  ADC */
+    {BACKGROUND_SCAN_LPAGE, PENDING_DEFECTS_SUBPG, 0, 0, 0,
+     "Pending defects", "pd", show_pending_defects_page}, /* 0x15, 0x1  SBC */
     {SAT_ATA_RESULTS_LPAGE, 0, 0, 0, 0, "ATA pass-through results", "aptr",
      show_ata_pt_results_page},         /* 0x16, 0x0  SAT */
     {0x16, 0, 0, PDT_TAPE, 0, "Tape diagnostic data", "tdd",
@@ -314,7 +327,7 @@ static struct log_elem log_arr[] = {
     {PCT_LPAGE, 0, 0, -1, 0, "Power condition transitions", "pct",
      show_power_condition_transitions_page}, /* 0x1a, 0  */
     {0x1b, 0, 0, PDT_TAPE, 0, "Data compression", "dc",
-     show_data_compression_lpage},      /* 0x1b, 0  SSC */
+     show_data_compression_page},       /* 0x1b, 0  SSC */
     {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, 0, "Tape alert", "ta",
      show_tape_alert_ssc_page},         /* 0x2e, 0  SSC */
     {IE_LPAGE, 0, 0, -1, 0, "Informational exceptions", "ie",
@@ -323,11 +336,11 @@ static struct log_elem log_arr[] = {
     {0x30, 0, 0, PDT_TAPE, VENDOR_M, "Performance counters (Hitachi)", "pc_hi",
      NULL},                             /* 0x30, 0  SBC */
     {0x30, 0, 0, PDT_TAPE, VENDOR_M, "Tape usage (lto-5, 6)", "ta_",
-     show_tape_usage_lpage},            /* 0x30, 0  SSC */
+     show_tape_usage_page},             /* 0x30, 0  SSC */
     {0x31, 0, 0, PDT_TAPE, VENDOR_M, "Tape capacity (lto-5, 6)", "tc_",
-     show_tape_capacity_lpage},         /* 0x31, 0  SSC */
+     show_tape_capacity_page},          /* 0x31, 0  SSC */
     {0x32, 0, 0, PDT_TAPE, VENDOR_M, "Data compression (ibm)", "dc_",
-     show_data_compression_lpage},      /* 0x32, 0  SSC; redirect to 0x1b */
+     show_data_compression_page},       /* 0x32, 0  SSC; redirect to 0x1b */
     {0x33, 0, 0, PDT_TAPE, VENDOR_M, "Write errors (lto-5)", "we_",
      NULL},                             /* 0x33, 0  SSC */
     {0x34, 0, 0, PDT_TAPE, VENDOR_M, "Read forward errors (lto-5)", "rfe_",
@@ -604,7 +617,7 @@ enumerate_helper(const struct log_elem * lep, int pos,
 }
 
 static void
-enumerate_lpages(const struct opts_t * op)
+enumerate_pages(const struct opts_t * op)
 {
     int k, j;
     struct log_elem * lep;
@@ -1395,8 +1408,8 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
 
 /* SUPP_PAGES_LPAGE [0x0,0x0] */
 static bool
-show_supported_pgs_lpage(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+show_supported_pgs_page(const uint8_t * resp, int len,
+                        const struct opts_t * op)
 {
     int num, k, pg_code;
     const uint8_t * ucp;
@@ -1427,8 +1440,8 @@ show_supported_pgs_lpage(const uint8_t * resp, int len,
 /* SUPP_PAGES_LPAGE,SUPP_SPGS_SUBPG [0x0,0xff] or all subpages of a given
  * page code: [<pg_code>,0xff] */
 static bool
-show_supported_pgs_sub_lpage(const uint8_t * resp, int len,
-                             const struct opts_t * op)
+show_supported_pgs_sub_page(const uint8_t * resp, int len,
+                            const struct opts_t * op)
 {
     int num, k, pg_code, subpg_code;
     const uint8_t * ucp;
@@ -1969,7 +1982,7 @@ skip:
 
 /* Tape usage: Vendor specific (LTO-5 and LTO-6): 0x30 */
 static bool
-show_tape_usage_lpage(const uint8_t * resp, int len, const struct opts_t * op)
+show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
@@ -2079,8 +2092,8 @@ show_tape_usage_lpage(const uint8_t * resp, int len, const struct opts_t * op)
 
 /* Tape capacity: vendor specific (IBM): 0x31 */
 static bool
-show_tape_capacity_lpage(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+show_tape_capacity_page(const uint8_t * resp, int len,
+                        const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
@@ -2147,8 +2160,8 @@ show_tape_capacity_lpage(const uint8_t * resp, int len,
 /* Data compression: originally vendor specific 0x32 (IBM), then
  * ssc-4 standardizes it at 0x1b */
 static bool
-show_data_compression_lpage(const uint8_t * resp, int len,
-                            const struct opts_t * op)
+show_data_compression_page(const uint8_t * resp, int len,
+                           const struct opts_t * op)
 {
     int k, j, pl, num, extra, pc, pcb, pg_code;
     uint64_t n;
@@ -2773,7 +2786,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* helper for SAS port of PROTO_SPECIFIC_LPAGE [0x18] */
+/* called for SAS port of PROTO_SPECIFIC_LPAGE [0x18] */
 static void
 show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
 {
@@ -2800,6 +2813,12 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
         break;
     case 0x6:
         printf("     Received ERROR  count: %u\n", val);
+        break;
+    case 0x7:
+        printf("     Invalid SPL packet count: %u\n", val);
+        break;
+    case 0x8:
+        printf("     Loss of SPL packet synchronization count: %u\n", val);
         break;
     case 0x20:
         printf("     Received address frame error count: %u\n", val);
@@ -2863,6 +2882,9 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
     case 0x2e:
         printf("     Peak connection time (us): %u\n", val);
         printf("         Peak value detector threshold: %u\n", thresh_val);
+        break;
+    case 0x2f:
+        printf("     Persistent connection count: %u\n", val);
         break;
     case 0x40:
         printf("     Transmitted SSP frame count: %u\n", val);
@@ -3059,6 +3081,9 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
                 break;
             case 0xb:
                 snprintf(s, sz, "12 Gbps");
+                break;
+            case 0xc:
+                snprintf(s, sz, "22.5 Gbps");
                 break;
             default:
                 snprintf(s, sz, "reserved [%d]", t);
@@ -3880,7 +3905,7 @@ static bool
 show_lb_provisioning_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
-    int j, num, pl, pc, pcb;
+    int num, pl, pc, pcb;
     const uint8_t * ucp;
     const char * cp;
     char str[PCB_STR_LEN];
@@ -3911,6 +3936,9 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
         case 0x2:
             cp = "  Used LBA mapping threshold";
             break;
+        case 0x3:
+            cp = "  Available provisioning resource percentage";
+            break;
         case 0x100:
             cp = "  De-duplicated LBA";
             break;
@@ -3925,7 +3953,6 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             break;
         }
         if (cp) {
-            printf("  %s resource count:", cp);
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     pr2serr("\n    truncated by response length, expected at "
@@ -3935,8 +3962,12 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-            printf(" %d\n", j);
+            if (0x3 == pc)
+                printf("  %s: %u %%\n", cp, sg_get_unaligned_be16(ucp + 4));
+            else {
+                printf("  %s resource count:", cp);
+                printf(" %u\n", sg_get_unaligned_be32(ucp + 4));
+            }
             if (pl > 8) {
                 switch (ucp[8] & 0x3) {
                 case 0: cp = "not reported"; break;
@@ -3952,6 +3983,79 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
         } else {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+/* UTILIZATION_SUBPG [0xe,0x1]  introduced: SBC-4 */
+static bool
+show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
+{
+    int num, pl, pc, pcb, k;
+    const uint8_t * ucp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Utilization page  [0xe,0x1]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            printf("  Workload utilization:");
+            if ((pl < 6) || (num < 6)) {
+                if (num < 6)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 6 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 6 expected, got %d\n",
+                            pl);
+                break;
+            }
+            k = sg_get_unaligned_be16(ucp + 4);
+            printf(" %d.%02d %%\n", k / 100, k % 100);
+            break;
+        case 0x1:
+            printf("  Utilization usage rate based on date and time:");
+            if ((pl < 6) || (num < 6)) {
+                if (num < 6)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 6 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 6 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %d %%\n", ucp[4]);
+            break;
+        default:
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            break;
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -4006,7 +4110,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %d%%\n", ucp[7]);
+            printf(" %u %%\n", ucp[7]);
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
@@ -4308,10 +4412,10 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             printf("    Number of background scans performed: %d\n", j);
             j = (ucp[12] << 8) + ucp[13];
 #ifdef SG_LIB_MINGW
-            printf("    Background medium scan progress: %g%%\n",
+            printf("    Background medium scan progress: %g %%\n",
                    (double)(j * 100.0 / 65536.0));
 #else
-            printf("    Background medium scan progress: %.2f%%\n",
+            printf("    Background medium scan progress: %.2f %%\n",
                    (double)(j * 100.0 / 65536.0));
 #endif
             j = (ucp[14] << 8) + ucp[15];
@@ -4368,6 +4472,137 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             for (m = 0; m < 8; ++m)
                 printf("%02x", ucp[16 + m]);
             printf("\n");
+            break;
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+/* PENDING_DEFECTS_SUBPG [0x15,0x1]  introduced: SBC-4 */
+static bool
+show_pending_defects_page(const uint8_t * resp, int len,
+                          const struct opts_t * op)
+{
+    int num, pl, pc, pcb;
+    const uint8_t * ucp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Pending defects page  [0x15,0x1]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            printf("  Pending defect count:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %u\n", sg_get_unaligned_be32(ucp + 4));
+            break;
+        default:
+            printf("  Pending defect: %d\n", pc);
+            if ((pl < 16) || (num < 16)) {
+                if (num < 16)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 16 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 16 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf("    LBA: 0x%" PRIx64 " accumulated_power_on_hours: %u\n",
+                   sg_get_unaligned_be64(ucp + 8),
+                   sg_get_unaligned_be32(ucp + 4));
+            break;
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+/* BACKGROUND_OP_SUBPG [0x15,0x2]  introduced: SBC-4 rev 7 */
+static bool
+show_background_op_page(const uint8_t * resp, int len,
+                        const struct opts_t * op)
+{
+    int num, pl, pc, pcb;
+    const uint8_t * ucp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Background operation page  [0x15,0x2]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = (ucp[0] << 8) | ucp[1];
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            printf("  Background operation:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" BO_STATUS=%d\n", ucp[4]);
+            break;
+        default:
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb) {
@@ -5516,7 +5751,7 @@ show_ascii_page(const uint8_t * resp, int len, const struct opts_t * op)
     pg_code = resp[0] & 0x3f;
     subpg_code = spf ? resp[1] : 0;
     if ((SUPP_SPGS_SUBPG == subpg_code) && (SUPP_PAGES_LPAGE != pg_code)) {
-        done = show_supported_pgs_sub_lpage(resp, len, op);
+        done = show_supported_pgs_sub_page(resp, len, op);
         if (done)
             return;
     }
@@ -5672,7 +5907,7 @@ main(int argc, char * argv[])
         if (op->device_name && op->verbose)
             pr2serr("Warning: device: %s is being ignored\n",
                     op->device_name);
-        enumerate_lpages(op);
+        enumerate_pages(op);
         return 0;
     }
 

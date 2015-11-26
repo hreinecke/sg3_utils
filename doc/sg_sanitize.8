@@ -1,4 +1,4 @@
-.TH SG_SANITIZE "8" "September 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_SANITIZE "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 .SH SYNOPSIS
@@ -8,7 +8,7 @@ sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 [\fI\-\-invert\fR] [\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR]
 [\fI\-\-pattern=PF\fR] [\fI\-\-quick\fR] [\fI\-\-test=TE\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR] [\fI\-\-zero\fR]
-\fIDEVICE\fR
+[\fI\-\-znr\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -144,6 +144,10 @@ with an "overwrite" sanitize operation this option causes the initialization
 pattern to be zero (4 zeros are used as the initialization pattern). Cannot
 be used with the \fI\-\-pattern=PF\fR option. If this option is given
 twice (e.g. '\-zz') then 0xff is used as the initialization byte.
+.TP
+\fB\-Z\fR, \fB\-\-znr\fR
+sets ZNR bit (zoned no reset) in cdb. Introduced in the SBC\-4 revision 7
+draft.
 .SH NOTES
 The SCSI SANITIZE command is closely related to the ATA SANITIZE command,
 both are relatively new with the ATA command being the first one defined.
@@ -226,7 +230,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2011\-2014 Douglas Gilbert
+Copyright \(co 2011\-2015 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
