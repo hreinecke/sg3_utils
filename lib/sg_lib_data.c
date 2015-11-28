@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.15 20151126";  /* spc5r06, sbc4r09 */
+const char * sg_lib_version_str = "2.16 20151126";  /* spc5r07, sbc4r09 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -107,7 +107,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x3b, 0, "Write buffer"},
     {0x3c, 0, "Read buffer(10)"},
     {0x3d, 0, "Update block"},
-    {0x3e, 0, "Read long(10)"},		/* obsolete in SBC-4 r7 */
+    {0x3e, 0, "Read long(10)"},         /* obsolete in SBC-4 r7 */
     {0x3f, 0, "Write long(10)"}, /* SBC-3 r31 recommends Write long(16) */
     {0x40, 0, "Change definition"},     /* obsolete in SPC-4 r11 */
     {0x41, 0, "Write same(10)"}, /* SBC-3 r31 recommends Write same(16) */
@@ -314,7 +314,7 @@ struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
 /* Service action in(16) [0x9e] service actions */
 struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x10, 0, "Read capacity(16)"},
-    {0x11, 0, "Read long(16)"},		/* obsolete in SBC-4 r7 */
+    {0x11, 0, "Read long(16)"},         /* obsolete in SBC-4 r7 */
     {0x12, 0, "Get LBA status"},
     {0x13, 0, "Report referrals"},
     {0x14, 0, "Stream control"},
@@ -798,6 +798,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x20,0x0C,"Illegal command when not in append-only mode"},
     {0x20,0x0D,"Not an administrative logical unit"},
     {0x20,0x0E,"Not a subsidiary logical unit"},
+    {0x20,0x0F,"Not a conglomerate logical unit"},
     {0x21,0x00,"Logical block address out of range"},
     {0x21,0x01,"Invalid element address"},
     {0x21,0x02,"Invalid address for write"},
@@ -806,6 +807,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x21,0x05,"Write boundary violation"},
     {0x21,0x06,"Attempt to read invalid data"},
     {0x21,0x07,"Read boundary violation"},
+    {0x21,0x08,"Misaligned write command"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x23,0x00,"Invalid token operation, cause not reportable"},
     {0x23,0x01,"Invalid token operation, unsupported token type"},

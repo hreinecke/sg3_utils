@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2015 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.

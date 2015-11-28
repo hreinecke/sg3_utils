@@ -2,7 +2,7 @@
 #define SG_UNALIGNED_H
 
 /*
- * Copyright (c) 2014 Douglas Gilbert.
+ * Copyright (c) 2014-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,6 +31,13 @@ static inline uint32_t __get_unaligned_be32(const uint8_t *p)
         return p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
 }
 
+/* Assume 48 bit value placed in uint64_t */
+static inline uint64_t __get_unaligned_be48(const uint8_t *p)
+{
+        return (uint64_t)__get_unaligned_be16(p) << 32 |
+               __get_unaligned_be32(p + 2);
+}
+
 static inline uint64_t __get_unaligned_be64(const uint8_t *p)
 {
         return (uint64_t)__get_unaligned_be32(p) << 32 |
@@ -47,6 +54,13 @@ static inline void __put_unaligned_be32(uint32_t val, uint8_t *p)
 {
         __put_unaligned_be16(val >> 16, p);
         __put_unaligned_be16(val, p + 2);
+}
+
+/* Assume 48 bit value placed in uint64_t */
+static inline void __put_unaligned_be48(uint64_t val, uint8_t *p)
+{
+        __put_unaligned_be16(val >> 32, p);
+        __put_unaligned_be32(val, p + 2);
 }
 
 static inline void __put_unaligned_be64(uint64_t val, uint8_t *p)
@@ -70,6 +84,12 @@ static inline uint32_t sg_get_unaligned_be32(const void *p)
         return __get_unaligned_be32((const uint8_t *)p);
 }
 
+/* Assume 48 bit value placed in uint64_t */
+static inline uint64_t sg_get_unaligned_be48(const void *p)
+{
+        return __get_unaligned_be48((const uint8_t *)p);
+}
+
 static inline uint64_t sg_get_unaligned_be64(const void *p)
 {
         return __get_unaligned_be64((const uint8_t *)p);
@@ -90,6 +110,12 @@ static inline void sg_put_unaligned_be24(uint32_t val, void *p)
 static inline void sg_put_unaligned_be32(uint32_t val, void *p)
 {
         __put_unaligned_be32(val, (uint8_t *)p);
+}
+
+/* Assume 48 bit value placed in uint64_t */
+static inline void sg_put_unaligned_be48(uint64_t val, void *p)
+{
+        __put_unaligned_be48(val, (uint8_t *)p);
 }
 
 static inline void sg_put_unaligned_be64(uint64_t val, void *p)
@@ -177,14 +203,22 @@ static inline uint16_t sg_get_unaligned_le16(const void *p)
         return __get_unaligned_le16((const uint8_t *)p);
 }
 
-static inline uint32_t sg_get_unaligned_le24(const uint8_t *p)
+static inline uint32_t sg_get_unaligned_le24(const void *p)
 {
-        return p[2] << 16 | p[1] << 8 | p[0];
+        return (uint32_t)__get_unaligned_le16(p) |
+               ((const uint8_t *)p)[2] << 16;
 }
 
 static inline uint32_t sg_get_unaligned_le32(const void *p)
 {
         return __get_unaligned_le32((const uint8_t *)p);
+}
+
+/* Assume 48 bit value placed in uint64_t */
+static inline uint64_t sg_get_unaligned_le48(const void *p)
+{
+        return (uint64_t)__get_unaligned_le16((const uint8_t *)p + 4) << 32 |
+               __get_unaligned_le32(p);
 }
 
 static inline uint64_t sg_get_unaligned_le64(const void *p)
@@ -207,6 +241,17 @@ static inline void sg_put_unaligned_le24(uint32_t val, void *p)
 static inline void sg_put_unaligned_le32(uint32_t val, void *p)
 {
         __put_unaligned_le32(val, (uint8_t *)p);
+}
+
+/* Assume 48 bit value placed in uint64_t */
+static inline void sg_put_unaligned_le48(uint64_t val, void *p)
+{
+        ((uint8_t *)p)[5] = (val >> 40) & 0xff;
+        ((uint8_t *)p)[4] = (val >> 32) & 0xff;
+        ((uint8_t *)p)[3] = (val >> 24) & 0xff;
+        ((uint8_t *)p)[2] = (val >> 16) & 0xff;
+        ((uint8_t *)p)[1] = (val >> 8) & 0xff;
+        ((uint8_t *)p)[0] = val & 0xff;
 }
 
 static inline void sg_put_unaligned_le64(uint64_t val, void *p)

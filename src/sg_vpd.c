@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.07 20151123";  /* spc5r04 + sbc4r07 */
+static const char * version_str = "1.08 20151127";  /* spc5r07 + sbc4r07 */
 
 
 /* These structures are duplicates of those of the same name in

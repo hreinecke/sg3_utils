@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_RAW "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_raw \- send arbitrary SCSI command to a device
 .SH SYNOPSIS
@@ -47,7 +47,18 @@ This option is ignored if \fB\-\-request\fR is not specified.
 \fB\-r\fR, \fB\-\-request\fR=\fIRLEN\fR
 Expect to receive up to \fIRLEN\fR bytes of data from the \fIDEVICE\fR.
 \fIRLEN\fR may be suffixed with 'k' to use kilobytes (1024 bytes) instead
-of bytes.
+of bytes. \fIRLEN\fR is decimal unless it has a leading '0x' or a
+trailing 'h'.
+.br
+If \fIRLEN\fR is too small (i.e. either smaller than indicated by the
+cdb (typically the "allocation length" field) and/or smaller than the
+\fIDEVICE\fR tries to send back) then the HBA driver may complain. Making
+\fIRLEN\fR larger than required should cause no problems. Most
+SCSI "data\-in" commands return a data block that contains (in its early
+bytes) a length that the \fIDEVICE\fR would "like" to send back if
+the "allocation length" field in the cdb is large enough. In practice, the
+\fIDEVICE\fR will return no more bytes than indicated in the "allocation
+length" field of the cdb.
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 Open \fIDEVICE\fR read\-only. The default (without this option) is to open
@@ -55,7 +66,14 @@ it read\-write.
 .TP
 \fB\-s\fR, \fB\-\-send\fR=\fISLEN\fR
 Read \fISLEN\fR bytes of data, either from stdin or from a file, and send
-them to the \fIDEVICE\fR.
+them to the \fIDEVICE\fR. In the SCSI transport, \fISLEN\fR becomes the
+length (in bytes) of the "data\-out" buffer. \fISLEN\fR is decimal unless
+it has a leading '0x' or a trailing 'h'.
+.br
+It is the responsibility of the user to make sure that the "data\-out"
+length implied or stated in the cdb matches \fISLEN\fR. Note that some
+common SCSI commands such as WRITE(10) have a "transfer length" field whose
+units are logical blocks (which are often 512 bytes long).
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
 Wait up to \fISEC\fR seconds for command completion (default: 20).
@@ -83,7 +101,7 @@ SG_IO ioctl cannot handle CDBs longer than 16 bytes, and the sg driver
 can handle longer CDBs from lk 3.17 .
 .PP
 The CDB command name defined by T10 for the given CDB is shown if
-the '\-vvv' option is given. The command line syntax still needs to be
+the '\-vv' option is given. The command line syntax still needs to be
 correct, so /dev/null may be used for the \fIDEVICE\fR since the CDB
 command name decoding is done before the \fIDEVICE\fR is checked.
 .SH EXAMPLES
@@ -133,7 +151,7 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2014 Ingo van Lil
+Copyright \(co 2001\-2015 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
