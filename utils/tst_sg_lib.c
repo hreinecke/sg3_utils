@@ -14,15 +14,18 @@
 #include <getopt.h>
 #include <ctype.h>
 #include <errno.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include "sg_lib.h"
+#include "sg_unaligned.h"
 
 /* A utility program to test sg_libs string handling, specifically
  * related to snprintf().
  *
  */
 
-static char * version_str = "1.01 20140427";
+static char * version_str = "1.02 20151127";
 
 
 #define MAX_LINE_LEN 1024
@@ -33,6 +36,7 @@ static struct option long_options[] = {
         {"help", 0, 0, 'h'},
         {"printf", 0, 0, 'p'},
         {"sense", 0, 0, 's'},
+        {"unaligned", 0, 0, 'u'},
         {"verbose", 0, 0, 'v'},
         {"version", 0, 0, 'V'},
         {0, 0, 0, 0},
@@ -75,12 +79,13 @@ usage()
 {
     fprintf(stderr, "Usage: "
           "tst_sg_lib [--dstrhex] [--help] [--printf] [--sense] "
-          "[--verbose]\n"
-          "                  [--version]\n"
+          "[--unaligned]\n"
+          "                  [--verbose] [--version]\n"
           "  where: --dstrhex|-d       test dStrHex* variants\n"
           "         --help|-h          print out usage message\n"
           "         --printf|-p        test library printf variants\n"
           "         --sense|-s         test sense data handling\n"
+          "         --unaligned|-u     test unaligned data handling\n"
           "         --verbose|-v       increase verbosity\n"
           "         --version|-V       print version string and exit\n\n"
           "Test various parts of sg_lib, see options\n"
@@ -115,6 +120,7 @@ main(int argc, char * argv[])
     int do_dstrhex = 0;
     int do_printf = 0;
     int do_sense = 0;
+    int do_unaligned = 0;
     int did_something = 0;
     int verbose = 0;
     int ret = 0;
@@ -124,7 +130,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhpsvV", long_options,
+        c = getopt_long(argc, argv, "dhpsuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -142,6 +148,9 @@ main(int argc, char * argv[])
             break;
         case 's':
             ++do_sense;
+            break;
+        case 'u':
+            ++do_unaligned;
             break;
         case 'v':
             ++verbose;
@@ -280,6 +289,83 @@ main(int argc, char * argv[])
             printf("%s", bb);
             printf("\n");
         }
+    }
+    if (do_unaligned) {
+        uint16_t u16 = 0x55aa;
+        uint16_t u16r;
+        uint32_t u24 = 0x224488;
+        uint32_t u24r;
+        uint32_t u32 = 0x224488ff;
+        uint32_t u32r;
+        uint64_t u48 = 0x112233445566ULL;
+        uint64_t u48r;
+        uint64_t u64 = 0x1122334455667788ULL;
+        uint64_t u64r;
+        uint8_t u8[64];
+
+        ++did_something;
+        if (verbose)
+            memset(u8, 0, sizeof(u8));
+        printf("u16=0x%" PRIx16 "\n", u16);
+        sg_put_unaligned_le16(u16, u8);
+        printf("  le16:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 2, -1);
+        u16r = sg_get_unaligned_le16(u8);
+        printf("  u16r=0x%" PRIx16 "\n", u16r);
+        sg_put_unaligned_be16(u16, u8);
+        printf("  be16:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 2, -1);
+        u16r = sg_get_unaligned_be16(u8);
+        printf("  u16r=0x%" PRIx16 "\n\n", u16r);
+
+        printf("u24=0x%" PRIx32 "\n", u24);
+        sg_put_unaligned_le24(u24, u8);
+        printf("  le24:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 3, -1);
+        u24r = sg_get_unaligned_le24(u8);
+        printf("  u24r=0x%" PRIx32 "\n", u24r);
+        sg_put_unaligned_be24(u24, u8);
+        printf("  be24:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 3, -1);
+        u24r = sg_get_unaligned_be24(u8);
+        printf("  u24r=0x%" PRIx32 "\n\n", u24r);
+
+        printf("u32=0x%" PRIx32 "\n", u32);
+        sg_put_unaligned_le32(u32, u8);
+        printf("  le32:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 4, -1);
+        u32r = sg_get_unaligned_le32(u8);
+        printf("  u32r=0x%" PRIx32 "\n", u32r);
+        sg_put_unaligned_be32(u32, u8);
+        printf("  be32:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 4, -1);
+        u32r = sg_get_unaligned_be32(u8);
+        printf("  u32r=0x%" PRIx32 "\n\n", u32r);
+
+        printf("u48=0x%" PRIx64 "\n", u48);
+        sg_put_unaligned_le48(u48, u8);
+        printf("  le48:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 6, -1);
+        u48r = sg_get_unaligned_le48(u8);
+        printf("  u48r=0x%" PRIx64 "\n", u48r);
+        sg_put_unaligned_be48(u48, u8);
+        printf("  be48:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 6, -1);
+        u48r = sg_get_unaligned_be48(u8);
+        printf("  u48r=0x%" PRIx64 "\n\n", u48r);
+
+        printf("u64=0x%" PRIx64 "\n", u64);
+        sg_put_unaligned_le64(u64, u8);
+        printf("  le64:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 8, -1);
+        u64r = sg_get_unaligned_le64(u8);
+        printf("  u64r=0x%" PRIx64 "\n", u64r);
+        sg_put_unaligned_be64(u64, u8);
+        printf("  be64:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 8, -1);
+        u64r = sg_get_unaligned_be64(u8);
+        printf("  u64r=0x%" PRIx64 "\n\n", u64r);
+
     }
 
     if (0 == did_something)

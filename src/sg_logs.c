@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 
-static const char * version_str = "1.33 20151123";    /* spc5r03 + sbc4r05 */
+static const char * version_str = "1.34 20151127";    /* spc5r07 + sbc4r05 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
