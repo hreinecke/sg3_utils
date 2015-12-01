@@ -93,11 +93,12 @@ bin_PROGRAMS = sg_compare_and_write$(EXEEXT) sg_decode_sense$(EXEEXT) \
 	sg_sat_read_gplog$(EXEEXT) sg_sat_set_features$(EXEEXT) \
 	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) sg_ses_microcode$(EXEEXT) \
 	sg_start$(EXEEXT) sg_stpg$(EXEEXT) sg_sync$(EXEEXT) \
-	sg_turs$(EXEEXT) sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
-	sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) sg_write_buffer$(EXEEXT) \
-	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
-	sg_write_verify$(EXEEXT) sg_zone$(EXEEXT) $(am__EXEEXT_1) \
-	$(am__EXEEXT_2) $(am__EXEEXT_3)
+	sg_timestamp$(EXEEXT) sg_turs$(EXEEXT) sg_unmap$(EXEEXT) \
+	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) \
+	sg_write_buffer$(EXEEXT) sg_write_long$(EXEEXT) \
+	sg_write_same$(EXEEXT) sg_write_verify$(EXEEXT) \
+	sg_zone$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2) \
+	$(am__EXEEXT_3)
 @OS_LINUX_TRUE@am__append_1 = \
 @OS_LINUX_TRUE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
 @OS_LINUX_TRUE@	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
@@ -282,6 +283,9 @@ sg_sync_DEPENDENCIES = ../lib/libsgutils2.la
 sg_test_rwbuf_SOURCES = sg_test_rwbuf.c
 sg_test_rwbuf_OBJECTS = sg_test_rwbuf.$(OBJEXT)
 sg_test_rwbuf_DEPENDENCIES = ../lib/libsgutils2.la
+sg_timestamp_SOURCES = sg_timestamp.c
+sg_timestamp_OBJECTS = sg_timestamp.$(OBJEXT)
+sg_timestamp_DEPENDENCIES = ../lib/libsgutils2.la
 sg_turs_SOURCES = sg_turs.c
 sg_turs_OBJECTS = sg_turs.$(OBJEXT)
 sg_turs_DEPENDENCIES = ../lib/libsgutils2.la
@@ -370,8 +374,8 @@ SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_sat_identify.c sg_sat_phy_event.c sg_sat_read_gplog.c \
 	sg_sat_set_features.c $(sg_scan_SOURCES) sg_senddiag.c \
 	sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c sg_sync.c \
-	sg_test_rwbuf.c sg_turs.c sg_unmap.c sg_verify.c \
-	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
+	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
 	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 DIST_SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
@@ -386,8 +390,8 @@ DIST_SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_sat_identify.c sg_sat_phy_event.c sg_sat_read_gplog.c \
 	sg_sat_set_features.c $(am__sg_scan_SOURCES_DIST) \
 	sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c \
-	sg_sync.c sg_test_rwbuf.c sg_turs.c sg_unmap.c sg_verify.c \
-	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
+	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
 	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 am__can_run_installinfo = \
@@ -597,6 +601,7 @@ sg_start_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_stpg_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_sync_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_test_rwbuf_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_timestamp_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_turs_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_unmap_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_verify_LDADD = ../lib/libsgutils2.la @os_libs@
@@ -885,6 +890,10 @@ sg_test_rwbuf$(EXEEXT): $(sg_test_rwbuf_OBJECTS) $(sg_test_rwbuf_DEPENDENCIES) $
 	@rm -f sg_test_rwbuf$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_test_rwbuf_OBJECTS) $(sg_test_rwbuf_LDADD) $(LIBS)
 
+sg_timestamp$(EXEEXT): $(sg_timestamp_OBJECTS) $(sg_timestamp_DEPENDENCIES) $(EXTRA_sg_timestamp_DEPENDENCIES) 
+	@rm -f sg_timestamp$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_timestamp_OBJECTS) $(sg_timestamp_LDADD) $(LIBS)
+
 sg_turs$(EXEEXT): $(sg_turs_OBJECTS) $(sg_turs_DEPENDENCIES) $(EXTRA_sg_turs_DEPENDENCIES) 
 	@rm -f sg_turs$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_turs_OBJECTS) $(sg_turs_LDADD) $(LIBS)
@@ -997,6 +1006,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_stpg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_test_rwbuf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_timestamp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_turs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_unmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_verify.Po@am__quote@

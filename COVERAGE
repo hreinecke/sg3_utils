@@ -66,6 +66,7 @@ REPORT REFERRALS    sg_referrals, ++
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
+REPORT TIMESTAMP    sg_timestamp
 REPORT ZONES        sg_rep_zones
 REQUEST SENSE       sg_requests, ++
 RESET WRITE POINTER sg_reset_wp
@@ -73,6 +74,7 @@ SANITIZE            sg_sanitize
 SEND DIAGNOSTIC     sg_senddiag, sg_ses, sg_ses_microcode ++
 SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
 SET TARGET PORT GROUPS       sg_stpg, ++
+SET TIMESTAMP       sg_timestamp
 START STOP          sg_start, ++
 SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
 SYNCHRONIZE CACHE(16)   sg_sync++
@@ -129,4 +131,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-7th January 2015
+1st December 2015

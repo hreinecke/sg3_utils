@@ -105,17 +105,13 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
         scCmdBlk[1] |= 4;
     if (immed)
         scCmdBlk[1] |= 2;
-    scCmdBlk[2] = (lba >> 24) & 0xff;
-    scCmdBlk[3] = (lba >> 16) & 0xff;
-    scCmdBlk[4] = (lba >> 8) & 0xff;
-    scCmdBlk[5] = lba & 0xff;
+    sg_put_unaligned_be32((int32_t)lba, scCmdBlk + 2);
     scCmdBlk[6] = group & 0x1f;
     if (count > 0xffff) {
         pr2ws("count too big\n");
         return -1;
     }
-    scCmdBlk[7] = (count >> 8) & 0xff;
-    scCmdBlk[8] = count & 0xff;
+    sg_put_unaligned_be16((int16_t)count, scCmdBlk + 7);
 
     if (verbose) {
         pr2ws("    synchronize cache(10) cdb: ");
@@ -167,20 +163,10 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
 
     if (pmi) { /* lbs only valid when pmi set */
         rcCmdBlk[14] |= 1;
-        rcCmdBlk[2] = (llba >> 56) & 0xff;
-        rcCmdBlk[3] = (llba >> 48) & 0xff;
-        rcCmdBlk[4] = (llba >> 40) & 0xff;
-        rcCmdBlk[5] = (llba >> 32) & 0xff;
-        rcCmdBlk[6] = (llba >> 24) & 0xff;
-        rcCmdBlk[7] = (llba >> 16) & 0xff;
-        rcCmdBlk[8] = (llba >> 8) & 0xff;
-        rcCmdBlk[9] = llba & 0xff;
+        sg_put_unaligned_be64(llba, rcCmdBlk + 2);
     }
     /* Allocation length, no guidance in SBC-2 rev 15b */
-    rcCmdBlk[10] = (mx_resp_len >> 24) & 0xff;
-    rcCmdBlk[11] = (mx_resp_len >> 16) & 0xff;
-    rcCmdBlk[12] = (mx_resp_len >> 8) & 0xff;
-    rcCmdBlk[13] = mx_resp_len & 0xff;
+    sg_put_unaligned_be32((int32_t)mx_resp_len, rcCmdBlk + 10);
     if (verbose) {
         pr2ws("    read capacity (16) cdb: ");
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
@@ -231,10 +217,7 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
 
     if (pmi) { /* lbs only valid when pmi set */
         rcCmdBlk[8] |= 1;
-        rcCmdBlk[2] = (lba >> 24) & 0xff;
-        rcCmdBlk[3] = (lba >> 16) & 0xff;
-        rcCmdBlk[4] = (lba >> 8) & 0xff;
-        rcCmdBlk[5] = lba & 0xff;
+        sg_put_unaligned_be32((int32_t)lba, rcCmdBlk + 2);
     }
     if (verbose) {
         pr2ws("    read capacity (10) cdb: ");
@@ -360,8 +343,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
     modesCmdBlk[1] = (unsigned char)((dbd ? 0x8 : 0) | (llbaa ? 0x10 : 0));
     modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
     modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
-    modesCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    modesCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+    sg_put_unaligned_be16((int16_t)mx_resp_len, modesCmdBlk + 7);
     if (mx_resp_len > 0xffff) {
         pr2ws("mx_resp_len too big\n");
         return -1;
@@ -490,8 +472,7 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
     struct sg_pt_base * ptvp;
 
     modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
-    modesCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
-    modesCmdBlk[8] = (unsigned char)(param_len & 0xff);
+    sg_put_unaligned_be16((int16_t)param_len, modesCmdBlk + 7);
     if (param_len > 0xffff) {
         pr2ws("mode select (10): param_len too big\n");
         return -1;
@@ -717,10 +698,8 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
     logsCmdBlk[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
     logsCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
     logsCmdBlk[3] = (unsigned char)(subpg_code & 0xff);
-    logsCmdBlk[5] = (unsigned char)((paramp >> 8) & 0xff);
-    logsCmdBlk[6] = (unsigned char)(paramp & 0xff);
-    logsCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    logsCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+    sg_put_unaligned_be16((int16_t)paramp, logsCmdBlk + 5);
+    sg_put_unaligned_be16((int16_t)mx_resp_len, logsCmdBlk + 7);
     if (verbose) {
         pr2ws("    log sense cdb: ");
         for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
@@ -794,8 +773,7 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
     logsCmdBlk[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
     logsCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
     logsCmdBlk[3] = (unsigned char)(subpg_code & 0xff);
-    logsCmdBlk[7] = (unsigned char)((param_len >> 8) & 0xff);
-    logsCmdBlk[8] = (unsigned char)(param_len & 0xff);
+    sg_put_unaligned_be16((int16_t)param_len, logsCmdBlk + 7);
     if (verbose) {
         pr2ws("    log select cdb: ");
         for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
