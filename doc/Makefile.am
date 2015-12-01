@@ -10,9 +10,9 @@ man_MANS = \
 	sg_rtpg.8 sg_safte.8 sg_sanitize.8 sg_sat_identify.8 \
 	sg_sat_phy_event.8 sg_sat_read_gplog.8 sg_sat_set_features.8 \
 	sg_senddiag.8 sg_ses.8 sg_ses_microcode.8 sg_start.8 sg_stpg.8 \
-	sg_sync.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 sg_wr_mode.8 \
-	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_write_verify.8 \
-	sg_zone.8
+	sg_sync.8 sg_timestamp.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 \
+	sg_wr_mode.8 sg_write_buffer.8 sg_write_long.8 sg_write_same.8 \
+	sg_write_verify.8 sg_zone.8
 CLEANFILES =
 
 if OS_LINUX

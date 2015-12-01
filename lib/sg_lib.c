@@ -37,6 +37,7 @@
 
 #include "sg_lib.h"
 #include "sg_lib_data.h"
+#include "sg_unaligned.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -316,7 +317,6 @@ int
 sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
                       uint64_t * info_outp)
 {
-    int j;
     const unsigned char * ucp;
     uint64_t ull;
 
@@ -328,19 +328,13 @@ sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
     case 0x70:
     case 0x71:
         if (info_outp)
-            *info_outp = ((unsigned int)sensep[3] << 24) + (sensep[4] << 16) +
-                         (sensep[5] << 8) + sensep[6];
+            *info_outp = sg_get_unaligned_be32(sensep + 3);
         return (sensep[0] & 0x80) ? 1 : 0;
     case 0x72:
     case 0x73:
         ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0 /* info desc */);
         if (ucp && (0xa == ucp[1])) {
-            ull = 0;
-            for (j = 0; j < 8; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                ull |= ucp[4 + j];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             if (info_outp)
                 *info_outp = ull;
             return !!(ucp[2] & 0x80);   /* since spc3r23 should be set */
@@ -422,7 +416,7 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
             return 0;
         if (sensep[15] & 0x80) {        /* SKSV bit set */
             if (progress_outp)
-                *progress_outp = (sensep[16] << 8) + sensep[17];
+                *progress_outp = sg_get_unaligned_be16(sensep + 16);
             return 1;
         } else
             return 0;
@@ -434,12 +428,12 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
         if (sk_pr && ((ucp = sg_scsi_sense_desc_find(sensep, sb_len, 2))) &&
             (0x6 == ucp[1]) && (0x80 & ucp[4])) {
             if (progress_outp)
-                *progress_outp = (ucp[5] << 8) + ucp[6];
+                *progress_outp = sg_get_unaligned_be16(ucp + 5);
             return 1;
         } else if (((ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0xa))) &&
                    ((0x6 == ucp[1]))) {
             if (progress_outp)
-                *progress_outp = (ucp[6] << 8) + ucp[7];
+                *progress_outp = sg_get_unaligned_be16(ucp + 6);
             return 1;
         } else
             return 0;
@@ -527,27 +521,17 @@ uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
                              "stop\n");
             return n;
         }
-        ull = 0;
-        for (j = 0; j < 8; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= dp[4 + j];
-        }
+        ull = sg_get_unaligned_be64(dp + 4);
         n += my_snprintf(b + n, blen - n, "      first uds LBA: 0x%" PRIx64
                          "\n", ull);
-        ull = 0;
-        for (j = 0; j < 8; ++j) {
-            if (j > 0)
-                ull <<= 8;
-            ull |= dp[12 + j];
-        }
+        ull = sg_get_unaligned_be64(dp + 12);
         n += my_snprintf(b + n, blen - n, "      last uds LBA:  0x%" PRIx64
                          "\n", ull);
         for (j = 0; j < tpgd; ++j) {
             tp = dp + 20 + (j * 4);
             decode_tpgs_state(tp[0] & 0xf, c, sizeof(c));
             n += my_snprintf(b + n, blen - n, "        tpg: %d  state: %s\n",
-                             (tp[2] << 8) + tp[3], c);
+                             sg_get_unaligned_be16(tp + 2), c);
         }
     }
     return n;
@@ -626,7 +610,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 n += my_snprintf(b + n, blen - n, "    Error in %s: byte %d",
                                  (descp[4] & 0x40) ? "Command" :
                                                      "Data parameters",
-                                 (descp[5] << 8) | descp[6]);
+                                 sg_get_unaligned_be16(descp + 5));
                 if (descp[4] & 0x08) {
                     n += my_snprintf(b + n, blen - n, " bit %d\n",
                                      descp[4] & 0x07);
@@ -653,7 +637,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                     processed = 0;
                     break;
                 }
-                progress = (descp[5] << 8) + descp[6];
+                progress = sg_get_unaligned_be16(descp + 5);
                 pr = (progress * 100) / 65536;
                 rem = ((progress * 100) % 65536) / 656;
                 n += my_snprintf(b + n, blen - n, "%d.%02d%%\n", pr, rem);
@@ -669,7 +653,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                                  "byte %d",
                                  (descp[4] & 0x20) ? "segment descriptor" :
                                                      "parameter list",
-                                 (descp[5] << 8) | descp[6]);
+                                 sg_get_unaligned_be16(descp + 5));
                 if (descp[4] & 0x08)
                     n += my_snprintf(b + n, blen - n, " bit %d\n",
                                      descp[4] & 0x07);
@@ -776,7 +760,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 processed = 0;
                 break;
             }
-            progress = (descp[6] << 8) + descp[7];
+            progress = sg_get_unaligned_be16(descp + 6);
             pr = (progress * 100) / 65536;
             rem = ((progress * 100) % 65536) / 656;
             n += my_snprintf(b + n, blen - n, "    %d.02%d%%", pr, rem);
@@ -966,9 +950,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             r = 0;
             valid = sense_buffer[0] & 0x80;
             if (len > 6) {
-                info = (unsigned int)((sense_buffer[3] << 24) |
-                        (sense_buffer[4] << 16) | (sense_buffer[5] << 8) |
-                        sense_buffer[6]);
+                info = sg_get_unaligned_be32(sense_buffer + 3);
                 if (valid)
                     r += my_snprintf(b + r, blen - r, "  Info fld=0x%x [%u] ",
                                      info, info);
@@ -1001,7 +983,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                              "Error in %s: byte %d",
                              ((sense_buffer[15] & 0x40) ? "Command" :
                                                           "Data parameters"),
-                             (sense_buffer[16] << 8) | sense_buffer[17]);
+                             sg_get_unaligned_be16(sense_buffer + 16));
                     if (sense_buffer[15] & 0x08)
                         r += my_snprintf(b + r, blen - r, " bit %d\n",
                                          sense_buffer[15] & 0x07);
@@ -1010,7 +992,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                     break;
                 case SPC_SK_NO_SENSE:
                 case SPC_SK_NOT_READY:
-                    progress = (sense_buffer[16] << 8) + sense_buffer[17];
+                    progress = sg_get_unaligned_be16(sense_buffer + 16);
                     pr = (progress * 100) / 65536;
                     rem = ((progress * 100) % 65536) / 656;
                     r += my_snprintf(b + r, blen - r, "  Progress "
@@ -1029,8 +1011,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                                      "%s, byte %d",
                                      ((sense_buffer[15] & 0x20) ?
                                       "segment descriptor" : "parameter list"),
-                                     ((sense_buffer[16] << 8) +
-                                      sense_buffer[17]));
+                                     sg_get_unaligned_be16(sense_buffer + 16));
                     if (sense_buffer[15] & 0x08)
                         r += my_snprintf(b + r, blen - r, " bit %d\n",
                                          sense_buffer[15] & 0x07);
@@ -1069,8 +1050,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                          (sense_buffer[0] & 0xf));
         if (sense_buffer[0] & 0x80)
             r += my_snprintf(b + r, blen - r, "  lba=0x%x\n",
-                             ((sense_buffer[1] & 0x1f) << 16) +
-                             (sense_buffer[2] << 8) + sense_buffer[3]);
+                     sg_get_unaligned_be24(sense_buffer + 1) & 0x1fffff);
         n += my_snprintf(buff + n, buff_len - n, "%s\n", b);
         len = sb_len;
         if (len > 32)
@@ -1219,7 +1199,7 @@ sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
         return;
     }
     service_action = (SG_VARIABLE_LENGTH_CMD == cmdp[0]) ?
-                     ((cmdp[8] << 8) | cmdp[9]) : (cmdp[1] & 0x1f);
+                     sg_get_unaligned_be16(cmdp + 8) : (cmdp[1] & 0x1f);
     sg_get_opcode_sa_name(cmdp[0], service_action, peri_type, buff_len, buff);
 }
 

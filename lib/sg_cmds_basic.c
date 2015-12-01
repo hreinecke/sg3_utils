@@ -22,6 +22,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -33,7 +34,7 @@
 #endif
 
 
-static const char * version_str = "1.70 20150511";
+static const char * version_str = "1.71 20151130";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -289,8 +290,7 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
         inqCmdBlk[1] |= 1;
     inqCmdBlk[2] = (unsigned char)pg_op;
     /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
-    inqCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    inqCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
+    sg_put_unaligned_be16((uint16_t)mx_resp_len, inqCmdBlk + 3);
     if (verbose) {
         pr2ws("    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
@@ -565,10 +565,7 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
     struct sg_pt_base * ptvp;
 
     rlCmdBlk[2] = select_report & 0xff;
-    rlCmdBlk[6] = (mx_resp_len >> 24) & 0xff;
-    rlCmdBlk[7] = (mx_resp_len >> 16) & 0xff;
-    rlCmdBlk[8] = (mx_resp_len >> 8) & 0xff;
-    rlCmdBlk[9] = mx_resp_len & 0xff;
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rlCmdBlk + 6);
     if (verbose) {
         pr2ws("    report luns cdb: ");
         for (k = 0; k < REPORT_LUNS_CMDLEN; ++k)

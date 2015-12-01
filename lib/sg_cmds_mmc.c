@@ -17,6 +17,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_mmc.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -72,10 +73,8 @@ sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
     struct sg_pt_base * ptvp;
 
     scsCmdBlk[1] |= (rot_control & 0x3);
-    scsCmdBlk[2] = (drv_read_speed >> 8) & 0xff;
-    scsCmdBlk[3] = drv_read_speed & 0xff;
-    scsCmdBlk[4] = (drv_write_speed >> 8) & 0xff;
-    scsCmdBlk[5] = drv_write_speed & 0xff;
+    sg_put_unaligned_be16((uint16_t)drv_read_speed, scsCmdBlk + 2);
+    sg_put_unaligned_be16((uint16_t)drv_write_speed, scsCmdBlk + 4);
 
     if (verbose) {
         pr2ws("    set cd speed cdb: ");
@@ -142,14 +141,12 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
         pr2ws("Bad starting field number: 0x%x\n", starting);
         return -1;
     }
-    gcCmdBlk[2] = (unsigned char)((starting >> 8) & 0xff);
-    gcCmdBlk[3] = (unsigned char)(starting & 0xff);
+    sg_put_unaligned_be16((uint16_t)starting, gcCmdBlk + 2);
     if ((mx_resp_len < 0) || (mx_resp_len > 0xffff)) {
         pr2ws("Bad mx_resp_len: 0x%x\n", starting);
         return -1;
     }
-    gcCmdBlk[7] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    gcCmdBlk[8] = (unsigned char)(mx_resp_len & 0xff);
+    sg_put_unaligned_be16((uint16_t)mx_resp_len, gcCmdBlk + 7);
 
     if (verbose) {
         pr2ws("    Get Configuration cdb: ");
@@ -193,8 +190,7 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             int len;
 
             ucp = (unsigned char *)resp;
-            len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) + ucp[3] +
-                  4;
+            len = sg_get_unaligned_be32(ucp + 0);
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;
@@ -228,16 +224,12 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
         return -1;
     }
     gpCmdBlk[1] = (data_type & 0x1f);
-    gpCmdBlk[2] = (unsigned char)((starting_lba >> 24) & 0xff);
-    gpCmdBlk[3] = (unsigned char)((starting_lba >> 16) & 0xff);
-    gpCmdBlk[4] = (unsigned char)((starting_lba >> 8) & 0xff);
-    gpCmdBlk[3] = (unsigned char)(starting_lba & 0xff);
+    sg_put_unaligned_be32((uint32_t)starting_lba, gpCmdBlk + 2);
     if ((max_num_desc < 0) || (max_num_desc > 0xffff)) {
         pr2ws("Bad max_num_desc: 0x%x\n", max_num_desc);
         return -1;
     }
-    gpCmdBlk[8] = (unsigned char)((max_num_desc >> 8) & 0xff);
-    gpCmdBlk[9] = (unsigned char)(max_num_desc & 0xff);
+    sg_put_unaligned_be16((uint16_t)max_num_desc, gpCmdBlk + 8);
     if ((ttype < 0) || (ttype > 0xff)) {
         pr2ws("Bad type: 0x%x\n", ttype);
         return -1;
@@ -286,8 +278,7 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
             int len;
 
             ucp = (unsigned char *)resp;
-            len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) + ucp[3] +
-                  4;
+            len = sg_get_unaligned_be32(ucp + 0);
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;
@@ -317,8 +308,7 @@ sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
     struct sg_pt_base * ptvp;
 
     ssCmdBlk[8] = type;
-    ssCmdBlk[9] = (param_len >> 8) & 0xff;
-    ssCmdBlk[10] = param_len & 0xff;
+    sg_put_unaligned_be16((uint16_t)param_len, ssCmdBlk + 9);
     if (verbose) {
         pr2ws("    set streaming cdb: ");
         for (k = 0; k < SET_STREAMING_CMDLEN; ++k)
