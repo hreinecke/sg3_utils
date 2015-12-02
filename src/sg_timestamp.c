@@ -362,7 +362,7 @@ main(int argc, char * argv[])
     memset(d_buff, 0, 12);
     if (do_set) {
         cmd_name = "Set timestamp";
-        sg_put_unaligned_be48(secs_given ? secs * 1000 : msecs, d_buff + 4);
+        sg_put_unaligned_be48(secs_given ? (secs * 1000) : msecs, d_buff + 4);
         res = sg_ll_set_timestamp(sg_fd, d_buff, 12, 1, verbose);
     } else {
         cmd_name = "Report timestamp";
