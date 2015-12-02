@@ -128,7 +128,7 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
     getLbaStatCmd[1] = GET_LBA_STATUS_SA;
 
     sg_put_unaligned_be64(start_llba, getLbaStatCmd + 2);
-    sg_put_unaligned_be32((uint32_t)alloc_len, getLbaStatCmd + 2);
+    sg_put_unaligned_be32((uint32_t)alloc_len, getLbaStatCmd + 10);
     if (verbose) {
         pr2ws("    Get LBA status cmd: ");
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)

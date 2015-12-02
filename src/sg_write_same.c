@@ -25,8 +25,9 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.09 20150511";
+static const char * version_str = "1.10 20151201";
 
 
 #define ME "sg_write_same: "
@@ -147,7 +148,6 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 {
     int k, ret, res, sense_cat, cdb_len;
     uint64_t llba;
-    uint32_t lba, unum;
     unsigned char wsCmdBlk[WRITE_SAME32_LEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -189,14 +189,9 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             wsCmdBlk[1] |= 0x4;
         if (op->lbdata)
             wsCmdBlk[1] |= 0x2;
-        lba = (uint32_t)op->lba;
-        for (k = 3; k >= 0; --k) {
-            wsCmdBlk[2 + k] = (lba & 0xff);
-            lba >>= 8;
-        }
+        sg_put_unaligned_be32((uint32_t)op->lba, wsCmdBlk + 2);
         wsCmdBlk[6] = (op->grpnum & 0x1f);
-        wsCmdBlk[7] = ((op->numblocks >> 8) & 0xff);
-        wsCmdBlk[8] = (op->numblocks & 0xff);
+        sg_put_unaligned_be16((uint16_t)op->numblocks, wsCmdBlk + 7);
         break;
     case WRITE_SAME16_LEN:
         wsCmdBlk[0] = WRITE_SAME16_OP;
@@ -211,16 +206,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             wsCmdBlk[1] |= 0x2;
         if (op->ndob)
             wsCmdBlk[1] |= 0x1;
-        llba = op->lba;
-        for (k = 7; k >= 0; --k) {
-            wsCmdBlk[2 + k] = (llba & 0xff);
-            llba >>= 8;
-        }
-        unum = op->numblocks;
-        for (k = 3; k >= 0; --k) {
-            wsCmdBlk[10 + k] = (unum & 0xff);
-            unum >>= 8;
-        }
+        sg_put_unaligned_be64(op->lba, wsCmdBlk + 2);
+        sg_put_unaligned_be32((uint32_t)op->numblocks, wsCmdBlk + 10);
         wsCmdBlk[14] = (op->grpnum & 0x1f);
         break;
     case WRITE_SAME32_LEN:
@@ -229,8 +216,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
         wsCmdBlk[0] = VARIABLE_LEN_OP;
         wsCmdBlk[6] = (op->grpnum & 0x1f);
         wsCmdBlk[7] = WRITE_SAME32_ADD;
-        wsCmdBlk[8] = ((WRITE_SAME32_SA >> 8) & 0xff);
-        wsCmdBlk[9] = (WRITE_SAME32_SA & 0xff);
+        sg_put_unaligned_be16((uint16_t)WRITE_SAME32_SA, wsCmdBlk + 8);
         wsCmdBlk[10] = ((op->wrprotect & 0x7) << 5);
         if (op->anchor)
             wsCmdBlk[10] |= 0x10;
@@ -242,16 +228,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             wsCmdBlk[10] |= 0x2;
         if (op->ndob)
             wsCmdBlk[10] |= 0x1;
-        llba = op->lba;
-        for (k = 7; k >= 0; --k) {
-            wsCmdBlk[12 + k] = (llba & 0xff);
-            llba >>= 8;
-        }
-        unum = op->numblocks;
-        for (k = 3; k >= 0; --k) {
-            wsCmdBlk[28 + k] = (unum & 0xff);
-            unum >>= 8;
-        }
+        sg_put_unaligned_be64(op->lba, wsCmdBlk + 12);
+        sg_put_unaligned_be32((uint32_t)op->numblocks, wsCmdBlk + 28);
         break;
     default:
         fprintf(stderr, "do_write_same: bad cdb length %d\n", cdb_len);
@@ -523,10 +501,7 @@ main(int argc, char * argv[])
             if (0 == res) {
                 if (vb > 3)
                     dStrHexErr((const char *)resp_buff, RCAP16_RESP_LEN, 1);
-                block_size = ((resp_buff[8] << 24) |
-                              (resp_buff[9] << 16) |
-                              (resp_buff[10] << 8) |
-                              resp_buff[11]);
+                block_size = sg_get_unaligned_be32(resp_buff + 8);
                 prot_en = !!(resp_buff[12] & 0x1);
                 op->xfer_len = block_size;
                 if (prot_en && (op->wrprotect > 0))
@@ -543,10 +518,7 @@ main(int argc, char * argv[])
                     if (vb > 3)
                         dStrHexErr((const char *)resp_buff, RCAP10_RESP_LEN,
                                    1);
-                    block_size = ((resp_buff[4] << 24) |
-                                  (resp_buff[5] << 16) |
-                                  (resp_buff[6] << 8) |
-                                  resp_buff[7]);
+                    block_size = sg_get_unaligned_be32(resp_buff + 4);
                     op->xfer_len = block_size;
                 } else {
                     sg_get_category_sense_str(res, sizeof(b), b, vb);

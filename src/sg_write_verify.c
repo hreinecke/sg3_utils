@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Douglas Gilbert
+ * Copyright (c) 2014-2015 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,8 +32,9 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.06 20141217";
+static const char * version_str = "1.07 20151201";
 
 
 #define ME "sg_write_verify: "
@@ -200,13 +201,9 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
     if (bytchk)
        wv_cdb[1] |= ((bytchk & 0x3) << 1);
 
-    wv_cdb[2] = (lba >> 24) & 0xff;
-    wv_cdb[3] = (lba >> 16) & 0xff;
-    wv_cdb[4] = (lba >> 8) & 0xff;
-    wv_cdb[5] = lba & 0xff;
+    sg_put_unaligned_be32((uint32_t)lba, wv_cdb + 2);
     wv_cdb[6] = group & 0x1f;
-    wv_cdb[7] = (num_lb >> 8) & 0xff;
-    wv_cdb[8] = num_lb & 0xff;
+    sg_put_unaligned_be16((uint16_t)num_lb, wv_cdb + 7);
     ret = run_scsi_transaction(sg_fd, wv_cdb, sizeof(wv_cdb), dop, do_len,
                                timeout, verbose);
     return ret;
@@ -231,18 +228,8 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
     if (bytchk)
         wv_cdb[1] |= ((bytchk & 0x3) << 1);
 
-    wv_cdb[2] = (llba >> 56) & 0xff;
-    wv_cdb[3] = (llba >> 48) & 0xff;
-    wv_cdb[4] = (llba >> 40) & 0xff;
-    wv_cdb[5] = (llba >> 32) & 0xff;
-    wv_cdb[6] = (llba >> 24) & 0xff;
-    wv_cdb[7] = (llba >> 16) & 0xff;
-    wv_cdb[8] = (llba >> 8) & 0xff;
-    wv_cdb[9] = llba & 0xff;
-    wv_cdb[10] = (num_lb >> 24) & 0xff;
-    wv_cdb[11] = (num_lb >> 16) & 0xff;
-    wv_cdb[12] = (num_lb >> 8) & 0xff;
-    wv_cdb[13] = num_lb & 0xff;
+    sg_put_unaligned_be64(llba, wv_cdb + 2);
+    sg_put_unaligned_be32((uint32_t)num_lb, wv_cdb + 10);
     wv_cdb[14] = group & 0x1f;
     ret = run_scsi_transaction(sg_fd, wv_cdb, sizeof(wv_cdb), dop, do_len,
                                timeout, verbose);

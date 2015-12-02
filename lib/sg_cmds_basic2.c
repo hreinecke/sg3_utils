@@ -105,7 +105,7 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
         scCmdBlk[1] |= 4;
     if (immed)
         scCmdBlk[1] |= 2;
-    sg_put_unaligned_be32((int32_t)lba, scCmdBlk + 2);
+    sg_put_unaligned_be32((uint32_t)lba, scCmdBlk + 2);
     scCmdBlk[6] = group & 0x1f;
     if (count > 0xffff) {
         pr2ws("count too big\n");
@@ -166,7 +166,7 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
         sg_put_unaligned_be64(llba, rcCmdBlk + 2);
     }
     /* Allocation length, no guidance in SBC-2 rev 15b */
-    sg_put_unaligned_be32((int32_t)mx_resp_len, rcCmdBlk + 10);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rcCmdBlk + 10);
     if (verbose) {
         pr2ws("    read capacity (16) cdb: ");
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
@@ -217,7 +217,7 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
 
     if (pmi) { /* lbs only valid when pmi set */
         rcCmdBlk[8] |= 1;
-        sg_put_unaligned_be32((int32_t)lba, rcCmdBlk + 2);
+        sg_put_unaligned_be32((uint32_t)lba, rcCmdBlk + 2);
     }
     if (verbose) {
         pr2ws("    read capacity (10) cdb: ");

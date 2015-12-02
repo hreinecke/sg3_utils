@@ -59,7 +59,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "5.83 20150215";
+static const char * version_str = "5.84 20151201";
 
 
 #define ME "sg_dd: "
@@ -517,7 +517,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         sz_ind = 0;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        sg_put_unaligned_be24(start_block, cdbp + 1);
+        sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
         cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
         if (blocks > 256) {
             fprintf(stderr, ME "for 6 byte commands, maximum number of "
