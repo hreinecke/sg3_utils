@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2014 D. Gilbert
+ *  Copyright (C) 1999-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,6 +36,7 @@
 #endif
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
 #define RB_MODE_DESC 3
 #define RB_MODE_DATA 2
@@ -53,7 +54,7 @@
 #endif
 
 
-static const char * version_str = "4.92 20141227";
+static const char * version_str = "4.93 20151207";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -457,11 +458,11 @@ main(int argc, char * argv[])
     }
 
     if (op->do_echo) {
-        buf_capacity = (((0x1f & rbBuff[2]) << 8) | rbBuff[3]);
+        buf_capacity = 0x1fff & sg_get_unaligned_be16(rbBuff + 2);
         printf("READ BUFFER reports: echo buffer capacity=%d\n",
                buf_capacity);
     } else {
-        buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
+        buf_capacity = sg_get_unaligned_be24(rbBuff + 1);
         printf("READ BUFFER reports: buffer capacity=%d, offset "
                "boundary=%d\n", buf_capacity, (int)rbBuff[0]);
     }
@@ -531,9 +532,7 @@ main(int argc, char * argv[])
         memset(rbCmdBlk, 0, RB_CMD_LEN);
         rbCmdBlk[0] = RB_OPCODE;
         rbCmdBlk[1] = op->do_echo ? RB_MODE_ECHO_DATA : RB_MODE_DATA;
-        rbCmdBlk[6] = 0xff & (buf_size >> 16);
-        rbCmdBlk[7] = 0xff & (buf_size >> 8);
-        rbCmdBlk[8] = 0xff & buf_size;
+        sg_put_unaligned_be24((uint32_t)buf_size, rbCmdBlk + 6);
 #ifdef SG_DEBUG
         memset(rbBuff, 0, buf_size);
 #endif

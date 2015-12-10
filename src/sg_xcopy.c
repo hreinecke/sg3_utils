@@ -1303,9 +1303,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
             memcpy(desc + 4, best, best_len + 4);
             desc[4] &= 0x1f;
             desc[28] = pad << 2;
-            desc[29] = (block_size >> 16) & 0xff;
-            desc[30] = (block_size >> 8) & 0xff;
-            desc[31] = block_size & 0xff;
+            sg_put_unaligned_be24((uint32_t)block_size, desc + 29);
             if (verbose > 3) {
                 pr2serr("Descriptor in hex (bs %d):\n", block_size);
                 dStrHexErr((const char *)desc, 32, 1);

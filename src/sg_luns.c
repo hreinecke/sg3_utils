@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,6 +21,7 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -29,7 +30,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.28 20141225";
+static const char * version_str = "1.29 20151207";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -105,7 +106,7 @@ usage()
     pr2serr("    --linux|-l         show Linux integer lun after T10 "
             "representation\n");
 #endif
-    pr2serr("    --lu_cong          decode as if LU_CONG is set; used "
+    pr2serr("    --lu_cong|-L       decode as if LU_CONG is set; used "
             "twice:\n"
             "                       decode as if LU_CONG is clear\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
@@ -187,7 +188,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
             if (lu_cong) {
                 snprintf(b, sizeof(b), "%sSimple lu addressing: ",
                          l_leadin);
-                x = ((lunp[0] & 0x3f) << 8) + lunp[1];
+                x = 0x3fff & sg_get_unaligned_be16(lunp + 0);
                 if (do_hex)
                     printf("%s0x%04x\n", b, x);
                 else
@@ -216,7 +217,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
             }
             break;
         case 1:         /* flat space addressing method */
-            lun = ((lunp[0] & 0x3f) << 8) + lunp[1];
+            lun = 0x3fff & sg_get_unaligned_be16(lunp + 0);
             if (lu_cong) {
                 printf("%sSince LU_CONG=1, unexpected Flat space "
                        "addressing: lun=0x%04x\n", l_leadin, lun);
@@ -276,7 +277,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                     break;
                 }
             } else if ((1 == len_fld) && (2 == e_a_method)) {
-                x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
+                x = sg_get_unaligned_be24(lunp + 1);
                 if (do_hex)
                     printf("%sExtended flat space addressing: lun=0x%06x\n",
                            l_leadin, x);
@@ -302,7 +303,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
             else {
                 if (len_fld < 2) {
                     if (1 == len_fld)
-                        x = (lunp[1] << 16) + (lunp[2] << 8) + lunp[3];
+                        x = sg_get_unaligned_be24(lunp + 1);
                     if (do_hex)
                         printf("%sExtended logical unit addressing: "
                                "length=%d, e.a. method=%d, value=0x%06x\n",
@@ -352,26 +353,21 @@ static void
 linux2t10_lun(uint64_t linux_lun, unsigned char t10_lun[])
 {
     int k;
-    unsigned int u;
 
-     for (k = 0; k < 4; ++k, linux_lun >>= 16) {
-        u = linux_lun & 0xffff;
-        t10_lun[(2 * k) + 1] = u & 0xff;
-        t10_lun[2 * k] = (u >> 8) & 0xff;
-    }
+    for (k = 0; k < 8; k += 2, linux_lun >>= 16)
+        sg_put_unaligned_be16((uint16_t)linux_lun, t10_lun + k);
 }
 
 static uint64_t
 t10_2linux_lun(const unsigned char t10_lun[])
 {
+    int k;
     const unsigned char * cp;
     uint64_t res;
 
-     res = (t10_lun[6] << 8) + t10_lun[7];
-     for (cp = t10_lun + 4; cp >= t10_lun; cp -= 2) {
-        res <<= 16;
-        res += (*cp << 8) + *(cp + 1);
-    }
+    res = sg_get_unaligned_be16(t10_lun + 6);
+    for (cp = t10_lun + 4, k = 0; k < 3; ++k, cp -= 2)
+        res = (res << 16) + sg_get_unaligned_be16(cp);
     return res;
 }
 
@@ -647,8 +643,7 @@ main(int argc, char * argv[])
                             verbose);
     ret = res;
     if (0 == res) {
-        list_len = (reportLunsBuff[0] << 24) + (reportLunsBuff[1] << 16) +
-                   (reportLunsBuff[2] << 8) + reportLunsBuff[3];
+        list_len = sg_get_unaligned_be32(reportLunsBuff + 0);
         len_cap = list_len + 8;
         if (len_cap > maxlen)
             len_cap = maxlen;

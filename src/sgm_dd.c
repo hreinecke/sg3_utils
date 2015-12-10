@@ -60,9 +60,10 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "1.41 20150215";
+static const char * version_str = "1.42 20151215";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -313,7 +314,7 @@ usage()
 static int
 scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
-    int k, res;
+    int res;
     unsigned int ui;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
     int verb;
@@ -326,26 +327,18 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
-        int64_t ls;
 
         res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
                                verb);
         if (0 != res)
             return res;
-        for (k = 0, ls = 0; k < 8; ++k) {
-            ls <<= 8;
-            ls |= rcBuff[k];
-        }
-        *num_sect = ls + 1;
-        *sect_sz = (rcBuff[8] << 24) | (rcBuff[9] << 16) |
-                   (rcBuff[10] << 8) | rcBuff[11];
+        *num_sect = sg_get_unaligned_be64(rcBuff + 0) + 1;
+        *sect_sz = sg_get_unaligned_be32(rcBuff + 8);
     } else {
-        ui = ((rcBuff[0] << 24) | (rcBuff[1] << 16) | (rcBuff[2] << 8) |
-              rcBuff[3]);
+        ui = sg_get_unaligned_be32(rcBuff + 0);
         /* take care not to sign extend values > 0x7fffffff */
         *num_sect = (int64_t)ui + 1;
-        *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
-                   (rcBuff[6] << 8) | rcBuff[7];
+        *sect_sz = sg_get_unaligned_be32(rcBuff + 4);
     }
     if (verbose)
         fprintf(stderr, "      number of blocks=%" PRId64 " [0x%" PRIx64
@@ -418,9 +411,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         sz_ind = 0;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[1] = (unsigned char)((start_block >> 16) & 0x1f);
-        cdbp[2] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[3] = (unsigned char)(start_block & 0xff);
+        sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
         cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
         if (blocks > 256) {
             fprintf(stderr, ME "for 6 byte commands, maximum number of "
@@ -442,12 +433,8 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         sz_ind = 1;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[2] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[5] = (unsigned char)(start_block & 0xff);
-        cdbp[7] = (unsigned char)((blocks >> 8) & 0xff);
-        cdbp[8] = (unsigned char)(blocks & 0xff);
+        sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
+        sg_put_unaligned_be16((uint16_t)blocks, cdbp + 7);
         if (blocks & (~0xffff)) {
             fprintf(stderr, ME "for 10 byte commands, maximum number of "
                             "blocks is %d\n", 0xffff);
@@ -458,31 +445,15 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         sz_ind = 2;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[2] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[5] = (unsigned char)(start_block & 0xff);
-        cdbp[6] = (unsigned char)((blocks >> 24) & 0xff);
-        cdbp[7] = (unsigned char)((blocks >> 16) & 0xff);
-        cdbp[8] = (unsigned char)((blocks >> 8) & 0xff);
-        cdbp[9] = (unsigned char)(blocks & 0xff);
+        sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
+        sg_put_unaligned_be32((uint32_t)blocks, cdbp + 6);
         break;
     case 16:
         sz_ind = 3;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[2] = (unsigned char)((start_block >> 56) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 48) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 40) & 0xff);
-        cdbp[5] = (unsigned char)((start_block >> 32) & 0xff);
-        cdbp[6] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[7] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[8] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[9] = (unsigned char)(start_block & 0xff);
-        cdbp[10] = (unsigned char)((blocks >> 24) & 0xff);
-        cdbp[11] = (unsigned char)((blocks >> 16) & 0xff);
-        cdbp[12] = (unsigned char)((blocks >> 8) & 0xff);
-        cdbp[13] = (unsigned char)(blocks & 0xff);
+        sg_put_unaligned_be64((uint64_t)start_block, cdbp + 2);
+        sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);
         break;
     default:
         fprintf(stderr, ME "expected cdb size of 6, 10, 12, or 16 but got"

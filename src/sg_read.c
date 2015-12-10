@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2014 D. Gilbert
+*  Copyright (C) 2001 - 2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -46,9 +46,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "1.22 20141227";
+static const char * version_str = "1.23 20151207";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -220,9 +221,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         sz_ind = 0;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[1] = (unsigned char)((start_block >> 16) & 0x1f);
-        cdbp[2] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[3] = (unsigned char)(start_block & 0xff);
+        sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
         cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
         if (blocks > 256) {
             fprintf(stderr, ME "for 6 byte commands, maximum number of "
@@ -244,12 +243,8 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         sz_ind = 1;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[2] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[5] = (unsigned char)(start_block & 0xff);
-        cdbp[7] = (unsigned char)((blocks >> 8) & 0xff);
-        cdbp[8] = (unsigned char)(blocks & 0xff);
+        sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
+        sg_put_unaligned_be16((uint16_t)blocks, cdbp + 7);
         if (blocks & (~0xffff)) {
             fprintf(stderr, ME "for 10 byte commands, maximum number of "
                             "blocks is %d\n", 0xffff);
@@ -260,31 +255,15 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         sz_ind = 2;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[2] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[5] = (unsigned char)(start_block & 0xff);
-        cdbp[6] = (unsigned char)((blocks >> 24) & 0xff);
-        cdbp[7] = (unsigned char)((blocks >> 16) & 0xff);
-        cdbp[8] = (unsigned char)((blocks >> 8) & 0xff);
-        cdbp[9] = (unsigned char)(blocks & 0xff);
+        sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
+        sg_put_unaligned_be32((uint32_t)blocks, cdbp + 6);
         break;
     case 16:
         sz_ind = 3;
         cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
-        cdbp[2] = (unsigned char)((start_block >> 56) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 48) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 40) & 0xff);
-        cdbp[5] = (unsigned char)((start_block >> 32) & 0xff);
-        cdbp[6] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[7] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[8] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[9] = (unsigned char)(start_block & 0xff);
-        cdbp[10] = (unsigned char)((blocks >> 24) & 0xff);
-        cdbp[11] = (unsigned char)((blocks >> 16) & 0xff);
-        cdbp[12] = (unsigned char)((blocks >> 8) & 0xff);
-        cdbp[13] = (unsigned char)(blocks & 0xff);
+        sg_put_unaligned_be64(start_block, cdbp + 2);
+        sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);
         break;
     default:
         fprintf(stderr, ME "expected cdb size of 6, 10, 12, or 16 but got"

@@ -50,8 +50,9 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.10 20150511";
+static const char * version_str = "1.11 20151207";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -322,14 +323,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
                 cdbp[1] |= FLAG_FUA;
         if (flags.fua_nv)
                 cdbp[1] |= FLAG_FUA_NV;
-        cdbp[2] = (unsigned char)((start_block >> 56) & 0xff);
-        cdbp[3] = (unsigned char)((start_block >> 48) & 0xff);
-        cdbp[4] = (unsigned char)((start_block >> 40) & 0xff);
-        cdbp[5] = (unsigned char)((start_block >> 32) & 0xff);
-        cdbp[6] = (unsigned char)((start_block >> 24) & 0xff);
-        cdbp[7] = (unsigned char)((start_block >> 16) & 0xff);
-        cdbp[8] = (unsigned char)((start_block >> 8) & 0xff);
-        cdbp[9] = (unsigned char)(start_block & 0xff);
+        sg_put_unaligned_be64((uint64_t)start_block, cdbp + 2);
         /* cdbp[10-12] are reserved */
         cdbp[13] = (unsigned char)(blocks & 0xff);
         cdbp[14] = (unsigned char)(flags.group & 0x1f);

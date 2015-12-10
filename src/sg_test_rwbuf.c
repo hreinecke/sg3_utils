@@ -1,7 +1,7 @@
 /*
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2008 Douglas Gilbert
+ * (c) 1999-2015 Douglas Gilbert
  *
  * Program to test the SCSI host adapter by issueing
  * write and read operations on a device's buffer
@@ -37,9 +37,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "1.07 20130507";
+static const char * version_str = "1.08 20151208";
 
 #define BPI (signed)(sizeof(int))
 
@@ -125,7 +126,7 @@ int find_out_about_buffer (int sg_fd)
                 return res;
         }
 
-        buf_capacity = ((rbBuff[1] << 16) | (rbBuff[2] << 8) | rbBuff[3]);
+        buf_capacity = sg_get_unaligned_be24(rbBuff + 1);
         buf_granul = (unsigned char)rbBuff[0];
 #if 0
         printf("READ BUFFER reports: %02x %02x %02x %02x\n",
@@ -222,9 +223,7 @@ int read_buffer (int sg_fd, unsigned size)
         if (NULL == rbBuff)
                 return -1;
         rbCmdBlk[1] = RWB_MODE_DATA;
-        rbCmdBlk[6] = 0xff & (bufSize >> 16);
-        rbCmdBlk[7] = 0xff & (bufSize >> 8);
-        rbCmdBlk[8] = 0xff & bufSize;
+        sg_put_unaligned_be24((uint32_t)bufSize, rbCmdBlk + 6);
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
         io_hdr.cmd_len = sizeof(rbCmdBlk);
@@ -281,9 +280,7 @@ int write_buffer (int sg_fd, unsigned size)
         memset(wbBuff, 0, bufSize);
         do_fill_buffer ((int*)wbBuff, size);
         wbCmdBlk[1] = RWB_MODE_DATA;
-        wbCmdBlk[6] = 0xff & (bufSize >> 16);
-        wbCmdBlk[7] = 0xff & (bufSize >> 8);
-        wbCmdBlk[8] = 0xff & bufSize;
+        sg_put_unaligned_be24((uint32_t)bufSize, wbCmdBlk + 6);
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
         io_hdr.cmd_len = sizeof(wbCmdBlk);

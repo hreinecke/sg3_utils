@@ -16,6 +16,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -24,7 +25,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.8 20150721";
+static const char * version_str = "1.9 20151204";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -164,7 +165,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            *d_id = ((ip[2] << 8) | ip[3]);
+            *d_id = sg_get_unaligned_be16(ip + 2);
             break;
         case 5: /* (primary) Target port group */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
@@ -173,7 +174,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            *d_tpg = ((ip[2] << 8) | ip[3]);
+            *d_tpg = sg_get_unaligned_be16(ip + 2);
             break;
         default:
             break;
@@ -273,8 +274,7 @@ encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
 
      for (i = 0, desc = buff + 4; i < numgrp; desc += 4, i++) {
           desc[0] = tgtState[i].current & 0x0f;
-          desc[2] = (tgtState[i].id >> 8) & 0xff;
-          desc[3] = tgtState[i].id & 0xff;
+          sg_put_unaligned_be16((uint16_t)tgtState[i].id, desc + 2);
      }
 }
 
@@ -567,7 +567,7 @@ main(int argc, char * argv[])
         res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
                             DEF_VPD_DEVICE_ID_LEN, 1, verbose);
         if (0 == res) {
-            report_len = ((rsp_buff[2] << 8) + rsp_buff[3]) + 4;
+            report_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
             if (VPD_DEVICE_ID != rsp_buff[1]) {
                 fprintf(stderr, "invalid VPD response; probably a STANDARD "
                         "INQUIRY response\n");
@@ -600,10 +600,7 @@ main(int argc, char * argv[])
                                         verbose);
         ret = res;
         if (0 == res) {
-            report_len = (reportTgtGrpBuff[0] << 24) +
-                         (reportTgtGrpBuff[1] << 16) +
-                         (reportTgtGrpBuff[2] << 8) +
-                         reportTgtGrpBuff[3] + 4;
+            report_len = sg_get_unaligned_be32(reportTgtGrpBuff + 0) + 4;
             if (report_len > (int)sizeof(reportTgtGrpBuff)) {
                 /* trunc = 1; */
                 fprintf(stderr, "  <<report too long for internal buffer,"
@@ -629,11 +626,11 @@ main(int argc, char * argv[])
                  k += off, ucp += off, numgrp ++) {
 
                 printf("  target port group id : 0x%x , Pref=%d\n",
-                       (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80));
+                       sg_get_unaligned_be16(ucp + 2), !!(ucp[0] & 0x80));
                 printf("    target port group asymmetric access state : ");
                 printf("0x%02x", ucp[0] & 0x0f);
                 printf("\n");
-                tgtStatePtr->id = (ucp[2] << 8) + ucp[3];
+                tgtStatePtr->id = sg_get_unaligned_be16(ucp + 2);
                 tgtStatePtr->current = ucp[0] & 0x0f;
                 tgtStatePtr->valid = ucp[1];
 
@@ -666,8 +663,7 @@ main(int argc, char * argv[])
         memset(setTgtGrpBuff, 0x0, sizeof(setTgtGrpBuff));
         for (k = 0, ucp = setTgtGrpBuff + 4; k < port_arr_len; ++k, ucp +=4) {
             ucp[0] = state_arr[k] & 0xf;
-            ucp[2] = (port_arr[k] >> 8) & 0xff;
-            ucp[3] = port_arr[k] & 0xff;
+            sg_put_unaligned_be16((uint16_t)port_arr[k], ucp + 2);
         }
         report_len = port_arr_len * 4 + 4;
     }

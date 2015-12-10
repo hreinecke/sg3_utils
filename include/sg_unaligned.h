@@ -205,7 +205,7 @@ static inline uint16_t sg_get_unaligned_le16(const void *p)
 
 static inline uint32_t sg_get_unaligned_le24(const void *p)
 {
-        return (uint32_t)__get_unaligned_le16(p) |
+        return (uint32_t)__get_unaligned_le16((const uint8_t *)p) |
                ((const uint8_t *)p)[2] << 16;
 }
 
@@ -218,7 +218,7 @@ static inline uint32_t sg_get_unaligned_le32(const void *p)
 static inline uint64_t sg_get_unaligned_le48(const void *p)
 {
         return (uint64_t)__get_unaligned_le16((const uint8_t *)p + 4) << 32 |
-               __get_unaligned_le32(p);
+               __get_unaligned_le32((const uint8_t *)p);
 }
 
 static inline uint64_t sg_get_unaligned_le64(const void *p)

@@ -19,6 +19,7 @@
 typedef unsigned char u_char;   /* horrible, for scsi.h */
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
 *  Copyright (C) 1999-2002 D. Gilbert and P. Allworth
@@ -47,7 +48,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.57 20140819";
+static char * version_str = "0.58 20151209";
 /* resurrected from "0.55 20020509" */
 
 #define DEF_BLOCK_SIZE 512
@@ -311,10 +312,8 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
         sg_chk_n_print3("read capacity", &io_hdr, 1);
         return -1;
     }
-    *num_sect = 1 + ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
-                (rcBuff[2] << 8) | rcBuff[3]);
-    *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
-               (rcBuff[6] << 8) | rcBuff[7];
+    *num_sect = 1 + sg_get_unaligned_be32(rcBuff + 0);
+    *sect_sz = sg_get_unaligned_be32(rcBuff + 4);
 #ifdef SG_DEBUG
     fprintf(stderr, "number of sectors=%d, sector size=%d\n",
             *num_sect, *sect_sz);
@@ -460,12 +459,8 @@ sg_start_io(Rq_elem * rep)
     rep->qstate = rep->wr ? QS_OUT_STARTED : QS_IN_STARTED;
     memset(rep->cmd, 0, sizeof(rep->cmd));
     rep->cmd[0] = rep->wr ? SGP_WRITE10 : SGP_READ10;
-    rep->cmd[2] = (unsigned char)((rep->blk >> 24) & 0xFF);
-    rep->cmd[3] = (unsigned char)((rep->blk >> 16) & 0xFF);
-    rep->cmd[4] = (unsigned char)((rep->blk >> 8) & 0xFF);
-    rep->cmd[5] = (unsigned char)(rep->blk & 0xFF);
-    rep->cmd[7] = (unsigned char)((rep->num_blks >> 8) & 0xff);
-    rep->cmd[8] = (unsigned char)(rep->num_blks & 0xff);
+    sg_put_unaligned_be32((uint32_t)rep->blk, rep->cmd + 2);
+    sg_put_unaligned_be16((uint16_t)rep->num_blks, rep->cmd + 7);
     memset(hp, 0, sizeof(sg_io_hdr_t));
     hp->interface_id = 'S';
     hp->cmd_len = sizeof(rep->cmd);

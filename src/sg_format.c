@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2014  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2015  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,8 +31,9 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.30 20141006";
+static const char * version_str = "1.31 20151207";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -415,7 +416,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                         fprintf(stderr, "VPD_SUPPORTED_VPDS corrupted\n");
                 return 0;
         }
-        n = (b[2] << 8) + b[3];
+        n = sg_get_unaligned_be16(b + 2);
         if (n > (SAFE_STD_INQ_RESP_LEN - 4))
                 n = (SAFE_STD_INQ_RESP_LEN - 4);
         for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
@@ -447,7 +448,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                                         "corrupted\n");
                         return 0;
                 }
-                n = (b[2] << 8) + b[3];
+                n = sg_get_unaligned_be16(b + 2);
                 if (n > (int)(sizeof(b) - 4))
                         n = (sizeof(b) - 4);
                 printf("      Unit serial number: %.*s\n", n,
@@ -467,7 +468,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                                 fprintf(stderr, "VPD_DEVICE_ID corrupted\n");
                         return 0;
                 }
-                n = (b[2] << 8) + b[3];
+                n = sg_get_unaligned_be16(b + 2);
                 if (n > (int)(sizeof(b) - 4))
                         n = (sizeof(b) - 4);
                 n = strlen(get_lu_name(b, n + 4, a, sizeof(a)));
@@ -484,7 +485,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
 static int
 print_read_cap(int fd, int do_16, int verbose)
 {
-        int res, k;
+        int res;
         unsigned char resp_buff[RCAP_REPLY_LEN];
         unsigned int last_blk_addr, block_size;
         uint64_t llast_blk_addr;
@@ -494,14 +495,8 @@ print_read_cap(int fd, int do_16, int verbose)
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
                                        resp_buff, 32, 1, verbose);
                 if (0 == res) {
-                        for (k = 0, llast_blk_addr = 0; k < 8; ++k) {
-                                llast_blk_addr <<= 8;
-                                llast_blk_addr |= resp_buff[k];
-                        }
-                        block_size = ((resp_buff[8] << 24) |
-                                      (resp_buff[9] << 16) |
-                                      (resp_buff[10] << 8) |
-                                      resp_buff[11]);
+                        llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);
+                        block_size = sg_get_unaligned_be32(resp_buff + 8);
                         printf("Read Capacity (16) results:\n");
                         printf("   Protection: prot_en=%d, p_type=%d, "
                                "p_i_exponent=%d\n",
@@ -514,7 +509,8 @@ print_read_cap(int fd, int do_16, int verbose)
                         printf("   Logical blocks per physical block "
                                "exponent=%d\n", resp_buff[13] & 0xf);
                         printf("   Lowest aligned logical block address=%d\n",
-                               ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
+                               0x3fff & sg_get_unaligned_be16(resp_buff +
+                                                              14));
                         printf("   Number of logical blocks=%" PRIu64 "\n",
                                llast_blk_addr + 1);
                         printf("   Logical block size=%u bytes\n",
@@ -525,14 +521,8 @@ print_read_cap(int fd, int do_16, int verbose)
                 res = sg_ll_readcap_10(fd, 0 /* pmi */, 0 /* lba */,
                                        resp_buff, 8, 1, verbose);
                 if (0 == res) {
-                        last_blk_addr = ((resp_buff[0] << 24) |
-                                         (resp_buff[1] << 16) |
-                                         (resp_buff[2] << 8) |
-                                         resp_buff[3]);
-                        block_size = ((resp_buff[4] << 24) |
-                                      (resp_buff[5] << 16) |
-                                      (resp_buff[6] << 8) |
-                                      resp_buff[7]);
+                        last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
+                        block_size = sg_get_unaligned_be32(resp_buff + 4);
                         if (0xffffffff == last_blk_addr) {
                             if (verbose)
                                 printf("Read Capacity (10) reponse "
@@ -827,9 +817,9 @@ again_with_long_lba:
                 dbuff[1] = 0;
                 dbuff[2] = 0;
         } else {
-                calc_len = (dbuff[0] << 8) + dbuff[1] + 2;
+                calc_len = sg_get_unaligned_be16(dbuff + 0);
                 dev_specific_param = dbuff[3];
-                bd_len = (dbuff[6] << 8) + dbuff[7];
+                bd_len = sg_get_unaligned_be16(dbuff + 6);
                 long_lba = (dbuff[4] & 1);
                 offset = 8;
                 /* prepare for mode select */
@@ -846,12 +836,8 @@ again_with_long_lba:
         if (dev_specific_param & 0x40)
                 printf("  <<< Write Protect (WP) bit set >>>\n");
         if (bd_len > 0) {
-                ull = 0;
-                for (j = 0; j < (long_lba ? 8 : 4); ++j) {
-                        if (j > 0)
-                                ull <<= 8;
-                        ull |= dbuff[offset + j];
-                }
+                ull = long_lba ? sg_get_unaligned_be64(dbuff + offset) :
+                                 sg_get_unaligned_be32(dbuff + offset);
                 if ((0 == long_lba) && (0xffffffff == ull)) {
                         if (verbose)
                                 fprintf(stderr, "Mode sense number of "
@@ -861,15 +847,9 @@ again_with_long_lba:
                         do_rcap16 = 1;
                         goto again_with_long_lba;
                 }
-                if (long_lba)
-                        bd_blk_len = (dbuff[offset + 12] << 24) +
-                                     (dbuff[offset + 13] << 16) +
-                                     (dbuff[offset + 14] << 8) +
-                                     dbuff[offset + 15];
-                else
-                        bd_blk_len = (dbuff[offset + 5] << 16) +
-                                     (dbuff[offset + 6] << 8) +
-                                     dbuff[offset + 7];
+                bd_blk_len = long_lba ?
+                                 sg_get_unaligned_be32(dbuff + offset + 12) :
+                                 sg_get_unaligned_be24(dbuff + offset + 5);
                 if (long_lba) {
                         printf("  <<< longlba flag set (64 bit lba) >>>\n");
                         if (bd_len != 16)
@@ -940,16 +920,12 @@ again_with_long_lba:
                                 dbuff[offset + j] = 0;
                 }
                 if ((blk_size > 0) && (blk_size != bd_blk_len)) {
-                        if (long_lba) {
-                                dbuff[offset + 12] = (blk_size >> 24) & 0xff;
-                                dbuff[offset + 13] = (blk_size >> 16) & 0xff;
-                                dbuff[offset + 14] = (blk_size >> 8) & 0xff;
-                                dbuff[offset + 15] = blk_size & 0xff;
-                        } else {
-                                dbuff[offset + 5] = (blk_size >> 16) & 0xff;
-                                dbuff[offset + 6] = (blk_size >> 8) & 0xff;
-                                dbuff[offset + 7] = blk_size & 0xff;
-                        }
+                        if (long_lba)
+                                sg_put_unaligned_be32((uint32_t)blk_size,
+                                                      dbuff + offset + 12);
+                        else
+                                sg_put_unaligned_be24((uint32_t)blk_size,
+                                                      dbuff + offset + 5);
                 }
                 if (mode6)
                         res = sg_ll_mode_select6(fd, 1 /* PF */, 1 /* SP */,

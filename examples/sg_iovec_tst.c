@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
@@ -25,7 +26,7 @@
    normal file. The purpose is to test the sg_iovec mechanism within the
    sg_io_hdr structure.
 
-   Version 0.13 (20150204)
+   Version 0.14 (20151209)
 */
 
 
@@ -66,12 +67,8 @@ static int sg_read(int sg_fd, unsigned char * buff, int num_blocks,
     int dxfer_len = bs * num_blocks;
     int k, pos, rem, res;
 
-    rdCmd[2] = (unsigned char)((from_block >> 24) & 0xff);
-    rdCmd[3] = (unsigned char)((from_block >> 16) & 0xff);
-    rdCmd[4] = (unsigned char)((from_block >> 8) & 0xff);
-    rdCmd[5] = (unsigned char)(from_block & 0xff);
-    rdCmd[7] = (unsigned char)((num_blocks >> 8) & 0xff);
-    rdCmd[8] = (unsigned char)(num_blocks & 0xff);
+    sg_put_unaligned_be32((uint32_t)from_block, rdCmd + 2);
+    sg_put_unaligned_be16((uint16_t)from_block, rdCmd + 7);
 
     for (k = 0, pos = 0, rem = dxfer_len; k < IOVEC_ELEMS; ++k) {
         iovec[k].iov_base = buff + pos;
