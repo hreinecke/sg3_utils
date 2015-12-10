@@ -1,18 +1,26 @@
-.TH SG_SES "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_SES "8" "December 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
+[\fI\-\-descriptor=DN\fR] [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR]
+[\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-hex\fR]
+[\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
+[\fI\-\-join\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR]
+[\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
+.PP
+.B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
 [\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR]
-[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-enumerate\fR]
-[\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
-[\fI\-\-join\fR] [\fI\-\-list\fR] [\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-nickname=SEN\fR] [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR]
-[\fI\-\-set=STR\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-warn\fR] \fIDEVICE\fR
+[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR]
+[\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-nickname=SEN\fR]
+[\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-readonly\fR]
+[\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR] [\fI\-\-verbose\fR]
+\fIDEVICE\fR
+.PP
+.B sg_ses
+[\fI\-\-enumerate\fR] [\fI\-\-list\fR] [\fI\-\-help\fR] [\fI\-\-version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -24,17 +32,28 @@ processor in which case an INQUIRY response's Peripheral Device Type is
 device (e.g. a disk) in which case the EncServ bit is set in its INQUIRY
 response.
 .PP
-If no options are given (i.e. only the \fIDEVICE\fR argument is given) then
-the names of all diagnostic pages supported are listed. Most, but not
-necessarily all, of the named diagnostic pages are defined in the SES
-standards and drafts. The most recent reference for this utility is the
-draft SCSI Enclosure Services 3 document T10/2149\-D Revision 11 at
-http://www.t10.org . Existing standards for SES and SES\-2 are ANSI INCITS
-305\-1998 and ANSI INCITS 448\-2008 respectively.
+If the \fIDEVICE\fR argument is given with no options then the names of all
+diagnostic pages supported are listed. Most, but not necessarily all, of the
+named diagnostic pages are defined in the SES standards and drafts. The most
+recent reference for this utility is the draft SCSI Enclosure Services 3
+document T10/2149\-D Revision 11 at http://www.t10.org . Existing standards
+for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI INCITS 448\-2008
+respectively.
 .PP
-Changing the state of an enclosure (e.g. requesting the "ident" (locate) LED
-to flash on a disk carrier in an array) is typically done using a
-read\-modify\-write cycle. See the section on CHANGING STATE below.
+The first form shown in the synopsis is for fetching and decoding pages
+or fields from the SES \fIDEVICE\fR. Alternatively a fetched page may be
+output in hex or binary with the \fI\-\-hex\fR or \fI\-\-raw\fR options.
+.PP
+The second form in the synopsis is for modifying pages or fields held in
+the SES \fIDEVICE\fR. Changing the state of an enclosure (e.g. requesting
+the "ident" (locate) LED to flash on a disk carrier in an array) is typically
+done using a read\-modify\-write cycle. See the section on CHANGING STATE
+below.
+.PP
+The third form in the synopsis shows the options for providing command line
+help (i.e. usage information), listing out page and field information tables
+held by the utility (\fI\-\-enumerate\fR), or printing the version string
+of this utility.
 .PP
 There is a web page discussing this utility at
 http://sg.danny.cz/sg/sg_ses.html . Support for downloading microcode to

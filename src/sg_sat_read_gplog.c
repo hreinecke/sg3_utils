@@ -20,6 +20,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -48,7 +49,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.11 20150410";
+static const char * version_str = "1.12 20151207";
 
 struct opts_t {
     int cdb_len;
@@ -179,11 +180,9 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
     if (op->cdb_len == 16) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
         aptCmdBlk[14] = ata_cmd;
-        aptCmdBlk[5] = (op->count >> 8) & 0xff;
-        aptCmdBlk[6] = op->count & 0xff;
+        sg_put_unaligned_be16((uint16_t)op->count, aptCmdBlk + 5);
         aptCmdBlk[8] = op->la;
-        aptCmdBlk[9] = (op->pn >> 8) & 0xff;
-        aptCmdBlk[10] = op->pn & 0xff;
+        sg_put_unaligned_be16((uint16_t)op->pn, aptCmdBlk + 9);
         aptCmdBlk[1] = (protocol << 1) | extend;
         aptCmdBlk[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
@@ -193,11 +192,12 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
                            sizeof(ata_return_desc), &resid, op->verbose);
     } else {
         /* Prepare ATA PASS-THROUGH COMMAND (12) command */
+        /* Cannot map upper 8 bits of the pn since no LBA (39:32) field */
         apt12CmdBlk[9] = ata_cmd;
         apt12CmdBlk[4] = op->count;
         apt12CmdBlk[5] = op->la;
         apt12CmdBlk[6] = op->pn & 0xff;
-        apt12CmdBlk[7] = (op->pn >> 8) & 0xff;
+        /* apt12CmdBlk[7] = (op->pn >> 8) & 0xff; */
         apt12CmdBlk[1] = (protocol << 1);
         apt12CmdBlk[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                          (byte_block << 2) | t_length;

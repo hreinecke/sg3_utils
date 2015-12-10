@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.05 20151126";
+static const char * version_str = "1.06 20151210";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -214,16 +214,16 @@ zone_condition_str(int zc, char * b, int blen, int vb)
         return "zone_condition_str: NULL ptr)";
     switch (zc) {
     case 0:
-        cp = "No write pointer";
+        cp = "Not write pointer";
         break;
     case 1:
         cp = "Empty";
         break;
     case 2:
-        cp = "Open";
+        cp = "Implicitly opened";
         break;
     case 3:
-        cp = "Explicit open";
+        cp = "Explicitly opened";
         break;
     case 4:
         cp = "Closed";
@@ -420,6 +420,8 @@ main(int argc, char * argv[])
         }
         same = reportZonesBuff[4] & 0xf;
         printf("  Same=%d: %s\n\n", same, same_desc_arr[same]);
+        printf("  Maximum LBA: 0x%" PRIx64 "\n",
+               sg_get_unaligned_be64(reportZonesBuff + 8));
         zones = (len - 64) / 64;
         for (k = 0, ucp = reportZonesBuff + 64; k < zones; ++k, ucp += 64) {
             printf(" Zone descriptor: %d\n", k);

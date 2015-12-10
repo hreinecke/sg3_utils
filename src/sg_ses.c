@@ -30,7 +30,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.03 20151126";    /* ses3r08->11 */
+static const char * version_str = "2.05 20151210";    /* ses3r08->11 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -711,32 +711,33 @@ static void
 usage(int help_num)
 {
     if (1 == help_num) {
-        pr2serr("Usage: "
-            "sg_ses [--byte1=B1] [--clear=STR] [--control] [--data=H,H...]\n"
-            "              [--descriptor=DN] [--dev-slot-num=SN] "
+        pr2serr(
+            "Usage: sg_ses [--descriptor=DN] [--dev-slot-num=SN] "
             "[--eiioe=A_F]\n"
-            "              [--enumerate] [--filter] [--get=STR] [--help] "
-            "[--hex]\n"
-            "              [--index=IIA | =TIA,II] [--inner-hex] "
-            "[--join] [--list]\n"
+            "              [--filter] [--get=STR] [--hex] "
+            "[--index=IIA | =TIA,II]\n"
+            "              [--inner-hex] [--join] [--maxlen=LEN] "
+            "[--page=PG]\n"
+            "              [--raw] [--sas-addr=SA] [--status] [--verbose] "
+            "[--warn]\n"
+            "              DEVICE\n\n"
+            "       sg_ses [--byte1=B1] [--clear=STR] [--control] "
+            "[--data=H,H...]\n"
+            "              [--descriptor=DN] [--dev-slot-num=SN] "
+            "[--index=IIA | =TIA,II]\n"
             "              [--mask] [--maxlen=LEN] [--nickname=SEN] "
             "[--nickid=SEID]\n"
-            "              [--page=PG] [--raw] [--sas-addr=SA] [--set=STR] "
-            "[--status]\n"
-            "              [--verbose] [--version] [--warn] DEVICE\n"
+            "              [--page=PG] [--sas-addr=SA] [--set=STR] "
+            "[--verbose]\n"
+            "              DEVICE\n\n"
+            "       sg_ses [--enumerate] [--help] [--list] [--version]\n\n"
             "  where the main options are:\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
+            "    --control|-c        send control information (def: fetch "
+            "status)\n"
             "    --descriptor=DN|-D DN    descriptor name (for indexing)\n"
             "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
             "(for indexing)\n"
-            "    --eiioe=A_F|-E A_F    where A_F is either 'auto' or 'force'."
-            "'force'\n"
-            "                          acts as if EIIOE is set, 'auto' tries "
-            "to guess\n"
-            "    --enumerate|-e      enumerate page names + element types "
-            "(ignore\n"
-            "                        DEVICE). Use twice for clear,get,set "
-            "acronyms\n"
             "    --filter|-f         filter out enclosure status flags that "
             "are clear\n"
             "                        use twice for status=okay entries "
@@ -767,22 +768,32 @@ usage(int help_num)
             "pages))\n"
             "    --sas-addr=SA|-A SA    SAS address in hex (for indexing)\n"
             "    --set=STR|-S STR    set value of field by acronym or "
-            "position\n\n"
-            "Fetches status or sends control data to a SCSI enclosure. Use "
-            "'-hh' for\nmore help, including the options not shown here.\n");
+            "position\n"
+            "    --status|-s         fetch status information (default "
+            "action)\n\n"
+            "First usage above is for fetching pages or fields from a SCSI "
+            "enclosure.\nThe second usage is for changing a page or field in "
+            "an enclosure. Use\n'-hh' for more help, including the options "
+            "not explained above.\n");
     } else {    /* for '-hh' or '--help --help' */
         pr2serr(
             "  where the remaining sg_ses options are:\n"
             "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
             "to B1\n"
-            "    --control|-c        send control information (def: fetch "
-            "status)\n"
             "    --data=H,H...|-d H,H...    string of ASCII hex bytes for "
             "control pages\n"
             "    --data=- | -d -     fetch string of ASCII hex bytes from "
             "stdin\n"
             "    --data=@FN | -d @FN    fetch string of ASCII hex bytes from "
             "file: FN\n"
+            "    --eiioe=A_F|-E A_F    where A_F is either 'auto' or 'force'."
+            "'force'\n"
+            "                          acts as if EIIOE is set, 'auto' tries "
+            "to guess\n"
+            "    --enumerate|-e      enumerate page names + element types "
+            "(ignore\n"
+            "                        DEVICE). Use twice for clear,get,set "
+            "acronyms\n"
             "    --hex|-H            print page response (or field) in hex\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
@@ -804,8 +815,6 @@ usage(int help_num)
             "to stdout\n"
             "    --readonly|-R       open DEVICE read-only (def: "
             "read-write)\n"
-            "    --status|-s         fetch status information (default "
-            "action)\n"
             "    --verbose|-v        increase verbosity\n"
             "    --version|-V        print version string and exit\n"
             "    --warn|-w           warn about join (and other) issues\n\n"
@@ -821,8 +830,7 @@ usage(int help_num)
             "options.\nAlternatively, medium level indexing can be done "
             "with either the\n'--descriptor=', 'dev-slot-num=' or "
             "'--sas-addr=' options. Support for\nthe medium level options "
-            "in the SES device is itself optional. The\nmedium level "
-            "options implicitly set '--join'.\n"
+            "in the SES device is itself optional.\n"
             );
     }
 }
@@ -4188,8 +4196,7 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
     }
     b[0] = (unsigned char)DPC_SUBENC_NICKNAME;  /* just in case */
     b[1] = (unsigned char)op->seid;
-    b[2] = (unsigned char)(control_plen >> 8);
-    b[3] = (unsigned char)control_plen;
+    sg_put_unaligned_be16((uint16_t)control_plen, b + 2);
     len = strlen(op->nickname_str);
     if (len > 32)
         len = 32;
@@ -4399,8 +4406,7 @@ main(int argc, char * argv[])
     else { /* control page requested */
         op->data_arr[0] = op->page_code;
         op->data_arr[1] = op->byte1;
-        op->data_arr[2] = (op->arr_len >> 8) & 0xff;
-        op->data_arr[3] = op->arr_len & 0xff;
+        sg_put_unaligned_be16((uint16_t)op->arr_len, op->data_arr + 2);
         switch (op->page_code) {
         case DPC_ENC_CONTROL:  /* Enclosure Control diagnostic page [0x2] */
             printf("Sending Enclosure Control [0x%x] page, with page "

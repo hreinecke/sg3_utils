@@ -23,9 +23,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "1.08 20150407";
+static const char * version_str = "1.09 20151207";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -134,10 +135,8 @@ static int fail_all_paths(int fd, int use_6_byte)
                                 (fail_paths_pg + 8);
                 rdac_page_exp->page_code = RDAC_CONTROLLER_PAGE | 0x40;
                 rdac_page_exp->subpage_code = 0x1;
-                rdac_page_exp->page_length[0] =
-                                EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
-                rdac_page_exp->page_length[1] =
-                                EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
+                sg_put_unaligned_be16(EXPANDED_LUN_SPACE_PAGE_LEN,
+                                      rdac_page_exp->page_length + 0);
                 rdac_common = &rdac_page_exp->attr;
         }
 
@@ -199,10 +198,8 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
                                 (fail_paths_pg + 8);
                 rdac_page_exp->page_code = RDAC_CONTROLLER_PAGE | 0x40;
                 rdac_page_exp->subpage_code = 0x1;
-                rdac_page_exp->page_length[0] =
-                                EXPANDED_LUN_SPACE_PAGE_LEN >> 8;
-                rdac_page_exp->page_length[1] =
-                                EXPANDED_LUN_SPACE_PAGE_LEN & 0xFF;
+                sg_put_unaligned_be16(EXPANDED_LUN_SPACE_PAGE_LEN,
+                                      rdac_page_exp->page_length + 0);
                 rdac_common = &rdac_page_exp->attr;
                 memset(rdac_page_exp->lun_table, 0x0, 256);
                 rdac_page_exp->lun_table[lun] = 0x81;

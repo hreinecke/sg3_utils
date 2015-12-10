@@ -25,8 +25,9 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "0.98 20151123";
+static const char * version_str = "0.99 20151207";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -186,12 +187,11 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         return SG_LIB_SYNTAX_ERROR;
     if (immed)
         sanCmdBlk[1] |= 0x80;
-    if (op->znr)	/* added sbc4r07 */
+    if (op->znr)        /* added sbc4r07 */
         sanCmdBlk[1] |= 0x40;
     if (op->ause)
         sanCmdBlk[1] |= 0x20;
-    sanCmdBlk[7] = ((param_lst_len >> 8) & 0xff);
-    sanCmdBlk[8] = (param_lst_len & 0xff);
+    sg_put_unaligned_be16((uint16_t)param_lst_len, sanCmdBlk + 7);
 
     if (op->verbose > 1) {
         fprintf(stderr, "    Sanitize cmd: ");
@@ -356,7 +356,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
             fprintf(stderr, "VPD_SUPPORTED_VPDS corrupted\n");
         return 0;
     }
-    n = (b[2] << 8) + b[3];
+    n = sg_get_unaligned_be16(b + 2);
     if (n > (SAFE_STD_INQ_RESP_LEN - 4))
         n = (SAFE_STD_INQ_RESP_LEN - 4);
     for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
@@ -385,7 +385,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                 fprintf(stderr, "VPD_UNIT_SERIAL_NUM corrupted\n");
             return 0;
         }
-        n = (b[2] << 8) + b[3];
+        n = sg_get_unaligned_be16(b + 2);
         if (n > (int)(sizeof(b) - 4))
             n = (sizeof(b) - 4);
         printf("      Unit serial number: %.*s\n", n, (const char *)(b + 4));
@@ -403,7 +403,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                 fprintf(stderr, "VPD_DEVICE_ID corrupted\n");
             return 0;
         }
-        n = (b[2] << 8) + b[3];
+        n = sg_get_unaligned_be16(b + 2);
         if (n > (int)(sizeof(b) - 4))
             n = (sizeof(b) - 4);
         n = strlen(get_lu_name(b, n + 4, a, sizeof(a)));
@@ -648,8 +648,7 @@ main(int argc, char * argv[])
             wBuff[0] |= ((op->test & 0x3) << 5);
         if (op->invert)
             wBuff[0] |= 0x80;
-        wBuff[2] = ((op->ipl >> 8) & 0xff);
-        wBuff[3] = (op->ipl & 0xff);
+        sg_put_unaligned_be16((uint16_t)op->ipl, wBuff + 2);
     }
 
     if ((0 == op->quick) && (! op->fail)) {

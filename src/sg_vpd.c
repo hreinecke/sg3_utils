@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.08 20151127";  /* spc5r07 + sbc4r07 */
+static const char * version_str = "1.09 20151205";  /* spc5r07 + sbc4r07 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -504,8 +504,7 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
         inqCmdBlk[1] |= 1;
     inqCmdBlk[2] = (unsigned char)pg_op;
     /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
-    inqCmdBlk[3] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    inqCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
+    sg_put_unaligned_be16((uint16_t)mx_resp_len, inqCmdBlk + 3);
     if (verbose) {
         pr2serr("    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
@@ -3657,7 +3656,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             }
             return res;
         }
-        n = (rp[2] >> 8) + rp[3];
+        n = sg_get_unaligned_be16(rp + 2);
         if (n > (rlen - 4)) {
             if (op->verbose)
                 pr2serr("%s: rlen=%d > page0 size=%d\n", __func__, rlen,

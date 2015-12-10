@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2014 Douglas Gilbert.
+ * Copyright (c) 2009-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -23,6 +23,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -30,7 +31,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.07 20140423";
+static const char * version_str = "1.08 20151205";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -504,27 +505,17 @@ main(int argc, char * argv[])
     memset(param_arr, 0, param_len);
     k = 8;
     for (j = 0; j < addr_arr_len; ++j) {
-        param_arr[k++] = (addr_arr[j] >> 56) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 48) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 40) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 32) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 24) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 16) & 0xff;
-        param_arr[k++] = (addr_arr[j] >> 8) & 0xff;
-        param_arr[k++] = addr_arr[j] & 0xff;
-        param_arr[k++] = (num_arr[j] >> 24) & 0xff;
-        param_arr[k++] = (num_arr[j] >> 16) & 0xff;
-        param_arr[k++] = (num_arr[j] >> 8) & 0xff;
-        param_arr[k++] = num_arr[j] & 0xff;
-        k += 4;
+        sg_put_unaligned_be64(addr_arr[j], param_arr + k);
+        k += 8;
+        sg_put_unaligned_be32(num_arr[j], param_arr + k);
+        k += 4 + 4;
     }
     k = 0;
     num = param_len - 2;
-    param_arr[k++] = (num >> 8) & 0xff;
-    param_arr[k++] = num & 0xff;
+    sg_put_unaligned_be16((uint16_t)num, param_arr + k);
+    k += 2;
     num = param_len - 8;
-    param_arr[k++] = (num >> 8) & 0xff;
-    param_arr[k++] = num & 0xff;
+    sg_put_unaligned_be16((uint16_t)num, param_arr + k);
 
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);

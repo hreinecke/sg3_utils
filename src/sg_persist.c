@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2014 D. Gilbert
+ *  Copyright (C) 2004-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,8 +26,9 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "0.49 20141007";
+static const char * version_str = "0.50 20151205";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -262,8 +263,7 @@ static void
 decode_transport_id(const char * leadin, unsigned char * ucp, int len,
                     int num_tids)
 {
-    int format_code, proto_id, num, j, k;
-    uint64_t ull;
+    int format_code, proto_id, num, k;
     int bump;
 
     if (num_tids > 0)
@@ -286,12 +286,12 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             break;
         case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
-                   leadin, ((ucp[2] << 8) | ucp[3]));
+                   leadin, sg_get_unaligned_be16(ucp + 2));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin, ((ucp[6] << 8) | ucp[7]));
+                   "0x%x\n", leadin,  sg_get_unaligned_be16(ucp + 6));
             break;
         case TPROTO_SSA:
             printf("%s  SSA (transport id not defined):\n", leadin);
@@ -314,7 +314,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             break;
         case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
-            num = ((ucp[2] << 8) | ucp[3]);
+            num =  sg_get_unaligned_be16(ucp + 2);
             if (0 == format_code)
                 printf("name: %.*s\n", num, &ucp[4]);
             else if (1 == format_code)
@@ -325,13 +325,8 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             }
             break;
         case TPROTO_SAS:
-            ull = 0;
-            for (j = 0; j < 8; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                ull |= ucp[4 + j];
-            }
-            printf("%s  SAS address: 0x%016" PRIx64 "\n", leadin, ull);
+            printf("%s  SAS address: 0x%016" PRIx64 "\n", leadin,
+                   sg_get_unaligned_be64(ucp + 4));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -353,7 +348,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
             break;
         case TPROTO_SOP:
             printf("%s  SOP ", leadin);
-            num = ((ucp[2] << 8) | ucp[3]);
+            num =  sg_get_unaligned_be16(ucp + 2);
             if (0 == format_code)
                 printf("Routing ID: 0x%x\n", num);
             else {
@@ -377,9 +372,8 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
 static int
 prin_work(int sg_fd, const struct opts_t * op)
 {
-    int k, j, num, res, add_len, add_desc_len, rel_pt_addr;
+    int k, j, num, res, add_len, add_desc_len;
     unsigned int pr_gen;
-    uint64_t ull;
     unsigned char * ucp;
     unsigned char pr_buff[MX_ALLOC_LEN];
 
@@ -446,10 +440,8 @@ prin_work(int sg_fd, const struct opts_t * op)
             }
         }
     } else {
-        pr_gen = ((pr_buff[0] << 24) | (pr_buff[1] << 16) |
-                  (pr_buff[2] << 8) | pr_buff[3]);
-        add_len = ((pr_buff[4] << 24) | (pr_buff[5] << 16) |
-                   (pr_buff[6] << 8) | pr_buff[7]);
+        pr_gen =  sg_get_unaligned_be32(pr_buff + 0);
+        add_len = sg_get_unaligned_be32(pr_buff + 4);
         if (op->hex) {
             if (op->hex > 1)
                 dStrHex((const char *)pr_buff, add_len + 8,
@@ -477,15 +469,9 @@ prin_work(int sg_fd, const struct opts_t * op)
                 else
                     printf("%d registered reservation keys follow:\n", num);
                 ucp = pr_buff + 8;
-                for (k = 0; k < num; ++k, ucp += 8) {
-                    ull = 0;
-                    for (j = 0; j < 8; ++j) {
-                        if (j > 0)
-                            ull <<= 8;
-                        ull |= ucp[j];
-                    }
-                    printf("    0x%" PRIx64 "\n", ull);
-                }
+                for (k = 0; k < num; ++k, ucp += 8)
+                    printf("    0x%" PRIx64 "\n",
+                           sg_get_unaligned_be64(ucp + 0));
             } else
                 printf("there are NO registered reservation keys\n");
         } else if (PRIN_RRES_SA == op->prin_sa) {
@@ -494,13 +480,7 @@ prin_work(int sg_fd, const struct opts_t * op)
             if (num > 0) {
                 printf("Reservation follows:\n");
                 ucp = pr_buff + 8;
-                ull = 0;
-                for (j = 0; j < 8; ++j) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[j];
-                }
-                printf("    Key=0x%" PRIx64 "\n", ull);
+                printf("    Key=0x%" PRIx64 "\n", sg_get_unaligned_be64(ucp));
                 j = ((ucp[13] >> 4) & 0xf);
                 if (0 == j)
                     printf("    scope: LU_SCOPE, ");
@@ -519,23 +499,15 @@ prin_work(int sg_fd, const struct opts_t * op)
                 printf("  So there are no registered IT nexuses\n");
             }
             for (k = 0; k < add_len; k += num, ucp += num) {
-                add_desc_len = ((ucp[20] << 24) | (ucp[21] << 16) |
-                                (ucp[22] << 8) | ucp[23]);
+                add_desc_len = sg_get_unaligned_be32(ucp + 20);
                 num = 24 + add_desc_len;
-                ull = 0;
-                for (j = 0; j < 8; ++j) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= ucp[j];
-                }
-                printf("    Key=0x%" PRIx64 "\n", ull);
+                printf("    Key=0x%" PRIx64 "\n", sg_get_unaligned_be64(ucp));
                 if (ucp[12] & 0x2)
                     printf("      All target ports bit set\n");
                 else {
                     printf("      All target ports bit clear\n");
-                    rel_pt_addr = ((ucp[18] << 8) | ucp[19]);
                     printf("      Relative port address: 0x%x\n",
-                           rel_pt_addr);
+                           sg_get_unaligned_be16(ucp + 18));
                 }
                 if (ucp[12] & 0x1) {
                     printf("      << Reservation holder >>\n");
@@ -569,7 +541,7 @@ compact_transportid_array(struct opts_t * op)
          ++k, off += MX_TID_LEN) {
         protocol_id = ucp[off] & 0xf;
         if (TPROTO_ISCSI == protocol_id) {
-            len = (ucp[off + 2] << 8) + ucp[off + 3] + 4;
+            len = sg_get_unaligned_be16(ucp + off + 2) + 4;
             if (len < 24)
                 len = 24;
             if (off > compact_len)
@@ -588,25 +560,15 @@ compact_transportid_array(struct opts_t * op)
 static int
 prout_work(int sg_fd, struct opts_t * op)
 {
-    int j, len, res, t_arr_len;
+    int len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
-    uint64_t param_rk;
-    uint64_t param_sark;
     char b[64];
     char bb[80];
 
     t_arr_len = compact_transportid_array(op);
-    param_rk = op->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
-    for (j = 7; j >= 0; --j) {
-        pr_buff[j] = (param_rk & 0xff);
-        param_rk >>= 8;
-    }
-    param_sark = op->param_sark;
-    for (j = 7; j >= 0; --j) {
-        pr_buff[8 + j] = (param_sark & 0xff);
-        param_sark >>= 8;
-    }
+    sg_put_unaligned_be64(op->param_rk, pr_buff + 0);
+    sg_put_unaligned_be64(op->param_sark, pr_buff + 8);
     if (op->param_alltgpt)
         pr_buff[20] |= 0x4;
     if (op->param_aptpl)
@@ -616,10 +578,7 @@ prout_work(int sg_fd, struct opts_t * op)
         pr_buff[20] |= 0x8;     /* set SPEC_I_PT bit */
         memcpy(&pr_buff[28], op->transportid_arr, t_arr_len);
         len += (t_arr_len + 4);
-        pr_buff[24] = (unsigned char)((t_arr_len >> 24) & 0xff);
-        pr_buff[25] = (unsigned char)((t_arr_len >> 16) & 0xff);
-        pr_buff[26] = (unsigned char)((t_arr_len >> 8) & 0xff);
-        pr_buff[27] = (unsigned char)(t_arr_len & 0xff);
+        sg_put_unaligned_be32((uint32_t)t_arr_len, pr_buff + 24);
     }
     res = sg_ll_persistent_reserve_out(sg_fd, op->prout_sa, 0,
                                        op->prout_type, pr_buff, len, 1,
@@ -649,37 +608,23 @@ prout_work(int sg_fd, struct opts_t * op)
 static int
 prout_reg_move_work(int sg_fd, struct opts_t * op)
 {
-    int j, len, res, t_arr_len;
+    int len, res, t_arr_len;
     unsigned char pr_buff[MX_ALLOC_LEN];
-    uint64_t param_rk;
-    uint64_t param_sark;
 
     t_arr_len = compact_transportid_array(op);
-    param_rk = op->param_rk;
     memset(pr_buff, 0, sizeof(pr_buff));
-    for (j = 7; j >= 0; --j) {
-        pr_buff[j] = (param_rk & 0xff);
-        param_rk >>= 8;
-    }
-    param_sark = op->param_sark;
-    for (j = 7; j >= 0; --j) {
-        pr_buff[8 + j] = (param_sark & 0xff);
-        param_sark >>= 8;
-    }
+    sg_put_unaligned_be64(op->param_rk, pr_buff + 0);
+    sg_put_unaligned_be64(op->param_sark, pr_buff + 8);
     if (op->param_unreg)
         pr_buff[17] |= 0x2;
     if (op->param_aptpl)
         pr_buff[17] |= 0x1;
-    pr_buff[18] = (unsigned char)((op->param_rtp >> 8) & 0xff);
-    pr_buff[19] = (unsigned char)(op->param_rtp & 0xff);
+    sg_put_unaligned_be16(op->param_rtp, pr_buff + 18);
     len = 24;
     if (t_arr_len > 0) {
         memcpy(&pr_buff[24], op->transportid_arr, t_arr_len);
         len += t_arr_len;
-        pr_buff[20] = (unsigned char)((t_arr_len >> 24) & 0xff);
-        pr_buff[21] = (unsigned char)((t_arr_len >> 16) & 0xff);
-        pr_buff[22] = (unsigned char)((t_arr_len >> 8) & 0xff);
-        pr_buff[23] = (unsigned char)(t_arr_len & 0xff);
+        sg_put_unaligned_be32((uint32_t)t_arr_len, pr_buff + 20);
     }
     res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA, 0,
                                        op->prout_type, pr_buff, len, 1,
@@ -744,10 +689,8 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
             return 0;
         }
         tidp[0] = TPROTO_SPI;
-        tidp[2] = (b >> 8) & 0xff;
-        tidp[3] = b & 0xff;
-        tidp[6] = (c >> 8) & 0xff;
-        tidp[7] = c & 0xff;
+        sg_put_unaligned_be16((uint16_t)b, tidp + 2);
+        sg_put_unaligned_be16((uint16_t)c, tidp + 6);
         return 1;
     } else if ((0 == memcmp("fcp,", lcp, 4)) ||
                (0 == memcmp("FCP,", lcp, 4))) {
@@ -848,8 +791,7 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
             return 0;
         }
         tidp[0] = TPROTO_SOP;
-        tidp[2] = (ui >> 8) & 0xff;
-        tidp[3] = ui & 0xff;
+        sg_put_unaligned_be16((uint16_t)ui, tidp + 2);
         return 1;
     }
     pr2serr("unable to parse symbolic TransportID: %s\n", lcp);

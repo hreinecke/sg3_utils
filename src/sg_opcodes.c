@@ -23,6 +23,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
 #include "sg_pt.h"
 
@@ -438,10 +439,10 @@ opcode_num_compare(const void * left, const void * right)
         return -1;
     l_opc = ll[0];
     if (ll[5] & 1)
-        l_serv_act = ((ll[2] << 8) | ll[3]);
+        l_serv_act = sg_get_unaligned_be16(ll + 2);
     r_opc = rr[0];
     if (rr[5] & 1)
-        r_serv_act = ((rr[2] << 8) | rr[3]);
+        r_serv_act = sg_get_unaligned_be16(rr + 2);
     if (l_opc < r_opc)
         return -1;
     if (l_opc > r_opc)
@@ -471,13 +472,13 @@ opcode_alpha_compare(const void * left, const void * right)
         return -1;
     l_opc = ll[0];
     if (ll[5] & 1)
-        l_serv_act = ((ll[2] << 8) | ll[3]);
+        l_serv_act = sg_get_unaligned_be16(ll + 2);
     l_name_buff[0] = '\0';
     sg_get_opcode_sa_name(l_opc, l_serv_act, peri_type,
                           NAME_BUFF_SZ, l_name_buff);
     r_opc = rr[0];
     if (rr[5] & 1)
-        r_serv_act = ((rr[2] << 8) | rr[3]);
+        r_serv_act = sg_get_unaligned_be16(rr + 2);
     r_name_buff[0] = '\0';
     sg_get_opcode_sa_name(r_opc, r_serv_act, peri_type,
                           NAME_BUFF_SZ, r_name_buff);
@@ -495,8 +496,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
     char sa_buff[8];
     unsigned char ** sort_arr = NULL;
 
-    cd_len = ((rsoc_buff[0] << 24) | (rsoc_buff[1] << 16) |
-              (rsoc_buff[2] << 8) | rsoc_buff[3]);
+    cd_len = sg_get_unaligned_be32(rsoc_buff + 0);
     if (cd_len > (rsoc_len - 4)) {
         printf("sg_opcodes: command data length=%d, allocation=%d; "
                "truncate\n", cd_len, rsoc_len - 4);
@@ -553,7 +553,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         sa_v = ucp[5] & 1;
         serv_act = 0;
         if (sa_v) {
-            serv_act = ((ucp[2] << 8) | ucp[3]);
+            serv_act = sg_get_unaligned_be16(ucp + 2);
             sg_get_opcode_sa_name(opcode, serv_act, peri_type, NAME_BUFF_SZ,
                                   name_buff);
             if (op->do_compact)
@@ -571,15 +571,13 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                            sa_buff);
                 else
                     printf(" %.2x     %.4s       %3d", opcode, sa_buff,
-                           ((ucp[6] << 8) | ucp[7]));
-                to = ((unsigned int)ucp[12] << 24) + (ucp[13] << 16) +
-                     (ucp[14] << 8) + ucp[15];
+                           sg_get_unaligned_be16(ucp + 6));
+                to = sg_get_unaligned_be32(ucp + 12);
                 if (0 == to)
                     printf("         -");
                 else
                     printf("  %8u", to);
-                to = ((unsigned int)ucp[16] << 24) + (ucp[17] << 16) +
-                     (ucp[18] << 8) + ucp[19];
+                to = sg_get_unaligned_be32(ucp + 16);
                 if (0 == to)
                     printf("          -");
                 else
@@ -591,15 +589,15 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                            (sa_v ? ',' : ' '), sa_buff, name_buff);
                 else
                     printf(" %.2x     %.4s       %3d                         "
-                           "%s\n", opcode, sa_buff, ((ucp[6] << 8) | ucp[7]),
-                           name_buff);
+                           "%s\n", opcode, sa_buff,
+                           sg_get_unaligned_be16(ucp + 6), name_buff);
         } else
             if (op->do_compact)
                 printf(" %.2x%c%.4s   %s\n", ucp[0], (sa_v ? ',' : ' '),
                        sa_buff, name_buff);
             else
-                printf(" %.2x     %.4s       %3d    %s\n",
-                       ucp[0], sa_buff, ((ucp[6] << 8) | ucp[7]), name_buff);
+                printf(" %.2x     %.4s       %3d    %s\n", ucp[0], sa_buff,
+                       sg_get_unaligned_be16(ucp + 6), name_buff);
         if (op->do_mask) {
             int cdb_sz;
             unsigned char b[64];
@@ -608,7 +606,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             res = do_rsoc(sg_fd, 0, (sa_v ? 2 : 1), opcode, serv_act,
                           b, sizeof(b), 1, op->do_verbose);
             if (0 == res) {
-                cdb_sz = (b[2] << 8) + b[3];
+                cdb_sz = sg_get_unaligned_be16(b + 2);
                 if ((cdb_sz > 0) && (cdb_sz <= 80)) {
                     if (op->do_compact)
                         printf("             usage: ");
@@ -635,13 +633,13 @@ decode_cmd_to_descriptor(unsigned char * dp, int max_b_len, char * b)
         return;
     b[max_b_len - 1] = '\0';
     --max_b_len;
-    len = (dp[0] << 8) + dp[1];
+    len = sg_get_unaligned_be16(dp + 0);
     if (10 != len) {
         snprintf(b, max_b_len, "command timeout descriptor length %d "
                  "(expect 10)", len);
         return;
     }
-    to = ((unsigned int)dp[4] << 24) + (dp[5] << 16) + (dp[6] << 8) + dp[7];
+    to = sg_get_unaligned_be32(dp + 4);
     if (0 == to)
         snprintf(b, max_b_len, "no nominal timeout, ");
     else
@@ -649,7 +647,7 @@ decode_cmd_to_descriptor(unsigned char * dp, int max_b_len, char * b)
     len = strlen(b);
     max_b_len -= len;
     b += len;
-    to = ((unsigned int)dp[8] << 24) + (dp[9] << 16) + (dp[10] << 8) + dp[11];
+    to = sg_get_unaligned_be32(dp + 8);
     if (0 == to)
         snprintf(b, max_b_len, "no recommended timeout");
     else
@@ -876,15 +874,12 @@ main(int argc, char * argv[])
             printf("    QTSTS=%d\n", !!(rsoc_buff[7] & 0x2));
             printf("    ITNRTS=%d\n", !!(rsoc_buff[7] & 0x1));
             printf("    tmf long timeout: %d (100 ms units)\n",
-                   (rsoc_buff[8] << 24) + (rsoc_buff[9] << 16) +
-                   (rsoc_buff[10] << 8) + rsoc_buff[11]);
+                   sg_get_unaligned_be32(rsoc_buff + 8));
             printf("    tmf short timeout: %d (100 ms units)\n",
-                   (rsoc_buff[12] << 24) + (rsoc_buff[13] << 16) +
-                   (rsoc_buff[14] << 8) + rsoc_buff[15]);
+                   sg_get_unaligned_be32(rsoc_buff + 12));
         }
     } else if (0 == rep_opts) {  /* list all supported operation codes */
-        len = ((rsoc_buff[0] << 24) | (rsoc_buff[1] << 16) |
-               (rsoc_buff[2] << 8) | rsoc_buff[3]) + 4;
+        len = sg_get_unaligned_be32(rsoc_buff + 0) + 4;
         if (len > (int)sizeof(rsoc_buff))
             len = sizeof(rsoc_buff);
         if (op->do_raw) {
@@ -897,7 +892,7 @@ main(int argc, char * argv[])
         }
         list_all_codes(rsoc_buff, sizeof(rsoc_buff), op, sg_fd);
     } else {    /* asked about specific command */
-        cd_len = ((rsoc_buff[2] << 8) | rsoc_buff[3]);
+        cd_len = sg_get_unaligned_be16(rsoc_buff + 2);
         len = cd_len + 4;
         if (len > (int)sizeof(rsoc_buff))
             len = sizeof(rsoc_buff);
@@ -934,15 +929,9 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
         rsocCmdBlk[2] |= (rep_opts & 0x7);
     if (rq_opcode > 0)
         rsocCmdBlk[3] = (rq_opcode & 0xff);
-    if (rq_servact > 0) {
-        rsocCmdBlk[4] = (unsigned char)((rq_servact >> 8) & 0xff);
-        rsocCmdBlk[5] = (unsigned char)(rq_servact & 0xff);
-
-    }
-    rsocCmdBlk[6] = (unsigned char)((mx_resp_len >> 24) & 0xff);
-    rsocCmdBlk[7] = (unsigned char)((mx_resp_len >> 16) & 0xff);
-    rsocCmdBlk[8] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    rsocCmdBlk[9] = (unsigned char)(mx_resp_len & 0xff);
+    if (rq_servact > 0)
+        sg_put_unaligned_be16((uint16_t)rq_servact, rsocCmdBlk + 4);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rsocCmdBlk + 6);
 
     if (verbose) {
         fprintf(stderr, "    Report Supported Operation Codes cmd: ");
@@ -993,10 +982,7 @@ do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
 
     if (repd)
         rstmfCmdBlk[2] = 0x80;
-    rstmfCmdBlk[6] = (unsigned char)((mx_resp_len >> 24) & 0xff);
-    rstmfCmdBlk[7] = (unsigned char)((mx_resp_len >> 16) & 0xff);
-    rstmfCmdBlk[8] = (unsigned char)((mx_resp_len >> 8) & 0xff);
-    rstmfCmdBlk[9] = (unsigned char)(mx_resp_len & 0xff);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rstmfCmdBlk + 6);
 
     if (verbose) {
         fprintf(stderr, "    Report Supported Task Management Functions "

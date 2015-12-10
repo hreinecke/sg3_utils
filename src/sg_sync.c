@@ -16,6 +16,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -25,7 +26,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.12 20150511";
+static const char * version_str = "1.13 20151208";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -98,19 +99,9 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
         scCmdBlk[1] |= 4;       /* obsolete in sbc3r35d */
     if (immed)
         scCmdBlk[1] |= 2;
-    scCmdBlk[2] = (lba >> 56) & 0xff;
-    scCmdBlk[3] = (lba >> 48) & 0xff;
-    scCmdBlk[4] = (lba >> 40) & 0xff;
-    scCmdBlk[5] = (lba >> 32) & 0xff;
-    scCmdBlk[6] = (lba >> 24) & 0xff;
-    scCmdBlk[7] = (lba >> 16) & 0xff;
-    scCmdBlk[8] = (lba >> 8) & 0xff;
-    scCmdBlk[9] = lba & 0xff;
+    sg_put_unaligned_be64(lba, scCmdBlk + 2);
     scCmdBlk[14] = group & 0x1f;
-    scCmdBlk[10] = (num_lb >> 24) & 0xff;
-    scCmdBlk[11] = (num_lb >> 16) & 0xff;
-    scCmdBlk[12] = (num_lb >> 8) & 0xff;
-    scCmdBlk[13] = num_lb & 0xff;
+    sg_put_unaligned_be32((uint32_t)num_lb, scCmdBlk + 10);
 
     if (verbose) {
         fprintf(stderr, "    synchronize cache(16) cdb: ");

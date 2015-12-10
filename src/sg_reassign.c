@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2014 Douglas Gilbert.
+ * Copyright (c) 2005-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -22,6 +22,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -32,7 +33,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.16 20140517";
+static const char * version_str = "1.17 20151207";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -371,24 +372,19 @@ main(int argc, char * argv[])
         k = 4;
         for (j = 0; j < addr_arr_len; ++j) {
             if (eight) {
-                param_arr[k++] = (addr_arr[j] >> 56) & 0xff;
-                param_arr[k++] = (addr_arr[j] >> 48) & 0xff;
-                param_arr[k++] = (addr_arr[j] >> 40) & 0xff;
-                param_arr[k++] = (addr_arr[j] >> 32) & 0xff;
+                sg_put_unaligned_be64(addr_arr[j], param_arr + k);
+                k += 8;
+            } else {
+                sg_put_unaligned_be32((uint32_t)addr_arr[j], param_arr + k);
+                k += 4;
             }
-            param_arr[k++] = (addr_arr[j] >> 24) & 0xff;
-            param_arr[k++] = (addr_arr[j] >> 16) & 0xff;
-            param_arr[k++] = (addr_arr[j] >> 8) & 0xff;
-            param_arr[k++] = addr_arr[j] & 0xff;
         }
         param_len = k;
         k -= 4;
-        if (longlist) {
-            param_arr[0] = (k >> 24) & 0xff;
-            param_arr[1] = (k >> 16) & 0xff;
-        }
-        param_arr[2] = (k >> 8) & 0xff;
-        param_arr[3] = k & 0xff;
+        if (longlist)
+            sg_put_unaligned_be32((uint32_t)k, param_arr + 0);
+        else
+            sg_put_unaligned_be16((uint16_t)k, param_arr + 2);
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
@@ -466,7 +462,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "defect list format %d unknown\n", dl_format);
                 break;
         }
-        dl_len = (param_arr[2] << 8) + param_arr[3];
+        dl_len = sg_get_unaligned_be16(param_arr + 2);
         if (0 == dl_len)
             printf(">> Elements in %s: 0\n", lstp);
         else {
