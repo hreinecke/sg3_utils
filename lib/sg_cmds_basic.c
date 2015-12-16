@@ -253,12 +253,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
             get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
             pr2ws("%s: transport: %s\n", leadin, b);
         }
-        if ((SAM_STAT_CHECK_CONDITION == get_scsi_pt_status_response(ptvp))
-            && (slen > 0))
-            return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp,
-                                          slen, noisy, verbose, o_sense_cat);
-        else
-            return -1;
+        return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp,
+                                      slen, noisy, verbose, o_sense_cat);
     case SCSI_PT_RESULT_OS_ERR:
         if (verbose || noisy) {
             get_scsi_pt_os_err_str(ptvp, sizeof(b), b);

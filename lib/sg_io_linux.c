@@ -244,6 +244,8 @@ sg_err_category_new(int scsi_status, int host_status, int driver_status,
             (SG_LIB_DID_BUS_BUSY == host_status) ||
             (SG_LIB_DID_TIME_OUT == host_status))
             return SG_LIB_CAT_TIMEOUT;
+        if (SG_LIB_DID_NEXUS_FAILURE == host_status)
+            return SG_LIB_CAT_RES_CONFLICT;
     }
     if (SG_LIB_DRIVER_TIMEOUT == masked_driver_status)
         return SG_LIB_CAT_TIMEOUT;
