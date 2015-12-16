@@ -560,7 +560,7 @@ doreportlun()
   REPLUNSTAT=$?
   lunremove=
   #echo "getluns reports " $targetluns
-  olddev=`find /sys/class/scsi_device/ -name $host:$channel:$id:* 2>/dev/null`
+  olddev=`find /sys/class/scsi_device/ -name $host:$channel:$id:* 2>/dev/null | sort -t: -k4 -n`
   oldluns=`echo "$olddev" | awk -F'/' '{print $5}' | awk -F':' '{print $4}'`
   oldtargets="$targetluns"
   # OK -- if we don't have a LUN to send a REPORT_LUNS to, we could
