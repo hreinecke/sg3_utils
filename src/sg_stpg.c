@@ -273,8 +273,8 @@ encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
 
      for (i = 0, desc = buff + 4; i < numgrp; desc += 4, i++) {
           desc[0] = tgtState[i].current & 0x0f;
-          desc[2] = (tgtState[i].id >> 8) & 0x0f;
-          desc[3] = tgtState[i].id & 0x0f;
+          desc[2] = (tgtState[i].id >> 8) & 0xff;
+          desc[3] = tgtState[i].id & 0xff;
      }
 }
 
