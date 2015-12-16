@@ -245,7 +245,7 @@ testonline ()
     RMB=`sg_inq /dev/$SGDEV | grep 'RMB=' | sed 's/^.*RMB=\(.\).*$/\1/'`
     print_and_scroll_back "$host:$channel:$id:$lun $SGDEV ($RMB) "
   fi
-  while test $RC = 2 -o $RC = 6 && test $ctr -le 8; do
+  while test $RC = 2 -o $RC = 6 && test $ctr -le 30; do
     if test $RC = 2 -a "$RMB" != "1"; then echo -n "."; let LN+=1; sleep 1
     else usleep 20000; fi
     let ctr+=1
