@@ -112,8 +112,8 @@ printtype ()
     4) echo "WORM" ;;
     5) echo "CD-ROM" ;;
     6) echo "Scanner" ;;
-    7) echo "Optical Device" ;;
-    8) echo "Medium Changer" ;;
+    7) echo "Optical-Device" ;;
+    8) echo "Medium-Changer" ;;
     9) echo "Communications" ;;
     10) echo "Unknown" ;;
     11) echo "Unknown" ;;
