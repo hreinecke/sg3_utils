@@ -239,18 +239,19 @@ testonline ()
   if test -z "$SGDEV"; then return 0; fi
   sg_turs /dev/$SGDEV >/dev/null 2>&1
   RC=$?
-  # Handle in progress of becoming ready and unit attention -- wait at max 11s
-  declare -i ctr=0
-  if test $RC = 2 -o $RC = 6; then 
-    RMB=`sg_inq /dev/$SGDEV | grep 'RMB=' | sed 's/^.*RMB=\(.\).*$/\1/'`
-    print_and_scroll_back "$host:$channel:$id:$lun $SGDEV ($RMB) "
-  fi
+
+  # Handle in progress of becoming ready and unit attention
   while test $RC = 2 -o $RC = 6 && test $ctr -le 30; do
     if test $RC = 2 -a "$RMB" != "1"; then echo -n "."; let LN+=1; sleep 1
     else usleep 20000; fi
     let ctr+=1
     sg_turs /dev/$SGDEV >/dev/null 2>&1
     RC=$?
+    # Check for removable device; TEST UNIT READY obviously will
+    # fail for a removable device with no medium
+    RMB=`sg_inq /dev/$SGDEV 2>/dev/null | grep 'RMB=' | sed 's/^.*RMB=\(.\).*$/\1/'`
+    print_and_scroll_back "$host:$channel:$id:$lun $SGDEV ($RMB) "
+    test $RC = 2 -a "$RMB" = "1" && break
   done
   if test $ctr != 0; then white_out; fi
   # echo -e "\e[A\e[A\e[A${yellow}Test existence of $SGDEV = $RC ${norm} \n\n\n"
