@@ -916,6 +916,17 @@ reloadmpaths()
   done
 }
 
+resizempaths()
+{
+  local mpath
+
+  for mpath in $mpaths ; do
+    echo -n "Resizing multipath map $mpath ..."
+    multipathd -k"resize map $mpath"
+    let updated+=1
+  done
+}
+
 flushmpaths()
 {
   local mpath
@@ -996,7 +1007,7 @@ findresized()
       mpathsizes[$i]="`$MULTIPATH -l $m | egrep -o [0-9]+.[0-9]+[KMGT]`"
       let i=$i+1
     done
-    reloadmpaths
+    resizempaths
     i=0
     for m in $mpaths ; do
       mpathsize="`$MULTIPATH -l $m | egrep -o [0-9\.]+[KMGT]`"
