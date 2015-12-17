@@ -1034,6 +1034,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo " -I SECS issue a FibreChannel LIP reset and wait for SECS seconds [default: disabled]"
     echo " -l      activates scanning for LUNs 0--7   [default: 0]"
     echo " -L NUM  activates scanning for LUNs 0--NUM [default: 0]"
+    echo " -m      update multipath devices           [default: disabled]"
     echo " -r      enables removing of devices        [default: disabled]"
     echo " -s      look for resized disks and reload associated multipath devices, if applicable"
     echo " -u      look for existing disks that have been remapped"
@@ -1128,7 +1129,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     w) opt_idsearch=`seq 0 15` ;;
     c) opt_channelsearch="0 1" ;;
     r) remove=1 ;;
-    s) resize=1 ;;
+    s) resize=1; mp_enable=1 ;;
     i) lipreset=0 ;;
     I) shift; lipreset=$opt ;;
     u) update=1 ;;
