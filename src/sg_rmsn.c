@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2014 Douglas Gilbert.
+ * Copyright (c) 2005-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program was originally written for the Linux OS SCSI subsystem.
  *
@@ -26,7 +28,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.10 20140516";
+static const char * version_str = "1.11 20151219";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -42,19 +44,18 @@ static struct option long_options[] = {
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_rmsn   [--help] [--raw] [--readonly] [--verbose] [--version]\n"
-          "                 DEVICE\n"
-          "  where:\n"
-          "    --help|-h       print out usage message\n"
-          "    --raw|-r        output serial number to stdout "
-          "(potentially binary)\n"
-          "    --readonly|-R    open DEVICE read-only (def: open it "
-          "read-write)\n"
-          "    --verbose|-v    increase verbosity\n"
-          "    --version|-V    print version string and exit\n\n"
-          "Performs a SCSI READ MEDIA SERIAL NUMBER command\n"
-          );
+    pr2serr("Usage: sg_rmsn   [--help] [--raw] [--readonly] [--verbose] "
+            "[--version]\n"
+            "                 DEVICE\n"
+            "  where:\n"
+            "    --help|-h       print out usage message\n"
+            "    --raw|-r        output serial number to stdout "
+            "(potentially binary)\n"
+            "    --readonly|-R    open DEVICE read-only (def: open it "
+            "read-write)\n"
+            "    --verbose|-v    increase verbosity\n"
+            "    --version|-V    print version string and exit\n\n"
+            "Performs a SCSI READ MEDIA SERIAL NUMBER command\n");
 }
 
 int main(int argc, char * argv[])
@@ -91,10 +92,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -106,15 +107,14 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -127,8 +127,7 @@ int main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -138,30 +137,27 @@ int main(int argc, char * argv[])
                                       1, verbose);
     ret = res;
     if (0 == res) {
-        sn_len = (rmsn_buff[0] << 24) + (rmsn_buff[1] << 16) +
-                     (rmsn_buff[2] << 8) + rmsn_buff[3];
+        sn_len = sg_get_unaligned_be32(rmsn_buff + 0);
         if (! raw)
             printf("Reported serial number length = %d\n", sn_len);
         if (0 == sn_len) {
-            fprintf(stderr, "    This implies the media has no serial "
-                    "number\n");
+            pr2serr("    This implies the media has no serial number\n");
             goto err_out;
         }
         if (sn_len > SERIAL_NUM_SANITY_LEN) {
-            fprintf(stderr, "    That length (%d) seems too long for a "
-                    "serial number\n", sn_len);
+            pr2serr("    That length (%d) seems too long for a serial "
+                    "number\n", sn_len);
             goto err_out;
         }
         sn_len += 4;
         ucp = (unsigned char *)malloc(sn_len);
         if (NULL == ucp) {
-            fprintf(stderr, "    Out of memory (ram)\n");
+            pr2serr("    Out of memory (ram)\n");
             goto err_out;
         }
         res = sg_ll_read_media_serial_num(sg_fd, ucp, sn_len, 1, verbose);
         if (0 == res) {
-            sn_len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) +
-                     ucp[3];
+            sn_len = sg_get_unaligned_be32(ucp + 0);
             if (raw) {
                 if (sn_len > 0) {
                     n = fwrite(ucp + 4, 1, sn_len, stdout);
@@ -178,9 +174,9 @@ int main(int argc, char * argv[])
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Read Media Serial Number: %s\n", b);
+        pr2serr("Read Media Serial Number: %s\n", b);
         if (0 == verbose)
-            fprintf(stderr, "    try '-v' for more information\n");
+            pr2serr("    try '-v' for more information\n");
     }
 
 err_out:
@@ -188,7 +184,7 @@ err_out:
         free(ucp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

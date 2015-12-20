@@ -23,13 +23,14 @@
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /*
  * This utility issues the SCSI READ BUFFER(10 or 16) command to the given
  * device.
  */
 
-static const char * version_str = "1.13 20150105";
+static const char * version_str = "1.14 20151219";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -66,8 +67,8 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-            "sg_read_buffer [--16] [--help] [--hex] [--id=ID] [--length=LEN]\n"
+    pr2serr("Usage: sg_read_buffer [--16] [--help] [--hex] [--id=ID] "
+            "[--length=LEN]\n"
             "                      [--long] [--mode=MO] [--offset=OFF] "
             "[--raw]\n"
             "                      [--readonly] [--specific=MS] [--verbose] "
@@ -129,10 +130,10 @@ print_modes(void)
 {
     const struct mode_s *mp;
 
-    fprintf(stderr, "The modes parameter argument can be numeric "
-                "(hex or decimal)\nor symbolic:\n");
+    pr2serr("The modes parameter argument can be numeric (hex or decimal)\n"
+            "or symbolic:\n");
     for (mp = modes; mp->mode_string; ++mp) {
-        fprintf(stderr, " %2d (0x%02x)  %-16s%s\n", mp->mode, mp->mode,
+        pr2serr(" %2d (0x%02x)  %-16s%s\n", mp->mode, mp->mode,
                 mp->mode_string, mp->comment);
     }
 }
@@ -157,15 +158,15 @@ ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     sg_put_unaligned_be24(rb_offset, rb10_cb + 3);
     sg_put_unaligned_be24(mx_resp_len, rb10_cb + 6);
     if (verbose) {
-        fprintf(stderr, "    Read buffer(10) cdb: ");
+        pr2serr("    Read buffer(10) cdb: ");
         for (k = 0; k < SG_READ_BUFFER_10_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", rb10_cb[k]);
-        fprintf(stderr, "\n");
+            pr2serr("%02x ", rb10_cb[k]);
+        pr2serr("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(stderr, "Read buffer(10): out of memory\n");
+        pr2serr("Read buffer(10): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rb10_cb, sizeof(rb10_cb));
@@ -188,7 +189,7 @@ ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            fprintf(stderr, "    Read buffer(10): response%s\n",
+            pr2serr("    Read buffer(10): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
             dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
@@ -221,15 +222,15 @@ ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     sg_put_unaligned_be24(mx_resp_len, rb16_cb + 11);
     rb16_cb[14] = (uint8_t)rb_id;
     if (verbose) {
-        fprintf(stderr, "    Read buffer(16) cdb: ");
+        pr2serr("    Read buffer(16) cdb: ");
         for (k = 0; k < SG_READ_BUFFER_16_CMDLEN; ++k)
-            fprintf(stderr, "%02x ", rb16_cb[k]);
-        fprintf(stderr, "\n");
+            pr2serr("%02x ", rb16_cb[k]);
+        pr2serr("\n");
     }
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(stderr, "Read buffer(16): out of memory\n");
+        pr2serr("Read buffer(16): out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rb16_cb, sizeof(rb16_cb));
@@ -252,7 +253,7 @@ ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            fprintf(stderr, "    Read buffer(16): response%s\n",
+            pr2serr("    Read buffer(16): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
             dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
         }
@@ -315,20 +316,19 @@ main(int argc, char * argv[])
         case 'i':
             rb_id = sg_get_num(optarg);
             if ((rb_id < 0) || (rb_id > 255)) {
-                fprintf(stderr, "argument to '--id' should be in the range "
-                        "0 to 255\n");
+                pr2serr("argument to '--id' should be in the range 0 to "
+                        "255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'l':
             rb_len = sg_get_num(optarg);
             if (rb_len < 0) {
-                fprintf(stderr, "bad argument to '--length'\n");
+                pr2serr("bad argument to '--length'\n");
                 return SG_LIB_SYNTAX_ERROR;
              }
              if (rb_len > 0xffffff) {
-                fprintf(stderr, "argument to '--length' must be <= "
-                        "0xffffff\n");
+                pr2serr("argument to '--length' must be <= 0xffffff\n");
                 return SG_LIB_SYNTAX_ERROR;
              }
              break;
@@ -339,8 +339,8 @@ main(int argc, char * argv[])
             if (isdigit(*optarg)) {
                 rb_mode = sg_get_num(optarg);
                 if ((rb_mode < 0) || (rb_mode > 31)) {
-                    fprintf(stderr, "argument to '--mode' should be in the "
-                            "range 0 to 31\n");
+                    pr2serr("argument to '--mode' should be in the range 0 "
+                            "to 31\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
             } else {
@@ -360,7 +360,7 @@ main(int argc, char * argv[])
         case 'o':
            ll = sg_get_llnum(optarg);
            if (ll < 0) {
-                fprintf(stderr, "bad argument to '--offset'\n");
+                pr2serr("bad argument to '--offset'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             rb_offset = ll;
@@ -374,8 +374,7 @@ main(int argc, char * argv[])
         case 'S':
            rb_mode_sp = sg_get_num(optarg);
            if ((rb_mode_sp < 0) || (rb_mode_sp > 7)) {
-                fprintf(stderr, "expected argument to '--specific' to be 0 "
-                        "to 7\n");
+                pr2serr("expected argument to '--specific' to be 0 to 7\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -383,10 +382,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -394,7 +393,7 @@ main(int argc, char * argv[])
     if (do_help) {
         if (do_help > 1) {
             usage();
-            fprintf(stderr, "\n");
+            pr2serr("\n");
             print_modes();
         } else
             usage();
@@ -407,15 +406,14 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -423,8 +421,7 @@ main(int argc, char * argv[])
     if (rb_len > 0) {
         resp = (unsigned char *)malloc(rb_len);
         if (NULL == resp) {
-            fprintf(stderr, "unable to allocate %d bytes on the heap\n",
-                    rb_len);
+            pr2serr("unable to allocate %d bytes on the heap\n", rb_len);
             return SG_LIB_CAT_OTHER;
         }
         memset(resp, 0, rb_len);
@@ -442,7 +439,7 @@ main(int argc, char * argv[])
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
     if (verbose > 4)
-        fprintf(stderr, "Initial win32 SPT interface state: %s\n",
+        pr2serr("Initial win32 SPT interface state: %s\n",
                 scsi_pt_win32_spt_state() ? "direct" : "indirect");
     scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
 #endif
@@ -450,8 +447,7 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
         goto fini;
     }
@@ -460,8 +456,8 @@ main(int argc, char * argv[])
         res = ll_read_buffer_16(sg_fd, rb_mode, rb_mode_sp, rb_id, rb_offset,
                                 resp, rb_len, &resid, 1, verbose);
     else if (rb_offset > 0xffffff) {
-        fprintf(stderr, "--offset value is too large for READ BUFFER(10), "
-                "try --16\n");
+        pr2serr("--offset value is too large for READ BUFFER(10), try "
+                "--16\n");
         ret = SG_LIB_SYNTAX_ERROR;
         goto fini;
     } else
@@ -474,8 +470,7 @@ main(int argc, char * argv[])
         ret = res;
         if (res > 0) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "Read buffer(%d) failed: %s\n",
-                    (do_long ? 16 : 10), b);
+            pr2serr("Read buffer(%d) failed: %s\n", (do_long ? 16 : 10), b);
         }
         goto fini;
     }
@@ -513,7 +508,7 @@ fini:
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
-            fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+            pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
                 return SG_LIB_FILE_ERROR;
         }

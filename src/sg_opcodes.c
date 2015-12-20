@@ -24,10 +24,11 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.44 20151127";    /* spc5r07 */
+static const char * version_str = "0.45 20151219";    /* spc5r07 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -97,8 +98,7 @@ struct opts_t {
 static void
 usage()
 {
-    fprintf(stderr,
-            "Usage:  sg_opcodes [--alpha] [--compact] [--help] [--hex] "
+    pr2serr("Usage:  sg_opcodes [--alpha] [--compact] [--help] [--hex] "
             "[--mask]\n"
             "                   [--no-inquiry] [--opcode=OP[,SA]] [--raw] "
             "[--rctd]\n"
@@ -141,8 +141,7 @@ usage()
 static void
 usage_old()
 {
-    fprintf(stderr,
-            "Usage:  sg_opcodes [-a] [-c] [-H] [-m] [-n] [-o=OP] [-q] [-r] "
+    pr2serr("Usage:  sg_opcodes [-a] [-c] [-H] [-m] [-n] [-o=OP] [-q] [-r] "
             "[-R] [-s=SA]\n"
             "                   [-t] [-u] [-v] [-V] DEVICE\n"
             "  where:\n"
@@ -206,7 +205,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             break;      /* ignore */
         case 'o':
             if (strlen(optarg) >= (sizeof(b) - 1)) {
-                fprintf(stderr, "argument to '--opcode' too long\n");
+                pr2serr("argument to '--opcode' too long\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             cp = strchr(optarg, ',');
@@ -215,13 +214,13 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 strncpy(b, optarg, cp - optarg);
                 n = sg_get_num(b);
                 if ((n < 0) || (n > 255)) {
-                    fprintf(stderr, "bad OP argument to '--opcode'\n");
+                    pr2serr("bad OP argument to '--opcode'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 optsp->do_opcode = n;
                 n = sg_get_num(cp + 1);
                 if ((n < 0) || (n > 0xffff)) {
-                    fprintf(stderr, "bad SA argument to '--opcode'\n");
+                    pr2serr("bad SA argument to '--opcode'\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -229,7 +228,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             } else {
                 n = sg_get_num(optarg);
                 if ((n < 0) || (n > 255)) {
-                    fprintf(stderr, "bad argument to '--opcode'\n");
+                    pr2serr("bad argument to '--opcode'\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -251,7 +250,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         case 's':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 0xffff)) {
-                fprintf(stderr, "bad argument to '--sa'\n");
+                pr2serr("bad argument to '--sa'\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -270,7 +269,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage();
@@ -284,8 +283,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -361,7 +359,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             if (0 == strncmp("o=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", (unsigned int *)&n);
                 if ((1 != num) || (n > 255)) {
-                    fprintf(stderr, "Bad number after 'o=' option\n");
+                    pr2serr("Bad number after 'o=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -369,7 +367,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             } else if (0 == strncmp("s=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", (unsigned int *)&n);
                 if (1 != num) {
-                    fprintf(stderr, "Bad number after 's=' option\n");
+                    pr2serr("Bad number after 's=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -377,15 +375,15 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (NULL == optsp->device_name)
             optsp->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", optsp->device_name, cp);
+            pr2serr("too many arguments, got: %s, not expecting: %s\n",
+                    optsp->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -740,12 +738,12 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (NULL == op->device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         if (op->opt_new)
             usage();
         else
@@ -753,7 +751,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((-1 != op->do_servact) && (-1 == op->do_opcode)) {
-        fprintf(stderr, "When '-s' is chosen, so must '-o' be chosen\n");
+        pr2serr("When '-s' is chosen, so must '-o' be chosen\n");
         if (op->opt_new)
             usage();
         else
@@ -761,13 +759,13 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_unsorted && op->do_alpha)
-        fprintf(stderr, "warning: unsorted ('-u') and alpha ('-a') options "
-                "chosen, ignoring alpha\n");
+        pr2serr("warning: unsorted ('-u') and alpha ('-a') options chosen, "
+                "ignoring alpha\n");
     if (op->do_taskman && ((-1 != op->do_opcode) || op->do_alpha ||
         op->do_unsorted)) {
-        fprintf(stderr, "warning: task management functions ('-t') chosen "
-                "so alpha ('-a'),\n          unsorted ('-u') and opcode "
-                "('-o') options ignored\n");
+        pr2serr("warning: task management functions ('-t') chosen so alpha "
+                "('-a'),\n          unsorted ('-u') and opcode ('-o') "
+                "options ignored\n");
     }
     op_name = op->do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
@@ -775,7 +773,7 @@ main(int argc, char * argv[])
     if (op->do_opcode < 0) {
         if ((sg_fd = scsi_pt_open_device(op->device_name, 1 /* RO */,
                                          op->do_verbose)) < 0) {
-            fprintf(stderr, "sg_opcodes: error opening file (ro): %s: %s\n",
+            pr2serr("sg_opcodes: error opening file (ro): %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
@@ -791,20 +789,20 @@ main(int argc, char * argv[])
                     printf("  Peripheral device type: 0x%x\n", peri_type);
             }
         } else {
-            fprintf(stderr, "sg_opcodes: %s doesn't respond to a SCSI "
-                    "INQUIRY\n", op->device_name);
+            pr2serr("sg_opcodes: %s doesn't respond to a SCSI INQUIRY\n",
+                    op->device_name);
             return SG_LIB_CAT_OTHER;
         }
         res = scsi_pt_close_device(sg_fd);
         if (res < 0) {
-            fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+            pr2serr("close error: %s\n", safe_strerror(-res));
             return SG_LIB_FILE_ERROR;
         }
     }
 
     if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */,
                                      op->do_verbose)) < 0) {
-        fprintf(stderr, "sg_opcodes: error opening file (rw): %s: %s\n",
+        pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
                 op->device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -820,7 +818,7 @@ main(int argc, char * argv[])
                       op->do_verbose);
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
-        fprintf(stderr, "%s: %s\n", op_name, b);
+        pr2serr("%s: %s\n", op_name, b);
         goto err_out;
     }
     if (op->do_taskman) {
@@ -857,8 +855,8 @@ main(int argc, char * argv[])
             printf("    I_T nexus reset\n");
         if (op->do_repd) {
             if (rsoc_buff[3] < 0xc) {
-                fprintf(stderr, "when REPD given, byte 3 of response "
-                        "should be >= 12\n");
+                pr2serr("when REPD given, byte 3 of response should be >= "
+                        "12\n");
                 res = SG_LIB_CAT_OTHER;
                 goto err_out;
             } else
@@ -934,14 +932,14 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rsocCmdBlk + 6);
 
     if (verbose) {
-        fprintf(stderr, "    Report Supported Operation Codes cmd: ");
+        pr2serr("    Report Supported Operation Codes cmd: ");
         for (k = 0; k < RSOC_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", rsocCmdBlk[k]);
-        fprintf(stderr, "\n");
+            pr2serr("%02x ", rsocCmdBlk[k]);
+        pr2serr("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(stderr, "Report Supported Operation Codes: out of memory\n");
+        pr2serr("Report Supported Operation Codes: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rsocCmdBlk, sizeof(rsocCmdBlk));
@@ -985,16 +983,14 @@ do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rstmfCmdBlk + 6);
 
     if (verbose) {
-        fprintf(stderr, "    Report Supported Task Management Functions "
-                "cmd: ");
+        pr2serr("    Report Supported Task Management Functions cmd: ");
         for (k = 0; k < RSTMF_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", rstmfCmdBlk[k]);
-        fprintf(stderr, "\n");
+            pr2serr("%02x ", rstmfCmdBlk[k]);
+        pr2serr("\n");
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(stderr, "Report Supported Task Management Functions: out of "
-                "memory\n");
+        pr2serr("Report Supported Task Management Functions: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rstmfCmdBlk, sizeof(rstmfCmdBlk));

@@ -1,4 +1,4 @@
-.TH SG_TIMESTAMP "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_TIMESTAMP "8" "December 2015" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_timestamp \- report or set timestamp on SCSI device
 .SH SYNOPSIS
@@ -18,7 +18,7 @@ given (and both can't be given) then the SET TIMESTAMP command is sent;
 otherwise the REPORT TIMESTAMP command is sent.
 .PP
 The timestamp is sent and received from the \fIDEVICE\fR as the number of
-milliseconds since the epoch of 1970-01-01 00:00:00 UTC and is held in a 48
+milliseconds since the epoch of 1970\-01\-01 00:00:00 UTC and is held in a 48
 bit unsigned integer. That same epoch is used by Unix machines, but they
 usually hold the number of seconds since that epoch. The Unix date command
 and especally its "+%s" format is useful in converting to and from
@@ -30,7 +30,7 @@ Arguments to long options are mandatory for short options as well.
 output the usage message then exit.
 .TP
 \fB\-m\fR, \fB\-\-milliseconds\fR=\fIMS\fR
-where \fIMS\fR is the number of milliseconds since 1970-01-01 00:00:00 UTC
+where \fIMS\fR is the number of milliseconds since 1970\-01\-01 00:00:00 UTC
 to set in the \fIDEVICE\fR with the SCSI SET TIMESTAMP command.
 .TP
 \fB\-o\fR, \fB\-\-origin\fR
@@ -40,7 +40,7 @@ before the timestamp value is output. The default action (i.e. when the
 option is not given) is not to print out this decoded field.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-output the SCSI REPORT TIMESTAMP response (i.e. the data-out buffer) in
+output the SCSI REPORT TIMESTAMP response (i.e. the data\-out buffer) in
 binary (to stdout). Note that the \fI\-\-origin\fR and \fI\-\-srep\fR
 options are ignored when this option is given. Also all error and
 verbose messages are output to stderr.
@@ -50,12 +50,12 @@ open the \fIDEVICE\fR read\-only. The default action is to open the
 \fIDEVICE\fR read\-write.
 .TP
 \fB\-s\fR, \fB\-\-seconds\fR=\fISEC\fR
-where \fISEC\fR is the number of seconds since 1970-01-01 00:00:00 UTC
+where \fISEC\fR is the number of seconds since 1970\-01\-01 00:00:00 UTC
 to set in the \fIDEVICE\fR with the SCSI SET TIMESTAMP command. \fISEC\fR
 is multiplied by 1000 before being used in the SET TIMESTAMP command.
 .TP
 \fB\-S\fR, \fB\-\-srep\fR
-report the number of seconds since 1970-01-01 00:00:00 UTC. This is done
+report the number of seconds since 1970\-01\-01 00:00:00 UTC. This is done
 by dividing by 1000 the value returned by the SCSI REPORT TIMESTAMP command.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
@@ -80,20 +80,25 @@ when working with timestamps.
 To fetch the timestamp from a \fIDEVICE\fR and display it in a humanly
 readable form the following could be used:
 .PP
-   # sg_timestamp -S /dev/sdb
+   # sg_timestamp \-S /dev/sdb
 .br
 1448993950
 .br
-   # date --date="@1448993950"
+   # date \-\-date="@1448993950"
 .br
 Tue Dec  1 13:19:10 EST 2015
 .br
-   # date -R --date="@1448993950"
+   # date \-R \-\-date="@1448993950"
 .br
-Tue, 01 Dec 2015 13:19:10 -0500
+Tue, 01 Dec 2015 13:19:10 \-0500
 .PP
 The latter two date commands show different forms of the same date (i.e.
-1448993950 seconds since 1970-01-01 00:00:00 UTC).
+1448993950 seconds since 1970\-01\-01 00:00:00 UTC). The sg_timestamp and
+date commands can be combined using backquotes:
+.PP
+   # date \-R \-\-date="@`sg_timestamp \-S /dev/sdc`"
+.br
+Wed, 16 Dec 2015 20:12:59 \-0500
 .PP
 To set the timestamp on the \fIDEVICE\fR to now (approximately) the
 following could be used:
@@ -102,11 +107,11 @@ following could be used:
 .br
 1448993955
 .br
-   # sg_timestamp --seconds=1448993955 /dev/sdb
+   # sg_timestamp \-\-seconds=1448993955 /dev/sdb
 .PP
 Those two command lines could be combined into one by using backquotes:
 .PP
-   # sg_timestamp --seconds=`date +%s` /dev/sdb
+   # sg_timestamp \-\-seconds=`date +%s` /dev/sdb
 .PP
 .SH AUTHORS
 Written by Douglas Gilbert.

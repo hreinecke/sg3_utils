@@ -14,7 +14,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -28,10 +27,11 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
-#include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "1.34 20151127";    /* spc5r07 + sbc4r05 */
+static const char * version_str = "1.36 20151219";    /* spc5r07 + sbc4r05 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -328,6 +328,8 @@ static struct log_elem log_arr[] = {
      show_power_condition_transitions_page}, /* 0x1a, 0  */
     {0x1b, 0, 0, PDT_TAPE, 0, "Data compression", "dc",
      show_data_compression_page},       /* 0x1b, 0  SSC */
+    {0x2d, 0, 0, PDT_TAPE, 0, "Current service information", "csi",
+     NULL},         			/* 0x2d, 0  SSC */
     {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, 0, "Tape alert", "ta",
      show_tape_alert_ssc_page},         /* 0x2e, 0  SSC */
     {IE_LPAGE, 0, 0, -1, 0, "Informational exceptions", "ie",
@@ -380,26 +382,6 @@ static int win32_spt_init_state = 0;
 static int win32_spt_curr_state = 0;
 #endif
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 usage(int hval)

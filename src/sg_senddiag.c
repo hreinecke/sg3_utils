@@ -25,9 +25,10 @@
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.46 20150427";
+static const char * version_str = "0.47 20151219";
 
 #define ME "sg_senddiag: "
 
@@ -184,8 +185,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'm':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 0xffff)) {
-                fprintf(stderr, "bad argument to '--maxlen=' or greater "
-                        "than 65535 [0xffff]\n");
+                pr2serr("bad argument to '--maxlen=' or greater than 65535 "
+                        "[0xffff]\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->maxlen = n;
@@ -201,8 +202,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'P':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 0xff)) {
-                fprintf(stderr, "bad argument to '--page=' or greater "
-                        "than 255 [0xff]\n");
+                pr2serr("bad argument to '--page=' or greater than 255 "
+                        "[0xff]\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->page_code = n;
@@ -214,7 +215,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 's':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 7)) {
-                fprintf(stderr, "bad argument to '--selftest='\n");
+                pr2serr("bad argument to '--selftest='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -233,7 +234,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (op->do_help)
                 break;
             usage();
@@ -247,8 +248,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -345,15 +345,15 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("-old", cp, 5))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == op->device_name)
             op->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", op->device_name, cp);
+            pr2serr("too many arguments, got: %s, not expecting: %s\n",
+                    op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -414,7 +414,7 @@ do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy, int mode6,
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Mode sense (%s): %s\n", (mode6 ? "6" : "10"), b);
+        pr2serr("Mode sense (%s): %s\n", (mode6 ? "6" : "10"), b);
     }
     return res;
 }
@@ -469,8 +469,8 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
                     if (1 == sscanf(carry_over, "%x", &h))
                         mp_arr[off - 1] = h;       /* back up and overwrite */
                     else {
-                        fprintf(stderr, "build_diag_page: carry_over error "
-                                "['%s'] around line %d\n", carry_over, j + 1);
+                        pr2serr("build_diag_page: carry_over error ['%s'] "
+                                "around line %d\n", carry_over, j + 1);
                         return 1;
                     }
                     lcp = line + 1;
@@ -489,16 +489,16 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
             if ((k < in_len) && ('#' != lcp[k])) {
-                fprintf(stderr, "build_diag_page: syntax error at "
-                        "line %d, pos %d\n", j + 1, m + k + 1);
+                pr2serr("build_diag_page: syntax error at line %d, pos %d\n",
+                        j + 1, m + k + 1);
                 return 1;
             }
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        fprintf(stderr, "build_diag_page: hex number "
-                                "larger than 0xff in line %d, pos %d\n",
-                                j + 1, (int)(lcp - line + 1));
+                        pr2serr("build_diag_page: hex number larger than "
+                                "0xff in line %d, pos %d\n", j + 1,
+                                (int)(lcp - line + 1));
                         return 1;
                     }
                     if (split_line && (1 == strlen(lcp))) {
@@ -506,8 +506,7 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        fprintf(stderr, "build_diag_page: array length "
-                                "exceeded\n");
+                        pr2serr("build_diag_page: array length exceeded\n");
                         return 1;
                     }
                     mp_arr[off + k] = h;
@@ -522,9 +521,8 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
                         --k;
                         break;
                     }
-                    fprintf(stderr, "build_diag_page: error in "
-                            "line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("build_diag_page: error in line %d, at pos %d\n",
+                            j + 1, (int)(lcp - line + 1));
                     return 1;
                 }
             }
@@ -534,14 +532,14 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
     } else {        /* hex string on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
-            fprintf(stderr, "build_diag_page: error at pos %d\n", k + 1);
+            pr2serr("build_diag_page: error at pos %d\n", k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
-                    fprintf(stderr, "build_diag_page: hex number larger "
-                            "than 0xff at pos %d\n", (int)(lcp - inp + 1));
+                    pr2serr("build_diag_page: hex number larger than 0xff at "
+                            "pos %d\n", (int)(lcp - inp + 1));
                     return 1;
                 }
                 mp_arr[k] = h;
@@ -555,14 +553,14 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                fprintf(stderr, "build_diag_page: error at pos %d\n",
+                pr2serr("build_diag_page: error at pos %d\n",
                         (int)(lcp - inp + 1));
                 return 1;
             }
         }
         *mp_arr_len = k + 1;
         if (k == max_arr_len) {
-            fprintf(stderr, "build_diag_page: array length exceeded\n");
+            pr2serr("build_diag_page: array length exceeded\n");
             return 1;
         }
     }
@@ -654,7 +652,7 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
     rsp_buff_size = op->maxlen;
@@ -664,7 +662,7 @@ main(int argc, char * argv[])
             list_page_codes();
             return 0;
         }
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         if (op->opt_new)
             usage();
         else
@@ -674,7 +672,7 @@ main(int argc, char * argv[])
     if (op->do_raw) {
         read_in = (unsigned char *)calloc(op->maxlen, 1);
         if (NULL == read_in) {
-            fprintf(stderr, "unable to allocate %d bytes\n", op->maxlen);
+            pr2serr("unable to allocate %d bytes\n", op->maxlen);
             return SG_LIB_CAT_OTHER;
         }
         if (build_diag_page(op->raw_arg, read_in, &read_in_len, op->maxlen)) {
@@ -735,7 +733,7 @@ main(int argc, char * argv[])
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
     if (op->do_verbose > 4)
-        fprintf(stderr, "Initial win32 SPT interface state: %s\n",
+        pr2serr("Initial win32 SPT interface state: %s\n",
                 scsi_pt_win32_spt_state() ? "direct" : "indirect");
     if (op->maxlen >= 16384)
         scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
@@ -744,13 +742,13 @@ main(int argc, char * argv[])
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, 0 /* rw */,
                                      op->do_verbose)) < 0) {
-        fprintf(stderr, ME "error opening file: %s: %s\n", op->device_name,
+        pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     rsp_buff = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == rsp_buff) {
-        fprintf(stderr, "unable to allocate %d bytes (2)\n", op->maxlen);
+        pr2serr("unable to allocate %d bytes (2)\n", op->maxlen);
         return SG_LIB_CAT_OTHER;
     }
     if (op->do_extdur) {
@@ -813,8 +811,7 @@ main(int argc, char * argv[])
                 }
             } else {
                 ret = res;
-                fprintf(stderr, "RECEIVE DIAGNOSTIC RESULTS command "
-                        "failed\n");
+                pr2serr("RECEIVE DIAGNOSTIC RESULTS command failed\n");
                 goto err_out9;
             }
         } else {
@@ -849,17 +846,16 @@ main(int argc, char * argv[])
 
 err_out:
     if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        fprintf(stderr, "SEND DIAGNOSTIC, unit attention\n");
+        pr2serr("SEND DIAGNOSTIC, unit attention\n");
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        fprintf(stderr, "SEND DIAGNOSTIC, aborted command\n");
+        pr2serr("SEND DIAGNOSTIC, aborted command\n");
     else if (SG_LIB_CAT_NOT_READY == res)
-        fprintf(stderr, "SEND DIAGNOSTIC, device not "
-                "ready\n");
+        pr2serr("SEND DIAGNOSTIC, device not ready\n");
     else
-        fprintf(stderr, "SEND DIAGNOSTIC command, failed\n");
+        pr2serr("SEND DIAGNOSTIC command, failed\n");
 err_out9:
     if (op->do_verbose < 2)
-        fprintf(stderr, "  try again with '-vv' for more information\n");
+        pr2serr("  try again with '-vv' for more information\n");
     res = sg_cmds_close_device(sg_fd);
     if ((res < 0) && (0 == ret))
         return SG_LIB_FILE_ERROR;

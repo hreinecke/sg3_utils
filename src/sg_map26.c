@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2013 Douglas Gilbert.
+ * Copyright (c) 2005-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -39,7 +40,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.09 20130507";
+static const char * version_str = "1.10 20151219";
 
 #define ME "sg_map26: "
 
@@ -123,11 +124,30 @@ static const char * nt_names[] = {
         "directory",
 };
 
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
+
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
 static void
 usage()
 {
-        fprintf(stderr, "Usage: "
-                "sg_map26 [--dev_dir=DIR] [--given_is=0...1] [--help] "
+        pr2serr("Usage: sg_map26 [--dev_dir=DIR] [--given_is=0...1] [--help] "
                 "[--result=0...3]\n"
                 "                [--symlink] [--verbose] [--version] "
                 "DEVICE\n"
@@ -357,7 +377,7 @@ list_matching_nodes(const char * dir_name, int file_type, int majj, int minn,
         num = scandir(dir_name, &namelist, nd_match_scandir_select, NULL);
         if (num < 0) {
                 if (verbose)
-                        fprintf(stderr, "scandir: %s %s\n", dir_name,
+                        pr2serr("scandir: %s %s\n", dir_name,
                                 ssafe_strerror(errno));
                 return -errno;
         }
@@ -472,13 +492,13 @@ from_sg_scan(const char * dir_name, int verbose)
         num = scandir(dir_name, &namelist, from_sg_scandir_select, NULL);
         if (num < 0) {
                 if (verbose)
-                        fprintf(stderr, "scandir: %s %s\n", dir_name,
+                        pr2serr("scandir: %s %s\n", dir_name,
                                 ssafe_strerror(errno));
                 return -errno;
         }
         if (verbose) {
                 for (k = 0; k < num; ++k)
-                        fprintf(stderr, "    %s/%s\n", dir_name,
+                        pr2serr("    %s/%s\n", dir_name,
                                 namelist[k]->d_name);
         }
         for (k = 0; k < num; ++k)
@@ -679,15 +699,14 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
                 return 0;
         }
         if (! get_value(name, "dev", value, sizeof(value))) {
-                fprintf(stderr, "Couldn't find sysfs match for "
-                        "device: %s\n", device_name);
+                pr2serr("Couldn't find sysfs match for device: %s\n",
+                        device_name);
                 return 1;
         }
         if (verbose)
-                fprintf(stderr, "sysfs sd dev: %s\n", value);
+                pr2serr("sysfs sd dev: %s\n", value);
         if (! if_directory_chdir(name, "device")) {
-                fprintf(stderr, "sysfs problem with device: %s\n",
-                        device_name);
+                pr2serr("sysfs problem with device: %s\n", device_name);
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
@@ -698,25 +717,22 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
                         return 0;
                 }
                 if (! get_value(".", "dev", value, sizeof(value))) {
-                        fprintf(stderr, "Couldn't find sysfs generic"
-                                "dev\n");
+                        pr2serr("Couldn't find sysfs generic dev\n");
                         return 1;
                 }
                 if (verbose)
                         printf("matching dev: %s\n", value);
                 if (2 != sscanf(value, "%d:%d", &m_ma, &m_mi)) {
-                        fprintf(stderr, "Couldn't decode mapped "
-                                "dev\n");
+                        pr2serr("Couldn't decode mapped dev\n");
                         return 1;
                 }
                 num = list_matching_nodes(device_dir, FT_CHAR, m_ma, m_mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         } else {
-                fprintf(stderr, "sd device: %s does not match any "
-                        "SCSI generic device\n", device_name);
-                fprintf(stderr, "    perhaps sg module is not "
-                        "loaded\n");
+                pr2serr("sd device: %s does not match any SCSI generic "
+                        "device\n", device_name);
+                pr2serr("    perhaps sg module is not loaded\n");
                 return 1;
         }
 }
@@ -740,15 +756,14 @@ map_sr(const char * device_name, const char * device_dir, int ma, int mi,
                 return 0;
         }
         if (! get_value(name, "dev", value, sizeof(value))) {
-                fprintf(stderr, "Couldn't find sysfs match for "
-                        "device: %s\n", device_name);
+                pr2serr("Couldn't find sysfs match for device: %s\n",
+                        device_name);
                 return 1;
         }
         if (verbose)
-                fprintf(stderr, "sysfs sr dev: %s\n", value);
+                pr2serr("sysfs sr dev: %s\n", value);
         if (! if_directory_chdir(name, "device")) {
-                fprintf(stderr, "sysfs problem with device: %s\n",
-                        device_name);
+                pr2serr("sysfs problem with device: %s\n", device_name);
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
@@ -759,25 +774,22 @@ map_sr(const char * device_name, const char * device_dir, int ma, int mi,
                         return 0;
                 }
                 if (! get_value(".", "dev", value, sizeof(value))) {
-                        fprintf(stderr, "Couldn't find sysfs generic"
-                                "dev\n");
+                        pr2serr("Couldn't find sysfs generic dev\n");
                         return 1;
                 }
                 if (verbose)
                         printf("matching dev: %s\n", value);
                 if (2 != sscanf(value, "%d:%d", &m_ma, &m_mi)) {
-                        fprintf(stderr, "Couldn't decode mapped "
-                                "dev\n");
+                        pr2serr("Couldn't decode mapped dev\n");
                         return 1;
                 }
                 num = list_matching_nodes(device_dir, FT_BLOCK, m_ma, m_mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         } else {
-                fprintf(stderr, "sr device: %s does not match any "
-                        "SCSI generic device\n", device_name);
-                fprintf(stderr, "    perhaps sg module is not "
-                        "loaded\n");
+                pr2serr("sr device: %s does not match any SCSI generic "
+                        "device\n", device_name);
+                pr2serr("    perhaps sg module is not loaded\n");
                 return 1;
         }
 }
@@ -802,15 +814,14 @@ map_st(const char * device_name, const char * device_dir, int ma, int mi,
                 return 0;
         }
         if (! get_value(name, "dev", value, sizeof(value))) {
-                fprintf(stderr, "Couldn't find sysfs match for "
-                        "device: %s\n", device_name);
+                pr2serr("Couldn't find sysfs match for device: %s\n",
+                        device_name);
                 return 1;
         }
         if (verbose)
-                fprintf(stderr, "sysfs st dev: %s\n", value);
+                pr2serr("sysfs st dev: %s\n", value);
         if (! if_directory_chdir(name, "device")) {
-                fprintf(stderr, "sysfs problem with device: %s\n",
-                        device_name);
+                pr2serr("sysfs problem with device: %s\n", device_name);
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
@@ -821,25 +832,22 @@ map_st(const char * device_name, const char * device_dir, int ma, int mi,
                         return 0;
                 }
                 if (! get_value(".", "dev", value, sizeof(value))) {
-                        fprintf(stderr, "Couldn't find sysfs generic"
-                                "dev\n");
+                        pr2serr("Couldn't find sysfs generic dev\n");
                         return 1;
                 }
                 if (verbose)
                         printf("matching dev: %s\n", value);
                 if (2 != sscanf(value, "%d:%d", &m_ma, &m_mi)) {
-                        fprintf(stderr, "Couldn't decode mapped "
-                                "dev\n");
+                        pr2serr("Couldn't decode mapped dev\n");
                         return 1;
                 }
                 num = list_matching_nodes(device_dir, FT_CHAR, m_ma, m_mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         } else {
-                fprintf(stderr, "st device: %s does not match any "
-                        "SCSI generic device\n", device_name);
-                fprintf(stderr, "    perhaps sg module is not "
-                        "loaded\n");
+                pr2serr("st device: %s does not match any SCSI generic "
+                        "device\n", device_name);
+                pr2serr("    perhaps sg module is not loaded\n");
                 return 1;
         }
 }
@@ -864,15 +872,14 @@ map_osst(const char * device_name, const char * device_dir, int ma, int mi,
                 return 0;
         }
         if (! get_value(name, "dev", value, sizeof(value))) {
-                fprintf(stderr, "Couldn't find sysfs match for "
-                        "device: %s\n", device_name);
+                pr2serr("Couldn't find sysfs match for device: %s\n",
+                        device_name);
                 return 1;
         }
         if (verbose)
-                fprintf(stderr, "sysfs osst dev: %s\n", value);
+                pr2serr("sysfs osst dev: %s\n", value);
         if (! if_directory_chdir(name, "device")) {
-                fprintf(stderr, "sysfs problem with device: %s\n",
-                        device_name);
+                pr2serr("sysfs problem with device: %s\n", device_name);
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
@@ -883,25 +890,22 @@ map_osst(const char * device_name, const char * device_dir, int ma, int mi,
                         return 0;
                 }
                 if (! get_value(".", "dev", value, sizeof(value))) {
-                        fprintf(stderr, "Couldn't find sysfs generic"
-                                "dev\n");
+                        pr2serr("Couldn't find sysfs generic dev\n");
                         return 1;
                 }
                 if (verbose)
                         printf("matching dev: %s\n", value);
                 if (2 != sscanf(value, "%d:%d", &m_ma, &m_mi)) {
-                        fprintf(stderr, "Couldn't decode mapped "
-                                "dev\n");
+                        pr2serr("Couldn't decode mapped dev\n");
                         return 1;
                 }
                 num = list_matching_nodes(device_dir, FT_CHAR, m_ma, m_mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         } else {
-                fprintf(stderr, "osst device: %s does not match any "
-                        "SCSI generic device\n", device_name);
-                fprintf(stderr, "    perhaps sg module is not "
-                        "loaded\n");
+                pr2serr("osst device: %s does not match any SCSI generic "
+                        "device\n", device_name);
+                pr2serr("    perhaps sg module is not loaded\n");
                 return 1;
         }
 }
@@ -925,15 +929,14 @@ map_ch(const char * device_name, const char * device_dir, int ma, int mi,
                 return 0;
         }
         if (! get_value(name, "dev", value, sizeof(value))) {
-                fprintf(stderr, "Couldn't find sysfs match for "
-                        "device: %s\n", device_name);
+                pr2serr("Couldn't find sysfs match for device: %s\n",
+                        device_name);
                 return 1;
         }
         if (verbose)
-                fprintf(stderr, "sysfs sch dev: %s\n", value);
+                pr2serr("sysfs sch dev: %s\n", value);
         if (! if_directory_chdir(name, "device")) {
-                fprintf(stderr, "sysfs problem with device: %s\n",
-                        device_name);
+                pr2serr("sysfs problem with device: %s\n", device_name);
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
@@ -944,25 +947,22 @@ map_ch(const char * device_name, const char * device_dir, int ma, int mi,
                         return 0;
                 }
                 if (! get_value(".", "dev", value, sizeof(value))) {
-                        fprintf(stderr, "Couldn't find sysfs generic"
-                                "dev\n");
+                        pr2serr("Couldn't find sysfs generic dev\n");
                         return 1;
                 }
                 if (verbose)
                         printf("matching dev: %s\n", value);
                 if (2 != sscanf(value, "%d:%d", &m_ma, &m_mi)) {
-                        fprintf(stderr, "Couldn't decode mapped "
-                                "dev\n");
+                        pr2serr("Couldn't decode mapped dev\n");
                         return 1;
                 }
                 num = list_matching_nodes(device_dir, FT_CHAR, m_ma, m_mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         } else {
-                fprintf(stderr, "sch device: %s does not match any "
-                        "SCSI generic device\n", device_name);
-                fprintf(stderr, "    perhaps sg module is not "
-                        "loaded\n");
+                pr2serr("sch device: %s does not match any SCSI generic "
+                        "device\n", device_name);
+                pr2serr("    perhaps sg module is not loaded\n");
                 return 1;
         }
 }
@@ -986,15 +986,14 @@ map_sg(const char * device_name, const char * device_dir, int ma, int mi,
                 return 0;
         }
         if (! get_value(name, "dev", value, sizeof(value))) {
-                fprintf(stderr, "Couldn't find sysfs match for "
-                        "device: %s\n", device_name);
+                pr2serr("Couldn't find sysfs match for device: %s\n",
+                        device_name);
                 return 1;
         }
         if (verbose)
-                fprintf(stderr, "sysfs sg dev: %s\n", value);
+                pr2serr("sysfs sg dev: %s\n", value);
         if (! if_directory_chdir(name, "device")) {
-                fprintf(stderr, "sysfs problem with device: %s\n",
-                        device_name);
+                pr2serr("sysfs problem with device: %s\n", device_name);
                 return 1;
         }
         if ((1 == from_sg_scan(".", verbose)) &&
@@ -1004,8 +1003,7 @@ map_sg(const char * device_name, const char * device_dir, int ma, int mi,
                             (if_directory_chdir(".", for_first.name))) {
                                 ;
                         } else {
-                                fprintf(stderr, "unexpected scan_for_first "
-                                        "error\n");
+                                pr2serr("unexpected scan_for_first error\n");
                         }
                 }
                 if (1 == result) {
@@ -1015,23 +1013,21 @@ map_sg(const char * device_name, const char * device_dir, int ma, int mi,
                         return 0;
                 }
                 if (! get_value(".", "dev", value, sizeof(value))) {
-                        fprintf(stderr, "Couldn't find sysfs block "
-                                "dev\n");
+                        pr2serr("Couldn't find sysfs block dev\n");
                         return 1;
                 }
                 if (verbose)
                         printf("matching dev: %s\n", value);
                 if (2 != sscanf(value, "%d:%d", &m_ma, &m_mi)) {
-                        fprintf(stderr, "Couldn't decode mapped "
-                                "dev\n");
+                        pr2serr("Couldn't decode mapped dev\n");
                         return 1;
                 }
                 num = list_matching_nodes(device_dir, from_sg.ft, m_ma, m_mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         } else {
-                fprintf(stderr, "sg device: %s does not match any "
-                        "other SCSI device\n", device_name);
+                pr2serr("sg device: %s does not match any other SCSI "
+                        "device\n", device_name);
                 return 1;
         }
 }
@@ -1072,8 +1068,8 @@ main(int argc, char * argv[])
                         if ((1 == num) && ((0 == res) || (1 == res)))
                                 given_is = res;
                         else {
-                                fprintf(stderr, "value for '--given_to=' "
-                                        "must be 0 or 1\n");
+                                pr2serr("value for '--given_to=' must be 0 "
+                                        "or 1\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -1086,8 +1082,8 @@ main(int argc, char * argv[])
                         if ((1 == num) && (res >= 0) && (res < 4))
                                 result = res;
                         else {
-                                fprintf(stderr, "value for '--result=' "
-                                        "must be 0..3\n");
+                                pr2serr("value for '--result=' must be "
+                                        "0..3\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -1098,11 +1094,10 @@ main(int argc, char * argv[])
                         ++verbose;
                         break;
                 case 'V':
-                        fprintf(stderr, ME "version: %s\n", version_str);
+                        pr2serr(ME "version: %s\n", version_str);
                         return 0;
                 default:
-                        fprintf(stderr, "unrecognised option code 0x%x ??\n",
-                                c);
+                        pr2serr("unrecognised option code 0x%x ??\n", c);
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1116,15 +1111,15 @@ main(int argc, char * argv[])
                 }
                 if (optind < argc) {
                         for (; optind < argc; ++optind)
-                                fprintf(stderr, "Unexpected extra argument: "
-                                        "%s\n", argv[optind]);
+                                pr2serr("Unexpected extra argument: %s\n",
+                                        argv[optind]);
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 }
         }
 
         if (0 == device_name[0]) {
-                fprintf(stderr, "missing device name!\n");
+                pr2serr("missing device name!\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
@@ -1138,10 +1133,10 @@ main(int argc, char * argv[])
                         else
                                 device_dir[0] = '\0';
                         if (verbose > 1)
-                                fprintf(stderr, "Absolute path to "
-                                        "dev_dir: %s\n", device_dir);
+                                pr2serr("Absolute path to dev_dir: %s\n",
+                                        device_dir);
                 } else {
-                        fprintf(stderr, "dev_dir: %s invalid\n", device_dir);
+                        pr2serr("dev_dir: %s invalid\n", device_dir);
                         return SG_LIB_FILE_ERROR;
                 }
         } else {
@@ -1154,21 +1149,21 @@ main(int argc, char * argv[])
         }
         ret = nt_typ_from_filename(device_name, &ma, &mi);
         if (ret < 0) {
-                fprintf(stderr, "stat failed on %s: %s\n", device_name,
+                pr2serr("stat failed on %s: %s\n", device_name,
                         ssafe_strerror(-ret));
                 return SG_LIB_FILE_ERROR;
         }
         if (verbose)
-                fprintf(stderr, " %s: %s device [maj=%d, min=%d]\n",
-                        device_name, nt_names[ret], ma, mi);
+                pr2serr(" %s: %s device [maj=%d, min=%d]\n", device_name,
+                        nt_names[ret], ma, mi);
         res = 0;
         switch (ret) {
         case NT_SD:
         case NT_SR:
         case NT_HD:
                 if (given_is > 0) {
-                        fprintf(stderr, "block special but '--given_is=' "
-                                "suggested sysfs device\n");
+                        pr2serr("block special but '--given_is=' suggested "
+                                "sysfs device\n");
                         return SG_LIB_FILE_ERROR;
                 }
                 break;
@@ -1177,23 +1172,23 @@ main(int argc, char * argv[])
         case NT_CH:
         case NT_SG:
                 if (given_is > 0) {
-                        fprintf(stderr, "character special but '--given_is=' "
+                        pr2serr("character special but '--given_is=' "
                                 "suggested sysfs device\n");
                         return SG_LIB_FILE_ERROR;
                 }
                 break;
         case NT_REG:
                 if (0 == given_is) {
-                        fprintf(stderr, "regular file but '--given_is=' "
-                                "suggested block or char special\n");
+                        pr2serr("regular file but '--given_is=' suggested "
+                                "block or char special\n");
                         return SG_LIB_FILE_ERROR;
                 }
                 strcpy(device_dir, def_dev_dir);
                 break;
         case NT_DIR:
                 if (0 == given_is) {
-                        fprintf(stderr, "directory but '--given_is=' "
-                                "suggested block or char special\n");
+                        pr2serr("directory but '--given_is=' suggested "
+                                "block or char special\n");
                         return SG_LIB_FILE_ERROR;
                 }
                 strcpy(device_dir, def_dev_dir);
@@ -1219,8 +1214,8 @@ main(int argc, char * argv[])
                         break;
                 case NT_HD:
                         if (result < 2) {
-                                fprintf(stderr, "a hd device does not map "
-                                        "to a sg device\n");
+                                pr2serr("a hd device does not map to a sg "
+                                        "device\n");
                                 return SG_LIB_FILE_ERROR;
                         }
                         res = map_hd(device_dir, ma, mi, result,
@@ -1245,14 +1240,14 @@ main(int argc, char * argv[])
                 case NT_REG:
                         if (! get_value(NULL, device_name, value,
                                         sizeof(value))) {
-                                fprintf(stderr, "Couldn't fetch value "
-                                        "from: %s\n", device_name);
+                                pr2serr("Couldn't fetch value from: %s\n",
+                                        device_name);
                                 return SG_LIB_FILE_ERROR;
                         }
                         if (verbose)
-                                fprintf(stderr, "value: %s\n", value);
+                                pr2serr("value: %s\n", value);
                         if (2 != sscanf(value, "%d:%d", &ma, &mi)) {
-                                fprintf(stderr, "Couldn't decode value\n");
+                                pr2serr("Couldn't decode value\n");
                                 return SG_LIB_FILE_ERROR;
                         }
                         tt = nt_typ_from_major(ma);
@@ -1261,14 +1256,14 @@ main(int argc, char * argv[])
                 case NT_DIR:
                         if (! get_value(device_name, "dev", value,
                                         sizeof(value))) {
-                                fprintf(stderr, "Couldn't fetch value from: "
-                                        "%s/dev\n", device_name);
+                                pr2serr("Couldn't fetch value from: %s/dev\n",
+                                        device_name);
                                 return SG_LIB_FILE_ERROR;
                         }
                         if (verbose)
-                                fprintf(stderr, "value: %s\n", value);
+                                pr2serr("value: %s\n", value);
                         if (2 != sscanf(value, "%d:%d", &ma, &mi)) {
-                                fprintf(stderr, "Couldn't decode value\n");
+                                pr2serr("Couldn't decode value\n");
                                 return SG_LIB_FILE_ERROR;
                         }
                         tt = nt_typ_from_major(ma);

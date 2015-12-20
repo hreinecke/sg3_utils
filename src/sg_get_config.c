@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,6 +19,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_mmc.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -27,7 +28,7 @@
 
 */
 
-static const char * version_str = "0.39 20140516";    /* mmc6r02 */
+static const char * version_str = "0.40 20151219";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -57,8 +58,7 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr,
-            "Usage:  sg_get_config [--brief] [--current] [--help] [--hex] "
+    pr2serr("Usage:  sg_get_config [--brief] [--current] [--help] [--hex] "
             "[--inner-hex]\n"
             "                      [--list] [--raw] [--readonly] [--rt=RT]\n"
             "                      [--starting=FC] [--verbose] [--version] "
@@ -873,7 +873,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         break;
     default:
-        fprintf(stderr, "    Unknown feature [0x%x], version=%d persist=%d, "
+        pr2serr("    Unknown feature [0x%x], version=%d persist=%d, "
                 "current=%d\n", feature, ((ucp[2] >> 2) & 0xf),
                 !!(ucp[2] & 0x2), !!(ucp[2] & 0x1));
         dStrHexErr((const char *)ucp, len, 1);
@@ -890,17 +890,17 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
     char buff[128];
 
     if (max_resp_len < len) {
-        fprintf(stderr, "<<<warning: response to long for buffer, "
-                "resp_len=%d>>>\n", len);
+        pr2serr("<<<warning: response to long for buffer, resp_len=%d>>>\n",
+                len);
             len = max_resp_len;
     }
     if (len < 8) {
-        fprintf(stderr, "response length too short: %d\n", len);
+        pr2serr("response length too short: %d\n", len);
         return;
     }
     curr_profile = (resp[6] << 8) + resp[7];
     if (0 == curr_profile)
-        fprintf(stderr, "No current profile\n");
+        pr2serr("No current profile\n");
     else
         printf("Current profile: %s\n", get_profile_str(curr_profile, buff));
     printf("Features%s:\n", (brief ? " (in brief)" : ""));
@@ -998,7 +998,7 @@ main(int argc, char * argv[])
         case 'r':
             rt = sg_get_num(optarg);
             if ((rt < 0) || (rt > 3)) {
-                fprintf(stderr, "bad argument to '--rt'\n");
+                pr2serr("bad argument to '--rt'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -1008,7 +1008,7 @@ main(int argc, char * argv[])
         case 's':
             starting = sg_get_num(optarg);
             if ((starting < 0) || (starting > 0xffff)) {
-                fprintf(stderr, "bad argument to '--starting'\n");
+                pr2serr("bad argument to '--starting'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -1016,10 +1016,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -1031,8 +1031,7 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -1043,13 +1042,13 @@ main(int argc, char * argv[])
         return 0;
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */, verbose)) < 0) {
-        fprintf(stderr, ME "error opening file: %s (ro): %s\n",
-                 device_name, safe_strerror(-sg_fd));
+        pr2serr(ME "error opening file: %s (ro): %s\n", device_name,
+                safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
@@ -1065,15 +1064,14 @@ main(int argc, char * argv[])
                 printf("  Peripheral device type: 0x%x\n", peri_type);
         }
     } else {
-        fprintf(stderr, ME "%s doesn't respond to a SCSI INQUIRY\n",
-                device_name);
+        pr2serr(ME "%s doesn't respond to a SCSI INQUIRY\n", device_name);
         return SG_LIB_CAT_OTHER;
     }
     sg_cmds_close_device(sg_fd);
 
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error (rw): %s\n", safe_strerror(-sg_fd));
+        pr2serr(ME "open error (rw): %s\n", safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (do_raw) {
@@ -1102,14 +1100,14 @@ main(int argc, char * argv[])
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Get Configuration command: %s\n", b);
+        pr2serr("Get Configuration command: %s\n", b);
         if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+            pr2serr("    try '-v' option for more information\n");
     }
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

@@ -24,9 +24,10 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.09 20151207";
+static const char * version_str = "1.10 20151219";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -157,11 +158,11 @@ static int fail_all_paths(int fd, int use_6_byte)
         switch (res) {
         case 0:
                 if (do_verbose)
-                        fprintf(stderr, "fail paths successful\n");
+                        pr2serr("fail paths successful\n");
                 break;
         default:
                 sg_get_category_sense_str(res, sizeof(b), b, do_verbose);
-                fprintf(stderr, "fail paths failed: %s\n", b);
+                pr2serr("fail paths failed: %s\n", b);
                 break;
         }
 
@@ -178,7 +179,7 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
         char b[80];
 
         if (use_6_byte && lun > 32) {
-                fprintf(stderr, "must use 10 byte cdb to fail luns over 32\n");
+                pr2serr("must use 10 byte cdb to fail luns over 32\n");
                 return -1;
         }
 
@@ -222,12 +223,11 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
         switch (res) {
         case 0:
                 if (do_verbose)
-                        fprintf(stderr, "fail paths successful\n");
+                        pr2serr("fail paths successful\n");
                 break;
         default:
                 sg_get_category_sense_str(res, sizeof(b), b, do_verbose);
-                fprintf(stderr, "fail paths page (lun=%d) failed: %s\n", lun,
-                        b);
+                pr2serr("fail paths page (lun=%d) failed: %s\n", lun, b);
                 break;
         }
 
@@ -405,18 +405,18 @@ int main(int argc, char * argv[])
                         use_6_byte = 1;
                 }
                 else if (!strcmp(*argptr, "-V")) {
-                        fprintf(stderr, "sg_rdac version: %s\n", version_str);
+                        pr2serr("sg_rdac version: %s\n", version_str);
                         return 0;
                 }
                 else if (*argv[k] == '-') {
-                        fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
+                        pr2serr("Unrecognized switch: %s\n", argv[k]);
                         file_name = 0;
                         break;
                 }
                 else if (0 == file_name)
                         file_name = argv[k];
                 else {
-                        fprintf(stderr, "too many arguments\n");
+                        pr2serr("too many arguments\n");
                         file_name = 0;
                         break;
                 }
@@ -428,8 +428,7 @@ int main(int argc, char * argv[])
 
         fd = sg_cmds_open_device(file_name, 0 /* rw */, do_verbose);
         if (fd < 0) {
-                fprintf(stderr, "open error: %s: %s\n", file_name,
-                        safe_strerror(-fd));
+                pr2serr("open error: %s: %s\n", file_name, safe_strerror(-fd));
                 usage();
                 return SG_LIB_FILE_ERROR;
         }
@@ -456,19 +455,19 @@ int main(int argc, char * argv[])
                         print_rdac_mode(rsp_buff, !use_6_byte);
                 } else {
                         if (SG_LIB_CAT_INVALID_OP == res)
-                                fprintf(stderr, ">>>>>> try again without "
-                                        "the '-6' switch for a 10 byte MODE "
-                                        "SENSE command\n");
+                                pr2serr(">>>>>> try again without the '-6' "
+                                        "switch for a 10 byte MODE SENSE "
+                                        "command\n");
                         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                                fprintf(stderr, "mode sense: invalid field "
-                                        "in cdb (perhaps subpages or page "
-                                        "control (PC) not supported)\n");
+                                pr2serr("mode sense: invalid field in cdb "
+                                        "(perhaps subpages or page control "
+                                        "(PC) not supported)\n");
                         else {
                                 char b[80];
 
                                 sg_get_category_sense_str(res, sizeof(b), b,
                                                           do_verbose);
-                                fprintf(stderr, "mode sense failed: %s\n", b);
+                                pr2serr("mode sense failed: %s\n", b);
                         }
                 }
         }
@@ -476,7 +475,7 @@ int main(int argc, char * argv[])
 
         res = sg_cmds_close_device(fd);
         if (res < 0) {
-                fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+                pr2serr("close error: %s\n", safe_strerror(-res));
                 if (0 == ret)
                         return SG_LIB_FILE_ERROR;
         }

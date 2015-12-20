@@ -2,14 +2,14 @@
 #define SG_IO_LINUX_H
 
 /*
- * Copyright (c) 2004-2012 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
 /*
- * Version 1.03 [20120914]
+ * Version 1.04 [20151217]
  */
 
 /*
@@ -96,7 +96,9 @@ extern "C" {
 #define DRIVER_HARD 0x07
 #define DRIVER_SENSE 0x08       /* Sense_buffer has been set */
 
-/* Following "suggests" are "or-ed" with one of previous 8 entries */
+/* N.B. the SUGGEST_* codes are no longer used in Linux and are only kept
+ * to stop compilation breakages.
+ * Following "suggests" are "or-ed" with one of previous 8 entries */
 #define SUGGEST_RETRY 0x10
 #define SUGGEST_ABORT 0x20
 #define SUGGEST_REMAP 0x30
@@ -104,6 +106,7 @@ extern "C" {
 #define SUGGEST_SENSE 0x80
 #define SUGGEST_IS_OK 0xff
 #endif
+
 #ifndef DRIVER_MASK
 #define DRIVER_MASK 0x0f
 #endif
@@ -121,6 +124,10 @@ extern "C" {
 #define SG_LIB_DRIVER_TIMEOUT   DRIVER_TIMEOUT
 #define SG_LIB_DRIVER_HARD      DRIVER_HARD
 #define SG_LIB_DRIVER_SENSE     DRIVER_SENSE
+
+
+/* N.B. the SUGGEST_* codes are no longer used in Linux and are only kept
+ * to stop compilation breakages. */
 #define SG_LIB_SUGGEST_RETRY    SUGGEST_RETRY
 #define SG_LIB_SUGGEST_ABORT    SUGGEST_ABORT
 #define SG_LIB_SUGGEST_REMAP    SUGGEST_REMAP

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2015 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,6 +19,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -26,7 +28,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.25 20140516";
+static const char * version_str = "0.26 20151219";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -73,14 +75,14 @@ read_safte_configuration(int sg_fd, unsigned char *rb_buff,
     int res;
 
     if (rb_len < buf_capacity) {
-        fprintf(stderr,"SCSI BUFFER size too small (%d/%d bytes)\n",
-                rb_len, buf_capacity);
+        pr2serr("SCSI BUFFER size too small (%d/%d bytes)\n", rb_len,
+                buf_capacity);
         return SG_LIB_CAT_ILLEGAL_REQ;
     }
 
     if (verbose > 1)
-        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=0 "
-                "to fetch configuration\n");
+        pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=0 to fetch "
+                "configuration\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 0, 0,
                             rb_buff, rb_len, 1, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED)
@@ -131,8 +133,8 @@ do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
 
 
     if (verbose > 1)
-        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=1 "
-                "to read enclosure status\n");
+        pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=1 to read "
+                "enclosure status\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 1, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED)
@@ -271,8 +273,8 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_buff = (unsigned char *)malloc(rb_len);
 
     if (verbose > 1)
-        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=2 "
-                "to read usage statistics\n");
+        pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=2 to read "
+                "usage statistics\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 2, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res) {
@@ -295,11 +297,9 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
         return 0;
     }
     printf("Usage Statistics:\n");
-    minutes = (rb_buff[0] << 24) + (rb_buff[1] << 16) +
-        (rb_buff[2] <<  8) + rb_buff[3];
+    minutes = sg_get_unaligned_be32(rb_buff + 0);
     printf("\tPower on Minutes: %u\n", minutes);
-    minutes = (rb_buff[4] << 24) + (rb_buff[5] << 16) +
-        (rb_buff[6] <<  8) + rb_buff[7];
+    minutes = sg_get_unaligned_be32(rb_buff + 4);
     printf("\tPower on Cycles: %u\n", minutes);
 
     free(rb_buff);
@@ -318,8 +318,8 @@ do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_buff = (unsigned char *)malloc(rb_len);
 
     if (verbose > 1)
-        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=3 "
-                "to read device insertions\n");
+        pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=3 to read "
+                "device insertions\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 3, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res ) {
@@ -343,7 +343,7 @@ do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
     }
     printf("Slot insertions:\n");
     for (i = 0; i < safte_cfg.slots; i++) {
-        slot_status = (rb_buff[i * 2] << 8) + rb_buff[i * 2];
+        slot_status = sg_get_unaligned_be16(rb_buff + (i * 2));
         printf("\tSlot %d: %d insertions", i, slot_status);
     }
     free(rb_buff);
@@ -362,8 +362,8 @@ do_safte_slot_status(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_buff = (unsigned char *)malloc(rb_len);
 
     if (verbose > 1)
-        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=4 "
-                "to read device slot status\n");
+        pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=4 to read "
+                "device slot status\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 4, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED) {
@@ -411,8 +411,8 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
     rb_buff = (unsigned char *)malloc(rb_len);
 
     if (verbose > 1)
-        fprintf(stderr, "Use READ BUFFER,mode=vendor_specific,buff_id=5 "
-                "to read global flags\n");
+        pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=5 to read "
+                "global flags\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 5, 0,
                             rb_buff, rb_len, 0, verbose);
     if (res ) {
@@ -467,8 +467,7 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
 static
 void usage()
 {
-    fprintf(stderr,
-            "Usage:  sg_safte [--config] [--devstatus] [--encstatus] "
+    pr2serr("Usage:  sg_safte [--config] [--devstatus] [--encstatus] "
             "[--flags] [--help]\n"
             "                 [--hex] [--insertions] [--raw] [--usage] "
             "[--verbose]\n"
@@ -570,10 +569,10 @@ main(int argc, char * argv[])
                 ++verbose;
                 break;
             case 'V':
-                fprintf(stderr, "Version string: %s\n", version_str);
+                pr2serr("Version string: %s\n", version_str);
                 exit(0);
             default:
-                fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+                pr2serr("unrecognised option code 0x%x ??\n", c);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
@@ -585,15 +584,14 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -623,8 +621,8 @@ main(int argc, char * argv[])
             else
                 printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
-            fprintf(stderr, "sg_safte: %s doesn't respond to a SCSI "
-                    "INQUIRY\n", device_name);
+            pr2serr("sg_safte: %s doesn't respond to a SCSI INQUIRY\n",
+                    device_name);
             return SG_LIB_CAT_OTHER;
         }
     }
@@ -721,13 +719,13 @@ err_out:
         break;
     default:
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "%s failed: %s\n", op_name, b);
+        pr2serr("%s failed: %s\n", op_name, b);
         break;
     }
     ret = res;
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

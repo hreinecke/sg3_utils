@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -23,6 +22,8 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* This is a companion file to sg_vpd.c . It contains logic to output and
    decode vendor specific VPD pages
@@ -187,26 +188,6 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {0, 0, 0, NULL, NULL},
 };
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static int
 is_like_pdt(int actual_pdt, const struct svpd_values_name_t * vnp)
@@ -389,31 +370,22 @@ decode_vpd_c0_hp3par(unsigned char * buff, int len)
     printf("  XCopy supported: %s\n", (buff[5] & 0x20) ? "yes" : "no");
 
     if (rev > 3) {
-        printf("  VV ID: %" PRIu64 "\n", ((uint64_t) buff[28] << 56) +
-                ((uint64_t) buff[29] << 48) + ((uint64_t) buff[30] << 40) +
-                ((uint64_t) buff[31] << 32) + ((uint64_t) buff[32] << 24) +
-                (buff[33] << 16) + (buff[34] << 8) + buff[35]);
-
+        printf("  VV ID: %" PRIu64 "\n", sg_get_unaligned_be64(buff + 28));
         offset = 44;
         printf("  Volume name: %s\n", &buff[offset]);
 
-        printf("  Domain ID: %d\n", (buff[36] << 24) +  (buff[37] << 16) +
-                (buff[38] << 8) + buff[39]);
+        printf("  Domain ID: %d\n", sg_get_unaligned_be32(buff + 36));
 
-        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
-                (buff[offset - 2] << 8) + buff[offset - 1] + 4;
+        offset += sg_get_unaligned_be32(buff + offset - 4) + 4;
         printf("  Domain Name: %s\n", &buff[offset]);
 
-        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
-                (buff[offset - 2] << 8) + buff[offset - 1] + 4;
+        offset += sg_get_unaligned_be32(buff + offset - 4) + 4;
         printf("  User CPG: %s\n", &buff[offset]);
 
-        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
-                (buff[offset - 2] << 8) + buff[offset - 1] + 4;
+        offset += sg_get_unaligned_be32(buff + offset - 4) + 4;
         printf("  Snap CPG: %s\n", &buff[offset]);
 
-        offset += (buff[offset - 4] << 24) + (buff[offset - 3] << 16) +
-                (buff[offset - 2] << 8) + buff[offset - 1];
+        offset += sg_get_unaligned_be32(buff + offset - 4);
 
         printf("  VV policies: %s,%s,%s,%s\n",
                 (buff[offset + 3] & 0x01) ? "stale_ss" : "no_stale_ss",
@@ -424,20 +396,13 @@ decode_vpd_c0_hp3par(unsigned char * buff, int len)
     }
 
     if (buff[5] & 0x04) {
-        printf("  Allocation unit: %d\n", (buff[8] << 24) +  (buff[9] << 16) +
-                (buff[10] << 8) + buff[11]);
+        printf("  Allocation unit: %d\n", sg_get_unaligned_be32(buff + 8));
 
         printf("  Data pool size: %" PRIu64 "\n",
-               (((uint64_t)buff[12]) << 56) + (((uint64_t)buff[13]) << 48) +
-               (((uint64_t)buff[14]) << 40) + (((uint64_t)buff[15]) << 32) +
-               (((uint64_t)buff[16]) << 24) + (buff[17] << 16) +
-               (buff[18] << 8) + buff[19]);
+               sg_get_unaligned_be64(buff + 12));
 
         printf("  Space allocated: %" PRIu64 "\n",
-               (((uint64_t)buff[20]) << 56) + (((uint64_t)buff[21]) << 48) +
-               (((uint64_t)buff[22]) << 40) + (((uint64_t)buff[23]) << 32) +
-               (((uint64_t)buff[24]) << 24) + (buff[25] << 16) +
-               (buff[26] << 8) + buff[27]);
+               sg_get_unaligned_be64(buff + 20));
     }
     return;
 }
@@ -642,7 +607,7 @@ decode_rdac_vpd_c0(unsigned char * buff, int len)
         return;
     }
     printf("  Number of channels: %x\n", buff[8]);
-    memsize = buff[10] << 8 | buff[11];
+    memsize = sg_get_unaligned_be16(buff + 10);
     printf("  Processor Memory Size: %d\n", memsize);
     memset(name, 0, 65);
     memcpy(name, buff + 16, 64);
@@ -906,13 +871,13 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
 
     printf("  Volume Unique Identifier: %s\n", uuid);
 #ifndef SG_LIB_MINGW
-    tstamp = (buff[24] << 24) + (buff[25] << 16) + (buff[26] << 8) + buff[27];
+    tstamp = sg_get_unaligned_be32(buff + 24);
     printf("    Creation Number: %d, Timestamp: %s",
-           (buff[22] << 8) + buff[23], ctime(&tstamp));
+           sg_get_unaligned_be16(buff + 22), ctime(&tstamp));
 #else
     printf("    Creation Number: %d, Timestamp value: %u",
-           (buff[22] << 8) + buff[23],
-           (buff[24] << 24) + (buff[25] << 16) + (buff[26] << 8) + buff[27]);
+           sg_get_unaligned_be16(buff + 22),
+           sg_get_unaligned_be32(buff + 24));
 #endif
     memset(label, 0, 61);
     label_len = buff[28];
@@ -958,7 +923,7 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
             break;
         case TPROTO_ISCSI: /* iSCSI */
             printf("iSCSI\n");
-            n = (buff[177] << 8) + buff[178];
+            n = sg_get_unaligned_be32(buff + 177);
             memcpy(port_id, &buff[179], n);
             n = 179 + n;
             break;

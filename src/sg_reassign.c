@@ -23,6 +23,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -57,41 +58,39 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_reassign [--address=A,A...] [--dummy] [--eight=0|1] "
-          "[--grown]\n"
-          "                   [--help] [--hex] [--longlist=0|1] [--primary] "
-          "[--verbose]\n"
-          "                   [--version] DEVICE\n"
-          "  where:\n"
-          "    --address=A,A...|-a A,A...    comma separated logical block "
-          "addresses\n"
-          "                                  one or more, assumed to be "
-          "decimal\n"
-          "    --address=-|-a -    read stdin for logical block "
-          "addresses\n"
-          "    --dummy|-d          prepare but do not execute REASSIGN "
-          "BLOCKS command\n"
-          "    --eight=0|1\n"
-          "      -e 0|1            force eight byte (64 bit) lbas "
-          "when 1,\n"
-          "                        four byte (32 bit) lbas when 0 "
-          "(def)\n"
-          "    --grown|-g          fetch grown defect list length, "
-          "don't reassign\n"
-          "    --help|-h           print out usage message\n"
-          "    --hex|-H            print response in hex (for '-g' or "
-          "'-p')\n"
-          "    --longlist=0|1\n"
-          "       -l 0|1           use 4 byte list length when 1, safe to "
-          "ignore\n"
-          "                        (def: 0 (2 byte list length))\n"
-          "    --primary|-p        fetch primary defect list length, "
-          "don't reassign\n"
-          "    --verbose|-v        increase verbosity\n"
-          "    --version|-V        print version string and exit\n\n"
-          "Perform a SCSI REASSIGN BLOCKS command (or READ DEFECT LIST)\n"
-          );
+    pr2serr("Usage: sg_reassign [--address=A,A...] [--dummy] [--eight=0|1] "
+            "[--grown]\n"
+            "                   [--help] [--hex] [--longlist=0|1] "
+            "[--primary] [--verbose]\n"
+            "                   [--version] DEVICE\n"
+            "  where:\n"
+            "    --address=A,A...|-a A,A...    comma separated logical block "
+            "addresses\n"
+            "                                  one or more, assumed to be "
+            "decimal\n"
+            "    --address=-|-a -    read stdin for logical block "
+            "addresses\n"
+            "    --dummy|-d          prepare but do not execute REASSIGN "
+            "BLOCKS command\n"
+            "    --eight=0|1\n"
+            "      -e 0|1            force eight byte (64 bit) lbas "
+            "when 1,\n"
+            "                        four byte (32 bit) lbas when 0 "
+            "(def)\n"
+            "    --grown|-g          fetch grown defect list length, "
+            "don't reassign\n"
+            "    --help|-h           print out usage message\n"
+            "    --hex|-H            print response in hex (for '-g' or "
+            "'-p')\n"
+            "    --longlist=0|1\n"
+            "       -l 0|1           use 4 byte list length when 1, safe to "
+            "ignore\n"
+            "                        (def: 0 (2 byte list length))\n"
+            "    --primary|-p        fetch primary defect list length, "
+            "don't reassign\n"
+            "    --verbose|-v        increase verbosity\n"
+            "    --version|-V        print version string and exit\n\n"
+            "Perform a SCSI REASSIGN BLOCKS command (or READ DEFECT LIST)\n");
 }
 
 /* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
@@ -171,16 +170,15 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxX ,\t");
             if ((k < in_len) && ('#' != lcp[k])) {
-                fprintf(stderr, "build_lba_arr: syntax error at "
-                        "line %d, pos %d\n", j + 1, m + k + 1);
+                pr2serr("build_lba_arr: syntax error at line %d, pos %d\n",
+                        j + 1, m + k + 1);
                 return 1;
             }
             for (k = 0; k < 1024; ++k) {
                 ll = get_llnum(lcp);
                 if (-1 != ll) {
                     if ((off + k) >= max_arr_len) {
-                        fprintf(stderr, "build_lba_arr: array length "
-                                "exceeded\n");
+                        pr2serr("build_lba_arr: array length exceeded\n");
                         return 1;
                     }
                     lba_arr[off + k] = (uint64_t)ll;
@@ -195,9 +193,8 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                         --k;
                         break;
                     }
-                    fprintf(stderr, "build_lba_arr: error in "
-                            "line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("build_lba_arr: error in line %d, at pos %d\n",
+                            j + 1, (int)(lcp - line + 1));
                     return 1;
                 }
             }
@@ -207,7 +204,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
     } else {        /* list of numbers (default decimal) on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
         if (in_len != k) {
-            fprintf(stderr, "build_lba_arr: error at pos %d\n", k + 1);
+            pr2serr("build_lba_arr: error at pos %d\n", k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
@@ -224,14 +221,14 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                fprintf(stderr, "build_lba_arr: error at pos %d\n",
+                pr2serr("build_lba_arr: error at pos %d\n",
                         (int)(lcp - inp + 1));
                 return 1;
             }
         }
         *lba_arr_len = k + 1;
         if (k == max_arr_len) {
-            fprintf(stderr, "build_lba_arr: array length exceeded\n");
+            pr2serr("build_lba_arr: array length exceeded\n");
             return 1;
         }
     }
@@ -272,7 +269,7 @@ main(int argc, char * argv[])
             memset(addr_arr, 0, sizeof(addr_arr));
             if (0 != build_lba_arr(optarg, addr_arr, &addr_arr_len,
                                    MAX_NUM_ADDR)) {
-                fprintf(stderr, "bad argument to '--address'\n");
+                pr2serr("bad argument to '--address'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             got_addr = 1;
@@ -285,7 +282,7 @@ main(int argc, char * argv[])
             if ((1 == num) && ((0 == res) || (1 == res)))
                 eight = res;
             else {
-                fprintf(stderr, "value for '--eight=' must be 0 or 1\n");
+                pr2serr("value for '--eight=' must be 0 or 1\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -304,7 +301,7 @@ main(int argc, char * argv[])
             if ((1 == num) && ((0 == res) || (1 == res)))
                 longlist = res;
             else {
-                fprintf(stderr, "value for '--longlist=' must be 0 or 1\n");
+                pr2serr("value for '--longlist=' must be 0 or 1\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -315,10 +312,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -330,26 +327,24 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (grown || primary) {
         if (got_addr) {
-            fprintf(stderr, "can't have '--address=' with '--grown' or "
-                    "'--primary'\n");
+            pr2serr("can't have '--address=' with '--grown' or '--primary'\n");
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     } else if ((0 == got_addr) || (addr_arr_len < 1)) {
-        fprintf(stderr, "need at least one address (see '--address=')\n");
+        pr2serr("need at least one address (see '--address=')\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -360,7 +355,7 @@ main(int argc, char * argv[])
                     eight = 1;
                     break;
                 } else if (0 == eight) {
-                    fprintf(stderr, "address number %d exceeds 32 bits so "
+                    pr2serr("address number %d exceeds 32 bits so "
                             "'--eight=0' invalid\n", k + 1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -389,16 +384,15 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
     if (got_addr) {
         if (dummy) {
-            fprintf(stderr, ">>> dummy: REASSIGN BLOCKS not executed\n");
+            pr2serr(">>> dummy: REASSIGN BLOCKS not executed\n");
             if (verbose) {
-                fprintf(stderr, "  Would have reassigned these blocks:\n");
+                pr2serr("  Would have reassigned these blocks:\n");
                 for (j = 0; j < addr_arr_len; ++j)
                     printf("    0x%" PRIx64 "\n", addr_arr[j]);
             }
@@ -409,7 +403,7 @@ main(int argc, char * argv[])
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "REASSIGN BLOCKS: %s\n", b);
+            pr2serr("REASSIGN BLOCKS: %s\n", b);
             goto err_out;
         }
     } else /* if (grown || primary) */ {
@@ -425,7 +419,7 @@ main(int argc, char * argv[])
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "READ DEFECT DATA(10): %s\n", b);
+            pr2serr("READ DEFECT DATA(10): %s\n", b);
             goto err_out;
         }
         if (do_hex) {
@@ -442,12 +436,12 @@ main(int argc, char * argv[])
         else if (got_primary)
             lstp = "primary defect list";
         else {
-            fprintf(stderr, "didn't get grown or primary list in response\n");
+            pr2serr("didn't get grown or primary list in response\n");
             goto err_out;
         }
         if (verbose)
-            fprintf(stderr, "asked for defect list format %d, got %d\n",
-                    dl_format, (param_arr[1] & 0x7));
+            pr2serr("asked for defect list format %d, got %d\n", dl_format,
+                    (param_arr[1] & 0x7));
         dl_format = (param_arr[1] & 0x7);
         switch (dl_format) {
             case 0:     /* short block */
@@ -459,7 +453,7 @@ main(int argc, char * argv[])
                 div = 8;
                 break;
             default:
-                fprintf(stderr, "defect list format %d unknown\n", dl_format);
+                pr2serr("defect list format %d unknown\n", dl_format);
                 break;
         }
         dl_len = sg_get_unaligned_be16(param_arr + 2);
@@ -478,7 +472,7 @@ main(int argc, char * argv[])
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

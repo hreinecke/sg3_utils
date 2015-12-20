@@ -275,6 +275,28 @@ because another machine (HBA or SCSI "initiator") holds a reservation on
 this \fIDEVICE\fR. On modern SCSI systems this is related to the use of
 the PERSISTENT RESERVATION family of commands.
 .TP
+.B 25
+the \fIDEVICE\fR reports a SCSI status of "condition met". Currently only
+the PRE\-FETCH command (see SBC\-4) yields this status.
+.TP
+.B 26
+the \fIDEVICE\fR reports a SCSI status of "busy". SAM\-5 defines this
+status as the logical unit is temporarily unable to process a command.
+It is recommended to re-issue the command.
+.TP
+.B 27
+the \fIDEVICE\fR reports a SCSI status of "task set full".
+.TP
+.B 28
+the \fIDEVICE\fR reports a SCSI status of "ACA active". ACA is "auto
+contingent allegiance" and is seldom used.
+.TP
+.B 29
+the \fIDEVICE\fR reports a SCSI status of "task aborted". SAM\-5 says:
+"This status shall be returned if a command is aborted by a command or task
+management function on another I_T nexus and the Control mode page TAS bit
+is set to one".
+.TP
 .B 33
 the command sent to \fIDEVICE\fR has timed out.
 .TP

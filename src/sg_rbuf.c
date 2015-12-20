@@ -37,6 +37,7 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 #define RB_MODE_DESC 3
 #define RB_MODE_DATA 2
@@ -54,7 +55,7 @@
 #endif
 
 
-static const char * version_str = "4.93 20151207";
+static const char * version_str = "4.94 20151219";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -91,20 +92,19 @@ struct opts_t {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: sg_rbuf [--buffer=EACH] [--dio] [--echo] "
+    pr2serr("Usage: sg_rbuf [--buffer=EACH] [--dio] [--echo] "
             "[--help] [--mmap]\n"
             "               [--quick] [--size=OVERALL] [--time] [--verbose] "
             "[--version]\n"
             "               DEVICE\n");
-    fprintf(stderr, "  where:\n"
+    pr2serr("  where:\n"
             "    --buffer=EACH|-b EACH    buffer size to use (in bytes)\n"
             "    --dio|-d        requests dio ('-q' overrides it)\n"
             "    --echo|-e       use echo buffer (def: use data mode)\n"
             "    --help|-h       print usage message then exit\n"
             "    --mmap|-m       requests mmap-ed IO (overrides -q, -d)\n"
             "    --quick|-q      quick, don't xfer to user space\n");
-    fprintf(stderr,
-            "    --size=OVERALL|-s OVERALL    total size to read (in bytes)\n"
+    pr2serr("    --size=OVERALL|-s OVERALL    total size to read (in bytes)\n"
             "                    default: 200 MiB\n"
             "    --time|-t       time the data transfer\n"
             "    --verbose|-v    increase verbosity (more debug)\n"
@@ -161,7 +161,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         case 'b':
             n = sg_get_num(optarg);
             if (n < 0) {
-                fprintf(stderr, "bad argument to '--buffer'\n");
+                pr2serr("bad argument to '--buffer'\n");
                 usage_for(optsp);
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -191,7 +191,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         case 's':
            nn = sg_get_llnum(optarg);
            if (nn < 0) {
-                fprintf(stderr, "bad argument to '--size'\n");
+                pr2serr("bad argument to '--size'\n");
                 usage_for(optsp);
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -207,7 +207,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             ++optsp->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (optsp->do_help)
                 break;
             usage_for(optsp);
@@ -221,8 +221,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage_for(optsp);
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -305,15 +304,15 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage_for(optsp);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == optsp->device_name)
             optsp->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", optsp->device_name, cp);
+            pr2serr("too many arguments, got: %s, not expecting: %s\n",
+                    optsp->device_name, cp);
             usage_for(optsp);
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -380,12 +379,12 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (NULL == op->device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -425,11 +424,11 @@ main(int argc, char * argv[])
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
     if (op->do_verbose) {
-        fprintf(stderr, "    Read buffer (%sdescriptor) cdb: ",
+        pr2serr("    Read buffer (%sdescriptor) cdb: ",
                 (op->do_echo ? "echo " : ""));
         for (k = 0; k < RB_CMD_LEN; ++k)
-            fprintf(stderr, "%02x ", rbCmdBlk[k]);
-        fprintf(stderr, "\n");
+            pr2serr("%02x ", rbCmdBlk[k]);
+        pr2serr("\n");
     }
 
     /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
@@ -440,7 +439,7 @@ main(int argc, char * argv[])
     }
 
     if (op->do_verbose > 2)
-        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
+        pr2serr("      duration=%u ms\n", io_hdr.duration);
     /* now for the error processing */
     res = sg_err_category3(&io_hdr);
     switch (res) {
@@ -494,14 +493,13 @@ main(int argc, char * argv[])
                                        sg_fd, 0);
         if (MAP_FAILED == rbBuff) {
             if (ENOMEM == errno) {
-                fprintf(stderr, "mmap() out of memory, try a smaller "
-                       "buffer size than %d bytes\n", buf_size);
+                pr2serr("mmap() out of memory, try a smaller buffer size "
+                        "than %d bytes\n", buf_size);
                 if (op->opt_new)
-                    fprintf(stderr, "    [with '--buffer=EACH' where EACH "
-                            "is in bytes]\n");
+                    pr2serr("    [with '--buffer=EACH' where EACH is in "
+                            "bytes]\n");
                 else
-                    fprintf(stderr, "    [with '-b=EACH' where EACH is in "
-                            "KiB]\n");
+                    pr2serr("    [with '-b=EACH' where EACH is in KiB]\n");
             } else
                 perror("error using mmap()");
             return SG_LIB_CAT_OTHER;
@@ -556,23 +554,22 @@ main(int argc, char * argv[])
         else if (op->do_quick)
             io_hdr.flags |= SG_FLAG_NO_DXFER;
         if (op->do_verbose > 1) {
-            fprintf(stderr, "    Read buffer (%sdata) cdb: ",
+            pr2serr("    Read buffer (%sdata) cdb: ",
                     (op->do_echo ? "echo " : ""));
             for (j = 0; j < RB_CMD_LEN; ++j)
-                fprintf(stderr, "%02x ", rbCmdBlk[j]);
-            fprintf(stderr, "\n");
+                pr2serr("%02x ", rbCmdBlk[j]);
+            pr2serr("\n");
         }
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             if (ENOMEM == errno) {
-                fprintf(stderr, "SG_IO data: out of memory, try a smaller "
-                       "buffer size than %d bytes\n", buf_size);
+                pr2serr("SG_IO data: out of memory, try a smaller buffer "
+                        "size than %d bytes\n", buf_size);
                 if (op->opt_new)
-                    fprintf(stderr, "    [with '--buffer=EACH' where EACH "
-                            "is in bytes]\n");
+                    pr2serr("    [with '--buffer=EACH' where EACH is in "
+                            "bytes]\n");
                 else
-                    fprintf(stderr, "    [with '-b=EACH' where EACH is in "
-                            "KiB]\n");
+                    pr2serr("    [with '-b=EACH' where EACH is in KiB]\n");
             } else
                 perror("SG_IO READ BUFFER data error");
             if (rawp) free(rawp);
@@ -580,8 +577,7 @@ main(int argc, char * argv[])
         }
 
         if (op->do_verbose > 2)
-            fprintf(stderr, "      duration=%u ms\n",
-                    io_hdr.duration);
+            pr2serr("      duration=%u ms\n", io_hdr.duration);
         /* now for the error processing */
         res = sg_err_category3(&io_hdr);
         switch (res) {

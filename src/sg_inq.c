@@ -19,7 +19,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -41,8 +40,9 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "1.51 20151201";    /* SPC-5 rev 06 */
+static const char * version_str = "1.52 20151219";    /* SPC-5 rev 06 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -237,26 +237,6 @@ struct opts_t {
     int opt_new;
 #endif
 };
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 
 static void

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2014 Douglas Gilbert.
+ * Copyright (c) 2009-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,6 +20,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -28,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.06 20140515";    /* sbc2r29 */
+static const char * version_str = "1.07 20151219";
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -53,8 +55,8 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-            "sg_get_lba_status  [--brief] [--help] [--hex] [--lba=LBA]\n"
+    pr2serr("Usage: sg_get_lba_status  [--brief] [--help] [--hex] "
+            "[--lba=LBA]\n"
             "                          [--maxlen=LEN] [--raw] [--readonly] "
             "[--verbose]\n"
             "                          [--version] DEVICE\n"
@@ -71,8 +73,7 @@ usage()
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
             DEF_GLBAS_BUFF_LEN );
-    fprintf(stderr,
-            "    --raw|-r          output in binary\n"
+    pr2serr("    --raw|-r          output in binary\n"
             "    --readonly|-R     open DEVICE read-only (def: read-write)\n"
             "    --verbose|-v      increase verbosity\n"
             "    --version|-V      print version string and exit\n\n"
@@ -96,24 +97,13 @@ static int
 decode_lba_status_desc(const unsigned char * ucp, uint64_t * slbap,
                        uint32_t * blocksp)
 {
-    int j;
     uint32_t blocks;
     uint64_t ull;
 
     if (NULL == ucp)
         return -1;
-    ull = 0;
-    for (j = 0; j < 8; ++j) {
-        if (j > 0)
-            ull <<= 8;
-        ull |= ucp[j];
-    }
-    blocks = 0;
-    for (j = 0; j < 4; ++j) {
-        if (j > 0)
-            blocks <<= 8;
-        blocks |= ucp[8 + j];
-    }
+    ull = sg_get_unaligned_be64(ucp + 0);
+    blocks = sg_get_unaligned_be32(ucp + 8);
     if (slbap)
         *slbap = ull;
     if (blocksp)
@@ -162,7 +152,7 @@ main(int argc, char * argv[])
         case 'l':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--lba'\n");
+                pr2serr("bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             lba = (uint64_t)ll;
@@ -170,8 +160,8 @@ main(int argc, char * argv[])
         case 'm':
             maxlen = sg_get_num(optarg);
             if ((maxlen < 0) || (maxlen > MAX_GLBAS_BUFF_LEN)) {
-                fprintf(stderr, "argument to '--maxlen' should be %d or "
-                        "less\n", MAX_GLBAS_BUFF_LEN);
+                pr2serr("argument to '--maxlen' should be %d or less\n",
+                        MAX_GLBAS_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -185,10 +175,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -200,22 +190,21 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_GLBAS_BUFF_LEN) {
         glbasBuffp = (unsigned char *)calloc(maxlen, 1);
         if (NULL == glbasBuffp) {
-            fprintf(stderr, "unable to allocate %d bytes on heap\n", maxlen);
+            pr2serr("unable to allocate %d bytes on heap\n", maxlen);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -229,8 +218,7 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
         goto free_buff;
     }
@@ -242,8 +230,7 @@ main(int argc, char * argv[])
         /* in sbc3r25 offset for calculating the 'parameter data length'
          * (rlen variable below) was reduced from 8 to 4. */
         if (maxlen >= 4)
-            rlen = (glbasBuffp[0] << 24) + (glbasBuffp[1] << 16) +
-                   (glbasBuffp[2] << 8) + glbasBuffp[3] + 4;
+            rlen = sg_get_unaligned_be32(glbasBuffp + 0) + 4;
         else
             rlen = maxlen;
         k = (rlen > maxlen) ? maxlen : rlen;
@@ -257,39 +244,38 @@ main(int argc, char * argv[])
         }
         if (maxlen < 4) {
             if (verbose)
-                fprintf(stderr, "Exiting because allocation length (maxlen) "
-                        " less than 4\n");
+                pr2serr("Exiting because allocation length (maxlen) less "
+                        "than 4\n");
             goto the_end;
         }
         if ((verbose > 1) || (verbose && (rlen > maxlen))) {
-            fprintf(stderr, "response length %d bytes\n", rlen);
+            pr2serr("response length %d bytes\n", rlen);
             if (rlen > maxlen)
-                fprintf(stderr, "  ... which is greater than maxlen "
-                        "(allocation length %d), truncation\n", maxlen);
+                pr2serr("  ... which is greater than maxlen (allocation "
+                        "length %d), truncation\n", maxlen);
         }
         if (rlen > maxlen)
             rlen = maxlen;
 
         if (do_brief > 1) {
             if (rlen < 24) {
-                fprintf(stderr, "Need maxlen and response length to "
-                        " be at least 24, have %d bytes\n", rlen);
+                pr2serr("Need maxlen and response length to be at least 24, "
+                        "have %d bytes\n", rlen);
                 ret = SG_LIB_CAT_OTHER;
                 goto the_end;
             }
             res = decode_lba_status_desc(glbasBuffp + 8, &d_lba, &d_blocks);
             if ((res < 0) || (res > 15)) {
-                fprintf(stderr, "first LBA status descriptor returned %d "
-                        "??\n", res);
+                pr2serr("first LBA status descriptor returned %d ??\n", res);
                 ret = SG_LIB_CAT_OTHER;
                 goto the_end;
             }
             if ((lba < d_lba) || (lba >= (d_lba + d_blocks))) {
-                fprintf(stderr, "given LBA not in range of first "
-                        "descriptor:\n" "  descriptor LBA: 0x");
+                pr2serr("given LBA not in range of first descriptor:\n"
+                        "  descriptor LBA: 0x");
                 for (j = 0; j < 8; ++j)
-                    fprintf(stderr, "%02x", glbasBuffp[8 + j]);
-                fprintf(stderr, "  blocks: 0x%x  p_status: %d\n",
+                    pr2serr("%02x", glbasBuffp[8 + j]);
+                pr2serr("  blocks: 0x%x  p_status: %d\n",
                         (unsigned int)d_blocks, res);
                 ret = SG_LIB_CAT_OTHER;
                 goto the_end;
@@ -304,13 +290,12 @@ main(int argc, char * argv[])
         }
         num_descs = (rlen - 8) / 16;
         if (verbose)
-            fprintf(stderr, "%d complete LBA status descriptors found\n",
-                    num_descs);
+            pr2serr("%d complete LBA status descriptors found\n", num_descs);
         for (ucp = glbasBuffp + 8, k = 0; k < num_descs; ucp += 16, ++k) {
             res = decode_lba_status_desc(ucp, &d_lba, &d_blocks);
             if ((res < 0) || (res > 15))
-                fprintf(stderr, "descriptor %d: bad LBA status descriptor "
-                        "returned %d\n", k + 1, res);
+                pr2serr("descriptor %d: bad LBA status descriptor returned "
+                        "%d\n", k + 1, res);
             if (do_brief) {
                 printf("0x");
                 for (j = 0; j < 8; ++j)
@@ -323,7 +308,7 @@ main(int argc, char * argv[])
                 printf("  blocks: %u", (unsigned int)d_blocks);
                 switch (res) {
                 case 0:
-                    printf("  mapped\n");
+                    printf("  mapped (or unknown)\n");
                     break;
                 case 1:
                     printf("  deallocated\n");
@@ -338,23 +323,22 @@ main(int argc, char * argv[])
             }
         }
         if ((num_descs * 16) + 8 < rlen)
-            fprintf(stderr, "incomplete trailing LBA status descriptors "
-                    "found\n");
+            pr2serr("incomplete trailing LBA status descriptors found\n");
     } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Get LBA Status command not supported\n");
+        pr2serr("Get LBA Status command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "Get LBA Status command: bad field in cdb\n");
+        pr2serr("Get LBA Status command: bad field in cdb\n");
     else {
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Get LBA Status command: %s\n", b);
+        pr2serr("Get LBA Status command: %s\n", b);
     }
 
 the_end:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             ret = SG_LIB_FILE_ERROR;
     }

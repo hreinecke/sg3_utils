@@ -20,6 +20,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
@@ -29,7 +31,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.04 20150515";    /* sbc4r01 */
+static const char * version_str = "1.05 20151219";    /* sbc4r01 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -91,8 +93,8 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-            "sg_referrals  [--help] [--hex] [--lba=LBA] [--maxlen=LEN]\n"
+    pr2serr("Usage: sg_referrals  [--help] [--hex] [--lba=LBA] "
+            "[--maxlen=LEN]\n"
             "                     [--one-segment] [--raw] [--readonly] "
             "[--verbose]\n"
             "                     [--version] DEVICE\n"
@@ -105,8 +107,7 @@ usage()
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
             DEF_REFER_BUFF_LEN );
-    fprintf(stderr,
-            "    --one-segment|-s    return information about the specified "
+    pr2serr("    --one-segment|-s    return information about the specified "
             "segment only\n"
             "    --raw|-r          output in binary\n"
             "    --verbose|-v      increase verbosity\n"
@@ -140,14 +141,8 @@ decode_referral_desc(const unsigned char * ucp, int bytes)
     if (bytes < 20)
         return -1;
 
-    first = ((uint64_t)ucp[4] << 56) | ((uint64_t)ucp[5] << 48) |
-        ((uint64_t)ucp[6] << 40) | ((uint64_t)ucp[7] << 32) |
-        ((uint64_t)ucp[8] << 24) | ((uint64_t)ucp[9] << 16) |
-        ((uint64_t)ucp[10] << 8) | (uint64_t)ucp[11];
-    last = ((uint64_t)ucp[12] << 56) | ((uint64_t)ucp[13] << 48) |
-        ((uint64_t)ucp[14] << 40) | ((uint64_t)ucp[15] << 32) |
-        ((uint64_t)ucp[16] << 24) | ((uint64_t)ucp[17] << 16) |
-        ((uint64_t)ucp[18] << 8) | (uint64_t)ucp[19];
+    first = sg_get_unaligned_be64(ucp + 4);
+    last = sg_get_unaligned_be64(ucp + 12);
 
     printf("    target port descriptors: %d\n", ucp[3]);
     printf("    user data segment: first lba %" PRIu64 ", last lba %"
@@ -203,7 +198,7 @@ main(int argc, char * argv[])
         case 'l':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--lba'\n");
+                pr2serr("bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             lba = (uint64_t)ll;
@@ -211,8 +206,8 @@ main(int argc, char * argv[])
         case 'm':
             maxlen = sg_get_num(optarg);
             if ((maxlen < 0) || (maxlen > MAX_REFER_BUFF_LEN)) {
-                fprintf(stderr, "argument to '--maxlen' should be %d or "
-                        "less\n", MAX_REFER_BUFF_LEN);
+                pr2serr("argument to '--maxlen' should be %d or less\n",
+                        MAX_REFER_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -229,10 +224,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -244,22 +239,21 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_REFER_BUFF_LEN) {
         referralBuffp = (unsigned char *)calloc(maxlen, 1);
         if (NULL == referralBuffp) {
-            fprintf(stderr, "unable to allocate %d bytes on heap\n", maxlen);
+            pr2serr("unable to allocate %d bytes on heap\n", maxlen);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -273,8 +267,7 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
         goto free_buff;
     }
@@ -306,15 +299,15 @@ main(int argc, char * argv[])
         }
         if (maxlen < 4) {
             if (verbose)
-                fprintf(stderr, "Exiting because allocation length (maxlen) "
-                        " less than 4\n");
+                pr2serr("Exiting because allocation length (maxlen)  less "
+                        "than 4\n");
             goto the_end;
         }
         if ((verbose > 1) || (verbose && (rlen > maxlen))) {
-            fprintf(stderr, "response length %d bytes\n", rlen);
+            pr2serr("response length %d bytes\n", rlen);
             if (rlen > maxlen)
-                fprintf(stderr, "  ... which is greater than maxlen "
-                        "(allocation length %d), truncation\n", maxlen);
+                pr2serr("  ... which is greater than maxlen (allocation "
+                        "length %d), truncation\n", maxlen);
         }
         if (rlen > maxlen)
             rlen = maxlen;
@@ -326,7 +319,7 @@ main(int argc, char * argv[])
             printf("  descriptor %d:\n", desc);
             res = decode_referral_desc(ucp + k, rlen - 4 - k);
             if (res < 0) {
-                fprintf(stderr, "bad user data segment referral descriptor\n");
+                pr2serr("bad user data segment referral descriptor\n");
                 k = rlen - 4;
                 break;
             }
@@ -337,13 +330,13 @@ main(int argc, char * argv[])
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Report Referrals command failed: %s\n", b);
+        pr2serr("Report Referrals command failed: %s\n", b);
     }
 
 the_end:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             ret = SG_LIB_FILE_ERROR;
     }

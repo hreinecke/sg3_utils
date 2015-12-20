@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,6 +20,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pr2serr.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -63,61 +64,59 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_verify [--16] [--bpc=BPC] [--count=COUNT] [--dpo] "
-          "[--ebytchk=BCH]\n"
-          "                 [--group=GN] [--help] [--in=IF] "
-          "[--lba=LBA] [--ndo=NDO]\n"
-          "                 [--quiet] [--readonly] [--verbose] "
-          "[--version]\n"
-          "                 [--vrprotect=VRP] DEVICE\n"
-          "  where:\n"
-          "    --16|-S             use VERIFY(16) (def: use "
-          "VERIFY(10) )\n"
-          "    --bpc=BPC|-b BPC    max blocks per verify command "
-          "(def: 128)\n"
-          "    --count=COUNT|-c COUNT    count of blocks to verify "
-          "(def: 1).\n"
-          "                              If BCH=3 then COUNT must "
-          "be 1 .\n"
-          "    --dpo|-d            disable page out (cache retention "
-          "priority)\n"
-          "    --ebytchk=BCH|-E BCH    sets BYTCHK value, either 1, 2 "
-          "or 3 (def: 0).\n"
-          "                            BCH overrides BYTCHK=1 set by "
-          "'--ndo='. If\n"
-          "                            BCH is 3 then NDO must be the LBA "
-          "size\n"
-          "                            (plus protection size if DIF "
-          "active)\n"
-          "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
-          "    --help|-h           print out usage message\n"
-          "    --in=IF|-i IF       input from file called IF (def: "
-          "stdin)\n"
-          "                        only active if --bytchk=N given\n"
-          "    --lba=LBA|-l LBA    logical block address to start "
-          "verify (def: 0)\n"
-          "    --ndo=NDO|-n NDO    NDO is number of bytes placed in "
-          "data-out buffer.\n"
-          "                        These are fetched from IF (or "
-          "stdin) and used\n"
-          "                        to verify the device data against. "
-          "Forces\n"
-          "                        --bpc=COUNT. Sets BYTCHK (byte check) "
-          "to 1\n"
-          "    --quiet|-q          suppress miscompare report to stderr, "
-          "still\n"
-          "                        causes an exit status of 14\n"
-          "    --readonly|-r       open DEVICE read-only (def: open it "
-          "read-write)\n"
-          "    --verbose|-v        increase verbosity\n"
-          "    --version|-V        print version string and exit\n"
-          "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
-          "(def: 0)\n"
-          "Performs one or more SCSI VERIFY(10) or SCSI VERIFY(16) "
-          "commands. sbc3r34\nmade the BYTCHK field two bits wide "
-          "(it was a single bit).\n"
-          );
+    pr2serr("Usage: sg_verify [--16] [--bpc=BPC] [--count=COUNT] [--dpo] "
+            "[--ebytchk=BCH]\n"
+            "                 [--group=GN] [--help] [--in=IF] "
+            "[--lba=LBA] [--ndo=NDO]\n"
+            "                 [--quiet] [--readonly] [--verbose] "
+            "[--version]\n"
+            "                 [--vrprotect=VRP] DEVICE\n"
+            "  where:\n"
+            "    --16|-S             use VERIFY(16) (def: use "
+            "VERIFY(10) )\n"
+            "    --bpc=BPC|-b BPC    max blocks per verify command "
+            "(def: 128)\n"
+            "    --count=COUNT|-c COUNT    count of blocks to verify "
+            "(def: 1).\n"
+            "                              If BCH=3 then COUNT must "
+            "be 1 .\n"
+            "    --dpo|-d            disable page out (cache retention "
+            "priority)\n"
+            "    --ebytchk=BCH|-E BCH    sets BYTCHK value, either 1, 2 "
+            "or 3 (def: 0).\n"
+            "                            BCH overrides BYTCHK=1 set by "
+            "'--ndo='. If\n"
+            "                            BCH is 3 then NDO must be the LBA "
+            "size\n"
+            "                            (plus protection size if DIF "
+            "active)\n"
+            "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
+            "    --help|-h           print out usage message\n"
+            "    --in=IF|-i IF       input from file called IF (def: "
+            "stdin)\n"
+            "                        only active if --bytchk=N given\n"
+            "    --lba=LBA|-l LBA    logical block address to start "
+            "verify (def: 0)\n"
+            "    --ndo=NDO|-n NDO    NDO is number of bytes placed in "
+            "data-out buffer.\n"
+            "                        These are fetched from IF (or "
+            "stdin) and used\n"
+            "                        to verify the device data against. "
+            "Forces\n"
+            "                        --bpc=COUNT. Sets BYTCHK (byte check) "
+            "to 1\n"
+            "    --quiet|-q          suppress miscompare report to stderr, "
+            "still\n"
+            "                        causes an exit status of 14\n"
+            "    --readonly|-r       open DEVICE read-only (def: open it "
+            "read-write)\n"
+            "    --verbose|-v        increase verbosity\n"
+            "    --version|-V        print version string and exit\n"
+            "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
+            "(def: 0)\n"
+            "Performs one or more SCSI VERIFY(10) or SCSI VERIFY(16) "
+            "commands. sbc3r34\nmade the BYTCHK field two bits wide "
+            "(it was a single bit).\n");
 }
 
 int
@@ -162,7 +161,7 @@ main(int argc, char * argv[])
         case 'b':
             bpc = sg_get_num(optarg);
             if (bpc < 1) {
-                fprintf(stderr, "bad argument to '--bpc'\n");
+                pr2serr("bad argument to '--bpc'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             ++bpc_given;
@@ -170,7 +169,7 @@ main(int argc, char * argv[])
         case 'c':
             count = sg_get_llnum(optarg);
             if (count < 0) {
-                fprintf(stderr, "bad argument to '--count'\n");
+                pr2serr("bad argument to '--count'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -180,14 +179,14 @@ main(int argc, char * argv[])
         case 'E':
             bytchk = sg_get_num(optarg);
             if ((bytchk < 1) || (bytchk > 3)) {
-                fprintf(stderr, "bad argument to '--ebytchk'\n");
+                pr2serr("bad argument to '--ebytchk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'g':
             group = sg_get_num(optarg);
             if ((group < 0) || (group > 31)) {
-                fprintf(stderr, "bad argument to '--group'\n");
+                pr2serr("bad argument to '--group'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -201,7 +200,7 @@ main(int argc, char * argv[])
         case 'l':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--lba'\n");
+                pr2serr("bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             lba = (uint64_t)ll;
@@ -210,19 +209,19 @@ main(int argc, char * argv[])
         case 'B':       /* undocumented, old --bytchk=NDO option */
             ndo = sg_get_num(optarg);
             if (ndo < 1) {
-                fprintf(stderr, "bad argument to '--ndo'\n");
+                pr2serr("bad argument to '--ndo'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'P':
             vrprotect = sg_get_num(optarg);
             if (-1 == vrprotect) {
-                fprintf(stderr, "bad argument to '--vrprotect'\n");
+                pr2serr("bad argument to '--vrprotect'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             if ((vrprotect < 0) || (vrprotect > 7)) {
-                fprintf(stderr, "'--vrprotect' requires a value from 0 to "
-                        "7 (inclusive)\n");
+                pr2serr("'--vrprotect' requires a value from 0 to 7 "
+                        "(inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -239,10 +238,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -254,8 +253,7 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -264,35 +262,35 @@ main(int argc, char * argv[])
         if (0 == bytchk)
             bytchk = 1;
         if (bpc_given && (bpc != count))
-            fprintf(stderr, "'bpc' argument ignored, using --bpc=%"
-                    PRIu64 "\n", count);
+            pr2serr("'bpc' argument ignored, using --bpc=%" PRIu64 "\n",
+                    count);
         if (count > 0x7fffffffLL) {
-            fprintf(stderr, "count exceed 31 bits, way too large\n");
+            pr2serr("count exceed 31 bits, way too large\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if ((3 == bytchk) && (1 != count)) {
-            fprintf(stderr, "count must be 1 when bytchk=3\n");
+            pr2serr("count must be 1 when bytchk=3\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         bpc = (int)count;
     } else if (bytchk > 0) {
-        fprintf(stderr, "when the 'ebytchk=BCH' option is given, "
-                "then '--bytchk=NDO' must also be given\n");
+        pr2serr("when the 'ebytchk=BCH' option is given, then '--bytchk=NDO' "
+                "must also be given\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
     if ((bpc > 0xffff) && (0 == verify16)) {
-        fprintf(stderr, "'%s' exceeds 65535, so use VERIFY(16)\n",
+        pr2serr("'%s' exceeds 65535, so use VERIFY(16)\n",
                 (ndo > 0) ? "count" : "bpc");
         ++verify16;
     }
     if (((lba + count - 1) > 0xffffffffLLU) && (0 == verify16)) {
-        fprintf(stderr, "'lba' exceed 32 bits, so use VERIFY(16)\n");
+        pr2serr("'lba' exceed 32 bits, so use VERIFY(16)\n");
         ++verify16;
     }
     if ((group > 0) && (0 == verify16))
-        fprintf(stderr, "group number ignored with VERIFY(10) command, "
-                "use the --16 option\n");
+        pr2serr("group number ignored with VERIFY(10) command, use the --16 "
+                "option\n");
 
     orig_count = count;
     orig_lba = lba;
@@ -300,7 +298,7 @@ main(int argc, char * argv[])
     if (ndo > 0) {
         ref_data = (char *)malloc(ndo);
         if (NULL == ref_data) {
-            fprintf(stderr, "failed to allocate %d byte buffer\n", ndo);
+            pr2serr("failed to allocate %d byte buffer\n", ndo);
             return SG_LIB_FILE_ERROR;
         }
         if ((NULL == file_name) || (0 == strcmp(file_name, "-"))) {
@@ -319,11 +317,11 @@ main(int argc, char * argv[])
                 perror("sg_set_binary_mode");
         }
         if (verbose && got_stdin)
-                fprintf(stderr, "about to wait on STDIN\n");
+                pr2serr("about to wait on STDIN\n");
         for (nread = 0; nread < ndo; nread += res) {
             res = read(infd, ref_data + nread, ndo - nread);
             if (res <= 0) {
-                fprintf(stderr, "reading from %s failed at file offset=%d\n",
+                pr2serr("reading from %s failed at file offset=%d\n",
                         (got_stdin ? "stdin" : file_name), nread);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
@@ -334,15 +332,14 @@ main(int argc, char * argv[])
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
     }
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
         goto err_out;
     }
@@ -364,30 +361,30 @@ main(int argc, char * argv[])
             ret = res;
             switch (res) {
             case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "bad field in %s cdb, near lba=0x%" PRIx64
-                        "\n", vc, lba);
+                pr2serr("bad field in %s cdb, near lba=0x%" PRIx64 "\n", vc,
+                        lba);
                 break;
             case SG_LIB_CAT_MEDIUM_HARD:
-                fprintf(stderr, "%s medium or hardware error near "
-                        "lba=0x%" PRIx64 "\n", vc, lba);
+                pr2serr("%s medium or hardware error near lba=0x%" PRIx64 "\n",
+                        vc, lba);
                 break;
             case SG_LIB_CAT_MEDIUM_HARD_WITH_INFO:
                 if (verify16)
-                    fprintf(stderr, "%s medium or hardware error, reported "
-                            "lba=0x%" PRIx64 "\n", vc, info64);
+                    pr2serr("%s medium or hardware error, reported lba=0x%"
+                            PRIx64 "\n", vc, info64);
                 else
-                    fprintf(stderr, "%s medium or hardware error, reported "
-                            "lba=0x%x\n", vc, info);
+                    pr2serr("%s medium or hardware error, reported lba=0x%x\n",
+                            vc, info);
                 break;
             case SG_LIB_CAT_MISCOMPARE:
                 if ((0 == quiet) || verbose)
-                    fprintf(stderr, "%s reported MISCOMPARE\n", vc);
+                    pr2serr("%s reported MISCOMPARE\n", vc);
                 break;
             default:
                 sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                fprintf(stderr, "%s: %s\n", vc, b);
-                fprintf(stderr, "    failed near lba=%" PRIu64 " [0x%" PRIx64
-                        "]\n", lba, lba);
+                pr2serr("%s: %s\n", vc, b);
+                pr2serr("    failed near lba=%" PRIu64 " [0x%" PRIx64 "]\n",
+                        lba, lba);
                 break;
             }
             break;
@@ -395,13 +392,13 @@ main(int argc, char * argv[])
     }
 
     if (verbose && (0 == ret) && (orig_count > 1))
-        fprintf(stderr, "Verified %" PRId64 " [0x%" PRIx64 "] blocks from "
-                "lba %" PRIu64 " [0x%" PRIx64 "]\n    without error\n",
-                orig_count, (uint64_t)orig_count, orig_lba, orig_lba);
+        pr2serr("Verified %" PRId64 " [0x%" PRIx64 "] blocks from lba %" PRIu64
+                " [0x%" PRIx64 "]\n    without error\n", orig_count,
+                (uint64_t)orig_count, orig_lba, orig_lba);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             ret = SG_LIB_FILE_ERROR;
     }

@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -270,6 +270,12 @@ void sg_print_scsi_status(int scsi_status);
                                 /* 24: this is a SCSI status, not sense. */
                                 /* It indicates reservation by another */
                                 /* machine blocks this command */
+#define SG_LIB_CAT_CONDITION_MET 25 /* this is a SCSI status, not sense. */
+                                    /* Only from PRE-FETCH (SBC-4) */
+#define SG_LIB_CAT_BUSY       26 /* this is a SCSI status, not sense. */
+#define SG_LIB_CAT_TS_FULL    27 /* this is a SCSI status, not sense. */
+#define SG_LIB_CAT_ACA_ACTIVE 28 /* this is a SCSI status, not sense. */
+#define SG_LIB_CAT_TASK_ABORTED 29 /* this is a SCSI status, not sense. */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
                                 /*       [sk,asc,ascq: 0xb,0x10,*] */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */

@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.24 20150511 */
+/* sg_pt_linux version 1.25 20151217 */
 
 
 #include <stdio.h>
@@ -39,6 +39,8 @@ static const char * linux_host_bytes[] = {
     "DID_TRANSPORT_DISRUPTED", "DID_TRANSPORT_FAILFAST",
     "DID_TARGET_FAILURE" /* 0x10 */,
     "DID_NEXUS_FAILURE (reservation conflict)",
+    "DID_ALLOC_FAILURE",
+    "DID_MEDIUM_ERROR",
 };
 
 #define LINUX_HOST_BYTES_SZ \
@@ -53,6 +55,7 @@ static const char * linux_driver_bytes[] = {
 #define LINUX_DRIVER_BYTES_SZ \
     (int)(sizeof(linux_driver_bytes) / sizeof(linux_driver_bytes[0]))
 
+#if 0
 static const char * linux_driver_suggests[] = {
     "SUGGEST_OK", "SUGGEST_RETRY", "SUGGEST_ABORT", "SUGGEST_REMAP",
     "SUGGEST_DIE", "UNKNOWN","UNKNOWN","UNKNOWN",
@@ -61,12 +64,13 @@ static const char * linux_driver_suggests[] = {
 
 #define LINUX_DRIVER_SUGGESTS_SZ \
     (int)(sizeof(linux_driver_suggests) / sizeof(linux_driver_suggests[0]))
+#endif
 
 /*
  * These defines are for constants that should be visible in the
  * /usr/include/scsi directory (brought in by sg_linux_inc.h).
  * Redefined and aliased here to decouple this code from
- * sg_io_linux.h
+ * sg_io_linux.h  N.B. the SUGGEST_* constants are no longer used.
  */
 #ifndef DRIVER_MASK
 #define DRIVER_MASK 0x0f
@@ -439,9 +443,8 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     int hs = ptp->io_hdr.host_status;
     int n, m;
     char * cp = b;
-    int driv, sugg;
+    int driv;
     const char * driv_cp = "unknown";
-    const char * sugg_cp = "unknown";
 
     if (max_b_len < 1)
         return b;
@@ -463,11 +466,12 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     driv = ds & SG_LIB_DRIVER_MASK;
     if (driv < LINUX_DRIVER_BYTES_SZ)
         driv_cp = linux_driver_bytes[driv];
+#if 0
     sugg = (ds & SG_LIB_SUGGEST_MASK) >> 4;
     if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
         sugg_cp = linux_driver_suggests[sugg];
-    n = snprintf(cp, m, "Driver_status=0x%02x [%s, %s]\n", ds, driv_cp,
-                 sugg_cp);
+#endif
+    n = snprintf(cp, m, "Driver_status=0x%02x [%s]\n", ds, driv_cp);
     m -= n;
     if (m < 1)
         b[max_b_len - 1] = '\0';
@@ -845,9 +849,8 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     int hs = ptp->io_hdr.transport_status;
     int n, m;
     char * cp = b;
-    int driv, sugg;
+    int driv;
     const char * driv_cp = "invalid";
-    const char * sugg_cp = "invalid";
 
     if (max_b_len < 1)
         return b;
@@ -869,11 +872,12 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
     driv = ds & SG_LIB_DRIVER_MASK;
     if (driv < LINUX_DRIVER_BYTES_SZ)
         driv_cp = linux_driver_bytes[driv];
+#if 0
     sugg = (ds & SG_LIB_SUGGEST_MASK) >> 4;
     if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
         sugg_cp = linux_driver_suggests[sugg];
-    n = snprintf(cp, m, "Driver_status=0x%02x [%s, %s]\n", ds, driv_cp,
-                 sugg_cp);
+#endif
+    n = snprintf(cp, m, "Driver_status=0x%02x [%s]\n", ds, driv_cp);
     m -= n;
     if (m < 1)
         b[max_b_len - 1] = '\0';

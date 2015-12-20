@@ -26,8 +26,9 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "0.99 20151207";
+static const char * version_str = "1.00 20151219";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -103,12 +104,11 @@ struct opts_t {
 };
 
 
-
 static void
 usage()
 {
-  fprintf(stderr, "Usage: "
-          "sg_sanitize [--ause] [--block] [--count=OC] [--crypto] [--early]\n"
+  pr2serr("Usage: sg_sanitize [--ause] [--block] [--count=OC] [--crypto] "
+          "[--early]\n"
           "                   [--fail] [--help] [--invert] [--ipl=LEN] "
           "[--overwrite]\n"
           "                   [--pattern=PF] [--quick] [--test=TE] "
@@ -194,18 +194,18 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     sg_put_unaligned_be16((uint16_t)param_lst_len, sanCmdBlk + 7);
 
     if (op->verbose > 1) {
-        fprintf(stderr, "    Sanitize cmd: ");
+        pr2serr("    Sanitize cmd: ");
         for (k = 0; k < SANITIZE_OP_LEN; ++k)
-            fprintf(stderr, "%02x ", sanCmdBlk[k]);
-        fprintf(stderr, "\n");
+            pr2serr("%02x ", sanCmdBlk[k]);
+        pr2serr("\n");
     }
     if ((op->verbose > 2) && (param_lst_len > 0)) {
-        fprintf(stderr, "    Parameter list contents:\n");
+        pr2serr("    Parameter list contents:\n");
         dStrHexErr((const char *)param_lstp, param_lst_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        fprintf(stderr, "Sanitize: out of memory\n");
+        pr2serr("Sanitize: out of memory\n");
         return -1;
     }
     set_scsi_pt_cdb(ptvp, sanCmdBlk, sizeof(sanCmdBlk));
@@ -231,7 +231,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
                 slen = get_scsi_pt_sense_len(ptvp);
                 valid = sg_get_sense_info_fld(sense_b, slen, &ull);
                 if (valid)
-                    fprintf(stderr, "Medium or hardware error starting at "
+                    pr2serr("Medium or hardware error starting at "
                             "lba=%" PRIu64 " [0x%" PRIx64 "]\n", ull, ull);
             }
             ret = sense_cat;
@@ -340,20 +340,19 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         if (b[5] & 1)
             printf("      << supports protection information>>\n");
     } else {
-        fprintf(stderr, "Short INQUIRY response: %d bytes, expect at least "
-                "36\n", n);
+        pr2serr("Short INQUIRY response: %d bytes, expect at least 36\n", n);
         return SG_LIB_CAT_OTHER;
     }
     res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
                         SAFE_STD_INQ_RESP_LEN, 1, verb);
     if (res) {
         if (verbose)
-            fprintf(stderr, "VPD_SUPPORTED_VPDS gave res=%d\n", res);
+            pr2serr("VPD_SUPPORTED_VPDS gave res=%d\n", res);
         return 0;
     }
     if (VPD_SUPPORTED_VPDS != b[1]) {
         if (verbose)
-            fprintf(stderr, "VPD_SUPPORTED_VPDS corrupted\n");
+            pr2serr("VPD_SUPPORTED_VPDS corrupted\n");
         return 0;
     }
     n = sg_get_unaligned_be16(b + 2);
@@ -363,7 +362,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
             if (has_di) {
                 if (verbose)
-                    fprintf(stderr, "VPD_SUPPORTED_VPDS dis-ordered\n");
+                    pr2serr("VPD_SUPPORTED_VPDS dis-ordered\n");
                 return 0;
             }
             ++has_sn;
@@ -377,12 +376,12 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                             sizeof(b), 1, verb);
         if (res) {
             if (verbose)
-                fprintf(stderr, "VPD_UNIT_SERIAL_NUM gave res=%d\n", res);
+                pr2serr("VPD_UNIT_SERIAL_NUM gave res=%d\n", res);
             return 0;
         }
         if (VPD_UNIT_SERIAL_NUM != b[1]) {
             if (verbose)
-                fprintf(stderr, "VPD_UNIT_SERIAL_NUM corrupted\n");
+                pr2serr("VPD_UNIT_SERIAL_NUM corrupted\n");
             return 0;
         }
         n = sg_get_unaligned_be16(b + 2);
@@ -395,12 +394,12 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                             sizeof(b), 1, verb);
         if (res) {
             if (verbose)
-                fprintf(stderr, "VPD_DEVICE_ID gave res=%d\n", res);
+                pr2serr("VPD_DEVICE_ID gave res=%d\n", res);
             return 0;
         }
         if (VPD_DEVICE_ID != b[1]) {
             if (verbose)
-                fprintf(stderr, "VPD_DEVICE_ID corrupted\n");
+                pr2serr("VPD_DEVICE_ID corrupted\n");
             return 0;
         }
         n = sg_get_unaligned_be16(b + 2);
@@ -452,8 +451,7 @@ main(int argc, char * argv[])
         case 'c':
             op->count = sg_get_num(optarg);
             if ((op->count < 1) || (op->count > 31))  {
-                fprintf(stderr, "bad argument to '--count', expect 1 to "
-                        "31\n");
+                pr2serr("bad argument to '--count', expect 1 to 31\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -476,8 +474,7 @@ main(int argc, char * argv[])
         case 'i':
             op->ipl = sg_get_num(optarg);
             if ((op->ipl < 1) || (op->ipl > 65535))  {
-                fprintf(stderr, "bad argument to '--ipl', expect 1 to "
-                        "65535\n");
+                pr2serr("bad argument to '--ipl', expect 1 to 65535\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -496,7 +493,7 @@ main(int argc, char * argv[])
         case 'T':
             op->test = sg_get_num(optarg);
             if ((op->test < 0) || (op->test > 3))  {
-                fprintf(stderr, "bad argument to '--test', expect 0 to 3\n");
+                pr2serr("bad argument to '--test', expect 0 to 3\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -504,7 +501,7 @@ main(int argc, char * argv[])
             ++op->verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         case 'w':
             ++op->wait;
@@ -516,7 +513,7 @@ main(int argc, char * argv[])
             ++op->znr;
             break;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -528,58 +525,57 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     vb = op->verbose;
     n = !!op->block + !!op->crypto + !!op->fail + !!op->overwrite;
     if (1 != n) {
-        fprintf(stderr, "one and only one of '--block', '--crypto', "
-                "'--fail' or '--overwrite' please\n");
+        pr2serr("one and only one of '--block', '--crypto', '--fail' or "
+                "'--overwrite' please\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->overwrite) {
         if (op->zero) {
             if (op->pattern_fn) {
-                fprintf(stderr, "confused: both '--pattern=PF' and '--zero' "
+                pr2serr("confused: both '--pattern=PF' and '--zero' "
                         "options\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->ipl = 4;
         } else {
             if (NULL == op->pattern_fn) {
-                fprintf(stderr, "'--overwrite' requires '--pattern=PF' "
-                        "or '--zero' option\n");
+                pr2serr("'--overwrite' requires '--pattern=PF' or '--zero' "
+                        "option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
             if (! got_stdin) {
                 memset(&a_stat, 0, sizeof(a_stat));
                 if (stat(op->pattern_fn, &a_stat) < 0) {
-                    fprintf(stderr, "pattern file: unable to stat(%s): %s\n",
+                    pr2serr("pattern file: unable to stat(%s): %s\n",
                             op->pattern_fn, safe_strerror(errno));
                     return SG_LIB_FILE_ERROR;
                 }
                 if (op->ipl <= 0) {
                     op->ipl = (int)a_stat.st_size;
                     if (op->ipl > MAX_XFER_LEN) {
-                        fprintf(stderr, "pattern file length exceeds 65535 "
-                                "bytes, need '--ipl=LEN' option\n");
+                        pr2serr("pattern file length exceeds 65535 bytes, "
+                                "need '--ipl=LEN' option\n");
                          return SG_LIB_FILE_ERROR;
                     }
                 }
             }
             if (op->ipl < 1) {
-                fprintf(stderr, "'--overwrite' requires '--ipl=LEN' "
-                        "option if can't get PF length\n");
+                pr2serr("'--overwrite' requires '--ipl=LEN' option if can't "
+                        "get PF length\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         }
@@ -587,7 +583,7 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+        pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -600,8 +596,8 @@ main(int argc, char * argv[])
         param_lst_len = op->ipl + 4;
         wBuff = (unsigned char*)calloc(op->ipl + 4, 1);
         if (NULL == wBuff) {
-            fprintf(stderr, "unable to allocate %d bytes of memory with "
-                    "calloc()\n", op->ipl + 4);
+            pr2serr("unable to allocate %d bytes of memory with calloc()\n",
+                    op->ipl + 4);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
@@ -636,9 +632,9 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             if (res < op->ipl) {
-                fprintf(stderr, "tried to read %d bytes from %s, got %d "
-                        "bytes\n", op->ipl, op->pattern_fn, res);
-                fprintf(stderr, "  so pad with 0x0 bytes and continue\n");
+                pr2serr("tried to read %d bytes from %s, got %d bytes\n",
+                         op->ipl, op->pattern_fn, res);
+                pr2serr("  so pad with 0x0 bytes and continue\n");
             }
             if (! got_stdin)
                 close(infd);
@@ -669,7 +665,7 @@ main(int argc, char * argv[])
     ret = do_sanitize(sg_fd, op, wBuff, param_lst_len);
     if (ret) {
         sg_get_category_sense_str(ret, sizeof(b), b, vb);
-        fprintf(stderr, "Sanitize failed: %s\n", b);
+        pr2serr("Sanitize failed: %s\n", b);
     }
 
     if ((0 == ret) && (0 == op->early) && (0 == op->wait)) {
@@ -681,28 +677,28 @@ main(int argc, char * argv[])
             if (res) {
                 ret = res;
                 if (SG_LIB_CAT_INVALID_OP == res)
-                    fprintf(stderr, "Request Sense command not supported\n");
+                    pr2serr("Request Sense command not supported\n");
                 else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-                    fprintf(stderr, "bad field in Request Sense cdb\n");
+                    pr2serr("bad field in Request Sense cdb\n");
                     if (1 == op->desc) {
-                        fprintf(stderr, "Descriptor type sense may not be "
-                                "supported, try again with fixed type\n");
+                        pr2serr("Descriptor type sense may not be supported, "
+                                "try again with fixed type\n");
                         op->desc = 0;
                         continue;
                     }
                 } else {
                     sg_get_category_sense_str(res, sizeof(b), b, vb);
-                    fprintf(stderr, "Request Sense: %s\n", b);
+                    pr2serr("Request Sense: %s\n", b);
                     if (0 == vb)
-                        fprintf(stderr, "    try the '-v' option for "
-                                "more information\n");
+                        pr2serr("    try the '-v' option for more "
+                                "information\n");
                 }
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
             if (vb > 2) {
-                fprintf(stderr, "Parameter data in hex\n");
+                pr2serr("Parameter data in hex\n");
                 dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
@@ -711,8 +707,8 @@ main(int argc, char * argv[])
             if (progress < 0) {
                 ret = res;
                 if (vb > 1)
-                     fprintf(stderr, "No progress indication found, "
-                             "iteration %d\n", k + 1);
+                     pr2serr("No progress indication found, iteration %d\n",
+                             k + 1);
                 /* N.B. exits first time there isn't a progress indication */
                 break;
             } else
@@ -726,7 +722,7 @@ err_out:
         free(wBuff);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

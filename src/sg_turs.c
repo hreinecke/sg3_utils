@@ -3,7 +3,7 @@
  * data transfer (and no REQUEST SENSE command iff the unit is ready)
  * then this can be used for timing per SCSI command overheads.
  *
- * Copyright (C) 2000-2014 D. Gilbert
+ * Copyright (C) 2000-2015 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -28,9 +28,10 @@
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.30 20140514";
+static const char * version_str = "3.31 20151220";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -129,7 +130,7 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'n':
             n = sg_get_num(optarg);
             if (n < 0) {
-                fprintf(stderr, "bad argument to '--number='\n");
+                pr2serr("bad argument to '--number='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -153,7 +154,7 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (op->do_help)
                 break;
             usage();
@@ -167,8 +168,7 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -228,15 +228,15 @@ static int process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == op->device_name)
             op->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", op->device_name, cp);
+            pr2serr("too many arguments, got: %s, not expecting: %s\n",
+                    op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -288,20 +288,20 @@ int main(int argc, char * argv[])
         return 0;
     }
     if (op->do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (NULL == op->device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
                                      op->do_verbose)) < 0) {
-        fprintf(stderr, "sg_turs: error opening file: %s: %s\n",
-                op->device_name, safe_strerror(-sg_fd));
+        pr2serr("sg_turs: error opening file: %s: %s\n", op->device_name,
+                safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (op->do_progress) {

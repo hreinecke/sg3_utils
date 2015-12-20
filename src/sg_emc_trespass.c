@@ -2,7 +2,7 @@
  * LUN ownership from one Service-Processor to this one on an EMC
  * CLARiiON and potentially other devices.
  *
- * Copyright (C) 2004-2014 Lars Marowsky-Bree <lmb@suse.de>
+ * Copyright (C) 2004-2015 Lars Marowsky-Bree <lmb@suse.de>
  *
  * Based on sg_start.c; credits from there also apply.
  * Minor modifications for sg_lib, D. Gilbert 2004/10/19
@@ -26,9 +26,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.19 20140516";
+static const char * version_str = "0.20 20141219";
 
 static int debug = 0;
 
@@ -72,24 +73,24 @@ static int do_trespass(int fd, int hr, int short_cmd)
         switch (res) {
         case 0:
                 if (debug)
-                        fprintf(stderr, "%s trespass successful\n",
-                                        short_cmd ? "short" : "long");
+                        pr2serr("%s trespass successful\n",
+                                short_cmd ? "short" : "long");
                 break;
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
-                fprintf(stderr, "%s form trepass page failed, try again %s "
-                        "'-s' option\n", short_cmd ? "short" : "long",
+                pr2serr("%s form trepass page failed, try again %s '-s' "
+                        "option\n", short_cmd ? "short" : "long",
                         short_cmd ? "without" : "with");
                 break;
         case SG_LIB_CAT_NOT_READY:
-                fprintf(stderr, "device not ready\n");
+                pr2serr("device not ready\n");
                 break;
         case SG_LIB_CAT_UNIT_ATTENTION:
-                fprintf(stderr, "unit attention\n");
+                pr2serr("unit attention\n");
                 break;
         default:
                 sg_get_category_sense_str(res, sizeof(b), b, debug);
-                fprintf(stderr, "%s trespass failed: %s\n",
+                pr2serr("%s trespass failed: %s\n",
                         (short_cmd ? "short" : "long"), b);
                 break;
         }
@@ -98,18 +99,17 @@ static int do_trespass(int fd, int hr, int short_cmd)
 
 void usage ()
 {
-        fprintf(stderr, "Usage:  sg_emc_trespass [-d] [-hr] [-s] "
-                        " [-V] DEVICE\n"
-               "  Change ownership of a LUN from another SP to this one.\n"
-               "  EMC CLARiiON CX-/AX-family + FC5300/FC4500/FC4700.\n"
-               "    -d : output debug\n"
-               "    -hr: Set Honor Reservation bit\n"
-               "    -s : Send Short Trespass Command page (default: long)\n"
-               "         (for FC series)\n"
-               "    -V: print version string then exit\n"
-               "     DEVICE   sg or block device (latter in lk 2.6 or lk 3 "
-               "series)\n"
-               "        Example: sg_emc_trespass /dev/sda\n");
+        pr2serr("Usage:  sg_emc_trespass [-d] [-hr] [-s] [-V] DEVICE\n"
+                "  Change ownership of a LUN from another SP to this one.\n"
+                "  EMC CLARiiON CX-/AX-family + FC5300/FC4500/FC4700.\n"
+                "    -d : output debug\n"
+                "    -hr: Set Honor Reservation bit\n"
+                "    -s : Send Short Trespass Command page (default: long)\n"
+                "         (for FC series)\n"
+                "    -V: print version string then exit\n"
+                "     DEVICE   sg or block device (latter in lk 2.6 or lk 3 "
+                "series)\n"
+                "        Example: sg_emc_trespass /dev/sda\n");
         exit (1);
 }
 
@@ -138,14 +138,14 @@ int main(int argc, char * argv[])
                         exit(0);
                 }
                 else if (*argv[k] == '-') {
-                        fprintf(stderr, "Unrecognized switch: %s\n", argv[k]);
+                        pr2serr("Unrecognized switch: %s\n", argv[k]);
                         file_name = 0;
                         break;
                 }
                 else if (0 == file_name)
                         file_name = argv[k];
                 else {
-                        fprintf(stderr, "too many arguments\n");
+                        pr2serr("too many arguments\n");
                         file_name = 0;
                         break;
                 }
@@ -157,7 +157,7 @@ int main(int argc, char * argv[])
 
         fd = open(file_name, O_RDWR | O_NONBLOCK);
         if (fd < 0) {
-                fprintf(stderr, "Error trying to open %s\n", file_name);
+                pr2serr("Error trying to open %s\n", file_name);
                 perror("");
                 usage();
                 return SG_LIB_FILE_ERROR;

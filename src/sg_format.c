@@ -32,8 +32,9 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "1.31 20151207";
+static const char * version_str = "1.32 20151219";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -205,7 +206,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                 fmt_pl, fmt_pl_sz, 1, verbose);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                fprintf(stderr, "Format command: %s\n", b);
+                pr2serr("Format command: %s\n", b);
                 return res;
         }
         if (! immed)
@@ -243,13 +244,13 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                         res = sg_ll_request_sense(fd, 0, reqSense,
                                                   sizeof(reqSense), 0, verb);
                         if (res) {
-                                fprintf(stderr, "polling with Request Sense "
-                                        "command failed [res=%d]\n", res);
+                                pr2serr("polling with Request Sense command "
+                                        "failed [res=%d]\n", res);
                                 break;
                         }
                         resp_len = reqSense[7] + 8;
                         if (verb) {
-                                fprintf(stderr, "Parameter data in hex:\n");
+                                pr2serr("Parameter data in hex:\n");
                                 dStrHexErr((const char *)reqSense, resp_len,
                                            1);
                         }
@@ -275,13 +276,13 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
             if (res) {
                 ret = res;
                 sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                fprintf(stderr, "Request Sense command: %s\n", b);
+                pr2serr("Request Sense command: %s\n", b);
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
-                fprintf(stderr, "Parameter data in hex\n");
+                pr2serr("Parameter data in hex\n");
                 dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
@@ -290,8 +291,8 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
             if (progress < 0) {
                 ret = res;
                 if (verbose > 1)
-                     fprintf(stderr, "No progress indication found, "
-                             "iteration %d\n", k + 1);
+                     pr2serr("No progress indication found, iteration %d\n",
+                             k + 1);
                 /* N.B. exits first time there isn't a progress indication */
                 break;
             } else
@@ -399,21 +400,20 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                         printf("      << supports protection information>>"
                                "\n");
         } else {
-                fprintf(stderr, "Short INQUIRY response: %d bytes, expect at "
-                        "least " "36\n", n);
+                pr2serr("Short INQUIRY response: %d bytes, expect at least "
+                        "36\n", n);
                 return SG_LIB_CAT_OTHER;
         }
         res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
                             SAFE_STD_INQ_RESP_LEN, 1, verb);
         if (res) {
                 if (verbose)
-                        fprintf(stderr, "VPD_SUPPORTED_VPDS gave res=%d\n",
-                                res);
+                        pr2serr("VPD_SUPPORTED_VPDS gave res=%d\n", res);
                 return 0;
         }
         if (VPD_SUPPORTED_VPDS != b[1]) {
                 if (verbose)
-                        fprintf(stderr, "VPD_SUPPORTED_VPDS corrupted\n");
+                        pr2serr("VPD_SUPPORTED_VPDS corrupted\n");
                 return 0;
         }
         n = sg_get_unaligned_be16(b + 2);
@@ -423,7 +423,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                 if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
                         if (has_di) {
                                 if (verbose)
-                                        fprintf(stderr, "VPD_SUPPORTED_VPDS "
+                                        pr2serr("VPD_SUPPORTED_VPDS "
                                                 "dis-ordered\n");
                                 return 0;
                         }
@@ -438,14 +438,13 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                                     b, sizeof(b), 1, verb);
                 if (res) {
                         if (verbose)
-                                fprintf(stderr, "VPD_UNIT_SERIAL_NUM gave "
-                                        "res=%d\n", res);
+                                pr2serr("VPD_UNIT_SERIAL_NUM gave res=%d\n",
+                                        res);
                         return 0;
                 }
                 if (VPD_UNIT_SERIAL_NUM != b[1]) {
                         if (verbose)
-                                fprintf(stderr, "VPD_UNIT_SERIAL_NUM "
-                                        "corrupted\n");
+                                pr2serr("VPD_UNIT_SERIAL_NUM corrupted\n");
                         return 0;
                 }
                 n = sg_get_unaligned_be16(b + 2);
@@ -459,13 +458,12 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                                     sizeof(b), 1, verb);
                 if (res) {
                         if (verbose)
-                                fprintf(stderr, "VPD_DEVICE_ID gave res=%d\n",
-                                        res);
+                                pr2serr("VPD_DEVICE_ID gave res=%d\n", res);
                         return 0;
                 }
                 if (VPD_DEVICE_ID != b[1]) {
                         if (verbose)
-                                fprintf(stderr, "VPD_DEVICE_ID corrupted\n");
+                                pr2serr("VPD_DEVICE_ID corrupted\n");
                         return 0;
                 }
                 n = sg_get_unaligned_be16(b + 2);
@@ -539,7 +537,7 @@ print_read_cap(int fd, int do_16, int verbose)
                 }
         }
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "READ CAPACITY (%d): %s\n", (do_16 ? 16 : 10), b);
+        pr2serr("READ CAPACITY (%d): %s\n", (do_16 ? 16 : 10), b);
         return -1;
 }
 
@@ -592,8 +590,7 @@ main(int argc, char **argv)
                         else {
                                 blk_count = sg_get_llnum(optarg);
                                 if (-1 == blk_count) {
-                                        fprintf(stderr, "bad argument to "
-                                                "'--count'\n");
+                                        pr2serr("bad argument to '--count'\n");
                                         return SG_LIB_SYNTAX_ERROR;
                                 }
                         }
@@ -601,8 +598,8 @@ main(int argc, char **argv)
                 case 'C':
                         cmplst = sg_get_num(optarg);
                         if ((cmplst < 0) || ( cmplst > 1)) {
-                                fprintf(stderr, "bad argument to '--cmplst', "
-                                        "want 0 or 1\n");
+                                pr2serr("bad argument to '--cmplst', want 0 "
+                                        "or 1\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -615,9 +612,8 @@ main(int argc, char **argv)
                 case 'f':
                         fmtpinfo = sg_get_num(optarg);
                         if ((fmtpinfo < 0) || ( fmtpinfo > 3)) {
-                                fprintf(stderr, "bad argument to "
-                                        "'--fmtpinfo', accepts 0 to 3 "
-                                        "inclusive\n");
+                                pr2serr("bad argument to '--fmtpinfo', "
+                                        "accepts 0 to 3 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -637,8 +633,8 @@ main(int argc, char **argv)
                 case 'M':
                         mode_page = sg_get_num(optarg);
                         if ((mode_page < 0) || ( mode_page > 62)) {
-                                fprintf(stderr, "bad argument to '--mode', "
-                                        "accepts 0 to 62 inclusive\n");
+                                pr2serr("bad argument to '--mode', accepts "
+                                        "0 to 62 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -648,16 +644,16 @@ main(int argc, char **argv)
                 case 'P':
                         pfu = sg_get_num(optarg);
                         if ((pfu < 0) || ( pfu > 7)) {
-                                fprintf(stderr, "bad argument to '--pfu', "
-                                        "accepts 0 to 7 inclusive\n");
+                                pr2serr("bad argument to '--pfu', accepts 0 "
+                                        "to 7 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'q':
                         pie = sg_get_num(optarg);
                         if ((pie < 0) || ( pie > 15)) {
-                                fprintf(stderr, "bad argument to '--pie', "
-                                        "accepts 0 to 15 inclusive\n");
+                                pr2serr("bad argument to '--pie', accepts 0 "
+                                        "to 15 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -670,8 +666,8 @@ main(int argc, char **argv)
                 case 's':
                         blk_size = sg_get_num(optarg);
                         if (blk_size <= 0) {
-                                fprintf(stderr, "bad argument to '--size', "
-                                        "want arg > 0\n");
+                                pr2serr("bad argument to '--size', want arg "
+                                        "> 0\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
@@ -682,8 +678,7 @@ main(int argc, char **argv)
                         verbose++;
                         break;
                 case 'V':
-                        fprintf(stderr, "sg_format version: %s\n",
-                                version_str);
+                        pr2serr("sg_format version: %s\n", version_str);
                         return 0;
                 case 'w':
                         fwait = 1;
@@ -707,42 +702,41 @@ main(int argc, char **argv)
         }
         if (optind < argc) {
                 for (; optind < argc; ++optind)
-                        fprintf(stderr, "Unexpected extra argument: %s\n",
+                        pr2serr("Unexpected extra argument: %s\n",
                                 argv[optind]);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
         if (NULL == device_name) {
-                fprintf(stderr, "no DEVICE name given\n");
+                pr2serr("no DEVICE name given\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
         if (ip_def && do_si) {
-                fprintf(stderr, "'--ip_def' and '--security' contradict, "
-                        "choose one\n");
+                pr2serr("'--ip_def' and '--security' contradict, choose "
+                        "one\n");
                 return SG_LIB_SYNTAX_ERROR;
         }
         if (resize) {
                 if (format) {
-                        fprintf(stderr, "both '--format' and '--resize'"
-                                "not permitted\n");
+                        pr2serr("both '--format' and '--resize' not "
+                                "permitted\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 } else if (0 == blk_count) {
-                        fprintf(stderr, "'--resize' needs a '--count' (other"
-                                " than 0)\n");
+                        pr2serr("'--resize' needs a '--count' (other than "
+                                "0)\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 } else if (0 != blk_size) {
-                        fprintf(stderr, "'--resize' not compatible with "
-                                "'--size'\n");
+                        pr2serr("'--resize' not compatible with '--size'\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 }
         }
         if ((pinfo > 0) || (rto_req > 0) || (fmtpinfo > 0)) {
                 if ((pinfo || rto_req) && fmtpinfo) {
-                        fprintf(stderr, "confusing with both '--pinfo' or "
+                        pr2serr("confusing with both '--pinfo' or "
                                 "'--rto_req' together with\n'--fmtpinfo', "
                                 "best use '--fmtpinfo' only\n");
                         usage();
@@ -755,8 +749,8 @@ main(int argc, char **argv)
         }
 
         if ((fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
-                fprintf(stderr, "error opening device file: %s: %s\n",
-                        device_name, safe_strerror(-fd));
+                pr2serr("error opening device file: %s: %s\n", device_name,
+                        safe_strerror(-fd));
                 return SG_LIB_FILE_ERROR;
         }
 
@@ -768,8 +762,8 @@ main(int argc, char **argv)
             goto out;
         pdt = 0x1f & inq_resp[0];
         if ((0 != pdt) && (7 != pdt) && (0xe != pdt)) {
-                fprintf(stderr, "This format is only defined for disks "
-                        "(using SBC-2 or RBC) and MO media\n");
+                pr2serr("This format is only defined for disks (using SBC-2 "
+                        "or RBC) and MO media\n");
                 ret = SG_LIB_CAT_MALFORMED;
                 goto out;
         }
@@ -789,21 +783,20 @@ again_with_long_lba:
         if (res) {
                 if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                         if (long_lba && (! mode6))
-                                fprintf(stderr, "bad field in MODE SENSE "
-                                        "(%d) [longlba flag not supported?]"
-                                        "\n", (mode6 ? 6 : 10));
+                                pr2serr("bad field in MODE SENSE (%d) "
+                                        "[longlba flag not supported?]\n",
+                                        (mode6 ? 6 : 10));
                         else
-                                fprintf(stderr, "bad field in MODE SENSE "
-                                        "(%d) [mode_page %d not supported?]"
-                                        "\n", (mode6 ? 6 : 10), mode_page);
+                                pr2serr("bad field in MODE SENSE (%d) "
+                                        "[mode_page %d not supported?]\n",
+                                        (mode6 ? 6 : 10), mode_page);
                 } else {
                         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                        fprintf(stderr, "MODE SENSE (%d) command: %s\n",
+                        pr2serr("MODE SENSE (%d) command: %s\n",
                                 (mode6 ? 6 : 10), b);
                 }
                 if (0 == verbose)
-                        fprintf(stderr, "    try '-v' for more "
-                                "information\n");
+                        pr2serr("    try '-v' for more information\n");
                 goto out;
         }
         if (mode6) {
@@ -840,8 +833,8 @@ again_with_long_lba:
                                  sg_get_unaligned_be32(dbuff + offset);
                 if ((0 == long_lba) && (0xffffffff == ull)) {
                         if (verbose)
-                                fprintf(stderr, "Mode sense number of "
-                                        "blocks maxed out, set longlba\n");
+                                pr2serr("Mode sense number of blocks maxed "
+                                        "out, set longlba\n");
                         long_lba = 1;
                         mode6 = 0;
                         do_rcap16 = 1;
@@ -902,10 +895,10 @@ again_with_long_lba:
 */
 
                 if (prob) {
-                        fprintf(stderr, "Need to perform MODE SELECT (to "
-                                "change number or blocks or block length)\n");
-                        fprintf(stderr, "but (single) block descriptor not "
-                                "found in earlier MODE SENSE\n");
+                        pr2serr("Need to perform MODE SELECT (to change "
+                                "number or blocks or block length)\n");
+                        pr2serr("but (single) block descriptor not found "
+                                "in earlier MODE SENSE\n");
                         ret = SG_LIB_CAT_MALFORMED;
                         goto out;
                 }
@@ -936,10 +929,9 @@ again_with_long_lba:
                 ret = res;
                 if (res) {
                         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                        fprintf(stderr, "MODE SELECT command: %s\n", b);
+                        pr2serr("MODE SELECT command: %s\n", b);
                         if (0 == verbose)
-                                fprintf(stderr, "    try '-v' for "
-                                        "more information\n");
+                                pr2serr("    try '-v' for more information\n");
                         goto out;
                 }
         }
@@ -986,20 +978,20 @@ format_only:
                                   pie, ip_def, do_si, early, pt, verbose);
                 ret = res;
                 if (res) {
-                        fprintf(stderr, "FORMAT failed\n");
+                        pr2serr("FORMAT failed\n");
                         if (0 == verbose)
-                                fprintf(stderr, "    try '-v' for more "
+                                pr2serr("    try '-v' for more "
                                         "information\n");
                 }
 #else
-                fprintf(stderr, "FORMAT ignored, testing\n");
+                pr2serr("FORMAT ignored, testing\n");
 #endif
         }
 
 out:
         res = sg_cmds_close_device(fd);
         if (res < 0) {
-                fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+                pr2serr("close error: %s\n", safe_strerror(-res));
                 if (0 == ret)
                         return SG_LIB_FILE_ERROR;
         }

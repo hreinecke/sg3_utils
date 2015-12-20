@@ -2,9 +2,10 @@
 # Skript to rescan SCSI bus, using the 
 # scsi add-single-device mechanism
 # (c) 1998--2010 Kurt Garloff <kurt@garloff.de>, GNU GPL v2 or v3
-# (c) 2006--2014 Hannes Reinecke, GNU GPL v2 or later
+# (c) 2006--2015 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
+VERSION="20151217"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -112,8 +113,8 @@ printtype ()
     4) echo "WORM" ;;
     5) echo "CD-ROM" ;;
     6) echo "Scanner" ;;
-    7) echo "Optical Device" ;;
-    8) echo "Medium Changer" ;;
+    7) echo "Optical-Device" ;;
+    8) echo "Medium-Changer" ;;
     9) echo "Communications" ;;
     10) echo "Unknown" ;;
     11) echo "Unknown" ;;
@@ -239,18 +240,19 @@ testonline ()
   if test -z "$SGDEV"; then return 0; fi
   sg_turs /dev/$SGDEV >/dev/null 2>&1
   RC=$?
-  # Handle in progress of becoming ready and unit attention -- wait at max 11s
-  declare -i ctr=0
-  if test $RC = 2 -o $RC = 6; then 
-    RMB=`sg_inq /dev/$SGDEV | grep 'RMB=' | sed 's/^.*RMB=\(.\).*$/\1/'`
-    print_and_scroll_back "$host:$channel:$id:$lun $SGDEV ($RMB) "
-  fi
-  while test $RC = 2 -o $RC = 6 && test $ctr -le 8; do
+
+  # Handle in progress of becoming ready and unit attention
+  while test $RC = 2 -o $RC = 6 && test $ctr -le 30; do
     if test $RC = 2 -a "$RMB" != "1"; then echo -n "."; let LN+=1; sleep 1
     else usleep 20000; fi
     let ctr+=1
     sg_turs /dev/$SGDEV >/dev/null 2>&1
     RC=$?
+    # Check for removable device; TEST UNIT READY obviously will
+    # fail for a removable device with no medium
+    RMB=`sg_inq /dev/$SGDEV 2>/dev/null | grep 'RMB=' | sed 's/^.*RMB=\(.\).*$/\1/'`
+    print_and_scroll_back "$host:$channel:$id:$lun $SGDEV ($RMB) "
+    test $RC = 2 -a "$RMB" = "1" && break
   done
   if test $ctr != 0; then white_out; fi
   # echo -e "\e[A\e[A\e[A${yellow}Test existence of $SGDEV = $RC ${norm} \n\n\n"
@@ -560,7 +562,7 @@ doreportlun()
   REPLUNSTAT=$?
   lunremove=
   #echo "getluns reports " $targetluns
-  olddev=`find /sys/class/scsi_device/ -name $host:$channel:$id:* 2>/dev/null`
+  olddev=`find /sys/class/scsi_device/ -name $host:$channel:$id:* 2>/dev/null | sort -t: -k4 -n`
   oldluns=`echo "$olddev" | awk -F'/' '{print $5}' | awk -F':' '{print $4}'`
   oldtargets="$targetluns"
   # OK -- if we don't have a LUN to send a REPORT_LUNS to, we could
@@ -703,9 +705,12 @@ findremapped()
   local mpath_uuid=
   local remapped=
   mpaths=""
-  local tmpfile="/tmp/rescan-scsi-bus-`date +s`"
+  local tmpfile=$(mktemp /tmp/rescan-scsi-bus.XXXXXXXX 2> /dev/null)
 
-  test -f $tmpfile && rm $tmpfile
+  if [ -z "$tmpfile" ] ; then
+    tmpfile="/tmp/rescan-scsi-bus.$$"
+    rm -f $tmpfile
+  fi
 
   # Get all of the ID_SERIAL attributes, after finding their sd node
   for hctl in $devs ; do
@@ -754,7 +759,7 @@ findremapped()
     echo "$SCSISTR"
     incrchgd "$hctl"
   done < $tmpfile
-  [ -f $tmpfile ] && rm $tmpfile
+  rm -f $tmpfile
 
   if test -n "$mp_enable" -a -n "$mpaths" ; then
     echo "Updating multipath device mappings"
@@ -850,12 +855,13 @@ findmultipath()
   local found_dup=0
 
   # Need a sdev, and executable multipath and dmsetup command here
-  if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x $MULTIPATH ] ; then
+  if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x "$MULTIPATH" ] ; then
     return 1
   fi
 
   local maj_min=`cat /sys/block/$dev/dev`
   for mp in $($DMSETUP ls --target=multipath | cut -f 1) ; do
+    [ "$mp" = "No devices found" ] && break;
     if $($DMSETUP status $mp | grep -q " $maj_min ") ; then
       # With two arguments, look up current uuid from sysfs
       # if it doesn't match what was passed, this multipath
@@ -887,7 +893,7 @@ findmultipath()
 reloadmpaths()
 {
   local mpath
-  if [ ! -x $MULTIPATH ] ; then
+  if [ ! -x "$MULTIPATH" ] ; then
     echo "no -x multipath"
     return
   fi
@@ -911,6 +917,17 @@ reloadmpaths()
   done
 }
 
+resizempaths()
+{
+  local mpath
+
+  for mpath in $mpaths ; do
+    echo -n "Resizing multipath map $mpath ..."
+    multipathd -k"resize map $mpath"
+    let updated+=1
+  done
+}
+
 flushmpaths()
 {
   local mpath
@@ -920,6 +937,7 @@ flushmpaths()
 
   if test -n "$1" ; then
     for mpath in $($DMSETUP ls --target=multipath | cut -f 1) ; do
+      [ "$mpath" = "No devices found" ] && break
       num=$($DMSETUP status $mpath | awk 'BEGIN{RS=" ";active=0}/[0-9]+:[0-9]+/{dev=1}/A/{if (dev == 1) active++; dev=0} END{ print active }')
       if [ $num -eq 0 ] ; then
         remove="$remove $mpath"
@@ -990,7 +1008,7 @@ findresized()
       mpathsizes[$i]="`$MULTIPATH -l $m | egrep -o [0-9]+.[0-9]+[KMGT]`"
       let i=$i+1
     done
-    reloadmpaths
+    resizempaths
     i=0
     for m in $mpaths ; do
       mpathsize="`$MULTIPATH -l $m | egrep -o [0-9\.]+[KMGT]`"
@@ -1017,9 +1035,11 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo " -I SECS issue a FibreChannel LIP reset and wait for SECS seconds [default: disabled]"
     echo " -l      activates scanning for LUNs 0--7   [default: 0]"
     echo " -L NUM  activates scanning for LUNs 0--NUM [default: 0]"
+    echo " -m      update multipath devices           [default: disabled]"
     echo " -r      enables removing of devices        [default: disabled]"
     echo " -s      look for resized disks and reload associated multipath devices, if applicable"
     echo " -u      look for existing disks that have been remapped"
+    echo " -V      print version date then exit"
     echo " -w      scan for target device IDs 0--15   [default: 0--7]"
     echo "--alltargets:    same as -a"
     echo "--attachpq3:     Tell kernel to attach sg to LUN 0 that reports PQ=3"
@@ -1035,6 +1055,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--issue-lip-wait=SECS:     same as -I"
     echo "--largelun:      Tell kernel to support LUNs > 7 even on SCSI2 devs"
     echo "--luns=LIST:     Scan only lun(s) in LIST"  
+    echo "--multipath:     same as -m"
     echo "--nooptscan:     don't stop looking for LUNs is 0 is not found"
     echo "--remove:        same as -r"
     echo "--reportlun2:    Tell kernel to try REPORT_LUN even on SCSI2 devices"
@@ -1042,12 +1063,18 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--sparselun:     Tell kernel to support sparse LUN numbering"
     echo "--sync/nosync:   Issue a sync / no sync [default: sync if remove]"
     echo "--update:        same as -u"
+    echo "--version:       same as -V"
     echo "--wide:          same as -w"
     echo ""
     echo "Host numbers may thus be specified either directly on cmd line (deprecated)"
     echo "or with the --hosts=LIST parameter (recommended)."
     echo "LIST: A[-B][,C[-D]]... is a comma separated list of single values and ranges"
     echo "(No spaces allowed.)"
+    exit 0
+fi
+
+if test @$1 = @--version -o @$1 = @-V ; then
+    echo ${VERSION}
     exit 0
 fi
 
@@ -1111,7 +1138,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     w) opt_idsearch=`seq 0 15` ;;
     c) opt_channelsearch="0 1" ;;
     r) remove=1 ;;
-    s) resize=1 ;;
+    s) resize=1; mp_enable=1 ;;
     i) lipreset=0 ;;
     I) shift; lipreset=$opt ;;
     u) update=1 ;;
@@ -1183,7 +1210,7 @@ declare -i updated=0
 declare -i rmvd=0
 
 if [ -n "$flush" ] ; then
-  if [-x $MULTIPATH ] ; then
+  if [ -x "$MULTIPATH" ] ; then
     flushmpaths 1
   fi
 fi
@@ -1252,8 +1279,10 @@ if test -n "$mp_enable" -a $rmvd_found -gt 0 ; then
   if test $found -gt 0 ; then
     /sbin/udevadm trigger --sysname-match=sd*
     udevadm_settle
-    echo "Trying to discover new multipath mappings for newly discovered devices... "
-    $MULTIPATH | grep "create:" 2> /dev/null
+    if [ -x "$MULTIPATH" ] ; then
+      echo "Trying to discover new multipath mappings for newly discovered devices... "
+      $MULTIPATH | grep "create:" 2> /dev/null
+    fi
   fi 
 fi
 

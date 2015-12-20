@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2014 D. Gilbert
+ *  Copyright (C) 2004-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,8 +30,9 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "1.1( 20140516";
+static const char * version_str = "1.11 20151220";
 
 
 #define MAX_XFER_LEN 10000
@@ -61,8 +62,7 @@ static struct option long_options[] = {
 static void
 usage()
 {
-  fprintf(stderr, "Usage: "
-          "sg_write_long [--16] [--cor_dis] [--help] [--in=IF] "
+  pr2serr("Usage: sg_write_long [--16] [--cor_dis] [--help] [--in=IF] "
           "[--lba=LBA]\n"
           "                     [--pblock] [--verbose] [--version] "
           "[--wr_uncor]\n"
@@ -136,7 +136,7 @@ main(int argc, char * argv[])
         case 'l':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--lba'\n");
+                pr2serr("bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             llba = (uint64_t)ll;
@@ -151,7 +151,7 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         case 'w':
             wr_uncor = 1;
@@ -159,12 +159,12 @@ main(int argc, char * argv[])
         case 'x':
             xfer_len = sg_get_num(optarg);
             if (-1 == xfer_len) {
-                fprintf(stderr, "bad argument to '--xfer_len'\n");
+                pr2serr("bad argument to '--xfer_len'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -176,40 +176,38 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (wr_uncor)
         xfer_len = 0;
     else if (xfer_len >= MAX_XFER_LEN) {
-        fprintf(stderr, "xfer_len (%d) is out of range ( < %d)\n",
-                xfer_len, MAX_XFER_LEN);
+        pr2serr("xfer_len (%d) is out of range ( < %d)\n", xfer_len,
+                MAX_XFER_LEN);
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
     if (wr_uncor) {
         if ('\0' != file_name[0])
-            fprintf(stderr, ">>> warning: when '--wr_uncor' given "
-                    "'-in=' is ignored\n");
+            pr2serr(">>> warning: when '--wr_uncor' given '-in=' is "
+                    "ignored\n");
     } else {
         if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
-            fprintf(stderr, ME "out of memory\n");
+            pr2serr(ME "out of memory\n");
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
@@ -240,17 +238,17 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             if (res < xfer_len) {
-                fprintf(stderr, "tried to read %d bytes from %s, got %d "
-                        "bytes\n", xfer_len, file_name, res);
-                fprintf(stderr, "pad with 0xff bytes and continue\n");
+                pr2serr("tried to read %d bytes from %s, got %d bytes\n",
+                        xfer_len, file_name, res);
+                pr2serr("pad with 0xff bytes and continue\n");
             }
             if (! got_stdin)
                 close(infd);
         }
     }
     if (verbose)
-        fprintf(stderr, ME "issue write long to device %s\n\t\txfer_len= %d "
-                "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 ")\n    cor_dis=%d, "
+        pr2serr(ME "issue write long to device %s\n\t\txfer_len= %d (0x%x), "
+                "lba=%" PRIu64 " (0x%" PRIx64 ")\n    cor_dis=%d, "
                 "wr_uncor=%d, pblock=%d\n", device_name, xfer_len, xfer_len,
                 llba, llba, cor_dis, wr_uncor, pblock);
 
@@ -267,12 +265,12 @@ main(int argc, char * argv[])
     case 0:
         break;
     case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
-        fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
-                ">>>\n", xfer_len - offset);
+        pr2serr("<<< device indicates 'xfer_len' should be %d >>>\n",
+                xfer_len - offset);
         break;
     default:
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "  SCSI WRITE LONG (%s): %s\n", ten_or, b);
+        pr2serr("  SCSI WRITE LONG (%s): %s\n", ten_or, b);
         break;
     }
 
@@ -281,7 +279,7 @@ err_out:
         free(rawp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

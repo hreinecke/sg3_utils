@@ -15,7 +15,6 @@
 #define _XOPEN_SOURCE 600       /* clear up posix_memalign() warning */
 
 #include <stdlib.h>
-#include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -28,8 +27,9 @@
 #endif
 #include "sg_lib.h"
 #include "sg_pt.h"
+#include "sg_pr2serr.h"
 
-#define SG_RAW_VERSION "0.4.13 (2015-11-27)"
+#define SG_RAW_VERSION "0.4.14 (2015-12-19)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -87,26 +87,6 @@ struct opts_t {
     int do_version;
 };
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 version()

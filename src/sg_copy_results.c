@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
@@ -22,6 +21,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
    *  Copyright (C) 2004-2010 D. Gilbert
@@ -99,26 +99,6 @@ struct descriptor_type segment_descriptor_codes [] = {
     { 0x15, "Third party persistent reservations source I_T nexus" },
     { -1, "" }
 };
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 
 static void

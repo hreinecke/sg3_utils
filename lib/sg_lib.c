@@ -880,7 +880,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     }
     blen = sizeof(b);
     n = 0;
-    if (sb_len < 1) {
+    if ((NULL == sense_buffer) || (sb_len < 1)) {
             my_snprintf(buff, buff_len, "sense buffer empty\n");
             return;
     }
@@ -1435,6 +1435,31 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
         break;
     case SG_LIB_CAT_RES_CONFLICT:       /* 24 */
         n = snprintf(buff, buff_len, "Reservation conflict");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_CONDITION_MET:      /* 25 */
+        n = snprintf(buff, buff_len, "Condition met");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_BUSY:               /* 26 */
+        n = snprintf(buff, buff_len, "Busy");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_TS_FULL:            /* 27 */
+        n = snprintf(buff, buff_len, "Task set full");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_ACA_ACTIVE:         /* 28 */
+        n = snprintf(buff, buff_len, "ACA active");
+        if (verbose && (n < (buff_len - 1)))
+            snprintf(buff + n, buff_len - n, " SCSI status");
+        break;
+    case SG_LIB_CAT_TASK_ABORTED:       /* 29 */
+        n = snprintf(buff, buff_len, "Task aborted");
         if (verbose && (n < (buff_len - 1)))
             snprintf(buff + n, buff_len - n, " SCSI status");
         break;
@@ -2134,3 +2159,15 @@ sg_set_binary_mode(int fd)
 }
 
 #endif
+
+int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}

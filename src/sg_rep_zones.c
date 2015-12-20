@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -24,6 +23,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.06 20151210";
+static const char * version_str = "1.07 20151219";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -59,26 +59,6 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 usage()
@@ -325,7 +305,7 @@ main(int argc, char * argv[])
         case 's':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--start=LBA'\n");
+                pr2serr("bad argument to '--start=LBA'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             st_lba = (uint64_t)ll;

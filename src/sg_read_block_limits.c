@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2014 Douglas Gilbert.
+ * Copyright (c) 2009-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,6 +20,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -28,7 +30,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.03 20140516";
+static const char * version_str = "1.04 20151219";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -48,9 +50,8 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-            "sg_read_block_limits  [--help] [--hex] [--raw] [--verbose] "
-            "[--version]\n"
+    pr2serr("Usage: sg_read_block_limits  [--help] [--hex] [--raw] "
+            "[--verbose] [--version]\n"
             "                             DEVICE\n"
             "  where:\n"
             "    --help|-h          print out usage message\n"
@@ -107,10 +108,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "invalid option -%c ??\n", c);
+            pr2serr("invalid option -%c ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -122,23 +123,21 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -155,39 +154,37 @@ main(int argc, char * argv[])
         goto the_end;
       }
 
-      max_block_size = (readBlkLmtBuff[0] << 24) +
-                       (readBlkLmtBuff[1] << 16) +
-                       (readBlkLmtBuff[2] << 8) + readBlkLmtBuff[3];
-      min_block_size = (readBlkLmtBuff[4] << 8) + readBlkLmtBuff[5];
+      max_block_size = sg_get_unaligned_be32(readBlkLmtBuff + 0);
+      min_block_size = sg_get_unaligned_be16(readBlkLmtBuff + 4);
       k = min_block_size / 1024;
-      fprintf(stderr, "Read Block Limits results:\n");
-      fprintf(stderr, "\tMinimum block size: %u byte(s)",
+      pr2serr("Read Block Limits results:\n");
+      pr2serr("\tMinimum block size: %u byte(s)",
               (unsigned int)min_block_size);
       if (k != 0)
-        fprintf(stderr, ", %d KB", k);
-      fprintf(stderr, "\n");
+        pr2serr(", %d KB", k);
+      pr2serr("\n");
       k = max_block_size / 1024;
       m = max_block_size / 1048576;
-      fprintf(stderr, "\tMaximum block size: %u byte(s)",
+      pr2serr("\tMaximum block size: %u byte(s)",
               (unsigned int)max_block_size);
       if (k != 0)
-        fprintf(stderr, ", %d KB", k);
+        pr2serr(", %d KB", k);
       if (m != 0)
-        fprintf(stderr, ", %d MB", m);
-      fprintf(stderr, "\n");
+        pr2serr(", %d MB", m);
+      pr2serr("\n");
     } else {
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Read block limits: %s\n", b);
+        pr2serr("Read block limits: %s\n", b);
         if (0 == verbose)
-            fprintf(stderr, "    try '-v' option for more information\n");
+            pr2serr("    try '-v' option for more information\n");
     }
 
 the_end:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

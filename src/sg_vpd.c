@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -26,6 +25,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* This utility program was originally written for the Linux OS SCSI subsystem.
 
@@ -226,26 +226,6 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {0, 0, 0, NULL, NULL},
 };
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 usage()
