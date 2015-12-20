@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.42 [20151210] [svn: r653]
+Changelog for sg3_utils-1.42 [20151220] [svn: r654]
   - sg_timestamp: new, to report or set timestamp
   - sg_stpg: fix truncation of target port field
   - sg_inq: cope with unicode strings, udev fixes
@@ -18,7 +18,14 @@ Changelog for sg3_utils-1.42 [20151210] [svn: r653]
   - sg_sanitize: add --znr option (sbc4r07)
   - sg_rep_zones: add --partial option (zbc-r04)
   - sg_raw: document length relationships
+  - rescan-scsi-bus.sh: updates from Suse
   - sg_lib_data: sync asc/ascq codes with T10 20151126
+  - sg_lib: add 'sense' categories for SCSI statuses:
+    condition met, busy, task set full, ACA active and
+    task aborted
+    - add pr2serr() extern
+  - sg_pr2serr.h: new, to shorten fprintf(stderr, ...)
+  - sg_io_linux, sg_pt_linux: drop SUGGEST_* decoding
   - sg_unaligned.h: add 48 bit support
 
 Changelog for sg3_utils-1.41 [20150511] [svn: r644]

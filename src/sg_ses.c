@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -24,13 +23,14 @@
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#include "sg_pr2serr.h"
 
 /*
  * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.05 20151210";    /* ses3r08->11 */
+static const char * version_str = "2.06 20151219";    /* ses3r08->11 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -685,26 +685,6 @@ static int read_hex(const char * inp, unsigned char * arr, int * arr_len,
 static int strcase_eq(const char * s1p, const char * s2p);
 static void enumerate_diag_pages(void);
 static int saddr_non_zero(const unsigned char * ucp);
-
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 
 static void

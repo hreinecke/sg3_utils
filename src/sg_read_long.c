@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2014 D. Gilbert
+   *  Copyright (C) 2004-2015 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,8 +28,9 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "1.19 20140516";
+static const char * version_str = "1.20 20151219";
 
 #define MAX_XFER_LEN 10000
 
@@ -55,32 +56,31 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_read_long [--16] [--correct] [--help] [--lba=LBA] "
-          "[--out=OF]\n"
-          "                    [--pblock] [--readonly] [--verbose] "
-          "[--version]\n"
-          "                    [--xfer_len=BTL] DEVICE\n"
-          "  where:\n"
-          "    --16|-S              do READ LONG(16) (default: "
-          "READ LONG(10))\n"
-          "    --correct|-c         use ECC to correct data "
-          "(default: don't)\n"
-          "    --help|-h            print out usage message\n"
-          "    --lba=LBA|-l LBA     logical block address"
-          " (default: 0)\n"
-          "    --out=OF|-o OF       output in binary to file named OF\n"
-          "    --pblock|-p          fetch physical block containing LBA\n"
-          "    --readonly|-r        open DEVICE read-only (def: open it "
-          "read-write)\n"
-          "    --verbose|-v         increase verbosity\n"
-          "    --version|-V         print version string and"
-          " exit\n"
-          "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000)"
-          " default 520\n\n"
-          "Perform a SCSI READ LONG (10 or 16) command. Reads a single "
-          "block with\nassociated ECC data. User data could be scrambled.\n"
-          );
+    pr2serr("Usage: sg_read_long [--16] [--correct] [--help] [--lba=LBA] "
+            "[--out=OF]\n"
+            "                    [--pblock] [--readonly] [--verbose] "
+            "[--version]\n"
+            "                    [--xfer_len=BTL] DEVICE\n"
+            "  where:\n"
+            "    --16|-S              do READ LONG(16) (default: "
+            "READ LONG(10))\n"
+            "    --correct|-c         use ECC to correct data "
+            "(default: don't)\n"
+            "    --help|-h            print out usage message\n"
+            "    --lba=LBA|-l LBA     logical block address"
+            " (default: 0)\n"
+            "    --out=OF|-o OF       output in binary to file named OF\n"
+            "    --pblock|-p          fetch physical block containing LBA\n"
+            "    --readonly|-r        open DEVICE read-only (def: open it "
+            "read-write)\n"
+            "    --verbose|-v         increase verbosity\n"
+            "    --version|-V         print version string and"
+            " exit\n"
+            "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000)"
+            " default 520\n\n"
+            "Perform a SCSI READ LONG (10 or 16) command. Reads a single "
+            "block with\nassociated ECC data. User data could be "
+            "scrambled.\n");
 }
 
 /* Returns 0 if successful */
@@ -103,12 +103,12 @@ process_read_long(int sg_fd, int do_16, int pblock, int correct,
     case 0:
         break;
     case SG_LIB_CAT_ILLEGAL_REQ_WITH_INFO:
-        fprintf(stderr, "<<< device indicates 'xfer_len' should be %d "
-                ">>>\n", xfer_len - offset);
+        pr2serr("<<< device indicates 'xfer_len' should be %d >>>\n",
+                xfer_len - offset);
         break;
     default:
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "  SCSI READ LONG (%s): %s\n", ten_or, b);
+        pr2serr("  SCSI READ LONG (%s): %s\n", ten_or, b);
         break;
     }
     return res;
@@ -155,7 +155,7 @@ main(int argc, char * argv[])
         case 'l':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--lba'\n");
+                pr2serr("bad argument to '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             llba = (uint64_t)ll;
@@ -176,17 +176,17 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         case 'x':
             xfer_len = sg_get_num(optarg);
            if (-1 == xfer_len) {
-                fprintf(stderr, "bad argument to '--xfer_len'\n");
+                pr2serr("bad argument to '--xfer_len'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -198,41 +198,39 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (xfer_len >= MAX_XFER_LEN){
-        fprintf(stderr, "xfer_len (%d) is out of range ( < %d)\n",
-                xfer_len, MAX_XFER_LEN);
+        pr2serr("xfer_len (%d) is out of range ( < %d)\n", xfer_len,
+                MAX_XFER_LEN);
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
     if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
-        fprintf(stderr, ME "out of memory\n");
+        pr2serr(ME "out of memory\n");
         sg_cmds_close_device(sg_fd);
         return SG_LIB_SYNTAX_ERROR;
     }
     readLongBuff = (unsigned char *)rawp;
     memset(rawp, 0x0, MAX_XFER_LEN);
 
-    fprintf(stderr, ME "issue read long (%s) to device %s\n    xfer_len=%d "
-            "(0x%x), lba=%" PRIu64 " (0x%" PRIx64 "), correct=%d\n",
+    pr2serr(ME "issue read long (%s) to device %s\n    xfer_len=%d (0x%x), "
+            "lba=%" PRIu64 " (0x%" PRIx64 "), correct=%d\n",
             (do_16 ? "16" : "10"), device_name, xfer_len, xfer_len, llba,
             llba, correct);
 
@@ -273,7 +271,7 @@ err_out:
     if (rawp) free(rawp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

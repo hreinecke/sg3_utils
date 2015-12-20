@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Douglas Gilbert.
+ * Copyright (c) 2006-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,6 +20,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_pr2serr.h"
 
 /* This program uses a ATA PASS-THROUGH SCSI command to package an
  * ATA IDENTIFY (PACKAGE) DEVICE command. It is based on the SCSI to
@@ -64,30 +65,29 @@ static struct option long_options[] = {
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
-          "[--ident]\n"
-          "                       [--len=16|12] [--packet] [--raw] "
-          "[--readonly]\n"
-          "                       [--verbose] [--version] DEVICE\n"
-          "  where:\n"
-          "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
-          "    --extend|-e      sets extend bit in cdb (def: 0)\n"
-          "    --help|-h        print out usage message then exit\n"
-          "    --hex|-H         output response in hex\n"
-          "    --ident|-i       output WWN prefixed by 0x, if not available "
-          "output\n"
-          "                     0x0000000000000000\n"
-          "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
-          "(default: 16)\n"
-          "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
-          "DEVICE) command\n"
-          "    --raw|-r         output response in binary to stdout\n"
-          "    --readonly|-R    open DEVICE read-only (def: read-write)\n"
-          "    --verbose|-v     increase verbosity\n"
-          "    --version|-V     print version string and exit\n\n"
-          "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
-          "layer\n");
+    pr2serr("Usage: sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
+            "[--ident]\n"
+            "                       [--len=16|12] [--packet] [--raw] "
+            "[--readonly]\n"
+            "                       [--verbose] [--version] DEVICE\n"
+            "  where:\n"
+            "    --ck_cond|-c     sets ck_cond bit in cdb (def: 0)\n"
+            "    --extend|-e      sets extend bit in cdb (def: 0)\n"
+            "    --help|-h        print out usage message then exit\n"
+            "    --hex|-H         output response in hex\n"
+            "    --ident|-i       output WWN prefixed by 0x, if not "
+            "available output\n"
+            "                     0x0000000000000000\n"
+            "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
+            "(default: 16)\n"
+            "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
+            "DEVICE) command\n"
+            "    --raw|-r         output response in binary to stdout\n"
+            "    --readonly|-R    open DEVICE read-only (def: read-write)\n"
+            "    --verbose|-v     increase verbosity\n"
+            "    --version|-V     print version string and exit\n\n"
+            "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
+            "layer\n");
 }
 
 static void dStrRaw(const char* str, int len)
@@ -159,7 +159,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     if (0 == res) {
         ok = 1;
         if (verbose > 2)
-            fprintf(stderr, "command completed with SCSI GOOD status\n");
+            pr2serr("command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
         if (verbose > 1)
             sg_print_sense("ATA pass through", sense_buffer, sb_sz,
@@ -170,13 +170,13 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                 if ((0x20 == ssh.asc) && (0x0 == ssh.ascq)) {
                     ret = SG_LIB_CAT_INVALID_OP;
                     if (verbose < 2)
-                        fprintf(stderr, "ATA PASS-THROUGH (%d) not "
-                                "supported\n", cdb_len);
+                        pr2serr("ATA PASS-THROUGH (%d) not supported\n",
+                                cdb_len);
                 } else {
                     ret = SG_LIB_CAT_ILLEGAL_REQ;
                     if (verbose < 2)
-                        fprintf(stderr, "ATA PASS-THROUGH (%d), bad "
-                                "field in cdb\n", cdb_len);
+                        pr2serr("ATA PASS-THROUGH (%d), bad field in cdb\n",
+                                cdb_len);
                 }
                 return ret;
             case SPC_SK_NO_SENSE:
@@ -186,8 +186,8 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                     if (0x72 == ssh.response_code) {
                         if (SAT_ATA_RETURN_DESC != ata_return_desc[0]) {
                             if (verbose)
-                                fprintf(stderr, "did not find ATA Return "
-                                        "(sense) Descriptor\n");
+                                pr2serr("did not find ATA Return (sense) "
+                                        "Descriptor\n");
                             return SG_LIB_CAT_RECOVERED;
                         }
                         got_ard = 1;
@@ -197,9 +197,9 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                         break;
                     } else {
                         if (verbose < 2)
-                            fprintf(stderr, "ATA PASS-THROUGH (%d), "
-                                    "unexpected  response_code=0x%x\n",
-                                    ssh.response_code, cdb_len);
+                            pr2serr("ATA PASS-THROUGH (%d), unexpected  "
+                                    "response_code=0x%x\n", ssh.response_code,
+                                    cdb_len);
                             return SG_LIB_CAT_RECOVERED;
                     }
                 } else if (SPC_SK_RECOVERED_ERROR == ssh.sense_key)
@@ -211,72 +211,70 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                 }
             case SPC_SK_UNIT_ATTENTION:
                 if (verbose < 2)
-                    fprintf(stderr, "ATA PASS-THROUGH (%d), Unit Attention "
-                                "detected\n", cdb_len);
+                    pr2serr("ATA PASS-THROUGH (%d), Unit Attention detected\n",
+                            cdb_len);
                 return SG_LIB_CAT_UNIT_ATTENTION;
             case SPC_SK_NOT_READY:
                 if (verbose < 2)
-                    fprintf(stderr, "ATA PASS-THROUGH (%d), device not "
-                                "ready\n", cdb_len);
+                    pr2serr("ATA PASS-THROUGH (%d), device not ready\n",
+                            cdb_len);
                 return SG_LIB_CAT_NOT_READY;
             case SPC_SK_MEDIUM_ERROR:
             case SPC_SK_HARDWARE_ERROR:
                 if (verbose < 2)
-                    fprintf(stderr, "ATA PASS-THROUGH (%d), medium or "
-                            "hardware error\n", cdb_len);
+                    pr2serr("ATA PASS-THROUGH (%d), medium or hardware "
+                            "error\n", cdb_len);
                 return SG_LIB_CAT_MEDIUM_HARD;
             case SPC_SK_ABORTED_COMMAND:
                 if (0x10 == ssh.asc) {
-                    fprintf(stderr, "Aborted command: protection "
-                            "information\n");
+                    pr2serr("Aborted command: protection information\n");
                     return SG_LIB_CAT_PROTECTION;
                 } else {
-                    fprintf(stderr, "Aborted command: try again with%s '-p' "
-                            "option\n", (do_packet ? "out" : ""));
+                    pr2serr("Aborted command: try again with%s '-p' option\n",
+                            (do_packet ? "out" : ""));
                     return SG_LIB_CAT_ABORTED_COMMAND;
                 }
             case SPC_SK_DATA_PROTECT:
-                fprintf(stderr, "ATA PASS-THROUGH (%d): data protect, read "
-                            "only media?\n", cdb_len);
+                pr2serr("ATA PASS-THROUGH (%d): data protect, read only "
+                        "media?\n", cdb_len);
                 return SG_LIB_CAT_DATA_PROTECT;
             default:
                 if (verbose < 2)
-                    fprintf(stderr, "ATA PASS-THROUGH (%d), some sense "
-                            "data, use '-v' for more information\n", cdb_len);
+                    pr2serr("ATA PASS-THROUGH (%d), some sense data, use "
+                            "'-v' for more information\n", cdb_len);
                 return SG_LIB_CAT_SENSE;
             }
         } else {
-            fprintf(stderr, "CHECK CONDITION without response code ??\n");
+            pr2serr("CHECK CONDITION without response code ??\n");
             return SG_LIB_CAT_SENSE;
         }
         if (0x72 != (sense_buffer[0] & 0x7f)) {
-            fprintf(stderr, "expected descriptor sense format, response "
-                    "code=0x%x\n", sense_buffer[0]);
+            pr2serr("expected descriptor sense format, response code=0x%x\n",
+                    sense_buffer[0]);
             return SG_LIB_CAT_MALFORMED;
         }
     } else if (res > 0) {
         if (SAM_STAT_RESERVATION_CONFLICT == res) {
-            fprintf(stderr, "SCSI status: RESERVATION CONFLICT\n");
+            pr2serr("SCSI status: RESERVATION CONFLICT\n");
             return SG_LIB_CAT_RES_CONFLICT;
         } else {
-            fprintf(stderr, "Unexpected SCSI status=0x%x\n", res);
+            pr2serr("Unexpected SCSI status=0x%x\n", res);
             return SG_LIB_CAT_MALFORMED;
         }
     } else {
-        fprintf(stderr, "ATA pass through (%d) failed\n", cdb_len);
+        pr2serr("ATA pass through (%d) failed\n", cdb_len);
         if (verbose < 2)
-            fprintf(stderr, "    try adding '-v' for more information\n");
+            pr2serr("    try adding '-v' for more information\n");
         return -1;
     }
 
     if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (0 == got_ard))
-        fprintf(stderr, "Seem to have got ATA Result Descriptor but "
-                "it was not indicated\n");
+        pr2serr("Seem to have got ATA Result Descriptor but it was not "
+                "indicated\n");
     if (got_ard) {
         if (ata_return_desc[3] & 0x4) {
-                fprintf(stderr, "error indication in returned FIS: aborted "
-                        "command\n");
-                fprintf(stderr, "    try again with%s '-p' option\n",
+                pr2serr("error indication in returned FIS: aborted command\n");
+                pr2serr("    try again with%s '-p' option\n",
                         (do_packet ? "out" : ""));
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
@@ -284,9 +282,8 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     }
     if (got_fixsense) {
         if (0x4 & sense_buffer[3]) { /* Error is MSB of Info field */
-                fprintf(stderr, "error indication in returned FIS: aborted "
-                        "command\n");
-                fprintf(stderr, "    try again with%s '-p' option\n",
+                pr2serr("error indication in returned FIS: aborted command\n");
+                pr2serr("    try again with%s '-p' option\n",
                         (do_packet ? "out" : ""));
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
@@ -369,7 +366,7 @@ int main(int argc, char * argv[])
         case 'l':
             cdb_len = sg_get_num(optarg);
             if (! ((cdb_len == 12) || (cdb_len == 16))) {
-                fprintf(stderr, "argument to '--len' should be 12 or 16\n");
+                pr2serr("argument to '--len' should be 12 or 16\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -386,10 +383,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "version: %s\n", version_str);
+            pr2serr("version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -401,15 +398,14 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return 1;
     }
@@ -421,8 +417,8 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose)) < 0) {
-        fprintf(stderr, "error opening file: %s: %s\n",
-                device_name, safe_strerror(-sg_fd));
+        pr2serr("error opening file: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -431,7 +427,7 @@ int main(int argc, char * argv[])
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

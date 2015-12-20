@@ -28,9 +28,10 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.94 20151126";
+static const char * version_str = "3.95 20151219";
 
 #define ME "sg_readcap: "
 
@@ -76,8 +77,7 @@ struct opts_t {
 static void
 usage()
 {
-    fprintf(stderr,
-            "Usage: sg_readcap [--brief] [--help] [--hex] [--lba=LBA] "
+    pr2serr("Usage: sg_readcap [--brief] [--help] [--hex] [--lba=LBA] "
             "[--long] [--16]\n"
             "                  [--pmi] [--raw] [--readonly] [--verbose] "
             "[--version]\n"
@@ -111,7 +111,7 @@ usage()
 static void
 usage_old()
 {
-    fprintf(stderr, "Usage:  sg_readcap [-16] [-b] [-h] [-H] [-lba=LBA] "
+    pr2serr("Usage:  sg_readcap [-16] [-b] [-h] [-H] [-lba=LBA] "
             "[-pmi] [-r] [-R]\n"
             "                   [-v] [-V] [-z] DEVICE\n"
             "  where:\n"
@@ -184,7 +184,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'L':
             nn = sg_get_llnum(optarg);
             if (-1 == nn) {
-                fprintf(stderr, "bad argument to '--lba='\n");
+                pr2serr("bad argument to '--lba='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -218,7 +218,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_zbc;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (op->do_help)
                 break;
             usage();
@@ -232,8 +232,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -326,15 +325,15 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == op->device_name)
             op->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not expecting: "
-                    "%s\n", op->device_name, cp);
+            pr2serr("too many arguments, got: %s, not expecting: %s\n",
+                    op->device_name, cp);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -412,12 +411,12 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (NULL == op->device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -435,7 +434,7 @@ main(int argc, char * argv[])
     memset(resp_buff, 0, sizeof(resp_buff));
 
     if ((0 == op->do_pmi) && (op->llba > 0)) {
-        fprintf(stderr, ME "lba can only be non-zero when '--pmi' is set\n");
+        pr2serr(ME "lba can only be non-zero when '--pmi' is set\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -445,7 +444,7 @@ main(int argc, char * argv[])
         rw_0_flag = 1;  /* RCAP(10) has opened RO in past, so leave */
     if ((sg_fd = sg_cmds_open_device(op->device_name, rw_0_flag,
                                      op->do_verbose)) < 0) {
-        fprintf(stderr, ME "error opening file: %s: %s\n", op->device_name,
+        pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -511,16 +510,16 @@ main(int argc, char * argv[])
             sg_cmds_close_device(sg_fd);
             if ((sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
                                              op->do_verbose)) < 0) {
-                fprintf(stderr, ME "error re-opening file: %s (rw): %s\n",
+                pr2serr(ME "error re-opening file: %s (rw): %s\n",
                         op->device_name, safe_strerror(-sg_fd));
                 return SG_LIB_FILE_ERROR;
             }
             if (op->do_verbose)
-                fprintf(stderr, "READ CAPACITY (10) not supported, trying "
-                        "READ CAPACITY (16)\n");
+                pr2serr("READ CAPACITY (10) not supported, trying READ "
+                        "CAPACITY (16)\n");
         } else if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
-            fprintf(stderr, "READ CAPACITY (10) failed: %s\n", b);
+            pr2serr("READ CAPACITY (10) failed: %s\n", b);
         }
     }
     if (op->do_long) {
@@ -600,11 +599,11 @@ main(int argc, char * argv[])
             }
             goto good;
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in READ CAPACITY (16) cdb "
-                    "including unsupported service action\n");
+            pr2serr("bad field in READ CAPACITY (16) cdb including "
+                    "unsupported service action\n");
         else if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
-            fprintf(stderr, "READ CAPACITY (16) failed: %s\n", b);
+            pr2serr("READ CAPACITY (16) failed: %s\n", b);
         }
     }
     if (op->do_brief)
@@ -613,7 +612,7 @@ main(int argc, char * argv[])
 good:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

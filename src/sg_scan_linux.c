@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999 - 2013 D. Gilbert
+ *  Copyright (C) 1999 - 2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -48,9 +48,10 @@
 
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.10 20130507";
+static const char * version_str = "4.11 20151219";
 
 #define ME "sg_scan: "
 
@@ -226,7 +227,7 @@ int main(int argc, char * argv[])
                     ++verbose;
                     break;
                 case 'V':
-                    fprintf(stderr, "Version string: %s\n", version_str);
+                    pr2serr("Version string: %s\n", version_str);
                     exit(0);
                 case 'w':
                     writeable = 1;
@@ -244,7 +245,7 @@ int main(int argc, char * argv[])
             if (plen <= 0)
                 continue;
             if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -300,8 +301,8 @@ int main(int argc, char * argv[])
             else if ((ENODEV == errno) || (ENOENT == errno) ||
                      (ENXIO == errno)) {
                 if (verbose)
-                    fprintf(stderr, "Unable to open: %s, errno=%d\n",
-                            file_namep, errno);
+                    pr2serr("Unable to open: %s, errno=%d\n", file_namep,
+                            errno);
                 ++num_errors;
                 ++num_silent;
                 continue;

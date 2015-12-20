@@ -17,6 +17,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -25,7 +26,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.9 20151204";
+static const char * version_str = "1.10 20151219";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -89,39 +90,36 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_stpg   [--active] [--help] [--hex] [--offline] [--optimized] "
-          "[--raw]\n"
-          "                 [--standby] [--state=S,S...] [--tp=P,P...] "
-          "[--unavailable]\n"
-          "                 [--verbose] [--version] DEVICE\n"
-          "  where:\n"
-          "    --active|-a        set asymm. access state to "
-          "active/non-optimized\n"
-          "    --help|-h          print out usage message\n"
-          "    --hex|-H           print out report response in hex, then "
-          "exit\n"
-          "    --offline|-l       set asymm. access state to offline, takes "
-          "relative\n"
-          "                       target port id, rather than target port "
-          "group id\n"
-          "    --optimized|-o     set asymm. access state to "
-          "active/optimized\n"
-          "    --raw|-r           output report response in binary to "
-          "stdout, then exit\n"
-          "    --standby|-s       set asymm. access state to standby\n"
-          "    --state=S,S.. |-S S,S...     list of states (values or "
-          "acronyms)\n"
-          "    --tp=P,P.. |-t P,P...        list of target port group "
-          "identifiers,\n"
-          "                                 or relative target port "
-          "identifiers\n"
-          "    --unavailable|-u   set asymm. access state to unavailable\n"
-          "    --verbose|-v       increase verbosity\n"
-          "    --version|-V       print version string and exit\n\n"
-          "Performs a SCSI SET TARGET PORT GROUPS command\n"
-          );
-
+    pr2serr("Usage: sg_stpg   [--active] [--help] [--hex] [--offline] "
+            "[--optimized] [--raw]\n"
+            "                 [--standby] [--state=S,S...] [--tp=P,P...] "
+            "[--unavailable]\n"
+            "                 [--verbose] [--version] DEVICE\n"
+            "  where:\n"
+            "    --active|-a        set asymm. access state to "
+            "active/non-optimized\n"
+            "    --help|-h          print out usage message\n"
+            "    --hex|-H           print out report response in hex, then "
+            "exit\n"
+            "    --offline|-l       set asymm. access state to offline, takes "
+            "relative\n"
+            "                       target port id, rather than target port "
+            "group id\n"
+            "    --optimized|-o     set asymm. access state to "
+            "active/optimized\n"
+            "    --raw|-r           output report response in binary to "
+            "stdout, then exit\n"
+            "    --standby|-s       set asymm. access state to standby\n"
+            "    --state=S,S.. |-S S,S...     list of states (values or "
+            "acronyms)\n"
+            "    --tp=P,P.. |-t P,P...        list of target port group "
+            "identifiers,\n"
+            "                                 or relative target port "
+            "identifiers\n"
+            "    --unavailable|-u   set asymm. access state to unavailable\n"
+            "    --verbose|-v       increase verbosity\n"
+            "    --version|-V       print version string and exit\n\n"
+            "Performs a SCSI SET TARGET PORT GROUPS command\n");
 }
 
 static void
@@ -148,8 +146,8 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
         ucp = buff + off;
         i_len = ucp[3];
         if ((off + i_len + 4) > len) {
-            fprintf(stderr, "    VPD page error: designator length longer "
-                    "than\n     remaining response length=%d\n", (len - off));
+            pr2serr("    VPD page error: designator length longer than\n     "
+                    "remaining response length=%d\n", (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
         ip = ucp + 4;
@@ -160,8 +158,8 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
         switch (desig_type) {
         case 4: /* Relative target port */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-                fprintf(stderr, "      << expected binary code_set, target "
-                        "port association, length 4>>\n");
+                pr2serr("      << expected binary code_set, target port "
+                        "association, length 4>>\n");
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
@@ -169,8 +167,8 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
             break;
         case 5: /* (primary) Target port group */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-                fprintf(stderr, "      << expected binary code_set, target "
-                        "port association, length 4>>\n");
+                pr2serr("      << expected binary code_set, target port "
+                        "association, length 4>>\n");
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
@@ -181,7 +179,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
         }
     }
     if (-1 == *d_id || -1 == *d_tpg) {
-        fprintf(stderr, "VPD page error: no target port group information\n");
+        pr2serr("VPD page error: no target port group information\n");
         return SG_LIB_CAT_MALFORMED;
     }
     return 0;
@@ -299,7 +297,7 @@ build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
         *port_arr_len = 0;
     k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX,");
     if (in_len != k) {
-        fprintf(stderr, "build_port_arr: error at pos %d\n", k + 1);
+        pr2serr("build_port_arr: error at pos %d\n", k + 1);
         return 1;
     }
     for (k = 0; k < max_arr_len; ++k) {
@@ -311,14 +309,14 @@ build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
                 break;
             lcp = cp + 1;
         } else {
-            fprintf(stderr, "build_port_arr: error at pos %d\n",
+            pr2serr("build_port_arr: error at pos %d\n",
                     (int)(lcp - inp + 1));
             return 1;
         }
     }
     *port_arr_len = k + 1;
     if (k == max_arr_len) {
-        fprintf(stderr, "build_port_arr: array length exceeded\n");
+        pr2serr("build_port_arr: array length exceeded\n");
         return 1;
     }
     return 0;
@@ -347,7 +345,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
         *state_arr_len = 0;
     k = strspn(inp, "0123456789aAbBcCdDeEfFhHnNoOsSuUxX,");
     if (in_len != k) {
-        fprintf(stderr, "build_state_arr: error at pos %d\n", k + 1);
+        pr2serr("build_state_arr: error at pos %d\n", k + 1);
         return 1;
     }
     for (k = 0; k < max_arr_len; ++k) {
@@ -373,8 +371,8 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 state_arr[k] = 3;
                 break;
             default:
-                fprintf(stderr, "build_state_arr: expected 'ao', 'an', 'o', "
-                        "'s' or 'u' at pos %d\n", (int)(lcp - inp + 1));
+                pr2serr("build_state_arr: expected 'ao', 'an', 'o', 's' or "
+                        "'u' at pos %d\n", (int)(lcp - inp + 1));
                 return 1;
             }
         }
@@ -383,11 +381,11 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
             if (((v >= 0) && (v <= 3)) || (14 ==v))
                 state_arr[k] = v;
             else if (-1 == v) {
-                fprintf(stderr, "build_state_arr: error at pos %d\n",
+                pr2serr("build_state_arr: error at pos %d\n",
                         (int)(lcp - inp + 1));
                 return 1;
             } else {
-                fprintf(stderr, "build_state_arr: expect 0,1,2,3 or 14\n");
+                pr2serr("build_state_arr: expect 0,1,2,3 or 14\n");
                 return 1;
             }
         }
@@ -398,7 +396,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
     }
     *state_arr_len = k + 1;
     if (k == max_arr_len) {
-        fprintf(stderr, "build_state_arr: array length exceeded\n");
+        pr2serr("build_state_arr: array length exceeded\n");
         return 1;
     }
     return 0;
@@ -476,10 +474,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "Version: %s\n", version_str);
+            pr2serr("Version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -491,8 +489,7 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -513,8 +510,8 @@ main(int argc, char * argv[])
         }
     }
     if ((state >= 0) && (state_arr_len > 0)) {
-        fprintf(stderr, "either use individual state option or '--state=' "
-                "but not both\n");
+        pr2serr("either use individual state option or '--state=' but not "
+                "both\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -525,14 +522,13 @@ main(int argc, char * argv[])
         state_arr_len = 0;
     }
     if (state_arr_len > port_arr_len) {
-        fprintf(stderr, "'state=' list longer than expected\n");
+        pr2serr("'state=' list longer than expected\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((port_arr_len > 0) && (0 == state_arr_len)) {
         if (-1 == state) {
-            fprintf(stderr, "target port list given but no state "
-                    "indicated\n");
+            pr2serr("target port list given but no state indicated\n");
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -546,20 +542,19 @@ main(int argc, char * argv[])
         state_arr_len = port_arr_len;
     }
     if (port_arr_len != state_arr_len) {
-        fprintf(stderr, "'state=' and '--tp=' lists mismatched\n");
+        pr2serr("'state=' and '--tp=' lists mismatched\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -569,17 +564,17 @@ main(int argc, char * argv[])
         if (0 == res) {
             report_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
             if (VPD_DEVICE_ID != rsp_buff[1]) {
-                fprintf(stderr, "invalid VPD response; probably a STANDARD "
-                        "INQUIRY response\n");
+                pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
+                        "response\n");
                 if (verbose) {
-                    fprintf(stderr, "First 32 bytes of bad response\n");
+                    pr2serr("First 32 bytes of bad response\n");
                     dStrHexErr((const char *)rsp_buff, 32, 0);
                 }
                 return SG_LIB_CAT_MALFORMED;
             }
             if (report_len > MX_ALLOC_LEN) {
-                fprintf(stderr, "response length too long: %d > %d\n",
-                        report_len, MX_ALLOC_LEN);
+                pr2serr("response length too long: %d > %d\n", report_len,
+                        MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
                 if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
@@ -603,8 +598,8 @@ main(int argc, char * argv[])
             report_len = sg_get_unaligned_be32(reportTgtGrpBuff + 0) + 4;
             if (report_len > (int)sizeof(reportTgtGrpBuff)) {
                 /* trunc = 1; */
-                fprintf(stderr, "  <<report too long for internal buffer,"
-                        " output truncated\n");
+                pr2serr("  <<report too long for internal buffer, output "
+                        "truncated\n");
                 report_len = (int)sizeof(reportTgtGrpBuff);
             }
             if (raw) {
@@ -641,9 +636,9 @@ main(int argc, char * argv[])
             }
         } else {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "Report Target Port Groups: %s\n", b);
+            pr2serr("Report Target Port Groups: %s\n", b);
             if (0 == verbose)
-                fprintf(stderr, "    try '-v' for more information\n");
+                pr2serr("    try '-v' for more information\n");
         }
         if (0 != res)
              goto err_out;
@@ -674,15 +669,15 @@ main(int argc, char * argv[])
         goto err_out;
     else {
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Set Target Port Groups: %s\n", b);
+        pr2serr("Set Target Port Groups: %s\n", b);
         if (0 == verbose)
-            fprintf(stderr, "    try '-v' for more information\n");
+            pr2serr("    try '-v' for more information\n");
     }
 
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

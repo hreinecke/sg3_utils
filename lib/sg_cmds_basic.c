@@ -176,7 +176,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, int mx_di_len, const unsigned char * sbp,
                      int noisy, int verbose, int * o_sense_cat)
 {
-    int got, cat, duration, slen, resid, resp_code, sstat;
+    int got, cat, duration, slen, resid, resp_code, sstat, transport_sense;
     char b[1024];
 
     if (NULL == leadin)
@@ -213,7 +213,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     slen = get_scsi_pt_sense_len(ptvp);
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
     case SCSI_PT_RESULT_GOOD:
-        if (slen > 7) {
+        if (sbp && (slen > 7)) {
             resp_code = sbp[0] & 0x7f;
             /* SBC referrals can have status=GOOD and sense_key=COMPLETED */
             if (resp_code >= 0x70) {
@@ -228,18 +228,44 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         if (mx_di_len > 0) {
             got = mx_di_len - resid;
-            if ((verbose > 1) && (resid > 0))
+            if ((verbose > 1) && (resid != 0))
                 pr2ws("    %s: pass-through requested %d bytes (data-in) "
                       "but got %d bytes\n", leadin, mx_di_len, got);
-            return got;
+            if (got >= 0)
+                return got;
+            else {
+                if (verbose)
+                    pr2ws("    %s: pass-through can't get negative bytes, "
+                          "say it got none\n", leadin);
+                return 0;
+            }
         } else
             return 0;
     case SCSI_PT_RESULT_STATUS: /* other than GOOD and CHECK CONDITION */
         sstat = get_scsi_pt_status_response(ptvp);
-        if ((SAM_STAT_RESERVATION_CONFLICT == sstat) && o_sense_cat) {
-            /* treat this SCSI status as "sense" category */
-            *o_sense_cat = SG_LIB_CAT_RES_CONFLICT;
-            return -2;
+        if (o_sense_cat) {
+            switch (sstat) {
+            case SAM_STAT_RESERVATION_CONFLICT:
+                *o_sense_cat = SG_LIB_CAT_RES_CONFLICT;
+                return -2;
+            case SAM_STAT_CONDITION_MET:
+                *o_sense_cat = SG_LIB_CAT_CONDITION_MET;
+                return -2;
+            case SAM_STAT_BUSY:
+                *o_sense_cat = SG_LIB_CAT_BUSY;
+                return -2;
+            case SAM_STAT_TASK_SET_FULL:
+                *o_sense_cat = SG_LIB_CAT_TS_FULL;
+                return -2;
+            case SAM_STAT_ACA_ACTIVE:
+                *o_sense_cat = SG_LIB_CAT_ACA_ACTIVE;
+                return -2;
+            case SAM_STAT_TASK_ABORTED:
+                *o_sense_cat = SG_LIB_CAT_TASK_ABORTED;
+                return -2;
+            default:
+                break;
+            }
         }
         if (verbose || noisy) {
             sg_get_scsi_status_str(sstat, sizeof(b), b);
@@ -254,8 +280,13 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
             get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
             pr2ws("%s: transport: %s\n", leadin, b);
         }
-        if ((SAM_STAT_CHECK_CONDITION == get_scsi_pt_status_response(ptvp))
-            && (slen > 0))
+#ifdef SG_LIB_LINUX
+        transport_sense = (slen > 0);
+#else
+        transport_sense = ((SAM_STAT_CHECK_CONDITION ==
+                            get_scsi_pt_status_response(ptvp)) && (slen > 0));
+#endif
+        if (transport_sense)
             return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp,
                                           slen, noisy, verbose, o_sense_cat);
         else

@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -24,6 +23,7 @@
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -32,7 +32,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.03 20151126";
+static const char * version_str = "1.04 20151219";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -52,26 +52,6 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 usage()
@@ -182,7 +162,7 @@ main(int argc, char * argv[])
         case 'z':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                fprintf(stderr, "bad argument to '--zone=ID'\n");
+                pr2serr("bad argument to '--zone=ID'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             zid = (uint64_t)ll;

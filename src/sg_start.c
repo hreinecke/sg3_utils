@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 1999-2013 D. Gilbert
+ *  Copyright (C) 1999-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,9 +29,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.59 20130507";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.60 20151219";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},
@@ -75,7 +76,7 @@ struct opts_t {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: sg_start [--eject] [--fl=FL] [--help] "
+    pr2serr("Usage: sg_start [--eject] [--fl=FL] [--help] "
             "[--immed] [--load] [--loej]\n"
             "                [--mod=PC_MOD] [--noflush] [--pc=PC] "
             "[--readonly]\n"
@@ -121,7 +122,7 @@ usage()
 static void
 usage_old()
 {
-    fprintf(stderr, "Usage:  sg_start [0] [1] [--eject] [--fl=FL] "
+    pr2serr("Usage:  sg_start [0] [1] [--eject] [--fl=FL] "
             "[-i] [--imm=0|1]\n"
             "                 [--load] [--loej] [--mod=PC_MOD] "
             "[--noflush] [--pc=PC]\n"
@@ -184,7 +185,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'f':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 3)) {
-                fprintf(stderr, "bad argument to '--fl='\n");
+                pr2serr("bad argument to '--fl='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -209,7 +210,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'm':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 15)) {
-                fprintf(stderr, "bad argument to '--mod='\n");
+                pr2serr("bad argument to '--mod='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -226,7 +227,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'p':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 15)) {
-                fprintf(stderr, "bad argument to '--pc='\n");
+                pr2serr("bad argument to '--pc='\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -248,7 +249,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_version;
             break;
         default:
-            fprintf(stderr, "unrecognised option code %c [0x%x]\n", c, c);
+            pr2serr("unrecognised option code %c [0x%x]\n", c, c);
             if (op->do_help)
                 break;
             usage();
@@ -269,7 +270,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         if (NULL == op->device_name)
             op->device_name = argv[optind];
         else {
-            fprintf(stderr, "Unexpected extra argument: %s\n", argv[optind]);
+            pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             ++err;
         }
     }
@@ -346,7 +347,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("fl=", cp, 3)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if (1 != num) {
-                    fprintf(stderr, "Bad value after 'fl=' option\n");
+                    pr2serr("Bad value after 'fl=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -356,7 +357,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("imm=", cp, 4)) {
                 num = sscanf(cp + 4, "%x", &u);
                 if ((1 != num) || (u > 1)) {
-                    fprintf(stderr, "Bad value after 'imm=' option\n");
+                    pr2serr("Bad value after 'imm=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -372,7 +373,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             else if (0 == strncmp("pc=", cp, 3)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if ((1 != num) || (u > 15)) {
-                    fprintf(stderr, "Bad value after after 'pc=' option\n");
+                    pr2serr("Bad value after after 'pc=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -380,7 +381,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("mod=", cp, 4)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if (1 != num) {
-                    fprintf(stderr, "Bad value after 'mod=' option\n");
+                    pr2serr("Bad value after 'mod=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -400,7 +401,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp(cp, "old", 3))
                 ;
             else if (jmp_out) {
-                fprintf(stderr, "Unrecognized option: %s\n", cp);
+                pr2serr("Unrecognized option: %s\n", cp);
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -417,13 +418,13 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         } else if (0 == op->device_name)
                 op->device_name = cp;
         else {
-            fprintf(stderr, "too many arguments, got: %s, not "
+            pr2serr("too many arguments, got: %s, not "
                     "expecting: %s\n", op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
         if (ambigu) {
-            fprintf(stderr, "please, only one of 0, 1, --eject, "
+            pr2serr("please, only one of 0, 1, --eject, "
                     "--load, --start or --stop\n");
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
@@ -479,16 +480,16 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->do_version) {
-        fprintf(stderr, "Version string: %s\n", version_str);
+        pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (op->do_start && op->do_stop) {
-        fprintf(stderr, "Ambiguous to give both '--start' and '--stop'\n");
+        pr2serr("Ambiguous to give both '--start' and '--stop'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_load && op->do_eject) {
-        fprintf(stderr, "Ambiguous to give both '--load' and '--eject'\n");
+        pr2serr("Ambiguous to give both '--load' and '--eject'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_load)
@@ -502,7 +503,7 @@ main(int argc, char * argv[])
     /* default action is to start when no other active options */
 
     if (0 == op->device_name) {
-        fprintf(stderr, "No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n");
         if (op->opt_new)
             usage();
         else
@@ -512,13 +513,13 @@ main(int argc, char * argv[])
 
     if (op->do_fl >= 0) {
         if (op->do_start == 0) {
-            fprintf(stderr, "Giving '--fl=FL' with '--stop' (or "
-                    "'--eject') is invalid\n");
+            pr2serr("Giving '--fl=FL' with '--stop' (or '--eject') is "
+                    "invalid\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         if (op->do_pc > 0) {
-            fprintf(stderr, "Giving '--fl=FL' with '--pc=PC' "
-                    "when PC is non-zero is invalid\n");
+            pr2serr("Giving '--fl=FL' with '--pc=PC' when PC is non-zero "
+                    "is invalid\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -526,8 +527,8 @@ main(int argc, char * argv[])
     fd = sg_cmds_open_device(op->device_name, op->do_readonly,
                              op->do_verbose);
     if (fd < 0) {
-        fprintf(stderr, "Error trying to open %s: %s\n",
-                op->device_name, safe_strerror(-fd));
+        pr2serr("Error trying to open %s: %s\n", op->device_name,
+                safe_strerror(-fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -551,9 +552,9 @@ main(int argc, char * argv[])
             char b[80];
 
             sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
-            fprintf(stderr, "%s\n", b);
+            pr2serr("%s\n", b);
         }
-        fprintf(stderr, "START STOP UNIT command failed\n");
+        pr2serr("START STOP UNIT command failed\n");
     }
     res = sg_cmds_close_device(fd);
     if ((res < 0) && (0 == ret))

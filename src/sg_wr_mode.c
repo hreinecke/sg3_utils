@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,8 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -25,7 +27,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.14 20140518";
+static const char * version_str = "1.15 20151220";
 
 #define ME "sg_wr_mode: "
 
@@ -51,41 +53,40 @@ static struct option long_options[] = {
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_wr_mode [--contents=H,H...] [--dbd] [--force] [--help]\n"
-          "                  [--len=10|6] [--mask=M,M...] "
-          "[--page=PG[,SPG]] [--save]\n"
-          "                  [--verbose] [--version] DEVICE\n"
-          "  where:\n"
-          "    --contents=H,H... | -c H,H...    comma separated string "
-          "of hex numbers\n"
-          "                                     that is mode page contents "
-          "to write\n"
-          "    --contents=- | -c -   read stdin for mode page contents"
-          " to write\n"
-          "    --dbd | -d            disable block descriptors (DBD bit"
-          " in cdb)\n"
-          "    --force | -f          force the contents to be written\n"
-          "    --help | -h           print out usage message\n"
-          "    --len=10|6 | -l 10|6    use 10 byte (def) or 6 byte "
-          "variants of\n"
-          "                            SCSI MODE SENSE/SELECT commands\n"
-          "    --mask=M,M... | -m M,M...   comma separated "
-          "string of hex\n"
-          "                                numbers that mask contents"
-          " to write\n"
-          "    --page=PG | -p PG     page_code to be written (in hex)\n"
-          "    --page=PG,SPG | -p PG,SPG    page and subpage code to "
-          "be\n"
-          "                                 written (in hex)\n"
-          "    --save | -s           set 'save page' (SP) bit; default "
-          "don't so\n"
-          "                          only 'current' values changed\n"
-          "    --verbose | -v        increase verbosity\n"
-          "    --version | -V        print version string and exit\n\n"
-          "writes given mode page with SCSI MODE SELECT (10 or 6) "
-          "command\n"
-          );
+    pr2serr("Usage: sg_wr_mode [--contents=H,H...] [--dbd] [--force] "
+            "[--help]\n"
+            "                  [--len=10|6] [--mask=M,M...] "
+            "[--page=PG[,SPG]] [--save]\n"
+            "                  [--verbose] [--version] DEVICE\n"
+            "  where:\n"
+            "    --contents=H,H... | -c H,H...    comma separated string "
+            "of hex numbers\n"
+            "                                     that is mode page contents "
+            "to write\n"
+            "    --contents=- | -c -   read stdin for mode page contents"
+            " to write\n"
+            "    --dbd | -d            disable block descriptors (DBD bit"
+            " in cdb)\n"
+            "    --force | -f          force the contents to be written\n"
+            "    --help | -h           print out usage message\n"
+            "    --len=10|6 | -l 10|6    use 10 byte (def) or 6 byte "
+            "variants of\n"
+            "                            SCSI MODE SENSE/SELECT commands\n"
+            "    --mask=M,M... | -m M,M...   comma separated "
+            "string of hex\n"
+            "                                numbers that mask contents"
+            " to write\n"
+            "    --page=PG | -p PG     page_code to be written (in hex)\n"
+            "    --page=PG,SPG | -p PG,SPG    page and subpage code to "
+            "be\n"
+            "                                 written (in hex)\n"
+            "    --save | -s           set 'save page' (SP) bit; default "
+            "don't so\n"
+            "                          only 'current' values changed\n"
+            "    --verbose | -v        increase verbosity\n"
+            "    --version | -V        print version string and exit\n\n"
+            "writes given mode page with SCSI MODE SELECT (10 or 6) "
+            "command\n");
 }
 
 
@@ -140,8 +141,8 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                     if (1 == sscanf(carry_over, "%x", &h))
                         mp_arr[off - 1] = h;       /* back up and overwrite */
                     else {
-                        fprintf(stderr, "build_mode_page: carry_over error "
-                                "['%s'] around line %d\n", carry_over, j + 1);
+                        pr2serr("build_mode_page: carry_over error ['%s'] "
+                                "around line %d\n", carry_over, j + 1);
                         return 1;
                     }
                     lcp = line + 1;
@@ -160,16 +161,16 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
             if ((k < in_len) && ('#' != lcp[k])) {
-                fprintf(stderr, "build_mode_page: syntax error at "
+                pr2serr("build_mode_page: syntax error at "
                         "line %d, pos %d\n", j + 1, m + k + 1);
                 return 1;
             }
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        fprintf(stderr, "build_mode_page: hex number "
-                                "larger than 0xff in line %d, pos %d\n",
-                                j + 1, (int)(lcp - line + 1));
+                        pr2serr("%s: hex number larger than 0xff in line %d, "
+                                "pos %d\n", __func__, j + 1,
+                                (int)(lcp - line + 1));
                         return 1;
                     }
                     if (split_line && (1 == strlen(lcp))) {
@@ -177,8 +178,7 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        fprintf(stderr, "build_mode_page: array length "
-                                "exceeded\n");
+                        pr2serr("%s: array length exceeded\n", __func__);
                         return 1;
                     }
                     mp_arr[off + k] = h;
@@ -193,9 +193,8 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                         --k;
                         break;
                     }
-                    fprintf(stderr, "build_mode_page: error in "
-                            "line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
                     return 1;
                 }
             }
@@ -205,14 +204,14 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
     } else {        /* hex string on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
-            fprintf(stderr, "build_mode_page: error at pos %d\n", k + 1);
+            pr2serr("%s: error at pos %d\n", __func__, k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
-                    fprintf(stderr, "build_mode_page: hex number larger "
-                            "than 0xff at pos %d\n", (int)(lcp - inp + 1));
+                    pr2serr("%s: hex number larger than 0xff at pos %d\n",
+                            __func__, (int)(lcp - inp + 1));
                     return 1;
                 }
                 mp_arr[k] = h;
@@ -226,14 +225,14 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                fprintf(stderr, "build_mode_page: error at pos %d\n",
+                pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
                 return 1;
             }
         }
         *mp_arr_len = k + 1;
         if (k == max_arr_len) {
-            fprintf(stderr, "build_mode_page: array length exceeded\n");
+            pr2serr("%s: array length exceeded\n", __func__);
             return 1;
         }
     }
@@ -260,19 +259,19 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
     if (0 == in_len)
         *mask_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
-        fprintf(stderr, "'--mask' does not accept input from stdin\n");
+        pr2serr("'--mask' does not accept input from stdin\n");
         return 1;
     } else {        /* hex string on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
-            fprintf(stderr, "build_mode_page: error at pos %d\n", k + 1);
+            pr2serr("%s: error at pos %d\n", __func__, k + 1);
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
-                    fprintf(stderr, "build_mode_page: hex number larger "
-                            "than 0xff at pos %d\n", (int)(lcp - inp + 1));
+                    pr2serr("%s: hex number larger than 0xff at pos %d\n",
+                            __func__, (int)(lcp - inp + 1));
                     return 1;
                 }
                 mask_arr[k] = h;
@@ -286,14 +285,14 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                fprintf(stderr, "build_mode_page: error at pos %d\n",
+                pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
                 return 1;
             }
         }
         *mask_arr_len = k + 1;
         if (k == max_arr_len) {
-            fprintf(stderr, "build_mode_page: array length exceeded\n");
+            pr2serr("%s: array length exceeded\n", __func__);
             return 1;
         }
     }
@@ -338,7 +337,7 @@ int main(int argc, char * argv[])
             memset(read_in, 0, sizeof(read_in));
             if (0 != build_mode_page(optarg, read_in, &read_in_len,
                                      sizeof(read_in))) {
-                fprintf(stderr, "bad argument to '--contents'\n");
+                pr2serr("bad argument to '--contents'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             got_contents = 1;
@@ -358,7 +357,7 @@ int main(int argc, char * argv[])
             if ((1 == num) && ((6 == res) || (10 == res)))
                 mode_6 = (6 == res) ? 1 : 0;
             else {
-                fprintf(stderr, "length (of cdb) must be 6 or 10\n");
+                pr2serr("length (of cdb) must be 6 or 10\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -366,7 +365,7 @@ int main(int argc, char * argv[])
             memset(mask_in, 0xff, sizeof(mask_in));
             if (0 != build_mask(optarg, mask_in, &mask_in_len,
                                 sizeof(mask_in))) {
-                fprintf(stderr, "bad argument to '--mask'\n");
+                pr2serr("bad argument to '--mask'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             got_mask = 1;
@@ -375,22 +374,20 @@ int main(int argc, char * argv[])
            if (NULL == strchr(optarg, ',')) {
                 num = sscanf(optarg, "%x", &u);
                 if ((1 != num) || (u > 62)) {
-                    fprintf(stderr, "Bad page code value after '--page' "
-                            "switch\n");
+                    pr2serr("Bad page code value after '--page' switch\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 pg_code = u;
             } else if (2 == sscanf(optarg, "%x,%x", &u, &uu)) {
                 if (uu > 254) {
-                    fprintf(stderr, "Bad sub page code value after '--page'"
-                            " switch\n");
+                    pr2serr("Bad sub page code value after '--page' switch\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 pg_code = u;
                 sub_pg_code = uu;
             } else {
-                fprintf(stderr, "Bad page code, subpage code sequence after "
-                        "'--page' switch\n");
+                pr2serr("Bad page code, subpage code sequence after '--page' "
+                        "switch\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -401,10 +398,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -416,32 +413,30 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (pg_code < 0) {
-        fprintf(stderr, "need page code (see '--page=')\n");
+        pr2serr("need page code (see '--page=')\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (got_mask && force) {
-        fprintf(stderr, "cannot use both '--force' and '--mask'\n");
+        pr2serr("cannot use both '--force' and '--mask'\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_data, 0, verbose))
@@ -462,17 +457,17 @@ int main(int argc, char * argv[])
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "MODE SENSE (%d) not supported, try '--len=%d'\n",
+            pr2serr("MODE SENSE (%d) not supported, try '--len=%d'\n",
                     (mode_6 ? 6 : 10), (mode_6 ? 10 : 6));
         else {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), b);
+            pr2serr("MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), b);
         }
         goto err_out;
     }
     off = sg_mode_page_offset(ref_md, alloc_len, mode_6, ebuff, EBUFF_SZ);
     if (off < 0) {
-        fprintf(stderr, "MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), ebuff);
+        pr2serr("MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), ebuff);
         goto err_out;
     }
     if (mode_6) {
@@ -481,12 +476,12 @@ int main(int argc, char * argv[])
         bd_len = ref_md[3];
     } else {
         hdr_len = 8;
-        md_len = (ref_md[0] << 8) + ref_md[1] + 2;
-        bd_len = (ref_md[6] << 8) + ref_md[7];
+        md_len = sg_get_unaligned_be16(ref_md + 0) + 2;
+        bd_len = sg_get_unaligned_be16(ref_md + 6);
     }
     if (got_contents) {
         if (read_in_len < 2) {
-            fprintf(stderr, "contents length=%d too short\n", read_in_len);
+            pr2serr("contents length=%d too short\n", read_in_len);
             goto err_out;
         }
         ref_md[0] = 0;  /* mode data length reserved for mode select */
@@ -495,8 +490,8 @@ int main(int argc, char * argv[])
         if (0 == pdt)   /* for disks mask out DPOFUA bit */
             ref_md[mode_6 ? 2 : 3] &= 0xef;
         if (md_len > alloc_len) {
-            fprintf(stderr, "mode data length=%d exceeds allocation "
-                    "length=%d\n", md_len, alloc_len);
+            pr2serr("mode data length=%d exceeds allocation length=%d\n",
+                    md_len, alloc_len);
             goto err_out;
         }
         if (got_mask) {
@@ -512,28 +507,28 @@ int main(int argc, char * argv[])
         }
         if (! force) {
             if ((! (ref_md[off] & 0x80)) && save) {
-                fprintf(stderr, "PS bit in existing mode page indicates that "
-                        "it is not saveable\n    but '--save' option given\n");
+                pr2serr("PS bit in existing mode page indicates that it is "
+                        "not saveable\n    but '--save' option given\n");
                 goto err_out;
             }
             read_in[0] &= 0x7f; /* mask out PS bit, reserved in mode select */
             if ((md_len - off) != read_in_len) {
-                fprintf(stderr, "contents length=%d but reference mode page "
+                pr2serr("contents length=%d but reference mode page "
                         "length=%d\n", read_in_len, md_len - off);
                 goto err_out;
             }
             if (pg_code != (read_in[0] & 0x3f)) {
-                fprintf(stderr, "contents page_code=0x%x but reference "
+                pr2serr("contents page_code=0x%x but reference "
                         "page_code=0x%x\n", (read_in[0] & 0x3f), pg_code);
                 goto err_out;
             }
             if ((read_in[0] & 0x40) != (ref_md[off] & 0x40)) {
-                fprintf(stderr, "contents flags subpage but reference page"
-                        "does not (or vice versa)\n");
+                pr2serr("contents flags subpage but reference page does not "
+                        "(or vice versa)\n");
                 goto err_out;
             }
             if ((read_in[0] & 0x40) && (read_in[1] != sub_pg_code)) {
-                fprintf(stderr, "contents subpage_code=0x%x but reference "
+                pr2serr("contents subpage_code=0x%x but reference "
                         "sub_page_code=0x%x\n", read_in[1], sub_pg_code);
                 goto err_out;
             }
@@ -550,7 +545,7 @@ int main(int argc, char * argv[])
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "MODE SELECT (%d): %s\n", (mode_6 ? 6 : 10), b);
+            pr2serr("MODE SELECT (%d): %s\n", (mode_6 ? 6 : 10), b);
             goto err_out;
         }
     } else {
@@ -568,7 +563,7 @@ int main(int argc, char * argv[])
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

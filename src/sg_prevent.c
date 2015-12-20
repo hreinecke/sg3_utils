@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,6 +17,7 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -24,7 +25,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.07 20140516";
+static const char * version_str = "1.08 20151219";
 
 #define ME "sg_prevent: "
 
@@ -40,22 +41,21 @@ static struct option long_options[] = {
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_prevent [--allow] [--help] [--prevent=PC] [--verbose] "
-          "[--version]\n"
-          "                  DEVICE\n"
-          "  where:\n"
-          "    --allow|-a            allow media removal\n"
-          "    --help|-h             print usage message then exit\n"
-          "    --prevent=PC|-p PC    prevent code value (def: 1 -> "
-          "prevent)\n"
-          "                            0 -> allow, 1 -> prevent\n"
-          "                            2 -> persistent allow, 3 -> "
-          "persistent prevent\n"
-          "    --verbose|-v          increase verbosity\n"
-          "    --version|-V          print version string and exit\n\n"
-          "Performs a SCSI PREVENT ALLOW MEDIUM REMOVAL command\n"
-          );
+    pr2serr("Usage: "
+            "sg_prevent [--allow] [--help] [--prevent=PC] [--verbose] "
+            "[--version]\n"
+            "                  DEVICE\n"
+            "  where:\n"
+            "    --allow|-a            allow media removal\n"
+            "    --help|-h             print usage message then exit\n"
+            "    --prevent=PC|-p PC    prevent code value (def: 1 -> "
+            "prevent)\n"
+            "                            0 -> allow, 1 -> prevent\n"
+            "                            2 -> persistent allow, 3 -> "
+            "persistent prevent\n"
+            "    --verbose|-v          increase verbosity\n"
+            "    --version|-V          print version string and exit\n\n"
+            "Performs a SCSI PREVENT ALLOW MEDIUM REMOVAL command\n");
 
 }
 
@@ -87,7 +87,7 @@ int main(int argc, char * argv[])
         case 'p':
            prevent = sg_get_num(optarg);
            if ((prevent < 0) || (prevent > 3)) {
-                fprintf(stderr, "bad argument to '--prevent'\n");
+                pr2serr("bad argument to '--prevent'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -95,10 +95,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -110,19 +110,18 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (allow && (prevent >= 0)) {
-        fprintf(stderr, "can't give both '--allow' and '--prevent='\n");
+        pr2serr("can't give both '--allow' and '--prevent='\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -133,7 +132,7 @@ int main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
+        pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -143,11 +142,11 @@ int main(int argc, char * argv[])
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Prevent allow medium removal: %s\n", b);
+        pr2serr("Prevent allow medium removal: %s\n", b);
     }
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

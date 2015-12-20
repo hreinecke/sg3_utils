@@ -37,7 +37,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -62,8 +61,9 @@
 #include "sg_cmds_extra.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "0.49 20150227";
+static const char * version_str = "0.50 20151227";
 
 #define ME "sg_xcopy: "
 
@@ -194,25 +194,7 @@ static const char * rec_copy_op_params_str = "Receive copy operating "
                                              "parameters";
 
 static void calc_duration_throughput(int contin);
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
 
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 install_handler(int sig_num, void (*sig_handler) (int sig))
@@ -228,7 +210,6 @@ install_handler(int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-
 static void
 print_stats(const char * str)
 {
@@ -239,7 +220,6 @@ print_stats(const char * str)
     pr2serr("%s%" PRId64 "+%d records out\n", str, out_full - out_partial,
             out_partial);
 }
-
 
 static void
 interrupt_handler(int sig)
@@ -256,7 +236,6 @@ interrupt_handler(int sig)
     print_stats("");
     kill(getpid (), sig);
 }
-
 
 static void
 siginfo_handler(int sig)

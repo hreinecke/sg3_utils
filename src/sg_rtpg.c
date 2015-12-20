@@ -18,6 +18,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -26,7 +28,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.19 20140515";
+static const char * version_str = "1.20 20151219";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -56,21 +58,20 @@ static struct option long_options[] = {
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_rtpg   [--decode] [--extended] [--help] [--hex] [--raw] "
-          "[--readonly]\n"
-          "                 [--verbose] [--version] DEVICE\n"
-          "  where:\n"
-          "    --decode|-d        decode status and asym. access state\n"
-          "    --extended|-e      use extended header parameter data format\n"
-          "    --help|-h          print out usage message\n"
-          "    --hex|-H           print out response in hex\n"
-          "    --raw|-r           output response in binary to stdout\n"
-          "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
-          "    --verbose|-v       increase verbosity\n"
-          "    --version|-V       print version string and exit\n\n"
-          "Performs a SCSI REPORT TARGET PORT GROUPS command\n"
-          );
+    pr2serr("Usage: sg_rtpg   [--decode] [--extended] [--help] [--hex] "
+            "[--raw] [--readonly]\n"
+            "                 [--verbose] [--version] DEVICE\n"
+            "  where:\n"
+            "    --decode|-d        decode status and asym. access state\n"
+            "    --extended|-e      use extended header parameter data "
+            "format\n"
+            "    --help|-h          print out usage message\n"
+            "    --hex|-H           print out response in hex\n"
+            "    --raw|-r           output response in binary to stdout\n"
+            "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
+            "    --verbose|-v       increase verbosity\n"
+            "    --version|-V       print version string and exit\n\n"
+            "Performs a SCSI REPORT TARGET PORT GROUPS command\n");
 
 }
 
@@ -178,10 +179,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, "Version: %s\n", version_str);
+            pr2serr("Version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -193,15 +194,14 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -214,8 +214,7 @@ int main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -227,14 +226,11 @@ int main(int argc, char * argv[])
                                     extended, 1, verbose);
     ret = res;
     if (0 == res) {
-        report_len = (reportTgtGrpBuff[0] << 24) +
-                     (reportTgtGrpBuff[1] << 16) +
-                     (reportTgtGrpBuff[2] << 8) +
-                     reportTgtGrpBuff[3] + 4;
+        report_len = sg_get_unaligned_be32(reportTgtGrpBuff + 0) + 4;
         if (report_len > (int)sizeof(reportTgtGrpBuff)) {
             /* trunc = 1; */
-            fprintf(stderr, "  <<report too long for internal buffer,"
-                    " output truncated\n");
+            pr2serr("  <<report too long for internal buffer, output "
+                    "truncated\n");
             report_len = (int)sizeof(reportTgtGrpBuff);
         }
         if (raw) {
@@ -253,7 +249,7 @@ int main(int argc, char * argv[])
         ucp = reportTgtGrpBuff + 4;
         if (extended) {
              if (0x10 != (ucp[0] & 0x70)) {
-                  fprintf(stderr, "   <<invalid extended header format\n");
+                  pr2serr("   <<invalid extended header format\n");
                   goto err_out;
              }
              printf("  Implicit transition time: %d\n", ucp[1]);
@@ -263,7 +259,7 @@ int main(int argc, char * argv[])
              k += off, ucp += off) {
 
             printf("  target port group id : 0x%x , Pref=%d, Rtpg_fmt=%d\n",
-                   (ucp[2] << 8) + ucp[3], !!(ucp[0] & 0x80),
+                   sg_get_unaligned_be16(ucp + 2), !!(ucp[0] & 0x80),
                    (ucp[0] >> 4) & 0x07);
             printf("    target port group asymmetric access state : ");
             printf("0x%02x", ucp[0] & 0x0f);
@@ -296,26 +292,26 @@ int main(int argc, char * argv[])
                 if (0 == j)
                     printf("    Relative target port ids:\n");
                 printf("      0x%02x\n",
-                       (ucp[8 + j + 2] << 8) + ucp[8 + j + 3]);
+                       sg_get_unaligned_be16(ucp + 8 + j + 2));
             }
             off = 8 + j;
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
-        fprintf(stderr, "Report Target Port Groups command not supported\n");
+        pr2serr("Report Target Port Groups command not supported\n");
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        fprintf(stderr, "bad field in Report Target Port Groups cdb "
-                "including unsupported service action\n");
+        pr2serr("bad field in Report Target Port Groups cdb including "
+                "unsupported service action\n");
     else {
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        fprintf(stderr, "Report Target Port Groups: %s\n", b);
+        pr2serr("Report Target Port Groups: %s\n", b);
     }
 
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

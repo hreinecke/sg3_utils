@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Douglas Gilbert.
+ * Copyright (c) 2014-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
@@ -30,13 +29,14 @@
 #endif
 #endif
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /*
  * This utility issues the SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.02 20141029";    /* ses3r07 */
+static const char * version_str = "1.03 20151219";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -78,26 +78,6 @@ static struct option long_options[] = {
     {0, 0, 0, 0},
 };
 
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static void
 usage()
@@ -793,9 +773,9 @@ fini:
                     ((MODE_DNLD_STATUS == op->mc_mode) ?
                      "" : "SEND DIAGNOSTIC or "));
         else if (ret > 0)
-            fprintf(stderr, "Failed, exit status %d\n", ret);
+            pr2serr("Failed, exit status %d\n", ret);
         else if (ret < 0)
-            fprintf(stderr, "Some error occurred\n");
+            pr2serr("Some error occurred\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

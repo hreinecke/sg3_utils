@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,7 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pr2serr.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -25,7 +26,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.25 20140515";
+static const char * version_str = "1.26 20151219";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -62,8 +63,7 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    fprintf(stderr, "Usage: "
-            "sg_requests [--desc] [--help] [--hex] [--maxlen=LEN] "
+    pr2serr("Usage: sg_requests [--desc] [--help] [--hex] [--maxlen=LEN] "
             "[--num=NUM]\n"
             "                   [--progress] [--raw] [--status] [--time] "
             "[--verbose]\n"
@@ -145,15 +145,15 @@ main(int argc, char * argv[])
         case 'm':
             maxlen = sg_get_num(optarg);
             if ((maxlen < 0) || (maxlen > MAX_REQS_RESP_LEN)) {
-                fprintf(stderr, "argument to '--maxlen' should be %d or "
-                        "less\n", MAX_REQS_RESP_LEN);
+                pr2serr("argument to '--maxlen' should be %d or less\n",
+                        MAX_REQS_RESP_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'n':
            num_rs = sg_get_num(optarg);
            if (num_rs < 1) {
-                fprintf(stderr, "bad argument to '--num'\n");
+                pr2serr("bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -175,10 +175,10 @@ main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -190,8 +190,7 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -200,7 +199,7 @@ main(int argc, char * argv[])
     if (0 == maxlen)
         maxlen = DEF_REQS_RESP_LEN;
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -213,8 +212,7 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, 1 /* ro */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (do_progress) {
@@ -227,21 +225,21 @@ main(int argc, char * argv[])
             if (res) {
                 ret = res;
                 if (SG_LIB_CAT_INVALID_OP == res)
-                    fprintf(stderr, "Request Sense command not supported\n");
+                    pr2serr("Request Sense command not supported\n");
                 else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                    fprintf(stderr, "bad field in Request Sense cdb\n");
+                    pr2serr("bad field in Request Sense cdb\n");
                 else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                    fprintf(stderr, "Request Sense, aborted command\n");
+                    pr2serr("Request Sense, aborted command\n");
                 else {
                     sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                    fprintf(stderr, "Request Sense command: %s\n", b);
+                    pr2serr("Request Sense command: %s\n", b);
                 }
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
-                fprintf(stderr, "Parameter data in hex\n");
+                pr2serr("Parameter data in hex\n");
                 dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
             progress = -1;
@@ -250,8 +248,8 @@ main(int argc, char * argv[])
             if (progress < 0) {
                 ret = res;
                 if (verbose > 1)
-                     fprintf(stderr, "No progress indication found, "
-                             "iteration %d\n", k + 1);
+                     pr2serr("No progress indication found, iteration %d\n",
+                             k + 1);
                 /* N.B. exits first time there isn't a progress indication */
                 break;
             } else
@@ -284,23 +282,23 @@ main(int argc, char * argv[])
             else if (do_hex)
                 dStrHex((const char *)requestSenseBuff, resp_len, 1);
             else if (1 == num_rs) {
-                fprintf(stderr, "Decode parameter data as sense data:\n");
+                pr2serr("Decode parameter data as sense data:\n");
                 sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
                 if (verbose > 1) {
-                    fprintf(stderr, "\nParameter data in hex\n");
+                    pr2serr("\nParameter data in hex\n");
                     dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
                 }
             }
             continue;
         } else if (SG_LIB_CAT_INVALID_OP == res)
-            fprintf(stderr, "Request Sense command not supported\n");
+            pr2serr("Request Sense command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            fprintf(stderr, "bad field in Request Sense cdb\n");
+            pr2serr("bad field in Request Sense cdb\n");
         else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            fprintf(stderr, "Request Sense, aborted command\n");
+            pr2serr("Request Sense, aborted command\n");
         else {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "Request Sense command: %s\n", b);
+            pr2serr("Request Sense command: %s\n", b);
         }
         break;
     }
@@ -343,7 +341,7 @@ main(int argc, char * argv[])
 finish:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

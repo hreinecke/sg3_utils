@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2014 D. Gilbert
+ *  Copyright (C) 1999-2015 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -28,7 +29,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.59 20141024";
+static const char * version_str = "0.60 20151219";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -62,12 +63,30 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+#ifdef __GNUC__
+static int pr2serr(const char * fmt, ...)
+        __attribute__ ((format (printf, 1, 2)));
+#else
+static int pr2serr(const char * fmt, ...);
+#endif
+
+
+static int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 static void
 usage(int compat_mode)
 {
-    fprintf(stderr, "Usage: "
-            "sg_reset [--bus] [--device] [--help] [--host] [--no-esc] "
+    pr2serr("Usage: sg_reset [--bus] [--device] [--help] [--host] [--no-esc] "
             "[--target]\n"
             "                [--verbose] [--version] DEVICE\n"
             "  where:\n"
@@ -75,16 +94,13 @@ usage(int compat_mode)
             "targets\n"
             "    --device|-d     device (logical unit) reset\n");
     if (compat_mode) {
-        fprintf(stderr,
-                "    --help|-z       print usage information then exit\n"
+        pr2serr("    --help|-z       print usage information then exit\n"
                 "    --host|-h|-H    host (bus adapter: HBA) reset\n");
     } else {
-        fprintf(stderr,
-                "    --help|-h       print usage information then exit\n"
+        pr2serr("    --help|-h       print usage information then exit\n"
                 "    --host|-H       host (bus adapter: HBA) reset\n");
     }
-    fprintf(stderr,
-            "    --no-esc|-N     overrides default action and only does "
+    pr2serr("    --no-esc|-N     overrides default action and only does "
             "reset requested\n"
             "    --target|-t     target reset. The target holds the DEVICE "
             "and perhaps\n"
@@ -156,13 +172,13 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         case 'z':
             usage(!!cp);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage(!!cp);
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -175,14 +191,13 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage(!!cp);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (NULL == device_name) {
-        fprintf(stderr, "Missing DEVICE name. Use '--help' to see usage.\n");
+        pr2serr("Missing DEVICE name. Use '--help' to see usage.\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -191,14 +206,13 @@ int main(int argc, char * argv[])
 
     if ((!!do_device_reset + !!do_target_reset + !!do_bus_reset +
          !!do_host_reset) > 1) {
-        fprintf(stderr, "Can only request one type of reset per "
-                "invocation\n");
+        pr2serr("Can only request one type of reset per invocation\n");
         return 1;
     }
 
     sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: ", device_name);
+        pr2serr(ME "open error: %s: ", device_name);
         perror("");
         return 1;
     }
@@ -227,42 +241,38 @@ int main(int argc, char * argv[])
     if (no_escalate)
         k += SG_SCSI_RESET_NO_ESCALATE;
     if (verbose > 2)
-        fprintf(stderr, "    third argument to ioctl(SG_SCSI_RESET) is "
-                "0x%x\n", k);
+        pr2serr("    third argument to ioctl(SG_SCSI_RESET) is 0x%x\n", k);
 
     res = ioctl(sg_fd, SG_SCSI_RESET, &k);
     if (res < 0) {
         hold_errno = errno;
         switch (errno) {
         case EBUSY:
-            fprintf(stderr, ME "BUSY, may be resetting now\n");
+            pr2serr(ME "BUSY, may be resetting now\n");
             break;
         case ENODEV:
-            fprintf(stderr, ME "'no device' error, may be temporary while "
-                    "device is resetting\n");
+            pr2serr(ME "'no device' error, may be temporary while device is "
+                    "resetting\n");
             break;
         case EAGAIN:
-            fprintf(stderr, ME "try again later, may be resetting now\n");
+            pr2serr(ME "try again later, may be resetting now\n");
             break;
         case EIO:
-            fprintf(stderr, ME "reset (for value=0x%x) may not be "
-                    "available\n", k);
+            pr2serr(ME "reset (for value=0x%x) may not be available\n", k);
             break;
         case EPERM:
         case EACCES:
-            fprintf(stderr, ME "reset requires CAP_SYS_ADMIN (root) "
-                   "permission\n");
+            pr2serr(ME "reset requires CAP_SYS_ADMIN (root) permission\n");
             break;
         case EINVAL:
-            fprintf(stderr, ME "SG_SCSI_RESET not supported (for "
-                    "value=0x%x)\n", k);
+            pr2serr(ME "SG_SCSI_RESET not supported (for value=0x%x)\n", k);
         default:
             perror(ME "SG_SCSI_RESET failed");
             break;
         }
         if (verbose > 1)
-            fprintf(stderr, ME "ioctl(SG_SCSI_RESET) returned %d, errno=%d\n",
-                    res, hold_errno);
+            pr2serr(ME "ioctl(SG_SCSI_RESET) returned %d, errno=%d\n", res,
+                    hold_errno);
         close(sg_fd);
         return 1;
     }

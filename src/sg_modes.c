@@ -25,8 +25,10 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
-static const char * version_str = "1.47 20151123";
+static const char * version_str = "1.48 20151219";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -84,27 +86,6 @@ struct opts_t {
     const char * device_name;
     int opt_new;
 };
-
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 
 static void
@@ -912,7 +893,7 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
         }
         if (0 == res) {
             len = op->do_six ? (rbuf[0] + 1) :
-                                  ((rbuf[0] << 8) + rbuf[1] + 2);
+                               (sg_get_unaligned_be16(rbuf + 0) + 2);
             if (len > mresp_len)
                 len = mresp_len;
             if (op->do_raw) {
@@ -1172,8 +1153,8 @@ main(int argc, char * argv[])
             longlba = 0;
         } else {
             headerlen = 8;
-            md_len = (rsp_buff[0] << 8) + rsp_buff[1] + 2;
-            bd_len = (rsp_buff[6] << 8) + rsp_buff[7];
+            md_len = sg_get_unaligned_be16(rsp_buff + 0) + 2;
+            bd_len = sg_get_unaligned_be16(rsp_buff + 6);
             medium_type = rsp_buff[2];
             specific = rsp_buff[3];
             longlba = rsp_buff[4] & 1;
@@ -1189,7 +1170,8 @@ main(int argc, char * argv[])
                 ucp = rsp_buff + bd_len + headerlen;
                 md_len -= bd_len + headerlen;
                 spf = ((ucp[0] & 0x40) ? 1 : 0);
-                len = (spf ? ((ucp[2] << 8) + ucp[3] + 4) : (ucp[1] + 2));
+                len = (spf ? (sg_get_unaligned_be16(ucp + 2) + 4) :
+                             (ucp[1] + 2));
                 len = (len < md_len) ? len : md_len;
                 for (k = 0; k < len; ++k)
                     printf("%02x\n", ucp[k]);
@@ -1259,7 +1241,7 @@ main(int argc, char * argv[])
             }
             uc = *ucp;
             spf = ((uc & 0x40) ? 1 : 0);
-            len = (spf ? ((ucp[2] << 8) + ucp[3] + 4) : (ucp[1] + 2));
+            len = (spf ? (sg_get_unaligned_be16(ucp + 2) + 4) : (ucp[1] + 2));
             page_num = ucp[0] & PG_CODE_MASK;
             if (0x0 == page_num) {
                 ++num_ua_pages;

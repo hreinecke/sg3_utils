@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
@@ -24,12 +23,13 @@
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /*
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.20 20150217";    /* spc5r02 */
+static const char * version_str = "1.21 20151219";    /* spc5r02 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -56,26 +56,6 @@ static struct option long_options[] = {
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
-
-#ifdef __GNUC__
-static int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2serr(const char * fmt, ...);
-#endif
-
-
-static int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 
 static void

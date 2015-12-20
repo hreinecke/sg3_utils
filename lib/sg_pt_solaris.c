@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2007-2010 Douglas Gilbert.
+ * Copyright (c) 2007-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.03 20100321 */
+/* sg_pt_solaris version 1.04 20151220 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,7 +65,8 @@ scsi_pt_open_flags(const char * device_name, int flags_arg, int verbose)
 
     flags_arg = flags_arg;  /* ignore flags argument, suppress warning */
     if (verbose > 1) {
-        fprintf(stderr, "open %s with flags=0x%x\n", device_name, oflags);
+        fprintf(sg_warnings_strm ? sg_warnings_strm : stderr,
+                "open %s with flags=0x%x\n", device_name, oflags);
     }
     fd = open(device_name, oflags);
     if (fd < 0)
@@ -237,13 +238,14 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     ptp->os_err = 0;
     if (ptp->in_err) {
         if (verbose)
-            fprintf(stderr, "Replicated or unused set_scsi_pt... "
-                    "functions\n");
+            fprintf(sg_warnings_strm ? sg_warnings_strm : stderr,
+                    "Replicated or unused set_scsi_pt... functions\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (NULL == ptp->uscsi.uscsi_cdb) {
         if (verbose)
-            fprintf(stderr, "No SCSI command (cdb) given\n");
+            fprintf(sg_warnings_strm ? sg_warnings_strm : stderr,
+                    "No SCSI command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (time_secs > 0)
@@ -256,8 +258,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
             return 0;
         }
         if (verbose)
-            fprintf(stderr, "ioctl(USCSICMD) failed with os_err "
-                    "(errno) = %d\n", ptp->os_err);
+            fprintf(sg_warnings_strm ? sg_warnings_strm : stderr,
+                    "ioctl(USCSICMD) failed with os_err (errno) = %d\n",
+                    ptp->os_err);
         return -ptp->os_err;
     }
     return 0;

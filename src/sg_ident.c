@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2014 Douglas Gilbert.
+ * Copyright (c) 2005-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,8 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -27,7 +29,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.13 20140904";
+static const char * version_str = "1.14 20151219";
 
 #define ME "sg_ident: "
 
@@ -63,14 +65,14 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
             n = write(STDOUT_FILENO, iip, ii_len);
 #endif
             if (verbose && (n < 1))
-                fprintf(stderr, "unable to write to stdout\n");
+                pr2serr("unable to write to stdout\n");
         }
         return;
     }
     if (0x7f == itype) {  /* list of available information types */
         for (k = 0; k < (ii_len - 3); k += 4)
             printf("  Information type: %d, Maximum information length: "
-                   "%d bytes\n", iip[k], ((iip[k + 2] << 8) + iip[k + 3]));
+                   "%d bytes\n", iip[k], sg_get_unaligned_be16(iip + 2));
     } else {        /* single element */
         if (verbose)
             printf("Information:\n");
@@ -85,26 +87,25 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-          "sg_ident   [--ascii] [--clear] [--help] [--itype=IT] [--raw] "
-          "[--set]\n"
-          "                  [--verbose] [--version] DEVICE\n"
-          "  where:\n"
-          "    --ascii|-A      report identifying information as ASCII "
-          "(or UTF8) string\n"
-          "    --clear|-C      clear (set to zero length) identifying "
-          "information\n"
-          "    --help|-h       print out usage message\n"
-          "    --itype=IT|-i IT    specify identifying information type "
-          "(def: 0)\n"
-          "    --raw|-r        output identifying information to "
-          "stdout\n"
-          "    --set|-S        invoke set identifying information with "
-          "data from stdin\n"
-          "    --verbose|-v    increase verbosity of output\n"
-          "    --version|-V    print version string and exit\n\n"
-          "Performs a SCSI REPORT (or SET) IDENTIFYING INFORMATION command\n"
-          );
+    pr2serr("Usage: sg_ident   [--ascii] [--clear] [--help] [--itype=IT] "
+            "[--raw] [--set]\n"
+            "                  [--verbose] [--version] DEVICE\n"
+            "  where:\n"
+            "    --ascii|-A      report identifying information as ASCII "
+            "(or UTF8) string\n"
+            "    --clear|-C      clear (set to zero length) identifying "
+            "information\n"
+            "    --help|-h       print out usage message\n"
+            "    --itype=IT|-i IT    specify identifying information type "
+            "(def: 0)\n"
+            "    --raw|-r        output identifying information to "
+            "stdout\n"
+            "    --set|-S        invoke set identifying information with "
+            "data from stdin\n"
+            "    --verbose|-v    increase verbosity of output\n"
+            "    --version|-V    print version string and exit\n\n"
+            "Performs a SCSI REPORT (or SET) IDENTIFYING INFORMATION "
+            "command\n");
 }
 
 int main(int argc, char * argv[])
@@ -144,8 +145,7 @@ int main(int argc, char * argv[])
         case 'i':
            itype = sg_get_num(optarg);
            if ((itype < 0) || (itype > 127)) {
-                fprintf(stderr, "argument to '--itype' should be in range "
-                        "0 to 127\n");
+                pr2serr("argument to '--itype' should be in range 0 to 127\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -159,10 +159,10 @@ int main(int argc, char * argv[])
             ++verbose;
             break;
         case 'V':
-            fprintf(stderr, ME "version: %s\n", version_str);
+            pr2serr(ME "version: %s\n", version_str);
             return 0;
         default:
-            fprintf(stderr, "unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -174,38 +174,35 @@ int main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                fprintf(stderr, "Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
     if (NULL == device_name) {
-        fprintf(stderr, "missing device name!\n");
+        pr2serr("missing device name!\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (do_set && do_clear) {
-        fprintf(stderr, "only one of '--clear' and '--set' can be given\n");
+        pr2serr("only one of '--clear' and '--set' can be given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (ascii && raw) {
-        fprintf(stderr, "only one of '--ascii' and '--raw' can be given\n");
+        pr2serr("only one of '--ascii' and '--raw' can be given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((do_set || do_clear) && (raw || ascii)) {
-        fprintf(stderr, "'--set' cannot be used with either '--ascii' or "
-                "'--raw'\n");
+        pr2serr("'--set' cannot be used with either '--ascii' or '--raw'\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
     if (sg_fd < 0) {
-        fprintf(stderr, ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
@@ -214,13 +211,12 @@ int main(int argc, char * argv[])
         if (do_set) {
             res = fread(rdi_buff, 1, REPORT_ID_INFO_SANITY_LEN + 2, stdin);
             if (res <= 0) {
-                fprintf(stderr, "no data read from stdin; to clear "
-                        "identifying information use '--clear' instead\n");
+                pr2serr("no data read from stdin; to clear identifying "
+                        "information use '--clear' instead\n");
                 ret = -1;
                 goto err_out;
             } else if (res > REPORT_ID_INFO_SANITY_LEN) {
-                fprintf(stderr, "SPC-4 limits information length to 512 "
-                        "bytes\n");
+                pr2serr("SPC-4 limits information length to 512 bytes\n");
                 ret = -1;
                 goto err_out;
             }
@@ -232,26 +228,25 @@ int main(int argc, char * argv[])
         if (res) {
             ret = res;
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "Set identifying information: %s\n", b);
+            pr2serr("Set identifying information: %s\n", b);
             if (0 == verbose)
-                fprintf(stderr, "    try '-v' for more information\n");
+                pr2serr("    try '-v' for more information\n");
         }
     } else {    /* do report identifying information */
         res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, 1, verbose);
         if (0 == res) {
-            ii_len = (rdi_buff[0] << 24) + (rdi_buff[1] << 16) +
-                         (rdi_buff[2] << 8) + rdi_buff[3];
+            ii_len = sg_get_unaligned_be32(rdi_buff + 0);
             if ((! raw) && (verbose > 0))
                 printf("Reported identifying information length = %d\n",
                        ii_len);
             if (0 == ii_len) {
                 if (verbose > 1)
-                    fprintf(stderr, "    This implies the device has an "
-                            "empty information field\n");
+                    pr2serr("    This implies the device has an empty "
+                            "information field\n");
                 goto err_out;
             }
             if (ii_len > REPORT_ID_INFO_SANITY_LEN) {
-                fprintf(stderr, "    That length (%d) seems too long for an "
+                pr2serr("    That length (%d) seems too long for an "
                         "information\n", ii_len);
                 ret = -1;
                 goto err_out;
@@ -260,8 +255,7 @@ int main(int argc, char * argv[])
             res = sg_ll_report_id_info(sg_fd, itype, ucp, ii_len + 4, 1,
                                        verbose);
             if (0 == res) {
-                ii_len = (ucp[0] << 24) + (ucp[1] << 16) + (ucp[2] << 8) +
-                         ucp[3];
+                ii_len = sg_get_unaligned_be32(ucp + 0);
                 decode_ii(ucp + 4, ii_len, itype, ascii, raw, verbose);
             } else
                 ret = res;
@@ -269,16 +263,16 @@ int main(int argc, char * argv[])
             ret = res;
         if (ret) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            fprintf(stderr, "Report identifying information: %s\n", b);
+            pr2serr("Report identifying information: %s\n", b);
             if (0 == verbose)
-                fprintf(stderr, "    try '-v' for more information\n");
+                pr2serr("    try '-v' for more information\n");
         }
     }
 
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
-        fprintf(stderr, "close error: %s\n", safe_strerror(-res));
+        pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
             return SG_LIB_FILE_ERROR;
     }

@@ -47,9 +47,10 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.23 20151207";
+static const char * version_str = "1.24 20151219";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -106,17 +107,15 @@ static void print_stats(int iters, const char * str)
 {
     if (orig_count > 0) {
         if (0 != dd_count)
-            fprintf(stderr, "  remaining block count=%" PRId64 "\n",
-                    dd_count);
-        fprintf(stderr, "%" PRId64 "+%d records in", in_full - in_partial,
+            pr2serr("  remaining block count=%" PRId64 "\n", dd_count);
+        pr2serr("%" PRId64 "+%d records in", in_full - in_partial,
                 in_partial);
         if (iters > 0)
-            fprintf(stderr, ", %s commands issued: %d\n", (str ? str : ""),
-                    iters);
+            pr2serr(", %s commands issued: %d\n", (str ? str : ""), iters);
         else
-            fprintf(stderr, "\n");
+            pr2serr("\n");
     } else if (iters > 0)
-        fprintf(stderr, "%s commands issued: %d\n", (str ? str : ""), iters);
+        pr2serr("%s commands issued: %d\n", (str ? str : ""), iters);
 }
 
 static void interrupt_handler(int sig)
@@ -127,7 +126,7 @@ static void interrupt_handler(int sig)
     sigemptyset (&sigact.sa_mask);
     sigact.sa_flags = 0;
     sigaction (sig, &sigact, NULL);
-    fprintf(stderr, "Interrupted by signal,");
+    pr2serr("Interrupted by signal,");
     print_stats(0, NULL);
     kill (getpid (), sig);
 }
@@ -135,7 +134,7 @@ static void interrupt_handler(int sig)
 static void siginfo_handler(int sig)
 {
     if (sig) { ; }      /* unused, dummy to suppress warning */
-    fprintf(stderr, "Progress report, continuing ...\n");
+    pr2serr("Progress report, continuing ...\n");
     print_stats(0, NULL);
 }
 
@@ -157,50 +156,48 @@ static int dd_filetype(const char * filename)
 
 static void usage()
 {
-    fprintf(stderr, "Usage: "
-           "sg_read  [blk_sgio=0|1] [bpt=BPT] [bs=BS] "
-           "[cdbsz=6|10|12|16]\n"
-           "                count=COUNT [dio=0|1] [dpo=0|1] [fua=0|1] "
-           "if=IFILE\n"
-           "                [mmap=0|1] [no_dfxer=0|1] [odir=0|1] "
-           "[skip=SKIP]\n"
-           "                [time=TI] [verbose=VERB] [--help] "
-           "[--version]\n"
-           "  where:\n"
-           "    blk_sgio 0->normal IO for block devices, 1->SCSI commands "
-           "via SG_IO\n"
-           "    bpt      is blocks_per_transfer (default is 128, or 64 KiB "
-           "for default BS)\n"
-           "             setting 'bpt=0' will do COUNT zero block SCSI "
-           "READs\n"
-           "    bs       must match sector size if IFILE accessed via SCSI "
-           "commands\n"
-           "             (def=512)\n"
-           "    cdbsz    size of SCSI READ command (default is 10)\n"
-           "    count    total bytes read will be BS*COUNT (if no "
-           "error)\n"
-           "             (if negative, do |COUNT| zero block SCSI READs)\n"
-           "    dio      1-> attempt direct IO on sg device, 0->indirect IO "
-           "(def)\n");
-    fprintf(stderr,
-           "    dpo      1-> set disable page out (DPO) in SCSI READs\n"
-           "    fua      1-> set force unit access (FUA) in SCSI READs\n"
-           "    if       an sg, block or raw device, or a seekable file (not "
-           "stdin)\n"
-           "    mmap     1->perform mmaped IO on sg device, 0->indirect IO "
-           "(def)\n"
-           "    no_dxfer 1->DMA to kernel buffers only, not user space, "
-           "0->normal(def)\n"
-           "    odir     1->open block device O_DIRECT, 0->don't (def)\n"
-           "    skip     each transfer starts at this logical address "
-           "(def=0)\n"
-           "    time     0->do nothing(def), 1->time from 1st cmd, 2->time "
-           "from 2nd, ...\n"
-           "    verbose  increase level of verbosity (def: 0)\n"
-           "    --help   print this usage message then exit\n"
-           "    --version  print version number then exit\n\n"
-           "Issue SCSI READ commands, each starting from the same logical "
-           "block address\n");
+    pr2serr("Usage: sg_read  [blk_sgio=0|1] [bpt=BPT] [bs=BS] "
+            "[cdbsz=6|10|12|16]\n"
+            "                count=COUNT [dio=0|1] [dpo=0|1] [fua=0|1] "
+            "if=IFILE\n"
+            "                [mmap=0|1] [no_dfxer=0|1] [odir=0|1] "
+            "[skip=SKIP]\n"
+            "                [time=TI] [verbose=VERB] [--help] "
+            "[--version]\n"
+            "  where:\n"
+            "    blk_sgio 0->normal IO for block devices, 1->SCSI commands "
+            "via SG_IO\n"
+            "    bpt      is blocks_per_transfer (default is 128, or 64 KiB "
+            "for default BS)\n"
+            "             setting 'bpt=0' will do COUNT zero block SCSI "
+            "READs\n"
+            "    bs       must match sector size if IFILE accessed via SCSI "
+            "commands\n"
+            "             (def=512)\n"
+            "    cdbsz    size of SCSI READ command (default is 10)\n"
+            "    count    total bytes read will be BS*COUNT (if no "
+            "error)\n"
+            "             (if negative, do |COUNT| zero block SCSI READs)\n"
+            "    dio      1-> attempt direct IO on sg device, 0->indirect IO "
+            "(def)\n");
+    pr2serr("    dpo      1-> set disable page out (DPO) in SCSI READs\n"
+            "    fua      1-> set force unit access (FUA) in SCSI READs\n"
+            "    if       an sg, block or raw device, or a seekable file (not "
+            "stdin)\n"
+            "    mmap     1->perform mmaped IO on sg device, 0->indirect IO "
+            "(def)\n"
+            "    no_dxfer 1->DMA to kernel buffers only, not user space, "
+            "0->normal(def)\n"
+            "    odir     1->open block device O_DIRECT, 0->don't (def)\n"
+            "    skip     each transfer starts at this logical address "
+            "(def=0)\n"
+            "    time     0->do nothing(def), 1->time from 1st cmd, 2->time "
+            "from 2nd, ...\n"
+            "    verbose  increase level of verbosity (def: 0)\n"
+            "    --help   print this usage message then exit\n"
+            "    --version  print version number then exit\n\n"
+            "Issue SCSI READ commands, each starting from the same logical "
+            "block address\n");
 }
 
 static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
@@ -224,18 +221,18 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
         cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
         if (blocks > 256) {
-            fprintf(stderr, ME "for 6 byte commands, maximum number of "
-                            "blocks is 256\n");
+            pr2serr(ME "for 6 byte commands, maximum number of blocks is "
+                    "256\n");
             return 1;
         }
         if ((start_block + blocks - 1) & (~0x1fffff)) {
-            fprintf(stderr, ME "for 6 byte commands, can't address blocks"
-                            " beyond %d\n", 0x1fffff);
+            pr2serr(ME "for 6 byte commands, can't address blocks beyond "
+                    "%d\n", 0x1fffff);
             return 1;
         }
         if (dpo || fua) {
-            fprintf(stderr, ME "for 6 byte commands, neither dpo nor fua"
-                            " bits supported\n");
+            pr2serr(ME "for 6 byte commands, neither dpo nor fua bits "
+                    "supported\n");
             return 1;
         }
         break;
@@ -246,8 +243,8 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
         sg_put_unaligned_be16((uint16_t)blocks, cdbp + 7);
         if (blocks & (~0xffff)) {
-            fprintf(stderr, ME "for 10 byte commands, maximum number of "
-                            "blocks is %d\n", 0xffff);
+            pr2serr(ME "for 10 byte commands, maximum number of blocks is "
+                    "%d\n", 0xffff);
             return 1;
         }
         break;
@@ -266,8 +263,8 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);
         break;
     default:
-        fprintf(stderr, ME "expected cdb size of 6, 10, 12, or 16 but got"
-                        " %d\n", cdb_sz);
+        pr2serr(ME "expected cdb size of 6, 10, 12, or 16 but got %d\n",
+                cdb_sz);
         return 1;
     }
     return 0;
@@ -287,8 +284,8 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, dpo)) {
-        fprintf(stderr, ME "bad cdb build, from_block=%" PRId64
-                ", blocks=%d\n", from_block, blocks);
+        pr2serr(ME "bad cdb build, from_block=%" PRId64 ", blocks=%d\n",
+                from_block, blocks);
         return -1;
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
@@ -314,10 +311,10 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = pack_id_count++;
     if (verbose > 1) {
-        fprintf(stderr, "    read cdb: ");
+        pr2serr( "    read cdb: ");
         for (k = 0; k < cdbsz; ++k)
-            fprintf(stderr, "%02x ", rdCmd[k]);
-        fprintf(stderr, "\n");
+            pr2serr( "%02x ", rdCmd[k]);
+        pr2serr( "\n");
     }
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
@@ -328,7 +325,7 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
     }
 
     if (verbose > 2)
-        fprintf(stderr, "      duration=%u ms\n", io_hdr.duration);
+        pr2serr( "      duration=%u ms\n", io_hdr.duration);
     switch (sg_err_category3(&io_hdr)) {
     case SG_LIB_CAT_CLEAN:
         break;
@@ -424,13 +421,13 @@ int main(int argc, char * argv[])
         else if (0 == strcmp(key,"bpt")) {
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
-                fprintf(stderr, ME "bad argument to 'bpt'\n");
+                pr2serr( ME "bad argument to 'bpt'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"bs")) {
             bs = sg_get_num(buf);
             if (-1 == bs) {
-                fprintf(stderr, ME "bad argument to 'bs'\n");
+                pr2serr( ME "bad argument to 'bs'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"cdbsz"))
@@ -440,14 +437,14 @@ int main(int argc, char * argv[])
             if ('-' == *buf) {
                 dd_count = sg_get_llnum(buf + 1);
                 if (-1 == dd_count) {
-                    fprintf(stderr, ME "bad argument to 'count'\n");
+                    pr2serr( ME "bad argument to 'count'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 dd_count = - dd_count;
             } else {
                 dd_count = sg_get_llnum(buf);
                 if (-1 == dd_count) {
-                    fprintf(stderr, ME "bad argument to 'count'\n");
+                    pr2serr( ME "bad argument to 'count'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
@@ -470,7 +467,7 @@ int main(int argc, char * argv[])
         else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1 == skip) {
-                fprintf(stderr, ME "bad argument to 'skip'\n");
+                pr2serr( ME "bad argument to 'skip'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"time"))
@@ -481,10 +478,10 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         } else if (0 == strncmp(key, "--vers", 6)) {
-            fprintf(stderr, ME ": %s\n", version_str);
+            pr2serr( ME ": %s\n", version_str);
             return 0;
         } else {
-            fprintf(stderr, "Unrecognized argument '%s'\n", key);
+            pr2serr( "Unrecognized argument '%s'\n", key);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -492,16 +489,15 @@ int main(int argc, char * argv[])
     if (bs <= 0) {
         bs = DEF_BLOCK_SIZE;
         if ((dd_count > 0) && (bpt > 0))
-            fprintf(stderr, "Assume default 'bs' (block size) of %d bytes\n",
-                    bs);
+            pr2serr( "Assume default 'bs' (block size) of %d bytes\n", bs);
     }
     if (! count_given) {
-        fprintf(stderr, "'count' must be given\n");
+        pr2serr("'count' must be given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (skip < 0) {
-        fprintf(stderr, "skip cannot be negative\n");
+        pr2serr("skip cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (bpt < 1) {
@@ -509,16 +505,16 @@ int main(int argc, char * argv[])
             if (dd_count > 0)
                 dd_count = - dd_count;
         } else {
-            fprintf(stderr, "bpt must be greater than 0\n");
+            pr2serr("bpt must be greater than 0\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (do_dio && do_mmap) {
-        fprintf(stderr, "cannot select both dio and mmap\n");
+        pr2serr("cannot select both dio and mmap\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (no_dxfer && (do_dio || do_mmap)) {
-        fprintf(stderr, "cannot select no_dxfer with dio or mmap\n");
+        pr2serr("cannot select no_dxfer with dio or mmap\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -528,26 +524,25 @@ int main(int argc, char * argv[])
     install_handler (SIGUSR1, siginfo_handler);
 
     if (! inf[0]) {
-        fprintf(stderr, "must provide 'if=<filename>'\n");
+        pr2serr("must provide 'if=<filename>'\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (0 == strcmp("-", inf)) {
-        fprintf(stderr, "'-' (stdin) invalid as <filename>\n");
+        pr2serr("'-' (stdin) invalid as <filename>\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     in_type = dd_filetype(inf);
     if (FT_ERROR == in_type) {
-        fprintf(stderr, "Unable to access: %s\n", inf);
+        pr2serr("Unable to access: %s\n", inf);
         return SG_LIB_FILE_ERROR;
     } else if ((FT_BLOCK & in_type) && do_blk_sgio)
         in_type |= FT_SG;
 
     if (FT_SG & in_type) {
         if ((dd_count < 0) && (6 == scsi_cdbsz)) {
-            fprintf(stderr, ME "SCSI READ (6) can't do zero block "
-                    "reads\n");
+            pr2serr(ME "SCSI READ (6) can't do zero block reads\n");
             return SG_LIB_SYNTAX_ERROR;
         }
         flags = O_RDWR;
@@ -565,12 +560,11 @@ int main(int argc, char * argv[])
             }
         }
         if (verbose)
-            fprintf(stderr, "Opened %s for SG_IO with flags=0x%x\n", inf,
-                    flags);
+            pr2serr("Opened %s for SG_IO with flags=0x%x\n", inf, flags);
         if ((dd_count > 0) && (! (FT_BLOCK & in_type))) {
             if (verbose > 2) {
                 if (ioctl(infd, SG_GET_RESERVED_SIZE, &t) >= 0)
-                    fprintf(stderr, "  SG_GET_RESERVED_SIZE yields: %d\n", t);
+                    pr2serr("  SG_GET_RESERVED_SIZE yields: %d\n", t);
             }
             t = bs * bpt;
             if ((do_mmap) && (0 != (t % psz)))
@@ -580,24 +574,21 @@ int main(int argc, char * argv[])
                 perror(ME "SG_SET_RESERVED_SIZE error");
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
-                fprintf(stderr, ME "sg driver prior to 3.x.y\n");
+                pr2serr(ME "sg driver prior to 3.x.y\n");
                 return SG_LIB_CAT_OTHER;
             }
             if (do_mmap && (t < 30122)) {
-                fprintf(stderr, ME "mmap-ed IO needs a sg driver version "
-                        ">= 3.1.22\n");
+                pr2serr(ME "mmap-ed IO needs a sg driver version >= 3.1.22\n");
                 return SG_LIB_CAT_OTHER;
             }
         }
     } else {
         if (do_mmap) {
-            fprintf(stderr, ME "mmap-ed IO only support on sg "
-                    "devices\n");
+            pr2serr(ME "mmap-ed IO only support on sg devices\n");
             return SG_LIB_CAT_OTHER;
         }
         if (dd_count < 0) {
-            fprintf(stderr, ME "negative 'count' only supported with "
-                    "SCSI READs\n");
+            pr2serr(ME "negative 'count' only supported with SCSI READs\n");
             return SG_LIB_CAT_OTHER;
         }
         flags = O_RDONLY;
@@ -610,8 +601,7 @@ int main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         }
         if (verbose)
-            fprintf(stderr, "Opened %s for Unix reads with flags=0x%x\n",
-                    inf, flags);
+            pr2serr("Opened %s for Unix reads with flags=0x%x\n", inf, flags);
         if (skip > 0) {
             off64_t offset = skip;
 
@@ -633,8 +623,7 @@ int main(int argc, char * argv[])
         if (do_dio || do_odir || (FT_RAW & in_type)) {
             wrkBuff = (unsigned char *)malloc(bs * bpt + psz);
             if (0 == wrkBuff) {
-                fprintf(stderr, "Not enough user memory for aligned "
-                        "storage\n");
+                pr2serr("Not enough user memory for aligned storage\n");
                 return SG_LIB_CAT_OTHER;
             }
             /* perhaps use posix_memalign() instead */
@@ -650,7 +639,7 @@ int main(int argc, char * argv[])
         } else {
             wrkBuff = (unsigned char *)malloc(bs * bpt);
             if (0 == wrkBuff) {
-                fprintf(stderr, "Not enough user memory\n");
+                pr2serr("Not enough user memory\n");
                 return SG_LIB_CAT_OTHER;
             }
             wrkPos = wrkBuff;
@@ -662,7 +651,7 @@ int main(int argc, char * argv[])
     start_tm.tv_usec = 0;
 
     if (verbose && (dd_count < 0))
-        fprintf(stderr, "About to issue %" PRId64 " zero block SCSI READs\n",
+        pr2serr("About to issue %" PRId64 " zero block SCSI READs\n",
                 0 - dd_count);
 
     /* main loop */
@@ -686,13 +675,11 @@ int main(int argc, char * argv[])
                     buf_sz = MIN_RESERVED_SIZE;
                 blocks_per = (buf_sz + bs - 1) / bs;
                 blocks = blocks_per;
-                fprintf(stderr,
-                        "Reducing read to %d blocks per loop\n", blocks_per);
+                pr2serr("Reducing read to %d blocks per loop\n", blocks_per);
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
                                fua, dpo, &dio_tmp, do_mmap, no_dxfer);
             } else if (2 == res) {
-                fprintf(stderr,
-                        "Unit attention, try again (r)\n");
+                pr2serr("Unit attention, try again (r)\n");
                 res = sg_bread(infd, wrkPos, blocks, skip, bs, scsi_cdbsz,
                                fua, dpo, &dio_tmp, do_mmap, no_dxfer);
             }
@@ -700,23 +687,23 @@ int main(int argc, char * argv[])
                 switch (res) {
                 case -3:
                     ret = SG_LIB_CAT_MEDIUM_HARD;
-                    fprintf(stderr, ME "SCSI READ medium/hardware error\n");
+                    pr2serr(ME "SCSI READ medium/hardware error\n");
                     break;
                 case -2:
                     ret = SG_LIB_CAT_NOT_READY;
-                    fprintf(stderr, ME "device not ready\n");
+                    pr2serr(ME "device not ready\n");
                     break;
                 case 2:
                     ret = SG_LIB_CAT_UNIT_ATTENTION;
-                    fprintf(stderr, ME "SCSI READ unit attention\n");
+                    pr2serr(ME "SCSI READ unit attention\n");
                     break;
                 case 3:
                     ret = SG_LIB_CAT_ABORTED_COMMAND;
-                    fprintf(stderr, ME "SCSI READ aborted command\n");
+                    pr2serr(ME "SCSI READ aborted command\n");
                     break;
                 default:
                     ret = SG_LIB_CAT_OTHER;
-                    fprintf(stderr, ME "SCSI READ failed\n");
+                    pr2serr(ME "SCSI READ failed\n");
                     break;
                 }
                 break;
@@ -744,8 +731,8 @@ int main(int argc, char * argv[])
                 perror(ebuff);
                 break;
             } else if (res < blocks * bs) {
-                fprintf(stderr, ME "short read: wanted/got=%d/%d bytes"
-                        ", stop\n", blocks * bs, res);
+                pr2serr(ME "short read: wanted/got=%d/%d bytes, stop\n",
+                        blocks * bs, res);
                 blocks = res / bs;
                 if ((res % bs) > 0) {
                     blocks++;
@@ -789,33 +776,32 @@ int main(int argc, char * argv[])
             }
 
             if (1 == do_time) {
-                fprintf(stderr, "Time for all %s commands was "
-                        "%d.%06d secs", read_str, (int)res_tm.tv_sec,
-                        (int)res_tm.tv_usec);
+                pr2serr("Time for all %s commands was %d.%06d secs", read_str,
+                        (int)res_tm.tv_sec, (int)res_tm.tv_usec);
                 if ((orig_count > 0) && (a > 0.00001) && (b > 511))
-                    fprintf(stderr, ", %.2f MB/sec\n", b / (a * 1000000.0));
+                    pr2serr(", %.2f MB/sec\n", b / (a * 1000000.0));
                 else
-                    fprintf(stderr, "\n");
+                    pr2serr("\n");
             } else if (2 == do_time) {
-                fprintf(stderr, "Time from second %s command to end "
-                        "was %d.%06d secs", read_str, (int)res_tm.tv_sec,
+                pr2serr("Time from second %s command to end was %d.%06d secs",
+                        read_str, (int)res_tm.tv_sec,
                         (int)res_tm.tv_usec);
                 if ((orig_count > 0) && (a > 0.00001) && (c > 511))
-                    fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
+                    pr2serr(", %.2f MB/sec\n", c / (a * 1000000.0));
                 else
-                    fprintf(stderr, "\n");
+                    pr2serr("\n");
             } else {
-                fprintf(stderr, "Time from start of %s command "
+                pr2serr("Time from start of %s command "
                         "#%d to end was %d.%06d secs", read_str, do_time,
                         (int)res_tm.tv_sec, (int)res_tm.tv_usec);
                 if ((orig_count > 0) && (a > 0.00001) && (c > 511))
-                    fprintf(stderr, ", %.2f MB/sec\n", c / (a * 1000000.0));
+                    pr2serr(", %.2f MB/sec\n", c / (a * 1000000.0));
                 else
-                    fprintf(stderr, "\n");
+                    pr2serr("\n");
             }
             if ((iters > 0) && (a > 0.00001))
-                fprintf(stderr, "Average number of %s commands per "
-                        "second was %.2f\n", read_str, (double)iters / a);
+                pr2serr("Average number of %s commands per second was %.2f\n",
+                        read_str, (double)iters / a);
         }
     }
 
@@ -825,7 +811,7 @@ int main(int argc, char * argv[])
     close(infd);
     res = 0;
     if (0 != dd_count) {
-        fprintf(stderr, "Some error occurred,");
+        pr2serr("Some error occurred,");
         if (0 == ret)
             ret = SG_LIB_CAT_OTHER;
     }
@@ -835,19 +821,18 @@ int main(int argc, char * argv[])
         int fd;
         char c;
 
-        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
+        pr2serr(">> Direct IO requested but incomplete %d times\n",
                 dio_incomplete);
         if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)
-                    fprintf(stderr, ">>> %s set to '0' but should be set "
-                            "to '1' for direct IO\n", proc_allow_dio);
+                    pr2serr(">>> %s set to '0' but should be set to '1' for "
+                            "direct IO\n", proc_allow_dio);
             }
             close(fd);
         }
     }
     if (sum_of_resids)
-        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
-                sum_of_resids);
+        pr2serr(">> Non-zero sum of residual counts=%d\n", sum_of_resids);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
