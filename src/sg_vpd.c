@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.09 20151205";  /* spc5r07 + sbc4r07 */
+static const char * version_str = "1.11 20160104";  /* spc5r07 + sbc4r07 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -142,7 +142,7 @@ unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
 static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                           int len, int m_assoc, int m_desig_type,
-                          int m_code_set, int long_out, int quiet);
+                          int m_code_set, const struct opts_t * op);
 static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len);
 
@@ -785,8 +785,8 @@ static const char * assoc_arr[] =
 };
 
 static void
-decode_id_vpd(unsigned char * buff, int len, int subvalue, int do_long,
-              int do_quiet)
+decode_id_vpd(unsigned char * buff, int len, int subvalue,
+              const struct opts_t * op)
 {
     int m_a, m_d, m_cs;
 
@@ -799,24 +799,23 @@ decode_id_vpd(unsigned char * buff, int len, int subvalue, int do_long,
     m_cs = -1;
     if (0 == subvalue) {
         decode_dev_ids(assoc_arr[VPD_ASSOC_LU], buff + 4, len - 4,
-                       VPD_ASSOC_LU, m_d, m_cs, do_long, do_quiet);
+                       VPD_ASSOC_LU, m_d, m_cs, op);
         decode_dev_ids(assoc_arr[VPD_ASSOC_TPORT], buff + 4, len - 4,
-                       VPD_ASSOC_TPORT, m_d, m_cs, do_long, do_quiet);
+                       VPD_ASSOC_TPORT, m_d, m_cs, op);
         decode_dev_ids(assoc_arr[VPD_ASSOC_TDEVICE], buff + 4, len - 4,
-                       VPD_ASSOC_TDEVICE, m_d, m_cs, do_long, do_quiet);
+                       VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     } else if (VPD_DI_SEL_AS_IS == subvalue)
-        decode_dev_ids(NULL, buff + 4, len - 4, m_a, m_d, m_cs, do_long,
-                       do_quiet);
+        decode_dev_ids(NULL, buff + 4, len - 4, m_a, m_d, m_cs, op);
     else {
         if (VPD_DI_SEL_LU & subvalue)
             decode_dev_ids(assoc_arr[VPD_ASSOC_LU], buff + 4, len - 4,
-                           VPD_ASSOC_LU, m_d, m_cs, do_long, do_quiet);
+                           VPD_ASSOC_LU, m_d, m_cs, op);
         if (VPD_DI_SEL_TPORT & subvalue)
             decode_dev_ids(assoc_arr[VPD_ASSOC_TPORT], buff + 4, len - 4,
-                           VPD_ASSOC_TPORT, m_d, m_cs, do_long, do_quiet);
+                           VPD_ASSOC_TPORT, m_d, m_cs, op);
         if (VPD_DI_SEL_TARGET & subvalue)
             decode_dev_ids(assoc_arr[VPD_ASSOC_TDEVICE], buff + 4, len - 4,
-                           VPD_ASSOC_TDEVICE, m_d, m_cs, do_long, do_quiet);
+                           VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     }
 }
 
@@ -926,14 +925,13 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_SCSI_PORTS */
 static void
-decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
-                      int do_quiet)
+decode_scsi_ports_vpd(unsigned char * buff, int len, const struct opts_t * op)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
     unsigned char * ucp;
 
-    if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -953,7 +951,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
             return;
         }
         if (ip_tid_len > 0) {
-            if (do_hex > 1) {
+            if (op->do_hex > 1) {
                 printf("    Initiator port transport id:\n");
                 dStrHex((const char *)(ucp + 8), ip_tid_len, 1);
             } else
@@ -966,14 +964,14 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int do_long,
             return;
         }
         if (tpd_len > 0) {
-            if (do_hex > 1) {
+            if (op->do_hex > 1) {
                 printf("    Target port descriptor(s):\n");
                 dStrHex((const char *)(ucp + bump + 4), tpd_len, 1);
             } else {
-                if ((0 == do_quiet) || (ip_tid_len > 0))
+                if ((0 == op->do_quiet) || (ip_tid_len > 0))
                     printf("    Target port descriptor(s):\n");
                 decode_dev_ids("SCSI Ports", ucp + bump + 4, tpd_len,
-                               VPD_ASSOC_TPORT, -1, -1, do_long, do_quiet);
+                               VPD_ASSOC_TPORT, -1, -1, op);
             }
         }
         bump += tpd_len + 4;
@@ -1003,7 +1001,8 @@ static const char * desig_type_arr[] =
     "MD5 logical unit identifier",
     "SCSI name string",
     "Protocol specific port identifier",  /* spc4r36 */
-    "Reserved [0xa]", "Reserved [0xb]",
+    "UUID identifier",                    /* 15-267r2 */
+    "Reserved [0xb]",
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
@@ -1035,7 +1034,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         desig_type = 3;
         i_len = 16;
         off = 16;
-        goto decode;
+        goto skip_1st_iter;
     }
     while ((u = sg_vpd_dev_id_iter(buff, len, &off, m_assoc, m_desig_type,
                                    m_code_set)) == 0) {
@@ -1053,7 +1052,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         is_sas = (piv && (6 == p_id)) ? 1 : 0;
         assoc = ((ucp[1] >> 4) & 0x3);
         desig_type = (ucp[1] & 0xf);
- decode:
+skip_1st_iter:
         switch (desig_type) {
         case 0: /* vendor specific */
             break;
@@ -1177,7 +1176,17 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
              */
             printf("  %s\n", (const char *)ip);
             break;
-        case 9: /* PCIe routing ID */
+        case 9: /* Protocol specific port identifier */
+            break;
+        case 0xa: /* UUID identifier */
+            if ((1 != c_set) || (18 != i_len) || (1 != ((ip[0] >> 4) & 0xf)))
+                break;
+            for (m = 0; m < 16; ++m) {
+                if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
+                    printf("-");
+                printf("%02x", (unsigned int)ip[2 + m]);
+            }
+            printf("\n");
             break;
         default: /* reserved */
             break;
@@ -1199,7 +1208,8 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
 static void
 decode_designation_descriptor(const unsigned char * ip, int i_len,
                               int p_id, int c_set, int piv, int assoc,
-                              int desig_type, int long_out, int print_assoc)
+                              int desig_type, int print_assoc,
+                              const struct opts_t * op)
 {
     int m, ci_off, c_id, d_id, naa;
     int vsi, k;
@@ -1245,7 +1255,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
         }
         break;
     case 2: /* EUI-64 based */
-        if (! long_out) {
+        if (! op->do_long) {
             if ((8 != i_len) && (12 != i_len) && (16 != i_len)) {
                 pr2serr("      << expect 8, 12 and 16 byte EUI, got %d>>\n",
                         i_len);
@@ -1303,7 +1313,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
             d_id = sg_get_unaligned_be16(ip) & 0xfff;
             c_id = sg_get_unaligned_be24(ip + 2);
             vsi = sg_get_unaligned_be24(ip + 5);
-            if (long_out) {
+            if (op->do_long) {
                 printf("      NAA 2, vendor specific identifier A: "
                        "0x%x\n", d_id);
                 printf("      IEEE Company_id: 0x%x\n", c_id);
@@ -1325,7 +1335,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            if (long_out)
+            if (op->do_long)
                 printf("      NAA 3, Locally assigned value:\n");
             printf("      0x");
             for (m = 0; m < 8; ++m)
@@ -1339,7 +1349,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
             }
-            if (long_out) {
+            if (op->do_long) {
                 c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
                         (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
                 vsei = ip[3] & 0xf;
@@ -1375,7 +1385,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
                 vsei <<= 8;
                 vsei |= ip[3 + m];
             }
-            if (long_out) {
+            if (op->do_long) {
                 printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
                 printf("      Vendor Specific Identifier: 0x%" PRIx64
                        "\n", vsei);
@@ -1482,6 +1492,32 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
                     "identifier\n",
                     sg_get_trans_proto_str(p_id, sizeof(b), b));
         break;
+    case 0xa: /* UUID identifier */
+        if (1 != c_set) {
+            pr2serr("      << expected binary code_set >>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
+            break;
+        }
+        if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != i_len)) {
+            pr2serr("      << expected locally assigned UUID, 16 bytes long "
+                    ">>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
+            break;
+        }
+        printf("      Locally assigned UUID: ");
+        for (m = 0; m < 16; ++m) {
+            if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
+                printf("-");    /* RFC 4122 format */
+            printf("%02x", (unsigned int)ip[2 + m]);
+        }
+        printf("\n");
+        if (op->do_long) {
+            printf("      [0x");
+            for (m = 0; m < 16; ++m)
+                printf("%02x", (unsigned int)ip[2 + m]);
+            printf("]\n");
+        }
+        break;
     default: /* reserved */
         pr2serr("      reserved designator=0x%x\n", desig_type);
         dStrHexErr((const char *)ip, i_len, 0);
@@ -1493,20 +1529,20 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
    designator type and/or code set. */
 static int
 decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
-               int m_assoc, int m_desig_type, int m_code_set, int long_out,
-               int quiet)
+               int m_assoc, int m_desig_type, int m_code_set,
+               const struct opts_t * op)
 {
     int assoc, i_len, c_set, piv, p_id, desig_type;
     int printed, off, u;
     const unsigned char * ucp;
 
-    if (quiet)
+    if (op->do_quiet)
         return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
                                     m_code_set);
     if ( buff[2] != 0 ) {
         if (m_assoc == VPD_ASSOC_LU)
-            decode_designation_descriptor( buff, 16, 0, 1, 0, m_assoc, 3,
-                                           long_out, 0);
+            decode_designation_descriptor(buff, 16, 0, 1, 0, m_assoc, 3, 0,
+                                          op);
         return 0;
     }
     off = -1;
@@ -1532,7 +1568,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
         piv = ((ucp[1] & 0x80) ? 1 : 0);
         desig_type = (ucp[1] & 0xf);
         decode_designation_descriptor(ucp + 4, i_len, p_id, c_set, piv, assoc,
-                                      desig_type, long_out, 0);
+                                      desig_type, 0, op);
     }
     if (-2 == u) {
         pr2serr("VPD page error: short designator around offset %d\n", off);
@@ -2400,7 +2436,7 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
                        !!(ucp[3] & 0x1));       /* added spl3r03 */
                 pidp = ucp + 8;
                 for (j = 0; j < desc_len; j += 4, pidp += 4)
-                    printf("      phy id=%d, ssp persistent capable=%d\n",
+                    printf("      phy id=%d, SSP persistent capable=%d\n",
                            pidp[1], (0x1 & pidp[2]));
                 break;
             default:
@@ -2584,7 +2620,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 
 /* VPD_LB_PROVISIONING */
 static int
-decode_block_lb_prov_vpd(unsigned char * b, int len)
+decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
 {
     int dp;
 
@@ -2624,7 +2660,7 @@ decode_block_lb_prov_vpd(unsigned char * b, int len)
         assoc = ((ucp[1] >> 4) & 0x3);
         desig_type = (ucp[1] & 0xf);
         decode_designation_descriptor(ucp, i_len, p_id, c_set, piv, assoc,
-                                      desig_type, 0, 1);
+                                      desig_type, 1, op);
     }
     return 0;
 }
@@ -2769,15 +2805,16 @@ decode_tapealert_supported_vpd(unsigned char * b, int len)
 /* VPD_LB_PROVISIONING sbc */
 /* VPD_TA_SUPPORTED ssc */
 static void
-decode_b2_vpd(unsigned char * buff, int len, int do_hex, int pdt)
+decode_b2_vpd(unsigned char * buff, int len, int pdt,
+              const struct opts_t * op)
 {
-    if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+    if (op->do_hex) {
+        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
     case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
-        decode_block_lb_prov_vpd(buff, len);
+        decode_block_lb_prov_vpd(buff, len, op);
         break;
     case PDT_TAPE: case PDT_MCHANGER:
         decode_tapealert_supported_vpd(buff, len);
@@ -3123,7 +3160,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_id_vpd(rp, len, subvalue, op->do_long, op->do_quiet);
+                decode_id_vpd(rp, len, subvalue, op);
             }
             return 0;
         }
@@ -3219,8 +3256,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_scsi_ports_vpd(rp, len, op->do_hex, op->do_long,
-                                      op->do_quiet);
+                decode_scsi_ports_vpd(rp, len, op);
             }
             return 0;
         }
@@ -3453,7 +3489,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_b2_vpd(rp, len, op->do_hex, pdt);
+                decode_b2_vpd(rp, len, pdt, op);
             }
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3))

@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2015 D. Gilbert
+*  Copyright (C) 2000-2016 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -42,7 +42,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.52 20151219";    /* SPC-5 rev 06 */
+static const char * version_str = "1.54 20160104";    /* SPC-5 rev 07 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1465,7 +1465,8 @@ static const char * desig_type_arr[] =
     "MD5 logical unit identifier", /* SCSI_IDENT_DEVICE_MD5 */
     "SCSI name string", /* SCSI_IDENT_DEVICE_SCSINAME */
     "Protocol specific port identifier",        /* spc4r36 */
-    "[0xa]", "[0xb]", "[0xc]", "[0xd]", "[0xe]", "[0xf]",
+    "UUID identifier",                          /* 15-267r2 */
+    "[0xb]", "[0xc]", "[0xd]", "[0xe]", "[0xf]",
 };
 
 /* These are target port, device server (i.e. target) and LU identifiers */
@@ -1768,6 +1769,26 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                        "identifier\n",
                        sg_get_trans_proto_str(p_id, sizeof(b), b));
             break;
+        case 0xa: /* UUID identifier [15-267r2] */
+            if (1 != c_set) {
+                pr2serr("      << expected binary code_set >>\n");
+                dStrHexErr((const char *)ip, i_len, 0);
+                break;
+            }
+            if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != i_len)) {
+                pr2serr("      << expected locally assigned UUID, 16 bytes "
+                        "long >>\n");
+                dStrHexErr((const char *)ip, i_len, 0);
+                break;
+            }
+            printf("      Locally assigned UUID: ");
+            for (m = 0; m < 16; ++m) {
+                if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
+                    printf("-");
+                printf("%02x", (unsigned int)ip[2 + m]);
+            }
+            printf("\n");
+                break;
         default: /* reserved */
             pr2serr("      reserved designator=0x%x\n", desig_type);
             dStrHexErr((const char *)ip, i_len, -1);

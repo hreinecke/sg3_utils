@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2015 Douglas Gilbert.
+ * Copyright (c) 2007-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.16 20151126";  /* spc5r07, sbc4r09 */
+const char * sg_lib_version_str = "2.17 20160103";  /* spc5r07, sbc4r09 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1418,12 +1418,12 @@ const char * sg_lib_transport_proto_strs[] =
     "Serial Bus Protocol for IEEE 1394 (SBP-3)",
     "SCSI RDMA Protocol (SRP)",
     "Internet SCSI (iSCSI)",
-    "Serial Attached SCSI Protocol (SPL-3)",
+    "Serial Attached SCSI Protocol (SPL-4)",
     "Automation/Drive Interface Transport (ADT-2)",
     "AT Attachment Interface (ACS-2)",          /* 0x8 */
     "USB Attached SCSI (UAS-2)",
     "SCSI over PCI Express (SOP)",
-    "PCIe",                             /* added in spc5r<x> ?? */
+    "PCIe",                             /* added in spc5r02 */
     "Oxc", "Oxd", "Oxe",
     "No specific protocol"
 };

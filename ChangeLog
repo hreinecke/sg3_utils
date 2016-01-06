@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.42 [20151220] [svn: r654]
+Changelog for sg3_utils-1.42 [20160105] [svn: r655]
   - sg_timestamp: new, to report or set timestamp
   - sg_stpg: fix truncation of target port field
   - sg_inq: cope with unicode strings, udev fixes
@@ -15,6 +15,8 @@ Changelog for sg3_utils-1.42 [20151220] [svn: r654]
     - add Device constituents VPD page
     - LB provisioning VPD page: expand LBPRZ, add
       Minimum and Threshold percentage fields
+  - sg_inq+sg_vpd+sg_xcopy: add support for locally
+    assigned UUIDs in VPD page 0x83 (15-267r2)
   - sg_sanitize: add --znr option (sbc4r07)
   - sg_rep_zones: add --partial option (zbc-r04)
   - sg_raw: document length relationships
