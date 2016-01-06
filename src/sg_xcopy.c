@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2015 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2016 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -63,7 +63,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.50 20151227";
+static const char * version_str = "0.51 20160104";
 
 #define ME "sg_xcopy: "
 
@@ -1181,6 +1181,26 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
             pr2serr("      >>>> unexpected protocol indentifier: 0x%x\n"
                     "           with Protocol specific port "
                     "identifier\n", p_id);
+        break;
+    case 0xa: /* UUID identifier */
+        if (1 != c_set) {
+            pr2serr("      << expected binary code_set >>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
+            break;
+        }
+        if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != i_len)) {
+            pr2serr("      << expected locally assigned UUID, 16 bytes long "
+                    ">>\n");
+            dStrHexErr((const char *)ip, i_len, 0);
+            break;
+        }
+        printf("      Locally assigned UUID: ");
+        for (m = 0; m < 16; ++m) {
+            if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
+                printf("-");
+            printf("%02x", (unsigned int)ip[2 + m]);
+        }
+        printf("\n");
         break;
     default: /* reserved */
         pr2serr("      reserved designator=0x%x\n", desig_type);
