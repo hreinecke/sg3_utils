@@ -861,7 +861,7 @@ findmultipath()
 
   local maj_min=`cat /sys/block/$dev/dev`
   for mp in $($DMSETUP ls --target=multipath | cut -f 1) ; do
-    [ "$mp" = "No devices found" ] && break;
+    [ "$mp" = "No" ] && break;
     if $($DMSETUP status $mp | grep -q " $maj_min ") ; then
       # With two arguments, look up current uuid from sysfs
       # if it doesn't match what was passed, this multipath
@@ -937,7 +937,7 @@ flushmpaths()
 
   if test -n "$1" ; then
     for mpath in $($DMSETUP ls --target=multipath | cut -f 1) ; do
-      [ "$mpath" = "No devices found" ] && break
+      [ "$mpath" = "No" ] && break
       num=$($DMSETUP status $mpath | awk 'BEGIN{RS=" ";active=0}/[0-9]+:[0-9]+/{dev=1}/A/{if (dev == 1) active++; dev=0} END{ print active }')
       if [ $num -eq 0 ] ; then
         remove="$remove $mpath"
