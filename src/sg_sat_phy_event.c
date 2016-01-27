@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -22,7 +22,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.06 20151219";
+static const char * version_str = "1.07 20160126";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -215,9 +215,11 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
         if (verbose > 2)
             pr2serr("command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
-        if (verbose > 1)
-            sg_print_sense("ATA pass through", sense_buffer, sb_sz,
+        if (verbose > 1) {
+            pr2serr("ATA pass through:\n");
+            sg_print_sense(NULL, sense_buffer, sb_sz,
                            ((verbose > 2) ? 1 : 0));
+        }
         if (sg_scsi_normalize_sense(sense_buffer, sb_sz, &ssh)) {
             switch (ssh.sense_key) {
             case SPC_SK_ILLEGAL_REQUEST:

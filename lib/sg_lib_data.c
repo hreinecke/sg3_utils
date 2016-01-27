@@ -477,6 +477,16 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0xffff, 0, NULL},
 };
 
+/* Read attribute [0x8c] service actions */
+struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
+    {0x0, 0, "attribute values"},
+    {0x1, 0, "attribute list"},
+    {0x2, 0, "logical volume list"},
+    {0x3, 0, "partition list"},
+    {0x5, 0, "supported attributes"},
+    {0xffff, 0, NULL},
+};
+
 #else   /* SG_SCSI_STRINGS */
 
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
@@ -548,6 +558,10 @@ struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
 };
 
 struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
     {0xffff, 0, NULL},
 };
 

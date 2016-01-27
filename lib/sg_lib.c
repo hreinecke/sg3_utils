@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2015 Douglas Gilbert.
+ * Copyright (c) 1999-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -470,6 +470,547 @@ sg_get_trans_proto_str(int tpi, int buff_len, char * buff)
     return buff;
 }
 
+static const char * desig_code_set_str_arr[] =
+{
+    "Reserved [0x0]",
+    "Binary",
+    "ASCII",
+    "UTF-8",
+    "Reserved [0x4]", "Reserved [0x5]", "Reserved [0x6]", "Reserved [0x7]",
+    "Reserved [0x8]", "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
+    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
+};
+
+const char *
+sg_get_desig_code_set_str(int val)
+{
+    if ((val >= 0) && (val < 16))
+        return desig_code_set_str_arr[val];
+    else
+        return NULL;
+}
+
+static const char * desig_assoc_str_arr[] =
+{
+    "Addressed logical unit",
+    "Target port",      /* that received request; unless SCSI ports VPD */
+    "Target device that contains addressed lu",
+    "Reserved [0x3]",
+};
+
+const char *
+sg_get_desig_assoc_str(int val)
+{
+    if ((val >= 0) && (val < 4))
+        return desig_assoc_str_arr[val];
+    else
+        return NULL;
+}
+
+static const char * desig_type_str_arr[] =
+{
+    "vendor specific [0x0]",
+    "T10 vendor identification",
+    "EUI-64 based",
+    "NAA",
+    "Relative target port",
+    "Target port group",        /* spc4r09: _primary_ target port group */
+    "Logical unit group",
+    "MD5 logical unit identifier",
+    "SCSI name string",
+    "Protocol specific port identifier",        /* spc4r36 */
+    "UUID identifier",          /* spc5r08 */
+    "Reserved [0xb]",
+    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
+};
+
+const char *
+sg_get_desig_type_str(int val)
+{
+    if ((val >= 0) && (val < 16))
+        return desig_type_str_arr[val];
+    else
+        return NULL;
+}
+
+int
+sg_get_designation_descriptor_str(const char * leadin,
+                                  const unsigned char * ddp, int dd_len,
+                                  int print_assoc, int do_long, int blen,
+                                  char * b)
+{
+    int m, p_id, piv, c_set, assoc, desig_type, ci_off, c_id, d_id, naa;
+    int vsi, k, n, dlen;
+    const unsigned char * ip;
+    uint64_t vsei;
+    uint64_t id_ext;
+    char e[64];
+    const char * cp;
+    const char * lip = "";
+
+    n = 0;
+    if (leadin)
+        lip = leadin;
+    if (dd_len < 4) {
+        n += my_snprintf(b + n, blen - n, "%sdesignator desc too short: "
+                         "got length of %d want 4 or more\n", lip, dd_len);
+        return n;
+    }
+    dlen = ddp[3];
+    if (dlen > (dd_len - 4)) {
+        n += my_snprintf(b + n, blen - n, "%sdesignator too long: says it "
+                         "is %d bytes, but given %d bytes\n", lip, dlen,
+                         dd_len - 4);
+        return n;
+    }
+    ip = ddp + 4;
+    p_id = ((ddp[0] >> 4) & 0xf);
+    c_set = (ddp[0] & 0xf);
+    piv = ((ddp[1] & 0x80) ? 1 : 0);
+    assoc = ((ddp[1] >> 4) & 0x3);
+    desig_type = (ddp[1] & 0xf);
+    if (print_assoc && ((cp = sg_get_desig_assoc_str(assoc))))
+        n += my_snprintf(b + n, blen - n, "%s  %s:\n", lip, cp);
+    n += my_snprintf(b + n, blen - n, "%s    designator type: ", lip);
+    cp = sg_get_desig_type_str(desig_type);
+    if (cp)
+        n += my_snprintf(b + n, blen - n, "%s", cp);
+    n += my_snprintf(b + n, blen - n, ",  code set: ");
+    cp = sg_get_desig_code_set_str(c_set);
+    if (cp)
+        n += my_snprintf(b + n, blen - n, "%s", cp);
+    n += my_snprintf(b + n, blen - n, "\n");
+    if (piv && ((1 == assoc) || (2 == assoc)))
+        n += my_snprintf(b + n, blen - n, "%s     transport: %s\n", lip,
+                         sg_get_trans_proto_str(p_id, sizeof(e), e));
+    /* printf("    associated with the %s\n", sdparm_assoc_arr[assoc]); */
+    switch (desig_type) {
+    case 0: /* vendor specific */
+        k = 0;
+        if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
+            for (k = 0; (k < dlen) && isprint(ip[k]); ++k)
+                ;
+            if (k >= dlen)
+                k = 1;
+        }
+        if (k)
+            n += my_snprintf(b + n, blen - n, "%s      vendor specific: "
+                             "%.*s\n", lip, dlen, ip);
+        else {
+            n += my_snprintf(b + n, blen - n, "%s      vendor specific:\n",
+                             lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+        }
+        break;
+    case 1: /* T10 vendor identification */
+        n += my_snprintf(b + n, blen - n, "%s      vendor id: %.8s\n", lip,
+                         ip);
+        if (dlen > 8) {
+            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
+                n += my_snprintf(b + n, blen - n, "%s      vendor specific: "
+                                 "%.*s\n", lip, dlen - 8, ip + 8);
+            } else {
+                n += my_snprintf(b + n, blen - n, "%s      vendor specific: "
+                                 "0x", lip);
+                for (m = 8; m < dlen; ++m)
+                    n += my_snprintf(b + n, blen - n, "%02x",
+                                     (unsigned int)ip[m]);
+                n += my_snprintf(b + n, blen - n, "\n");
+            }
+        }
+        break;
+    case 2: /* EUI-64 based */
+        if (! do_long) {
+            if ((8 != dlen) && (12 != dlen) && (16 != dlen)) {
+                n += my_snprintf(b + n, blen - n, "%s      << expect 8, 12 "
+                                 "and 16 byte EUI, got %d >>\n", lip, dlen);
+                 n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                                 b + n);
+                break;
+            }
+            n += my_snprintf(b + n, blen - n, "%s      0x", lip);
+            for (m = 0; m < dlen; ++m)
+                n += my_snprintf(b + n, blen - n, "%02x", (unsigned int)ip[m]);
+            n += my_snprintf(b + n, blen - n, "\n");
+            break;
+        }
+        n += my_snprintf(b + n, blen - n, "%s      EUI-64 based %d byte "
+                         "identifier\n", lip, dlen);
+        if (1 != c_set) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected binary "
+                             "code_set (1) >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        ci_off = 0;
+        if (16 == dlen) {
+            ci_off = 8;
+            id_ext = sg_get_unaligned_be64(ip);
+            n += my_snprintf(b + n, blen - n, "%s      Identifier extension: "
+                             "0x%" PRIx64 "\n", lip, id_ext);
+        } else if ((8 != dlen) && (12 != dlen)) {
+            n += my_snprintf(b + n, blen - n, "%s      << can only decode 8, "
+                             "12 and 16 byte ids >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        c_id = sg_get_unaligned_be24(ip + ci_off);
+        n += my_snprintf(b + n, blen - n, "%s      IEEE Company_id: 0x%x\n",
+                         lip, c_id);
+        vsei = 0;
+        for (m = 0; m < 5; ++m) {
+            if (m > 0)
+                vsei <<= 8;
+            vsei |= ip[ci_off + 3 + m];
+        }
+        n += my_snprintf(b + n, blen - n, "%s      Vendor Specific Extension "
+                         "Identifier: 0x%" PRIx64 "\n", lip, vsei);
+        if (12 == dlen) {
+            d_id = sg_get_unaligned_be32(ip + 8);
+            n += my_snprintf(b + n, blen - n, "%s      Directory ID: 0x%x\n",
+                             lip, d_id);
+        }
+        break;
+    case 3: /* NAA <n> */
+        if (1 != c_set) {
+            n += my_snprintf(b + n, blen - n, "%s      << unexpected code "
+                             "set %d for NAA >>\n", lip, c_set);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        naa = (ip[0] >> 4) & 0xff;
+        switch (naa) {
+        case 2:         /* NAA 2: IEEE Extended */
+            if (8 != dlen) {
+                n += my_snprintf(b + n, blen - n, "%s      << unexpected NAA "
+                                 "2 identifier length: 0x%x >>\n", lip, dlen);
+                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                                b + n);
+                break;
+            }
+            d_id = (((ip[0] & 0xf) << 8) | ip[1]);
+            c_id = sg_get_unaligned_be24(ip + 2);
+            vsi = sg_get_unaligned_be24(ip + 5);
+            if (do_long) {
+                n += my_snprintf(b + n, blen - n, "%s      NAA 2, vendor "
+                                 "specific identifier A: 0x%x\n", lip, d_id);
+                n += my_snprintf(b + n, blen - n, "%s      IEEE Company_id: "
+                                 "0x%x\n", lip, c_id);
+                n += my_snprintf(b + n, blen - n, "%s      vendor specific "
+                                 "identifier B: 0x%x\n", lip, vsi);
+                n += my_snprintf(b + n, blen - n, "%s      [0x", lip);
+                for (m = 0; m < 8; ++m)
+                    n += my_snprintf(b + n, blen - n, "%02x",
+                                     (unsigned int)ip[m]);
+                n += my_snprintf(b + n, blen - n, "]\n");
+            }
+            n += my_snprintf(b + n, blen - n, "%s      0x", lip);
+            for (m = 0; m < 8; ++m)
+                n += my_snprintf(b + n, blen - n, "%02x", (unsigned int)ip[m]);
+            n += my_snprintf(b + n, blen - n, "\n");
+            break;
+        case 3:         /* NAA 3: Locally assigned */
+            if (8 != dlen) {
+                n += my_snprintf(b + n, blen - n, "%s      << unexpected NAA "
+                                 "3 identifier length: 0x%x >>\n", lip, dlen);
+                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                                b + n);
+                break;
+            }
+            if (do_long)
+                n += my_snprintf(b + n, blen - n, "%s      NAA 3, Locally "
+                                 "assigned:\n", lip);
+            n += my_snprintf(b + n, blen - n, "%s      0x", lip);
+            for (m = 0; m < 8; ++m)
+                n += my_snprintf(b + n, blen - n, "%02x", (unsigned int)ip[m]);
+            n += my_snprintf(b + n, blen - n, "\n");
+            break;
+        case 5:         /* NAA 5: IEEE Registered */
+            if (8 != dlen) {
+                n += my_snprintf(b + n, blen - n, "%s      << unexpected NAA "
+                                 "5 identifier length: 0x%x >>\n", lip, dlen);
+                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                                b + n);
+                break;
+            }
+            c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
+                    (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
+            vsei = ip[3] & 0xf;
+            for (m = 1; m < 5; ++m) {
+                vsei <<= 8;
+                vsei |= ip[3 + m];
+            }
+            if (do_long) {
+                n += my_snprintf(b + n, blen - n, "%s      NAA 5, IEEE "
+                                 "Company_id: 0x%x\n", lip, c_id);
+                n += my_snprintf(b + n, blen - n, "%s      Vendor Specific "
+                                 "Identifier: 0x%" PRIx64 "\n", lip, vsei);
+                n += my_snprintf(b + n, blen - n, "%s      [0x", lip);
+                for (m = 0; m < 8; ++m)
+                    n += my_snprintf(b + n, blen - n, "%02x",
+                                     (unsigned int)ip[m]);
+                n += my_snprintf(b + n, blen - n, "]\n");
+            } else {
+                n += my_snprintf(b + n, blen - n, "%s      0x", lip);
+                for (m = 0; m < 8; ++m)
+                    n += my_snprintf(b + n, blen - n, "%02x",
+                                     (unsigned int)ip[m]);
+                n += my_snprintf(b + n, blen - n, "\n");
+            }
+            break;
+        case 6:         /* NAA 6: IEEE Registered extended */
+            if (16 != dlen) {
+                n += my_snprintf(b + n, blen - n, "%s      << unexpected NAA "
+                                 "6 identifier length: 0x%x >>\n", lip, dlen);
+                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                                b + n);
+                break;
+            }
+            c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
+                    (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
+            vsei = ip[3] & 0xf;
+            for (m = 1; m < 5; ++m) {
+                vsei <<= 8;
+                vsei |= ip[3 + m];
+            }
+            if (do_long) {
+                n += my_snprintf(b + n, blen - n, "%s      NAA 6, IEEE "
+                                 "Company_id: 0x%x\n", lip, c_id);
+                n += my_snprintf(b + n, blen - n, "%s      Vendor Specific "
+                                 "Identifier: 0x%" PRIx64 "\n", lip, vsei);
+                vsei = sg_get_unaligned_be64(ip + 8);
+                n += my_snprintf(b + n, blen - n, "%s      Vendor Specific "
+                                 "Identifier Extension: 0x%" PRIx64 "\n", lip,
+                                 vsei);
+                n += my_snprintf(b + n, blen - n, "%s      [0x", lip);
+                for (m = 0; m < 16; ++m)
+                    n += my_snprintf(b + n, blen - n, "%02x",
+                                     (unsigned int)ip[m]);
+                n += my_snprintf(b + n, blen - n, "]\n");
+            } else {
+                n += my_snprintf(b + n, blen - n, "%s      0x", lip);
+                for (m = 0; m < 16; ++m)
+                    n += my_snprintf(b + n, blen - n, "%02x",
+                                     (unsigned int)ip[m]);
+                n += my_snprintf(b + n, blen - n, "\n");
+            }
+            break;
+        default:
+            n += my_snprintf(b + n, blen - n, "%s      << unexpected NAA "
+                             "[0x%x] >>\n", lip, naa);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        break;
+    case 4: /* Relative target port */
+        if ((1 != c_set) || (1 != assoc) || (4 != dlen)) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected binary "
+                             "code_set, target port association, length 4 "
+                             ">>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, "", 0, blen - n, b + n);
+            break;
+        }
+        d_id = sg_get_unaligned_be16(ip + 2);
+        n += my_snprintf(b + n, blen - n, "%s      Relative target port: "
+                         "0x%x\n", lip, d_id);
+        break;
+    case 5: /* (primary) Target port group */
+        if ((1 != c_set) || (1 != assoc) || (4 != dlen)) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected binary "
+                             "code_set, target port association, length 4 "
+                             ">>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        d_id = sg_get_unaligned_be16(ip + 2);
+        n += my_snprintf(b + n, blen - n, "%s      Target port group: 0x%x\n",
+                         lip, d_id);
+        break;
+    case 6: /* Logical unit group */
+        if ((1 != c_set) || (0 != assoc) || (4 != dlen)) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected binary "
+                             "code_set, logical unit association, length "
+                             "4 >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        d_id = sg_get_unaligned_be16(ip + 2);
+        n += my_snprintf(b + n, blen - n, "%s      Logical unit group: "
+                         "0x%x\n", lip, d_id);
+        break;
+    case 7: /* MD5 logical unit identifier */
+        if ((1 != c_set) || (0 != assoc)) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected binary "
+                             "code_set, logical unit association >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, "", 0, blen - n, b + n);
+            break;
+        }
+        n += my_snprintf(b + n, blen - n, "%s      MD5 logical unit "
+                         "identifier:\n", lip);
+        n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+        break;
+    case 8: /* SCSI name string */
+        if (3 != c_set) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected UTF-8 "
+                             "code_set >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        n += my_snprintf(b + n, blen - n, "%s      SCSI name string:\n", lip);
+        /* does %s print out UTF-8 ok??
+         * Seems to depend on the locale. Looks ok here with my
+         * locale setting: en_AU.UTF-8
+         */
+        n += my_snprintf(b + n, blen - n, "%s      %s\n", lip,
+                         (const char *)ip);
+        break;
+    case 9: /* Protocol specific port identifier */
+        /* added in spc4r36, PIV must be set, proto_id indicates */
+        /* whether UAS (USB) or SOP (PCIe) or ... */
+        if (! piv)
+            n += my_snprintf(b + n, blen - n, " %s      >>>> Protocol "
+                             "specific port identifier expects protocol\n"
+                             "%s           identifier to be valid and it is "
+                             "not\n", lip, lip);
+        if (TPROTO_UAS == p_id) {
+            n += my_snprintf(b + n, blen - n, "%s      USB device address: "
+                             "0x%x\n", lip, 0x7f & ip[0]);
+            n += my_snprintf(b + n, blen - n, "%s      USB interface number: "
+                             "0x%x\n", lip, ip[2]);
+        } else if (TPROTO_SOP == p_id) {
+            n += my_snprintf(b + n, blen - n, "%s      PCIe routing ID, bus "
+                             "number: 0x%x\n", lip, ip[0]);
+            n += my_snprintf(b + n, blen - n, "%s          function number: "
+                             "0x%x\n", lip, ip[1]);
+            n += my_snprintf(b + n, blen - n, "%s          [or device "
+                             "number: 0x%x, function number: 0x%x]\n", lip,
+                             (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+        } else
+            n += my_snprintf(b + n, blen - n, "%s      >>>> unexpected "
+                             "protocol indentifier: %s\n%s           with "
+                             "Protocol specific port identifier\n", lip,
+                   sg_get_trans_proto_str(p_id, sizeof(e), e), lip);
+        break;
+    case 0xa: /* UUID identifier */
+        if (1 != c_set) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected binary "
+                             "code_set >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != dlen)) {
+            n += my_snprintf(b + n, blen - n, "%s      << expected locally "
+                             "assigned UUID, 16 bytes long >>\n", lip);
+            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            break;
+        }
+        n += my_snprintf(b + n, blen - n, "%s      Locally assigned UUID: ",
+                         lip);
+        for (m = 0; m < 16; ++m) {
+            if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
+                n += my_snprintf(b + n, blen - n, "-");
+            n += my_snprintf(b + n, blen - n, "%02x", (unsigned int)ip[2 + m]);
+        }
+        n += my_snprintf(b + n, blen - n, "\n");
+        if (do_long) {
+            n += my_snprintf(b + n, blen - n, "%s      [0x", lip);
+            for (m = 0; m < 16; ++m)
+                n += my_snprintf(b + n, blen - n, "%02x",
+                                 (unsigned int)ip[2 + m]);
+            n += my_snprintf(b + n, blen - n, "]\n");
+        }
+        break;
+    default: /* reserved */
+        n += my_snprintf(b + n, blen - n, "%s      reserved "
+                         "designator=0x%x\n", lip, desig_type);
+        n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+        break;
+    }
+    return n;
+}
+
+static int
+decode_sks(const char * leadin, const unsigned char * descp, int add_d_len,
+           int sense_key, int * processedp, int blen, char * b)
+{
+    int progress, pr, rem, n;
+    const char * lip = "";
+
+    n = 0;
+    if (leadin)
+        lip = leadin;
+    switch (sense_key) {
+    case SPC_SK_ILLEGAL_REQUEST:
+        if (add_d_len < 6) {
+            n += my_snprintf(b + n, blen - n, "Field pointer: ");
+            goto too_short;
+        }
+        /* abbreviate to fit on one line */
+        n += my_snprintf(b + n, blen - n, "Field pointer:\n");
+        n += my_snprintf(b + n, blen - n, "%s        Error in %s: byte %d",
+                         lip, (descp[4] & 0x40) ? "Command" :
+                                                  "Data parameters",
+                         sg_get_unaligned_be16(descp + 5));
+        if (descp[4] & 0x08) {
+            n += my_snprintf(b + n, blen - n, " bit %d\n",
+                             descp[4] & 0x07);
+        } else
+            n += my_snprintf(b + n, blen - n, "\n");
+        break;
+    case SPC_SK_HARDWARE_ERROR:
+    case SPC_SK_MEDIUM_ERROR:
+    case SPC_SK_RECOVERED_ERROR:
+        n += my_snprintf(b + n, blen - n, "Actual retry count: ");
+        if (add_d_len < 6)
+            goto too_short;
+        n += my_snprintf(b + n, blen - n,"%u\n",
+                         sg_get_unaligned_be16(descp + 5));
+        break;
+    case SPC_SK_NO_SENSE:
+    case SPC_SK_NOT_READY:
+        n += my_snprintf(b + n, blen - n, "Progress indication: ");
+        if (add_d_len < 6)
+            goto too_short;
+        progress = sg_get_unaligned_be16(descp + 5);
+        pr = (progress * 100) / 65536;
+        rem = ((progress * 100) % 65536) / 656;
+        n += my_snprintf(b + n, blen - n, "%d.%02d%%\n", pr, rem);
+        break;
+    case SPC_SK_COPY_ABORTED:
+        n += my_snprintf(b + n, blen - n, "Segment pointer:\n");
+        if (add_d_len < 6)
+            goto too_short;
+        n += my_snprintf(b + n, blen - n, "%s        Relative to start of "
+                         "%s, byte %d", lip,
+                         (descp[4] & 0x20) ? "segment descriptor" :
+                                             "parameter list",
+                         sg_get_unaligned_be16(descp + 5));
+        if (descp[4] & 0x08)
+            n += my_snprintf(b + n, blen - n, " bit %d\n",
+                             descp[4] & 0x07);
+        else
+            n += my_snprintf(b + n, blen - n, "\n");
+        break;
+    case SPC_SK_UNIT_ATTENTION:
+        n += my_snprintf(b + n, blen - n, "Unit attention condition "
+                         "queue:\n");
+        n += my_snprintf(b + n, blen - n, "%s        overflow flag is %d\n",
+                         lip, !!(descp[4] & 0x1));
+        break;
+    default:
+        n += my_snprintf(b + n, blen - n, "Sense_key: 0x%x "
+                         "unexpected\n", sense_key);
+        *processedp = 0;
+        break;
+    }
+    return n;
+
+too_short:
+    n += my_snprintf(b + n, blen - n, "%s\n", "   >> descriptor too short");
+    *processedp = 0;
+    return n;
+}
+
 #define TPGS_STATE_OPTIMIZED 0x0
 #define TPGS_STATE_NONOPTIMIZED 0x1
 #define TPGS_STATE_STANDBY 0x2
@@ -500,7 +1041,7 @@ decode_tpgs_state(int st, char * b, int blen)
 
 static int
 uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
-                            int alen)
+                            int alen, const char * leadin)
 {
     int n = 0;
     int dlen = alen - 2;
@@ -508,58 +1049,73 @@ uds_referral_descriptor_str(char * b, int blen, const unsigned char * dp,
     const unsigned char * tp;
     uint64_t ull;
     char c[40];
+    const char * lip = "";
 
-    n += my_snprintf(b + n, blen - n, "   Not all referrals: %d\n",
+    if (leadin)
+        lip = leadin;
+    n += my_snprintf(b + n, blen - n, "%s   Not all referrals: %d\n", lip,
                      !!(dp[2] & 0x1));
     dp += 4;
     for (k = 0, f = 1; (k + 4) < dlen; k += g, dp += g, ++f) {
         tpgd = dp[3];
         g = (tpgd * 4) + 20;
-        n += my_snprintf(b + n, blen - n, "    Descriptor %d\n", f);
+        n += my_snprintf(b + n, blen - n, "%s    Descriptor %d\n", lip, f);
         if ((k + g) > dlen) {
-            n += my_snprintf(b + n, blen - n, "      truncated descriptor, "
-                             "stop\n");
+            n += my_snprintf(b + n, blen - n, "%s      truncated descriptor, "
+                             "stop\n", lip);
             return n;
         }
         ull = sg_get_unaligned_be64(dp + 4);
-        n += my_snprintf(b + n, blen - n, "      first uds LBA: 0x%" PRIx64
-                         "\n", ull);
+        n += my_snprintf(b + n, blen - n, "%s      first uds LBA: 0x%" PRIx64
+                         "\n", lip, ull);
         ull = sg_get_unaligned_be64(dp + 12);
-        n += my_snprintf(b + n, blen - n, "      last uds LBA:  0x%" PRIx64
-                         "\n", ull);
+        n += my_snprintf(b + n, blen - n, "%s      last uds LBA:  0x%" PRIx64
+                         "\n", lip, ull);
         for (j = 0; j < tpgd; ++j) {
             tp = dp + 20 + (j * 4);
             decode_tpgs_state(tp[0] & 0xf, c, sizeof(c));
-            n += my_snprintf(b + n, blen - n, "        tpg: %d  state: %s\n",
-                             sg_get_unaligned_be16(tp + 2), c);
+            n += my_snprintf(b + n, blen - n, "%s        tpg: %d  state: "
+                             "%s\n", lip, sg_get_unaligned_be16(tp + 2), c);
         }
     }
     return n;
 }
 
-static const char * sdata_src[] = {
-    "unknown",
-    "Extended Copy command source device",
-    "Extended Copy command destination device",
-    };
+static const char * dd_usage_reason_str_arr[] = {
+    "Unknown",
+    "resend this and further commands to:",
+    "resend this command to:",
+    "new subsiduary lu added to this administrative lu:",
+    "administrative lu associated with a preferred binding:",
+   };
 
 
 /* Decode descriptor format sense descriptors (assumes sense buffer is
  * in descriptor format) */
-static void
-sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
+int
+sg_get_sense_descriptors_str(const char * leadin,
+                             const unsigned char * sense_buffer, int sb_len,
                              int blen, char * b)
 {
     int add_sb_len, add_d_len, desc_len, k, j, sense_key, processed;
     int n, progress, pr, rem;
     const unsigned char * descp;
+    const char * lip = "";
     const char * dtsp = "   >> descriptor too short";
+    const char * eccp = "Extended copy command";
+    const char * ddp = "destination device";
+    char z[64];
 
     if ((NULL == b) || (blen <= 0))
-        return;
+        return 0;
     b[0] = '\0';
+    if (leadin) {
+        lip = leadin;
+        snprintf(z, sizeof(z), "%.60s  ", lip);
+    } else
+         snprintf(z, sizeof(z), "  ");
     if ((sb_len < 8) || (0 == (add_sb_len = sense_buffer[7])))
-        return;
+        return 0;
     add_sb_len = (add_sb_len < (sb_len - 8)) ? add_sb_len : (sb_len - 8);
     sense_key = (sense_buffer[1] & 0xf);
 
@@ -570,13 +1126,13 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         if ((k + add_d_len + 2) > add_sb_len)
             add_d_len = add_sb_len - k - 2;
         desc_len = add_d_len + 2;
-        n += my_snprintf(b + n, blen - n, "  Descriptor type: ");
+        n += my_snprintf(b + n, blen - n, "%s  Descriptor type: ", lip);
         processed = 1;
         switch (descp[0]) {
         case 0:
-            n += my_snprintf(b + n, blen - n, "Information\n");
+            n += my_snprintf(b + n, blen - n, "Information: ");
             if ((add_d_len >= 10) && (0x80 & descp[2])) {
-                n += my_snprintf(b + n, blen - n, "    0x");
+                n += my_snprintf(b + n, blen - n, "0x");
                 for (j = 0; j < 8; ++j)
                     n += my_snprintf(b + n, blen - n, "%02x", descp[4 + j]);
                 n += my_snprintf(b + n, blen - n, "\n");
@@ -586,9 +1142,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             }
             break;
         case 1:
-            n += my_snprintf(b + n, blen - n, "Command specific\n");
+            n += my_snprintf(b + n, blen - n, "Command specific: ");
             if (add_d_len >= 10) {
-                n += my_snprintf(b + n, blen - n, "    0x");
+                n += my_snprintf(b + n, blen - n, "0x");
                 for (j = 0; j < 8; ++j)
                     n += my_snprintf(b + n, blen - n, "%02x", descp[4 + j]);
                 n += my_snprintf(b + n, blen - n, "\n");
@@ -597,102 +1153,29 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 processed = 0;
             }
             break;
-        case 2:
-            n += my_snprintf(b + n, blen - n, "Sense key specific:");
-            switch (sense_key) {
-            case SPC_SK_ILLEGAL_REQUEST:
-                n += my_snprintf(b + n, blen - n, " Field pointer\n");
-                if (add_d_len < 6) {
-                    n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                    processed = 0;
-                    break;
-                }
-                n += my_snprintf(b + n, blen - n, "    Error in %s: byte %d",
-                                 (descp[4] & 0x40) ? "Command" :
-                                                     "Data parameters",
-                                 sg_get_unaligned_be16(descp + 5));
-                if (descp[4] & 0x08) {
-                    n += my_snprintf(b + n, blen - n, " bit %d\n",
-                                     descp[4] & 0x07);
-                } else
-                    n += my_snprintf(b + n, blen - n, "\n");
-                break;
-            case SPC_SK_HARDWARE_ERROR:
-            case SPC_SK_MEDIUM_ERROR:
-            case SPC_SK_RECOVERED_ERROR:
-                n += my_snprintf(b + n, blen - n, " Actual retry count\n");
-                if (add_d_len < 6) {
-                    n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                    processed = 0;
-                    break;
-                }
-                n += my_snprintf(b + n, blen - n,"    0x%02x%02x\n", descp[5],
-                                 descp[6]);
-                break;
-            case SPC_SK_NO_SENSE:
-            case SPC_SK_NOT_READY:
-                n += my_snprintf(b + n, blen - n, " Progress indication: ");
-                if (add_d_len < 6) {
-                    n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                    processed = 0;
-                    break;
-                }
-                progress = sg_get_unaligned_be16(descp + 5);
-                pr = (progress * 100) / 65536;
-                rem = ((progress * 100) % 65536) / 656;
-                n += my_snprintf(b + n, blen - n, "%d.%02d%%\n", pr, rem);
-                break;
-            case SPC_SK_COPY_ABORTED:
-                n += my_snprintf(b + n, blen - n, " Segment pointer\n");
-                if (add_d_len < 6) {
-                    n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                    processed = 0;
-                    break;
-                }
-                n += my_snprintf(b + n, blen - n, " Relative to start of %s, "
-                                 "byte %d",
-                                 (descp[4] & 0x20) ? "segment descriptor" :
-                                                     "parameter list",
-                                 sg_get_unaligned_be16(descp + 5));
-                if (descp[4] & 0x08)
-                    n += my_snprintf(b + n, blen - n, " bit %d\n",
-                                     descp[4] & 0x07);
-                else
-                    n += my_snprintf(b + n, blen - n, "\n");
-                break;
-            case SPC_SK_UNIT_ATTENTION:
-                n += my_snprintf(b + n, blen - n, " Unit attention condition "
-                                 "queue: ");
-                n += my_snprintf(b + n, blen - n, "overflow flag is %d\n",
-                             !!(descp[4] & 0x1));
-                break;
-            default:
-                n += my_snprintf(b + n, blen - n, " Sense_key: 0x%x "
-                                 "unexpected\n", sense_key);
-                processed = 0;
-                break;
-            }
+        case 2:         /* Sense Key Specific */
+            n += my_snprintf(b + n, blen - n, "Sense key specific: ");
+            n += decode_sks(lip, descp, add_d_len, sense_key, &processed,
+                            blen - n, b + n);
             break;
         case 3:
-            n += my_snprintf(b + n, blen - n, "Field replaceable unit\n");
+            n += my_snprintf(b + n, blen - n, "Field replaceable unit code: ");
             if (add_d_len >= 2)
-                n += my_snprintf(b + n, blen - n, "    code=0x%x\n",
-                                 descp[3]);
+                n += my_snprintf(b + n, blen - n, "0x%x\n", descp[3]);
             else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
             }
             break;
         case 4:
-            n += my_snprintf(b + n, blen - n, "Stream commands\n");
+            n += my_snprintf(b + n, blen - n, "Stream commands: ");
             if (add_d_len >= 2) {
                 if (descp[3] & 0x80)
-                    n += my_snprintf(b + n, blen - n, "    FILEMARK");
+                    n += my_snprintf(b + n, blen - n, "FILEMARK");
                 if (descp[3] & 0x40)
-                    n += my_snprintf(b + n, blen - n, "    End Of Medium "
-                                     "(EOM)");
+                    n += my_snprintf(b + n, blen - n, "End Of Medium (EOM)");
                 if (descp[3] & 0x20)
-                    n += my_snprintf(b + n, blen - n, "    Incorrect Length "
+                    n += my_snprintf(b + n, blen - n, "Incorrect Length "
                                      "Indicator (ILI)");
                 n += my_snprintf(b + n, blen - n, "\n");
             } else {
@@ -701,9 +1184,9 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             }
             break;
         case 5:
-            n += my_snprintf(b + n, blen - n, "Block commands\n");
+            n += my_snprintf(b + n, blen - n, "Block commands: ");
             if (add_d_len >= 2)
-                n += my_snprintf(b + n, blen - n, "    Incorrect Length "
+                n += my_snprintf(b + n, blen - n, "Incorrect Length "
                                  "Indicator (ILI) %s\n",
                                  (descp[3] & 0x20) ? "set" : "clear");
             else {
@@ -725,27 +1208,27 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                              "identification\n");
             processed = 0;
             break;
-        case 9:         /* this is defined in SAT (and SAT-2) */
-            n += my_snprintf(b + n, blen - n, "ATA Status Return\n");
+        case 9:         /* this is defined in SAT (SAT-2) */
+            n += my_snprintf(b + n, blen - n, "ATA Status Return: ");
             if (add_d_len >= 12) {
-                int extend, sector_count;
+                int extend, count;
 
                 extend = descp[2] & 1;
-                sector_count = descp[5] + (extend ? (descp[4] << 8) : 0);
-                n += my_snprintf(b + n, blen - n, "    extend=%d  error=0x%x "
-                                 " sector_count=0x%x\n", extend, descp[3],
-                                 sector_count);
+                count = descp[5] + (extend ? (descp[4] << 8) : 0);
+                n += my_snprintf(b + n, blen - n, "extend=%d error=0x%x "
+                                 "\n%s        count=0x%x ", extend,
+                                 descp[3], lip, count);
                 if (extend)
-                    n += my_snprintf(b + n, blen - n, "    "
-                                     "lba=0x%02x%02x%02x%02x%02x%02x\n",
+                    n += my_snprintf(b + n, blen - n,
+                                     "lba=0x%02x%02x%02x%02x%02x%02x ",
                                      descp[10], descp[8], descp[6],
                                      descp[11], descp[9], descp[7]);
                 else
-                    n += my_snprintf(b + n, blen - n, "    "
-                                     "lba=0x%02x%02x%02x\n",
+                    n += my_snprintf(b + n, blen - n,
+                                     "lba=0x%02x%02x%02x ",
                                      descp[11], descp[9], descp[7]);
-                n += my_snprintf(b + n, blen - n, "    device=0x%x  "
-                                 "status=0x%x\n", descp[12], descp[13]);
+                n += my_snprintf(b + n, blen - n, "device=0x%x status=0x%x\n",
+                                 descp[12], descp[13]);
             } else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
@@ -754,7 +1237,7 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         case 0xa:
            /* Added in SPC-4 rev 17, became 'Another ...' in rev 34 */
             n += my_snprintf(b + n, blen - n, "Another progress "
-                             "indication\n");
+                             "indication: ");
             if (add_d_len < 6) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
@@ -763,20 +1246,21 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
             progress = sg_get_unaligned_be16(descp + 6);
             pr = (progress * 100) / 65536;
             rem = ((progress * 100) % 65536) / 656;
-            n += my_snprintf(b + n, blen - n, "    %d.02%d%%", pr, rem);
-            n += my_snprintf(b + n, blen - n, " [sense_key=0x%x "
-                             "asc,ascq=0x%x,0x%x]\n",
-                             descp[2], descp[3], descp[4]);
+            n += my_snprintf(b + n, blen - n, "%d.02%d%%\n", pr, rem);
+            n += my_snprintf(b + n, blen - n, "%s        [sense_key=0x%x "
+                             "asc,ascq=0x%x,0x%x]\n", lip, descp[2], descp[3],
+                             descp[4]);
             break;
         case 0xb:       /* Added in SPC-4 rev 23, defined in SBC-3 rev 22 */
-            n += my_snprintf(b + n, blen - n, "User data segment referral\n");
+            n += my_snprintf(b + n, blen - n, "User data segment referral: ");
             if (add_d_len < 2) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
                 processed = 0;
                 break;
             }
+            n += my_snprintf(b + n, blen - n, "\n");
             n += uds_referral_descriptor_str(b + n, blen - n, descp,
-                                             add_d_len);
+                                             add_d_len, lip);
             break;
         case 0xc:       /* Added in SPC-4 rev 28 */
             n += my_snprintf(b + n, blen - n, "Forwarded sense data\n");
@@ -785,31 +1269,91 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
                 processed = 0;
                 break;
             }
-            n += my_snprintf(b + n, blen - n, "    FSDT: %s\n",
+            n += my_snprintf(b + n, blen - n, "%s    FSDT: %s\n", lip,
                              (descp[2] & 0x80) ? "set" : "clear");
             j = descp[2] & 0xf;
-            if (j < 3)
-                n += my_snprintf(b + n, blen - n, "    Sense data source: "
-                                 "%s\n", sdata_src[j]);
-            else
-                n += my_snprintf(b + n, blen - n, "    Sense data source: "
-                                 "reserved [%d]\n", j);
+            n += my_snprintf(b + n, blen - n, "%s    Sense data source: ",
+                             lip);
+            switch (j) {
+            case 0:
+                n += my_snprintf(b + n, blen - n, "%s source device\n", eccp);
+                break;
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+                n += my_snprintf(b + n, blen - n, "%s %s %d\n", eccp, ddp,
+                                 j - 1);
+                break;
+            default:
+                n += my_snprintf(b + n, blen - n, "unknown [%d]\n", j);
+            }
             {
-                char c[200];
+                char c[480];
 
                 sg_get_scsi_status_str(descp[3], sizeof(c) - 1, c);
                 c[sizeof(c) - 1] = '\0';
-                n += my_snprintf(b + n, blen - n, "    Forwarded status: "
-                                 "%s\n", c);
+                n += my_snprintf(b + n, blen - n, "%s    Forwarded status: "
+                                 "%s\n", lip, c);
                 if (add_d_len > 2) {
                     /* recursing; hope not to get carried away */
-                    n += my_snprintf(b + n, blen - n, " vvvvvvvvvvvvvvvv\n");
-                    sg_get_sense_str(NULL, descp + 4, add_d_len - 2, 0,
+                    n += my_snprintf(b + n, blen - n, "%s vvvvvvvvvvvvvvvv\n",
+                                     lip);
+                    sg_get_sense_str(lip, descp + 4, add_d_len - 2, 0,
                                      sizeof(c), c);
                     n += my_snprintf(b + n, blen - n, "%s", c);
-                    n += my_snprintf(b + n, blen - n, " ^^^^^^^^^^^^^^^^\n");
+                    n += my_snprintf(b + n, blen - n, "%s ^^^^^^^^^^^^^^^^\n",
+                                     lip);
                 }
             }
+            break;
+        case 0xd:       /* Added in SBC-3 rev 36d */
+            /* this descriptor combines descriptors 0, 1, 2 and 3 */
+            n += my_snprintf(b + n, blen - n, "Direct-access block device\n");
+            if (add_d_len < 28) {
+                n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
+                processed = 0;
+                break;
+            }
+            if (0x20 & descp[2])
+                n += my_snprintf(b + n, blen - n, "%s    ILI (incorrect "
+                                 "length indication) set\n", lip);
+            if (0x80 & descp[4]) {
+                n += my_snprintf(b + n, blen - n, "%s    Sense key "
+                                 "specific: ", lip);
+                n += decode_sks(lip, descp, add_d_len, sense_key, &processed,
+                                blen - n, b + n);
+            }
+            n += my_snprintf(b + n, blen - n, "%s    Field replaceable unit "
+                             "code: 0x%x\n", lip, descp[7]);
+            if (0x80 & descp[2]) {
+                n += my_snprintf(b + n, blen - n, "%s    Information: 0x",
+                                 lip);
+                for (j = 0; j < 8; ++j)
+                    n += my_snprintf(b + n, blen - n, "%02x", descp[8 + j]);
+                n += my_snprintf(b + n, blen - n, "\n");
+            }
+            n += my_snprintf(b + n, blen - n, "%s    Command specific: 0x",
+                             lip);
+            for (j = 0; j < 8; ++j)
+                n += my_snprintf(b + n, blen - n, "%02x", descp[16 + j]);
+            n += my_snprintf(b + n, blen - n, "\n");
+            break;
+        case 0xe:       /* Added in SPC-5 rev 6 (for bind/unbind) */
+            n += my_snprintf(b + n, blen - n, "Device designation\n");
+            j = (int)(sizeof(dd_usage_reason_str_arr) /
+                      sizeof(dd_usage_reason_str_arr[0]));
+            if (descp[3] < j)
+                n += my_snprintf(b + n, blen - n, "%s    Usage reason: %s\n",
+                                 lip, dd_usage_reason_str_arr[descp[3]]);
+            else
+                n += my_snprintf(b + n, blen - n, "%s    Usage reason: "
+                                 "reserved[%d]\n", lip, descp[3]);
+            n += sg_get_designation_descriptor_str(z, descp + 4, descp[1] - 2,
+                                                   1, 0, blen - n, b + n);
             break;
         default:
             if (descp[0] >= 0x80)
@@ -823,43 +1367,48 @@ sg_get_sense_descriptors_str(const unsigned char * sense_buffer, int sb_len,
         }
         if (! processed) {
             if (add_d_len > 0) {
-                n += my_snprintf(b + n, blen - n, "    ");
+                n += my_snprintf(b + n, blen - n, "%s    ", lip);
                 for (j = 0; j < add_d_len; ++j) {
                     if ((j > 0) && (0 == (j % 24)))
-                        n += my_snprintf(b + n, blen - n, "\n    ");
+                        n += my_snprintf(b + n, blen - n, "\n%s    ", lip);
                     n += my_snprintf(b + n, blen - n, "%02x ", descp[j + 2]);
                 }
                 n += my_snprintf(b + n, blen - n, "\n");
             }
         }
         if (add_d_len < 0)
-            n += my_snprintf(b + n, blen - n, "    short descriptor\n");
+            n += my_snprintf(b + n, blen - n, "%s    short descriptor\n", lip);
     }
+    return n;
 }
 
 /* Decode SAT ATA PASS-THROUGH fixed format sense */
-static void
-sg_get_sense_sat_pt_fixed_str(const unsigned char * sp, int slen, int blen,
-                              char * b)
+static int
+sg_get_sense_sat_pt_fixed_str(const char * leadin, const unsigned char * sp,
+                              int slen, int blen, char * b)
 {
     int n = 0;
+    const char * lip = "";
 
     if ((blen < 1) || (slen < 12))
-        return;
+        return n;
+    if (leadin)
+        lip = leadin;
     if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2]))
-        n += my_snprintf(b + n, blen - n, "  >> expected Sense key: "
-                         "Recovered Error ??\n");
-    n += my_snprintf(b + n, blen - n, "  error=0x%x, status=0x%x, "
-                     "device=0x%x, sector_count(7:0)=0x%x%c\n", sp[3], sp[4],
-                     sp[5], sp[6], ((0x40 & sp[8]) ? '+' : ' '));
-    n += my_snprintf(b + n, blen - n, "  extend=%d, log_index=0x%x, "
-                     "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n",
+        n += my_snprintf(b + n, blen - n, "%s  >> expected Sense key: "
+                         "Recovered Error ??\n", lip);
+    n += my_snprintf(b + n, blen - n, "%s  error=0x%x, status=0x%x, "
+                     "device=0x%x, sector_count(7:0)=0x%x%c\n", lip, sp[3],
+                     sp[4], sp[5], sp[6], ((0x40 & sp[8]) ? '+' : ' '));
+    n += my_snprintf(b + n, blen - n, "%s  extend=%d, log_index=0x%x, "
+                     "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n", lip,
                      (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
                      ((0x20 & sp[8]) ? '+' : ' '));
+    return n;
 }
 
 /* Fetch sense information */
-void
+int
 sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                  int sb_len, int raw_sinfo, int buff_len, char * buff)
 {
@@ -871,21 +1420,23 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
     char error_buff[64];
     char b[256];
     struct sg_scsi_sense_hdr ssh;
+    const char * lip = "";
 
     if ((NULL == buff) || (buff_len <= 0))
-        return;
+        return 0;
     else if (1 == buff_len) {
         buff[0] = '\0';
-        return;
+        return 0;
     }
     blen = sizeof(b);
     n = 0;
-    if ((NULL == sense_buffer) || (sb_len < 1)) {
-            my_snprintf(buff, buff_len, "sense buffer empty\n");
-            return;
-    }
     if (leadin)
-        n += my_snprintf(buff + n, buff_len - n, "%s: ", leadin);
+        lip = leadin;
+    if ((NULL == sense_buffer) || (sb_len < 1)) {
+            n += my_snprintf(buff, buff_len, "%s >>> sense buffer empty\n",
+                             lip);
+            return n;
+    }
     len = sb_len;
     if (sg_scsi_normalize_sense(sense_buffer, sb_len, &ssh)) {
         switch (ssh.response_code) {
@@ -921,34 +1472,34 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             ebp = error_buff;
             break;
         }
-        n += my_snprintf(buff + n, buff_len - n, " %s;  Sense key: %s\n ",
-                         ebp, sg_lib_sense_key_desc[ssh.sense_key]);
+        n += my_snprintf(buff + n, buff_len - n, "%s%s; Sense key: %s\n",
+                         lip, ebp, sg_lib_sense_key_desc[ssh.sense_key]);
         if (sdat_ovfl)
-            n += my_snprintf(buff + n, buff_len - n, "<<<Sense data "
-                             "overflow>>>\n");
+            n += my_snprintf(buff + n, buff_len - n, "%s<<<Sense data "
+                             "overflow>>>\n", lip);
         if (descriptor_format) {
-            n += my_snprintf(buff + n, buff_len - n, "%s\n",
+            n += my_snprintf(buff + n, buff_len - n, "%s%s\n", lip,
                              sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
                                                  sizeof(b), b));
-            sg_get_sense_descriptors_str(sense_buffer, len, buff_len - n,
-                                         buff + n);
-            n = strlen(buff);
+            n += sg_get_sense_descriptors_str(lip, sense_buffer, len,
+                                              buff_len - n, buff + n);
         } else if ((len > 12) && (0 == ssh.asc) &&
                    (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
             /* SAT ATA PASS-THROUGH fixed format */
-            n += my_snprintf(buff + n, buff_len - n, "%s\n",
+            n += my_snprintf(buff + n, buff_len - n, "%s%s\n", lip,
                              sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
                              sizeof(b), b));
-            sg_get_sense_sat_pt_fixed_str(sense_buffer, len, buff_len - n,
-                                          buff + n);
-            n = strlen(buff);
+            n += sg_get_sense_sat_pt_fixed_str(lip, sense_buffer, len,
+                                               buff_len - n, buff + n);
         } else if (len > 2) {   /* fixed format */
             if (len > 12)
-                n += my_snprintf(buff + n, buff_len - n, "%s\n",
+                n += my_snprintf(buff + n, buff_len - n, "%s%s\n", lip,
                                  sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
                                                      sizeof(b), b));
             r = 0;
             valid = sense_buffer[0] & 0x80;
+            if (strlen(lip) > 0)
+                r += my_snprintf(b + r, blen - r, "%s", lip);
             if (len > 6) {
                 info = sg_get_unaligned_be32(sense_buffer + 3);
                 if (valid)
@@ -973,14 +1524,14 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             } else if (valid || (info > 0))
                 r += my_snprintf(b + r, blen - r, "\n");
             if ((len >= 14) && sense_buffer[14])
-                r += my_snprintf(b + r, blen - r, "  Field replaceable unit "
-                                 "code: %d\n", sense_buffer[14]);
+                r += my_snprintf(b + r, blen - r, "%s  Field replaceable unit "
+                                 "code: %d\n", lip, sense_buffer[14]);
             if ((len >= 18) && (sense_buffer[15] & 0x80)) {
                 /* sense key specific decoding */
                 switch (ssh.sense_key) {
                 case SPC_SK_ILLEGAL_REQUEST:
-                    r += my_snprintf(b + r, blen - r, "  Sense Key Specific: "
-                             "Error in %s: byte %d",
+                    r += my_snprintf(b + r, blen - r, "%s  Sense Key "
+                                     "Specific: Error in %s: byte %d", lip,
                              ((sense_buffer[15] & 0x40) ? "Command" :
                                                           "Data parameters"),
                              sg_get_unaligned_be16(sense_buffer + 16));
@@ -995,18 +1546,19 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                     progress = sg_get_unaligned_be16(sense_buffer + 16);
                     pr = (progress * 100) / 65536;
                     rem = ((progress * 100) % 65536) / 656;
-                    r += my_snprintf(b + r, blen - r, "  Progress "
-                                     "indication: %d.%02d%%\n", pr, rem);
+                    r += my_snprintf(b + r, blen - r, "%s  Progress "
+                                     "indication: %d.%02d%%\n", lip, pr, rem);
                     break;
                 case SPC_SK_HARDWARE_ERROR:
                 case SPC_SK_MEDIUM_ERROR:
                 case SPC_SK_RECOVERED_ERROR:
-                    r += my_snprintf(b + r, blen - r, "  Actual retry count: "
-                                     "0x%02x%02x\n", sense_buffer[16],
-                                     sense_buffer[17]);
+                    r += my_snprintf(b + r, blen - r, "%s  Actual retry "
+                                     "count: " "0x%02x%02x\n", lip,
+                                     sense_buffer[16], sense_buffer[17]);
                     break;
                 case SPC_SK_COPY_ABORTED:
-                    r += my_snprintf(b + r, blen - r, "  Segment pointer: ");
+                    r += my_snprintf(b + r, blen - r, "%s  Segment pointer: ",
+                                     lip);
                     r += my_snprintf(b + r, blen - r, "Relative to start of "
                                      "%s, byte %d",
                                      ((sense_buffer[15] & 0x20) ?
@@ -1019,37 +1571,39 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                         r += my_snprintf(b + r, blen - r, "\n");
                     break;
                 case SPC_SK_UNIT_ATTENTION:
-                    r += my_snprintf(b + r, blen - r, "  Unit attention "
-                                     "condition queue: ");
+                    r += my_snprintf(b + r, blen - r, "%s  Unit attention "
+                                     "condition queue: ", lip);
                     r += my_snprintf(b + r, blen - r, "overflow flag is %d\n",
                                      !!(sense_buffer[15] & 0x1));
                     break;
                 default:
-                    r += my_snprintf(b + r, blen - r, "  Sense_key: 0x%x "
-                                     "unexpected\n", ssh.sense_key);
+                    r += my_snprintf(b + r, blen - r, "%s  Sense_key: 0x%x "
+                                     "unexpected\n", lip, ssh.sense_key);
                     break;
                 }
             }
             if (r > 0)
                 n += my_snprintf(buff + n, buff_len - n, "%s", b);
         } else
-            n += my_snprintf(buff + n, buff_len - n, " fixed descriptor "
-                             "length too short, len=%d\n", len);
+            n += my_snprintf(buff + n, buff_len - n, "%s fixed descriptor "
+                             "length too short, len=%d\n", lip, len);
     } else {    /* non-extended SCSI-1 sense data ?? */
         if (sb_len < 4) {
-            n += my_snprintf(buff + n, buff_len - n, "sense buffer too short "
-                             "(4 byte minimum)\n");
-            return;
+            n += my_snprintf(buff + n, buff_len - n, "%ssense buffer too "
+                             "short (4 byte minimum)\n", lip);
+            return n;
         }
         r = 0;
-        r += my_snprintf(b + r, blen - r, "Probably uninitialized data.\n  "
-                         "Try to view as SCSI-1 non-extended sense:\n");
+        if (strlen(lip) > 0)
+            r += my_snprintf(b + r, blen - r, "%s", lip);
+        r += my_snprintf(b + r, blen - r, "Probably uninitialized data.\n%s  "
+                         "Try to view as SCSI-1 non-extended sense:\n", lip);
         r += my_snprintf(b + r, blen - r, "  AdValid=%d  Error class=%d  "
                          "Error code=%d\n", !!(sense_buffer[0] & 0x80),
                          ((sense_buffer[0] >> 4) & 0x7),
                          (sense_buffer[0] & 0xf));
         if (sense_buffer[0] & 0x80)
-            r += my_snprintf(b + r, blen - r, "  lba=0x%x\n",
+            r += my_snprintf(b + r, blen - r, "%s  lba=0x%x\n", lip,
                      sg_get_unaligned_be24(sense_buffer + 1) & 0x1fffff);
         n += my_snprintf(buff + n, buff_len - n, "%s\n", b);
         len = sb_len;
@@ -1057,13 +1611,17 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             len = 32;   /* trim in case there is a lot of rubbish */
     }
     if (raw_sinfo) {
-        n += my_snprintf(buff + n, buff_len - n, " Raw sense data (in hex):"
-                         "\n");
+        char z[64];
+
+        n += my_snprintf(buff + n, buff_len - n, "%s Raw sense data (in hex):"
+                         "\n", lip);
         if (n >= (buff_len - 1))
-            return;
-        dStrHexStr((const char *)sense_buffer, len, "        ", 0,
-                   buff_len - n, buff + n);
+            return n;
+        snprintf(z, sizeof(z), "%.50s        ", lip);
+        n += dStrHexStr((const char *)sense_buffer, len, z,  0,
+                        buff_len - n, buff + n);
     }
+    return n;
 }
 
 /* Print sense information */
@@ -1223,11 +1781,13 @@ static struct op_code2sa_t op_code2sa_arr[] = {
     {SG_3PARTY_COPY_OUT, sg_lib_xcopy_sa_arr, NULL},
     {SG_3PARTY_COPY_IN, sg_lib_rec_copy_sa_arr, NULL},
     {SG_READ_BUFFER, sg_lib_read_buff_arr, "Read buffer"},
-    {SG_WRITE_BUFFER, sg_lib_write_buff_arr, "Write buffer"},
+    {SG_READ_ATTRIBUTE, sg_lib_read_attr_arr, "Read attribute"},
     {SG_SANITIZE, sg_lib_sanitize_sa_arr, "Sanitize"},
+    {SG_WRITE_BUFFER, sg_lib_write_buff_arr, "Write buffer"},
+    {SG_ZONING_IN, sg_lib_zoning_in_arr, NULL},
+    {SG_ZONING_OUT, sg_lib_zoning_out_arr, NULL},
     {0xffff, NULL, NULL},
 };
-
 
 void
 sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
@@ -1653,8 +2213,9 @@ dStrHexErr(const char* str, int len, int no_ascii)
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
  * per line with an extra space between the 8th and 9th bytes. 'format'
- * is unused (currently), set to 0 . */
-void
+ * is unused (currently), set to 0 . Returns number of bytes written
+ * to 'b' excluding the trailing '\0'. */
+int
 dStrHexStr(const char* str, int len, const char * leadin, int format,
            int b_len, char * b)
 {
@@ -1666,7 +2227,7 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
     if (len <= 0) {
         if (b_len > 0)
             b[0] = '\0';
-        return;
+        return 0;
     }
     if (0 != format) {
         ;       /* do nothing different for now */
@@ -1695,7 +2256,7 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
             trimTrailingSpaces(buff);
             n += my_snprintf(b + n, b_len - n, "%s\n", buff);
             if (n >= (b_len - 1))
-                return;
+                return n;
             bpos = bpstart;
             memset(buff, ' ', 120);
             if (bpstart > 0)
@@ -1707,7 +2268,7 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
         trimTrailingSpaces(buff);
         n += my_snprintf(b + n, b_len - n, "%s\n", buff);
     }
-    return;
+    return n;
 }
 
 /* Returns 1 when executed on big endian machine; else returns 0.

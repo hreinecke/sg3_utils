@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2015 Douglas Gilbert.
+ * Copyright (c) 1999-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -719,6 +719,19 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                   int cmplst, int dlist_format, int timeout_secs,
                   void * paramp, int param_len, int noisy, int verbose)
 {
+    return sg_ll_format_unit2(sg_fd, fmtpinfo, longlist, fmtdata, cmplst,
+                              dlist_format, 0, timeout_secs, paramp,
+                              param_len, noisy, verbose);
+}
+
+/* Invokes a FORMAT UNIT (SBC-4) command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * FFMT field added in sbc4r10 [20160121] */
+int
+sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
+                   int cmplst, int dlist_format, int ffmt, int timeout_secs,
+                   void * paramp, int param_len, int noisy, int verbose)
+{
     int k, res, ret, sense_cat, tmout;
     unsigned char fuCmdBlk[FORMAT_UNIT_CMDLEN] =
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
@@ -735,9 +748,11 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
         fuCmdBlk[1] |= 0x8;
     if (dlist_format)
         fuCmdBlk[1] |= (dlist_format & 0x7);
+    if (ffmt)
+        fuCmdBlk[4] |= (ffmt & 0x3);
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
     if (verbose) {
-        pr2ws("    format cdb: ");
+        pr2ws("    format unit cdb: ");
         for (k = 0; k < 6; ++k)
             pr2ws("%02x ", fuCmdBlk[k]);
         pr2ws("\n");

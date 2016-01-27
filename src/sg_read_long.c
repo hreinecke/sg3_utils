@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2015 D. Gilbert
+   *  Copyright (C) 2004-2016 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20151219";
+static const char * version_str = "1.21 20160121";
 
 #define MAX_XFER_LEN 10000
 
@@ -79,8 +79,8 @@ usage()
             "    --xfer_len=BTL|-x BTL    byte transfer length (< 10000)"
             " default 520\n\n"
             "Perform a SCSI READ LONG (10 or 16) command. Reads a single "
-            "block with\nassociated ECC data. User data could be "
-            "scrambled.\n");
+            "block with\nassociated ECC data. The user data could be "
+            "encoded or encrypted.\n");
 }
 
 /* Returns 0 if successful */

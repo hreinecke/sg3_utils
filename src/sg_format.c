@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2015  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2016  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
@@ -34,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.32 20151219";
+static const char * version_str = "1.33 20160123";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -57,6 +58,31 @@ static const char * version_str = "1.32 20151219";
 #define sleep_for(seconds)    sleep(seconds)
 #endif
 
+struct opts_t {
+        int64_t blk_count;      /* -c value */
+        int blk_size;           /* -s value */
+        int cmplst;             /* -C value */
+        bool dcrt;              /* -D */
+        bool early;             /* -e */
+        int ffmt;               /* -q value */
+        int fmtpinfo;
+        int format;             /* -F */
+        bool fwait;             /* -w (negate for immed) */
+        bool ip_def;            /* -I */
+        bool long_lba;          /* -l */
+        int mode_page;          /* -M value */
+        bool mode6;             /* -6 */
+        int pfu;                /* -P value */
+        int pie;                /* -q value */
+        bool pinfo;             /* -p, deprecated, prefer fmtpinfo */
+        int pollt;              /* -x value */
+        bool do_rcap16;         /* -l */
+        bool resize;            /* -r */
+        bool rto_req;           /* -R, deprecated, prefer fmtpinfo */
+        int sec_init;           /* -S */
+        int verbose;            /* -v */
+        const char * device_name;
+};
 
 #define MAX_BUFF_SZ     252
 static unsigned char dbuff[MAX_BUFF_SZ];
@@ -67,6 +93,7 @@ static struct option long_options[] = {
         {"cmplst", required_argument, 0, 'C'},
         {"dcrt", no_argument, 0, 'D'},
         {"early", no_argument, 0, 'e'},
+        {"ffmt", required_argument, 0, 't'},
         {"fmtpinfo", required_argument, 0, 'f'},
         {"format", no_argument, 0, 'F'},
         {"help", no_argument, 0, 'h'},
@@ -94,13 +121,14 @@ usage()
 {
         printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
                "[--early]\n"
-               "                 [--fmtpinfo=FPI] [--format] [--help] "
-               "[--ip_def] [--long]\n"
-               "                 [--mode=MP] [--pfu=PFU] [--pie=PIE] "
-               "[--pinfo] [--poll=PT]\n"
-               "                 [--resize] [--rto_req] [--security] "
-               "[--six] [--size=SIZE]\n"
-               "                 [--verbose] [--version] [--wait] DEVICE\n"
+               "                 [--ffmt] [--fmtpinfo=FPI] [--format] "
+               "[--help] [--ip_def]\n"
+               "                 [--long] [--mode=MP] [--pfu=PFU] "
+               "[--pie=PIE] [--pinfo]\n"
+               "                 [--poll=PT] [--resize] [--rto_req] "
+               "[--security] [--six]\n"
+               "                 [--size=SIZE] [--verbose] [--version] "
+               "[--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -113,6 +141,9 @@ usage()
                "verify media)\n"
                "    --early|-e      exit once format started (user can "
                "monitor progress)\n"
+               "    --ffmt=FFMT|-t FFMT      fast format (def: 0 -> "
+               "possibly write\n"
+               "                             to whole medium\n"
                "    --fmtpinfo=FPI|-f FPI    FMTPINFO field value "
                "(default: 0)\n"
                "    --format|-F     format unit (default: report current "
@@ -162,14 +193,13 @@ usage()
                "have the correct DEVICE.\n");
 }
 
-/* Return 0 on success, else see sg_ll_format_unit() */
+/* Return 0 on success, else see sg_ll_format_unit2() */
 static int
-scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
-            int dcrt, int pie, int ip_def, int sec_init, int early, int pt,
-            int verbose)
+scsi_format(int fd, const struct opts_t * op)
 {
         int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
         int resp_len, ip_desc;
+        int immed = ! op->fwait;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
@@ -178,34 +208,35 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
         char b[80];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
-        longlist = (pie > 0);
-        ip_desc = (ip_def || sec_init);
+        longlist = (op->pie > 0);
+        ip_desc = (op->ip_def || op->sec_init);
         off = longlist ? LO_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
-        fmt_pl[0] = pf_usage & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
+        fmt_pl[0] = op->pfu & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
         fmt_pl[1] = (immed ? 0x2 : 0); /* FOV=0, [DPRY,DCRT,STPF,IP=0] */
-        if (dcrt)
+        if (op->dcrt)
                 fmt_pl[1] |= 0xa0;     /* FOV=1, DCRT=1 */
         if (ip_desc) {
                 fmt_pl[1] |= 0x88;     /* FOV=1, IP=1 */
-                if (sec_init)
+                if (op->sec_init)
                         fmt_pl[off + 0] = 0x20; /* SI=1 in IP desc */
         }
         if (longlist)
-                fmt_pl[3] = (pie & 0xf);    /* PROTECTION_INTERVAL_EXPONENT */
+                fmt_pl[3] = (op->pie & 0xf);/* PROTECTION_INTERVAL_EXPONENT */
         /* with the long parameter list header, P_I_INFORMATION is always 0 */
 
-        need_hdr = (immed || cmplst || dcrt || ip_desc || (pf_usage > 0) ||
-                    (pie > 0));
+        need_hdr = (immed || op->cmplst || op->dcrt || ip_desc ||
+                    (op->pfu > 0) || (op->pie > 0));
         fmt_pl_sz = 0;
         if (need_hdr)
                 fmt_pl_sz = off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0);
 
-        res = sg_ll_format_unit(fd, fmtpinfo, longlist, need_hdr /* FMTDATA*/,
-                                cmplst, 0 /* DEFECT_LIST_FORMAT */,
-                                (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
-                                fmt_pl, fmt_pl_sz, 1, verbose);
+        res = sg_ll_format_unit2(fd, op->fmtpinfo, longlist,
+                                 need_hdr/* FMTDATA*/, op->cmplst,
+                                 0 /* DEFECT_LIST_FORMAT */, op->ffmt,
+                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
+                                 fmt_pl, fmt_pl_sz, 1, op->verbose);
         if (res) {
-                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format command: %s\n", b);
                 return res;
         }
@@ -213,7 +244,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                 return 0;
 
         printf("\nFormat has started\n");
-        if (early) {
+        if (op->early) {
                 if (immed)
                         printf("Format continuing,\n    request sense or "
                                "test unit ready can be used to monitor "
@@ -221,8 +252,8 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                 return 0;
         }
 
-        verb = (verbose > 1) ? (verbose - 1) : 0;
-        if (0 == pt) {
+        verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
+        if (0 == op->pollt) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
@@ -237,7 +268,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                 break;
                 }
         }
-        if (pt || (SG_LIB_CAT_NOT_READY == res)) {
+        if (op->pollt || (SG_LIB_CAT_NOT_READY == res)) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, sizeof(reqSense));
@@ -272,16 +303,16 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                 sleep_for(30);
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
             res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                      1, verbose);
+                                      1, op->verbose);
             if (res) {
                 ret = res;
-                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Request Sense command: %s\n", b);
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
-            if (verbose > 1) {
+            if (op->verbose > 1) {
                 pr2serr("Parameter data in hex\n");
                 dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
             }
@@ -290,7 +321,7 @@ scsi_format(int fd, int fmtpinfo, int cmplst, int pf_usage, int immed,
                                       &progress);
             if (progress < 0) {
                 ret = res;
-                if (verbose > 1)
+                if (op->verbose > 1)
                      pr2serr("No progress indication found, iteration %d\n",
                              k + 1);
                 /* N.B. exits first time there isn't a progress indication */
@@ -371,14 +402,15 @@ get_lu_name(const unsigned char * ucp, int u_len, char * b, int b_len)
 #define VPD_DEVICE_ID 0x83
 
 static int
-print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
+print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen,
+             const struct opts_t * op)
 {
         int res, k, n, verb, pdt, has_sn, has_di;
         unsigned char b[256];
         char a[256];
         char pdt_name[64];
 
-        verb = (verbose > 1) ? verbose - 1 : 0;
+        verb = (op->verbose > 1) ? op->verbose - 1 : 0;
         memset(sinq_resp, 0, max_rlen);
         res = sg_ll_inquiry(fd, 0, 0 /* evpd */, 0 /* pg_op */, b,
                             SAFE_STD_INQ_RESP_LEN, 1, verb);
@@ -394,7 +426,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                        (const char *)(b + 8), (const char *)(b + 16),
                        (const char *)(b + 32),
                        sg_get_pdt_str(pdt, sizeof(pdt_name), pdt_name), pdt);
-                if (verbose)
+                if (op->verbose)
                         printf("      PROTECT=%d\n", !!(b[5] & 1));
                 if (b[5] & 1)
                         printf("      << supports protection information>>"
@@ -407,12 +439,12 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
                             SAFE_STD_INQ_RESP_LEN, 1, verb);
         if (res) {
-                if (verbose)
+                if (op->verbose)
                         pr2serr("VPD_SUPPORTED_VPDS gave res=%d\n", res);
                 return 0;
         }
         if (VPD_SUPPORTED_VPDS != b[1]) {
-                if (verbose)
+                if (op->verbose)
                         pr2serr("VPD_SUPPORTED_VPDS corrupted\n");
                 return 0;
         }
@@ -422,7 +454,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
                 if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
                         if (has_di) {
-                                if (verbose)
+                                if (op->verbose)
                                         pr2serr("VPD_SUPPORTED_VPDS "
                                                 "dis-ordered\n");
                                 return 0;
@@ -437,13 +469,13 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                 res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_UNIT_SERIAL_NUM,
                                     b, sizeof(b), 1, verb);
                 if (res) {
-                        if (verbose)
+                        if (op->verbose)
                                 pr2serr("VPD_UNIT_SERIAL_NUM gave res=%d\n",
                                         res);
                         return 0;
                 }
                 if (VPD_UNIT_SERIAL_NUM != b[1]) {
-                        if (verbose)
+                        if (op->verbose)
                                 pr2serr("VPD_UNIT_SERIAL_NUM corrupted\n");
                         return 0;
                 }
@@ -457,12 +489,12 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
                 res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_DEVICE_ID, b,
                                     sizeof(b), 1, verb);
                 if (res) {
-                        if (verbose)
+                        if (op->verbose)
                                 pr2serr("VPD_DEVICE_ID gave res=%d\n", res);
                         return 0;
                 }
                 if (VPD_DEVICE_ID != b[1]) {
-                        if (verbose)
+                        if (op->verbose)
                                 pr2serr("VPD_DEVICE_ID corrupted\n");
                         return 0;
                 }
@@ -481,7 +513,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
 /* Returns block size or -2 if do_16==0 and the number of blocks is too
  * big, or returns -1 for other error. */
 static int
-print_read_cap(int fd, int do_16, int verbose)
+print_read_cap(int fd, const struct opts_t * op)
 {
         int res;
         unsigned char resp_buff[RCAP_REPLY_LEN];
@@ -489,9 +521,9 @@ print_read_cap(int fd, int do_16, int verbose)
         uint64_t llast_blk_addr;
         char b[80];
 
-        if (do_16) {
+        if (op->do_rcap16) {
                 res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
-                                       resp_buff, 32, 1, verbose);
+                                       resp_buff, 32, 1, op->verbose);
                 if (0 == res) {
                         llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);
                         block_size = sg_get_unaligned_be32(resp_buff + 8);
@@ -517,12 +549,12 @@ print_read_cap(int fd, int do_16, int verbose)
                 }
         } else {
                 res = sg_ll_readcap_10(fd, 0 /* pmi */, 0 /* lba */,
-                                       resp_buff, 8, 1, verbose);
+                                       resp_buff, 8, 1, op->verbose);
                 if (0 == res) {
                         last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
                         block_size = sg_get_unaligned_be32(resp_buff + 4);
                         if (0xffffffff == last_blk_addr) {
-                            if (verbose)
+                            if (op->verbose)
                                 printf("Read Capacity (10) reponse "
                                        "indicates that Read Capacity (16) "
                                        "is required\n");
@@ -536,8 +568,8 @@ print_read_cap(int fd, int do_16, int verbose)
                         return (int)block_size;
                 }
         }
-        sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        pr2serr("READ CAPACITY (%d): %s\n", (do_16 ? 16 : 10), b);
+        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+        pr2serr("READ CAPACITY (%d): %s\n", (op->do_rcap16 ? 16 : 10), b);
         return -1;
 }
 
@@ -545,40 +577,25 @@ print_read_cap(int fd, int do_16, int verbose)
 int
 main(int argc, char **argv)
 {
-        int mode_page = RW_ERROR_RECOVERY_PAGE;
         int fd, res, calc_len, bd_len, dev_specific_param;
-        int offset, j, bd_blk_len, prob, len, pdt;
+        int offset, j, n, bd_blk_len, prob, len, pdt;
         uint64_t ull;
-        int64_t blk_count = 0;  /* -c value */
-        int blk_size = 0;     /* -s value */
-        int format = 0;         /* -F */
-        int ip_def = 0;         /* -I */
-        int resize = 0;         /* -r */
-        int verbose = 0;        /* -v */
-        int fwait = 0;          /* -w */
-        int mode6 = 0;
-        int fmtpinfo = 0;
-        int pinfo = 0;          /* deprecated, prefer fmtpinfo */
-        int pie = 0;
-        int pfu = 0;
-        int pt = DEF_POLL_TYPE;
-        int rto_req = 0;        /* deprecated, prefer fmtpinfo */
-        int cmplst = 1;
-        int do_rcap16 = 0;
-        int long_lba = 0;
-        int dcrt = 0;
-        int do_si = 0;
-        int early = 0;
-        const char * device_name = NULL;
         char b[80];
         unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
         int ret = 0;
+        struct opts_t opts;
+        struct opts_t * op;
 
+        op = &opts;
+        memset(op, 0, sizeof(opts));
+        op->cmplst = 1;
+        op->mode_page = RW_ERROR_RECOVERY_PAGE;
+        op->pollt = DEF_POLL_TYPE;
         while (1) {
                 int option_index = 0;
                 int c;
 
-                c = getopt_long(argc, argv, "c:C:Def:FhIlM:pP:q:rRs:SvVwx:6",
+                c = getopt_long(argc, argv, "c:C:Def:FhIlM:pP:q:rRs:St:vVwx:6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -586,108 +603,116 @@ main(int argc, char **argv)
                 switch (c) {
                 case 'c':
                         if (0 == strcmp("-1", optarg))
-                                blk_count = -1;
+                                op->blk_count = -1;
                         else {
-                                blk_count = sg_get_llnum(optarg);
-                                if (-1 == blk_count) {
+                                op->blk_count = sg_get_llnum(optarg);
+                                if (-1 == op->blk_count) {
                                         pr2serr("bad argument to '--count'\n");
                                         return SG_LIB_SYNTAX_ERROR;
                                 }
                         }
                         break;
                 case 'C':
-                        cmplst = sg_get_num(optarg);
-                        if ((cmplst < 0) || ( cmplst > 1)) {
+                        op->cmplst = sg_get_num(optarg);
+                        if ((op->cmplst < 0) || (op->cmplst > 1)) {
                                 pr2serr("bad argument to '--cmplst', want 0 "
                                         "or 1\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'D':
-                        dcrt = 1;
+                        op->dcrt = 1;
                         break;
                 case 'e':
-                        early = 1;
+                        op->early = true;
                         break;
                 case 'f':
-                        fmtpinfo = sg_get_num(optarg);
-                        if ((fmtpinfo < 0) || ( fmtpinfo > 3)) {
+                        op->fmtpinfo = sg_get_num(optarg);
+                        if ((op->fmtpinfo < 0) || ( op->fmtpinfo > 3)) {
                                 pr2serr("bad argument to '--fmtpinfo', "
                                         "accepts 0 to 3 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'F':
-                        ++format;
+                        ++op->format;
                         break;
                 case 'h':
                         usage();
                         return 0;
                 case 'I':
-                        ip_def = 1;
+                        op->ip_def = true;
                         break;
                 case 'l':
-                        long_lba = 1;
-                        do_rcap16 = 1;
+                        op->long_lba = true;
+                        op->do_rcap16 = true;
                         break;
                 case 'M':
-                        mode_page = sg_get_num(optarg);
-                        if ((mode_page < 0) || ( mode_page > 62)) {
+                        op->mode_page = sg_get_num(optarg);
+                        if ((op->mode_page < 0) || ( op->mode_page > 62)) {
                                 pr2serr("bad argument to '--mode', accepts "
                                         "0 to 62 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'p':
-                        pinfo = 1;
+                        op->pinfo = true;
                         break;
                 case 'P':
-                        pfu = sg_get_num(optarg);
-                        if ((pfu < 0) || ( pfu > 7)) {
+                        op->pfu = sg_get_num(optarg);
+                        if ((op->pfu < 0) || ( op->pfu > 7)) {
                                 pr2serr("bad argument to '--pfu', accepts 0 "
                                         "to 7 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'q':
-                        pie = sg_get_num(optarg);
-                        if ((pie < 0) || ( pie > 15)) {
+                        op->pie = sg_get_num(optarg);
+                        if ((op->pie < 0) || (op->pie > 15)) {
                                 pr2serr("bad argument to '--pie', accepts 0 "
                                         "to 15 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'r':
-                        resize = 1;
+                        op->resize = true;
                         break;
                 case 'R':
-                        rto_req = 1;
+                        op->rto_req = true;
                         break;
                 case 's':
-                        blk_size = sg_get_num(optarg);
-                        if (blk_size <= 0) {
+                        op->blk_size = sg_get_num(optarg);
+                        if (op->blk_size <= 0) {
                                 pr2serr("bad argument to '--size', want arg "
                                         "> 0\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         break;
                 case 'S':
-                        do_si = 1;
+                        op->sec_init = true;
+                        break;
+                case 't':
+                        op->ffmt = sg_get_num(optarg);
+                        if ((op->ffmt < 0) || ( op->ffmt > 3)) {
+                                pr2serr("bad argument to '--ffmt', "
+                                        "accepts 0 to 3 inclusive\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
                         break;
                 case 'v':
-                        verbose++;
+                        op->verbose++;
                         break;
                 case 'V':
                         pr2serr("sg_format version: %s\n", version_str);
                         return 0;
                 case 'w':
-                        fwait = 1;
+                        op->fwait = true;
                         break;
                 case 'x':
-                        pt = !!sg_get_num(optarg);
+                        op->pollt = !!sg_get_num(optarg);
                         break;
                 case '6':
-                        mode6 = 1;
+                        op->mode6 = true;
                         break;
                 default:
                         usage();
@@ -695,8 +720,8 @@ main(int argc, char **argv)
                 }
         }
         if (optind < argc) {
-                if (NULL == device_name) {
-                        device_name = argv[optind];
+                if (NULL == op->device_name) {
+                        op->device_name = argv[optind];
                         ++optind;
                 }
         }
@@ -707,57 +732,58 @@ main(int argc, char **argv)
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
-        if (NULL == device_name) {
+        if (NULL == op->device_name) {
                 pr2serr("no DEVICE name given\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
-        if (ip_def && do_si) {
+        if (op->ip_def && op->sec_init) {
                 pr2serr("'--ip_def' and '--security' contradict, choose "
                         "one\n");
                 return SG_LIB_SYNTAX_ERROR;
         }
-        if (resize) {
-                if (format) {
+        if (op->resize) {
+                if (op->format) {
                         pr2serr("both '--format' and '--resize' not "
                                 "permitted\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
-                } else if (0 == blk_count) {
+                } else if (0 == op->blk_count) {
                         pr2serr("'--resize' needs a '--count' (other than "
                                 "0)\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
-                } else if (0 != blk_size) {
+                } else if (0 != op->blk_size) {
                         pr2serr("'--resize' not compatible with '--size'\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 }
         }
-        if ((pinfo > 0) || (rto_req > 0) || (fmtpinfo > 0)) {
-                if ((pinfo || rto_req) && fmtpinfo) {
+        if ((op->pinfo > 0) || (op->rto_req > 0) || (op->fmtpinfo > 0)) {
+                if ((op->pinfo || op->rto_req) && op->fmtpinfo) {
                         pr2serr("confusing with both '--pinfo' or "
                                 "'--rto_req' together with\n'--fmtpinfo', "
                                 "best use '--fmtpinfo' only\n");
                         usage();
                         return SG_LIB_SYNTAX_ERROR;
                 }
-                if (pinfo)
-                        fmtpinfo |= 2;
-                if (rto_req)
-                        fmtpinfo |= 1;
+                if (op->pinfo)
+                        op->fmtpinfo |= 2;
+                if (op->rto_req)
+                        op->fmtpinfo |= 1;
         }
 
-        if ((fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
-                pr2serr("error opening device file: %s: %s\n", device_name,
-                        safe_strerror(-fd));
+        if ((fd = sg_cmds_open_device(op->device_name, 0 /* read write */,
+                                      op->verbose)) < 0) {
+                pr2serr("error opening device file: %s: %s\n",
+                        op->device_name, safe_strerror(-fd));
                 return SG_LIB_FILE_ERROR;
         }
 
-        if (format > 2)
+        if (op->format > 2)
                 goto format_only;
 
-        ret = print_dev_id(fd, inq_resp, sizeof(inq_resp), verbose);
+        ret = print_dev_id(fd, inq_resp, sizeof(inq_resp), op);
         if (ret)
             goto out;
         pdt = 0x1f & inq_resp[0];
@@ -770,40 +796,41 @@ main(int argc, char **argv)
 
 again_with_long_lba:
         memset(dbuff, 0, MAX_BUFF_SZ);
-        if (mode6)
+        if (op->mode6)
                 res = sg_ll_mode_sense6(fd, 0 /* DBD */, 0 /* current */,
-                                        mode_page, 0 /* subpage */, dbuff,
-                                        MAX_BUFF_SZ, 1, verbose);
+                                        op->mode_page, 0 /* subpage */, dbuff,
+                                        MAX_BUFF_SZ, 1, op->verbose);
         else
-                res = sg_ll_mode_sense10(fd, long_lba, 0 /* DBD */,
-                                         0 /* current */, mode_page,
+                res = sg_ll_mode_sense10(fd, op->long_lba, 0 /* DBD */,
+                                         0 /* current */, op->mode_page,
                                          0 /* subpage */, dbuff,
-                                         MAX_BUFF_SZ, 1, verbose);
+                                         MAX_BUFF_SZ, 1, op->verbose);
         ret = res;
         if (res) {
                 if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-                        if (long_lba && (! mode6))
+                        if (op->long_lba && (! op->mode6))
                                 pr2serr("bad field in MODE SENSE (%d) "
                                         "[longlba flag not supported?]\n",
-                                        (mode6 ? 6 : 10));
+                                        (op->mode6 ? 6 : 10));
                         else
                                 pr2serr("bad field in MODE SENSE (%d) "
                                         "[mode_page %d not supported?]\n",
-                                        (mode6 ? 6 : 10), mode_page);
+                                        (op->mode6 ? 6 : 10), op->mode_page);
                 } else {
-                        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                        sg_get_category_sense_str(res, sizeof(b), b,
+                                                  op->verbose);
                         pr2serr("MODE SENSE (%d) command: %s\n",
-                                (mode6 ? 6 : 10), b);
+                                (op->mode6 ? 6 : 10), b);
                 }
-                if (0 == verbose)
+                if (0 == op->verbose)
                         pr2serr("    try '-v' for more information\n");
                 goto out;
         }
-        if (mode6) {
+        if (op->mode6) {
                 calc_len = dbuff[0] + 1;
                 dev_specific_param = dbuff[2];
                 bd_len = dbuff[3];
-                long_lba = 0;
+                op->long_lba = 0;
                 offset = 4;
                 /* prepare for mode select */
                 dbuff[0] = 0;
@@ -813,7 +840,7 @@ again_with_long_lba:
                 calc_len = sg_get_unaligned_be16(dbuff + 0);
                 dev_specific_param = dbuff[3];
                 bd_len = sg_get_unaligned_be16(dbuff + 6);
-                long_lba = (dbuff[4] & 1);
+                op->long_lba = (dbuff[4] & 1);
                 offset = 8;
                 /* prepare for mode select */
                 dbuff[0] = 0;
@@ -829,21 +856,21 @@ again_with_long_lba:
         if (dev_specific_param & 0x40)
                 printf("  <<< Write Protect (WP) bit set >>>\n");
         if (bd_len > 0) {
-                ull = long_lba ? sg_get_unaligned_be64(dbuff + offset) :
+                ull = op->long_lba ? sg_get_unaligned_be64(dbuff + offset) :
                                  sg_get_unaligned_be32(dbuff + offset);
-                if ((0 == long_lba) && (0xffffffff == ull)) {
-                        if (verbose)
+                if ((0 == op->long_lba) && (0xffffffff == ull)) {
+                        if (op->verbose)
                                 pr2serr("Mode sense number of blocks maxed "
                                         "out, set longlba\n");
-                        long_lba = 1;
-                        mode6 = 0;
-                        do_rcap16 = 1;
+                        op->long_lba = 1;
+                        op->mode6 = 0;
+                        op->do_rcap16 = 1;
                         goto again_with_long_lba;
                 }
-                bd_blk_len = long_lba ?
+                bd_blk_len = op->long_lba ?
                                  sg_get_unaligned_be32(dbuff + offset + 12) :
                                  sg_get_unaligned_be24(dbuff + offset + 5);
-                if (long_lba) {
+                if (op->long_lba) {
                         printf("  <<< longlba flag set (64 bit lba) >>>\n");
                         if (bd_len != 16)
                                 prob = 1;
@@ -856,9 +883,8 @@ again_with_long_lba:
                 printf("  No block descriptors present\n");
                 prob = 1;
         }
-        if (resize ||
-            (format && ((blk_count != 0) ||
-                        ((blk_size > 0) && (blk_size != bd_blk_len))))) {
+        if (op->resize || (op->format && ((op->blk_count != 0) ||
+              ((op->blk_size > 0) && (op->blk_size != bd_blk_len))))) {
                 /* want to run MODE SELECT */
 
 /* Working Draft SCSI Primary Commands - 3 (SPC-3)    pg 255
@@ -902,48 +928,52 @@ again_with_long_lba:
                         ret = SG_LIB_CAT_MALFORMED;
                         goto out;
                 }
-                if (blk_count != 0)  {
-                        len = (long_lba ? 8 : 4);
-                        for (j = 0; j < len; ++j)
+                if (op->blk_count != 0)  {
+                        len = (op->long_lba ? 8 : 4);
+                        for (j = 0; j < len; ++j) {
+                                n = (len - j - 1) * 8;
                                 dbuff[offset + j] =
-                                    (blk_count >> ((len - j - 1) * 8)) & 0xff;
-                } else if ((blk_size > 0) && (blk_size != bd_blk_len)) {
-                        len = (long_lba ? 8 : 4);
+                                            (op->blk_count >> n) & 0xff;
+                        }
+                } else if ((op->blk_size > 0) &&
+                           (op->blk_size != bd_blk_len)) {
+                        len = (op->long_lba ? 8 : 4);
                         for (j = 0; j < len; ++j)
                                 dbuff[offset + j] = 0;
                 }
-                if ((blk_size > 0) && (blk_size != bd_blk_len)) {
-                        if (long_lba)
-                                sg_put_unaligned_be32((uint32_t)blk_size,
+                if ((op->blk_size > 0) && (op->blk_size != bd_blk_len)) {
+                        if (op->long_lba)
+                                sg_put_unaligned_be32((uint32_t)op->blk_size,
                                                       dbuff + offset + 12);
                         else
-                                sg_put_unaligned_be24((uint32_t)blk_size,
+                                sg_put_unaligned_be24((uint32_t)op->blk_size,
                                                       dbuff + offset + 5);
                 }
-                if (mode6)
+                if (op->mode6)
                         res = sg_ll_mode_select6(fd, 1 /* PF */, 1 /* SP */,
-                                                 dbuff, calc_len, 1, verbose);
+                                         dbuff, calc_len, 1, op->verbose);
                 else
                         res = sg_ll_mode_select10(fd, 1 /* PF */, 1 /* SP */,
-                                                  dbuff, calc_len, 1, verbose);
+                                          dbuff, calc_len, 1, op->verbose);
                 ret = res;
                 if (res) {
-                        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                        sg_get_category_sense_str(res, sizeof(b), b,
+                                                  op->verbose);
                         pr2serr("MODE SELECT command: %s\n", b);
-                        if (0 == verbose)
+                        if (0 == op->verbose)
                                 pr2serr("    try '-v' for more information\n");
                         goto out;
                 }
         }
-        if (resize) {
+        if (op->resize) {
                 printf("Resize operation seems to have been successful\n");
                 goto out;
         }
-        else if (! format) {
-                res = print_read_cap(fd, do_rcap16, verbose);
+        else if (! op->format) {
+                res = print_read_cap(fd, op);
                 if (-2 == res) {
-                        do_rcap16 = 1;
-                        res = print_read_cap(fd, do_rcap16, verbose);
+                        op->do_rcap16 = 1;
+                        res = print_read_cap(fd, op);
                 }
                 if (res < 0)
                         ret = -1;
@@ -959,27 +989,29 @@ again_with_long_lba:
                 goto out;
         }
 
-        if (format) {
+        if (op->format) {
 format_only:
 #if 1
                 printf("\nA FORMAT will commence in 15 seconds\n");
-                printf("    ALL data on %s will be DESTROYED\n", device_name);
+                printf("    ALL data on %s will be DESTROYED\n",
+                       op->device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
                 printf("\nA FORMAT will commence in 10 seconds\n");
-                printf("    ALL data on %s will be DESTROYED\n", device_name);
+                printf("    ALL data on %s will be DESTROYED\n",
+                       op->device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
                 printf("\nA FORMAT will commence in 5 seconds\n");
-                printf("    ALL data on %s will be DESTROYED\n", device_name);
+                printf("    ALL data on %s will be DESTROYED\n",
+                       op->device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
-                res = scsi_format(fd, fmtpinfo, cmplst, pfu, ! fwait, dcrt,
-                                  pie, ip_def, do_si, early, pt, verbose);
+                res = scsi_format(fd, op);
                 ret = res;
                 if (res) {
                         pr2serr("FORMAT failed\n");
-                        if (0 == verbose)
+                        if (0 == op->verbose)
                                 pr2serr("    try '-v' for more "
                                         "information\n");
                 }

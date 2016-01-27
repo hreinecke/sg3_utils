@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2015 Douglas Gilbert.
+ * Copyright (c) 1999-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
 #endif
 
 
-static const char * version_str = "1.71 20151130";
+static const char * version_str = "1.72 20160126";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -145,7 +145,9 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
         break;
     }
     if (verbose || n) {
-        sg_get_sense_str(leadin, sbp, slen, (verbose > 1),
+        if (leadin && (strlen(leadin) > 0))
+            pr2ws("%s:\n", leadin);
+        sg_get_sense_str(NULL, sbp, slen, (verbose > 1),
                          sizeof(b), b);
         pr2ws("%s", b);
         if ((mx_di_len > 0) && (resid > 0)) {

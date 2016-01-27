@@ -13,7 +13,7 @@ Send SCSI READ LONG command to \fIDEVICE\fR. The read buffer is output in hex
 and ASCII to stdout or placed in a file. Note that the data returned includes
 the logical block data (typically 512 bytes for a disk) plus ECC
 information (whose format is proprietary) plus optionally other proprietary
-data.
+data. Note that the logical block data may be encoded or encrypted.
 .PP
 In SBC\-4 revision 7 the SCSI READ LONG (10 and 16 byte) commands were made
 obsolete. In the same revision all uses of SCSI WRITE LONG (10 and 16 byte)
@@ -94,7 +94,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2015 Douglas Gilbert
+Copyright \(co 2004\-2016 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

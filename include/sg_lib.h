@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -203,9 +203,29 @@ int sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
 
 /* Closely related to sg_print_sense(). Puts decoded sense data in 'buff'.
  * Usually multiline with multiple '\n' including one trailing. If
- * 'raw_sinfo' set appends sense buffer in hex. */
-void sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
-                      int sb_len, int raw_sinfo, int buff_len, char * buff);
+ * 'raw_sinfo' set appends sense buffer in hex. 'leadin' is string prepended
+ * to each line written to 'buff', NULL treated as "". Returns the number of
+ * bytes written to 'buff' excluding the trailing '\0'. */
+int sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
+                     int sb_len, int raw_sinfo, int buff_len, char * buff);
+
+/* Decode descriptor format sense descriptors (assumes sense buffer is
+ * in descriptor format). 'leadin' is string prepended to each line written
+ * to 'b', NULL treated as "". Returns the number of bytes written to 'b'
+ * excluding the trailing '\0'. */
+int sg_get_sense_descriptors_str(const char * leadin,
+                                 const unsigned char * sense_buffer,
+                                 int sb_len, int blen, char * b);
+
+/* Decodes a designation descriptor (e.g. as found in the Device
+ * Identification VPD page (0x83)) into string 'b' whose maximum length is
+ * blen. 'leadin' is string prepended to each line written to 'b', NULL
+ * treated as "". Returns the number of bytes written to 'b' excluding the
+ * trailing '\0'. */
+int sg_get_designation_descriptor_str(const char * leadin,
+                                      const unsigned char * ddp, int dd_len,
+                                      int print_assoc, int do_long, int blen,
+                                      char * b);
 
 /* Yield string associated with peripheral device type (pdt). Returns
  * 'buff'. If 'pdt' out of range yields "bad pdt" string. */
@@ -222,12 +242,25 @@ int sg_lib_pdt_decay(int pdt);
  *    'buff'. If 'tpi' out of range yields "bad tpi" string. */
 char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
 
+/* Returns a designator's type string given 'val' (0 to 15 inclusive),
+ * otherwise returns NULL. */
+const char * sg_get_desig_type_str(int val);
+
+/* Returns a designator's code_set string given 'val' (0 to 15 inclusive),
+ * otherwise returns NULL. */
+const char * sg_get_desig_code_set_str(int val);
+
+/* Returns a designator's association string given 'val' (0 to 3 inclusive),
+ * otherwise returns NULL. */
+const char * sg_get_desig_assoc_str(int val);
+
 extern FILE * sg_warnings_strm;
 
 void sg_set_warnings_strm(FILE * warnings_strm);
 
 /* The following "print" functions send ACSII to 'sg_warnings_strm' file
- * descriptor (default value is stderr) */
+ * descriptor (default value is stderr). 'leadin' is string prepended to
+ * each line printed out, NULL treated as "". */
 void sg_print_command(const unsigned char * command);
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     int sb_len, int raw_info);
@@ -347,9 +380,10 @@ void dStrHexErr(const char* str, int len, int no_ascii);
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
  * per line with an extra space between the 8th and 9th bytes. 'format'
- * is unused, set to 0 . */
-void dStrHexStr(const char* str, int len, const char * leadin, int format,
-                int b_len, char * b);
+ * is unused, set to 0 . Returns number of bytes written to 'b' excluding
+ * the trailing '\0'.*/
+int dStrHexStr(const char* str, int len, const char * leadin, int format,
+               int b_len, char * b);
 
 /* Returns 1 when executed on big endian machine; else returns 0.
  * Useful for displaying ATA identify words (which need swapping on a

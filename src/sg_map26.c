@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -16,7 +16,7 @@
 /* #define _XOPEN_SOURCE 500 */
 /* needed to see DT_REG and friends when compiled with: c99 pedantic */
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE
+#define _GNU_SOURCE 1
 #endif
 
 #include <unistd.h>
@@ -40,7 +40,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.10 20151219";
+static const char * version_str = "1.11 20160121";
 
 #define ME "sg_map26: "
 

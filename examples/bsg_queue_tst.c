@@ -20,7 +20,7 @@
    The default behaviour is to "queue at head" which is useful for
    error processing but not for streaming READ and WRITE commands.
 
-*  Copyright (C) 2010 D. Gilbert
+*  Copyright (C) 2010-2016 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -148,8 +148,8 @@ int main(int argc, char * argv[])
                 ok = 1;
                 break;
             default: /* won't bother decoding other categories */
-                sg_print_sense("command error",
-                               (unsigned char *)(long)rio_hdr.response,
+                fprintf(stderr, "command error:\n");
+                sg_print_sense(NULL, (unsigned char *)(long)rio_hdr.response,
                                rio_hdr.response_len, 1);
                 break;
             }

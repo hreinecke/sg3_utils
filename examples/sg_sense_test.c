@@ -63,19 +63,26 @@ int main(/* int argc, char * argv[] */)
     char b[2048];
     int k, prev_len;
 
-    sg_print_sense("err1 test", err1, sizeof(err1), 1 /* raw_info */);
-    sg_print_sense("\nerr2 test", err2, sizeof(err2), 1);
-    sg_print_sense("\nerr3 test", err3, sizeof(err3), 1);
-    sg_print_sense("\nerr4 test", err4, sizeof(err4), 1);
-    sg_print_sense("\nerr5 test", err5, sizeof(err5), 1);
-    sg_print_sense("\nerr6 test", err6, sizeof(err6), 1);
-    sg_print_sense("\nerr7 test", err7, sizeof(err7), 1);
+    fprintf(stderr, "err1 test:\n");
+    sg_print_sense(NULL, err1, sizeof(err1), 1 /* raw_info */);
+    fprintf(stderr, "err2 test:\n");
+    sg_print_sense(" ", err2, sizeof(err2), 1);
+    fprintf(stderr, "err3 test:\n");
+    sg_print_sense("  ", err3, sizeof(err3), 1);
+    fprintf(stderr, "err4 test:\n");
+    sg_print_sense(">  ", err4, sizeof(err4), 1);
+    fprintf(stderr, "err5 test:\n");
+    sg_print_sense(">>    ", err5, sizeof(err5), 1);
+    fprintf(stderr, "err6 test:\n");
+    sg_print_sense(">>    ", err6, sizeof(err6), 1);
+    fprintf(stderr, "err7 test:\n");
+    sg_print_sense(">>        ", err7, sizeof(err7), 1);
 
     printf("\n\nTry different output string sizes with "
            "sg_get_sense_str(err2):\n");
     for (k = 1, prev_len = -1; k < 512; ++k) {
-        snprintf(leadin, sizeof(leadin), "blen=%d", k);
-        sg_get_sense_str(leadin, err2, sizeof(err2), 0, k, b);
+        /* snprintf(leadin, sizeof(leadin), "blen=%d", k); */
+        sg_get_sense_str(NULL, err2, sizeof(err2), 0, k, b);
         printf("%s\n", b);
         if (prev_len == (int)strlen(b))
             break;
@@ -86,8 +93,8 @@ int main(/* int argc, char * argv[] */)
     printf("\n\nTry different output string sizes with "
            "sg_get_sense_str(err4):\n");
     for (k = 1, prev_len = -1; k < 512; ++k) {
-        snprintf(leadin, sizeof(leadin), "blen=%d", k);
-        sg_get_sense_str(leadin, err4, sizeof(err4), 0, k, b);
+        /* snprintf(leadin, sizeof(leadin), "blen=%d", k); */
+        sg_get_sense_str(NULL, err4, sizeof(err4), 0, k, b);
         printf("%s\n", b);
         if (prev_len == (int)strlen(b))
             break;

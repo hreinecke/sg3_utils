@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -46,7 +46,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.11 20141110";
+static const char * version_str = "1.12 20160126";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -161,9 +161,11 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         if (verbose > 2)
             pr2serr("command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
-        if (verbose > 1)
-            sg_print_sense("ATA pass through", sense_buffer, sb_sz,
+        if (verbose > 1) {
+            pr2serr("ATA pass through:\n");
+            sg_print_sense(NULL, sense_buffer, sb_sz,
                            ((verbose > 2) ? 1 : 0));
+        }
         if (sg_scsi_normalize_sense(sense_buffer, sb_sz, &ssh)) {
             switch (ssh.sense_key) {
             case SPC_SK_ILLEGAL_REQUEST:

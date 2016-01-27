@@ -119,7 +119,7 @@
 
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE
+#define _GNU_SOURCE 1
 #endif
 
 static const char * version_str = "2.35 [20140403]";

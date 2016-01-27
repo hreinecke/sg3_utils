@@ -36,7 +36,7 @@
 
 */
 
-static const char * version_str = "1.11 20160104";  /* spc5r07 + sbc4r07 */
+static const char * version_str = "1.12 20160126";  /* spc5r08 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -776,14 +776,6 @@ decode_std_inq(unsigned char * b, int len, int verbose)
     printf("  Product_revision_level: %.4s\n", b + 32);
 }
 
-static const char * assoc_arr[] =
-{
-    "Addressed logical unit",
-    "Target port",      /* that received request; unless SCSI ports VPD */
-    "Target device that contains addressed lu",
-    "Reserved [0x3]",
-};
-
 static void
 decode_id_vpd(unsigned char * buff, int len, int subvalue,
               const struct opts_t * op)
@@ -798,24 +790,25 @@ decode_id_vpd(unsigned char * buff, int len, int subvalue,
     m_d = -1;
     m_cs = -1;
     if (0 == subvalue) {
-        decode_dev_ids(assoc_arr[VPD_ASSOC_LU], buff + 4, len - 4,
-                       VPD_ASSOC_LU, m_d, m_cs, op);
-        decode_dev_ids(assoc_arr[VPD_ASSOC_TPORT], buff + 4, len - 4,
-                       VPD_ASSOC_TPORT, m_d, m_cs, op);
-        decode_dev_ids(assoc_arr[VPD_ASSOC_TDEVICE], buff + 4, len - 4,
-                       VPD_ASSOC_TDEVICE, m_d, m_cs, op);
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), buff + 4,
+                       len - 4, VPD_ASSOC_LU, m_d, m_cs, op);
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), buff + 4,
+                       len - 4, VPD_ASSOC_TPORT, m_d, m_cs, op);
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), buff + 4,
+                       len - 4, VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     } else if (VPD_DI_SEL_AS_IS == subvalue)
         decode_dev_ids(NULL, buff + 4, len - 4, m_a, m_d, m_cs, op);
     else {
         if (VPD_DI_SEL_LU & subvalue)
-            decode_dev_ids(assoc_arr[VPD_ASSOC_LU], buff + 4, len - 4,
-                           VPD_ASSOC_LU, m_d, m_cs, op);
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), buff + 4,
+                           len - 4, VPD_ASSOC_LU, m_d, m_cs, op);
         if (VPD_DI_SEL_TPORT & subvalue)
-            decode_dev_ids(assoc_arr[VPD_ASSOC_TPORT], buff + 4, len - 4,
-                           VPD_ASSOC_TPORT, m_d, m_cs, op);
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), buff + 4,
+                           len - 4, VPD_ASSOC_TPORT, m_d, m_cs, op);
         if (VPD_DI_SEL_TARGET & subvalue)
-            decode_dev_ids(assoc_arr[VPD_ASSOC_TDEVICE], buff + 4, len - 4,
-                           VPD_ASSOC_TDEVICE, m_d, m_cs, op);
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE),
+                           buff + 4, len - 4, VPD_ASSOC_TDEVICE, m_d, m_cs,
+                           op);
     }
 }
 
@@ -858,7 +851,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
         printf("  %s, Service type: %s\n",
-               assoc_arr[(ucp[0] >> 5) & 0x3],
+               sg_get_desig_assoc_str((ucp[0] >> 5) & 0x3),
                network_service_type_arr[ucp[0] & 0x1f]);
         na_len = sg_get_unaligned_be16(ucp + 2);
         bump = 4 + na_len;
@@ -977,35 +970,6 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, const struct opts_t * op)
         bump += tpd_len + 4;
     }
 }
-
-static const char * code_set_arr[] =
-{
-    "Reserved [0x0]",
-    "Binary",
-    "ASCII",
-    "UTF-8",
-    "Reserved [0x4]", "Reserved [0x5]", "Reserved [0x6]", "Reserved [0x7]",
-    "Reserved [0x8]", "Reserved [0x9]", "Reserved [0xa]", "Reserved [0xb]",
-    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
-};
-
-static const char * desig_type_arr[] =
-{
-    "vendor specific [0x0]",
-    "T10 vendor identification",
-    "EUI-64 based",
-    "NAA",
-    "Relative target port",
-    "Target port group",        /* spc4r09: _primary_ target port group */
-    "Logical unit group",
-    "MD5 logical unit identifier",
-    "SCSI name string",
-    "Protocol specific port identifier",  /* spc4r36 */
-    "UUID identifier",                    /* 15-267r2 */
-    "Reserved [0xb]",
-    "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
-};
-
 
 /* Prints outs an abridged set of device identification designators
    selected by association, designator type and/or code set. */
@@ -1218,13 +1182,14 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
     char b[64];
 
     if (print_assoc)
-        printf("  %s:\n", assoc_arr[assoc]);
+        printf("  %s:\n", sg_get_desig_assoc_str(assoc & 3));
     printf("    designator type: %s,  code set: %s\n",
-           desig_type_arr[desig_type], code_set_arr[c_set]);
+           sg_get_desig_type_str(desig_type & 0xf),
+           sg_get_desig_code_set_str(c_set & 0xf));
     if (piv && ((1 == assoc) || (2 == assoc)))
         printf("     transport: %s\n",
                sg_get_trans_proto_str(p_id, sizeof(b), b));
-    /* printf("    associated with the %s\n", assoc_arr[assoc]); */
+/* printf("    associated with the %s\n", sg_get_desig_assoc_str(assoc)); */
     switch (desig_type) {
     case 0: /* vendor specific */
         k = 0;
@@ -1562,7 +1527,7 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
             printf("  %s:\n", print_if_found);
         }
         if (NULL == print_if_found)
-            printf("  %s:\n", assoc_arr[assoc]);
+            printf("  %s:\n", sg_get_desig_assoc_str(assoc));
         p_id = ((ucp[0] >> 4) & 0xf);
         c_set = (ucp[0] & 0xf);
         piv = ((ucp[1] & 0x80) ? 1 : 0);

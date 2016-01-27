@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -52,6 +52,10 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
 int sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                       int cmplist, int dlist_format, int timeout_secs,
                       void * paramp, int param_len, int noisy, int verbose);
+int sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
+                       int cmplist, int dlist_format, int ffmt,
+                       int timeout_secs, void * paramp, int param_len,
+                       int noisy, int verbose);
 
 /* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> GET LBA STATUS not supported,
