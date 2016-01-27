@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2015 D. Gilbert
+ *  Copyright (C) 2000-2016 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.36 20151219";    /* spc5r07 + sbc4r05 */
+static const char * version_str = "1.37 20160124";    /* spc5r07 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -69,6 +69,7 @@ static const char * version_str = "1.36 20151219";    /* spc5r07 + sbc4r05 */
 #define ENV_REPORTING_SUBPG 0x1
 #define UTILIZATION_SUBPG 0x1
 #define ENV_LIMITS_SUBPG 0x2
+#define LPS_MISALIGNMENT_SUBPG 0x3
 
 #define VENDOR_M 0x1000
 
@@ -202,6 +203,8 @@ static bool show_pending_defects_page(const uint8_t * resp, int len,
                                       const struct opts_t * op);
 static bool show_background_op_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
+static bool show_lps_misalignment_page(const uint8_t * resp, int len,
+                                       const struct opts_t * op);
 static bool show_element_stats_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
 static bool show_ata_pt_results_page(const uint8_t * resp, int len,
@@ -300,6 +303,9 @@ static struct log_elem log_arr[] = {
     {BACKGROUND_SCAN_LPAGE, BACKGROUND_OP_SUBPG, 0, 0, 0,
      "Background operation", "bop", show_background_op_page},
                                         /* 0x15, 0x2  SBC */
+    {BACKGROUND_SCAN_LPAGE, LPS_MISALIGNMENT_SUBPG, 0, 0, 0,
+     "LPS misalignment", "lps", show_lps_misalignment_page},
+                                        /* 0x15, 0x3  SBC-4 */
     {0x15, 0, 0, PDT_MCHANGER, 0, "Element statistics", "els",
      show_element_stats_page},          /* 0x15, 0x0  SMC */
     {0x15, 0, 0, PDT_ADC, 0, "Service buffers information", "sbi",
@@ -329,7 +335,7 @@ static struct log_elem log_arr[] = {
     {0x1b, 0, 0, PDT_TAPE, 0, "Data compression", "dc",
      show_data_compression_page},       /* 0x1b, 0  SSC */
     {0x2d, 0, 0, PDT_TAPE, 0, "Current service information", "csi",
-     NULL},         			/* 0x2d, 0  SSC */
+     NULL},                             /* 0x2d, 0  SSC */
     {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, 0, "Tape alert", "ta",
      show_tape_alert_ssc_page},         /* 0x2e, 0  SSC */
     {IE_LPAGE, 0, 0, -1, 0, "Informational exceptions", "ie",
@@ -1089,20 +1095,11 @@ dStrRaw(const char* str, int len)
 static uint64_t
 decode_count(const uint8_t * xp, int len)
 {
-    int j;
-    uint64_t ull;
-
-    if (len > (int)sizeof(ull)) {
-        xp += (len - sizeof(ull));
-        len = sizeof(ull);
+    if (len > (int)sizeof(uint64_t)) {
+        xp += (len - sizeof(uint64_t));
+        len = sizeof(uint64_t);
     }
-    ull = 0;
-    for (j = 0; j < len; ++j) {
-        if (j > 0)
-            ull <<= 8;
-        ull |= xp[j];
-    }
-    return ull;
+    return sg_get_unaligned_be64(xp + 0);
 }
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
@@ -1194,8 +1191,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                 if (1 == sscanf(carry_over, "%4x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
-                    pr2serr("f2hex_arr: carry_over error ['%s'] around line "
-                            "%d\n", carry_over, j + 1);
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
                     goto bad;
                 }
                 lcp = line + 1;
@@ -1215,7 +1212,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
         if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
-            pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                     j + 1, m + k + 1);
             goto bad;
         }
@@ -1223,12 +1220,12 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
                  ++k, lcp += 2) {
                 if (1 != sscanf(lcp, "%2x", &h)) {
-                    pr2serr("f2hex_arr: bad hex number in line %d, "
-                            "pos %d\n", j + 1, (int)(lcp - line + 1));
+                    pr2serr("%s: bad hex number in line %d, pos %d\n",
+                            __func__, j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
                 if ((off + k) >= max_arr_len) {
-                    pr2serr("f2hex_arr: array length exceeded\n");
+                    pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
                 mp_arr[off + k] = h;
@@ -1240,8 +1237,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%4x", &h)) {
                     if (h > 0xff) {
-                        pr2serr("f2hex_arr: hex number larger than "
-                                "0xff in line %d, pos %d\n", j + 1,
+                        pr2serr("%s: hex number larger than 0xff in line %d, "
+                                "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
                         goto bad;
                     }
@@ -1250,7 +1247,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        pr2serr("f2hex_arr: array length exceeded\n");
+                        pr2serr("%s: array length exceeded\n", __func__);
                         goto bad;
                     }
                     mp_arr[off + k] = h;
@@ -1265,8 +1262,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         --k;
                         break;
                     }
-                    pr2serr("f2hex_arr: error in line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
             }
@@ -1326,7 +1323,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
                                    1 /* noisy */, vb)))
             return res;
-        actual_len = (resp[2] << 8) + resp[3] + 4;
+        actual_len = sg_get_unaligned_be16(resp + 2) + 4;
         if ((0 == op->do_raw) && (vb > 1)) {
             pr2serr("  Log sense (find length) response:\n");
             dStrHexErr((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
@@ -1479,7 +1476,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
         cp = NULL;
         pl = ucp[3] + 4;
         count = (pl > 4) ? decode_count(ucp + 4, pl - 4) : 0;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
@@ -1622,7 +1619,7 @@ show_error_counter_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -1677,7 +1674,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -1731,7 +1728,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -1820,7 +1817,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -1893,7 +1890,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -1981,7 +1978,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Tape usage page  (LTO-5 and LTO-6 specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         extra = ucp[3] + 4;
         if (op->filter_given) {
@@ -1999,15 +1996,13 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
         ull = n = 0;
         switch (ucp[3]) {
         case 2:
-            n = (ucp[4] << 8) | ucp[5];
+            n = sg_get_unaligned_be16(ucp + 4);
             break;
         case 4:
-            n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+            n = sg_get_unaligned_be32(ucp + 4);
             break;
         case 8:
-            for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             break;
         }
         switch (pc) {
@@ -2091,7 +2086,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Tape capacity page  (IBM specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         extra = ucp[3] + 4;
         if (op->filter_given) {
@@ -2108,7 +2103,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         }
         if (extra != 8)
             continue;
-        n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+        n = sg_get_unaligned_be32(ucp + 4);
         switch (pc) {
         case 0x01:
             printf("  Main partition remaining capacity (in MiB): %u", n);
@@ -2165,7 +2160,7 @@ show_data_compression_page(const uint8_t * resp, int len,
                    pg_code);
     }
     for (k = num; k > 0; k -= extra, ucp += extra) {
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3];
         extra = pl + 4;
@@ -2187,6 +2182,7 @@ show_data_compression_page(const uint8_t * resp, int len,
             dStrHex((const char *)ucp, extra, 1);
             goto skip_para;
         }
+        /* variable length integer, max length 8 bytes */
         for (j = 0, n = 0; j < pl; ++j) {
             if (j > 0)
                 n <<= 8;
@@ -2267,7 +2263,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
             return false;
         }
         pl = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2325,7 +2321,7 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
             return true;
         }
         pl = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2390,7 +2386,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     for (k = 0, ucp = resp + 4; k < 20; ++k, ucp += 20 ) {
         pcb = ucp[2];
         pl = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -2402,7 +2398,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
                 break;
             }
         }
-        n = (ucp[6] << 8) | ucp[7];
+        n = sg_get_unaligned_be16(ucp + 6);
         if ((0 == n) && (0 == ucp[4]))
             break;
         printf("  Parameter code = %d, accumulated power-on hours = %d\n",
@@ -2413,10 +2409,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
         printf("    self-test result: %s [%d]\n", self_test_result[res], res);
         if (ucp[5])
             printf("    self-test number = %d\n", (int)ucp[5]);
-        ull = ucp[8]; ull <<= 8; ull |= ucp[9]; ull <<= 8; ull |= ucp[10];
-        ull <<= 8; ull |= ucp[11]; ull <<= 8; ull |= ucp[12];
-        ull <<= 8; ull |= ucp[13]; ull <<= 8; ull |= ucp[14];
-        ull <<= 8; ull |= ucp[15];
+        ull = sg_get_unaligned_be64(ucp + 8);
         if ((0xffffffffffffffffULL != ull) && (res > 0) && ( res < 0xf))
             printf("    address of first error = 0x%" PRIx64 "\n", ull);
         v = ucp[16] & 0xf;
@@ -2463,7 +2456,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             return true;
         }
         extra = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2537,7 +2530,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             return true;
         }
         extra = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2574,7 +2567,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 3:
             if (extra > 7) {
-                n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+                n = sg_get_unaligned_be32(ucp + 4);
                 if (0xffffffff == n)
                     printf("  Specified cycle count over device lifetime "
                            "= -1");
@@ -2585,7 +2578,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 4:
             if (extra > 7) {
-                n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+                n = sg_get_unaligned_be32(ucp + 4);
                 if (0xffffffff == n)
                     printf("  Accumulated start-stop cycles = -1");
                 else
@@ -2594,7 +2587,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 5:
             if (extra > 7) {
-                n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+                n = sg_get_unaligned_be32(ucp + 4);
                 if (0xffffffff == n)
                     printf("  Specified load-unload count over device "
                            "lifetime = -1");
@@ -2605,7 +2598,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 6:
             if (extra > 7) {
-                n = (ucp[4] << 24) | (ucp[5] << 16) | (ucp[6] << 8) | ucp[7];
+                n = sg_get_unaligned_be32(ucp + 4);
                 if (0xffffffff == n)
                     printf("  Accumulated load-unload cycles = -1");
                 else
@@ -2662,7 +2655,7 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
             return true;
         }
         extra = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter != pc)
             continue;
@@ -2711,7 +2704,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             return false;
         }
         extra = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2916,7 +2909,7 @@ static void
 show_sas_port_param(const uint8_t * ucp, int param_len,
                     const struct opts_t * op)
 {
-    int j, m, n, nphys, pcb, t, sz, spld_len;
+    int j, m, nphys, pcb, t, sz, spld_len;
     const uint8_t * vcp;
     uint64_t ull;
     unsigned int ui;
@@ -2925,7 +2918,7 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
 
     sz = sizeof(s);
     pcb = ucp[2];
-    t = (ucp[0] << 8) | ucp[1];
+    t = sg_get_unaligned_be16(ucp + 0);
     if (op->do_name)
         printf("rel_target_port=%d\n", t);
     else
@@ -2963,24 +2956,20 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
             printf("      att_iport_mask=0x%x\n", vcp[6]);
             printf("      att_phy_id=%d\n", vcp[24]);
             printf("      att_reason=0x%x\n", (vcp[4] & 0xf));
-            for (n = 0, ull = vcp[16]; n < 8; ++n) {
-                ull <<= 8; ull |= vcp[16 + n];
-            }
+            ull = sg_get_unaligned_be64(vcp + 16);
             printf("      att_sas_addr=0x%" PRIx64 "\n", ull);
             printf("      att_tport_mask=0x%x\n", vcp[7]);
-            ui = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
+            ui = sg_get_unaligned_be32(vcp + 32);
             printf("      inv_dwords=%u\n", ui);
-            ui = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
+            ui = sg_get_unaligned_be32(vcp + 40);
             printf("      loss_dword_sync=%u\n", ui);
             printf("      neg_log_lrate=%d\n", 0xf & vcp[5]);
-            ui = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
+            ui = sg_get_unaligned_be32(vcp + 44);
             printf("      phy_reset_probs=%u\n", ui);
-            ui = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
+            ui = sg_get_unaligned_be32(vcp + 36);
             printf("      running_disparity=%u\n", ui);
             printf("      reason=0x%x\n", (vcp[5] & 0xf0) >> 4);
-            for (n = 0, ull = vcp[8]; n < 8; ++n) {
-                ull <<= 8; ull |= vcp[8 + n];
-            }
+            ull = sg_get_unaligned_be64(vcp + 8);
             printf("      sas_addr=0x%" PRIx64 "\n", ull);
         } else {
             t = ((0x70 & vcp[4]) >> 4);
@@ -3076,22 +3065,18 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
                    !! (vcp[6] & 8), !! (vcp[6] & 4), !! (vcp[6] & 2));
             printf("    attached target port: ssp=%d stp=%d smp=%d\n",
                    !! (vcp[7] & 8), !! (vcp[7] & 4), !! (vcp[7] & 2));
-            for (n = 0, ull = vcp[8]; n < 8; ++n) {
-                ull <<= 8; ull |= vcp[8 + n];
-            }
+            ull = sg_get_unaligned_be64(vcp + 8);
             printf("    SAS address = 0x%" PRIx64 "\n", ull);
-            for (n = 0, ull = vcp[16]; n < 8; ++n) {
-                ull <<= 8; ull |= vcp[16 + n];
-            }
+            ull = sg_get_unaligned_be64(vcp + 16);
             printf("    attached SAS address = 0x%" PRIx64 "\n", ull);
             printf("    attached phy identifier = %d\n", vcp[24]);
-            ui = (vcp[32] << 24) | (vcp[33] << 16) | (vcp[34] << 8) | vcp[35];
+            ui = sg_get_unaligned_be32(vcp + 32);
             printf("    Invalid DWORD count = %u\n", ui);
-            ui = (vcp[36] << 24) | (vcp[37] << 16) | (vcp[38] << 8) | vcp[39];
+            ui = sg_get_unaligned_be32(vcp + 36);
             printf("    Running disparity error count = %u\n", ui);
-            ui = (vcp[40] << 24) | (vcp[41] << 16) | (vcp[42] << 8) | vcp[43];
+            ui = sg_get_unaligned_be32(vcp + 40);
             printf("    Loss of DWORD synchronization = %u\n", ui);
-            ui = (vcp[44] << 24) | (vcp[45] << 16) | (vcp[46] << 8) | vcp[47];
+            ui = sg_get_unaligned_be32(vcp + 44);
             printf("    Phy reset problem = %u\n", ui);
         }
         if (spld_len > 51) {
@@ -3114,10 +3099,8 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
             xcp = vcp + 52;
             for (m = 0; m < (num_ped * 12); m += 12, xcp += 12) {
                 pes = xcp[3];
-                ui = (xcp[4] << 24) | (xcp[5] << 16) | (xcp[6] << 8) |
-                     xcp[7];
-                pvdt = (xcp[8] << 24) | (xcp[9] << 16) | (xcp[10] << 8) |
-                       xcp[11];
+                ui = sg_get_unaligned_be32(xcp + 4);
+                pvdt = sg_get_unaligned_be32(xcp + 8);
                 show_sas_phy_event_info(pes, ui, pvdt);
             }
         } else if (op->verbose)
@@ -3139,7 +3122,7 @@ show_protocol_specific_page(const uint8_t * resp, int len,
             printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
     }
     for (k = 0, ucp = resp + 4; k < num; ) {
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pl = ucp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -3177,8 +3160,9 @@ static bool
 show_stats_perform_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int k, num, n, param_len, param_code, spf, subpg_code, extra;
+    int k, num, param_len, param_code, spf, subpg_code, extra;
     int pcb, nam;
+    unsigned int ui;
     const uint8_t * ucp;
     const char * ccp;
     uint64_t ull;
@@ -3212,7 +3196,7 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 return false;
             param_len = ucp[3];
             extra = param_len + 4;
-            param_code = (ucp[0] << 8) + ucp[1];
+            param_code = sg_get_unaligned_be16(ucp + 0);
             pcb = ucp[2];
             if (op->filter_given) {
                 if (param_code != op->filter)
@@ -3231,49 +3215,33 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=1" : "Statistics and performance "
                         "log parameter";
                 printf("%s\n", ccp);
-                for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 4);
                 ccp = nam ? "read_commands=" : "number of read commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[12]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[12 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 12);
                 ccp = nam ? "write_commands=" : "number of write commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[20]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[20 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 20);
                 ccp = nam ? "lb_received="
                           : "number of logical blocks received = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[28]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[28 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 28);
                 ccp = nam ? "lb_transmitted="
                           : "number of logical blocks transmitted = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[36]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[36 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 36);
                 ccp = nam ? "read_proc_intervals="
                           : "read command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[44]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[44 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 44);
                 ccp = nam ? "write_proc_intervals="
                           : "write command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[52]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[52 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 52);
                 ccp = nam ? "weight_rw_commands=" : "weighted number of "
                                 "read commands plus write commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[60]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[60 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 60);
                 ccp = nam ? "weight_rw_processing=" : "weighted read command "
                                 "processing plus write command processing = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3281,9 +3249,7 @@ show_stats_perform_page(const uint8_t * resp, int len,
             case 2:     /* Idle time log parameter */
                 ccp = nam ? "parameter_code=2" : "Idle time log parameter";
                 printf("%s\n", ccp);
-                for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 4);
                 ccp = nam ? "idle_time_intervals=" : "idle time "
                                 "intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3292,68 +3258,48 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=3" : "Time interval log "
                         "parameter for general stats";
                 printf("%s\n", ccp);
-                for (n = 0, ull = ucp[4]; n < 4; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ui = sg_get_unaligned_be32(ucp + 4);
                 ccp = nam ? "time_interval_neg_exp=" : "time interval "
                                 "negative exponent = ";
-                printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[8]; n < 4; ++n) {
-                    ull <<= 8; ull |= ucp[8 + n];
-                }
+                printf("  %s%u\n", ccp, ui);
+                ui = sg_get_unaligned_be32(ucp + 8);
                 ccp = nam ? "time_interval_int=" : "time interval "
                                 "integer = ";
-                printf("  %s%" PRIu64 "\n", ccp, ull);
+                printf("  %s%u\n", ccp, ui);
                 break;
             case 4:     /* FUA statistics and performance log parameter */
                 ccp = nam ? "parameter_code=4" : "Force unit access "
                         "statistics and performance log parameter ";
                 printf("%s\n", ccp);
-                for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 4);
                 ccp = nam ? "read_fua_commands=" : "number of read FUA "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[12]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[12 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 12);
                 ccp = nam ? "write_fua_commands=" : "number of write FUA "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[20]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[20 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 20);
                 ccp = nam ? "read_fua_nv_commands="
                           : "number of read FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[28]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[28 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 28);
                 ccp = nam ? "write_fua_nv_commands="
                           : "number of write FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[36]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[36 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 36);
                 ccp = nam ? "read_fua_proc_intervals="
                           : "read FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[44]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[44 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 44);
                 ccp = nam ? "write_fua_proc_intervals="
                           : "write FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[52]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[52 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 52);
                 ccp = nam ? "read_fua_nv_proc_intervals="
                           : "read FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[60]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[60 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 60);
                 ccp = nam ? "write_fua_nv_proc_intervals="
                           : "write FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3362,15 +3308,11 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=6" : "Time interval log "
                         "parameter for cache stats";
                 printf("%s\n", ccp);
-                for (n = 0, ull = ucp[4]; n < 4; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 4);
                 ccp = nam ? "time_interval_neg_exp=" : "time interval "
                                 "negative exponent = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[8]; n < 4; ++n) {
-                    ull <<= 8; ull |= ucp[8 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 8);
                 ccp = nam ? "time_interval_int=" : "time interval "
                                 "integer = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3401,7 +3343,7 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 return false;
             param_len = ucp[3];
             extra = param_len + 4;
-            param_code = (ucp[0] << 8) + ucp[1];
+            param_code = sg_get_unaligned_be16(ucp + 0);
             pcb = ucp[2];
             if (op->filter_given) {
                 if (param_code != op->filter)
@@ -3422,39 +3364,27 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 else
                     printf("Group %d Statistics and performance log "
                            "parameter\n", subpg_code);
-                for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 4);
                 ccp = nam ? "gn_read_commands=" : "group n number of read "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[12]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[12 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 12);
                 ccp = nam ? "gn_write_commands=" : "group n number of write "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[20]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[20 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 20);
                 ccp = nam ? "gn_lb_received="
                           : "group n number of logical blocks received = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[28]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[28 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 28);
                 ccp = nam ? "gn_lb_transmitted="
                           : "group n number of logical blocks transmitted = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[36]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[36 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 36);
                 ccp = nam ? "gn_read_proc_intervals="
                           : "group n read command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[44]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[44 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 44);
                 ccp = nam ? "gn_write_proc_intervals="
                           : "group n write command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3463,51 +3393,35 @@ show_stats_perform_page(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=4" : "Group n force unit access "
                         "statistics and performance log parameter";
                 printf("%s\n", ccp);
-                for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[4 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 4);
                 ccp = nam ? "gn_read_fua_commands="
                           : "group n number of read FUA commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[12]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[12 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 12);
                 ccp = nam ? "gn_write_fua_commands="
                           : "group n number of write FUA commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[20]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[20 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 20);
                 ccp = nam ? "gn_read_fua_nv_commands="
                           : "group n number of read FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[28]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[28 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 28);
                 ccp = nam ? "gn_write_fua_nv_commands="
                           : "group n number of write FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[36]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[36 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 36);
                 ccp = nam ? "gn_read_fua_proc_intervals="
                           : "group n read FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[44]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[44 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 44);
                 ccp = nam ? "gn_write_fua_proc_intervals=" : "group n write "
                             "FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[52]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[52 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 52);
                 ccp = nam ? "gn_read_fua_nv_proc_intervals=" : "group n "
                             "read FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                for (n = 0, ull = ucp[60]; n < 8; ++n) {
-                    ull <<= 8; ull |= ucp[60 + n];
-                }
+                ull = sg_get_unaligned_be64(ucp + 60);
                 ccp = nam ? "gn_write_fua_nv_proc_intervals=" : "group n "
                             "write FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3539,8 +3453,9 @@ show_stats_perform_page(const uint8_t * resp, int len,
 static bool
 show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, n, pc, spf, subpg_code, extra;
+    int k, num, pc, spf, subpg_code, extra;
     int pcb, nam;
+    unsigned int ui;
     const uint8_t * ucp;
     const char * ccp;
     uint64_t ull;
@@ -3575,7 +3490,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             return false;
         }
         extra = ucp[3] + 4;
-        pc = (ucp[0] << 8) + ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         if (op->filter_given) {
             if (pc != op->filter)
@@ -3594,9 +3509,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=1" :
                         "Read cache memory hits log parameter";
             printf("%s\n", ccp);
-            for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             ccp = nam ? "read_cache_memory_hits=" :
                         "read cache memory hits = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3605,9 +3518,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=2" :
                         "Reads to cache memory log parameter";
             printf("%s\n", ccp);
-            for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             ccp = nam ? "reads_to_cache_memory=" :
                         "reads to cache memory = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3616,9 +3527,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=3" :
                         "Write cache memory hits log parameter";
             printf("%s\n", ccp);
-            for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             ccp = nam ? "write_cache_memory_hits=" :
                         "write cache memory hits = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3627,9 +3536,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=4" :
                         "Writes from cache memory log parameter";
             printf("%s\n", ccp);
-            for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             ccp = nam ? "writes_from_cache_memory=" :
                         "writes from cache memory = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3638,9 +3545,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=5" :
                         "Time from last hard reset log parameter";
             printf("%s\n", ccp);
-            for (n = 0, ull = ucp[4]; n < 8; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ull = sg_get_unaligned_be64(ucp + 4);
             ccp = nam ? "time_from_last_hard_reset=" :
                         "time from last hard reset = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3649,18 +3554,14 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=6" :
                         "Time interval log parameter";
             printf("%s\n", ccp);
-            for (n = 0, ull = ucp[4]; n < 4; ++n) {
-                ull <<= 8; ull |= ucp[4 + n];
-            }
+            ui = sg_get_unaligned_be32(ucp + 4);
             ccp = nam ? "time_interval_neg_exp=" : "time interval "
                             "negative exponent = ";
-            printf("  %s%" PRIu64 "\n", ccp, ull);
-            for (n = 0, ull = ucp[8]; n < 4; ++n) {
-                ull <<= 8; ull |= ucp[8 + n];
-            }
+            printf("  %s%u\n", ccp, ui);
+            ui = sg_get_unaligned_be32(ucp + 8);
             ccp = nam ? "time_interval_int=" : "time interval "
                             "integer = ";
-            printf("  %s%" PRIu64 "\n", ccp, ull);
+            printf("  %s%u\n", ccp, ui);
             break;
         default:
             if (nam) {
@@ -3699,7 +3600,7 @@ show_format_status_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -3807,7 +3708,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -3825,7 +3726,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
         case 0:
             printf("  Remaining non-volatile time: ");
             if (3 == ucp[4]) {
-                j = (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+                j = sg_get_unaligned_be24(ucp + 5);
                 switch (j) {
                 case 0:
                     printf("0 (i.e. it is now volatile)\n");
@@ -3846,7 +3747,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
         case 1:
             printf("  Maximum non-volatile time: ");
             if (3 == ucp[4]) {
-                j = (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+                j = sg_get_unaligned_be24(ucp + 5);
                 switch (j) {
                 case 0:
                     printf("0 (i.e. it is now volatile)\n");
@@ -3897,7 +3798,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -3992,7 +3893,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4066,7 +3967,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4146,7 +4047,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4205,7 +4106,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %d milliseconds\n", (ucp[4] << 8) + ucp[5]);
+            printf(" %d milliseconds\n", sg_get_unaligned_be16(ucp + 4));
             break;
         case 0x2:
             printf("   DT device ADC data encryption control status (hex "
@@ -4268,7 +4169,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4355,7 +4256,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4382,7 +4283,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 break;
             }
             printf("    Accumulated power on minutes: ");
-            j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+            j = sg_get_unaligned_be32(ucp + 4);
             printf("%d [h:m  %d:%d]\n", j, (j / 60), (j % 60));
             printf("    Status: ");
             j = ucp[9];
@@ -4390,9 +4291,9 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 printf("%s\n", bms_status[j]);
             else
                 printf("unknown [0x%x] background scan status value\n", j);
-            j = (ucp[10] << 8) + ucp[11];
+            j = sg_get_unaligned_be16(ucp + 10);
             printf("    Number of background scans performed: %d\n", j);
-            j = (ucp[12] << 8) + ucp[13];
+            j = sg_get_unaligned_be16(ucp + 12);
 #ifdef SG_LIB_MINGW
             printf("    Background medium scan progress: %g %%\n",
                    (double)(j * 100.0 / 65536.0));
@@ -4400,7 +4301,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             printf("    Background medium scan progress: %.2f %%\n",
                    (double)(j * 100.0 / 65536.0));
 #endif
-            j = (ucp[14] << 8) + ucp[15];
+            j = sg_get_unaligned_be16(ucp + 14);
             if (0 == j)
                 printf("    Number of background medium scans performed: 0 "
                        "[not reported]\n");
@@ -4430,7 +4331,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 break;
             }
             printf("    Power on minutes when error detected: ");
-            j = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+            j = sg_get_unaligned_be32(ucp + 4);
             printf("%d [%d:%d]\n", j, (j / 60), (j % 60));
             j = (ucp[8] >> 4) & 0xf;
             if (j <
@@ -4483,7 +4384,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4554,7 +4455,7 @@ show_background_op_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4600,6 +4501,72 @@ skip:
     return true;
 }
 
+/* LPS misalignment page [0x15,0x3]  introduced: SBC-4 rev 10 */
+static bool
+show_lps_misalignment_page(const uint8_t * resp, int len,
+                           const struct opts_t * op)
+{
+    int num, pl, pc, pcb;
+    const uint8_t * ucp;
+    char pcb_str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("LPS misalignment page  [0x15,0x3]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(ucp + 0);
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            printf("  LPS misalignment count: ");
+            if (4 == ucp[3])
+                printf("max lpsm: %" PRIu16 ", count=%" PRIu16 "\n",
+                       sg_get_unaligned_be16(ucp + 4),
+                       sg_get_unaligned_be16(ucp + 6));
+            else
+                printf("<unexpected pc=0 parameter length=%d>\n", ucp[4]);
+            break;
+        default:
+            if (pc <= 0xf000) {
+                if (8 == ucp[3])
+                    printf("  LBA of misaligned block: 0x%" PRIx64 "\n",
+                           sg_get_unaligned_be64(ucp + 8));
+                else
+                    printf("<unexpected pc=0x%x parameter length=%d>\n",
+                           pc, ucp[4]);
+            } else {
+                printf("<unexpected pc=0x%x>\n", pc);
+                dStrHex((const char *)ucp, pl, 0);
+            }
+            break;
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
+            printf("        <%s>\n", pcb_str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+
 /* Sequential access device page [0xc] for tape */
 static bool
 show_sequential_access_page(const uint8_t * resp, int len,
@@ -4615,7 +4582,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4725,7 +4692,7 @@ show_device_stats_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4834,7 +4801,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4973,7 +4940,7 @@ show_element_stats_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -4988,17 +4955,17 @@ show_element_stats_page(const uint8_t * resp, int len,
             }
         }
         printf("  Element address: %d\n", pc);
-        v = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+        v = sg_get_unaligned_be32(ucp + 4);
         printf("    Number of places: %u\n", v);
-        v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        v = sg_get_unaligned_be32(ucp + 8);
         printf("    Number of place retries: %u\n", v);
-        v = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15];
+        v = sg_get_unaligned_be32(ucp + 12);
         printf("    Number of picks: %u\n", v);
-        v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
+        v = sg_get_unaligned_be32(ucp + 16);
         printf("    Number of pick retries: %u\n", v);
-        v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
+        v = sg_get_unaligned_be32(ucp + 20);
         printf("    Number of determined volume identifiers: %u\n", v);
-        v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
+        v = sg_get_unaligned_be32(ucp + 24);
         printf("    Number of unreadable volume identifiers: %u\n", v);
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -5029,7 +4996,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -5046,7 +5013,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         printf("  Parameter code: %d\n", pc);
         printf("    Density code: 0x%x\n", ucp[6]);
         printf("    Medium type: 0x%x\n", ucp[7]);
-        v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        v = sg_get_unaligned_be32(ucp + 8);
         printf("    Lifetime media motion hours: %u\n", v);
         printf("    Repeat: %d\n", !!(ucp[13] & 0x80));
         v = ucp[13] & 0xf;
@@ -5057,11 +5024,11 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         if (ucp[14] || ucp[15])
             printf("      [%s]\n", sg_get_asc_ascq_str(ucp[14], ucp[15],
                    sizeof(b), b));
-        v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
+        v = sg_get_unaligned_be32(ucp + 16);
         printf("    Vendor specific code qualifier: 0x%x\n", v);
-        v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
+        v = sg_get_unaligned_be32(ucp + 20);
         printf("    Product revision level: %u\n", v);
-        v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
+        v = sg_get_unaligned_be32(ucp + 24);
         printf("    Hours since last clean: %u\n", v);
         printf("    Operation code: 0x%x\n", ucp[28]);
         printf("    Service action: 0x%x\n", ucp[29] & 0xf);
@@ -5122,7 +5089,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -5146,23 +5113,23 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         if (ucp[6] || ucp[7])
             printf("      [%s]\n", sg_get_asc_ascq_str(ucp[6], ucp[7],
                    sizeof(b), b));
-        v = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        v = sg_get_unaligned_be32(ucp + 8);
         printf("    Vendor specific code qualifier: 0x%x\n", v);
-        v = (ucp[12] << 24) + (ucp[13] << 16) + (ucp[14] << 8) + ucp[15];
+        v = sg_get_unaligned_be32(ucp + 12);
         printf("    Product revision level: %u\n", v);
-        v = (ucp[16] << 24) + (ucp[17] << 16) + (ucp[18] << 8) + ucp[19];
+        v = sg_get_unaligned_be32(ucp + 16);
         printf("    Number of moves: %u\n", v);
-        v = (ucp[20] << 24) + (ucp[21] << 16) + (ucp[22] << 8) + ucp[23];
+        v = sg_get_unaligned_be32(ucp + 20);
         printf("    Number of pick: %u\n", v);
-        v = (ucp[24] << 24) + (ucp[25] << 16) + (ucp[26] << 8) + ucp[27];
+        v = sg_get_unaligned_be32(ucp + 24);
         printf("    Number of pick retries: %u\n", v);
-        v = (ucp[28] << 24) + (ucp[29] << 16) + (ucp[30] << 8) + ucp[31];
+        v = sg_get_unaligned_be32(ucp + 28);
         printf("    Number of places: %u\n", v);
-        v = (ucp[32] << 24) + (ucp[33] << 16) + (ucp[34] << 8) + ucp[35];
+        v = sg_get_unaligned_be32(ucp + 32);
         printf("    Number of place retries: %u\n", v);
-        v = (ucp[36] << 24) + (ucp[37] << 16) + (ucp[38] << 8) + ucp[39];
+        v = sg_get_unaligned_be32(ucp + 36);
         printf("    Number of determined volume identifiers: %u\n", v);
-        v = (ucp[40] << 24) + (ucp[41] << 16) + (ucp[42] << 8) + ucp[43];
+        v = sg_get_unaligned_be32(ucp + 40);
         printf("    Number of unreadable volume identifiers: %u\n", v);
         printf("    Operation code: 0x%x\n", ucp[44]);
         printf("    Service action: 0x%x\n", ucp[45] & 0xf);
@@ -5171,13 +5138,13 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         printf("    IAV: %d\n", !!(ucp[47] & 0x4));
         printf("    LSAV: %d\n", !!(ucp[47] & 0x2));
         printf("    DAV: %d\n", !!(ucp[47] & 0x1));
-        v = (ucp[48] << 8) + ucp[49];
+        v = sg_get_unaligned_be16(ucp + 48);
         printf("    Medium transport address: 0x%x\n", v);
-        v = (ucp[50] << 8) + ucp[51];
+        v = sg_get_unaligned_be16(ucp + 50);
         printf("    Intial address: 0x%x\n", v);
-        v = (ucp[52] << 8) + ucp[53];
+        v = sg_get_unaligned_be16(ucp + 52);
         printf("    Last successful address: 0x%x\n", v);
-        v = (ucp[54] << 8) + ucp[55];
+        v = sg_get_unaligned_be16(ucp + 54);
         printf("    Destination address: 0x%x\n", v);
         if (pl > 91) {
             printf("    Volume tag information:\n");
@@ -5205,15 +5172,16 @@ skip:
 static void
 volume_stats_partition(const uint8_t * xp, int len, int hex)
 {
-    int dl;
+    int dl, pn;
 
     while (len > 3) {
         dl = xp[0] + 1;
         if (dl < 3)
             return;
+        pn = sg_get_unaligned_be16(xp + 2);
         if (hex)
             printf("    partition number: %d, partition record data "
-                   "counter: 0x%" PRIx64 "\n", (xp[2] << 8) + xp[3],
+                   "counter: 0x%" PRIx64 "\n", pn,
                    decode_count(xp + 4, dl - 4));
         else {
             int k;
@@ -5237,15 +5205,15 @@ volume_stats_partition(const uint8_t * xp, int len, int hex)
 
             if (0 == (all_ffs + ffs_last_fe))
                 printf("    partition number: %d, partition record data "
-                       "counter: %" PRIu64 "\n", (xp[2] << 8) + xp[3],
+                       "counter: %" PRIu64 "\n", pn,
                        decode_count(xp + 4, dl - 4));
             else if (all_ffs)
                 printf("    partition number: %d, partition record data "
-                       "counter is all 0xFFs\n", (xp[2] << 8) + xp[3]);
+                       "counter is all 0xFFs\n", pn);
             else
                 printf("    partition number: %d, partition record data "
                        "counter is all 0xFFs apart\n    from a trailing "
-                       "0xFE\n", (xp[2] << 8) + xp[3]);
+                       "0xFE\n", pn);
         }
         xp += dl;
         len -= dl;
@@ -5279,7 +5247,7 @@ show_volume_stats_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -5562,7 +5530,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -5614,7 +5582,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -5673,7 +5641,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
     num = len - 4;
     ucp = &resp[0] + 4;
     while (num > 3) {
-        pc = (ucp[0] << 8) | ucp[1];
+        pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
         pl = ucp[3] + 4;
         if (op->filter_given) {
@@ -5768,20 +5736,20 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
     op->subpg_code = NOT_SPG_SUBPG;
     res = do_logs(sg_fd, resp, max_len, op);
     if (0 == res) {
-        len = (resp[2] << 8) + resp[3] + 4;
+        len = sg_get_unaligned_be16(resp + 2) + 4;
         if (op->do_raw)
             dStrRaw((const char *)resp, len);
         else if (op->do_hex)
             dStrHex((const char *)resp, len, (1 == op->do_hex));
         else
             show_temperature_page(resp, len, op);
-    }else if (SG_LIB_CAT_NOT_READY == res)
+    } else if (SG_LIB_CAT_NOT_READY == res)
         pr2serr("Device not ready\n");
     else {
         op->pg_code = IE_LPAGE;
         res = do_logs(sg_fd, resp, max_len, op);
         if (0 == res) {
-            len = (resp[2] << 8) + resp[3] + 4;
+            len = sg_get_unaligned_be16(resp + 2) + 4;
             if (op->do_raw)
                 dStrRaw((const char *)resp, len);
             else if (op->do_hex)
@@ -6074,7 +6042,7 @@ main(int argc, char * argv[])
     resp_len = (op->maxlen > 0) ? op->maxlen : MX_ALLOC_LEN;
     res = do_logs(sg_fd, rsp_buff, resp_len, op);
     if (0 == res) {
-        pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
+        pg_len = sg_get_unaligned_be16(rsp_buff + 2);
         if ((pg_len + 4) > resp_len) {
             pr2serr("Only fetched %d bytes of response (available: %d "
                     "bytes)\n    truncate output\n",
@@ -6143,7 +6111,7 @@ main(int argc, char * argv[])
 
             res = do_logs(sg_fd, rsp_buff, resp_len, op);
             if (0 == res) {
-                pg_len = (rsp_buff[2] << 8) + rsp_buff[3];
+                pg_len = sg_get_unaligned_be16(rsp_buff + 2);
                 if ((pg_len + 4) > resp_len) {
                     pr2serr("Only fetched %d bytes of response, truncate "
                             "output\n", resp_len);

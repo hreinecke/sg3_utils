@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 Hannes Reinecke, SUSE Linux GmbH.
+ * Copyright (c) 2014-2016 Hannes Reinecke, SUSE Linux GmbH.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -49,7 +49,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.12 20151207";
+static const char * version_str = "1.13 20160126";
 
 struct opts_t {
     int cdb_len;
@@ -200,9 +200,11 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
         else    /* '-HHHH' hex bytes only */
             dStrHex((const char *)inbuff, 512, -1);
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
-        if (op->verbose > 1)
-            sg_print_sense("ATA pass through", sense_buffer, sb_sz,
+        if (op->verbose > 1) {
+            pr2serr("ATA pass through:\n");
+            sg_print_sense(NULL, sense_buffer, sb_sz,
                            ((op->verbose > 2) ? 1 : 0));
+        }
         if (sg_scsi_normalize_sense(sense_buffer, sb_sz, &ssh)) {
             switch (ssh.sense_key) {
             case SPC_SK_ILLEGAL_REQUEST:

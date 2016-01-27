@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2015 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2016 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -27,7 +27,7 @@
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE     /* resolves u_char typedef in scsi/scsi.h [lk 2.4] */
+#define _GNU_SOURCE 1
 #endif
 
 #include <unistd.h>

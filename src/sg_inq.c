@@ -42,7 +42,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.54 20160104";    /* SPC-5 rev 07 */
+static const char * version_str = "1.55 20160126";    /* SPC-5 rev 08 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1443,32 +1443,6 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
-static const char * code_set_arr[] =
-{
-    "Reserved [0x0]",
-    "Binary",
-    "ASCII",
-    "UTF-8",
-    "[0x4]", "[0x5]", "[0x6]", "[0x7]", "[0x8]", "[0x9]", "[0xa]", "[0xb]",
-    "[0xc]", "[0xd]", "[0xe]", "[0xf]",
-};
-
-static const char * desig_type_arr[] =
-{
-    "vendor specific [0x0]", /* SCSI_IDENT_DEVICE_VENDOR */
-    "T10 vendor identification", /* SCSI_IDENT_DEVICE_T10 */
-    "EUI-64 based", /* SCSI_IDENT_DEVICE_EUI64 */
-    "NAA", /* SCSI_IDENT_DEVICE_NAA */
-    "Relative target port", /* SCSI_IDENT_PORT_RELATIVE */
-    "Target port group", /* SCSI_IDENT_PORT_TP_GROUP */
-    "Logical unit group", /* SCSI_IDENT_PORT_LU_GROUP */
-    "MD5 logical unit identifier", /* SCSI_IDENT_DEVICE_MD5 */
-    "SCSI name string", /* SCSI_IDENT_DEVICE_SCSINAME */
-    "Protocol specific port identifier",        /* spc4r36 */
-    "UUID identifier",                          /* 15-267r2 */
-    "[0xb]", "[0xc]", "[0xd]", "[0xe]", "[0xf]",
-};
-
 /* These are target port, device server (i.e. target) and LU identifiers */
 static void
 decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
@@ -1480,6 +1454,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
     const unsigned char * ucp;
     const unsigned char * ip;
     char b[64];
+    const char * cp;
 
     if (buff[2] != 0) {
         /*
@@ -1529,9 +1504,12 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
         if (piv && ((1 == assoc) || (2 == assoc)))
             printf("    transport: %s\n",
                    sg_get_trans_proto_str(p_id, sizeof(b), b));
-        printf("    designator_type: %s,  code_set: %s\n",
-               desig_type_arr[desig_type], code_set_arr[c_set]);
-        printf("    associated with the %s\n", assoc_arr[assoc]);
+        cp = sg_get_desig_type_str(desig_type);
+        printf("    designator_type: %s,  ", cp ? cp : "-");
+        cp = sg_get_desig_code_set_str(c_set);
+        printf("code_set: %s\n", cp ? cp : "-");
+        cp = sg_get_desig_assoc_str(assoc);
+        printf("    associated with the %s\n", cp ? cp : "-");
         if (do_hex) {
             printf("    designator header(hex): %.2x %.2x %.2x %.2x\n",
                    ucp[0], ucp[1], ucp[2], ucp[3]);
@@ -1769,7 +1747,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
                        "identifier\n",
                        sg_get_trans_proto_str(p_id, sizeof(b), b));
             break;
-        case 0xa: /* UUID identifier [15-267r2] */
+        case 0xa: /* UUID identifier [spc5r08] */
             if (1 != c_set) {
                 pr2serr("      << expected binary code_set >>\n");
                 dStrHexErr((const char *)ip, i_len, 0);

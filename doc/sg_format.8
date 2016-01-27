@@ -1,15 +1,15 @@
-.TH SG_FORMAT "8" "July 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_FORMAT "8" "January 2016" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_format \- format, resize or modify protection information of a SCSI disk
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
-[\fI\-\-early\fR] [\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR]
-[\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR]
-[\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR]
-[\fI\-\-resize\fR] [\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
-[\fI\-\-size=SIZE\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-wait\fR] \fIDEVICE\fR
+[\fI\-\-early\fR] [\fI\-\-ffmy=FFMT\fR] [\fI\-\-fmtpinfo=FPI\fR]
+[\fI\-\-format\fR] [\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR]
+[\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR]
+[\fI\-\-poll=PT\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
+[\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wait\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -117,6 +117,21 @@ that is as soon as the format operation has commenced. Then the user can
 monitor the progress of the ongoing format operation with other
 utilities (e.g. sg_turs(8) or sg_requests(8)). This option and \fI\-\-wait\fR
 are mutually exclusive.
+.TP
+\fB\-t\fR, \fB\-\-ffmt\fR=\fIFFMT\fR
+\fIFFMT\fR is placed in a field of the same name in the FORMAT UNIT cdb.
+The field was introduced in SBC\-4 revision 10. The default value is 0 which
+implies the former action to typically write to all blocks on the
+\fIDEVICE\fR and that can take a long time.
+.br
+\fIFFMT\fR has values 1 and 2 for fast format with 3 being reserved
+currently. The difference between 1 and 2 concerns read operations on LBAs to
+which no data has been written to, since the fast format. When \fIFFMT\fR
+is 1 the read operation should return "unspecified logical block data" and
+complete without error. When \fIFFMT\fR is 2 the read operation should
+yield check condition status with a sense key set to hardware error, medium
+error or command aborted. See SBC\-4 revsion 10 section 4.35 for more
+details.
 .TP
 \fB\-f\fR, \fB\-\-fmtpinfo\fR=\fIFPI\fR
 sets the FMTPINFO field in the FORMAT UNIT cdb to a value between 0 and 3.
@@ -498,7 +513,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2014 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2016 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

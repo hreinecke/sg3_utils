@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2015 D. Gilbert
+ *  Copyright (C) 2004-2016 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -32,7 +32,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.11 20151220";
+static const char * version_str = "1.12 20160121";
 
 
 #define MAX_XFER_LEN 10000
@@ -86,7 +86,7 @@ usage()
           "(default:\n"
           "                             520 bytes)\n\n"
           "Performs a SCSI WRITE LONG (10 or 16) command. Writes a single "
-          "block\nincluding associated ECC data. Valid data can be obtained "
+          "block\nincluding associated ECC data. That data may be obtained "
           "from the\nSCSI READ LONG command. See the sg_read_long utility.\n"
           );
 }

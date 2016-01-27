@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2015 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2016 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE
+#define _GNU_SOURCE 1
 #endif
 
 #include <unistd.h>
@@ -58,7 +58,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.51 20151219";
+static const char * version_str = "5.52 20160121";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

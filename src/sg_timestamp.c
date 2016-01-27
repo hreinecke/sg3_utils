@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Douglas Gilbert.
+ * Copyright (c) 2015-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.01 20151219";
+static const char * version_str = "1.02 20160126";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -108,12 +108,13 @@ usage()
             "The timestamp\nis SET if either the --milliseconds=MS or "
             "--seconds=SEC option is given,\notherwise the existing "
             "timestamp is reported. The DEVICE stores the\ntimestamp as "
-            "the number of milliseconds since 1970-01-01 00:00:00 UTC\n"
-            "which also happens to be the time 'epoch' of Unix "
-            "machines. The 'date +%%s'\ncommand in Unix returns the "
-            "number of seconds since the epoch. To\nconvert a reported "
-            "timestamp (in seconds since the epoch) to a more\nreadable "
-            "form use 'date --date='@<secs_since_epoch>' .\n");
+            "the number of milliseconds since power up (or reset) or\n"
+            "since 1970-01-01 00:00:00 UTC which also happens to be the "
+            "time 'epoch'\nof Unix machines. The 'date +%%s' command in "
+            "Unix returns the number of\nseconds since the epoch. To "
+            "convert a reported timestamp (in seconds since\nthe epoch) "
+            "to a more readable form use "
+            "'date --date='@<secs_since_epoch>' .\n");
 }
 
 /* Invokes a SCSI REPORT TIMESTAMP command.  Return of 0 -> success,

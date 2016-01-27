@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2015, Kaminario Technologies LTD
+*  Copyright (c) 2012-2016, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -31,7 +31,7 @@
 #ifndef __sun
 #define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE
+#define _GNU_SOURCE 1
 #endif
 #endif
 
@@ -53,7 +53,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20151219";
+static const char * version_str = "1.14 20160121";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
