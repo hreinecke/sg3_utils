@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2015 Douglas Gilbert.
+ * Copyright (c) 2009-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -31,7 +32,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.09 20151219";
+static const char * version_str = "1.10 20160201";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -252,7 +253,8 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
 {
     char line[1024];
     int off = 0;
-    int in_len, k, j, m, have_stdin, ind, bit0;
+    int in_len, k, j, m, ind, bit0;
+    bool have_stdin;
     char * lcp;
     FILE * fp;
     int64_t ll;
@@ -263,7 +265,7 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
     else {
         fp = fopen(file_name, "r");
         if (NULL == fp) {
-            pr2serr("build_joint_arr: unable to open %s\n", file_name);
+            pr2serr("%s: unable to open %s\n", __func__, file_name);
             return 1;
         }
     }
@@ -291,9 +293,9 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxXiIkKmMgGtTpP ,\t");
         if ((k < in_len) && ('#' != lcp[k])) {
-            pr2serr("build_joint_arr: syntax error at line %d, pos %d\n",
-                    j + 1, m + k + 1);
-            return 1;
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__, j + 1,
+                    m + k + 1);
+            goto bad_exit;
         }
         for (k = 0; k < 1024; ++k) {
             ll = sg_get_llnum(lcp);
@@ -301,15 +303,15 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
                 ind = ((off + k) >> 1);
                 bit0 = 0x1 & (off + k);
                 if (ind >= max_arr_len) {
-                    pr2serr("build_joint_arr: array length exceeded\n");
-                    return 1;
+                    pr2serr("%s: array length exceeded\n", __func__);
+                    goto bad_exit;
                 }
                 if (bit0) {
                     if (ll > UINT32_MAX) {
-                        pr2serr("build_joint_arr: number exceeds 32 bits in "
-                                "line %d, at pos %d\n", j + 1,
+                        pr2serr("%s: number exceeds 32 bits in line %d, at "
+                                "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
-                        return 1;
+                        goto bad_exit;
                     }
                     num_arr[ind] = (uint32_t)ll;
                 } else
@@ -325,20 +327,27 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
                     --k;
                     break;
                 }
-                pr2serr("build_joint_arr: error on line %d, at pos %d\n",
-                        j + 1, (int)(lcp - line + 1));
-                return 1;
+                pr2serr("%s: error on line %d, at pos %d\n", __func__, j + 1,
+                        (int)(lcp - line + 1));
+                goto bad_exit;
             }
         }
         off += (k + 1);
     }
     if (0x1 & off) {
-        pr2serr("build_joint_arr: expect LBA,NUM pairs but decoded odd "
-                "number\n  from %s\n", have_stdin ? "stdin" : file_name);
-        return 1;
+        pr2serr("%s: expect LBA,NUM pairs but decoded odd number\n  from "
+                "%s\n", __func__, have_stdin ? "stdin" : file_name);
+        goto bad_exit;
     }
     *arr_len = off >> 1;
+    if (fp && (stdin != fp))
+        fclose(fp);
     return 0;
+
+bad_exit:
+    if (fp && (stdin != fp))
+        fclose(fp);
+    return 1;
 }
 
 

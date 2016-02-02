@@ -1,19 +1,20 @@
-.TH SG_LOGS "8" "December 2014" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_LOGS "8" "January 2016" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
 [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
-[\fI\-\-enumerate\fR] [\fI\-\-filter=FI\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-in=FN\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR]
-[\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
-[\fI\-\-reset\fR] [\fI\-\-select\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
-[\fI\-\-transport\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-enumerate\fR] [\fI\-\-enum_vendor\fR] [\fI\-\-filter=FI\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR] [\fI\-\-list\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR] [\fI\-\-sp\fR]
+[\fI\-\-temperature\fR] [\fI\-\-transport\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-e\fR] [\fI\-f=FI\fR]
-[\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-e\fR] [\fI\-E\fR]
+[\fI\-f=FI\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
 [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
 [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
 [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
@@ -73,6 +74,10 @@ the numeric order.
 .br
 The \fI\-\-filter=FI\fR and \fI\-\-verbose\fR options modify the output
 of the enumeration.
+.TP
+\fB\-E\fR, \fB\-\-enum_vendor\fR
+this option is used to output information held in internal tables about
+known vendor specific log pages including their names and acronyms.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR=\fIFI\fR
 \fIFI\fR is either a parameter code when \fIDEVICE\fR is given, or a
@@ -318,6 +323,10 @@ Equivalent to \fI\-\-control=PC\fR in the main description.
 enumerate internal tables to show information about known log pages.
 Equivalent to \fI\-\-enumerate\fR in the main description.
 .TP
+\fB\-E\fR
+enumerate internal tables to show information about known vendor specific
+log pages. Equivalent to \fI\-\-enum_vendor\fR in the main description.
+.TP
 \fB\-h\fR
 suppresses decoding of known log sense pages and prints out the
 response in hex instead.
@@ -408,7 +417,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2014 Douglas Gilbert
+Copyright \(co 2002\-2016 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

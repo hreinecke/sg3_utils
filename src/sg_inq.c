@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -42,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.55 20160126";    /* SPC-5 rev 08 */
+static const char * version_str = "1.56 20160201";    /* SPC-5 rev 08 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -741,7 +742,8 @@ static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
           unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
+    int fn_len, in_len, k, j, m, split_line, fd;
+    bool has_stdin;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -820,8 +822,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                 if (1 == sscanf(carry_over, "%x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
-                    pr2serr("f2hex_arr: carry_over error ['%s'] around line "
-                            "%d\n", carry_over, j + 1);
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
                     goto bad;
                 }
                 lcp = line + 1;
@@ -841,7 +843,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
         if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
-            pr2serr("f2hex_arr: syntax error at line %d, pos %d\n",
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                     j + 1, m + k + 1);
             goto bad;
         }
@@ -849,12 +851,12 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
                  ++k, lcp += 2) {
                 if (1 != sscanf(lcp, "%2x", &h)) {
-                    pr2serr("f2hex_arr: bad hex number in line %d, "
-                            "pos %d\n", j + 1, (int)(lcp - line + 1));
+                    pr2serr("%s: bad hex number in line %d, pos %d\n",
+                            __func__, j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
                 if ((off + k) >= max_arr_len) {
-                    pr2serr("f2hex_arr: array length exceeded\n");
+                    pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
                 mp_arr[off + k] = h;
@@ -866,8 +868,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        pr2serr("f2hex_arr: hex number larger than "
-                                "0xff in line %d, pos %d\n", j + 1,
+                        pr2serr("%s: hex number larger than 0xff in line %d, "
+                                "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
                         goto bad;
                     }
@@ -876,7 +878,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        pr2serr("f2hex_arr: array length exceeded\n");
+                        pr2serr("%s: array length exceeded\n", __func__);
                         goto bad;
                     }
                     mp_arr[off + k] = h;
@@ -891,8 +893,8 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         --k;
                         break;
                     }
-                    pr2serr("f2hex_arr: error in line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
             }

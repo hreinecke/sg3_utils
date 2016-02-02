@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.37 20160124";    /* spc5r07 + sbc4r10 */
+static const char * version_str = "1.38 20160130";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -72,6 +72,7 @@ static const char * version_str = "1.37 20160124";    /* spc5r07 + sbc4r10 */
 #define LPS_MISALIGNMENT_SUBPG 0x3
 
 #define VENDOR_M 0x1000
+#define LTO5_M 0x2000
 
 #define PCB_STR_LEN 128
 
@@ -84,6 +85,7 @@ static struct option long_options[] = {
         {"brief", no_argument, 0, 'b'},
         {"control", required_argument, 0, 'c'},
         {"enumerate", no_argument, 0, 'e'},
+        {"enum_vendor", no_argument, 0, 'E'},
         {"filter", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
@@ -114,6 +116,7 @@ struct opts_t {
     int do_all;
     int do_brief;
     int do_enumerate;
+    int do_enum_vendor;
     int do_help;
     int do_hex;
     int do_list;
@@ -341,44 +344,44 @@ static struct log_elem log_arr[] = {
     {IE_LPAGE, 0, 0, -1, 0, "Informational exceptions", "ie",
      show_ie_page},                     /* 0x2f, 0  */
 /* vendor specific */
-    {0x30, 0, 0, PDT_TAPE, VENDOR_M, "Performance counters (Hitachi)", "pc_hi",
-     NULL},                             /* 0x30, 0  SBC */
-    {0x30, 0, 0, PDT_TAPE, VENDOR_M, "Tape usage (lto-5, 6)", "ta_",
+    {0x30, 0, 0, PDT_DISK, VENDOR_M, "Performance counters (Hitachi)",
+     "pc_hi", NULL},                             /* 0x30, 0  SBC */
+    {0x30, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape usage (lto-5, 6)", "ta_",
      show_tape_usage_page},             /* 0x30, 0  SSC */
-    {0x31, 0, 0, PDT_TAPE, VENDOR_M, "Tape capacity (lto-5, 6)", "tc_",
-     show_tape_capacity_page},          /* 0x31, 0  SSC */
-    {0x32, 0, 0, PDT_TAPE, VENDOR_M, "Data compression (ibm)", "dc_",
+    {0x31, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape capacity (lto-5, 6)",
+     "tc_", show_tape_capacity_page},          /* 0x31, 0  SSC */
+    {0x32, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Data compression (ibm)", "dc_",
      show_data_compression_page},       /* 0x32, 0  SSC; redirect to 0x1b */
-    {0x33, 0, 0, PDT_TAPE, VENDOR_M, "Write errors (lto-5)", "we_",
+    {0x33, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Write errors (lto-5)", "we_",
      NULL},                             /* 0x33, 0  SSC */
-    {0x34, 0, 0, PDT_TAPE, VENDOR_M, "Read forward errors (lto-5)", "rfe_",
-     NULL},                             /* 0x34, 0  SSC */
-    {0x35, 0, 0, PDT_TAPE, VENDOR_M, "DT Device Error (lto-6)", "dtde_",
-     NULL},                             /* 0x35, 0  SSC */
+    {0x34, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Read forward errors (lto-5)",
+     "rfe_", NULL},                             /* 0x34, 0  SSC */
+    {0x35, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "DT Device Error (lto-5, 6)",
+     "dtde_", NULL},                             /* 0x35, 0  SSC */
     {0x37, 0, 0, PDT_DISK, VENDOR_M, "Cache (seagate)", "c_se",
      show_seagate_cache_page},          /* 0x37, 0  SBC */
     {0x37, 0, 0, PDT_DISK, VENDOR_M, "Miscellaneous (hitachi)", "mi_hi",
      NULL},                             /* 0x37, 0  SBC */
-    {0x37, 0, 0, PDT_TAPE, VENDOR_M, "Performance characteristics (lto-5)",
-     "pc_", NULL},                             /* 0x37, 0  SSC */
-    {0x38, 0, 0, PDT_TAPE, VENDOR_M, "Blocks/bytes transferred (lto-5)",
-     "bbt_", NULL},                             /* 0x38, 0  SSC */
-    {0x39, 0, 0, PDT_TAPE, VENDOR_M, "Host port 0 interface errors (lto-5)",
-     "hp0_", NULL},                             /* 0x39, 0  SSC */
-    {0x3a, 0, 0, PDT_TAPE, VENDOR_M, "Drive control verification (lto-5)",
-     "dcv_", NULL},                             /* 0x3a, 0  SSC */
-    {0x3b, 0, 0, PDT_TAPE, VENDOR_M, "Host port 1 interface errors (lto-5)",
-     "hp1_", NULL},                             /* 0x3b, 0  SSC */
-    {0x3c, 0, 0, PDT_TAPE, VENDOR_M, "Drive usage information (lto-5)",
-     "dui_", NULL},                             /* 0x3c, 0  SSC */
-    {0x3d, 0, 0, PDT_TAPE, VENDOR_M, "Subsystem statistics (lto-5)", "ss_",
-     NULL},                             /* 0x3d, 0  SSC */
+    {0x37, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Performance characteristics "
+     "(lto-5)", "pc_", NULL},                             /* 0x37, 0  SSC */
+    {0x38, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Blocks/bytes transferred "
+     "(lto-5)", "bbt_", NULL},                             /* 0x38, 0  SSC */
+    {0x39, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Host port 0 interface errors "
+     "(lto-5)", "hp0_", NULL},                             /* 0x39, 0  SSC */
+    {0x3a, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Drive control verification "
+     "(lto-5)", "dcv_", NULL},                             /* 0x3a, 0  SSC */
+    {0x3b, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Host port 1 interface errors "
+     "(lto-5)", "hp1_", NULL},                             /* 0x3b, 0  SSC */
+    {0x3c, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Drive usage information "
+     "(lto-5)", "dui_", NULL},                             /* 0x3c, 0  SSC */
+    {0x3d, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Subsystem statistics (lto-5)",
+     "ss_", NULL},                             /* 0x3d, 0  SSC */
     {0x3e, 0, 0, PDT_DISK, VENDOR_M, "Factory (seagate)", "f_se",
      show_seagate_factory_page},        /* 0x3e, 0  SBC */
     {0x3e, 0, 0, PDT_DISK, VENDOR_M, "Factory (hitachi)", "f_hi",
      NULL},                             /* 0x3e, 0  SBC */
-    {0x3e, 0, 0, PDT_TAPE, VENDOR_M, "Device Status (lto-6)", "ds_",
-     NULL},                             /* 0x3e, 0  SSC */
+    {0x3e, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Device Status (lto-5, 6)",
+     "ds_", NULL},                             /* 0x3e, 0  SSC */
 
     {-1, -1, -1, -1, -1, NULL, "zzzzz", NULL},           /* end sentinel */
 };
@@ -395,14 +398,15 @@ usage(int hval)
     if (1 == hval) {
         pr2serr(
            "Usage: sg_logs [--all] [--brief] [--control=PC] [--enumerate] "
-           "[--filter=FI]\n"
-           "               [--help] [--hex] [--in=FN] [--list] [--no_inq] "
-           "[--maxlen=LEN]\n"
-           "               [--name] [--page=PG] [--paramp=PP] [--pcb] "
-           "[--ppc] [--raw]\n"
-           "               [--readonly] [--reset] [--select] [--sp] "
-           "[--temperature]\n"
-           "               [--transport] [--verbose] [--version] DEVICE\n"
+           "[--enum_vendor]\n"
+           "               [--filter=FI] [--help] [--hex] [--in=FN] [--list] "
+           "[--no_inq]\n"
+           "               [--maxlen=LEN] [--name] [--page=PG] [--paramp=PP] "
+           "[--pcb]\n"
+           "               [--ppc] [--raw] [--readonly] [--reset] [--select] "
+           "[--sp]\n"
+           "               [--temperature] [--transport] [--verbose] "
+           "[--version] DEVICE\n"
            "  where the main options are:\n"
            "    --all|-a        fetch and decode all log pages, but not "
            "subpages; use\n"
@@ -415,6 +419,8 @@ usage(int hval)
            "by acronym;\n"
            "                      '-eee': all numerically; '-eeee': "
            "non-v numerically\n"
+           "    --enum_vendor|-E    enumerate known specific vendor pages "
+           "only\n"
            "    --filter=FI|-f FI    FI is parameter code to display (def: "
            "all); with\n"
            "                         '-e' then FI>=0 enumerate that pdt + "
@@ -489,13 +495,13 @@ usage(int hval)
 static void
 usage_old()
 {
-    printf("Usage:  sg_logs [-a] [-A] [-b] [-c=PC] [-e] [-f=FI] [-h] [-H] "
-           "[-i=FN]\n"
-           "                [-l] [-L] [-m=LEN] [-n] [-p=PG] "
+    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-e] [-E] [-f=FI] [-h] "
+           "[-H]\n"
+           "               [-i=FN] [-l] [-L] [-m=LEN] [-n] [-p=PG] "
            "[-paramp=PP]\n"
-           "                [-pcb] [-ppc] [-r] [-select] [-sp] [-t] [-T] "
+           "               [-pcb] [-ppc] [-r] [-select] [-sp] [-t] [-T] "
            "[-v] [-V]\n"
-           "                [-x] [-X] [-?] DEVICE\n"
+           "               [-x] [-X] [-?] DEVICE\n"
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
@@ -504,6 +510,7 @@ usage_old()
            "                  0: current threshhold, 1: current cumulative\n"
            "                  2: default threshhold, 3: default cumulative\n"
            "    -e     enumerate known log pages\n"
+           "    -E     enumerate known vendor specific log pages only\n"
            "    -f=FI    filter match parameter code or pdt\n"
            "    -h     output in hex (default: decode if known)\n"
            "    -H     output in hex (same as '-h')\n"
@@ -572,6 +579,8 @@ enumerate_helper(const struct log_elem * lep, int pos,
             printf("===================================================\n");
         }
     }
+    if ((op->do_enum_vendor > 0) && !(VENDOR_M & lep->flags))
+        return;
     if ((0 == (op->do_enumerate % 2)) && (VENDOR_M & lep->flags))
         return;     /* if do_enumerate is even then skip vendor pages */
     else if ((! op->filter_given) || (-1 == op->filter))
@@ -662,6 +671,8 @@ pg_subpg_pdt_search(int pg_code, int subpg_code, int pdt)
                     return lep;
                 else if (d_pdt == lep->pdt)
                     return lep;
+                else if (pdt == sg_lib_pdt_decay(lep->pdt))
+                    return lep;
             } else if ((lep->subpg_high > 0) &&
                      (subpg_code > lep->subpg_code) &&
                      (subpg_code <= lep->subpg_high))
@@ -690,7 +701,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:ef:hHi:lLm:nNOp:P:qQrRsStTvVxX",
+        c = getopt_long(argc, argv, "aAbc:eEf:hHi:lLm:nNOp:P:qQrRsStTvVxX",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -716,6 +727,9 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             break;
         case 'e':
             ++op->do_enumerate;
+            break;
+        case 'E':
+            ++op->do_enum_vendor;
             break;
         case 'f':
             if ('-' == optarg[0]) {
@@ -870,6 +884,9 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'e':
                     ++op->do_enumerate;
+                    break;
+                case 'E':
+                    ++op->do_enum_vendor;
                     break;
                 case 'h':
                 case 'H':
@@ -1089,17 +1106,35 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-/* Decode counter up to 8 chars long (big endian) into an uint64_t.
- * In the unlikely event that the counter is larger than 8 chars long
- * then take the last 8 chars. */
-static uint64_t
-decode_count(const uint8_t * xp, int len)
+/* Assumes an integral numbers of bytes pointed to by 'xp' of length
+ * 'num_bytes' given. [So the number of bits modulo 8 must be zero.]
+ * Returns true if all bytes are 0xff (which is the same as all bits
+ * being set), else returns false. */
+static bool
+all_bits_set(const uint8_t * xp, int num_bytes)
 {
-    if (len > (int)sizeof(uint64_t)) {
-        xp += (len - sizeof(uint64_t));
-        len = sizeof(uint64_t);
+    for ( ; num_bytes > 0; ++xp, --num_bytes) {
+        if (0xff != *xp)
+            return false;
     }
-    return sg_get_unaligned_be64(xp + 0);
+    return true;
+}
+
+static char *
+num_or_unknown(const uint8_t * xp, int num_bytes, bool in_hex, char * b,
+               int blen)
+{
+    if (all_bits_set(xp, num_bytes))
+        snprintf(b, blen, "unknown");
+    else {
+        uint64_t num = sg_get_unaligned_be(num_bytes, xp);
+
+        if (in_hex)
+            snprintf(b, blen, "0x%" PRIx64, num);
+        else
+            snprintf(b, blen, "%" PRIu64, num);
+    }
+    return b;
 }
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
@@ -1475,7 +1510,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
     while (num > 3) {
         cp = NULL;
         pl = ucp[3] + 4;
-        count = (pl > 4) ? decode_count(ucp + 4, pl - 4) : 0;
+        count = (pl > 4) ? sg_get_unaligned_be(pl - 4, ucp + 4) : 0;
         pc = sg_get_unaligned_be16(ucp + 0);
         if (op->filter_given) {
             if (pc != op->filter)
@@ -1645,7 +1680,7 @@ show_error_counter_page(const uint8_t * resp, int len,
         case 0x8015: printf("  Positioning errors [Hitachi]"); break;
         default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
-        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1699,7 +1734,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
                 printf("  Vendor specific [0x%x]", pc);
             break;
         }
-        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1758,7 +1793,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
         default:
             printf("  Reserved [0x%x]", pc);
         }
-        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -2409,9 +2444,11 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
         printf("    self-test result: %s [%d]\n", self_test_result[res], res);
         if (ucp[5])
             printf("    self-test number = %d\n", (int)ucp[5]);
-        ull = sg_get_unaligned_be64(ucp + 8);
-        if ((0xffffffffffffffffULL != ull) && (res > 0) && ( res < 0xf))
-            printf("    address of first error = 0x%" PRIx64 "\n", ull);
+        if (! all_bits_set(ucp + 8, 8)) {
+            ull = sg_get_unaligned_be64(ucp + 8);
+            if ((res > 0) && ( res < 0xf))
+                printf("    address of first error = 0x%" PRIx64 "\n", ull);
+        }
         v = ucp[16] & 0xf;
         if (v) {
             printf("    sense key = 0x%x [%s] , asc = 0x%x, ascq = 0x%x",
@@ -2512,7 +2549,6 @@ static bool
 show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
-    unsigned int n;
     const uint8_t * ucp;
     char pcb_str[PCB_STR_LEN];
 
@@ -2567,42 +2603,40 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 3:
             if (extra > 7) {
-                n = sg_get_unaligned_be32(ucp + 4);
-                if (0xffffffff == n)
+                if (all_bits_set(ucp + 4, 4))
                     printf("  Specified cycle count over device lifetime "
                            "= -1");
                 else
                     printf("  Specified cycle count over device lifetime "
-                           "= %u", n);
+                           "= %u", sg_get_unaligned_be32(ucp + 4));
             }
             break;
         case 4:
             if (extra > 7) {
-                n = sg_get_unaligned_be32(ucp + 4);
-                if (0xffffffff == n)
+                if (all_bits_set(ucp + 4, 4))
                     printf("  Accumulated start-stop cycles = -1");
                 else
-                    printf("  Accumulated start-stop cycles = %u", n);
+                    printf("  Accumulated start-stop cycles = %u",
+                           sg_get_unaligned_be32(ucp + 4));
             }
             break;
         case 5:
             if (extra > 7) {
-                n = sg_get_unaligned_be32(ucp + 4);
-                if (0xffffffff == n)
+                if (all_bits_set(ucp + 4, 4))
                     printf("  Specified load-unload count over device "
                            "lifetime = -1");
                 else
                     printf("  Specified load-unload count over device "
-                           "lifetime = %u", n);
+                           "lifetime = %u", sg_get_unaligned_be32(ucp + 4));
             }
             break;
         case 6:
             if (extra > 7) {
-                n = sg_get_unaligned_be32(ucp + 4);
-                if (0xffffffff == n)
+                if (all_bits_set(ucp + 4, 4))
                     printf("  Accumulated load-unload cycles = -1");
                 else
-                    printf("  Accumulated load-unload cycles = %u", n);
+                    printf("  Accumulated load-unload cycles = %u",
+                           sg_get_unaligned_be32(ucp + 4));
             }
             break;
         default:
@@ -2904,6 +2938,37 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
     }
 }
 
+static const char * sas_link_rate_arr[16] = {
+    "phy enabled; unknown rate",
+    "phy disabled",
+    "phy enabled; speed negotiation failed",
+    "phy enabled; SATA spinup hold state",
+    "phy enabled; port selector",
+    "phy enabled; reset in progress",
+    "phy enabled; unsupported phy attached",
+    "reserved [0x7]",
+    "1.5 Gbps",                 /* 0x8 */
+    "3 Gbps",
+    "6 Gbps",
+    "12 Gbps",
+    "22.5 Gbps",
+    "reserved [0xd]",
+    "reserved [0xe]",
+    "reserved [0xf]",
+};
+
+static char *
+sas_negot_link_rate(int lrate, char * b, int blen)
+{
+    int mask = 0xf;
+
+    if (~mask & lrate)
+        snprintf(b, blen, "bad link_rate value=0x%x\n", lrate);
+    else
+        snprintf(b, blen, "%s", sas_link_rate_arr[lrate]);
+    return b;
+}
+
 /* helper for SAS port of PROTO_SPECIFIC_LPAGE [0x18] */
 static void
 show_sas_port_param(const uint8_t * ucp, int param_len,
@@ -3018,49 +3083,8 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
             default: snprintf(s, sz, "reserved [0x%x]", t); break;
             }
             printf("    reason: %s\n", s);
-            t = (0xf & vcp[5]);
-            switch (t) {
-            case 0:
-                snprintf(s, sz, "phy enabled; unknown reason");
-                break;
-            case 1:
-                snprintf(s, sz, "phy disabled");
-                break;
-            case 2:
-                snprintf(s, sz, "phy enabled; speed negotiation failed");
-                break;
-            case 3:
-                snprintf(s, sz, "phy enabled; SATA spinup hold state");
-                break;
-            case 4:
-                snprintf(s, sz, "phy enabled; port selector");
-                break;
-            case 5:
-                snprintf(s, sz, "phy enabled; reset in progress");
-                break;
-            case 6:
-                snprintf(s, sz, "phy enabled; unsupported phy attached");
-                break;
-            case 8:
-                snprintf(s, sz, "1.5 Gbps");
-                break;
-            case 9:
-                snprintf(s, sz, "3 Gbps");
-                break;
-            case 0xa:
-                snprintf(s, sz, "6 Gbps");
-                break;
-            case 0xb:
-                snprintf(s, sz, "12 Gbps");
-                break;
-            case 0xc:
-                snprintf(s, sz, "22.5 Gbps");
-                break;
-            default:
-                snprintf(s, sz, "reserved [%d]", t);
-                break;
-            }
-            printf("    negotiated logical link rate: %s\n", s);
+            printf("    negotiated logical link rate: %s\n",
+                   sas_negot_link_rate((0xf & vcp[5]), s, sz));
             printf("    attached initiator port: ssp=%d stp=%d smp=%d\n",
                    !! (vcp[6] & 8), !! (vcp[6] & 4), !! (vcp[6] & 2));
             printf("    attached target port: ssp=%d stp=%d smp=%d\n",
@@ -4041,6 +4065,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
     int num, pl, pc, pcb, j;
     const uint8_t * ucp;
     char str[PCB_STR_LEN];
+    char b[64];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("DT device status page (ssc-3, adc-3) [0x11]\n");
@@ -4136,11 +4161,32 @@ show_dt_device_status_page(const uint8_t * resp, int len,
             dStrHex((const char *)ucp + 4, 12, 1);
             break;
         default:
-            printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            if ((pc >= 0x101) && (pc <= 0x1ff)) {
+                printf("  Primary port %d status:\n", pc - 0x100);
+                if (12 == ucp[3]) { /* if length of desc is 12, assume SAS */
+                    printf("    SAS: negotiated physical link rate: %s\n",
+                           sas_negot_link_rate((0xf & (ucp[4] >> 4)), b,
+                                               sizeof(b)));
+                    printf("    signal=%d, pic=%d, ", !!(0x2 & ucp[4]),
+                           !!(0x1 & ucp[4]));
+                    printf("hashed SAS addr: 0x%u\n",
+                            sg_get_unaligned_be24(ucp + 5));
+                    printf("    SAS addr: 0x%" PRIx64 "\n",
+                            sg_get_unaligned_be64(ucp + 8));
+                } else {
+                    printf("    non-SAS transport, in hex:\n");
+                    dStrHex((const char *)ucp + 4,
+                            ((pl < num) ? pl : num) - 4, 0);
+                }
+            } else if (pc >= 0x8000) {
+                printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            } else {
+                printf("  Reserved [parameter_code=0x%x]:\n", pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            }
             break;
         }
-// xxxxxxxxxxxxxxx
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
             printf("        <%s>\n", str);
@@ -4575,6 +4621,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
     int num, pl, pc, pcb;
     const uint8_t * ucp;
     uint64_t ull, gbytes;
+    bool all_set;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
@@ -4596,7 +4643,8 @@ show_sequential_access_page(const uint8_t * resp, int len,
                 break;
             }
         }
-        ull = decode_count(ucp + 4, pl - 4);
+        ull = sg_get_unaligned_be(pl - 4, ucp + 4);
+        all_set = all_bits_set(ucp + 4, pl - 4);
         gbytes = ull / 1000000000;
         switch (pc) {
         case 0:
@@ -4628,24 +4676,29 @@ show_sequential_access_page(const uint8_t * resp, int len,
             printf("\n");
             break;
         case 4:
-            printf("  Native capacity from BOP to EOD: %" PRIu64 " MB\n",
-                   ull);
+            if (! all_set)
+                printf("  Native capacity from BOP to EOD: %" PRIu64 " MB\n",
+                       ull);
             break;
         case 5:
-            printf("  Native capacity from BOP to EW of current partition: "
-                   "%" PRIu64 " MB\n", ull);
+            if (! all_set)
+                printf("  Native capacity from BOP to EW of current "
+                       "partition: %" PRIu64 " MB\n", ull);
             break;
         case 6:
-            printf("  Minimum native capacity from EW to EOP of current "
-                   "partition: %" PRIu64 " MB\n", ull);
+            if (! all_set)
+                printf("  Minimum native capacity from EW to EOP of current "
+                       "partition: %" PRIu64 " MB\n", ull);
             break;
         case 7:
-            printf("  Native capacity from BOP to current position: %"
-                   PRIu64 " MB\n", ull);
+            if (! all_set)
+                printf("  Native capacity from BOP to current position: %"
+                       PRIu64 " MB\n", ull);
             break;
         case 8:
-            printf("  Maximum native capacity in device object buffer: %"
-                   PRIu64 " MB\n", ull);
+            if (! all_set)
+                printf("  Maximum native capacity in device object buffer: %"
+                       PRIu64 " MB\n", ull);
             break;
         case 0x100:
             if (ull > 0)
@@ -4707,7 +4760,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             }
         }
         if (pc < 0x1000) {
-            ull = decode_count(ucp + 4, pl - 4);
+            ull = sg_get_unaligned_be(pl - 4, ucp + 4);
             switch (pc) {
             case 0:
                 printf("  Lifetime media loads: %" PRIu64 "\n", ull);
@@ -4755,21 +4808,88 @@ show_device_stats_page(const uint8_t * resp, int len,
                        "initiated forced reset\n    and/or emergency "
                        "eject occurred: %" PRIu64 "\n", ull);
                 break;
+            case 0xc:
+                printf("  Lifetime power cycles: %" PRIu64 "\n", ull);
+                break;
+            case 0xd:
+                printf("  Volume loads since last parameter reset: %" PRIu64
+                       "\n", ull);
+                break;
+            case 0xe:
+                printf("  Hard write errors: %" PRIu64 "\n", ull);
+                break;
+            case 0xf:
+                printf("  Hard read errors: %" PRIu64 "\n", ull);
+                break;
+            case 0x10:
+                printf("  Duty cycle sample time: %" PRIu64 " ms\n", ull);
+                break;
+            case 0x11:
+                printf("  Read duty cycle: %" PRIu64 "\n", ull);
+                break;
+            case 0x12:
+                printf("  Write duty cycle: %" PRIu64 "\n", ull);
+                break;
+            case 0x13:
+                printf("  Activity duty cycle: %" PRIu64 "\n", ull);
+                break;
+            case 0x14:
+                printf("  Volume not present duty cycle: %" PRIu64 "\n", ull);
+                break;
+            case 0x15:
+                printf("  Ready duty cycle: %" PRIu64 "\n", ull);
+                break;
+            case 0x16:
+                printf("  MBs transferred from app client in duty cycle "
+                       "sample time: %" PRIu64 "\n", ull);
+                break;
+            case 0x17:
+                printf("  MBs transferred to app client in duty cycle "
+                       "sample time: %" PRIu64 "\n", ull);
+                break;
+            case 0x40:
+                printf("  Drive manufacturer's serial number: %" PRIu64 "\n",
+                       ull);
+                break;
+            case 0x41:
+                printf("  Drive serial number: %" PRIu64 "\n", ull);
+                break;
+            case 0x80:
+                printf("  Medium removal prevented: %" PRIu64 "\n", ull);
+                break;
+            case 0x81:
+                printf("  Maximum recommended mechanism temperature "
+                       "exceeded: %" PRIu64 "\n", ull);
+                break;
+            case 0x1000:
+                printf("  Medium motion hours for each medium type: %" PRIu64
+                       "\n", ull);
+                break;
             default:
-                printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n",
-                       pc, ull);
+                printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n", pc,
+                       ull);
                 break;
             }
         } else {
+            int k;
+            const uint8_t * p = ucp + 4;
+
             switch (pc) {
             case 0x1000:
                 printf("  Media motion (head) hours for each medium type:\n");
-                printf("      <<to be decoded, dump in hex for now>>:\n");
-                dStrHex((const char *)ucp, pl, 0);
-                // xxxxxxxxxxx
+                for (k = 0; ((pl - 4) - k) >= 8; k += 8, p += 8) {
+                    printf("    Density code: 0x%x, Medium type: 0x%x\n",
+                           p[2], p[3]);
+                    printf("      Medium motion hours: %u\n",
+                           sg_get_unaligned_be32(p + 4));
+                }
                 break;
             default:
-                printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
+                if (pc >= 0x8000)
+                    printf("  Vendor specific parameter [0x%x], dump in "
+                           "hex:\n", pc);
+                else
+                    printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
                 dStrHex((const char *)ucp, pl, 0);
                 break;
             }
@@ -4815,7 +4935,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 break;
             }
         }
-        ull = decode_count(ucp + 4, pl - 4);
+        ull = sg_get_unaligned_be(pl - 4, ucp + 4);
         switch (pc) {
         case 0:
             printf("  Number of moves: %" PRIu64 "\n", ull);
@@ -5170,51 +5290,46 @@ skip:
 
 /* Helper for show_volume_stats_page() */
 static void
-volume_stats_partition(const uint8_t * xp, int len, int hex)
+volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
 {
-    int dl, pn;
+    int dl, pn, k;
+    bool all_ffs, ffs_last_fe;
+    uint8_t uc;
+    uint64_t ull;
 
     while (len > 3) {
         dl = xp[0] + 1;
         if (dl < 3)
             return;
         pn = sg_get_unaligned_be16(xp + 2);
-        if (hex)
-            printf("    partition number: %d, partition record data "
-                   "counter: 0x%" PRIx64 "\n", pn,
-                   decode_count(xp + 4, dl - 4));
-        else {
-            int k;
-            int all_ffs = 0;
-            int ffs_last_fe = 0;
-            uint8_t uc;
-
-            for (k = 0; k < (dl - 4); ++k) {
-                uc = xp[4 + k];
-                if (uc < 0xfe)
-                    break;
-                if ((k < (dl - 5)) && (0xfe == uc))
-                    break;
-                if (k == (dl - 5)) {
-                    if (0xff == uc)
-                        all_ffs = 1;
-                    else if (0xfe == uc)
-                        ffs_last_fe = 1;
-                }
+        for (k = 0, all_ffs = false, ffs_last_fe = false; k < (dl - 4); ++k) {
+            uc = xp[4 + k];
+            if (uc < 0xfe)
+                break;
+            if ((k < (dl - 5)) && (0xfe == uc))
+                break;
+            if (k == (dl - 5)) {
+                if (0xff == uc)
+                    all_ffs = true;
+                else if (0xfe == uc)
+                    ffs_last_fe = true;
             }
-
-            if (0 == (all_ffs + ffs_last_fe))
+        }
+        if ((! all_ffs) && (! ffs_last_fe)) {
+            ull = sg_get_unaligned_be(dl - 4, xp + 4);
+            if (in_hex)
                 printf("    partition number: %d, partition record data "
-                       "counter: %" PRIu64 "\n", pn,
-                       decode_count(xp + 4, dl - 4));
-            else if (all_ffs)
-                printf("    partition number: %d, partition record data "
-                       "counter is all 0xFFs\n", pn);
+                       "counter: 0x%" PRIx64 "\n", pn, ull);
             else
                 printf("    partition number: %d, partition record data "
-                       "counter is all 0xFFs apart\n    from a trailing "
-                       "0xFE\n", pn);
-        }
+                       "counter: %" PRIu64 "\n", pn, ull);
+        } else if (all_ffs)
+            printf("    partition number: %d, partition record data "
+                   "counter is all 0xFFs\n", pn);
+        else
+            printf("    partition number: %d, partition record data "
+                   "counter is all 0xFFs apart\n    from a trailing "
+                   "0xFE\n", pn);
         xp += dl;
         len -= dl;
     }
@@ -5228,6 +5343,7 @@ show_volume_stats_page(const uint8_t * resp, int len,
     int num, pl, pc, pcb, spf, subpg_code;
     const uint8_t * ucp;
     char pcb_str[PCB_STR_LEN];
+    char b[64];
 
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
@@ -5265,99 +5381,99 @@ show_volume_stats_page(const uint8_t * resp, int len,
         switch (pc) {
         case 0:
             printf("  Page valid: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 1:
             printf("  Thread count: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 2:
             printf("  Total data sets written: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 3:
             printf("  Total write retries: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 4:
             printf("  Total unrecovered write errors: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 5:
             printf("  Total suspended writes: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 6:
             printf("  Total fatal suspended writes: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 7:
             printf("  Total data sets read: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 8:
             printf("  Total read retries: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 9:
             printf("  Total unrecovered read errors: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0xa:
             printf("  Total suspended reads: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0xb:
             printf("  Total fatal suspended reads: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0xc:
             printf("  Last mount unrecovered write errors: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0xd:
             printf("  Last mount unrecovered read errors: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0xe:
             printf("  Last mount megabytes written: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0xf:
             printf("  Last mount megabytes read: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x10:
             printf("  Lifetime megabytes written: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x11:
             printf("  Lifetime megabytes read: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x12:
             printf("  Last load write compression ratio: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x13:
             printf("  Last load read compression ratio: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x14:
             printf("  Medium mount time: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x15:
             printf("  Medium ready time: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x16:
-            printf("  Total native capacity: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+            printf("  Total native capacity [MB]: %s\n",
+                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x17:
-            printf("  Total used native capacity: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+            printf("  Total used native capacity [MB]: %s\n",
+                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x40:
             printf("  Volume serial number: %.*s\n", pl - 4, ucp + 4);
@@ -5378,49 +5494,50 @@ show_volume_stats_page(const uint8_t * resp, int len,
             printf("  Volume personality: %.*s\n", pl - 4, ucp + 4);
             break;
         case 0x80:
-            printf("  Write protect: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+            printf("  Write protect: %s\n",
+                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x81:
-            printf("  WORM: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+            printf("  WORM: %s\n",
+                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x82:
-            printf("  Maximum recommended tape path temperature exceeded: %"
-                   PRIu64 "\n", decode_count(ucp + 4, pl - 4));
+            printf("  Maximum recommended tape path temperature exceeded: "
+                   "%s\n", num_or_unknown(ucp + 4, pl - 4, false, b,
+                                          sizeof(b)));
             break;
         case 0x100:
             printf("  Volume write mounts: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x101:
             printf("  Beginning of medium passes: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x102:
             printf("  Middle of medium passes: %" PRIu64 "\n",
-                   decode_count(ucp + 4, pl - 4));
+                   sg_get_unaligned_be(pl - 4, ucp + 4));
             break;
         case 0x200:
             printf("  Logical position of first encrypted logical object:\n");
-            volume_stats_partition(ucp + 4, pl - 4, 1);
+            volume_stats_partition(ucp + 4, pl - 4, true);
             break;
         case 0x201:
             printf("  Logical position of first unencrypted logical object "
                    "after first\n  encrypted logical object:\n");
-            volume_stats_partition(ucp + 4, pl - 4, 1);
+            volume_stats_partition(ucp + 4, pl - 4, true);
             break;
         case 0x202:
-            printf("  Native capacity partition(s):\n");
-            volume_stats_partition(ucp + 4, pl - 4, 0);
+            printf("  Native capacity partition(s) [MB]:\n");
+            volume_stats_partition(ucp + 4, pl - 4, false);
             break;
         case 0x203:
-            printf("  Used native capacity partition(s):\n");
-            volume_stats_partition(ucp + 4, pl - 4, 0);
+            printf("  Used native capacity partition(s) [MB]:\n");
+            volume_stats_partition(ucp + 4, pl - 4, false);
             break;
         case 0x204:
-            printf("  Remaining native capacity partition(s):\n");
-            volume_stats_partition(ucp + 4, pl - 4, 0);
+            printf("  Remaining native capacity partition(s) [MB]:\n");
+            volume_stats_partition(ucp + 4, pl - 4, false);
             break;
         case 0x300:
             printf("  Mount history, payload in hex:\n");
@@ -5611,7 +5728,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
                    "> segment size"); break;
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
-        printf(" = %" PRIu64 "", decode_count(ucp + 4, pl - 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -5666,7 +5783,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
             break;
         }
         if (valid) {
-            ull = decode_count(ucp + 4, pl - 4);
+            ull = sg_get_unaligned_be(pl - 4, ucp + 4);
             if (0 == pc)
                 printf(" = %.2f", ((double)ull) / 60.0 );
             else
@@ -5711,11 +5828,10 @@ show_ascii_page(const uint8_t * resp, int len, const struct opts_t * op)
 
     if (! done) {
         if (spf)
-            printf("No ascii information for page = 0x%x, subpage = 0x%x, "
-                   "here is hex:\n", pg_code, subpg_code);
+            printf("Unable to decode page = 0x%x, subpage = 0x%x, here is "
+                   "hex:\n", pg_code, subpg_code);
         else
-            printf("No ascii information for page = 0x%x, here is hex:\n",
-                   pg_code);
+            printf("Unable to decode page = 0x%x, here is hex:\n", pg_code);
         if (len > 128) {
             dStrHex((const char *)resp, 64, 1);
             printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
@@ -5853,10 +5969,12 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
-    if (op->do_enumerate > 0) {
+    if ((op->do_enumerate > 0) || (op->do_enum_vendor > 0)) {
         if (op->device_name && op->verbose)
             pr2serr("Warning: device: %s is being ignored\n",
                     op->device_name);
+        if ((op->do_enum_vendor > 0) && (0 == op->do_enumerate))
+            op->do_enumerate = 1;
         enumerate_pages(op);
         return 0;
     }

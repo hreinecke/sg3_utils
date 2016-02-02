@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2015 D. Gilbert
+*  Copyright (C) 2000-2016 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -26,10 +26,10 @@ const char * sg_ansi_version_arr[] =
     "no conformance claimed",
     "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
     "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
-    "SPC",              /* withdrawn */
-    "SPC-2",
-    "SPC-3",
-    "SPC-4",
+    "SPC",              /* withdrawn, ANSI INCITS 301-1997 */
+    "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
+    "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
+    "SPC-4",            /* ANSI INCITS 513-2015 */
     "SPC-5",
     "ecma=1, [8h]",
     "ecma=1, [9h]",
@@ -48,8 +48,8 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-5 revision 06 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20151101 */
+/* table from SPC-5 revision 08 [sorted numerically (from Annex E.9)] */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20160125 */
 
 
 #ifdef SG_SCSI_STRINGS
@@ -233,7 +233,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x600, "SBC-4 (no version claimed)"},
     {0x620, "ZBC (no version claimed)"},
     {0x622, "ZBC BSR INCITS 536 revision 02"},
+    {0x624, "ZBC BSR INCITS 536 revision 05"},
     {0x640, "ADC-4 (no version claimed)"},
+    {0x660, "ZBC-2 (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
     {0x83b, "SSA-TL2 T10/1147-D revision 05b"},
     {0x83c, "SSA-TL2 ANSI INCITS 308-1998"},
@@ -277,7 +279,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x99a, "SBP-3 T10/1467-D revision 4"},
     {0x99b, "SBP-3 T10/1467-D revision 5"},
     {0x99c, "SBP-3 ANSI INCITS 375-2004"},
-    /* {0x9a0, "SRP-2 (no version claimed)"}, */
+    {0x9a0, "SRP-2 (no version claimed)"},
     {0x9c0, "ADP (no version claimed)"},
     {0x9e0, "ADT (no version claimed)"},
     {0x9f9, "ADT T10/1557-D revision 11"},
@@ -518,8 +520,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x2204, "PQI T10/BSR INCITS 490 revision 6"},
     {0x2206, "PQI T10/BSR INCITS 490 revision 7"},
     {0x2208, "PQI ANSI INCITS 490-2014"},
-    {0x2220, "SOP-2 (no version claimed)"},
+    {0x2220, "SOP-2 (no draft published)"},
     {0x2240, "PQI-2 (no version claimed)"},
+    {0x2242, "PQI-2 T10/BSR INCITS 507 revision 01"},
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},
     {0xffc2, "IEEE 1667-2009"},

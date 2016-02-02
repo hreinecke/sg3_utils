@@ -2,7 +2,7 @@
 #define SG_UNALIGNED_H
 
 /*
- * Copyright (c) 2014-2015 Douglas Gilbert.
+ * Copyright (c) 2014-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -16,10 +16,10 @@ extern "C" {
 
 /* Borrowed from the Linux kernel, via mhvtl */
 
-/* In the first section below, functions that copy unsigned integers in
- * a computer's native format, to and from an unaligned big endian sequence
- * of bytes. Big endian byte format "on the wire" is the default used by
- * SCSI standards (www.t10.org). */
+/* In the first section below, functions that copy unsigned integers in a
+ * computer's native format, to and from an unaligned big endian sequence of
+ * bytes. Big endian byte format "on the wire" is the default used by SCSI
+ * standards (www.t10.org). Big endian is also the network byte order. */
 
 static inline uint16_t __get_unaligned_be16(const uint8_t *p)
 {
@@ -95,6 +95,23 @@ static inline uint64_t sg_get_unaligned_be64(const void *p)
         return __get_unaligned_be64((const uint8_t *)p);
 }
 
+/* Returns 0 if 'num_bytes' is less than or equal to 0 or greater than
+ * 8 (i.e. sizeof(uint64_t)). Else returns result in uint64_t which is
+ * an 8 bytes unsigned integer. */
+static inline uint64_t sg_get_unaligned_be(int num_bytes, const void *p)
+{
+        if ((num_bytes <= 0) || (num_bytes > (int)sizeof(uint64_t)))
+                return 0;
+        else {
+                const uint8_t * xp = (const uint8_t *)p;
+                uint64_t res = *xp;
+
+                for (++xp; num_bytes > 1; ++xp, --num_bytes)
+                        res = (res << 8) | *xp;
+                return res;
+        }
+}
+
 static inline void sg_put_unaligned_be16(uint16_t val, void *p)
 {
         __put_unaligned_be16(val, (uint8_t *)p);
@@ -156,12 +173,6 @@ static inline void sg_nz_put_unaligned_be64(uint64_t val, void *p)
 
 /* Below are the little endian equivalents of the big endian functions
  * above. Little endian is used by ATA, networking and PCI.
- * This section could take advantage of the
- * 'uint32_t htonl(uint32_t hostlong)' [and the complementary ntohl()]
- * family of functions but that would introduce a dependency on the
- * <arpa/inet.h> header. Also they don't address moving to and from
- * an unaligned sequence of bytes. The latter would still need to be
- * done.
  */
 
 static inline uint16_t __get_unaligned_le16(const uint8_t *p)
@@ -224,6 +235,23 @@ static inline uint64_t sg_get_unaligned_le48(const void *p)
 static inline uint64_t sg_get_unaligned_le64(const void *p)
 {
         return __get_unaligned_le64((const uint8_t *)p);
+}
+
+/* Returns 0 if 'num_bytes' is less than or equal to 0 or greater than
+ * 8 (i.e. sizeof(uint64_t)). Else returns result in uint64_t which is
+ * an 8 bytes unsigned integer. */
+static inline uint64_t sg_get_unaligned_le(int num_bytes, const void *p)
+{
+        if ((num_bytes <= 0) || (num_bytes > (int)sizeof(uint64_t)))
+                return 0;
+        else {
+                const uint8_t * xp = (const uint8_t *)p + (num_bytes - 1);
+                uint64_t res = *xp;
+
+                for (--xp; num_bytes > 1; --xp, --num_bytes)
+                        res = (res << 8) | *xp;
+                return res;
+        }
 }
 
 static inline void sg_put_unaligned_le16(uint16_t val, void *p)
