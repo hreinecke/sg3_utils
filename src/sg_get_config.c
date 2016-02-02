@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,6 +19,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_mmc.h"
+#include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
@@ -28,7 +29,7 @@
 
 */
 
-static const char * version_str = "0.40 20151219";    /* mmc6r02 */
+static const char * version_str = "0.41 20160131";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -255,7 +256,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("    available profiles [more recent typically higher "
                "in list]:\n");
         for (k = 4; k < len; k += 4) {
-            profile = (ucp[k] << 8) + ucp[k + 1];
+            profile = sg_get_unaligned_be16(ucp + k);
             printf("      profile: %s , currentP=%d\n",
                    get_profile_str(profile, buff), !!(ucp[k + 2] & 1));
         }
@@ -268,7 +269,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+        num = sg_get_unaligned_be32(ucp + 4);
         switch (num) {
         case 0: cp = "unspecified"; break;
         case 1: cp = "SCSI family"; break;
@@ -347,9 +348,9 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+        num = sg_get_unaligned_be32(ucp + 4);
         printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
-               num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
+               num, sg_get_unaligned_be16(ucp + 8), !!(ucp[10] & 0x1));
         break;
     case 0x1d:     /* Multi-read */
     case 0x22:     /* Sector erasable */
@@ -393,10 +394,10 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
-        n = (ucp[8] << 24) + (ucp[9] << 16) + (ucp[10] << 8) + ucp[11];
+        num = sg_get_unaligned_be32(ucp + 4);
+        n = sg_get_unaligned_be32(ucp + 8);
         printf("      Last lba=0x%x, Logical block size=0x%x, blocking=0x%x,"
-               " PP=%d\n", num, n, ((ucp[12] << 8) + ucp[13]),
+               " PP=%d\n", num, n, sg_get_unaligned_be16(ucp + 12),
                !!(ucp[14] & 0x1));
         break;
     case 0x21:     /* Incremental streaming writable */
@@ -408,7 +409,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
             break;
         }
         printf("      Data block types supported=0x%x, TRIO=%d, ARSV=%d, "
-               "BUF=%d\n", ((ucp[4] << 8) + ucp[5]), !!(ucp[6] & 0x4),
+               "BUF=%d\n", sg_get_unaligned_be16(ucp + 4), !!(ucp[6] & 0x4),
                !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
         num = ucp[7];
         printf("      Number of link sizes=%d\n", num);
@@ -442,9 +443,9 @@ decode_feature(int feature, unsigned char * ucp, int len)
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = (ucp[4] << 24) + (ucp[5] << 16) + (ucp[6] << 8) + ucp[7];
+        num = sg_get_unaligned_be16(ucp + 4);
         printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
-               num, ((ucp[8] << 8) + ucp[9]), !!(ucp[10] & 0x1));
+               num, sg_get_unaligned_be16(ucp + 8), !!(ucp[10] & 0x1));
         break;
     /* case 0x26:     Restricted overwrite -> see 0x1d entry */
     /* case 0x27:     CDRW CAV write -> see 0x1d entry */
@@ -466,7 +467,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      DRT-DM=%d, number of DBI cache zones=0x%x, number of "
                "entries=0x%x\n", !!(ucp[4] & 0x1), ucp[5],
-               ((ucp[6] << 8) + ucp[7]));
+               sg_get_unaligned_be16(ucp + 6));
         break;
     case 0x2a:     /* DVD+RW */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -513,7 +514,8 @@ decode_feature(int feature, unsigned char * ucp, int len)
                !!(ucp[4] & 0x40), !!(ucp[4] & 0x10), !!(ucp[4] & 0x8),
                !!(ucp[4] & 0x4));
         printf("      CD-RW=%d, R-W sub-code=%d, Data type supported=%d\n",
-               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1), (ucp[6] << 8) + ucp[7]);
+               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1),
+               sg_get_unaligned_be16(ucp + 6));
         break;
     case 0x2e:     /* CD mastering (session at once) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -529,7 +531,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      Test write=%d, CD-RW=%d, R-W=%d\n",
                !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
         printf("      Maximum cue sheet length=0x%x\n",
-               (ucp[5] << 16) + (ucp[6] << 8) + ucp[7]);
+               sg_get_unaligned_be24(ucp + 5));
         break;
     case 0x2f:     /* DVD-R/-RW write */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -610,22 +612,22 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      Bitmaps for BD-RE read support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
-               (ucp[10] << 8) + ucp[11],
-               (ucp[12] << 8) + ucp[13],
-               (ucp[14] << 8) + ucp[15]);
+               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 8),
+               sg_get_unaligned_be16(ucp + 10),
+               sg_get_unaligned_be16(ucp + 12),
+               sg_get_unaligned_be16(ucp + 14));
         printf("      Bitmaps for BD-R read support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[16] << 8) + ucp[17],
-               (ucp[18] << 8) + ucp[19],
-               (ucp[20] << 8) + ucp[21],
-               (ucp[22] << 8) + ucp[23]);
+               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 16),
+               sg_get_unaligned_be16(ucp + 18),
+               sg_get_unaligned_be16(ucp + 20),
+               sg_get_unaligned_be16(ucp + 22));
         printf("      Bitmaps for BD-ROM read support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[24] << 8) + ucp[25],
-               (ucp[26] << 8) + ucp[27],
-               (ucp[28] << 8) + ucp[29],
-               (ucp[30] << 8) + ucp[31]);
+               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 24),
+               sg_get_unaligned_be16(ucp + 26),
+               sg_get_unaligned_be16(ucp + 28),
+               sg_get_unaligned_be16(ucp + 30));
         break;
     case 0x41:     /* BD Write */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -638,22 +640,22 @@ decode_feature(int feature, unsigned char * ucp, int len)
         printf("      SVNR=%d\n", !!(ucp[4] & 0x1));
         printf("      Bitmaps for BD-RE write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[8] << 8) + ucp[9],
-               (ucp[10] << 8) + ucp[11],
-               (ucp[12] << 8) + ucp[13],
-               (ucp[14] << 8) + ucp[15]);
+               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 8),
+               sg_get_unaligned_be16(ucp + 10),
+               sg_get_unaligned_be16(ucp + 12),
+               sg_get_unaligned_be16(ucp + 14));
         printf("      Bitmaps for BD-R write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[16] << 8) + ucp[17],
-               (ucp[18] << 8) + ucp[19],
-               (ucp[20] << 8) + ucp[21],
-               (ucp[22] << 8) + ucp[23]);
+               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 16),
+               sg_get_unaligned_be16(ucp + 18),
+               sg_get_unaligned_be16(ucp + 20),
+               sg_get_unaligned_be16(ucp + 22));
         printf("      Bitmaps for BD-ROM write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", (ucp[24] << 8) + ucp[25],
-               (ucp[26] << 8) + ucp[27],
-               (ucp[28] << 8) + ucp[29],
-               (ucp[30] << 8) + ucp[31]);
+               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 24),
+               sg_get_unaligned_be16(ucp + 26),
+               sg_get_unaligned_be16(ucp + 28),
+               sg_get_unaligned_be16(ucp + 30));
         break;
     /* case 0x42:     TSR (timely safe recording) -> see 0x1d entry */
     case 0x50:     /* HD DVD Read */
@@ -730,7 +732,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      Scan=%d, SCM=%d, SV=%d, number of volume levels=%d\n",
                !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1),
-               (ucp[6] << 8) + ucp[7]);
+               sg_get_unaligned_be16(ucp + 6));
         break;
     case 0x104:    /* Firmware upgrade */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
@@ -749,7 +751,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                feature);
         if (len > 7) {
             printf("      Group 3=%d, unit length=%d\n",
-                   !!(ucp[4] & 0x1), (ucp[6] << 8) + ucp[7]);
+                   !!(ucp[4] & 0x1), sg_get_unaligned_be16(ucp + 6));
         }
         break;
     case 0x106:    /* DVD CSS */
@@ -792,8 +794,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
                feature);
         printf("      Disc control blocks:\n");
         for (k = 4; k < len; k += 4) {
-            printf("        0x%x\n", ((unsigned int)ucp[k] << 24) +
-                   (ucp[k + 1] << 16) + (ucp[k + 2] << 8) + ucp[k + 3]);
+            printf("        0x%x\n", sg_get_unaligned_be32(ucp + k));
         }
         break;
     case 0x10b:    /* DVD CPRM */
@@ -868,8 +869,7 @@ decode_feature(int feature, unsigned char * ucp, int len)
         num = ucp[5];
         printf("      Profile numbers:\n");
         for (k = 6; (num > 0) && (k < len); --num, k += 2) {
-            printf("        %d\n",
-                   ((unsigned int)ucp[k] << 8) + ucp[k + 1]);
+            printf("        %u\n", sg_get_unaligned_be16(ucp + k));
         }
         break;
     default:
@@ -898,7 +898,7 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
         pr2serr("response length too short: %d\n", len);
         return;
     }
-    curr_profile = (resp[6] << 8) + resp[7];
+    curr_profile = sg_get_unaligned_be16(resp + 6);
     if (0 == curr_profile)
         pr2serr("No current profile\n");
     else
@@ -908,7 +908,7 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
     len -= 8;
     for (k = 0; k < len; k += extra_len, ucp += extra_len) {
         extra_len = 4 + ucp[3];
-        feature = (ucp[0] << 8) + ucp[1];
+        feature = sg_get_unaligned_be16(ucp + 0);
         printf("  %s feature\n", get_feature_str(feature, buff));
         if (brief)
             continue;
@@ -1085,8 +1085,7 @@ main(int argc, char * argv[])
                               sizeof(resp_buffer), 1, verbose);
     ret = res;
     if (0 == res) {
-        len = (resp_buffer[0] << 24) + (resp_buffer[1] << 16) +
-              (resp_buffer[2] << 8) + resp_buffer[3] + 4;
+        len = sg_get_unaligned_be32(resp_buffer + 0) + 4;
         if (do_hex) {
             if (len > (int)sizeof(resp_buffer))
                 len = sizeof(resp_buffer);

@@ -205,7 +205,9 @@ int sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
  * Usually multiline with multiple '\n' including one trailing. If
  * 'raw_sinfo' set appends sense buffer in hex. 'leadin' is string prepended
  * to each line written to 'buff', NULL treated as "". Returns the number of
- * bytes written to 'buff' excluding the trailing '\0'. */
+ * bytes written to 'buff' excluding the trailing '\0'.
+ * N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the first
+ * line output. Also this function returned type void. */
 int sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                      int sb_len, int raw_sinfo, int buff_len, char * buff);
 
@@ -262,9 +264,13 @@ void sg_set_warnings_strm(FILE * warnings_strm);
  * descriptor (default value is stderr). 'leadin' is string prepended to
  * each line printed out, NULL treated as "". */
 void sg_print_command(const unsigned char * command);
+void sg_print_scsi_status(int scsi_status);
+
+/* 'leadin' is string prepended to each line printed out, NULL treated as
+ * "". N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the
+ * first line printed. */
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     int sb_len, int raw_info);
-void sg_print_scsi_status(int scsi_status);
 
 /* Utilities can use these exit status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */
@@ -303,12 +309,12 @@ void sg_print_scsi_status(int scsi_status);
                                 /* 24: this is a SCSI status, not sense. */
                                 /* It indicates reservation by another */
                                 /* machine blocks this command */
-#define SG_LIB_CAT_CONDITION_MET 25 /* this is a SCSI status, not sense. */
+#define SG_LIB_CAT_CONDITION_MET 25 /* SCSI status, not sense key. */
                                     /* Only from PRE-FETCH (SBC-4) */
-#define SG_LIB_CAT_BUSY       26 /* this is a SCSI status, not sense. */
-#define SG_LIB_CAT_TS_FULL    27 /* this is a SCSI status, not sense. */
-#define SG_LIB_CAT_ACA_ACTIVE 28 /* this is a SCSI status, not sense. */
-#define SG_LIB_CAT_TASK_ABORTED 29 /* this is a SCSI status, not sense. */
+#define SG_LIB_CAT_BUSY       26 /* SCSI status, not sense. Invites retry */
+#define SG_LIB_CAT_TS_FULL    27 /* SCSI status, not sense. Wait then retry */
+#define SG_LIB_CAT_ACA_ACTIVE 28 /* SCSI status; ACA seldom used */
+#define SG_LIB_CAT_TASK_ABORTED 29 /* SCSI status, this command aborted by? */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
                                 /*       [sk,asc,ascq: 0xb,0x10,*] */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */

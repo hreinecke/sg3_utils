@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2016 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.14 20151219";
+static const char * version_str = "1.15 20160131";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -484,14 +484,13 @@ main(int argc, char * argv[])
         else {
             switch (rb_mode) {
             case MODE_DESCRIPTOR:
-                k = (resp[1] << 16) | (resp[2] << 8) | resp[3];
+                k = sg_get_unaligned_be24(resp + 1);
                 printf("OFFSET BOUNDARY: %d, Buffer offset alignment: "
                        "%d-byte\n", resp[0], (1 << resp[0]));
                 printf("BUFFER CAPACITY: %d (0x%x)\n", k, k);
                 break;
             case MODE_ECHO_BDESC:
-                k = ((resp[2] & 0x1F) << 8) | resp[3];
-
+                k = sg_get_unaligned_be16(resp + 2) & 0x1fff;
                 printf("EBOS:%d\n", resp[0] & 1 ? 1 : 0);
                 printf("Echo buffer capacity: %d (0x%x)\n", k, k);
                 break;

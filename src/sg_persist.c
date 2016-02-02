@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2015 D. Gilbert
+ *  Copyright (C) 2004-2016 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.51 20151219";
+static const char * version_str = "0.52 20160201";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -779,8 +779,8 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
     return 0;
 }
 
-/* Read one or more TransportIDs from the given file or from stdin.
- * Returns 0 if successful, 1 otherwise. */
+/* Read one or more TransportIDs from the given file or stdin. Reads from
+ * stdin when 'fnp' is NULL. Returns 0 if successful, 1 otherwise. */
 static int
 decode_file_tids(const char * fnp, struct opts_t * op)
 {
@@ -797,7 +797,7 @@ decode_file_tids(const char * fnp, struct opts_t * op)
     if (fnp) {
         fp = fopen(fnp, "r");
         if (NULL == fp) {
-            pr2serr("decode_file_tids: unable to open %s\n", fnp);
+            pr2serr("%s: unable to open %s\n", __func__, fnp);
             return 1;
         }
     }
@@ -825,8 +825,8 @@ decode_file_tids(const char * fnp, struct opts_t * op)
                 if (1 == sscanf(carry_over, "%x", &h))
                     tid_arr[off - 1] = h;       /* back up and overwrite */
                 else {
-                    pr2serr("decode_file_tids: carry_over error ['%s'] "
-                            "around line %d\n", carry_over, j + 1);
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
                     goto bad;
                 }
                 lcp = line + 1;
@@ -847,16 +847,15 @@ decode_file_tids(const char * fnp, struct opts_t * op)
             goto my_cont_a;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
         if ((k < in_len) && ('#' != lcp[k])) {
-            pr2serr("decode_file_tids: syntax error at line %d, pos %d\n",
-                    j + 1, m + k + 1);
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__, j + 1,
+                    m + k + 1);
             goto bad;
         }
         for (k = 0; k < 1024; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
-                    pr2serr("decode_file_tids: hex number larger than 0xff "
-                            "in line %d, pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: hex number larger than 0xff in line %d, pos "
+                            "%d\n", __func__, j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
                 if (split_line && (1 == strlen(lcp))) {
@@ -864,7 +863,7 @@ decode_file_tids(const char * fnp, struct opts_t * op)
                     carry_over[0] = *lcp;
                 }
                 if ((off + k) >= (int)sizeof(op->transportid_arr)) {
-                    pr2serr("decode_file_tids: array length exceeded\n");
+                    pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
                 tid_arr[off + k] = h;
@@ -879,20 +878,22 @@ decode_file_tids(const char * fnp, struct opts_t * op)
                     --k;
                     break;
                 }
-                pr2serr("decode_file_tids: error in line %d, at pos %d\n",
-                        j + 1, (int)(lcp - line + 1));
+                pr2serr("%s: error in line %d, at pos %d\n", __func__, j + 1,
+                        (int)(lcp - line + 1));
                 goto bad;
             }
         }
 my_cont_a:
         off += MX_TID_LEN;
         if (off >= (MX_TIDS * MX_TID_LEN)) {
-            pr2serr("decode_file_tids: array length exceeded\n");
+            pr2serr("%s: array length exceeded\n", __func__);
             goto bad;
         }
         ++num;
     }
     op->num_transportids = num;
+   if (fnp)
+        fclose(fp);
     return 0;
 
 bad:

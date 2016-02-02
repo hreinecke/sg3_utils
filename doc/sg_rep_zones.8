@@ -1,4 +1,4 @@
-.TH SG_REP_ZONES "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_REP_ZONES "8" "February 2016" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES command
 .SH SYNOPSIS
@@ -42,11 +42,15 @@ The default is to open it read\-write.
 .TP
 \fB\-o\fR, \fB\-\-report\fR=\fIOPT\fR
 where \fIOPT\fR will become the contents of the REPORTING OPTION field
-in the cdb. The default value is 0 which means report a list or all zones.
-Some other values are 1 for list full zones; 2 for list all open zones; 3
-for list all empty zones; 4 for list all read only zones; 5 for list all
-offline zones; 6 for list all zones with the RESET bit set; and 7 for list
-all zones with the NON_SEQ bit set.
+in the cdb. The default value is 0 which means report a list of all zones.
+Some other values are 1 for list zones with a zone condition of empty; 2 for
+list zones with a zone condition of implicitly opened; 3 for list zones with
+a zone condition of explicitly opened; 4 for list zones with a zone condition
+of closed; 5 for list zones with a zone condition of full; 6 for list zones
+with a zone condition of read only; 7 for list zones with a zone condition of
+offline. Other values are 0x10 for list zones with RWP recommended set to
+true; 0x11 for list zones with non\-sequential write resource active set to
+true and 0x3f for list zones with a zone condition of not write pointer.
 .TP
 \fB\-s\fR, \fB\-\-start\fR=\fILBA\fR
 where \fILBA\fR is at the start or within the first zone to be reported. The
@@ -67,7 +71,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2015 Douglas Gilbert
+Copyright \(co 2014\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

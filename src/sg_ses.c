@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.06 20151219";    /* ses3r08->11 */
+static const char * version_str = "2.07 20160201";    /* ses3r08->11 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1615,14 +1615,14 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
 
     resp = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == resp) {
-        pr2serr("populate: unable to allocate %d bytes on heap\n",
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
                 op->maxlen);
         ret = -1;
         goto the_end;
     }
     res = do_rec_diag(fd, DPC_CONFIGURATION, resp, op->maxlen, op, &resp_len);
     if (res) {
-        pr2serr("populate: couldn't read config page, res=%d\n", res);
+        pr2serr("%s: couldn't read config page, res=%d\n", __func__, res);
         ret = -1;
         goto the_end;
     }
@@ -1643,7 +1643,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         el = ucp[3] + 4;
         sum_type_dheaders += ucp[2];
         if (el < 40) {
-            pr2serr("populate: short enc descriptor len=%d ??\n", el);
+            pr2serr("%s: short enc descriptor len=%d ??\n", __func__, el);
             continue;
         }
         if ((0 == k) && primary_ip) {
@@ -1660,7 +1660,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
         if ((ucp + 3) > last_ucp)
             goto p_truncated;
         if (k >= MX_ELEM_HDR) {
-            pr2serr("populate: too many elements\n");
+            pr2serr("%s: too many elements\n", __func__);
             ret = -1;
             goto the_end;
         }
@@ -1683,10 +1683,10 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
             op->ind_th = k;
         else {
             if (op->ind_et_inst)
-                pr2serr("populate: unable to find element type '%s%d'\n",
+                pr2serr("%s: unable to find element type '%s%d'\n", __func__,
                         op->ind_etp->abbrev, op->ind_et_inst);
             else
-                pr2serr("populate: unable to find element type '%s'\n",
+                pr2serr("%s: unable to find element type '%s'\n", __func__,
                         op->ind_etp->abbrev);
             ret = -1;
             goto the_end;
@@ -1696,7 +1696,7 @@ populate_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
     goto the_end;
 
 p_truncated:
-    pr2serr("populate: config too short\n");
+    pr2serr("%s: config too short\n", __func__);
     ret = -1;
 
 the_end:
@@ -3010,16 +3010,15 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
         return 1;
     lcp = inp;
     in_len = strlen(inp);
-    if (0 == in_len) {
+    if (0 == in_len)
         *arr_len = 0;
-    }
     if (('-' == inp[0]) || ('@' == inp[0])) {    /* read from stdin or file */
         if ('-' == inp[0])
             fp = stdin;
         else {
             fp = fopen(inp + 1, "r");
             if (NULL == fp) {
-                pr2serr("read_hex: unable to open file: %s\n", inp + 1);
+                pr2serr("%s: unable to open file: %s\n", __func__, inp + 1);
                 return 1;
             }
         }
@@ -3048,8 +3047,8 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
                     if (1 == sscanf(carry_over, "%x", &h))
                         arr[off - 1] = h;       /* back up and overwrite */
                     else {
-                        pr2serr("read_hex: carry_over error ['%s'] around "
-                                "line %d\n", carry_over, j + 1);
+                        pr2serr("%s: carry_over error ['%s'] around line "
+                                "%d\n", __func__, carry_over, j + 1);
                         goto err_with_fp;
                     }
                     lcp = line + 1;
@@ -3068,15 +3067,15 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
             if (in_len != k) {
-                pr2serr("read_hex: syntax error at line %d, pos %d\n", j + 1,
-                        m + k + 1);
+                pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
+                        j + 1, m + k + 1);
                 goto err_with_fp;
             }
             for (k = 0; k < (MX_DATA_IN - off); ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        pr2serr("read_hex: hex number larger than 0xff in "
-                                "line %d, pos %d\n", j + 1,
+                        pr2serr("%s: hex number larger than 0xff in line %d, "
+                                "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
                         goto err_with_fp;
                     }
@@ -3092,8 +3091,8 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
                     if ('\0' == *lcp)
                         break;
                 } else {
-                    pr2serr("read_hex: error in line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
                     goto err_with_fp;
                 }
             }
@@ -3105,15 +3104,15 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
     } else {        /* hex string on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
-            pr2serr("read_hex: error at pos %d\n", k + 1);
-            return 1;
+            pr2serr("%s: error at pos %d\n", __func__, k + 1);
+            goto err_with_fp;
         }
         for (k = 0; k < MX_DATA_IN; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
-                    pr2serr("read_hex: hex number larger than 0xff at pos "
-                            "%d\n", (int)(lcp - inp + 1));
-                    return 1;
+                    pr2serr("%s: hex number larger than 0xff at pos %d\n",
+                            __func__, (int)(lcp - inp + 1));
+                    goto err_with_fp;
                 }
                 arr[k] = h;
                 cp = (char *)strchr(lcp, ',');
@@ -3126,8 +3125,9 @@ read_hex(const char * inp, unsigned char * arr, int * arr_len, int verb)
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                pr2serr("read_hex: error at pos %d\n", (int)(lcp - inp + 1));
-                return 1;
+                pr2serr("%s: error at pos %d\n", __func__,
+                        (int)(lcp - inp + 1));
+                goto err_with_fp;
             }
         }
         *arr_len = k + 1;
@@ -3157,7 +3157,7 @@ ses_process_status_page(int sg_fd, struct opts_t * op)
 
     resp = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == resp) {
-        pr2serr("process_status_page: unable to allocate %d bytes on heap\n",
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
                 op->maxlen);
         ret = -1;
         goto fini;
@@ -4158,21 +4158,21 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
     /* Only after the generation code, offset 4 for 4 bytes */
     res = do_rec_diag(sg_fd, DPC_SUBENC_NICKNAME, b, 8, op, &resp_len);
     if (res) {
-        pr2serr("set_nickname: Subenclosure nickname status page, res=%d\n",
+        pr2serr("%s: Subenclosure nickname status page, res=%d\n", __func__,
                 res);
         return -1;
     }
     if (resp_len < 8) {
-        pr2serr("set_nickname: Subenclosure nickname status page, response "
-                "length too short: %d\n", resp_len);
+        pr2serr("%s: Subenclosure nickname status page, response length too "
+                "short: %d\n", __func__, resp_len);
         return -1;
     }
     if (op->verbose) {
         uint32_t gc;
 
         gc = sg_get_unaligned_be32(b + 4);
-        pr2serr("set_nickname: generation code from status page: %" PRIu32
-                "\n", gc);
+        pr2serr("%s: generation code from status page: %" PRIu32 "\n",
+                __func__, gc);
     }
     b[0] = (unsigned char)DPC_SUBENC_NICKNAME;  /* just in case */
     b[1] = (unsigned char)op->seid;

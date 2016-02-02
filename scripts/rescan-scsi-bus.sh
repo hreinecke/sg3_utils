@@ -5,7 +5,7 @@
 # (c) 2006--2015 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20151217"
+VERSION="20160201"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -244,7 +244,7 @@ testonline ()
   # Handle in progress of becoming ready and unit attention
   while test $RC = 2 -o $RC = 6 && test $ctr -le 30; do
     if test $RC = 2 -a "$RMB" != "1"; then echo -n "."; let LN+=1; sleep 1
-    else usleep 20000; fi
+    else sleep 0.02; fi
     let ctr+=1
     sg_turs /dev/$SGDEV >/dev/null 2>&1
     RC=$?
@@ -413,7 +413,7 @@ udevadm_settle()
     /sbin/udevsettle
     white_out
   else
-    usleep 20000
+    sleep 0.02
   fi
 }
 
@@ -475,7 +475,7 @@ dolunscan()
           incrrmvd "$host:$channel:$id:$lun"
         fi
         echo 1 > /sys/class/scsi_device/${host}:${channel}:${id}:${lun}/device/delete
-        usleep 20000
+        sleep 0.02
       else
         echo "scsi remove-single-device $devnr" > /proc/scsi/scsi
         if test $RC -eq 1 -o $lun -eq 0 ; then
@@ -959,7 +959,7 @@ flushmpaths()
       elif test $i -eq $flush_retries ; then
         echo "Fail"
       fi
-      usleep 20000
+      sleep 0.02
       let i=$i+1
     done
   done

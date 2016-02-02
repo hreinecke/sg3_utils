@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -36,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.12 20160126";  /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.12 20160201";  /* spc5r08 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -286,7 +287,8 @@ static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
           unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
+    int fn_len, in_len, k, j, m, split_line, fd;
+    bool has_stdin;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -499,7 +501,7 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        pr2serr("inquiry: out of memory\n");
+        pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
@@ -526,7 +528,7 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
         }
     } else if (ret < 4) {
         if (verbose)
-            pr2serr("inquiry: got too few bytes (%d)\n", ret);
+            pr2serr("%s: got too few bytes (%d)\n", __func__, ret);
         ret = SG_LIB_CAT_MALFORMED;
     } else
         ret = 0;
@@ -1892,14 +1894,14 @@ decode_dev_const_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, j, bump, cd_len;
     unsigned char * ucp;
+    const char * dcp = "Device constituents VPD page";
 
     if ((1 == do_hex) || (do_hex > 2)) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 4) {
-        pr2serr("Deice constituents VPD page length too short=%d\n",
-                len);
+        pr2serr("%s length too short=%d\n", dcp, len);
         return;
     }
     len -= 4;
@@ -1909,8 +1911,8 @@ decode_dev_const_vpd(unsigned char * buff, int len, int do_hex)
 
         printf("  Constituent descriptor %d:\n", j + 1);
         if ((k + 36) > len) {
-            pr2serr("Device constituents VPD page, short descriptor "
-                    "length=36, left=%d\n", (len - k));
+            pr2serr("%s, short descriptor length=36, left=%d\n", dcp,
+                    (len - k));
             return;
         }
         printf("    Constituent type: 0x%x\n",
@@ -1922,8 +1924,8 @@ decode_dev_const_vpd(unsigned char * buff, int len, int do_hex)
         cd_len = sg_get_unaligned_be16(ucp + 34);
         bump = 36 + cd_len;
         if ((k + bump) > len) {
-            pr2serr("Device constituents VPD page, short descriptor "
-                    "length=%d, left=%d\n", bump, (len - k));
+            pr2serr("%s, short descriptor length=%d, left=%d\n", dcp, bump,
+                    (len - k));
             return;
         }
         if (cd_len > 0) {
@@ -1952,13 +1954,14 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
     int k, bump;
     unsigned char * ucp;
     unsigned int value;
+    const char * pcp = "Power consumption VPD page";
 
     if ((1 == do_hex) || (do_hex > 2)) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
-        pr2serr("Power consumption VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", pcp,len);
         return;
     }
     len -= 4;
@@ -1966,8 +1969,8 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
     for (k = 0; k < len; k += bump, ucp += bump) {
         bump = 4;
         if ((k + bump) > len) {
-            pr2serr("Power consumption VPD page, short descriptor "
-                    "length=%d, left=%d\n", bump, (len - k));
+            pr2serr("%s, short descriptor length=%d, left=%d\n", pcp, bump,
+                    (len - k));
             return;
         }
         if (do_hex > 1)

@@ -63,7 +63,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.53 20160126";
+static const char * version_str = "0.53 20160201";
 
 #define ME "sg_xcopy: "
 
@@ -992,7 +992,7 @@ decode_designation_descriptor(const unsigned char * ucp, int i_len)
     char c[2048];
 
     sg_get_designation_descriptor_str(NULL, ucp, i_len, 1, verbose,
-				      sizeof(c), c);
+                                      sizeof(c), c);
     pr2serr("%s", c);
 }
 

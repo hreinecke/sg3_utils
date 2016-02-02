@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2015 Hannes Reinecke.
+ * Copyright (c) 2010-2016 Hannes Reinecke.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.05 20151219";    /* sbc4r01 */
+static const char * version_str = "1.06 20160131";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -154,7 +154,8 @@ decode_referral_desc(const unsigned char * ucp, int bytes)
             return -1;
         printf("      target port descriptor %d:\n", j);
         printf("        port group %x state (%s)\n",
-               (ucp[n+2] << 8) | (ucp[n+3]), decode_tpgs_state(ucp[n] & 0xf));
+               sg_get_unaligned_be16(ucp + n + 2),
+               decode_tpgs_state(ucp[n] & 0xf));
         n += 4;
         bytes -= 4;
     }
@@ -284,8 +285,7 @@ main(int argc, char * argv[])
              * possible user segments.
              * And maybe someone takes a pity and updates the spec ...
              */
-            rlen = (referralBuffp[0] << 24) + (referralBuffp[1] << 16) +
-                   (referralBuffp[2] << 8) + referralBuffp[3] + 4;
+            rlen = sg_get_unaligned_be32(referralBuffp + 0) + 4;
         else
             rlen = maxlen;
         k = (rlen > maxlen) ? maxlen : rlen;

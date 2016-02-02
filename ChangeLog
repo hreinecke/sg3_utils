@@ -2,11 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.42 [20160127] [svn: r657]
+Changelog for sg3_utils-1.42 [20160201] [svn: r658]
   - sg_timestamp: new, to report or set timestamp
   - sg_stpg: fix truncation of target port field
   - sg_inq: cope with unicode strings, udev fixes
-    - update version descriptor list to 20151101
+    - update version descriptor list to 20160125
   - sg_ses: add more field acronyms (ses3r11)
   - sg_logs: add Utilization lpage (sbc4r07)
     - add Background operation lpage
@@ -39,7 +39,8 @@ Changelog for sg3_utils-1.42 [20160127] [svn: r657]
   - sg_cmds_extra: add sg_ll_format_unit2() for FFMT
   - sg_pr2serr.h: new, to shorten fprintf(stderr, ...)
   - sg_io_linux, sg_pt_linux: drop SUGGEST_* decoding
-  - sg_unaligned.h: add 48 bit support
+  - sg_unaligned.h: add 48 bit support and gets for
+    variable length unsigned integers
 
 Changelog for sg3_utils-1.41 [20150511] [svn: r644]
   - sg_zone: new utility for open, close and finish

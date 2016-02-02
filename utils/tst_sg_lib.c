@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 Douglas Gilbert.
+ * Copyright (c) 2013-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,14 +25,14 @@
  *
  */
 
-static char * version_str = "1.03 20160126";
+static char * version_str = "1.03 20160128";
 
 
 #define MAX_LINE_LEN 1024
 
 
 static struct option long_options[] = {
-        {"dtsrhex",  no_argument, 0, 'd'},
+        {"dstrhex",  no_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
         {"leadin",  required_argument, 0, 'l'},
         {"printf", no_argument, 0, 'p'},
@@ -137,8 +137,9 @@ usage()
 {
     fprintf(stderr,
             "Usage: tst_sg_lib [--dstrhex] [--help] [--leadin=STR] "
-            "[--printf] [--sense]\n"
-            "                  [--unaligned] [--verbose] [--version]\n"
+            "[--printf]\n"
+            "                  [--sense] [--unaligned] [--verbose] "
+            "[--version]\n"
             "  where: --dstrhex|-d       test dStrHex* variants\n"
             "         --help|-h          print out usage message\n"
             "         --leadin=STR|-l STR    every line output by --sense "
@@ -149,7 +150,8 @@ usage()
             "         --unaligned|-u     test unaligned data handling\n"
             "         --verbose|-v       increase verbosity\n"
             "         --version|-V       print version string and exit\n\n"
-            "Test various parts of sg_lib, see options\n"
+            "Test various parts of sg_lib, see options. Sense data tests "
+            "overlap\nsomewhat with examples/sg_sense_test .\n"
            );
 
 }
@@ -449,6 +451,13 @@ main(int argc, char * argv[])
         dStrHex((const char *)u8, verbose ? 10 : 8, -1);
         u64r = sg_get_unaligned_be64(u8);
         printf("  u64r=0x%" PRIx64 "\n\n", u64r);
+        printf("  be[8]:\n");
+        dStrHex((const char *)u8, verbose ? 10 : 8, -1);
+        u64r = sg_get_unaligned_be(8, u8);
+        printf("  u64r[8]=0x%" PRIx64 "\n\n", u64r);
+        printf("  le[8]:\n");
+        u64r = sg_get_unaligned_le(8, u8);
+        printf("  u64r[8]=0x%" PRIx64 "\n\n", u64r);
 
     }
 
