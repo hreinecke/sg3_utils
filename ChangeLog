@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.42 [20160201] [svn: r658]
+Changelog for sg3_utils-1.42 [20160203] [svn: r659]
   - sg_timestamp: new, to report or set timestamp
   - sg_stpg: fix truncation of target port field
   - sg_inq: cope with unicode strings, udev fixes
@@ -12,10 +12,13 @@ Changelog for sg3_utils-1.42 [20160201] [svn: r658]
     - add Background operation lpage
     - add Pending defects lpage
     - add LPS misalignment lpage (sbc4r10)
+    - document '--All' ('-A') option
+    - rework lto tape vendor lpages
   - sg_vpd: add Block limits extension VPD page
     - add Device constituents VPD page
     - LB provisioning VPD page: expand LBPRZ, add
       Minimum and Threshold percentage fields
+    - rework lto tape vendor VPD pages
   - sg_inq+sg_vpd+sg_xcopy: add support for locally
     assigned UUIDs in VPD page 0x83 (15-267r2)
   - sg_sanitize: add --znr option (sbc4r07)
@@ -34,8 +37,8 @@ Changelog for sg3_utils-1.42 [20160201] [svn: r658]
     - add sg_get_designation_descriptor_str() function
     - sg_get_desig_type_str()+sg_get_desig_assoc_str()
       and sg_get_desig_code_set_str() added
-    - sg_get_opcode_sa_name() break out zoning in/out
-      and read attribute service actions
+    - sg_get_opcode_sa_name() break out zoning in/out,
+      read attribute and read position service actions
   - sg_cmds_extra: add sg_ll_format_unit2() for FFMT
   - sg_pr2serr.h: new, to shorten fprintf(stderr, ...)
   - sg_io_linux, sg_pt_linux: drop SUGGEST_* decoding

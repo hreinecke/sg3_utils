@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -49,8 +49,8 @@
 #define VPD_VP_EMC 2
 #define VPD_VP_DDS 3
 #define VPD_VP_HP3PAR 4
-#define VPD_VP_LTO5 5
-#define VPD_VP_LTO6 6
+#define VPD_VP_IBM_LTO 5
+#define VPD_VP_HP_LTO 6
 
 
 /* vendor VPD pages */
@@ -59,24 +59,24 @@
 #define VPD_V_UPR_EMC  0xc0
 #define VPD_V_HVER_RDAC  0xc0
 #define VPD_V_FVER_DDS 0xc0
-#define VPD_V_FVER_LTO6 0xc0
-#define VPD_V_DCRL_LTO5 0xc0
+#define VPD_V_FVER_LTO 0xc0
+#define VPD_V_DCRL_LTO 0xc0
 #define VPD_V_DATC_SEA  0xc1
 #define VPD_V_FVER_RDAC  0xc1
-#define VPD_V_HVER_LTO6 0xc1
-#define VPD_V_DSN_LTO5 0xc1
+#define VPD_V_HVER_LTO 0xc1
+#define VPD_V_DSN_LTO 0xc1
 #define VPD_V_JUMP_SEA 0xc2
 #define VPD_V_SVER_RDAC 0xc2
-#define VPD_V_PCA_LTO6 0xc2
+#define VPD_V_PCA_LTO 0xc2
 #define VPD_V_DEV_BEH_SEA 0xc3
 #define VPD_V_FEAT_RDAC 0xc3
-#define VPD_V_MECH_LTO6 0xc3
+#define VPD_V_MECH_LTO 0xc3
 #define VPD_V_SUBS_RDAC 0xc4
-#define VPD_V_HEAD_LTO6 0xc4
-#define VPD_V_ACI_LTO6 0xc5
-#define VPD_V_DUCD_LTO5 0xc7
+#define VPD_V_HEAD_LTO 0xc4
+#define VPD_V_ACI_LTO 0xc5
+#define VPD_V_DUCD_LTO 0xc7
 #define VPD_V_EDID_RDAC 0xc8
-#define VPD_V_MPDS_LTO5 0xc8
+#define VPD_V_MPDS_LTO 0xc8
 #define VPD_V_VAC_RDAC 0xc9
 #define VPD_V_RVSI_RDAC 0xca
 #define VPD_V_SAID_RDAC 0xd0
@@ -135,8 +135,8 @@ static struct svpd_vp_name_t vp_arr[] = {
     {VPD_VP_DDS, "dds", "DDS tape family from IBM"},
     {VPD_VP_EMC, "emc", "EMC (company)"},
     {VPD_VP_HP3PAR, "hp3par", "3PAR array (HP was Left Hand)"},
-    {VPD_VP_LTO5, "lto5", "LTO-5 tape/systems (IBM)"},
-    {VPD_VP_LTO6, "lto6", "LTO-6 tape/systems (IBM)"},
+    {VPD_VP_IBM_LTO, "ibm_lto", "IBM LTO tape/systems"},
+    {VPD_VP_HP_LTO, "hp_lto", "HP LTO tape/systems"},
     {VPD_VP_RDAC, "rdac", "RDAC array (NetApp E-Series)"},
     {VPD_VP_SEAGATE, "sea", "Seagate disk"},
     {0, NULL, NULL},
@@ -146,37 +146,38 @@ static struct svpd_vp_name_t vp_arr[] = {
 /* 'subvalue' holds vendor/product number to disambiguate */
 /* Arrange in alphabetical order by acronym */
 static struct svpd_values_name_t vendor_vpd_pg[] = {
-    {VPD_V_ACI_LTO6, VPD_VP_LTO6, 1, "aci", "ACI revision level (LTO-6)"},
+    {VPD_V_ACI_LTO, VPD_VP_HP_LTO, 1, "aci", "ACI revision level (HP LTO)"},
     {VPD_V_DATC_SEA, VPD_VP_SEAGATE, 0, "datc", "Date code (Seagate)"},
-    {VPD_V_DCRL_LTO5, VPD_VP_LTO5, 1, "dcrl" , "Drive component revision "
-     "levels (LTO-5)"},
+    {VPD_V_DCRL_LTO, VPD_VP_IBM_LTO, 1, "dcrl" , "Drive component revision "
+     "levels (IBM LTO)"},
     {VPD_V_FVER_DDS, VPD_VP_DDS, 1, "ddsver", "Firmware revision (DDS)"},
     {VPD_V_DEV_BEH_SEA, VPD_VP_SEAGATE, 0, "devb", "Device behavior "
      "(Seagate)"},
-    {VPD_V_DSN_LTO5, VPD_VP_LTO5, 1, "dsn" , "Drive serial numbers (LTO-5)"},
-    {VPD_V_DUCD_LTO5, VPD_VP_LTO5, 1, "ducd" , "Device unique "
-     "configuration data (LTO-5)"},
+    {VPD_V_DSN_LTO, VPD_VP_IBM_LTO, 1, "dsn" , "Drive serial numbers (IBM "
+     "LTO)"},
+    {VPD_V_DUCD_LTO, VPD_VP_IBM_LTO, 1, "ducd" , "Device unique "
+     "configuration data (IBM LTO)"},
     {VPD_V_EDID_RDAC, VPD_VP_RDAC, 0, "edid", "Extended device "
      "identification (RDAC)"},
     {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "prm4", "Feature Parameters (RDAC)"},
     {VPD_V_FIRM_SEA, VPD_VP_SEAGATE, 0, "firm", "Firmware numbers "
      "(Seagate)"},
-    {VPD_V_FVER_LTO6, VPD_VP_LTO6, 0, "frl" , "Firmware revision level "
-     "(LTO-6)"},
+    {VPD_V_FVER_LTO, VPD_VP_HP_LTO, 0, "frl" , "Firmware revision level "
+     "(HP LTO)"},
     {VPD_V_FVER_RDAC, VPD_VP_RDAC, 0, "fwr4", "Firmware version (RDAC)"},
-    {VPD_V_HEAD_LTO6, VPD_VP_LTO6, 1, "head", "Head Assy revision level "
-     "(LTO-6)"},
+    {VPD_V_HEAD_LTO, VPD_VP_HP_LTO, 1, "head", "Head Assy revision level "
+     "(HP LTO)"},
     {VPD_V_HP3PAR, VPD_VP_HP3PAR, 0, "hp3par", "Volume information "
      "(HP/3PAR)"},
-    {VPD_V_HVER_LTO6, VPD_VP_LTO6, 1, "hrl", "Hardware revision level "
-     "(LTO-6)"},
+    {VPD_V_HVER_LTO, VPD_VP_HP_LTO, 1, "hrl", "Hardware revision level "
+     "(HP LTO)"},
     {VPD_V_HVER_RDAC, VPD_VP_RDAC, 0, "hwr4", "Hardware version (RDAC)"},
     {VPD_V_JUMP_SEA, VPD_VP_SEAGATE, 0, "jump", "Jump setting (Seagate)"},
-    {VPD_V_MECH_LTO6, VPD_VP_LTO6, 1, "mech", "Mechanism revision level "
-     "(LTO-6)"},
-    {VPD_V_MPDS_LTO5, VPD_VP_LTO5, 1, "mpds" , "Mode parameter default "
-     "settings (LTO-5)"},
-    {VPD_V_PCA_LTO6, VPD_VP_LTO6, 1, "pca", "PCA revision level (LTO-6)"},
+    {VPD_V_MECH_LTO, VPD_VP_HP_LTO, 1, "mech", "Mechanism revision level "
+     "(HP LTO)"},
+    {VPD_V_MPDS_LTO, VPD_VP_IBM_LTO, 1, "mpds" , "Mode parameter default "
+     "settings (IBM LTO)"},
+    {VPD_V_PCA_LTO, VPD_VP_HP_LTO, 1, "pca", "PCA revision level (HP LTO)"},
     {VPD_V_RVSI_RDAC, VPD_VP_RDAC, 0, "rvsi", "Replicated volume source "
      "identifier (RDAC)"},
     {VPD_V_SAID_RDAC, VPD_VP_RDAC, 0, "said", "Storage array world wide "
@@ -1199,7 +1200,7 @@ decode_dds_vpd_c0(unsigned char * buff, int len)
 }
 
 static void
-decode_lto6_vpd_cx(unsigned char * buff, int len, int page)
+decode_hp_lto_vpd_cx(unsigned char * buff, int len, int page)
 {
     char str[32];
     const char *comp = NULL;
@@ -1254,10 +1255,10 @@ decode_lto6_vpd_cx(unsigned char * buff, int len, int page)
 }
 
 static void
-decode_lto5_dcrl(unsigned char * buff, int len)
+decode_ibm_lto_dcrl(unsigned char * buff, int len)
 {
     if (len < 0x2b) {
-        pr2serr("Driver Component Revision Levels page (LTO-5) invalid "
+        pr2serr("Driver Component Revision Levels page (IBM LTO) invalid "
                 "length=%d\n", len);
         return;
     }
@@ -1268,10 +1269,10 @@ decode_lto5_dcrl(unsigned char * buff, int len)
 }
 
 static void
-decode_lto5_dsn(unsigned char * buff, int len)
+decode_ibm_lto_dsn(unsigned char * buff, int len)
 {
     if (len < 0x1c) {
-        pr2serr("Driver Serial Numbers page (LTO-5) invalid "
+        pr2serr("Driver Serial Numbers page (IBM LTO) invalid "
                 "length=%d\n", len);
         return;
     }
@@ -1324,10 +1325,10 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                         decode_rdac_vpd_c0(rp, len);
                     else if (VPD_VP_DDS == op->vend_prod_num)
                         decode_dds_vpd_c0(rp, len);
-                    else if (VPD_VP_LTO5 == op->vend_prod_num)
-                        decode_lto5_dcrl(rp, len);
-                    else if (VPD_VP_LTO6 == op->vend_prod_num)
-                        decode_lto6_vpd_cx(rp, len, op->num_vpd);
+                    else if (VPD_VP_IBM_LTO == op->vend_prod_num)
+                        decode_ibm_lto_dcrl(rp, len);
+                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1336,18 +1337,18 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                         decode_date_code_vpd_c1_sea(rp, len);
                     else if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c1(rp, len);
-                    else if (VPD_VP_LTO5 == op->vend_prod_num)
-                        decode_lto5_dsn(rp, len);
-                    else if (VPD_VP_LTO6 == op->vend_prod_num)
-                        decode_lto6_vpd_cx(rp, len, op->num_vpd);
+                    else if (VPD_VP_IBM_LTO == op->vend_prod_num)
+                        decode_ibm_lto_dsn(rp, len);
+                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
                 case 0xc2:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c2(rp, len);
-                    else if (VPD_VP_LTO6 == op->vend_prod_num)
-                        decode_lto6_vpd_cx(rp, len, op->num_vpd);
+                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1356,22 +1357,22 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                         decode_dev_beh_vpd_c3_sea(rp, len);
                     else if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c3(rp, len);
-                    else if (VPD_VP_LTO6 == op->vend_prod_num)
-                        decode_lto6_vpd_cx(rp, len, op->num_vpd);
+                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
                 case 0xc4:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c4(rp, len);
-                    else if (VPD_VP_LTO6 == op->vend_prod_num)
-                        decode_lto6_vpd_cx(rp, len, op->num_vpd);
+                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
                 case 0xc5:
-                    if (VPD_VP_LTO6 == op->vend_prod_num)
-                        decode_lto6_vpd_cx(rp, len, op->num_vpd);
+                    if (VPD_VP_HP_LTO == op->vend_prod_num)
+                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;

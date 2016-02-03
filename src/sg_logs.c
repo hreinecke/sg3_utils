@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.38 20160130";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.39 20160203";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -81,6 +81,7 @@ static const char * version_str = "1.38 20160130";    /* spc5r08 + sbc4r10 */
 static uint8_t rsp_buff[MX_ALLOC_LEN + 4];
 
 static struct option long_options[] = {
+        {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
         {"all", no_argument, 0, 'a'},
         {"brief", no_argument, 0, 'b'},
         {"control", required_argument, 0, 'c'},
@@ -346,12 +347,12 @@ static struct log_elem log_arr[] = {
 /* vendor specific */
     {0x30, 0, 0, PDT_DISK, VENDOR_M, "Performance counters (Hitachi)",
      "pc_hi", NULL},                             /* 0x30, 0  SBC */
-    {0x30, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape usage (lto-5, 6)", "ta_",
+    {0x30, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape usage (lto-5, 6)", "tu_",
      show_tape_usage_page},             /* 0x30, 0  SSC */
     {0x31, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape capacity (lto-5, 6)",
-     "tc_", show_tape_capacity_page},          /* 0x31, 0  SSC */
-    {0x32, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Data compression (ibm)", "dc_",
-     show_data_compression_page},       /* 0x32, 0  SSC; redirect to 0x1b */
+     "tc_", show_tape_capacity_page},   /* 0x31, 0  SSC */
+    {0x32, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Data compression (lto-5)",
+     "dc_", show_data_compression_page}, /* 0x32, 0  SSC; redirect to 0x1b */
     {0x33, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Write errors (lto-5)", "we_",
      NULL},                             /* 0x33, 0  SSC */
     {0x34, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Read forward errors (lto-5)",
@@ -397,17 +398,20 @@ usage(int hval)
 {
     if (1 == hval) {
         pr2serr(
-           "Usage: sg_logs [--all] [--brief] [--control=PC] [--enumerate] "
-           "[--enum_vendor]\n"
-           "               [--filter=FI] [--help] [--hex] [--in=FN] [--list] "
-           "[--no_inq]\n"
-           "               [--maxlen=LEN] [--name] [--page=PG] [--paramp=PP] "
-           "[--pcb]\n"
-           "               [--ppc] [--raw] [--readonly] [--reset] [--select] "
-           "[--sp]\n"
-           "               [--temperature] [--transport] [--verbose] "
-           "[--version] DEVICE\n"
+           "Usage: sg_logs [-All] [--all] [--brief] [--control=PC] "
+           "[--enumerate]\n"
+           "               [--enum_vendor] [--filter=FL] [--help] [--hex] "
+           "[--in=FN]\n"
+           "               [--list] [--no_inq] [--maxlen=LEN] [--name] "
+           "[--page=PG]\n"
+           "               [--paramp=PP] [--pcb] [--ppc] [--raw] "
+           "[--readonly]\n"
+           "               [--reset] [--select] [--sp] [--temperature] "
+           "[--transport]\n"
+           "               [--verbose] [--version] DEVICE\n"
            "  where the main options are:\n"
+           "    --All|-A        fetch and decode all log pages and "
+           "subpages\n"
            "    --all|-a        fetch and decode all log pages, but not "
            "subpages; use\n"
            "                    twice to fetch and decode all log pages "
@@ -421,11 +425,11 @@ usage(int hval)
            "non-v numerically\n"
            "    --enum_vendor|-E    enumerate known specific vendor pages "
            "only\n"
-           "    --filter=FI|-f FI    FI is parameter code to display (def: "
-           "all); with\n"
-           "                         '-e' then FI>=0 enumerate that pdt + "
-           "spc\n"
-           "                         FI=-1 all (default), FI=-2 spc only\n"
+           "    --filter=FL|-f FL    FL is parameter code to display (def: "
+           "all);\n"
+           "                         with '-e' then FL>=0 enumerate that "
+           "pdt + spc\n"
+           "                         FL=-1 all (default), FL=-2 spc only\n"
            "    --help|-h       print usage message then exit. Use twice "
            "for more help\n"
            "    --hex|-H        output response in hex (default: decode if "
@@ -495,7 +499,7 @@ usage(int hval)
 static void
 usage_old()
 {
-    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-e] [-E] [-f=FI] [-h] "
+    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-e] [-E] [-f=FL] [-h] "
            "[-H]\n"
            "               [-i=FN] [-l] [-L] [-m=LEN] [-n] [-p=PG] "
            "[-paramp=PP]\n"
@@ -511,7 +515,7 @@ usage_old()
            "                  2: default threshhold, 3: default cumulative\n"
            "    -e     enumerate known log pages\n"
            "    -E     enumerate known vendor specific log pages only\n"
-           "    -f=FI    filter match parameter code or pdt\n"
+           "    -f=FL    filter match parameter code or pdt\n"
            "    -h     output in hex (default: decode if known)\n"
            "    -H     output in hex (same as '-h')\n"
            "    -i=FN    FN is a filename containing a log page "
@@ -587,6 +591,12 @@ enumerate_helper(const struct log_elem * lep, int pos,
         ;           /* otherwise enumerate all lpages if no --filter= */
     else if (-2 == op->filter) {   /* skip non-SPC pages */
         if (lep->pdt >= 0)
+            return;
+    } else if (-10 == op->filter) {   /* skip non-disk like pages */
+        if (sg_lib_pdt_decay(lep->pdt) != 0)
+            return;
+    } else if (-11 == op->filter) {   /* skip tape like device pages */
+        if (sg_lib_pdt_decay(lep->pdt) != 1)
             return;
     } else if ((op->filter >= 0) && (op->filter <= 0x1f)) {
         if ((lep->pdt >= 0) && (lep->pdt != op->filter) &&
@@ -2102,7 +2112,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* Tape capacity: vendor specific (IBM): 0x31 */
+/* Tape capacity: vendor specific (LTO-5 and LTO-6 ?): 0x31 */
 static bool
 show_tape_capacity_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -2119,7 +2129,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         return false;
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
-        printf("Tape capacity page  (IBM specific) [0x31]\n");
+        printf("Tape capacity page  (LTO-5 and LTO-6 specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, ucp += extra) {
         pc = sg_get_unaligned_be16(ucp + 0);
         pcb = ucp[2];
@@ -2169,7 +2179,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
     return true;
 }
 
-/* Data compression: originally vendor specific 0x32 (IBM), then
+/* Data compression: originally vendor specific 0x32 (LTO-5), then
  * ssc-4 standardizes it at 0x1b */
 static bool
 show_data_compression_page(const uint8_t * resp, int len,
@@ -2191,7 +2201,7 @@ show_data_compression_page(const uint8_t * resp, int len,
         if (0x1b == pg_code)
             printf("Data compression page  (ssc-4) [0x1b]\n");
         else
-            printf("Data compression page  (IBM specific) [0x%x]\n",
+            printf("Data compression page  (LTO-5 specific) [0x%x]\n",
                    pg_code);
     }
     for (k = num; k > 0; k -= extra, ucp += extra) {
