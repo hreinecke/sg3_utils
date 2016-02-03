@@ -1,10 +1,10 @@
-.TH SG_LOGS "8" "January 2016" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_LOGS "8" "February 2016" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
-[\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
-[\fI\-\-enumerate\fR] [\fI\-\-enum_vendor\fR] [\fI\-\-filter=FI\fR]
+[\fI\-\-All\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
+[\fI\-\-enumerate\fR] [\fI\-\-enum_vendor\fR] [\fI\-\-filter=FL\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR] [\fI\-\-list\fR]
 [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR]
 [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-raw\fR]
@@ -14,7 +14,7 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 .PP
 .B sg_logs
 [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-e\fR] [\fI\-E\fR]
-[\fI\-f=FI\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
+[\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
 [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
 [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
 [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
@@ -37,6 +37,14 @@ first in the synopsis and explained in this section. A later section on the
 old command line syntax outlines the second group of options.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-A\fR, \fB\-\-All\fR
+fetch and decode all the log pages and subpages supported by the \fIDEVICE\fR.
+This requires a two stage process: first the "supported log pages and
+subpages" log page is fetched, then for each entry in the response, the
+corresponding log page (or subpage) is fetched and displayed. Note that there
+are many SCSI devices that do not support LOG SENSE subpages and respond
+to this option with an illegal request sense key.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
 outputs all the log pages supported by the \fIDEVICE\fR. This requires a two
@@ -72,18 +80,18 @@ When given three times, all known pages are listed, sorted in ascending
 numeric order listed; when given four times, vendor pages are excluded from
 the numeric order.
 .br
-The \fI\-\-filter=FI\fR and \fI\-\-verbose\fR options modify the output
+The \fI\-\-filter=FL\fR and \fI\-\-verbose\fR options modify the output
 of the enumeration.
 .TP
 \fB\-E\fR, \fB\-\-enum_vendor\fR
 this option is used to output information held in internal tables about
 known vendor specific log pages including their names and acronyms.
 .TP
-\fB\-f\fR, \fB\-\-filter\fR=\fIFI\fR
-\fIFI\fR is either a parameter code when \fIDEVICE\fR is given, or a
+\fB\-f\fR, \fB\-\-filter\fR=\fIFL\fR
+\fIFL\fR is either a parameter code when \fIDEVICE\fR is given, or a
 peripheral device type (pdt) (or other) if \fI\-\-enumerate\fR is given.
 .br
-In the parameter code case \fIFI\fR is a value between 0 and 65535 (0xffff)
+In the parameter code case \fIFL\fR is a value between 0 and 65535 (0xffff)
 and only the parameter section matching that code is output.
 The \fB\-\-hex\fR option outputs log parameter in hexadecimal rather than
 decoding it. If the \fB\-\-hex\fR option is used twice then the leading
@@ -92,11 +100,14 @@ given then the log parameter is output in binary.
 Most log pages contain one or more log parameters. Examples of those that
 don't are those pages that list supported log pages.
 .br
-In the \fI\-\-enumerate\fR case, when \fIFI\fR >= zero it is taken as a
+In the \fI\-\-enumerate\fR case, when \fIFL\fR >= zero it is taken as a
 pdt value and only log pages associated with that pdt plus generic pages
-listed in SPC are enumerated. If \fIFI\fR is \-1 then the filter does
-nothing which is the same as not giving this option; when \fIFI\fR is \-2
-then only generic pages listed in SPC are enumerated.
+listed in SPC are enumerated. If \fIFL\fR is \-1 then the filter does
+nothing which is the same as not giving this option; when \fIFL\fR is \-2
+then only generic pages listed in SPC are enumerated. If \fIFL\fR is \-10
+then only generic direct access like (e.g. disk) pages are enumerated. If
+\fIFL\fR is \-11 then only generic tape like pages (e.g. includes ADC)
+are enumerated.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -119,7 +130,7 @@ The other context is with no \fIDEVICE\fR argument given in which case
 the contents of \fIFN\fR are decoded as if it were the response of a LOG
 SENSE command (i.e. a log page). For decoding the page and subpage numbers
 are taken from \fIFN\fR while the device type is either generic (i.e. from
-SPC) or the value given by \fI\-\-filter=FI\fR.
+SPC) or the value given by \fI\-\-filter=FL\fR.
 .br
 \fIFN\fR is treated as a file name (or '\-' for stdin) which contains ASCII
 hexadecimal or binary representing a log page. The hexadecimal should be

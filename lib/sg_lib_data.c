@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.17 20160103";  /* spc5r07, sbc4r09 */
+const char * sg_lib_version_str = "2.17 20160202";  /* spc5r08, sbc4r10 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -257,6 +257,15 @@ struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
     {0x1a, 0, "enable expander comms protocol and echo buffer"},
     {0x1b, 0, "disable expander comms protocol"},
     {0x1c, 0, "download application client error history"},
+    {0xffff, 0, NULL},
+};
+
+/* Read position (SSC) [0x34] service actions, need prefix */
+struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
+    {0x0, PDT_TAPE, "short form - block id"},
+    {0x1, PDT_TAPE, "short form - vendor specific"},
+    {0x6, PDT_TAPE, "long form"},
+    {0x8, PDT_TAPE, "extended form"},
     {0xffff, 0, NULL},
 };
 

@@ -1763,36 +1763,40 @@ sg_get_command_name(const unsigned char * cmdp, int peri_type, int buff_len,
 
 struct op_code2sa_t {
     int op_code;
+    int pdt_match;      /* -1->all; 0->disk,ZBC,RCB, 1->tape+adc+smc */
     struct sg_lib_value_name_t * arr;
     const char * prefix;
 };
 
 static struct op_code2sa_t op_code2sa_arr[] = {
-    {SG_VARIABLE_LENGTH_CMD, sg_lib_variable_length_arr, NULL},
-    {SG_MAINTENANCE_IN, sg_lib_maint_in_arr, NULL},
-    {SG_MAINTENANCE_OUT, sg_lib_maint_out_arr, NULL},
-    {SG_SERVICE_ACTION_IN_12, sg_lib_serv_in12_arr, NULL},
-    {SG_SERVICE_ACTION_OUT_12, sg_lib_serv_out12_arr, NULL},
-    {SG_SERVICE_ACTION_IN_16, sg_lib_serv_in16_arr, NULL},
-    {SG_SERVICE_ACTION_OUT_16, sg_lib_serv_out16_arr, NULL},
-    {SG_SERVICE_ACTION_BIDI, sg_lib_serv_bidi_arr, NULL},
-    {SG_PERSISTENT_RESERVE_IN, sg_lib_pr_in_arr, "Persistent reserve in"},
-    {SG_PERSISTENT_RESERVE_OUT, sg_lib_pr_out_arr, "Persistent reserve out"},
-    {SG_3PARTY_COPY_OUT, sg_lib_xcopy_sa_arr, NULL},
-    {SG_3PARTY_COPY_IN, sg_lib_rec_copy_sa_arr, NULL},
-    {SG_READ_BUFFER, sg_lib_read_buff_arr, "Read buffer"},
-    {SG_READ_ATTRIBUTE, sg_lib_read_attr_arr, "Read attribute"},
-    {SG_SANITIZE, sg_lib_sanitize_sa_arr, "Sanitize"},
-    {SG_WRITE_BUFFER, sg_lib_write_buff_arr, "Write buffer"},
-    {SG_ZONING_IN, sg_lib_zoning_in_arr, NULL},
-    {SG_ZONING_OUT, sg_lib_zoning_out_arr, NULL},
-    {0xffff, NULL, NULL},
+    {SG_VARIABLE_LENGTH_CMD, -1, sg_lib_variable_length_arr, NULL},
+    {SG_MAINTENANCE_IN, -1, sg_lib_maint_in_arr, NULL},
+    {SG_MAINTENANCE_OUT, -1, sg_lib_maint_out_arr, NULL},
+    {SG_SERVICE_ACTION_IN_12, -1, sg_lib_serv_in12_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_12, -1, sg_lib_serv_out12_arr, NULL},
+    {SG_SERVICE_ACTION_IN_16, -1, sg_lib_serv_in16_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_16, -1, sg_lib_serv_out16_arr, NULL},
+    {SG_SERVICE_ACTION_BIDI, -1, sg_lib_serv_bidi_arr, NULL},
+    {SG_PERSISTENT_RESERVE_IN, -1, sg_lib_pr_in_arr, "Persistent reserve in"},
+    {SG_PERSISTENT_RESERVE_OUT, -1, sg_lib_pr_out_arr,
+     "Persistent reserve out"},
+    {SG_3PARTY_COPY_OUT, -1, sg_lib_xcopy_sa_arr, NULL},
+    {SG_3PARTY_COPY_IN, -1, sg_lib_rec_copy_sa_arr, NULL},
+    {SG_READ_BUFFER, -1, sg_lib_read_buff_arr, "Read buffer"},
+    {SG_READ_ATTRIBUTE, -1, sg_lib_read_attr_arr, "Read attribute"},
+    {SG_READ_POSITION, 1, sg_lib_read_pos_arr, "Read position"},
+    {SG_SANITIZE, 0, sg_lib_sanitize_sa_arr, "Sanitize"},
+    {SG_WRITE_BUFFER, -1, sg_lib_write_buff_arr, "Write buffer"},
+    {SG_ZONING_IN, 0, sg_lib_zoning_in_arr, NULL},
+    {SG_ZONING_OUT, 0, sg_lib_zoning_out_arr, NULL},
+    {0xffff, -1, NULL, NULL},
 };
 
 void
 sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
                       int peri_type, int buff_len, char * buff)
 {
+    int d_pdt;
     const struct sg_lib_value_name_t * vnp;
     const struct op_code2sa_t * osp;
     char b[80];
@@ -1804,24 +1808,27 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         return;
     }
 
+    d_pdt = sg_lib_pdt_decay(peri_type);
     for (osp = op_code2sa_arr; osp->arr; ++osp) {
         if ((int)cmd_byte0 == osp->op_code) {
-            vnp = get_value_name(osp->arr, service_action, peri_type);
-            if (vnp) {
-                if (osp->prefix)
-                    my_snprintf(buff, buff_len, "%s, %s", osp->prefix,
-                                vnp->name);
-                else
-                    my_snprintf(buff, buff_len, "%s", vnp->name);
-            } else {
-                sg_get_opcode_name(cmd_byte0, peri_type, sizeof(b), b);
-                my_snprintf(buff, buff_len, "%s service action=0x%x",
-                            b, service_action);
-            }
+            if ((osp->pdt_match < 0) || (d_pdt == osp->pdt_match)) {
+                vnp = get_value_name(osp->arr, service_action, peri_type);
+                if (vnp) {
+                    if (osp->prefix)
+                        my_snprintf(buff, buff_len, "%s, %s", osp->prefix,
+                                    vnp->name);
+                    else
+                        my_snprintf(buff, buff_len, "%s", vnp->name);
+                } else {
+                    sg_get_opcode_name(cmd_byte0, peri_type, sizeof(b), b);
+                    my_snprintf(buff, buff_len, "%s service action=0x%x",
+                                b, service_action);
+                }
+            } else
+                sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
             return;
         }
     }
-
     sg_get_opcode_name(cmd_byte0, peri_type, buff_len, buff);
 }
 

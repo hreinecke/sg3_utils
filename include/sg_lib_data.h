@@ -33,6 +33,7 @@ extern "C" {
 #define SG_PERSISTENT_RESERVE_OUT 0x5f
 #define SG_READ_ATTRIBUTE 0x8c
 #define SG_READ_BUFFER 0x3c
+#define SG_READ_POSITION 0x34   /* SSC command with service actions */
 #define SG_SANITIZE 0x48
 #define SG_SERVICE_ACTION_BIDI 0x9d
 #define SG_SERVICE_ACTION_IN_12 0xab
@@ -87,6 +88,7 @@ extern struct sg_lib_value_name_t sg_lib_variable_length_arr[];
 extern struct sg_lib_value_name_t sg_lib_zoning_out_arr[];
 extern struct sg_lib_value_name_t sg_lib_zoning_in_arr[];
 extern struct sg_lib_value_name_t sg_lib_read_attr_arr[];
+extern struct sg_lib_value_name_t sg_lib_read_pos_arr[];
 extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
 extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
 extern const char * sg_lib_sense_key_desc[];
