@@ -3,8 +3,9 @@
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
-[\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR]
+[\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fIOTHER_OPTIONS\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -373,6 +374,32 @@ response in ASCII hexadecimal. To produce hexadecimal that can be parsed
 by other utilities (e.g. without a relative address to the left and without
 trailing ASCII) use this option three or four times.
 .TP
+\fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
+many SCSI commands fetch a significant amount of data (returned in the
+data\-in buffer) which several of these utilities decode (e.g. sg_vpd and
+sg_logs). To separate the two steps of fetching the data from a SCSI device
+and then decoding it, this option has been added. The first step (fetching
+the data) can be done using the \fI\-\-hex\fR or \fI\-\-raw\fR option and
+redirecting the command line output to a file (often done with ">" in Unix
+based operating systems). The difference between \fI\-\-hex\fR and
+\fI\-\-raw\fR is that the former produces output in ASCII hexadecimal
+while \fI\-\-raw\fR produces its output in "raw" binary.
+.br
+The second step (i.e. decoding the SCSI response data now held in a file)
+can be done using this \fI\-\-in=FN\fR option where the file name is
+\fIFN\fR. If "\-" is used for \fIFN\fR then stdin is assumed, again this
+allows for command line redirection (or piping). That file (or stdin)
+is assumed to contain ASCII hexadecimal unless the \fI\-\-raw\fR option is
+also given in which case it is assumed to be binary. Notice that the meaning
+of the \fI\-\-raw\fR option is "flipped" when used with \fI\-\-in=FN\fR to
+act on the input, typically it acts on the output data.
+.br
+Since the structure of the data returned by SCSI commands varies
+considerably then the usage information or manpage of the utility being
+used should be checked. In some cases \fI\-\-hex\fR may need to be used
+multiple times (and is more conveniently given as '\-HH' or '\-HHH). In
+other cases the name of this option is \fI\-\-inhex=FN\fR.
+.TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
 lengths that vary depending on many factors, only some of which these
@@ -393,8 +420,10 @@ usually sent to stderr so as to not interfere with the output from this
 option.
 .br
 Some utilities that consume data to send to the \fIDEVICE\fR along with the
-SCSI command, use this option. This option may indicate that binary data
-can be read from stdin or a nominated file.
+SCSI command, use this option. Alernatively the \fI\-\-in=FN\fR option causes
+\fIDEVICE\fR to be ignored and the response data (to be decoded) fetched
+from a file named \fIFN\fR. In these cases this option may indicate that
+binary data can be read from stdin or from a nominated file (e.g. \fIFN\fR).
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Can be used multiple

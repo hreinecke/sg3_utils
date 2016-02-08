@@ -34,7 +34,7 @@ libsgutils2_la_SOURCES += sg_pt_osf1.c
 endif
 
 # For C++/clang testing
-## CC = g++
+## CC = gcc
 ## CC = g++
 ## CC = clang
 ## CC = clang++

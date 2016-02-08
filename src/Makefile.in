@@ -93,12 +93,12 @@ bin_PROGRAMS = sg_compare_and_write$(EXEEXT) sg_decode_sense$(EXEEXT) \
 	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) sg_inq$(EXEEXT) \
 	sg_logs$(EXEEXT) sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
 	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) sg_prevent$(EXEEXT) \
-	sg_raw$(EXEEXT) sg_rdac$(EXEEXT) sg_read_block_limits$(EXEEXT) \
-	sg_read_buffer$(EXEEXT) sg_read_long$(EXEEXT) \
-	sg_readcap$(EXEEXT) sg_reassign$(EXEEXT) sg_referrals$(EXEEXT) \
-	sg_rep_zones$(EXEEXT) sg_requests$(EXEEXT) \
-	sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) sg_rtpg$(EXEEXT) \
-	sg_safte$(EXEEXT) sg_sanitize$(EXEEXT) \
+	sg_raw$(EXEEXT) sg_rdac$(EXEEXT) sg_read_attr$(EXEEXT) \
+	sg_read_block_limits$(EXEEXT) sg_read_buffer$(EXEEXT) \
+	sg_read_long$(EXEEXT) sg_readcap$(EXEEXT) sg_reassign$(EXEEXT) \
+	sg_referrals$(EXEEXT) sg_rep_zones$(EXEEXT) \
+	sg_requests$(EXEEXT) sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) \
+	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) sg_sanitize$(EXEEXT) \
 	sg_sat_identify$(EXEEXT) sg_sat_phy_event$(EXEEXT) \
 	sg_sat_read_gplog$(EXEEXT) sg_sat_set_features$(EXEEXT) \
 	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) sg_ses_microcode$(EXEEXT) \
@@ -209,6 +209,9 @@ sg_rdac_DEPENDENCIES = ../lib/libsgutils2.la
 sg_read_SOURCES = sg_read.c
 sg_read_OBJECTS = sg_read.$(OBJEXT)
 sg_read_DEPENDENCIES = ../lib/libsgutils2.la
+sg_read_attr_SOURCES = sg_read_attr.c
+sg_read_attr_OBJECTS = sg_read_attr.$(OBJEXT)
+sg_read_attr_DEPENDENCIES = ../lib/libsgutils2.la
 sg_read_block_limits_SOURCES = sg_read_block_limits.c
 sg_read_block_limits_OBJECTS = sg_read_block_limits.$(OBJEXT)
 sg_read_block_limits_DEPENDENCIES = ../lib/libsgutils2.la
@@ -376,14 +379,14 @@ SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_get_config.c sg_get_lba_status.c sg_ident.c \
 	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
 	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
-	sg_rbuf.c sg_rdac.c sg_read.c sg_read_block_limits.c \
-	sg_read_buffer.c sg_read_long.c sg_readcap.c sg_reassign.c \
-	sg_referrals.c sg_rep_zones.c sg_requests.c sg_reset.c \
-	sg_reset_wp.c sg_rmsn.c sg_rtpg.c sg_safte.c sg_sanitize.c \
-	sg_sat_identify.c sg_sat_phy_event.c sg_sat_read_gplog.c \
-	sg_sat_set_features.c $(sg_scan_SOURCES) sg_senddiag.c \
-	sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c sg_sync.c \
-	sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
+	sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
+	sg_read_block_limits.c sg_read_buffer.c sg_read_long.c \
+	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_zones.c \
+	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
+	sg_safte.c sg_sanitize.c sg_sat_identify.c sg_sat_phy_event.c \
+	sg_sat_read_gplog.c sg_sat_set_features.c $(sg_scan_SOURCES) \
+	sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c \
+	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
 	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
 	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
@@ -392,14 +395,15 @@ DIST_SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_get_config.c sg_get_lba_status.c sg_ident.c \
 	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
 	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
-	sg_rbuf.c sg_rdac.c sg_read.c sg_read_block_limits.c \
-	sg_read_buffer.c sg_read_long.c sg_readcap.c sg_reassign.c \
-	sg_referrals.c sg_rep_zones.c sg_requests.c sg_reset.c \
-	sg_reset_wp.c sg_rmsn.c sg_rtpg.c sg_safte.c sg_sanitize.c \
-	sg_sat_identify.c sg_sat_phy_event.c sg_sat_read_gplog.c \
-	sg_sat_set_features.c $(am__sg_scan_SOURCES_DIST) \
-	sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c \
-	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
+	sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
+	sg_read_block_limits.c sg_read_buffer.c sg_read_long.c \
+	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_zones.c \
+	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
+	sg_safte.c sg_sanitize.c sg_sat_identify.c sg_sat_phy_event.c \
+	sg_sat_read_gplog.c sg_sat_set_features.c \
+	$(am__sg_scan_SOURCES_DIST) sg_senddiag.c sg_ses.c \
+	sg_ses_microcode.c sg_start.c sg_stpg.c sg_sync.c \
+	sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
 	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
 	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
@@ -583,6 +587,7 @@ sg_raw_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_rbuf_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_rdac_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_read_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_read_attr_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_readcap_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_read_block_limits_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_read_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
@@ -795,6 +800,10 @@ sg_read$(EXEEXT): $(sg_read_OBJECTS) $(sg_read_DEPENDENCIES) $(EXTRA_sg_read_DEP
 	@rm -f sg_read$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_read_OBJECTS) $(sg_read_LDADD) $(LIBS)
 
+sg_read_attr$(EXEEXT): $(sg_read_attr_OBJECTS) $(sg_read_attr_DEPENDENCIES) $(EXTRA_sg_read_attr_DEPENDENCIES) 
+	@rm -f sg_read_attr$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_read_attr_OBJECTS) $(sg_read_attr_LDADD) $(LIBS)
+
 sg_read_block_limits$(EXEEXT): $(sg_read_block_limits_OBJECTS) $(sg_read_block_limits_DEPENDENCIES) $(EXTRA_sg_read_block_limits_DEPENDENCIES) 
 	@rm -f sg_read_block_limits$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_read_block_limits_OBJECTS) $(sg_read_block_limits_LDADD) $(LIBS)
@@ -988,6 +997,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rbuf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rdac.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_read.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_read_attr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_read_block_limits.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_read_buffer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_read_long.Po@am__quote@

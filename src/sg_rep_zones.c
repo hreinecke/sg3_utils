@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 Douglas Gilbert.
+ * Copyright (c) 2014-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.07 20151219";
+static const char * version_str = "1.08 20160203";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -116,7 +116,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int partial, int report_opts,
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        pr2serr("Report zones: out of memory\n");
+        pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, rzCmdBlk, sizeof(rzCmdBlk));
@@ -329,8 +329,7 @@ main(int argc, char * argv[])
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
-                pr2serr("Unexpected extra argument: %s\n",
-                        argv[optind]);
+                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
