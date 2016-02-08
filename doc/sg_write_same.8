@@ -31,7 +31,7 @@ or the \fI\-\-unmap\fR option is given then WRITE SAME(16) is sent.
 The \fI\-\-10\fR, \fI\-\-16\fR and \fI\-\-32\fR options are mutually
 exclusive.
 .PP
-SBC\-3 revision 35d introduced a "no data-out buffer" (NDOB) bit which, if
+SBC\-3 revision 35d introduced a "no data\-out buffer" (NDOB) bit which, if
 set, bypasses the requirement to send a single block of data to the
 \fIDEVICE\fR together with the command. Only WRITE SAME (16 and 32 byte)
 support the NDOB bit. If given, a user block of zeros is assumed; if
