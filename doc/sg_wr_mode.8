@@ -1,11 +1,11 @@
-.TH SG_WR_MODE "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_WR_MODE "8" "February 2016" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
 sg_wr_mode \- write (modify) SCSI mode page
 .SH SYNOPSIS
 .B sg_wr_mode
 [\fI\-\-contents=H,H...\fR] [\fI\-\-dbd\fR] [\fI\-\-force\fR]
 [\fI\-\-help\fR] [\fI\-\-len=\fR10|6\fR] [\fI\-\-mask=M,M...\fR]
-[\fI\-\-page=PG[,SPG]\fR] [\fI\-\-save\fR] [\fI\-\-verbose\fR]
+[\fI\-\-page=PG_H[,SPG_H]\fR] [\fI\-\-save\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -99,17 +99,17 @@ bytes are taken from the contents string. If the contents string is shorter
 than the existing mode page then the remaining bytes are taken from the
 existing mode page (i.e. they are left unaltered).
 .TP
-\fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
-where \fIPG\fR is the page code value to fetch and modify. The page code is
-in hex and should be between 0 and 3e inclusive. Notice that page code
+\fB\-p\fR, \fB\-\-page\fR=\fIPG_H\fR
+where \fIPG_H\fR is the page code value to fetch and modify. The page code
+is in hex and should be between 0 and 3e inclusive. Notice that page code
 3f to fetch all mode pages is disallowed.
 .TP
-\fB\-p\fR, \fB\-\-page\fR=\fIPG,SPG\fR
-where \fIPG\fR is the page code value and \fISPG\fR is the subpage code value
-to fetch and modify. Both values are in hex. The subpage code should be
-between 0 and fe inclusive. Notice that subpage code ff to fetch all mode
-subpages (for a given mode page or all mode pages in the case of 3f,ff) is
-disallowed.
+\fB\-p\fR, \fB\-\-page\fR=\fIPG_H,SPG_H\fR
+where \fIPG_H\fR is the page code value and \fISPG_H\fR is the subpage code
+value to fetch and modify. Both values are in hex. The subpage code should
+be between 0 and fe inclusive. Notice that subpage code ff to fetch all
+mode subpages (for a given mode page or all mode pages in the case of 3f,ff)
+is disallowed.
 .TP
 \fB\-s\fR, \fB\-\-save\fR
 changes the "saved" mode page when MODE SELECT is successful. By
@@ -190,7 +190,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
