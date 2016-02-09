@@ -22,7 +22,8 @@ INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
                     sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
                     sg_persist, sg_scan, sg_ses, sg_vpd ++
 FINISH ZONE         sg_zone
-FORMAT UNIT         sg_format, ++
+FORMAT MEDIUM       sg_format, ++ [SSC]
+FORMAT UNIT         sg_format, ++ [SBC]
 LOG SELECT          sg_logs('-r' or '-select'), ++
 LOG SENSE           sg_logs, ++
 MODE SELECT(6)      sdparm, sg_wr_mode, sginfo, sg_format,
@@ -132,4 +133,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-3rd February 2016
+8th February 2016

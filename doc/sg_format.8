@@ -1,6 +1,6 @@
-.TH SG_FORMAT "8" "January 2016" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_FORMAT "8" "February 2016" "sg3_utils\-1.42" SG3_UTILS
 .SH NAME
-sg_format \- format, resize or modify protection information of a SCSI disk
+sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
@@ -8,8 +8,9 @@ sg_format \- format, resize or modify protection information of a SCSI disk
 [\fI\-\-format\fR] [\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR]
 [\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR]
 [\fI\-\-poll=PT\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
-[\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-wait\fR] \fIDEVICE\fR
+[\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR] [\fI\-\-tape=FM\fR]
+[\fI\-\-verbose\fR] [\fI\-\-verify\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -32,12 +33,12 @@ www.t10.org) has obsoleted the "format device" mode page. Many of the low
 level details found in that mode page are now left up to the discretion of
 the manufacturer.
 .PP
-When this utility is used without options (i.e. it is only given a DEVICE
-argument) it prints out the existing block size and block count derived from
-two sources. These two sources are a block descriptor in the response to a
-MODE SENSE command and the response to a READ CAPACITY command. The reason
-for this double check is to detect a "format corrupt" state (see NOTES
-section). This usage will not modify the disk.
+When this utility is used without options (i.e. it is only given a
+\fIDEVICE\fR argument) it prints out the existing block size and block count
+derived from two sources. These two sources are a block descriptor in the
+response to a MODE SENSE command and the response to a READ CAPACITY command.
+The reason for this double check is to detect a "format corrupt" state (see
+the NOTES section). This usage will not modify the disk.
 .PP
 When this utility is used with the "\-\-format" (or "\-F") option it will
 attempt to format the given DEVICE. There is a 15 second pause during which
@@ -49,6 +50,11 @@ Protection information is optional and is made up of one or more protection
 intervals, each made up of 8 bytes associated with each logical block. Four
 protection types are defined with protection type 0 being no protection
 intervals. See the PROTECTION INFORMATION section below for more information.
+.PP
+When the \fI\-\-tape=FM\fR option is given then the SCSI FORMAT MEDIUM
+command is sent to the \fIDEVICE\fR. FORMAT MEDIUM is defined in SSC and
+prepares a volume for use which may include partitioning the medium. See
+the section below on TAPE for more information.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -254,9 +260,19 @@ sectors).  If the given size in unacceptable with the disk, most likely
 an "Invalid field in parameter list" message will appear in sense
 data (requires the use of '\-v' to decode sense data).
 .TP
+\fB\-T\fR, \fB\-\-tape\fR=\fIFM\fR
+will send a FORMAT MEDIUM command to the \fIDEVICE\fR with the FORMAT field
+set to \fIFM\fR. This option is used to prepare a tape (i.e. the "medium")
+in a tape drive for use. Values for \fIFM\fR include 0 to do the "default"
+format; 1 to partition a volume and 2 to do a default format then partition.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). "\-vvv" gives
 a lot more debug output.
+.TP
+\fB\-y\fR, \fB\-\-verify\fR
+set the VERIFY bit in the FORMAT MEDIUM cdb. The default is that the VERIFY
+bit is clear. This option is only appropriate for tapes.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
@@ -428,6 +444,37 @@ provisioned formats typically complete faster than fully provisioned ones
 on the same disk (see the \fI\-\-ip_def\fR option). In either case format
 operations on SSDs tend to be a lot faster than they are on hard disks with
 spinning media.
+.SH TAPE
+Tape system use a variant of the FORMAT UNIT command used on disks. Tape
+systems use the FORMAT MEDIUM command which is simpler with only three
+fields in the cdb typically used. Apart from sharing the same opcode the
+cdbs of FORMAT UNIT and FORMAT MEDIUM are quite different. FORMAT MEDIUM's
+fields are VERIFY, IMMED and FORMAT (with TRANSFER LENGTH always set to 0).
+The VERIFY bit field is set with the \fI\-\-verify\fR option. The IMMED bit
+is manipulated by the \fI\-\-wait\fR option in the same way it is for disks;
+one difference is that if the \fI\-\-poll=PT\fR option is not given then it
+defaults to \fIPT\fR of 1 which means the poll is done with REQUEST SENSE
+commands.
+.PP
+The argument given to the \fI\-\-tape=FM\fR option is used to set the FORMAT
+field. \fIFM\fR can take values from "\-1" to "15" where "\-1" (the default)
+means don't do a tape format; value "8" to "15" are for vendor specific
+formats. The \fI\-\-early\fR option may also be used to set the IMMED
+bit and then exit this utility (rather than poll periodically until it is
+finished). In this case the tape drive will still be busy doing the format
+for some time but, according to T10, should still respond in full to the
+INQUIRY and REPORT LUNS commands. Other commands (including REQUEST SENSE)
+should yield a "not ready" sense key with an additional sense code
+of "Logical unit not ready, format in progress". Additionally REQUEST SENSE
+should contain a progress indication in its sense data.
+.PP
+When \fIFM\fR is 1 or 2 then the settings in the Medium partition mode page
+control the partitioning. That mode page can be viewed and modified with the
+sdparm utility.
+.PP
+Prior to invoking this utility the tape may need to be positioned to the
+beginning of partition 0. In Linux that can typically be done with the mt
+utility (e.g. 'mt -f /dev/st0 rewind').
 .SH EXAMPLES
 These examples use Linux device names. For suitable device names in
 other supported Operating Systems see the sg3_utils(8) man page.
@@ -521,4 +568,4 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .B sg_turs(8), sg_requests(8), sg_inq(8), sg_modes(8), sg_vpd(8),
 .B sg_reassign(8), sg_readcap(8), sg3_utils(8),
 .B sg_sanitize(8) [all in sg3_utils],
-.B sdparm(8), scsiformat (old), hdparm(8)
+.B mt(mt-st), sdparm(8), scsiformat (old), hdparm(8)

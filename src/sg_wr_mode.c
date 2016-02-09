@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.15 20151220";
+static const char * version_str = "1.16 20160208";
 
 #define ME "sg_wr_mode: "
 
@@ -56,8 +56,8 @@ static void usage()
     pr2serr("Usage: sg_wr_mode [--contents=H,H...] [--dbd] [--force] "
             "[--help]\n"
             "                  [--len=10|6] [--mask=M,M...] "
-            "[--page=PG[,SPG]] [--save]\n"
-            "                  [--verbose] [--version] DEVICE\n"
+            "[--page=PG_H[,SPG_H]]\n"
+            "                  [--save] [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --contents=H,H... | -c H,H...    comma separated string "
             "of hex numbers\n"
@@ -76,10 +76,10 @@ static void usage()
             "string of hex\n"
             "                                numbers that mask contents"
             " to write\n"
-            "    --page=PG | -p PG     page_code to be written (in hex)\n"
-            "    --page=PG,SPG | -p PG,SPG    page and subpage code to "
-            "be\n"
-            "                                 written (in hex)\n"
+            "    --page=PG_H | -p PG_H     page_code to be written (in hex)\n"
+            "    --page=PG_H,SPG_H | -p PG_H,SPG_H    page and subpage code "
+            "to be\n"
+            "                                         written (in hex)\n"
             "    --save | -s           set 'save page' (SP) bit; default "
             "don't so\n"
             "                          only 'current' values changed\n"
@@ -374,20 +374,22 @@ int main(int argc, char * argv[])
            if (NULL == strchr(optarg, ',')) {
                 num = sscanf(optarg, "%x", &u);
                 if ((1 != num) || (u > 62)) {
-                    pr2serr("Bad page code value after '--page' switch\n");
+                    pr2serr("Bad hex page code value after '--page' "
+                            "switch\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 pg_code = u;
             } else if (2 == sscanf(optarg, "%x,%x", &u, &uu)) {
                 if (uu > 254) {
-                    pr2serr("Bad sub page code value after '--page' switch\n");
+                    pr2serr("Bad hex sub page code value after '--page' "
+                            "switch\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 pg_code = u;
                 sub_pg_code = uu;
             } else {
-                pr2serr("Bad page code, subpage code sequence after '--page' "
-                        "switch\n");
+                pr2serr("Bad hex page code, subpage code sequence after "
+                        "'--page' switch\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

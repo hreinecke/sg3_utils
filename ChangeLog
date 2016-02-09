@@ -2,12 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.42 [20160207] [svn: r660]
+Changelog for sg3_utils-1.42 [20160209] [svn: r661]
   - sg_timestamp: new, to report or set timestamp
   - sg_read_attr: new, supported by tape drives
   - sg_stpg: fix truncation of target port field
   - sg_inq: cope with unicode strings, udev fixes
     - update version descriptor list to 20160125
+    - '--export': new entries for UUID descriptor
   - sg_ses: add more field acronyms (ses3r11)
   - sg_logs: add Utilization lpage (sbc4r07)
     - add Background operation lpage
@@ -25,6 +26,7 @@ Changelog for sg3_utils-1.42 [20160207] [svn: r660]
   - sg_sanitize: add --znr option (sbc4r07)
   - sg_rep_zones: add --partial option (zbc-r04)
   - sg_format: add ffmt option (sbc4r10)
+    - add support for FORMAT MEDIUM (for tape)
   - sg_raw: document length relationships
   - rescan-scsi-bus.sh: updates from Suse
   - sg_lib_data: sync asc/ascq codes with T10 20151126

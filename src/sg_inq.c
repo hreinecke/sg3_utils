@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.56 20160201";    /* SPC-5 rev 08 */
+static const char * version_str = "1.57 20160208";    /* SPC-5 rev 08 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2072,6 +2072,31 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 pr2serr("      << Protocol specific port identifier "
                         "protocol_id=0x%x>>\n", p_id);
             }
+            break;
+        case 0xa: /* UUID based */
+            if (1 != c_set) {
+                if (verbose) {
+                    pr2serr("      << expected binary code_set (1)>>\n");
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
+                break;
+            }
+            if (i_len < 18) {
+                if (verbose) {
+                    pr2serr("      << short UUID field expected 18 or more, "
+                            "got %d >>\n", i_len);
+                    dStrHexErr((const char *)ip, i_len, 0);
+                }
+                break;
+            }
+            printf("SCSI_IDENT_%s_UUID=", assoc_str);
+            for (m = 2; m < i_len; ++m) {
+                if ((6 == m) || (8 == m) || (10 == m) || (12 == m))
+                    printf("-%02x", (unsigned int)ip[m]);
+                else
+                    printf("%02x", (unsigned int)ip[m]);
+            }
+            printf("\n");
             break;
         default: /* reserved */
             if (verbose) {
