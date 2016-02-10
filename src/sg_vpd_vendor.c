@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2014 Douglas Gilbert.
+ * Copyright (c) 2006-2015 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -136,7 +136,7 @@ static struct svpd_vp_name_t vp_arr[] = {
     {VPD_VP_HP3PAR, "hp3par", "3PAR array (HP was Left Hand)"},
     {VPD_VP_LTO5, "lto5", "LTO-5 tape/systems (IBM)"},
     {VPD_VP_LTO6, "lto6", "LTO-6 tape/systems (IBM)"},
-    {VPD_VP_RDAC, "rdac", "RDAC array (EMC Clariion)"},
+    {VPD_VP_RDAC, "rdac", "RDAC array (NetApp E-Series)"},
     {VPD_VP_SEAGATE, "sea", "Seagate disk"},
     {0, NULL, NULL},
 };
@@ -157,19 +157,19 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
      "configuration data (LTO-5)"},
     {VPD_V_EDID_RDAC, VPD_VP_RDAC, 0, "edid", "Extended device "
      "identification (RDAC)"},
-    {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "feat", "Feature Parameters (RDAC)"},
+    {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "prm4", "Feature Parameters (RDAC)"},
     {VPD_V_FIRM_SEA, VPD_VP_SEAGATE, 0, "firm", "Firmware numbers "
      "(Seagate)"},
     {VPD_V_FVER_LTO6, VPD_VP_LTO6, 0, "frl" , "Firmware revision level "
      "(LTO-6)"},
-    {VPD_V_FVER_RDAC, VPD_VP_RDAC, 0, "fver", "Firmware version (RDAC)"},
+    {VPD_V_FVER_RDAC, VPD_VP_RDAC, 0, "fwr4", "Firmware version (RDAC)"},
     {VPD_V_HEAD_LTO6, VPD_VP_LTO6, 1, "head", "Head Assy revision level "
      "(LTO-6)"},
     {VPD_V_HP3PAR, VPD_VP_HP3PAR, 0, "hp3par", "Volume information "
      "(HP/3PAR)"},
     {VPD_V_HVER_LTO6, VPD_VP_LTO6, 1, "hrl", "Hardware revision level "
      "(LTO-6)"},
-    {VPD_V_HVER_RDAC, VPD_VP_RDAC, 0, "hver", "Hardware version (RDAC)"},
+    {VPD_V_HVER_RDAC, VPD_VP_RDAC, 0, "hwr4", "Hardware version (RDAC)"},
     {VPD_V_JUMP_SEA, VPD_VP_SEAGATE, 0, "jump", "Jump setting (Seagate)"},
     {VPD_V_MECH_LTO6, VPD_VP_LTO6, 1, "mech", "Mechanism revision level "
      "(LTO-6)"},
@@ -180,10 +180,10 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
      "identifier (RDAC)"},
     {VPD_V_SAID_RDAC, VPD_VP_RDAC, 0, "said", "Storage array world wide "
      "name (RDAC)"},
-    {VPD_V_SUBS_RDAC, VPD_VP_RDAC, 0, "sub", "Subsystem identifier (RDAC)"},
-    {VPD_V_SVER_RDAC, VPD_VP_RDAC, 0, "sver", "Software version (RDAC)"},
+    {VPD_V_SUBS_RDAC, VPD_VP_RDAC, 0, "subs", "Subsystem identifier (RDAC)"},
+    {VPD_V_SVER_RDAC, VPD_VP_RDAC, 0, "swr4", "Software version (RDAC)"},
     {VPD_V_UPR_EMC, VPD_VP_EMC, 0, "upr", "Unit path report (EMC)"},
-    {VPD_V_VAC_RDAC, VPD_VP_RDAC, 0, "vac", "Volume access control (RDAC)"},
+    {VPD_V_VAC_RDAC, VPD_VP_RDAC, 0, "vac1", "Volume access control (RDAC)"},
     {0, 0, 0, NULL, NULL},
 };
 
@@ -666,7 +666,7 @@ decode_rdac_vpd_c0(unsigned char * buff, int len)
     memcpy(name, buff + 152, 2);
     printf("  Board Revision: %s\n", name);
     memset(name, 0, 65);
-    memcpy(name, buff + 154, 2);
+    memcpy(name, buff + 154, 4);
     printf("  Board Identifier: %s\n", name);
 
     return;
@@ -687,7 +687,7 @@ decode_rdac_vpd_c1(unsigned char * buff, int len)
                 buff[4], buff[5], buff[6], buff[7]);
         return;
     }
-    printf("  Firmware Version: %x.%x.%x\n", buff[8], buff[9], buff[10]);
+    printf("  Firmware Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
     printf("  Firmware Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
 
     num_part = (len - 12) / 16;
@@ -729,7 +729,7 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
                 buff[4], buff[5], buff[6], buff[7]);
         return;
     }
-    printf("  Software Version: %x.%x.%x\n", buff[8], buff[9], buff[10]);
+    printf("  Software Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
     printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
     printf("  Features:");
     if (buff[14] & 0x01)
@@ -739,9 +739,9 @@ decode_rdac_vpd_c2(unsigned char * buff, int len)
     if (buff[14] & 0x04)
         printf(" Multiple Sub-enclosures,");
     if (buff[14] & 0x08)
-        printf(" DCE/DRM,");
+        printf(" DCE/DRM/DSS/DVE,");
     if (buff[14] & 0x10)
-        printf(" AVT,");
+        printf(" Asymmetric Logical Unit Access,");
     printf("\n");
     printf("  Max. #of LUNS: %d\n", buff[15]);
 
@@ -786,7 +786,8 @@ decode_rdac_vpd_c3(unsigned char * buff, int len)
     printf("  UTM: %s\n", buff[11] & 0x80?"enabled":"disabled");
     if ((buff[11] & 0x80))
         printf("    UTM LUN: %02x\n", buff[11] & 0x7f);
-
+    printf("  Persistent Reservations Bus Reset Support: %s\n",
+           (buff[12] & 0x01) ? "enabled" : "disabled");
     return;
 }
 
@@ -826,12 +827,48 @@ decode_rdac_vpd_c4(unsigned char * buff, int len)
         printf(" (Board ID 2880)\n");
     else if (!strcmp(subsystem_rev, "14.0"))
         printf(" (Board ID 2822)\n");
+    else if (!strcmp(subsystem_rev, "15.0"))
+        printf(" (Board ID 6091)\n");
+    else if (!strcmp(subsystem_rev, "16.0"))
+        printf(" (Board ID 3992)\n");
+    else if (!strcmp(subsystem_rev, "16.1"))
+        printf(" (Board ID 3991)\n");
+    else if (!strcmp(subsystem_rev, "17.0"))
+        printf(" (Board ID 1331)\n");
+    else if (!strcmp(subsystem_rev, "17.1"))
+        printf(" (Board ID 1332)\n");
+    else if (!strcmp(subsystem_rev, "17.3"))
+        printf(" (Board ID 1532)\n");
+    else if (!strcmp(subsystem_rev, "17.4"))
+        printf(" (Board ID 1932)\n");
+    else if (!strcmp(subsystem_rev, "42.0"))
+        printf(" (Board ID 26x0)\n");
+    else if (!strcmp(subsystem_rev, "43.0"))
+        printf(" (Board ID 498x)\n");
+    else if (!strcmp(subsystem_rev, "44.0"))
+        printf(" (Board ID 548x)\n");
+    else if (!strcmp(subsystem_rev, "45.0"))
+        printf(" (Board ID 5501)\n");
+    else if (!strcmp(subsystem_rev, "46.0"))
+        printf(" (Board ID 2701)\n");
+    else if (!strcmp(subsystem_rev, "47.0"))
+        printf(" (Board ID 5601)\n");
     else
         printf(" (Board ID unknown)\n");
 
     printf("  Slot ID: %s\n", slot_id);
 
     return;
+}
+
+static void
+convert_binary_to_ascii(unsigned char * src, unsigned char * dst,  int len)
+{
+    int i;
+
+    for (i = 0; i < len; i++) {
+        sprintf((char *)(dst+2*i), "%02x", *(src+i));
+    }
 }
 
 static void
@@ -846,6 +883,8 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
     int label_len;
     char uuid[33];
     int uuid_len;
+    unsigned char port_id[128];
+    int n;
 
     if (len < 0xab) {
         pr2serr("Extended Device Identification VPD page length too "
@@ -902,7 +941,107 @@ decode_rdac_vpd_c8(unsigned char * buff, int len)
 
     printf("  Logical Unit Number: %s\n", uuid);
 
+    /* Initiator transport ID */
+    if ( buff[10] & 0x01 ) {
+        memset(port_id, 0, 128);
+        printf("  Transport Protocol: ");
+        switch (buff[175] & 0x0F) {
+        case TPROTO_FCP: /* FC */
+            printf("FC\n");
+            convert_binary_to_ascii(&buff[183], port_id, 8);
+            n = 199;
+            break;
+        case TPROTO_SRP: /* SRP */
+            printf("SRP\n");
+            convert_binary_to_ascii(&buff[183], port_id, 8);
+            n = 199;
+            break;
+        case TPROTO_ISCSI: /* iSCSI */
+            printf("iSCSI\n");
+            n = (buff[177] << 8) + buff[178];
+            memcpy(port_id, &buff[179], n);
+            n = 179 + n;
+            break;
+        case TPROTO_SAS: /* SAS */
+            printf("SAS\n");
+            convert_binary_to_ascii(&buff[179], port_id, 8);
+            n = 199;
+            break;
+        default:
+            return; /* Can't continue decoding, so return */
+        }
+
+        printf("  Initiator Port Identifier: %s\n", port_id);
+        if ( buff[10] & 0x02 ) {
+            memset(port_id, 0, 128);
+            memcpy(port_id, &buff[n], 8);
+            printf("  Supplemental Vendor ID: %s\n", port_id);
+        }
+    }
+
     return;
+}
+
+static void
+decode_rdac_vpd_c9_rtpg_data(unsigned char aas, unsigned char vendor)
+{
+    printf("  Asymmetric Access State:");
+    switch(aas & 0x0F) {
+    case 0x0:
+        printf(" Active/Optimized");
+        break;
+    case 0x1:
+        printf(" Active/Non-Optimized");
+        break;
+    case 0x2:
+        printf(" Standby");
+        break;
+    case 0x3:
+        printf(" Unavailable");
+        break;
+    case 0xE:
+        printf(" Offline");
+        break;
+    case 0xF:
+        printf(" Transitioning");
+        break;
+    default:
+        printf(" (unknown)");
+        break;
+    }
+    printf("\n");
+
+    printf("  Vendor Specific Field:");
+    switch(vendor) {
+    case 0x01:
+        printf(" Operating normally");
+        break;
+    case 0x02:
+        printf(" Non-responsive to queries");
+        break;
+    case 0x03:
+        printf(" Controller being held in reset");
+        break;
+    case 0x04:
+        printf(" Performing controller firmware download (1st controller)");
+        break;
+    case 0x05:
+        printf(" Performing controller firmware download (2nd controller)");
+        break;
+    case 0x06:
+        printf(" Quiesced as a result of an administrative request");
+        break;
+    case 0x07:
+        printf(" Service mode as a result of an administrative request");
+        break;
+    case 0xFF:
+        printf(" Details are not available");
+        break;
+    default:
+        printf(" (unknown)");
+        break;
+    }
+    printf("\n");
 }
 
 static void
@@ -920,14 +1059,18 @@ decode_rdac_vpd_c9(unsigned char * buff, int len)
     if (buff[7] != '1') {
         pr2serr("Invalid page version '%c' (should be 1)\n", buff[7]);
     }
-    printf("  AVT:");
-    if (buff[8] & 0x80) {
-        printf(" Enabled");
-        if (buff[8] & 0x40)
-            printf(" (Allow reads on sector 0)");
-        printf("\n");
+    if ( (buff[8] & 0xE0) == 0xE0 ) {
+        printf("  IOShipping (ALUA): Enabled\n");
     } else {
-        printf(" Disabled\n");
+        printf("  AVT:");
+        if (buff[8] & 0x80) {
+            printf(" Enabled");
+            if (buff[8] & 0x40)
+                printf(" (Allow reads on sector 0)");
+            printf("\n");
+        } else {
+            printf(" Disabled\n");
+        }
     }
     printf("  Volume Access via: ");
     if (buff[8] & 0x01)
@@ -935,8 +1078,9 @@ decode_rdac_vpd_c9(unsigned char * buff, int len)
     else
         printf("alternate controller\n");
 
-    printf("  Path priority: %d ", buff[9] & 0xf);
-    switch(buff[9] & 0xf) {
+    if (buff[8] & 0x08) {
+        printf("  Path priority: %d ", buff[15] & 0xf);
+        switch(buff[15] & 0xf) {
         case 0x1:
             printf("(preferred path)\n");
             break;
@@ -946,9 +1090,62 @@ decode_rdac_vpd_c9(unsigned char * buff, int len)
         default:
             printf("(unknown)\n");
             break;
+        }
+
+        printf("  Preferred Path Auto Changeable:");
+        switch(buff[14] & 0x3C) {
+        case 0x14:
+            printf(" No (User Disabled and Host Type Restricted)\n");
+            break;
+        case 0x18:
+            printf(" No (User Disabled)\n");
+            break;
+        case 0x24:
+            printf(" No (Host Type Restricted)\n");
+            break;
+        case 0x28:
+            printf(" Yes\n");
+            break;
+        default:
+            printf(" (Unknown)\n");
+            break;
+        }
+
+        printf("  Implicit Failback:");
+        switch(buff[14] & 0x03) {
+        case 0x1:
+            printf(" Disabled\n");
+            break;
+        case 0x2:
+            printf(" Enabled\n");
+            break;
+        default:
+            printf(" (Unknown)\n");
+            break;
+        }
+    } else {
+        printf("  Path priority: %d ", buff[9] & 0xf);
+        switch(buff[9] & 0xf) {
+        case 0x1:
+            printf("(preferred path)\n");
+            break;
+        case 0x2:
+            printf("(secondary path)\n");
+            break;
+        default:
+            printf("(unknown)\n");
+            break;
+        }
     }
 
-    return;
+
+    if (buff[8] & 0x80) {
+        printf(" Target Port Group Data (This controller):\n");
+        decode_rdac_vpd_c9_rtpg_data(buff[10], buff[11]);
+
+        printf(" Target Port Group Data (Alternate controller):\n");
+        decode_rdac_vpd_c9_rtpg_data(buff[12], buff[13]);
+    }
 }
 
 static void

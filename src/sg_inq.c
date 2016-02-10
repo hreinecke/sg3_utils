@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2014 D. Gilbert
+*  Copyright (C) 2000-2015 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -41,7 +41,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.43 20141107";    /* SPC-4 rev 37 */
+static const char * version_str = "1.51 20151201";    /* SPC-5 rev 06 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2225,7 +2225,8 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            "SIMPSUP=%d\n", !!(buff[5] & 0x20), !!(buff[5] & 0x10),
            !!(buff[5] & 0x8), !!(buff[5] & 0x4), !!(buff[5] & 0x2),
            !!(buff[5] & 0x1));
-    printf("  WU_SUP=%d CRD_SUP=%d NV_SUP=%d V_SUP=%d\n",
+    /* CRD_SUP made obsolete in spc5r04 */
+    printf("  WU_SUP=%d [CRD_SUP=%d] NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1));
     printf("  P_I_I_SUP=%d LUICLR=%d R_SUP=%d CBCS=%d\n",
@@ -2489,7 +2490,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
                 printf("reserved [%u]\n", u);
                 break;
             }
-            printf("  HAW_ZBC=%d\n", buff[8] & 0x10);       /* sbc4r01 */
+            printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);   /* sbc4r04 */
             printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             break;
@@ -2681,8 +2682,8 @@ decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
                 "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
         return;
     }
-    printf("  Software Version: %d.%d.%d\n", buff[8], buff[9], buff[10]);
-    printf("  Software Date: %02x/%02x/%02x\n", buff[11], buff[12], buff[13]);
+    printf("  Software Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
+    printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
     printf("  Features:");
     if (buff[14] & 0x01)
         printf(" Dual Active,");
@@ -2691,12 +2692,76 @@ decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
     if (buff[14] & 0x04)
         printf(" Multiple Sub-enclosures,");
     if (buff[14] & 0x08)
-        printf(" DCE/DRM,");
+        printf(" DCE/DRM/DSS/DVE,");
     if (buff[14] & 0x10)
-        printf(" AVT,");
+        printf(" Asymmetric Logical Unit Access,");
     printf("\n");
     printf("  Max. #of LUNS: %d\n", buff[15]);
     return;
+}
+
+static void
+decode_rdac_vpd_c9_rtpg_data(unsigned char aas, unsigned char vendor)
+{
+    printf("  Asymmetric Access State:");
+    switch(aas & 0x0F) {
+        case 0x0:
+            printf(" Active/Optimized");
+            break;
+        case 0x1:
+            printf(" Active/Non-Optimized");
+            break;
+        case 0x2:
+            printf(" Standby");
+            break;
+        case 0x3:
+            printf(" Unavailable");
+            break;
+        case 0xE:
+            printf(" Offline");
+            break;
+        case 0xF:
+            printf(" Transitioning");
+            break;
+        default:
+            printf(" (unknown)");
+            break;
+    }
+    printf("\n");
+
+    printf("  Vendor Specific Field:");
+    switch(vendor) {
+        case 0x01:
+            printf(" Operating normally");
+            break;
+        case 0x02:
+            printf(" Non-responsive to queries");
+            break;
+        case 0x03:
+            printf(" Controller being held in reset");
+            break;
+        case 0x04:
+            printf(" Performing controller firmware download (1st "
+                   "controller)");
+            break;
+        case 0x05:
+            printf(" Performing controller firmware download (2nd "
+                   "controller)");
+            break;
+        case 0x06:
+            printf(" Quiesced as a result of an administrative request");
+            break;
+        case 0x07:
+            printf(" Service mode as a result of an administrative request");
+            break;
+        case 0xFF:
+            printf(" Details are not available");
+            break;
+        default:
+            printf(" (unknown)");
+            break;
+    }
+    printf("\n");
 }
 
 static void
@@ -2718,14 +2783,18 @@ decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
     if (buff[7] != '1') {
         pr2serr("Invalid page version '%c' (should be 1)\n", buff[7]);
     }
-    printf("  AVT:");
-    if (buff[8] & 0x80) {
-        printf(" Enabled");
-        if (buff[8] & 0x40)
-            printf(" (Allow reads on sector 0)");
-        printf("\n");
+    if ( (buff[8] & 0xE0) == 0xE0 ) {
+        printf("  IOShipping (ALUA): Enabled\n");
     } else {
-        printf(" Disabled\n");
+        printf("  AVT:");
+        if (buff[8] & 0x80) {
+            printf(" Enabled");
+            if (buff[8] & 0x40)
+                printf(" (Allow reads on sector 0)");
+            printf("\n");
+        } else {
+            printf(" Disabled\n");
+        }
     }
     printf("  Volume Access via: ");
     if (buff[8] & 0x01)
@@ -2733,17 +2802,72 @@ decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
     else
         printf("alternate controller\n");
 
-    printf("  Path priority: %d ", buff[9] & 0xf);
-    switch(buff[9] & 0xf) {
-        case 0x1:
-            printf("(preferred path)\n");
-            break;
-        case 0x2:
-            printf("(secondary path)\n");
-            break;
-        default:
-            printf("(unknown)\n");
-            break;
+    if (buff[8] & 0x08) {
+        printf("  Path priority: %d ", buff[15] & 0xf);
+        switch(buff[15] & 0xf) {
+            case 0x1:
+                printf("(preferred path)\n");
+                break;
+            case 0x2:
+                printf("(secondary path)\n");
+                break;
+            default:
+                printf("(unknown)\n");
+                break;
+        }
+
+        printf("  Preferred Path Auto Changeable:");
+        switch(buff[14] & 0x3C) {
+            case 0x14:
+                printf(" No (User Disabled and Host Type Restricted)\n");
+                break;
+            case 0x18:
+                printf(" No (User Disabled)\n");
+                break;
+            case 0x24:
+                printf(" No (Host Type Restricted)\n");
+                break;
+            case 0x28:
+                printf(" Yes\n");
+                break;
+            default:
+                printf(" (Unknown)\n");
+                break;
+        }
+
+        printf("  Implicit Failback:");
+        switch(buff[14] & 0x03) {
+            case 0x1:
+                printf(" Disabled\n");
+                break;
+            case 0x2:
+                printf(" Enabled\n");
+                break;
+            default:
+                printf(" (Unknown)\n");
+                break;
+        }
+    } else {
+        printf("  Path priority: %d ", buff[9] & 0xf);
+        switch(buff[9] & 0xf) {
+            case 0x1:
+                printf("(preferred path)\n");
+                break;
+            case 0x2:
+                printf("(secondary path)\n");
+                break;
+            default:
+                printf("(unknown)\n");
+                break;
+        }
+    }
+
+    if (buff[8] & 0x80) {
+        printf(" Target Port Group Data (This controller):\n");
+        decode_rdac_vpd_c9_rtpg_data(buff[10], buff[11]);
+
+        printf(" Target Port Group Data (Alternate controller):\n");
+        decode_rdac_vpd_c9_rtpg_data(buff[12], buff[13]);
     }
 
     return;
@@ -2860,9 +2984,11 @@ std_inq_response(const struct opts_t * op, int act_len)
                 xtra_buff[i] = ' ';
         if (op->do_export) {
             len = encode_whitespaces((unsigned char *)xtra_buff, 8);
-            printf("SCSI_VENDOR=%s\n", xtra_buff);
-            encode_string(xtra_buff, &rp[8], 8);
-            printf("SCSI_VENDOR_ENC=%s\n", xtra_buff);
+            if (len > 0) {
+                printf("SCSI_VENDOR=%s\n", xtra_buff);
+                encode_string(xtra_buff, &rp[8], 8);
+                printf("SCSI_VENDOR_ENC=%s\n", xtra_buff);
+            }
         } else
             printf(" Vendor identification: %s\n", xtra_buff);
         if (act_len <= 16) {
@@ -2873,9 +2999,11 @@ std_inq_response(const struct opts_t * op, int act_len)
             xtra_buff[16] = '\0';
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff, 16);
-                printf("SCSI_MODEL=%s\n", xtra_buff);
-                encode_string(xtra_buff, &rp[16], 16);
-                printf("SCSI_MODEL_ENC=%s\n", xtra_buff);
+                if (len > 0) {
+                    printf("SCSI_MODEL=%s\n", xtra_buff);
+                    encode_string(xtra_buff, &rp[16], 16);
+                    printf("SCSI_MODEL_ENC=%s\n", xtra_buff);
+                }
             } else
                 printf(" Product identification: %s\n", xtra_buff);
         }
@@ -2887,7 +3015,8 @@ std_inq_response(const struct opts_t * op, int act_len)
             xtra_buff[4] = '\0';
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff, 4);
-                printf("SCSI_REVISION=%s\n", xtra_buff);
+                if (len > 0)
+                    printf("SCSI_REVISION=%s\n", xtra_buff);
             } else
                 printf(" Product revision level: %s\n", xtra_buff);
         }
@@ -2897,7 +3026,8 @@ std_inq_response(const struct opts_t * op, int act_len)
                    20);
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff, 20);
-                printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
+                if (len > 0)
+                    printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
                 printf(" Vendor specific: %s\n", xtra_buff);
         }
@@ -2911,7 +3041,8 @@ std_inq_response(const struct opts_t * op, int act_len)
             if (op->do_export) {
                 len = encode_whitespaces((unsigned char *)xtra_buff,
                                          act_len - 96);
-                printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
+                if (len > 0)
+                    printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
                 printf(" Vendor specific: %s\n", xtra_buff);
         }
@@ -2975,6 +3106,13 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     if (page != rp[1]) {
         pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
                 "response\n");
+        return SG_LIB_CAT_MALFORMED;
+    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
+        /* could be a Unit Serial number VPD page with a very long
+         * length of 4+514 bytes; more likely standard response for
+         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
+        pr2serr("invalid Unit Serial Number VPD response; probably a "
+                "STANDARD INQUIRY response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (mxlen < 0)
