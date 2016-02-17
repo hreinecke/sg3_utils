@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.13 20160202";  /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.14 20160217";  /* spc5r08 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -113,6 +113,7 @@ int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
 #define VPD_SUP_BLOCK_LENS 0xb4 /* SBC-4 */
 #define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
 #define VPD_BLOCK_DEV_C_EXTENS 0xb5 /* SBC-4 */
+#define VPD_LB_PROTECTION 0xb5  /* SSC-5 */
 #define VPD_ZBC_DEV_CHARS 0xb6  /* ZBC */
 #define VPD_BLOCK_LIMITS_EXT 0xb7   /* SBC-4 */
 #define VPD_NO_RATHER_STD_INQ -2      /* request for standard inquiry */
@@ -195,10 +196,9 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_EXT_INQ, 0, -1, "ei", "Extended inquiry data"},
     {VPD_IMP_OP_DEF, 0, -1, "iod",
      "Implemented operating definition (obsolete)"},
-    {VPD_LB_PROVISIONING, 0, 0, "lbpv",
-     "Logical block provisioning (SBC)"},
-    {VPD_MAN_ASS_SN, 0, 1, "mas",
-     "Manufacturer assigned serial number (SSC)"},
+    {VPD_LB_PROTECTION, 0, 0, "lbpro", "Logical block protection (SSC)"},
+    {VPD_LB_PROVISIONING, 0, 0, "lbpv", "Logical block provisioning (SBC)"},
+    {VPD_MAN_ASS_SN, 0, 1, "mas", "Manufacturer assigned serial number (SSC)"},
     {VPD_MAN_ASS_SN, 0, 0x12, "masa",
      "Manufacturer assigned serial number (ADC)"},
     {VPD_MAN_NET_ADDR, 0, -1, "mna", "Management network addresses"},
@@ -2727,6 +2727,37 @@ decode_block_dev_char_ext_vpd(unsigned char * b, int len)
     printf("  Utilization A: %u\n", sg_get_unaligned_be32(b + 12));
 }
 
+/* VPD_LB_PROTECTION    (SSC)  [added in ssc5r02a] */
+static void
+decode_lb_protection_vpd(unsigned char * buff, int len, int do_hex)
+{
+    int k, bump;
+    unsigned char * ucp;
+
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 8) {
+        pr2serr("Logical block protection VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    len -= 8;
+    ucp = buff + 8;
+    for (k = 0; k < len; k += bump, ucp += bump) {
+        bump = 1 + ucp[0];
+        printf("  method: %d, info_len: %d, LBP_W_C=%d, LBP_R_C=%d, "
+               "RBDP_C=%d\n", ucp[1], 0x3f & ucp[2], !!(0x80 & ucp[3]),
+               !!(0x40 & ucp[3]), !!(0x20 & ucp[3]));
+        if ((k + bump) > len) {
+            pr2serr("Logical block protection VPD page, short "
+                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            return;
+        }
+    }
+}
+
 /* VPD_TA_SUPPORTED */
 static int
 decode_tapealert_supported_vpd(unsigned char * b, int len)
@@ -2871,6 +2902,9 @@ decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
     switch (pdt) {
     case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
         decode_block_dev_char_ext_vpd(b, len);
+        break;
+    case PDT_TAPE: case PDT_MCHANGER:
+        decode_lb_protection_vpd(b, len, do_hex);
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
@@ -3370,7 +3404,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                     printf("Block limits VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
-                    printf("Sequential access device capabilities VPD page "
+                    printf("Sequential-access device capabilities VPD page "
                            "(SSC):\n");
                     break;
                 case PDT_OSD:
@@ -3405,14 +3439,14 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                     printf("Block device characteristics VPD page (SBC):\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
-                    printf("Manufactured assigned serial number VPD page "
+                    printf("Manufactured-assigned serial number VPD page "
                            "(SSC):\n");
                     break;
                 case PDT_OSD:
                     printf("Security token VPD page (OSD):\n");
                     break;
                 case PDT_ADC:
-                    printf("Manufactured assigned serial number VPD page "
+                    printf("Manufactured-assigned serial number VPD page "
                            "(ADC):\n");
                     break;
                 default:
@@ -3534,6 +3568,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("Block device characteristics extension VPD page "
                            "(SBC):\n");
+                    break;
+                case PDT_TAPE: case PDT_MCHANGER:
+                    printf("Logical block protection VPD page (SSC):\n");
                     break;
                 default:
                     printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
