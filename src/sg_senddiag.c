@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2015 D. Gilbert
+*  Copyright (C) 2003-2016 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.47 20151219";
+static const char * version_str = "0.48 20160218";
 
 #define ME "sg_senddiag: "
 
@@ -48,6 +48,7 @@ static struct option long_options[] = {
         {"raw", required_argument, 0, 'r'},
         {"selftest", required_argument, 0, 's'},
         {"test", no_argument, 0, 't'},
+        {"timeout", required_argument, 0, 'T'},
         {"uoff", no_argument, 0, 'u'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
@@ -66,6 +67,7 @@ struct opts_t {
     int do_raw;
     int do_selftest;
     int do_deftest;
+    int timeout;
     int do_uoff;
     int do_verbose;
     int do_version;
@@ -82,9 +84,9 @@ usage()
            "[--list]\n"
            "                   [--maxlen=LEN] [--page=PG] [--pf] "
            "[--raw=H,H...]\n"
-           "                   [--selftest=ST] [--test] [--uoff] "
-           "[--verbose] [--version]\n"
-           "                   [DEVICE]\n"
+           "                   [--selftest=ST] [--test] [--timeout=SEC] "
+           "[--uoff]\n"
+           "                   [--verbose] [--version] [DEVICE]\n"
            "  where:\n"
            "    --doff|-d       device online (def: 0, only with '--test')\n"
            "    --extdur|-e     duration of an extended self-test (from mode "
@@ -112,6 +114,8 @@ usage()
            "                           5->foreground short, 6->foreground "
            "extended\n"
            "    --test|-t       default self-test\n"
+           "    --timeout=SEC|-T SEC    timeout for foreground self tests\n"
+           "                            unit: second (def: 7200 seconds)\n"
            "    --uoff|-u       unit offline (def: 0, only with '--test')\n"
            "    --verbose|-v    increase verbosity\n"
            "    --version|-V    output version string then exit\n\n"
@@ -125,7 +129,7 @@ usage_old()
 {
     printf("Usage: sg_senddiag [-doff] [-e] [-h] [-H] [-l] [-pf]"
            " [-raw=H,H...]\n"
-           "                   [-s=SF] [-t] [-uoff] [-v] [-V] "
+           "                   [-s=SF] [-t] [-T=SEC] [-uoff] [-v] [-V] "
            "[DEVICE]\n"
            "  where:\n"
            "    -doff   device online (def: 0, only with '-t')\n"
@@ -143,6 +147,7 @@ usage_old()
            " 4->abort test\n"
            "            5->foreground short, 6->foreground extended\n"
            "    -t      default self-test\n"
+           "    -T SEC    timeout for foreground self tests\n"
            "    -uoff   unit offline (def: 0, only with '-t')\n"
            "    -v      increase verbosity (print issued SCSI cmds)\n"
            "    -V      output version string\n"
@@ -160,7 +165,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dehHlm:NOpP:r:s:tuvV", long_options,
+        c = getopt_long(argc, argv, "dehHlm:NOpP:r:s:tT:uvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -224,6 +229,14 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 't':
             op->do_deftest = 1;
             break;
+        case 'T':
+            n = sg_get_num(optarg);
+            if (n < 0) {
+                pr2serr("bad argument to '--timeout=SEC'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->timeout = n;
+            break;
         case 'u':
             op->do_uoff = 1;
             break;
@@ -259,7 +272,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num;
+    int k, jmp_out, plen, num, n;
     unsigned int u;
     const char * cp;
 
@@ -342,6 +355,14 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->do_selftest = u;
+            } else if (0 == strncmp("T=", cp, 2)) {
+                num = sscanf(cp + 2, "%d", &n);
+                if ((1 != num) || (n < 0)) {
+                    printf("Bad page code after '-T=SEC' option\n");
+                    usage_old();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->timeout = n;
             } else if (0 == strncmp("-old", cp, 5))
                 ;
             else if (jmp_out) {
@@ -385,13 +406,18 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 /* Return of 0 -> success, otherwise see sg_ll_send_diag() */
 static int
 do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
-            int unitofl_bit, void * outgoing_pg, int outgoing_len,
+            int unitofl_bit, void * outgoing_pg, int outgoing_len, int tmout,
             int noisy, int verbose)
 {
     int long_duration = 0;
 
-    if ((0 == sf_bit) && ((5 == sf_code) || (6 == sf_code)))
-        long_duration = 1;      /* foreground self-tests */
+    if ((0 == sf_bit) && ((5 == sf_code) || (6 == sf_code))) {
+        /* foreground self-tests */
+        if (tmout <= 0)
+            long_duration = 1;
+        else
+            long_duration = tmout;
+    }
     return sg_ll_send_diag(sg_fd, sf_code, pf_bit, sf_bit, devofl_bit,
                            unitofl_bit, long_duration, outgoing_pg,
                            outgoing_len, noisy, verbose);
@@ -777,8 +803,8 @@ main(int argc, char * argv[])
     } else if ((op->do_list) || (op->page_code >= 0x0)) {
         pg = op->page_code;
         if (pg < 0)
-            res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4, 1,
-                              op->do_verbose);
+            res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4,
+                              op->timeout, 1, op->do_verbose);
         else
             res = 0;
         if (0 == res) {
@@ -820,14 +846,14 @@ main(int argc, char * argv[])
         }
     } else if (op->do_raw) {
         res = do_senddiag(sg_fd, 0, op->do_pf, 0, 0, 0, read_in,
-                          read_in_len, 1, op->do_verbose);
+                          read_in_len, op->timeout, 1, op->do_verbose);
         if (res) {
             ret = res;
             goto err_out;
         }
     } else {
         res = do_senddiag(sg_fd, op->do_selftest, op->do_pf, op->do_deftest,
-                          op->do_doff, op->do_uoff, NULL, 0, 1,
+                          op->do_doff, op->do_uoff, NULL, 0, op->timeout, 1,
                           op->do_verbose);
         if (0 == res) {
             if ((5 == op->do_selftest) || (6 == op->do_selftest))
