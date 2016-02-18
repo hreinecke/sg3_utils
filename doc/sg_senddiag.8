@@ -1,4 +1,4 @@
-.TH SG_SENDDIAG "8" "April 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_SENDDIAG "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 .SH SYNOPSIS
@@ -6,13 +6,14 @@ sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 [\fI\-\-doff\fR] [\fI\-\-extdur\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-pf\fR]
 [\fI\-\-raw=H,H...\fR] [\fI\-\-raw=\-\fR] [\fI\-\-selftest=ST\fR]
-[\fI\-\-test\fR] [\fI\-\-uoff\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-test\fR] [\fI\-\-timeout=SEC\fR] [\fI\-\-uoff\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_senddiag
 [\fI\-doff\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-l\fR] [\fI\-pf\fR]
 [\fI\-raw=H,H...\fR] [\fI\-raw=\-\fR] [\fI\-s=ST\fR] [\fI\-t\fR]
-[\fI\-uoff\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
+[\fI\-T=SEC\fR] [\fI\-uoff\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -127,6 +128,11 @@ sets the _default_ Self Test (SelfTest) bit. By default this is clear (0).
 The \fI\-\-selftest=ST\fR option should not be active together with this
 option. Both the \fI\-\-doff\fR and/or \fI\-\-uoff\fR options can be used
 with this option.
+.TP
+\fB\-T\fR, \fB\-\-timeout\fR=\fISEC\fR
+where \fISEC\fR is a timeout value (in seconds) for foreground self\-test
+operations. The default value is 7200 seconds (2 hours) and any values
+of \fISEC\fR less than the default are ignored.
 .TP
 \fB\-u\fR, \fB\-\-uoff\fR
 set the Unit Offline (UnitOffL) bit (default is clear). Only significant
@@ -247,6 +253,10 @@ The \fI\-s=ST\fR option should not be active together with this option.
 Both the \fI\-doff\fR and/or \fI\-uoff\fR options can be used with this
 option.
 .TP
+\fB\-T\fR=\fISEC\fR
+where \fISEC\fR is a timeout value (in seconds) for foreground self\-test
+operations. See the \fI\-\-timeout=SEC\fR option above.
+.TP
 \fB\-uoff\fR
 set the Unit Offline (UnitOffL) bit (default is clear). Equivalent to
 \fI\-\-uoff\fR in the main description.
@@ -276,7 +286,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2003\-2015 Douglas Gilbert
+Copyright \(co 2003\-2016 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
