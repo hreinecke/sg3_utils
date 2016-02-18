@@ -2,6 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.43 [20160218] [svn: r664]
+  - bump version
+
 Changelog for sg3_utils-1.42 [20160217] [svn: r663]
   - sg_timestamp: new, to report or set timestamp
   - sg_read_attr: new, supported by tape drives
@@ -23,7 +26,7 @@ Changelog for sg3_utils-1.42 [20160217] [svn: r663]
       Minimum and Threshold percentage fields
     - rework lto tape vendor VPD pages
   - sg_inq+sg_vpd+sg_xcopy: add support for locally
-    assigned UUIDs in VPD page 0x83 (15-267r2)
+    assigned UUIDs in VPD page 0x83 (spc5r08)
   - sg_sanitize: add --znr option (sbc4r07)
   - sg_rep_zones: add --partial option (zbc-r04)
   - sg_format: add ffmt option (sbc4r10)
