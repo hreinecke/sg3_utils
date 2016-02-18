@@ -29,7 +29,6 @@
  */
 
 #ifndef __sun
-#define _XOPEN_SOURCE 500
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
@@ -38,6 +37,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #define __STDC_FORMAT_MACROS 1
@@ -53,7 +53,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20160121";
+static const char * version_str = "1.15 20160217";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
