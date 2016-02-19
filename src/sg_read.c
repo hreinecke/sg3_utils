@@ -18,7 +18,7 @@
 
 */
 
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
@@ -50,7 +50,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.25 20160121";
+static const char * version_str = "1.26 20160218";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

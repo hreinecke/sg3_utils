@@ -43,8 +43,8 @@ Here is a list of utilities that have been ported:
     sg_logs
     sg_luns
     sg_modes
-    sg_persist
     sg_opcodes
+    sg_persist
     sg_prevent
     sg_raw
     sg_rdac
@@ -56,8 +56,8 @@ Here is a list of utilities that have been ported:
     sg_reassign
     sg_referrals
     sg_rep_zones
-    sg_reset_wp
     sg_requests
+    sg_reset_wp
     sg_rmsn
     sg_rtpg
     sg_safte
@@ -83,7 +83,7 @@ Here is a list of utilities that have been ported:
     sg_write_long
     sg_write_same
     sg_write_verify
-    sg_zones
+    sg_zone
 
 Most utility names are indicative of the main SCSI command that they execute.
 Some utilities are slightly higher level, for example sg_ses fetches SCSI
@@ -238,4 +238,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-17th February 2016
+18th February 2016

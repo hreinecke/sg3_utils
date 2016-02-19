@@ -23,7 +23,7 @@
  * This version is designed for the linux kernel 2.4, 2.6 and 3 series.
  */
 
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif

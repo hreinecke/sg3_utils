@@ -11,7 +11,7 @@
  */
 
 
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
@@ -55,7 +55,7 @@
 #endif
 
 
-static const char * version_str = "4.95 20160121";
+static const char * version_str = "4.96 20160218";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
