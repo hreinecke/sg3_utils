@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 Douglas Gilbert.
+ * Copyright (c) 2011-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.00 20151219";
+static const char * version_str = "1.01 20160218";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -422,7 +422,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
-    unsigned char requestSenseBuff[DEF_REQS_RESP_LEN];
+    unsigned char rsBuff[DEF_REQS_RESP_LEN];
     unsigned char * wBuff = NULL;
     int ret = -1;
     struct opts_t opts;
@@ -671,9 +671,9 @@ main(int argc, char * argv[])
     if ((0 == ret) && (0 == op->early) && (0 == op->wait)) {
         for (k = 0 ;; ++k) {
             sleep_for(POLL_DURATION_SECS);
-            memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-            res = sg_ll_request_sense(sg_fd, op->desc, requestSenseBuff,
-                                      sizeof(requestSenseBuff), 1, vb);
+            memset(rsBuff, 0x0, sizeof(rsBuff));
+            res = sg_ll_request_sense(sg_fd, op->desc, rsBuff, sizeof(rsBuff),
+				      1, vb);
             if (res) {
                 ret = res;
                 if (SG_LIB_CAT_INVALID_OP == res)
@@ -696,14 +696,13 @@ main(int argc, char * argv[])
                 break;
             }
             /* "Additional sense length" same in descriptor and fixed */
-            resp_len = requestSenseBuff[7] + 8;
+            resp_len = rsBuff[7] + 8;
             if (vb > 2) {
                 pr2serr("Parameter data in hex\n");
-                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
+                dStrHexErr((const char *)rsBuff, resp_len, 1);
             }
             progress = -1;
-            sg_get_sense_progress_fld(requestSenseBuff, resp_len,
-                                      &progress);
+            sg_get_sense_progress_fld(rsBuff, resp_len, &progress);
             if (progress < 0) {
                 ret = res;
                 if (vb > 1)

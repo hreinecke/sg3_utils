@@ -29,7 +29,7 @@
    This version is designed for the linux kernel 2.4, 2.6 and 3 series.
 */
 
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
@@ -64,7 +64,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.44 20151219";
+static const char * version_str = "1.45 20160218";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

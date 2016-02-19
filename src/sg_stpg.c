@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2004-2015 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
+* Copyright (c) 2004-2016 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -12,7 +12,11 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -26,7 +30,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.10 20151219";
+static const char * version_str = "1.11 20160218";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -39,7 +43,15 @@ static const char * version_str = "1.10 20151219";
 #define TPGS_STATE_TRANSITIONING 0xf
 
 /* See also table 306 - Target port group descriptor format in SPC-4 rev 36e */
-#ifndef __cplusplus
+#ifdef __cplusplus
+
+// C++ does not support designated initializers
+static const unsigned char state_sup_mask[] = {
+    0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0,
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x80,
+};
+
+#else
 
 static const unsigned char state_sup_mask[] = {
         [TPGS_STATE_OPTIMIZED]     = 0x01,
@@ -48,14 +60,6 @@ static const unsigned char state_sup_mask[] = {
         [TPGS_STATE_UNAVAILABLE]   = 0x08,
         [TPGS_STATE_OFFLINE]       = 0x40,
         [TPGS_STATE_TRANSITIONING] = 0x80,
-};
-
-#else
-
-// C++ does not support designated initializers
-static const unsigned char state_sup_mask[] = {
-    0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0,
-    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x80,
 };
 
 #endif  /* C or C++ ? */
@@ -345,7 +349,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
         *state_arr_len = 0;
     k = strspn(inp, "0123456789aAbBcCdDeEfFhHnNoOsSuUxX,");
     if (in_len != k) {
-        pr2serr("build_state_arr: error at pos %d\n", k + 1);
+        pr2serr("%s: error at pos %d\n", __func__, k + 1);
         return 1;
     }
     for (k = 0; k < max_arr_len; ++k) {
@@ -371,8 +375,8 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 state_arr[k] = 3;
                 break;
             default:
-                pr2serr("build_state_arr: expected 'ao', 'an', 'o', 's' or "
-                        "'u' at pos %d\n", (int)(lcp - inp + 1));
+                pr2serr("%s: expected 'ao', 'an', 'o', 's' or 'u' at pos "
+			"%d\n", __func__, (int)(lcp - inp + 1));
                 return 1;
             }
         }
@@ -381,11 +385,11 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
             if (((v >= 0) && (v <= 3)) || (14 ==v))
                 state_arr[k] = v;
             else if (-1 == v) {
-                pr2serr("build_state_arr: error at pos %d\n",
+                pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
                 return 1;
             } else {
-                pr2serr("build_state_arr: expect 0,1,2,3 or 14\n");
+                pr2serr("%s: expect 0,1,2,3 or 14\n", __func__);
                 return 1;
             }
         }
@@ -396,7 +400,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
     }
     *state_arr_len = k + 1;
     if (k == max_arr_len) {
-        pr2serr("build_state_arr: array length exceeded\n");
+        pr2serr("%s: array length exceeded\n", __func__);
         return 1;
     }
     return 0;
