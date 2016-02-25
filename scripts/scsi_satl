@@ -45,7 +45,7 @@ timeout=0
 unit_attention=0
 aborted_command=0
 
-total_err=0
+## total_err=0
 
 usage()
 {
@@ -83,19 +83,19 @@ for command in "sg_inq" "sg_vpd" "sg_vpd -p di" "sg_vpd -p ai" "sg_luns" \
                "sg_sat_identify"
 do
   if [ $quiet -eq 0 ]
-    then echo "$command" $1
+    then echo "$command" "$1"
   fi
 
   if [ $log -eq 0 ]
   then
     if [ $verbose ]
     then
-      $command $verbose $1 > /dev/null
+      $command $verbose "$1" > /dev/null
     else
-      $command $1 > /dev/null 2>> /dev/null
+      $command "$1" > /dev/null 2>> /dev/null
     fi
   else
-    $command $verbose $1 > /dev/null 2>> scsi_satl.err
+    $command $verbose "$1" > /dev/null 2>> scsi_satl.err
   fi
   res=$?
   case "$res" in
@@ -109,7 +109,7 @@ do
     11) echo "  aborted command" ; let aborted_command=$aborted_command+1 ;;
     15) echo "  file error with $1 " ; let file_err=$file_err+1 ;;
     20) echo "  no sense" ; let other_err=$other_err+1 ;;
-    21) echo "  recovered error" ; let recovered_err=$recovered_err+1 ;;
+    21) echo "  recovered error" ; let recovered=$recovered+1 ;;
     33) echo "  timeout" ; let timeout=$timeout+1 ;;
     97) echo "  response fails sanity" ; let sanity=$sanity+1 ;;
     98) echo "  other SCSI error" ; let other_err=$other_err+1 ;;

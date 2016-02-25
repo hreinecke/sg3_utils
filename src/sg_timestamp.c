@@ -162,8 +162,14 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
         }
     } else
         ret = 0;
+    k = get_scsi_pt_resid(ptvp);
     if (residp)
-        *residp = get_scsi_pt_resid(ptvp);
+        *residp = k;
+    if ((verbose > 2) && ((mx_resp_len - k) > 0)) {
+        pr2serr("Parameter data returned:\n");
+        dStrHexErr((const char *)resp, mx_resp_len - k,
+                   ((verbose > 3) ? -1 : 1));
+    }
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

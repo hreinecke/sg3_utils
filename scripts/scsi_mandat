@@ -37,7 +37,7 @@ timeout=0
 unit_attention=0
 aborted_command=0
 
-total_err=0
+## total_err=0
 
 usage()
 {
@@ -77,23 +77,23 @@ for command in "sg_inq" "sg_luns" "sg_turs" "sg_requests" "sg_vpd" \
                 "sg_vpd -i" "sg_senddiag -t"
 do
   if [ $quiet -eq 0 ]
-    then echo "$command" $verbose $1
+    then echo "$command" $verbose "$1"
   fi
 
   if [ $verbose ]
   then
     if [ $log -eq 0 ]
     then
-      $command $verbose $1
+      $command $verbose "$1"
     else
-      $command $verbose $1 >> scsi_mandat.err 2>> scsi_mandat.err
+      $command $verbose "$1" >> scsi_mandat.err 2>> scsi_mandat.err
     fi
   else
     if [ $log -eq 0 ]
     then
-      $command $1 > /dev/null 2>> /dev/null
+      $command "$1" > /dev/null 2>> /dev/null
     else
-      $command $1 > /dev/null 2>> scsi_mandat.err
+      $command "$1" > /dev/null 2>> scsi_mandat.err
     fi
   fi
   res=$?
@@ -108,7 +108,7 @@ do
     11) echo "  aborted command" ; let aborted_command=$aborted_command+1 ;;
     15) echo "  file error with $1 " ; let file_err=$file_err+1 ;;
     20) echo "  no sense" ; let other_err=$other_err+1 ;;
-    21) echo "  recovered error" ; let recovered_err=$recovered_err+1 ;;
+    21) echo "  recovered error" ; let recovered=$recovered+1 ;;
     33) echo "  timeout" ; let timeout=$timeout+1 ;;
     97) echo "  response fails sanity" ; let sanity=$sanity+1 ;;
     98) echo "  other SCSI error" ; let other_err=$other_err+1 ;;

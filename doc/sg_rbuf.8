@@ -26,6 +26,11 @@ useful for downloading firmware amongst other things.
 This utility supports two command line syntaxes, the preferred one is
 shown first in the synopsis and explained in this section. A later section
 on the old command line syntax outlines the second group of options.
+.PP
+This is a Linux only utility and only works when \fIDEVICE\fR is an sg
+device (e.g. "/dev/sg1"). The sg_read_buffer utility has similar
+functionality and is ported to other OSes and within Linux can use
+bsg and normal block device names (e.g. "/dev/sdc").
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP

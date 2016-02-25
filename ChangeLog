@@ -2,8 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160218] [svn: r666]
+Changelog for sg3_utils-1.43 [20160224] [svn: r679]
   - sg_senddiag: add --timeout=SEC option
+  - shellcheck cleanup on scripts
 
 Changelog for sg3_utils-1.42 [20160217] [svn: r663]
   - sg_timestamp: new, to report or set timestamp
@@ -21,7 +22,7 @@ Changelog for sg3_utils-1.42 [20160217] [svn: r663]
     - rework lto tape vendor lpages
   - sg_vpd: add Block limits extension VPD page
     - add Device constituents VPD page
-    - add LB Protection VPD page (ssc 15-296r1)
+    - add LB Protection VPD page (ssc ssc5r02a)
     - LB provisioning VPD page: expand LBPRZ, add
       Minimum and Threshold percentage fields
     - rework lto tape vendor VPD pages
