@@ -55,7 +55,7 @@
 #endif
 
 
-static const char * version_str = "4.96 20160218";
+static const char * version_str = "4.96 20160222";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -96,7 +96,7 @@ usage()
             "[--help] [--mmap]\n"
             "               [--quick] [--size=OVERALL] [--time] [--verbose] "
             "[--version]\n"
-            "               DEVICE\n");
+            "               SG_DEVICE\n");
     pr2serr("  where:\n"
             "    --buffer=EACH|-b EACH    buffer size to use (in bytes)\n"
             "    --dio|-d        requests dio ('-q' overrides it)\n"
@@ -110,14 +110,15 @@ usage()
             "    --verbose|-v    increase verbosity (more debug)\n"
             "    --version|-V    print version string then exit\n\n"
             "Use SCSI READ BUFFER command (data or echo buffer mode, buffer "
-            "id 0)\nrepeatedly\n");
+            "id 0)\nrepeatedly. This utility only works with Linux sg "
+            "devices.\n");
 }
 
 static void
 usage_old()
 {
     printf("Usage: sg_rbuf [-b=EACH_KIB] [-d] [-m] [-q] [-s=OVERALL_MIB] "
-           "[-t] [-v] [-V]\n               DEVICE\n");
+           "[-t] [-v] [-V]\n               SG_DEVICE\n");
     printf("  where:\n");
     printf("    -b=EACH_KIB    num is buffer size to use (in KiB)\n");
     printf("    -d       requests dio ('-q' overrides it)\n");
@@ -131,7 +132,8 @@ usage_old()
     printf("    -v       increase verbosity (more debug)\n");
     printf("    -V       print version string then exit\n\n");
     printf("Use SCSI READ BUFFER command (data or echo buffer mode, buffer "
-           "id 0)\nrepeatedly\n");
+           "id 0)\nrepeatedly. This utility only works with Linux sg "
+            "devices.\n");
 }
 
 static void
@@ -434,7 +436,8 @@ main(int argc, char * argv[])
     /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         perror("SG_IO READ BUFFER descriptor error");
-        if (rawp) free(rawp);
+        if (rawp)
+            free(rawp);
         return SG_LIB_CAT_OTHER;
     }
 

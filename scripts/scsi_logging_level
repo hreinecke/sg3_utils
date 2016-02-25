@@ -30,10 +30,10 @@ SET=0
 GET=0
 CREATE=0
 
-OPTS=`getopt -o hvcgsa:E:T:S:I:M:L:H: --long \
+OPTS=$(getopt -o hvcgsa:E:T:S:I:M:L:H: --long \
 help,version,create,get,set,all:,error:,timeout:,scan:,ioctl:,\
 midlevel:,mlqueue:,mlcomplete:,lowlevel:,llqueue:,llcomplete:,\
-highlevel:,hlqueue:,hlcomplete: -n \'$SCRIPTNAME\' -- "$@"`
+highlevel:,hlqueue:,hlcomplete: -n \'$SCRIPTNAME\' -- "$@")
 eval set -- "$OPTS"
 
 # print version info
@@ -104,7 +104,7 @@ check_cmdline()
 {
     while true ; do
         case "$1" in
-            -a|--all)   _ALL=$2; check_level $2
+            -a|--all)   _ALL="$2"; check_level "$2"
                         shift 2;;
             -c|--create) CREATE=1;
                         shift 1;;
@@ -116,31 +116,31 @@ check_cmdline()
                         shift 1;;
             -v|--version) printversion
                         exit 0;;
-            -E|--error) _ERROR=$2; check_level $2
+            -E|--error) _ERROR="$2"; check_level "$2"
                         shift 2;;
-            -T|--timeout) _TIMEOUT=$2; check_level $2
+            -T|--timeout) _TIMEOUT="$2"; check_level "$2"
                         shift 2;;
-            -S|--scan)  _SCAN=$2; check_level $2
+            -S|--scan)  _SCAN="$2"; check_level "$2"
                         shift 2;;
-            -M|--midlevel) _ML=$2; check_level $2
+            -M|--midlevel) _ML="$2"; check_level "$2"
                         shift 2;;
-            --mlqueue)  _MLQUEUE=$2; check_level $2
+            --mlqueue)  _MLQUEUE="$2"; check_level "$2"
                         shift 2;;
-            --mlcomplete) _MLCOMPLETE=$2; check_level $2
+            --mlcomplete) _MLCOMPLETE="$2"; check_level "$2"
                         shift 2;;
-            -L|--lowlevel) _LL=$2; check_level $2
+            -L|--lowlevel) _LL="$2"; check_level "$2"
                         shift 2;;
-            --llqueue)  _LLQUEUE=$2; check_level $2
+            --llqueue)  _LLQUEUE="$2"; check_level "$2"
                         shift 2;;
-            --llcomplete) _LLCOMPLETE=$2; check_level $2
+            --llcomplete) _LLCOMPLETE="$2"; check_level "$2"
                         shift 2;;
-            -H|--highlevel) _HL=$2; check_level $2
+            -H|--highlevel) _HL="$2"; check_level "$2"
                         shift 2;;
-            --hlqueue)  _HLQUEUE=$2; check_level $2
+            --hlqueue)  _HLQUEUE="$2"; check_level "$2"
                         shift 2;;
-            --hlcomplete) _HLCOMPLETE=$2; check_level $2
+            --hlcomplete) _HLCOMPLETE="$2"; check_level "$2"
                         shift 2;;
-            -I|--ioctl) _IOCTL=$2; check_level $2
+            -I|--ioctl) _IOCTL="$2"; check_level "$2"
                         shift 2;;
             --) shift; break;;
             *) echo "Internal error!" ; exit 1;;
@@ -149,7 +149,7 @@ check_cmdline()
 
     if [ -n "$*" ]
     then
-        invalid_cmdline invalid parameter $*
+        invalid_cmdline invalid parameter "$*"
     fi
 
     if [ $GET = "1" -a $SET = "1" ]
@@ -185,8 +185,8 @@ invalid_cmdline()
 get_logging_level()
 {
     echo "Current scsi logging level:"
-#   LEVEL=`sysctl -n dev.scsi.logging_level`
-    LEVEL=`cat /proc/sys/dev/scsi/logging_level`
+#   LEVEL=$(sysctl -n dev.scsi.logging_level)
+    LEVEL=$(cat /proc/sys/dev/scsi/logging_level)
     if [ $? != 0 ]
     then
         echo "$SCRIPTNAME: could not read scsi logging level" \
@@ -199,16 +199,16 @@ show_logging_level()
 {
     echo "/proc/sys/dev/scsi/logging_level = $LEVEL"
 
-    LOG_ERROR=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_TIMEOUT=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_SCAN=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_MLQUEUE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_MLCOMPLETE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_LLQUEUE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_LLCOMPLETE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3))
-    LOG_HLQUEUE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3));
-    LOG_HLCOMPLETE=$(($LEVEL & 7)); LEVEL=$(($LEVEL>>3));
-    LOG_IOCTL=$(($LEVEL & 7))
+    LOG_ERROR=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_TIMEOUT=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_SCAN=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_MLQUEUE=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_MLCOMPLETE=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_LLQUEUE=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_LLCOMPLETE=$((LEVEL & 7)); LEVEL=$((LEVEL>>3))
+    LOG_HLQUEUE=$((LEVEL & 7)); LEVEL=$((LEVEL>>3));
+    LOG_HLCOMPLETE=$((LEVEL & 7)); LEVEL=$((LEVEL>>3));
+    LOG_IOCTL=$((LEVEL & 7))
 
     echo "SCSI_LOG_ERROR=$LOG_ERROR"
     echo "SCSI_LOG_TIMEOUT=$LOG_TIMEOUT"
@@ -236,19 +236,19 @@ set_logging_level()
 }
 create_logging_level()
 {
-    LEVEL=$(($LOG_IOCTL & 7)); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_HLCOMPLETE & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_HLQUEUE & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_LLCOMPLETE & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_LLQUEUE & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_MLCOMPLETE & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_MLQUEUE & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_SCAN & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_TIMEOUT & 7))); LEVEL=$(($LEVEL<<3))
-    LEVEL=$(($LEVEL|($LOG_ERROR & 7)))
+    LEVEL=$((LOG_IOCTL & 7)); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_HLCOMPLETE & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_HLQUEUE & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_LLCOMPLETE & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_LLQUEUE & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_MLCOMPLETE & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_MLQUEUE & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_SCAN & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_TIMEOUT & 7))); LEVEL=$((LEVEL<<3))
+    LEVEL=$((LEVEL|(LOG_ERROR & 7)))
 }
 
-check_cmdline $*
+check_cmdline "$*"
 
 if [ $SET = "1" ]
 then
