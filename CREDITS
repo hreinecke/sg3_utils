@@ -6,6 +6,9 @@ Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
         written by Joerg Schilling). isosize is now found in the util-linux
         package and in the archive directory of this package.
 
+Bart Van Assche <bart dot vanassche at sandisk dot com>
+        harden (improve) code in rescan-scsi-bus.sh [20160224]
+
 Brian Bunker <Brian dot Bunker at netapp dot com> contributed
         sg_read_block_limits and the target reset addition to sg_reset
         [20090615]
@@ -135,4 +138,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-17th February 2015
+28th February 2016
