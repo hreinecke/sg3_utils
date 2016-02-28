@@ -382,7 +382,7 @@ usage_for(const struct opts_t * op)
 static void
 usage_for(const struct opts_t * op)
 {
-    op = op;
+    if (op) { }         /* suppress warning */
     usage();
 }
 
@@ -3380,8 +3380,8 @@ cmddt_process(int sg_fd, const struct opts_t * op)
 static int
 cmddt_process(int sg_fd, const struct opts_t * op)
 {
-    sg_fd = sg_fd;
-    op = op;
+    if (sg_fd) { }      /* suppress warning */
+    if (op) { }         /* suppress warning */
     pr2serr("'--cmddt' not implemented, use sg_opcodes\n");
     return 0;
 }

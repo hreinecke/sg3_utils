@@ -354,7 +354,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
 }
 
 /* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
- * take a long time, if so set long_duration flag in which case the timout
+ * take a long time, if so set long_duration flag in which case the timeout
  * is set to 7200 seconds; if the value of long_duration is > 7200 then that
  * value is taken as the timeout value in seconds. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
@@ -372,21 +372,24 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
     senddiagCmdBlk[1] = (unsigned char)((sf_code << 5) | (pf_bit << 4) |
                         (sf_bit << 2) | (devofl_bit << 1) | unitofl_bit);
     sg_put_unaligned_be16((uint16_t)param_len, senddiagCmdBlk + 3);
+    if (long_duration > LONG_PT_TIMEOUT)
+        tmout = long_duration;
+    else
+        tmout = long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT;
 
     if (verbose) {
         pr2ws("    Send diagnostic cmd: ");
         for (k = 0; k < SEND_DIAGNOSTIC_CMDLEN; ++k)
             pr2ws("%02x ", senddiagCmdBlk[k]);
         pr2ws("\n");
-        if ((verbose > 1) && paramp && param_len) {
-            pr2ws("    Send diagnostic parameter list:\n");
-            dStrHexErr((const char *)paramp, param_len, -1);
+        if (verbose > 1) {
+            if (paramp && param_len) {
+                pr2ws("    Send diagnostic parameter list:\n");
+                dStrHexErr((const char *)paramp, param_len, -1);
+            }
+            pr2ws("    Send diagnostic timeout: %d seconds\n", tmout);
         }
     }
-    if (long_duration > LONG_PT_TIMEOUT)
-        tmout = long_duration;
-    else
-        tmout = long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT;
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -756,10 +759,13 @@ sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
         for (k = 0; k < 6; ++k)
             pr2ws("%02x ", fuCmdBlk[k]);
         pr2ws("\n");
-    }
-    if ((verbose > 1) && (param_len > 0)) {
-        pr2ws("    format parameter list:\n");
-        dStrHexErr((const char *)paramp, param_len, -1);
+        if (verbose > 1) {
+            if (param_len > 0) {
+                pr2ws("    format unit parameter list:\n");
+                dStrHexErr((const char *)paramp, param_len, -1);
+            }
+            pr2ws("    format unit timeout: %d seconds\n", tmout);
+        }
     }
 
     ptvp = construct_scsi_pt_obj();

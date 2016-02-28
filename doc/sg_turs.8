@@ -1,10 +1,11 @@
-.TH SG_TURS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_TURS "8" "Fenruary 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
 .B sg_turs
-[\fI\-\-help\fR] [\fI\-\-number=NUM\fR] [\fI\-\-progress\fR] [\fI\-\-time\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-number=NUM\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-progress\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .PP
 .B sg_turs
 [\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR]
@@ -34,6 +35,10 @@ g G GiB *1,073,741,824; and GB *1,000,000,000 . Also a suffix of the
 form "x<n>" multiplies the leading number by <n>. Alternatively a hex
 number may be given, prefixed by either '0x' or has a trailing 'h'.
 .TP
+\fB\-\-num\fR=\fINUM\fR
+same as \fI\-\-number=NUM\fR. Added for compatibility with sg_requests
+which has taken over the role of polling the progress indication.
+.TP
 \fB\-O\fR, \fB\-\-old\fR
 switch to older style options.
 .TP
@@ -57,7 +62,9 @@ print version string then exit.
 The progress indication is optionally part of the sense data. When a prior
 command that takes a long time to complete (and typically precludes other
 media access commands) is still underway, the progress indication can be used
-to determine how long before the device returns to its normal state.
+to determine how long before the device returns to its normal state. Around
+SPC\-3 T10 changed the preferred command for polling the progress indication
+from TEST UNIT READY to REQUEST SENSE (see the sg_requests utilty).
 .PP
 The SCSI FORMAT command for disks used with the IMMED bit set is an example
 of an operation that takes a significant amount of time and precludes other
@@ -108,9 +115,9 @@ print out version string then exit.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2014 Douglas Gilbert
+Copyright \(co 2000\-2016 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_inq, sg_request (sg3_utils)
+.B sg_inq, sg_requests (sg3_utils)

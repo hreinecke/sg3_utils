@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2015 Douglas Gilbert.
+ * Copyright (c) 2009-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.11 20151220";
+static const char * version_str = "1.12 20160226";
 
 
 #define ME "sg_write_same: "
@@ -49,6 +49,10 @@ static const char * version_str = "1.11 20151220";
 #define DEF_WS_NUMBLOCKS 1
 #define MAX_XFER_LEN (64 * 1024)
 #define EBUFF_SZ 256
+
+#ifndef UINT32_MAX
+#define UINT32_MAX ((uint32_t)-1)
+#endif
 
 static struct option long_options[] = {
     {"10", no_argument, 0, 'R'},
@@ -155,7 +159,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     cdb_len = op->pref_cdb_size;
     if (WRITE_SAME10_LEN == cdb_len) {
         llba = op->lba + op->numblocks;
-        if ((op->numblocks > 0xffff) || (llba > ULONG_MAX) ||
+        if ((op->numblocks > 0xffff) || (llba > UINT32_MAX) ||
             op->ndob || (op->unmap && (0 == op->want_ws10))) {
             cdb_len = WRITE_SAME16_LEN;
             if (op->verbose) {
@@ -164,7 +168,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 
                 if (op->numblocks > 0xffff)
                     pr2serr("%s since blocks exceed 65535\n", cp);
-                else if (llba > ULONG_MAX)
+                else if (llba > UINT32_MAX)
                     pr2serr("%s since LBA may exceed 32 bits\n", cp);
                 else
                     pr2serr("%s due to ndob or unmap settings\n", cp);

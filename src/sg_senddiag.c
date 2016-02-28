@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.48 20160218";
+static const char * version_str = "0.49 20160228";
 
 #define ME "sg_senddiag: "
 

@@ -1,4 +1,4 @@
-.TH SG_SANITIZE "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_SANITIZE "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 .SH SYNOPSIS
@@ -7,8 +7,8 @@ sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 [\fI\-\-desc\fR] [\fI\-\-early\fR] [\fI\-\-fail\fR] [\fI\-\-help\fR]
 [\fI\-\-invert\fR] [\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR]
 [\fI\-\-pattern=PF\fR] [\fI\-\-quick\fR] [\fI\-\-test=TE\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR] [\fI\-\-zero\fR]
-[\fI\-\-znr\fR] \fIDEVICE\fR
+[\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-wait\fR] [\fI\-\-zero\fR] [\fI\-\-znr\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -36,7 +36,7 @@ in case the wrong \fIDEVICE\fR has been given.
 If the \fI\-\-early\fR option is given then this utility will exit soon
 after starting the SANITIZE command with the IMMED bit set. The user can
 monitor the progress of the sanitize operation with
-the "sg_request \-\-num=9999 \-\-progress" which sends a REQUEST SENSE
+the "sg_requests \-\-num=9999 \-\-progress" which sends a REQUEST SENSE
 command every 30 seconds. Otherwise if the \fI\-\-wait\fR option is given
 then this utility will wait until the SANITIZE command completes (or fails)
 and that can be many hours.
@@ -123,6 +123,10 @@ is skipped.
 set the TEST field in the overwrite service action parameter list. This
 only affects the "overwrite" sanitize operation. The default is to place
 0 in that field.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
+where \fISEC\fR is the number of seconds used for the timeout on the
+SANITIZE command.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -230,7 +234,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2011\-2015 Douglas Gilbert
+Copyright \(co 2011\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -36,7 +36,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.34 20160209";
+static const char * version_str = "1.35 20160227";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -86,8 +86,9 @@ struct opts_t {
         bool do_rcap16;         /* -l */
         bool resize;            /* -r */
         bool rto_req;           /* -R, deprecated, prefer fmtpinfo */
-        int tape;               /* -T <format>, def: -1 */
         int sec_init;           /* -S */
+        int tape;               /* -T <format>, def: -1 */
+        int timeout;            /* -m SEC, def: depends on IMMED bit */
         int verbose;            /* -v */
         int verify;             /* -y */
         const char * device_name;
@@ -119,6 +120,7 @@ static struct option long_options[] = {
         {"six", no_argument, 0, '6'},
         {"size", required_argument, 0, 's'},
         {"tape", required_argument, 0, 'T'},
+        {"timeout", required_argument, 0, 'm'},
         {"verbose", no_argument, 0, 'v'},
         {"verify", no_argument, 0, 'y'},
         {"version", no_argument, 0, 'V'},
@@ -138,9 +140,9 @@ usage()
                "[--pie=PIE] [--pinfo]\n"
                "                 [--poll=PT] [--resize] [--rto_req] "
                "[--security] [--six]\n"
-               "                 [--size=SIZE] [--tape=FM] [--verbose] "
-               "[--verify]\n"
-               "                 [--version] [--wait] DEVICE\n"
+               "                 [--size=SIZE] [--tape=FM] [--timeout=SEC] "
+               "[--verbose]\n"
+               "                 [--verify] [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -195,6 +197,8 @@ usage()
                "    --tape=FM|-T FM    request FORMAT MEDIUM with FORMAT "
                "field set\n"
                "                       to FM (def: 0 --> default format)\n"
+               "    --timeout=SEC|-m SEC    FORMAT UNIT/MEDIUM command "
+               "timeout in seconds\n"
                "    --verbose|-v    increase verbosity\n"
                "    --verify|-y     sets VERIFY bit in FORMAT MEDIUM (tape)\n"
                "    --version|-V    print version details and exit\n"
@@ -273,7 +277,7 @@ static int
 scsi_format_unit(int fd, const struct opts_t * op)
 {
         int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
-        int resp_len, ip_desc;
+        int resp_len, ip_desc, timeout;
         int immed = ! op->fwait;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
@@ -283,6 +287,9 @@ scsi_format_unit(int fd, const struct opts_t * op)
         char b[80];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
+        timeout = (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT);
+        if (op->timeout > timeout)
+                timeout = op->timeout;
         longlist = (op->pie > 0);
         ip_desc = (op->ip_def || op->sec_init);
         off = longlist ? LO_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
@@ -308,8 +315,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
         res = sg_ll_format_unit2(fd, op->fmtpinfo, longlist,
                                  need_hdr/* FMTDATA*/, op->cmplst,
                                  0 /* DEFECT_LIST_FORMAT */, op->ffmt,
-                                 (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
-                                 fmt_pl, fmt_pl_sz, 1, op->verbose);
+                                 timeout, fmt_pl, fmt_pl_sz, 1, op->verbose);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format unit command: %s\n", b);
@@ -374,37 +380,40 @@ scsi_format_unit(int fd, const struct opts_t * op)
         }
 #if 0
         for (k = 0; k < num_rs; ++k) {
-            if (k > 0)
-                sleep_for(30);
-            memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                      1, op->verbose);
-            if (res) {
-                ret = res;
-                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
-                pr2serr("Request Sense command: %s\n", b);
-                break;
-            }
-            /* "Additional sense length" same in descriptor and fixed */
-            resp_len = requestSenseBuff[7] + 8;
-            if (op->verbose > 1) {
-                pr2serr("Parameter data in hex\n");
-                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
-            }
-            progress = -1;
-            sg_get_sense_progress_fld(requestSenseBuff, resp_len,
-                                      &progress);
-            if (progress < 0) {
-                ret = res;
-                if (op->verbose > 1)
-                     pr2serr("No progress indication found, iteration %d\n",
-                             k + 1);
-                /* N.B. exits first time there isn't a progress indication */
-                break;
-            } else
-                printf("Progress indication: %d.%02d%% done\n",
-                       (progress * 100) / 65536,
-                       ((progress * 100) % 65536) / 656);
+                if (k > 0)
+                        sleep_for(30);
+                memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
+                res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
+                                          maxlen, 1, op->verbose);
+                if (res) {
+                        ret = res;
+                        sg_get_category_sense_str(res, sizeof(b), b,
+                                                  op->verbose);
+                        pr2serr("Request Sense command: %s\n", b);
+                        break;
+                }
+                /* "Additional sense length" same in descriptor and fixed */
+                resp_len = requestSenseBuff[7] + 8;
+                if (op->verbose > 1) {
+                        pr2serr("Parameter data in hex\n");
+                        dStrHexErr((const char *)requestSenseBuff, resp_len,
+                                   1);
+                }
+                progress = -1;
+                sg_get_sense_progress_fld(requestSenseBuff, resp_len,
+                                          &progress);
+                if (progress < 0) {
+                        ret = res;
+                        if (op->verbose > 1)
+                                pr2serr("No progress indication found, "
+                                        "iteration %d\n", k + 1);
+                                /* N.B. exits first time there isn't a
+                                 * progress indication */
+                        break;
+                } else
+                        printf("Progress indication: %d.%02d%% done\n",
+                               (progress * 100) / 65536,
+                               ((progress * 100) % 65536) / 656);
         }
 #endif
         printf("FORMAT UNIT Complete\n");
@@ -415,14 +424,16 @@ scsi_format_unit(int fd, const struct opts_t * op)
 static int
 scsi_format_medium(int fd, const struct opts_t * op)
 {
-        int res, progress, pr, rem, verb, resp_len;
+        int res, progress, pr, rem, verb, resp_len, timeout;
         int immed = ! op->fwait;
         unsigned char reqSense[MAX_BUFF_SZ];
         char b[80];
 
+        timeout = (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT);
+        if (op->timeout > timeout)
+                timeout = op->timeout;
         res = sg_ll_format_medium(fd, op->verify, immed, 0xf & op->tape, NULL,
-                                  0, (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT),
-                                  1, op->verbose);
+                                  0, timeout, 1, op->verbose);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format medium command: %s\n", b);
@@ -707,11 +718,11 @@ print_read_cap(int fd, const struct opts_t * op)
                         last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
                         block_size = sg_get_unaligned_be32(resp_buff + 4);
                         if (0xffffffff == last_blk_addr) {
-                            if (op->verbose)
-                                printf("Read Capacity (10) reponse "
-                                       "indicates that Read Capacity (16) "
-                                       "is required\n");
-                            return -2;
+                                if (op->verbose)
+                                        printf("Read Capacity (10) reponse "
+                                               "indicates that Read Capacity "
+                                               "(16) is required\n");
+                                return -2;
                         }
                         printf("Read Capacity (10) results:\n");
                         printf("   Number of logical blocks=%u\n",
@@ -750,7 +761,7 @@ main(int argc, char **argv)
                 int c;
 
                 c = getopt_long(argc, argv,
-                                "c:C:Def:FhIlM:pP:q:rRs:St:T:vVwx:y6",
+                                "c:C:Def:FhIlm:M:pP:q:rRs:St:T:vVwx:y6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -801,6 +812,14 @@ main(int argc, char **argv)
                 case 'l':
                         op->long_lba = true;
                         op->do_rcap16 = true;
+                        break;
+                case 'm':
+                        op->timeout = sg_get_num(optarg);
+                        if (op->timeout < 0) {
+                                pr2serr("bad argument to '--timeout=', "
+                                        "accepts 0 or more\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
                         break;
                 case 'M':
                         op->mode_page = sg_get_num(optarg);
@@ -1156,8 +1175,7 @@ again_with_long_lba:
         if (op->resize) {
                 printf("Resize operation seems to have been successful\n");
                 goto out;
-        }
-        else if (! op->format) {
+        } else if (! op->format) {
                 res = print_read_cap(fd, op);
                 if (-2 == res) {
                         op->do_rcap16 = 1;
@@ -1174,10 +1192,10 @@ again_with_long_lba:
                 }
                 if ((PDT_TAPE == pdt) || (PDT_MCHANGER == pdt) ||
                     (PDT_ADC == pdt))
-                    printf("No changes made. To format use '--tape='.\n");
+                        printf("No changes made. To format use '--tape='.\n");
                 else
-                    printf("No changes made. To format use '--format'. To "
-                           "resize use '--resize'\n");
+                        printf("No changes made. To format use '--format'. "
+                               "To resize use '--resize'\n");
                 goto out;
         }
 
