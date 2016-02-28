@@ -86,6 +86,10 @@ static const char * version_str = "0.53 20160201";
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
+#ifndef UINT32_MAX
+#define UINT32_MAX ((uint32_t)-1)
+#endif
+
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
 #endif
@@ -174,8 +178,8 @@ struct xcopy_fp_t {
     dev_t devno;
     int sg_type;
     int sg_fd;
-    unsigned long min_bytes;
-    unsigned long max_bytes;
+    uint32_t min_bytes;
+    uint32_t max_bytes;
     int64_t num_sect;
     int sect_sz;
     int append;
@@ -718,7 +722,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     max_segment_num = sg_get_unaligned_be16(rcBuff + 10);
     max_desc_len = sg_get_unaligned_be32(rcBuff + 12);
     max_segment_len = sg_get_unaligned_be32(rcBuff + 16);
-    xfp->max_bytes = max_segment_len ? max_segment_len : ULONG_MAX;
+    xfp->max_bytes = max_segment_len ? max_segment_len : UINT32_MAX;
     max_inline_data = sg_get_unaligned_be32(rcBuff + 20);
     if (verbose) {
         pr2serr(" >> %s response:\n", rec_copy_op_params_str);
@@ -1763,36 +1767,38 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    if ((unsigned long)dd_count < ixcf.min_bytes / ixcf.sect_sz) {
-        pr2serr("not enough data to read (min %ld bytes)\n", oxcf.min_bytes);
+    if (dd_count < (ixcf.min_bytes / (uint32_t)ixcf.sect_sz)) {
+        pr2serr("not enough data to read (min %" PRIu32 " bytes)\n",
+                oxcf.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
-    if ((unsigned long)dd_count < oxcf.min_bytes / oxcf.sect_sz) {
-        pr2serr("not enough data to write (min %ld bytes)\n", oxcf.min_bytes);
+    if (dd_count < (oxcf.min_bytes / (uint32_t)oxcf.sect_sz)) {
+        pr2serr("not enough data to write (min %" PRIu32 " bytes)\n",
+                oxcf.min_bytes);
         return SG_LIB_CAT_OTHER;
     }
 
     if (bpt_given) {
         if (xcopy_flag_dc) {
-            if ((unsigned long)bpt * oxcf.sect_sz > oxcf.max_bytes) {
-                pr2serr("bpt too large (max %ld blocks)\n",
-                        oxcf.max_bytes / oxcf.sect_sz);
+            if ((uint32_t)(bpt * oxcf.sect_sz) > oxcf.max_bytes) {
+                pr2serr("bpt too large (max %" PRIu32 " blocks)\n",
+                        oxcf.max_bytes / (uint32_t)oxcf.sect_sz);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else {
-            if ((unsigned long)bpt * ixcf.sect_sz > ixcf.max_bytes) {
-                pr2serr("bpt too large (max %ld blocks)\n",
-                        ixcf.max_bytes / ixcf.sect_sz);
+            if ((uint32_t)(bpt * ixcf.sect_sz) > ixcf.max_bytes) {
+                pr2serr("bpt too large (max %" PRIu32 " blocks)\n",
+                        ixcf.max_bytes / (uint32_t)ixcf.sect_sz);
                 return SG_LIB_SYNTAX_ERROR;
             }
         }
     } else {
-        unsigned long r;
+        uint32_t r;
 
         if (xcopy_flag_dc)
-            r = oxcf.max_bytes / (unsigned long)oxcf.sect_sz;
+            r = oxcf.max_bytes / (uint32_t)oxcf.sect_sz;
         else
-            r = ixcf.max_bytes / (unsigned long)ixcf.sect_sz;
+            r = ixcf.max_bytes / (uint32_t)ixcf.sect_sz;
         bpt = (r > MAX_BLOCKS_PER_TRANSFER) ? MAX_BLOCKS_PER_TRANSFER : r;
     }
 

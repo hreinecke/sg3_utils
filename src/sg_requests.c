@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.26 20151219";
+static const char * version_str = "1.27 20160226";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -51,6 +51,7 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"maxlen", required_argument, 0, 'm'},
         {"num", required_argument, 0, 'n'},
+        {"number", required_argument, 0, 'n'},
         {"progress", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"status", no_argument, 0, 's'},
@@ -65,9 +66,9 @@ usage()
 {
     pr2serr("Usage: sg_requests [--desc] [--help] [--hex] [--maxlen=LEN] "
             "[--num=NUM]\n"
-            "                   [--progress] [--raw] [--status] [--time] "
-            "[--verbose]\n"
-            "                   [--version] DEVICE\n"
+            "                   [--number=NUM] [--progress] [--raw] "
+            "[--status]\n"
+            "                   [--time] [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --desc|-d         set flag for descriptor sense "
             "format\n"
@@ -78,6 +79,7 @@ usage()
             "                           (def: 0 -> 252 bytes)\n"
             "    --num=NUM|-n NUM  number of REQUEST SENSE commands "
             "to send (def: 1)\n"
+            "    --number=NUM      same action as '--num=NUM'\n"
             "    --progress|-p     output a progress indication (percentage) "
             "if available\n"
             "    --raw|-r          output in binary (to stdout)\n"

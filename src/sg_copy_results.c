@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2016 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.12 20150227";
+static const char * version_str = "1.13 20160227";
 
 
 #define MAX_XFER_LEN 10000
@@ -408,7 +408,8 @@ main(int argc, char * argv[])
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = SG_LIB_FILE_ERROR;
+        goto finish;
     }
 
     if ((sa < 0) || (sa >= (int)(sizeof(rec_copy_name_arr) / sizeof(char *))))

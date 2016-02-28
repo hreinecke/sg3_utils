@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.01 20160218";
+static const char * version_str = "1.02 20160227";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -76,6 +76,7 @@ static struct option long_options[] = {
     {"pattern", required_argument, 0, 'p'},
     {"quick", no_argument, 0, 'Q'},
     {"test", required_argument, 0, 'T'},
+    {"timeout", required_argument, 0, 't'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
     {"wait", no_argument, 0, 'w'},
@@ -94,8 +95,9 @@ struct opts_t {
     int invert;
     int ipl;    /* initialization pattern length */
     int overwrite;
-    int test;
     int quick;
+    int test;
+    int timeout;        /* in seconds */
     int verbose;
     int wait;
     int zero;
@@ -112,8 +114,9 @@ usage()
           "                   [--fail] [--help] [--invert] [--ipl=LEN] "
           "[--overwrite]\n"
           "                   [--pattern=PF] [--quick] [--test=TE] "
-          "[--verbose]\n"
-          "                   [--version] [--wait] [--zero] [--znr] DEVICE\n"
+          "[--timeout=SEC]\n"
+          "                   [--verbose] [--version] [--wait] [--zero] "
+          "[--znr] DEVICE\n"
           "  where:\n"
           "    --ause|-A            set AUSE bit in cdb\n"
           "    --block|-B           do BLOCK ERASE sanitize\n"
@@ -143,6 +146,7 @@ usage()
           "    --test=TE|-T TE      TE is placed in TEST field of "
           "OVERWRITE\n"
           "                         parameter list (def: 0)\n"
+          "    --timeout=SEC|-t SEC    SANITIZE command timeout in seconds\n"
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string then exit\n"
           "    --wait|-w            wait for command to finish (could "
@@ -164,7 +168,7 @@ static int
 do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             int param_lst_len)
 {
-    int k, ret, res, sense_cat, immed;
+    int k, ret, res, sense_cat, immed, timeout;
     unsigned char sanCmdBlk[SANITIZE_OP_LEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -173,6 +177,10 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         immed = op->early ? 1 : 0;
     else
         immed = 1;
+    timeout = (immed ? SHORT_TIMEOUT : LONG_TIMEOUT);
+    /* only use command line timeout if it exceeds previous defaults */
+    if (op->timeout > timeout)
+        timeout = op->timeout;
     memset(sanCmdBlk, 0, sizeof(sanCmdBlk));
     sanCmdBlk[0] = SANITIZE_OP;
     if (op->overwrite)
@@ -198,10 +206,13 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         for (k = 0; k < SANITIZE_OP_LEN; ++k)
             pr2serr("%02x ", sanCmdBlk[k]);
         pr2serr("\n");
-    }
-    if ((op->verbose > 2) && (param_lst_len > 0)) {
-        pr2serr("    Parameter list contents:\n");
-        dStrHexErr((const char *)param_lstp, param_lst_len, 1);
+        if (op->verbose > 2) {
+            if (param_lst_len > 0) {
+                pr2serr("    Parameter list contents:\n");
+                dStrHexErr((const char *)param_lstp, param_lst_len, 1);
+            }
+            pr2serr("    Sanitize command timeout: %d seconds\n", timeout);
+        }
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -211,8 +222,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     set_scsi_pt_cdb(ptvp, sanCmdBlk, sizeof(sanCmdBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)param_lstp, param_lst_len);
-    res = do_scsi_pt(ptvp, sg_fd, (immed ? SHORT_TIMEOUT : LONG_TIMEOUT),
-                     op->verbose);
+    res = do_scsi_pt(ptvp, sg_fd, timeout, op->verbose);
     ret = sg_cmds_process_resp(ptvp, "Sanitize", res, 0, sense_b,
                                1 /*noisy */, op->verbose, &sense_cat);
     if (-1 == ret)
@@ -436,7 +446,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:QT:vVwzZ", long_options,
+        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:Qt:T:vVwzZ", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -489,6 +499,13 @@ main(int argc, char * argv[])
             break;
         case 'Q':
             ++op->quick;
+            break;
+        case 't':
+            op->timeout = sg_get_num(optarg);
+            if (op->timeout < 0) {
+                pr2serr("bad argument to '--timeout=SEC', want 0 or more\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'T':
             op->test = sg_get_num(optarg);
@@ -673,7 +690,7 @@ main(int argc, char * argv[])
             sleep_for(POLL_DURATION_SECS);
             memset(rsBuff, 0x0, sizeof(rsBuff));
             res = sg_ll_request_sense(sg_fd, op->desc, rsBuff, sizeof(rsBuff),
-				      1, vb);
+                                      1, vb);
             if (res) {
                 ret = res;
                 if (SG_LIB_CAT_INVALID_OP == res)

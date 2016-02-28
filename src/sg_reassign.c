@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,11 +34,15 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.17 20151207";
+static const char * version_str = "1.18 20160226";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
 #define MAX_NUM_ADDR 1024
+
+#ifndef UINT32_MAX
+#define UINT32_MAX ((uint32_t)-1)
+#endif
 
 
 static struct option long_options[] = {
@@ -350,7 +354,7 @@ main(int argc, char * argv[])
     }
     if (got_addr) {
         for (k = 0; k < addr_arr_len; ++k) {
-            if (addr_arr[k] >= ULONG_MAX) {
+            if (addr_arr[k] >= UINT32_MAX) {
                 if (eight < 0) {
                     eight = 1;
                     break;

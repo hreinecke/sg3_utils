@@ -3,7 +3,7 @@
  * data transfer (and no REQUEST SENSE command iff the unit is ready)
  * then this can be used for timing per SCSI command overheads.
  *
- * Copyright (C) 2000-2015 D. Gilbert
+ * Copyright (C) 2000-2016 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.31 20151220";
+static const char * version_str = "3.32 20160226";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -45,14 +45,16 @@ static const char * version_str = "3.31 20151220";
 #endif
 
 static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
-        {"new", 0, 0, 'N'},
-        {"number", 1, 0, 'n'},
-        {"old", 0, 0, 'O'},
-        {"progress", 0, 0, 'p'},
-        {"time", 0, 0, 't'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"help", no_argument, 0, 'h'},
+        {"new", no_argument, 0, 'N'},
+        {"number", required_argument, 0, 'n'},
+        {"num", required_argument, 0, 'n'}, /* added in v3.32 (sg3_utils
+                                * v1.43) for sg_requests compatibility */
+        {"old", no_argument, 0, 'O'},
+        {"progress", no_argument, 0, 'p'},
+        {"time", no_argument, 0, 't'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -70,20 +72,21 @@ struct opts_t {
 
 static void usage()
 {
-    printf("Usage: sg_turs [--help] [--number=NUM] [--progress] [--time] "
-           "[--verbose]\n"
-           "               [--version] DEVICE\n"
+    printf("Usage: sg_turs [--help] [--number=NUM] [--num=NUM] [--progress] "
+           "[--time]\n"
+           "               [--verbose] [--version] DEVICE\n"
            "  where:\n"
            "    --help|-h        print usage message then exit\n"
            "    --number=NUM|-n NUM    number of test_unit_ready commands "
            "(def: 1)\n"
+           "    --num=NUM|-n NUM       same action as '--number=NUM'\n"
            "    --progress|-p    outputs progress indication (percentage) "
            "if available\n"
            "    --time|-t        outputs total duration and commands per "
            "second\n"
            "    --verbose|-v     increase verbosity\n"
            "    --version|-V     print version string then exit\n\n"
-           "Performs a SCSI TEST UNIT READY command (or many of them)\n");
+           "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
 
 static void usage_old()
@@ -99,7 +102,7 @@ static void usage_old()
            "second\n"
            "    -v        increase verbosity\n"
            "    -V        print version string then exit\n\n"
-           "Performs a SCSI TEST UNIT READY command (or many of them)\n");
+           "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
 
 static void usage_for(const struct opts_t * op)

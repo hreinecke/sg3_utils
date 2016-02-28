@@ -1,11 +1,12 @@
-.TH SG_REQUESTS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_REQUESTS "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
 .B sg_requests
 [\fI\-\-desc\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-num=NUM\fR] [\fI\-\-progress\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR]
-[\fI\-\-time\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR] [\fI\-\-progress\fR]
+[\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -41,6 +42,9 @@ cdb's "allocation length" field. If not given (or \fILEN\fR is zero) then
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 perform \fINUM\fR SCSI REQUEST SENSE commands, stopping when either \fINUM\fR
 is reached or an error occurs. The default value for \fINUM\fR is 1 .
+.TP
+\fB\-\-number\fR=\fINUM\fR
+same action as \fI\-\-num=NUM\fR. Added for compatibility with sg_turs.
 .TP
 \fB\-p\fR, \fB\-\-progress\fR
 show progress indication (a percentage) if available. If \fI\-\-number=NUM\fR
@@ -103,8 +107,8 @@ SBC\-3). Several long duration SCSI commands associated with tape drives also
 use the progress indication (see SSC\-3).
 .PP
 Early standards suggested that the SCSI TEST UNIT READY command be used for
-polling the progress indication. More recent standards seem to suggest
-the SCSI REQUEST SENSE command should be used instead.
+polling the progress indication (see the sg_turs utility). Since SPC\-3 the
+standards suggest that the SCSI REQUEST SENSE command should be used instead.
 .PP
 The \fIDEVICE\fR is opened with a read\-only flag (e.g. in Unix with the
 O_RDONLY flag).
@@ -116,9 +120,9 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2014 Douglas Gilbert
+Copyright \(co 2004\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg3_utils
+.B sg_turs (sg3_utils)

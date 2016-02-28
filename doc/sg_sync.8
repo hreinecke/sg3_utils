@@ -1,11 +1,11 @@
-.TH SG_SYNC "8" "July 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_SYNC "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_sync \- send SCSI SYNCHRONIZE CACHE command
 .SH SYNOPSIS
 .B sg_sync
 [\fI\-\-16\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-group=GN\fR]
 [\fI\-\-help\fR] [\fI\-\-immed\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-sync\-nv\fR]
-[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -58,8 +58,8 @@ option (or if there is no non\-volatile cache in the device) the
 synchronization is with the medium. The SYNC_NV bit was made obsolete in
 SBC\-3 revision 35d.
 .TP
-\fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
-where \fISECS\fR is the number of seconds the OS allows the SYNCHRONIZE
+\fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
+where \fISEC\fR is the number of seconds the OS allows the SYNCHRONIZE
 CACHE(16) to complete before it tries to cancel the command. Cancelling
 commands (typically with the task management function "abort task") is
 best avoided. Note this option is only active together with the \fI\-\-16\fR
@@ -89,7 +89,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2013 Douglas Gilbert
+Copyright \(co 2004\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

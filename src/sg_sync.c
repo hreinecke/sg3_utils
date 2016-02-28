@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.14 20151219";
+static const char * version_str = "1.15 20160227";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -53,7 +53,7 @@ static void usage()
 {
     pr2serr("Usage: sg_sync    [--16] [--count=COUNT] [--group=GN] [--help] "
             "[--immed]\n"
-            "                  [--lba=LBA] [--sync-nv] [--timeout=SECS] "
+            "                  [--lba=LBA] [--sync-nv] [--timeout=SEC] "
             "[--verbose]\n"
             "                  [--version] DEVICE\n"
             "  where:\n"
@@ -74,7 +74,7 @@ static void usage()
             "    --sync-nv|-s        synchronize to non-volatile storage "
             "(if distinct\n"
             "                        from medium). Obsolete in sbc3r35d.\n"
-            "    --timeout=SECS|-t SECS    command timeout in seconds, only "
+            "    --timeout=SEC|-t SEC    command timeout in seconds, only "
             "active\n"
             "                              if '--16' given (def: 60 seconds)\n"
             "    --verbose|-v        increase verbosity\n"
