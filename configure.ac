@@ -1,7 +1,7 @@
 AC_INIT(sg3_utils, 1.43, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE
-AM_MAINTAINER_MODE
+AM_MAINTAINER_MODE([-Wall -Werror foreign])
 AM_CONFIG_HEADER(config.h)
 
 AC_PROG_CC
@@ -10,6 +10,9 @@ AC_PROG_INSTALL
 		
 # Adding libtools to the build seems to bring in C++ environment
 AC_PROG_LIBTOOL
+
+# AM_PROG_AR is supported and needed since automake v1.12+
+ifdef([AM_PROG_AR], [AM_PROG_AR], []) 
 
 # check for headers
 AC_HEADER_STDC
