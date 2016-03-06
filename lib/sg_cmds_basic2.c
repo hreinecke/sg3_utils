@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2015 Douglas Gilbert.
+ * Copyright (c) 1999-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -308,9 +308,14 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    mode sense (6): response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    mode sense (6): response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -381,9 +386,14 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    mode sense (10): response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    mode sense (10): response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }

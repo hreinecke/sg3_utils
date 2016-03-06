@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.39 20160203";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.40 20160303";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -134,7 +134,7 @@ struct opts_t {
     int verbose;
     int do_version;
     int filter;
-    int filter_given;
+    bool filter_given;
     int page_control;
     int maxlen;
     int pg_code;
@@ -219,12 +219,12 @@ static bool show_mchanger_diag_data_page(const uint8_t * resp, int len,
                                          const struct opts_t * op);
 static bool show_non_volatile_cache_page(const uint8_t * resp, int len,
                                          const struct opts_t * op);
-static bool show_volume_stats_page(const uint8_t * resp, int len,
-                                   const struct opts_t * op);
+static bool show_volume_stats_pages(const uint8_t * resp, int len,
+                                    const struct opts_t * op);
 static bool show_protocol_specific_page(const uint8_t * resp, int len,
                                         const struct opts_t * op);
-static bool show_stats_perform_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+static bool show_stats_perform_pages(const uint8_t * resp, int len,
+                                     const struct opts_t * op);
 static bool show_cache_stats_page(const uint8_t * resp, int len,
                                   const struct opts_t * op);
 static bool show_power_condition_transitions_page(const uint8_t * resp,
@@ -324,14 +324,14 @@ static struct log_elem log_arr[] = {
      show_mchanger_diag_data_page},     /* 0x16, 0x0  SMC */
     {0x17, 0, 0, 0, 0, "Non volatile cache", "nvc",
      show_non_volatile_cache_page},     /* 0x17, 0x0  SBC */
-    {0x17, 0, 0, PDT_TAPE, 0, "Volume statistics", "vs",
-     show_volume_stats_page},           /* 0x17, 0x0  SSC */
+    {0x17, 0, 0xf, PDT_TAPE, 0, "Volume statistics", "vs",
+     show_volume_stats_pages},          /* 0x17, 0x0...0xf  SSC */
     {PROTO_SPECIFIC_LPAGE, 0, 0, -1, 0, "Protocol specific port", "psp",
      show_protocol_specific_page},      /* 0x18, 0x0  */
     {STATS_LPAGE, 0, 0, -1, 0, "General Statistics and Performance", "gsp",
-     show_stats_perform_page},          /* 0x19, 0x0  */
+     show_stats_perform_pages},         /* 0x19, 0x0  */
     {STATS_LPAGE, 0x1, 0x1f, -1, 0, "Group Statistics and Performance", "grsp",
-     show_stats_perform_page},          /* 0x19, 0x1...0x1f  */
+     show_stats_perform_pages},         /* 0x19, 0x1...0x1f  */
     {STATS_LPAGE, 0x20, 0, -1, 0, "Cache memory statistics", "cms",
      show_cache_stats_page},            /* 0x19, 0x20  */
     {PCT_LPAGE, 0, 0, -1, 0, "Power condition transitions", "pct",
@@ -758,7 +758,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
                 }
                 op->filter = n;
             }
-            ++op->filter_given;
+            op->filter_given = true;
             break;
         case 'h':
         case '?':
@@ -970,7 +970,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->filter = n;
-                ++op->filter_given;
+                op->filter_given = true;
             } else if (0 == strncmp("i=", cp, 2))
                 op->in_fn = cp + 2;
             else if (0 == strncmp("m=", cp, 2)) {
@@ -3188,11 +3188,11 @@ skip:
     return true;
 }
 
-/* Returns 1 if processed page, 0 otherwise */
+/* Returns true if processed page, false otherwise */
 /* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f  introduced: SPC-4 */
 static bool
-show_stats_perform_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+show_stats_perform_pages(const uint8_t * resp, int len,
+                         const struct opts_t * op)
 {
     int k, num, param_len, param_code, spf, subpg_code, extra;
     int pcb, nam;
@@ -3482,7 +3482,7 @@ show_stats_perform_page(const uint8_t * resp, int len,
     return true;
 }
 
-/* Returns 1 if processed page, 0 otherwise */
+/* Returns true if processed page, false otherwise */
 /* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20]  introduced: SPC-4 */
 static bool
 show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
@@ -5298,7 +5298,7 @@ skip:
     return true;
 }
 
-/* Helper for show_volume_stats_page() */
+/* Helper for show_volume_stats_pages() */
 static void
 volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
 {
@@ -5345,9 +5345,32 @@ volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
     }
 }
 
-/* Volume Statistics log page (ssc-4) [0x17, 0x1-0xf] */
+/* Helper for show_volume_stats_pages() */
+static void
+volume_stats_history(const uint8_t * xp, int len)
+{
+    int dl, mhi;
+
+    while (len > 3) {
+        dl = xp[0] + 1;
+        if (dl < 4)
+            return;
+        mhi = sg_get_unaligned_be16(xp + 2);
+        if (dl < 12)
+            printf("    index: %d\n", mhi);
+        else if (12 == dl)
+            printf("    index: %d, vendor: %.8s\n", mhi, xp + 4);
+        else
+            printf("    index: %d, vendor: %.8s, unit serial number: %.*s\n",
+                   mhi, xp + 4, dl - 12, xp + 12);
+        xp += dl;
+        len -= dl;
+    }
+}
+
+/* Volume Statistics log page and subpages (ssc-4) [0x17, 0x0-0xf] */
 static bool
-show_volume_stats_page(const uint8_t * resp, int len,
+show_volume_stats_pages(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
     int num, pl, pc, pcb, spf, subpg_code;
@@ -5358,10 +5381,7 @@ show_volume_stats_page(const uint8_t * resp, int len,
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
-        if (0 == subpg_code)
-            printf("Volume statistics page (ssc-4) but subpage=0, abnormal: "
-                   "treat like subpage=1\n");
-        else if (subpg_code < 0x10)
+        if (subpg_code < 0x10)
             printf("Volume statistics page (ssc-4), subpage=%d\n",
                    subpg_code);
         else {
@@ -5550,9 +5570,8 @@ show_volume_stats_page(const uint8_t * resp, int len,
             volume_stats_partition(ucp + 4, pl - 4, false);
             break;
         case 0x300:
-            printf("  Mount history, payload in hex:\n");
-            // xxxxxxxx TODO
-            dStrHex((const char *)(ucp + 4), pl - 4, 0);
+            printf("  Mount history:\n");
+            volume_stats_history(ucp + 4, pl - 4);
             break;
 
         default:

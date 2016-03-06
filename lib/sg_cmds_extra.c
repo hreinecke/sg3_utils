@@ -161,9 +161,14 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    get LBA status: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    get LBA status: response\n");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -229,9 +234,14 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    report target port group: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    report target port group: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -343,9 +353,14 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    report referrals: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    report referrals: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -470,9 +485,14 @@ sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    receive diagnostic results: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    receive diagnostic results: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -531,9 +551,14 @@ sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist, int dl_format,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    read defect (10): response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    read defect (10): response\n");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -588,9 +613,14 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    read media serial number: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    read media serial number: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -648,9 +678,14 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    report identifying information: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    report identifying information: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -903,9 +938,14 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    persistent reserve in: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    persistent reserve in: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -1065,9 +1105,14 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    read long(10): response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    read long(10): response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -1150,9 +1195,14 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    read long(16): response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    read long(16): response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -1686,9 +1736,14 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    read buffer: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    read buffer: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }
@@ -1718,10 +1773,15 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
             pr2ws("%02x ", wbufCmdBlk[k]);
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
-            pr2ws("    Write buffer parameter list%s:\n",
-                  ((param_len > 256) ? " (first 256 bytes)" : ""));
-            dStrHexErr((const char *)paramp,
-                       ((param_len > 256) ? 256 : param_len), -1);
+            pr2ws("    Write buffer parameter list");
+            if (2 == verbose) {
+                pr2ws("%s:\n", (param_len > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)paramp,
+                           (param_len > 256 ? 256 : param_len), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)paramp, param_len, 0);
+            }
         }
     }
 
@@ -1866,9 +1926,14 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    read block limits: response%s\n",
-                  (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            pr2ws("    read block limits: response");
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
         }
         ret = 0;
     }

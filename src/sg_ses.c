@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -30,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.07 20160201";    /* ses3r08->11 */
+static const char * version_str = "2.08 20160306";    /* ses3r08->11 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -101,7 +102,7 @@ struct element_type_t {
 
 struct opts_t {
     int byte1;
-    int byte1_given;
+    bool byte1_given;
     int do_control;
     int do_data;
     int dev_slot_num;
@@ -111,7 +112,7 @@ struct opts_t {
     int do_filter;
     int do_help;
     int do_hex;
-    int ind_given;
+    bool ind_given;
     int ind_th;         /* type header index */
     int ind_indiv;      /* individual element index; -1 for overall */
     int ind_et_inst;    /* ETs can have multiple type header instances */
@@ -121,9 +122,9 @@ struct opts_t {
     int mask_ign;       /* element read-mask-modify-write actions */
     int maxlen;
     int seid;
-    int seid_given;
+    bool seid_given;
     int page_code;
-    int page_code_given;
+    bool page_code_given;
     int do_raw;
     int o_readonly;
     int do_status;
@@ -185,7 +186,7 @@ struct join_row_t {
     unsigned char * elem_descp;
     unsigned char * enc_statp;  /* NULL indicates past last */
     unsigned char * thresh_inp;
-    unsigned char * add_elem_statp;
+    unsigned char * ae_statp;
     int dev_slot_num;           /* if not available, set to -1 */
     unsigned char sas_addr[8];  /* if not available, set to 0 */
 };
@@ -826,7 +827,7 @@ parse_index(struct opts_t *op)
     const struct element_type_t * etp;
     char b[64];
 
-    op->ind_given = 1;
+    op->ind_given = true;
     if ((cp = strchr(op->index_str, ','))) {
         if (0 == strcmp("-1", cp + 1))
             n = -1;
@@ -940,7 +941,7 @@ parse_index(struct opts_t *op)
 }
 
 
-/* process command line options and argument. Returns 0 if ok. */
+/* command line process, options and arguments. Returns 0 if ok. */
 static int
 cl_process(struct opts_t *op, int argc, char *argv[])
 {
@@ -953,8 +954,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:rRsS:v"
-                        "Vwx:", long_options, &option_index);
+        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:rRs"
+                        "S:vVwx:", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -984,7 +985,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                 pr2serr("bad argument to '--byte1' (0 to 255 inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->byte1_given;
+            op->byte1_given = true;
             break;
         case 'c':
             ++op->do_control;
@@ -1049,7 +1050,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                 pr2serr("bad argument to '--nick_id' (0 to 255 inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->seid_given;
+            op->seid_given = true;
             break;
         case 'm':
             op->maxlen = sg_get_num(optarg);
@@ -1086,7 +1087,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
-            ++op->page_code_given;
+            op->page_code_given = true;
             break;
         case 'r':
             ++op->do_raw;
@@ -1174,7 +1175,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         if ((0 == op->do_join) && (0 == op->do_control) &&
-            (0 == op->num_cgs) && (0 == op->page_code_given)) {
+            (0 == op->num_cgs) && (! op->page_code_given)) {
             ++op->do_join;      /* implicit --join */
             if (op->verbose)
                 pr2serr("assume --join option is set\n");
@@ -1182,8 +1183,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     }
     if (op->ind_given) {
         if ((0 == op->do_join) && (0 == op->do_control) &&
-            (0 == op->num_cgs) && (0 == op->page_code_given)) {
-            ++op->page_code_given;
+            (0 == op->num_cgs) && (! op->page_code_given)) {
+            op->page_code_given = true;
             op->page_code = 2;  /* implicit status page */
             if (op->verbose)
                 pr2serr("assume --page=2 (es) option is set\n");
@@ -2252,18 +2253,23 @@ reserved_or_num(char * buff, int buff_len, int num, int reserve_num)
 }
 
 static void
-ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
+ses_threshold_helper(const char * header, const char * pad,
+                     const unsigned char *tp, int etype,
                      const struct opts_t * op)
 {
     char b[128];
     char b2[128];
 
     if (op->inner_hex) {
+        if (header)
+            printf("%s", header);
         printf("%s%02x %02x %02x %02x\n", pad, tp[0], tp[1], tp[2], tp[3]);
         return;
     }
     switch (etype) {
     case 0x4:  /*temperature */
+        if (header)
+            printf("%s", header);
         printf("%shigh critical=%s, high warning=%s\n", pad,
                reserved_or_num(b, 128, tp[0] - TEMPERAT_OFF, -TEMPERAT_OFF),
                reserved_or_num(b2, 128, tp[1] - TEMPERAT_OFF, -TEMPERAT_OFF));
@@ -2272,6 +2278,8 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
                reserved_or_num(b2, 128, tp[3] - TEMPERAT_OFF, -TEMPERAT_OFF));
         break;
     case 0xb:  /* UPS */
+        if (header)
+            printf("%s", header);
         if (0 == tp[2])
             strcpy(b, "<vendor>");
         else
@@ -2284,19 +2292,23 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         printf("low critical=%s (in minutes)\n", b);
         break;
     case 0x12: /* voltage */
+        if (header)
+            printf("%s", header);
 #ifdef SG_LIB_MINGW
-        printf("%shigh critical=%g %%, high warning=%g %%\n", pad,
-               0.5 * tp[0], 0.5 * tp[1]);
-        printf("%slow warning=%g %%, low critical=%g %% (from nominal "
+        printf("%shigh critical=%g %%, high warning=%g %% (above nominal "
+               "voltage)\n", pad, 0.5 * tp[0], 0.5 * tp[1]);
+        printf("%slow warning=%g %%, low critical=%g %% (below nominal "
                "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
 #else
-        printf("%shigh critical=%.1f %%, high warning=%.1f %%\n", pad,
-               0.5 * tp[0], 0.5 * tp[1]);
-        printf("%slow warning=%.1f %%, low critical=%.1f %% (from nominal "
+        printf("%shigh critical=%.1f %%, high warning=%.1f %% (above nominal "
+               "voltage)\n", pad, 0.5 * tp[0], 0.5 * tp[1]);
+        printf("%slow warning=%.1f %%, low critical=%.1f %% (below nominal "
                "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
 #endif
         break;
     case 0x13: /* current */
+        if (header)
+            printf("%s", header);
 #ifdef SG_LIB_MINGW
         printf("%shigh critical=%g %%, high warning=%g %%", pad,
                0.5 * tp[0], 0.5 * tp[1]);
@@ -2307,8 +2319,11 @@ ses_threshold_helper(const char * pad, const unsigned char *tp, int etype,
         printf(" (above nominal current)\n");
         break;
     default:
-        if (op->verbose)
+        if (op->verbose) {
+            if (header)
+                printf("%s", header);
             printf("%s<< no thresholds for this element type >>\n", pad);
+        }
         break;
     }
 }
@@ -2348,8 +2363,8 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
             printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
                    find_element_tname(tdhp->etype, b, sizeof(b)),
                    tdhp->se_id, k);
-            printf("      Overall descriptor:\n");
-            ses_threshold_helper("        ", ucp, tdhp->etype, op);
+            ses_threshold_helper("      Overall descriptor:\n", "        ",
+                                 ucp, tdhp->etype, op);
             ++got1;
         }
         for (ucp += 4, j = 0, elem_ind = 0; j < tdhp->num_elements;
@@ -2359,8 +2374,9 @@ ses_threshold_sdg(const struct type_desc_hdr_t * tdhp, int num_telems,
                     (elem_ind != op->ind_indiv))
                     continue;
             }
-            printf("      Element %d descriptor:\n", elem_ind);
-            ses_threshold_helper("        ", ucp, tdhp->etype, op);
+            snprintf(b, sizeof(b), "      Element %d descriptor:\n",
+                     elem_ind);
+            ses_threshold_helper(b, "        ", ucp, tdhp->etype, op);
             ++got1;
         }
     }
@@ -3351,13 +3367,18 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, unsigned char * ae_ucp)
 /* Fetch Configuration, Enclosure Status, Element Descriptor, Additional
  * Element Status and optionally Threshold In pages, place in static arrays.
  * Collate (join) overall and individual elements into the static join_arr[].
- * Returns 0 for success, any other return value is an error. */
+ * When 'display' is true then the join_arr[]  is output to stdout in a form
+ * suitable for end users. For debug purposes the join_arr[] is output to
+ * stderr when op->verbose > 3. Returns 0 for success, any other return value
+ * is an error. */
 static int
-join_work(int sg_fd, struct opts_t * op, int display)
+join_work(int sg_fd, struct opts_t * op, bool display)
 {
     int k, j, res, num_t_hdrs, elem_ind, ei, desc_len, dn_len;
     int et4aes, broken_ei, ei2, got1, jr_max_ind, mlen;
     uint32_t ref_gen_code, gen_code;
+    int eip_count = 0;
+    int eiioe_count = 0;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
     unsigned char * es_ucp;
@@ -3470,7 +3491,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
     }
 
     if ((op->do_join > 1) ||
-        ((0 == display) && (DPC_THRESHOLD == op->page_code))) {
+        ((! display) && (DPC_THRESHOLD == op->page_code))) {
         mlen = sizeof(threshold_rsp);
         if (mlen > op->maxlen)
             mlen = op->maxlen;
@@ -3517,7 +3538,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
         jrp->elem_descp = ed_ucp;
         if (ed_ucp)
             ed_ucp += sg_get_unaligned_be16(ed_ucp + 2) + 4;
-        jrp->add_elem_statp = NULL;
+        jrp->ae_statp = NULL;
         jrp->thresh_inp = t_ucp;
         jrp->dev_slot_num = -1;
         /* assume sas_addr[8] zeroed since it's static file scope */
@@ -3547,7 +3568,7 @@ join_work(int sg_fd, struct opts_t * op, int display)
             /* assume sas_addr[8] zeroed since it's static file scope */
             if (t_ucp)
                 t_ucp += 4;
-            jrp->add_elem_statp = NULL;
+            jrp->ae_statp = NULL;
             ++jr_max_ind;
         }
         if (jrp >= join_arr_lastp) {
@@ -3577,11 +3598,14 @@ join_work(int sg_fd, struct opts_t * op, int display)
                         break;
                     }
                     eip = !!(ae_ucp[0] & 0x10); /* element index present */
-                    if (eip)
+                    if (eip) {
+                        ++eip_count;
+                        if (ae_ucp[2] & 1)
+                            ++eiioe_count;
                         eiioe = op->eiioe_force ? 1 : (ae_ucp[2] & 1);
-                    else
+                    } else
                         eiioe = 0;
-                    if (eip && eiioe) {
+                    if (eip && eiioe) {         /* EIIOE=1 */
                         ei = ae_ucp[3];
                         jr2p = join_arr + ei;
                         if ((ei >= jr_max_ind) || (NULL == jr2p->enc_statp)) {
@@ -3592,13 +3616,19 @@ join_work(int sg_fd, struct opts_t * op, int display)
                             break;
                         }
                         devslotnum_and_sasaddr(jr2p, ae_ucp);
-                        if (jr2p->add_elem_statp) {
-                            if (op->warn || op->verbose)
-                                pr2serr("warning: aes slot busy [oi=%d, "
-                                        "ei=%d, aes_i=%d]\n", k, ei, aes_i);
+                        if (jr2p->ae_statp) {
+                            if (op->warn || op->verbose) {
+                                pr2serr("warning: aes slot already in use, "
+                                        "keep existing AES+%ld\n\t",
+                                        jr2p->ae_statp - add_elem_rsp);
+                                pr2serr("dropping AES+%ld [length=%d, oi=%d, "
+                                        "ei=%d, aes_i=%d]\n",
+                                        ae_ucp - add_elem_rsp,
+                                        ae_ucp[1] + 2, k, ei, aes_i);
+                            }
                         } else
-                            jr2p->add_elem_statp = ae_ucp;
-                    } else if (eip) {     /* and EIIOE=0 */
+                            jr2p->ae_statp = ae_ucp;
+                    } else if (eip) {           /* and EIIOE=0 */
                         ei = ae_ucp[3];
 try_again:
                         for (jr2p = join_arr; jr2p->enc_statp; ++jr2p) {
@@ -3623,15 +3653,21 @@ try_again:
                             goto try_again;
                         }
                         devslotnum_and_sasaddr(jr2p, ae_ucp);
-                        if (jr2p->add_elem_statp) {
-                            if (op->warn || op->verbose)
-                                pr2serr("warning: aes slot busy [oi=%d, "
-                                        "ei=%d, aes_i=%d]\n", k, ei, aes_i);
+                        if (jr2p->ae_statp) {
+                            if (op->warn || op->verbose) {
+                                pr2serr("warning2: aes slot already in use, "
+                                        "keep existing AES+%ld\n\t",
+                                        jr2p->ae_statp - add_elem_rsp);
+                                pr2serr("dropping AES+%ld [length=%d, oi=%d, "
+                                        "ei=%d, aes_i=%d]\n",
+                                        ae_ucp - add_elem_rsp,
+                                        ae_ucp[1] + 2, k, ei, aes_i);
+                            }
                         } else
-                            jr2p->add_elem_statp = ae_ucp;
+                            jr2p->ae_statp = ae_ucp;
                     } else {    /* EIP=0 */
                         while (jrp->enc_statp && ((-1 == jrp->el_ind_indiv) ||
-                                                  jrp->add_elem_statp))
+                                                  jrp->ae_statp))
                             ++jrp;
                         if (NULL == jrp->enc_statp) {
                             get_out = 1;
@@ -3639,7 +3675,7 @@ try_again:
                                     "ae\n", __func__);
                             break;
                         }
-                        jrp->add_elem_statp = ae_ucp;
+                        jrp->ae_statp = ae_ucp;
                         ++jrp;
                     }
                     ae_ucp += ae_ucp[1] + 2;
@@ -3664,21 +3700,33 @@ try_again:
     if (op->verbose > 3) {
         jrp = join_arr;
         for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-            pr2serr("el_ind_th=%d el_ind_indiv=%d etype=%d se_id=%d ei=%d "
-                    "ei2=%d dsn=%d sa=0x", jrp->el_ind_th, jrp->el_ind_indiv,
+            pr2serr("ei_th=%d ei_indiv=%d etype=%d se_id=%d ei=%d "
+                    "ei2=%d dsn=%d", jrp->el_ind_th, jrp->el_ind_indiv,
                     jrp->etype, jrp->se_id, jrp->ei_asc, jrp->ei_asc2,
                     jrp->dev_slot_num);
-            if (saddr_non_zero(jrp->sas_addr)) {
-                for (j = 0; j < 8; ++j)
-                    pr2serr("%02x", jrp->sas_addr[j]);
-            } else
-                pr2serr("0");
-            pr2serr(" %s %s %s %s\n", (jrp->enc_statp ? "ES" : ""),
-                    (jrp->elem_descp ? "ED" : ""),
-                    (jrp->add_elem_statp ? "AES" : ""),
-                    (jrp->thresh_inp ? "TI" : ""));
+            if (op->do_join > 2) {
+                pr2serr(" sa=0x");
+                if (saddr_non_zero(jrp->sas_addr)) {
+                    for (j = 0; j < 8; ++j)
+                        pr2serr("%02x", jrp->sas_addr[j]);
+                } else
+                    pr2serr("0");
+            }
+            if (jrp->enc_statp)
+                pr2serr(" ES+%ld", jrp->enc_statp - enc_stat_rsp);
+            if (jrp->elem_descp)
+                pr2serr(" ED+%ld", jrp->elem_descp - elem_desc_rsp);
+            if (jrp->ae_statp)
+                pr2serr(" AES+%ld", jrp->ae_statp - add_elem_rsp);
+            if (jrp->thresh_inp)
+                pr2serr(" TI+%ld", jrp->thresh_inp - threshold_rsp);
+            pr2serr("\n");
         }
-        pr2serr(">> elements in join_arr: %d, broken_ei=%d\n", k, broken_ei);
+        pr2serr(">> ES len=%d, ED len=%d, AES len=%d, TI len=%d\n",
+                enc_stat_rsp_len, elem_desc_rsp_len, add_elem_rsp_len,
+                threshold_rsp_len);
+        pr2serr(">> join_arr elements=%d, eip_count=%d, eiioe_count=%d "
+                "broken_ei=%d\n", k, eip_count, eiioe_count, broken_ei);
     }
 
     if (! display)      /* probably wanted join_arr[] built only */
@@ -3737,16 +3785,16 @@ try_again:
                    jrp->el_ind_indiv, cp);
         printf("  Enclosure Status:\n");
         enc_status_helper("    ", jrp->enc_statp, jrp->etype, op);
-        if (jrp->add_elem_statp) {
+        if (jrp->ae_statp) {
             printf("  Additional Element Status:\n");
-            ae_ucp = jrp->add_elem_statp;
+            ae_ucp = jrp->ae_statp;
             desc_len = ae_ucp[1] + 2;
             additional_elem_helper("    ",  ae_ucp, desc_len, jrp->etype, op);
         }
         if (jrp->thresh_inp) {
-            printf("  Threshold In:\n");
             t_ucp = jrp->thresh_inp;
-            ses_threshold_helper("    ", t_ucp, jrp->etype, op);
+            ses_threshold_helper("  Threshold In:\n", "    ", t_ucp,
+                                 jrp->etype, op);
         }
     }
     if (0 == got1) {
@@ -4011,7 +4059,7 @@ cgs_additional_el(const struct join_row_t * jrp,
     uint64_t ui;
     const struct acronym2tuple * ap;
 
-    if (NULL == jrp->add_elem_statp) {
+    if (NULL == jrp->ae_statp) {
         pr2serr("No additional element status element available\n");
         return -1;
     }
@@ -4034,7 +4082,7 @@ cgs_additional_el(const struct join_row_t * jrp,
             return -2;
     }
     if (op->get_str) {
-        ui = get_big_endian(jrp->add_elem_statp + s_byte, s_bit, n_bits);
+        ui = get_big_endian(jrp->ae_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else
@@ -4077,7 +4125,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         pr2serr("acroynm %s not found (try '-ee' option)\n", tavp->acron);
         return -1;
     }
-    ret = join_work(sg_fd, op, 0);
+    ret = join_work(sg_fd, op, false);
     if (ret)
         return ret;
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
@@ -4380,7 +4428,7 @@ main(int argc, char * argv[])
     else if (have_cgs)
         ret = ses_cgs(sg_fd, &tav, op);
     else if (op->do_join)
-        ret = join_work(sg_fd, op, 1);
+        ret = join_work(sg_fd, op, true);
     else if (op->do_status)
         ret = ses_process_status_page(sg_fd, op);
     else { /* control page requested */
