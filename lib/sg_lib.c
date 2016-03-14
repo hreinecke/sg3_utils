@@ -107,6 +107,8 @@ get_value_name(const struct sg_lib_value_name_t * arr, int value,
     const struct sg_lib_value_name_t * vp = arr;
     const struct sg_lib_value_name_t * holdp;
 
+    if (peri_type < 0)
+        peri_type = 0;
     for (; vp->name; ++vp) {
         if (value == vp->value) {
             if (peri_type == vp->peri_dev_type)
@@ -456,7 +458,7 @@ int
 sg_lib_pdt_decay(int pdt)
 {
     if ((pdt < 0) || (pdt > 31))
-        return pdt;
+        return 0;
     return sg_lib_pdt_decay_arr[pdt];
 }
 
@@ -1382,12 +1384,16 @@ sg_get_sense_descriptors_str(const char * leadin,
     return n;
 }
 
-/* Decode SAT ATA PASS-THROUGH fixed format sense */
+/* Decode SAT ATA PASS-THROUGH fixed format sense. Shows "+" after 'count'
+ * and/or 'lba' values to indicate that not all data in those fields is shown.
+ * That extra field information may be available in the ATA pass-through
+ * results log page parameter with the corresponding 'log_index'. */
 static int
 sg_get_sense_sat_pt_fixed_str(const char * leadin, const unsigned char * sp,
                               int slen, int blen, char * b)
 {
     int n = 0;
+    int extend, count_upper_nz, lba_upper_nz;
     const char * lip = "";
 
     if ((blen < 1) || (slen < 12))
@@ -1397,13 +1403,18 @@ sg_get_sense_sat_pt_fixed_str(const char * leadin, const unsigned char * sp,
     if (SPC_SK_RECOVERED_ERROR != (0xf & sp[2]))
         n += my_snprintf(b + n, blen - n, "%s  >> expected Sense key: "
                          "Recovered Error ??\n", lip);
+    /* Fixed sense command-specific information field starts at sp + 8 */
+    extend = !!(0x80 & sp[8]);
+    count_upper_nz = !!(0x40 & sp[8]);
+    lba_upper_nz = !!(0x20 & sp[8]);
+    /* Fixed sense information field starts at sp + 3 */
     n += my_snprintf(b + n, blen - n, "%s  error=0x%x, status=0x%x, "
-                     "device=0x%x, sector_count(7:0)=0x%x%c\n", lip, sp[3],
-                     sp[4], sp[5], sp[6], ((0x40 & sp[8]) ? '+' : ' '));
+                     "device=0x%x, count(7:0)=0x%x%c\n", lip, sp[3],
+                     sp[4], sp[5], sp[6], (count_upper_nz ? '+' : ' '));
     n += my_snprintf(b + n, blen - n, "%s  extend=%d, log_index=0x%x, "
                      "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n", lip,
-                     (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
-                     ((0x20 & sp[8]) ? '+' : ' '));
+                     extend, (0xf & sp[8]), sp[9], sp[10], sp[11],
+                     (lba_upper_nz ? '+' : ' '));
     return n;
 }
 
@@ -1808,6 +1819,8 @@ sg_get_opcode_sa_name(unsigned char cmd_byte0, int service_action,
         return;
     }
 
+    if (peri_type < 0)
+        peri_type = 0;
     d_pdt = sg_lib_pdt_decay(peri_type);
     for (osp = op_code2sa_arr; osp->arr; ++osp) {
         if ((int)cmd_byte0 == osp->op_code) {

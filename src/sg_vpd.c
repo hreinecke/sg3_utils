@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.14 20160217";  /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.15 20160312";  /* spc5r08 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -2166,6 +2166,10 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         pr2serr("Third-party Copy VPD page length too short=%d\n", len);
         return;
     }
+    if (3 == do_hex) {
+        dStrHex((const char *)buff, len, -1);
+        return;
+    }
     len -= 4;
     ucp = buff + 4;
     for (k = 0; k < len; k += bump, ucp += bump) {
@@ -2318,8 +2322,8 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
     int k, bump, rel_port, desc_len, proto;
     unsigned char * ucp;
 
-    if (1 == do_hex) {
-        dStrHex((const char *)buff, len, 0);
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -2369,8 +2373,8 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * ucp;
     unsigned char * pidp;
 
-    if (1 == do_hex) {
-        dStrHex((const char *)buff, len, 0);
+    if ((1 == do_hex) || (do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -2586,7 +2590,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
-/* VPD_LB_PROVISIONING */
+/* VPD_LB_PROVISIONING 0xb2 */
 static int
 decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
 {
@@ -2727,7 +2731,7 @@ decode_block_dev_char_ext_vpd(unsigned char * b, int len)
     printf("  Utilization A: %u\n", sg_get_unaligned_be32(b + 12));
 }
 
-/* VPD_LB_PROTECTION    (SSC)  [added in ssc5r02a] */
+/* VPD_LB_PROTECTION 0xb5 (SSC)  [added in ssc5r02a] */
 static void
 decode_lb_protection_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -2758,46 +2762,27 @@ decode_lb_protection_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
-/* VPD_TA_SUPPORTED */
+/* VPD_TA_SUPPORTED 0xb2 */
 static int
 decode_tapealert_supported_vpd(unsigned char * b, int len)
 {
+    int k, mod, div;
+
     if (len < 12) {
         pr2serr("TapeAlert supported flags length too short=%d\n", len);
         return SG_LIB_CAT_MALFORMED;
     }
-    printf("  Flag01h: %d  02h: %d  03h: %d  04h: %d  05h: %d  06h: %d  "
-           "07h: %d  08h: %d\n", !!(b[4] & 0x80), !!(b[4] & 0x40),
-           !!(b[4] & 0x20), !!(b[4] & 0x10), !!(b[4] & 0x8), !!(b[4] & 0x4),
-           !!(b[4] & 0x2), !!(b[4] & 0x1));
-    printf("  Flag09h: %d  0ah: %d  0bh: %d  0ch: %d  0dh: %d  0eh: %d  "
-           "0fh: %d  10h: %d\n", !!(b[5] & 0x80), !!(b[5] & 0x40),
-           !!(b[5] & 0x20), !!(b[5] & 0x10), !!(b[5] & 0x8), !!(b[5] & 0x4),
-           !!(b[5] & 0x2), !!(b[5] & 0x1));
-    printf("  Flag11h: %d  12h: %d  13h: %d  14h: %d  15h: %d  16h: %d  "
-           "17h: %d  18h: %d\n", !!(b[6] & 0x80), !!(b[6] & 0x40),
-           !!(b[6] & 0x20), !!(b[6] & 0x10), !!(b[6] & 0x8), !!(b[6] & 0x4),
-           !!(b[6] & 0x2), !!(b[6] & 0x1));
-    printf("  Flag19h: %d  1ah: %d  1bh: %d  1ch: %d  1dh: %d  1eh: %d  "
-           "1fh: %d  20h: %d\n", !!(b[7] & 0x80), !!(b[7] & 0x40),
-           !!(b[7] & 0x20), !!(b[7] & 0x10), !!(b[7] & 0x8), !!(b[7] & 0x4),
-           !!(b[7] & 0x2), !!(b[7] & 0x1));
-    printf("  Flag21h: %d  22h: %d  23h: %d  24h: %d  25h: %d  26h: %d  "
-           "27h: %d  28h: %d\n", !!(b[8] & 0x80), !!(b[8] & 0x40),
-           !!(b[8] & 0x20), !!(b[8] & 0x10), !!(b[8] & 0x8), !!(b[8] & 0x4),
-           !!(b[8] & 0x2), !!(b[8] & 0x1));
-    printf("  Flag29h: %d  2ah: %d  2bh: %d  2ch: %d  2dh: %d  2eh: %d  "
-           "2fh: %d  30h: %d\n", !!(b[9] & 0x80), !!(b[9] & 0x40),
-           !!(b[9] & 0x20), !!(b[9] & 0x10), !!(b[9] & 0x8), !!(b[9] & 0x4),
-           !!(b[9] & 0x2), !!(b[9] & 0x1));
-    printf("  Flag31h: %d  32h: %d  33h: %d  34h: %d  35h: %d  36h: %d  "
-           "37h: %d  38h: %d\n", !!(b[10] & 0x80), !!(b[10] & 0x40),
-           !!(b[10] & 0x20), !!(b[10] & 0x10), !!(b[10] & 0x8),
-           !!(b[10] & 0x4), !!(b[10] & 0x2), !!(b[10] & 0x1));
-    printf("  Flag39h: %d  3ah: %d  3bh: %d  3ch: %d  3dh: %d  3eh: %d  "
-           "3fh: %d  40h: %d\n", !!(b[11] & 0x80), !!(b[11] & 0x40),
-           !!(b[11] & 0x20), !!(b[11] & 0x10), !!(b[11] & 0x8),
-           !!(b[11] & 0x4), !!(b[11] & 0x2), !!(b[11] & 0x1));
+    for (k = 1; k < 0x41; ++k) {
+        mod = ((k - 1) % 8);
+        div = (k - 1) / 8;
+        if (0 == mod) {
+            if (div > 0)
+                printf("\n");
+            printf("  Flag%02Xh: %d", k, !! (b[4 + div] & 0x80));
+        } else
+            printf("  %02Xh: %d", k, !! (b[4 + div] & (1 << (7 - mod))));
+    }
+    printf("\n");
     return 0;
 }
 
@@ -2913,7 +2898,7 @@ decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
     }
 }
 
-/* VPD_ZBC_DEV_CHARS  sbc or zbc */
+/* VPD_ZBC_DEV_CHARS 0xb6  sbc or zbc */
 static void
 decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
 {

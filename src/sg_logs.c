@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.40 20160303";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.40 20160313";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -101,6 +101,7 @@ static struct option long_options[] = {
         {"paramp", required_argument, 0, 'P'},
         {"pcb", no_argument, 0, 'q'},
         {"ppc", no_argument, 0, 'Q'},
+        {"pdt", required_argument, 0, 'D'},
         {"raw", no_argument, 0, 'r'},
         {"readonly", no_argument, 0, 'X'},
         {"reset", no_argument, 0, 'R'},
@@ -142,7 +143,7 @@ struct opts_t {
     int paramp;
     int opt_new;
     int no_inq;
-    int dev_pdt;
+    int dev_pdt;        /* from device or --pdt=DT */
     const char * device_name;
     const char * in_fn;
     const char * pg_arg;
@@ -201,6 +202,10 @@ static bool show_media_stats_page(const uint8_t * resp, int len,
                                   const struct opts_t * op);
 static bool show_dt_device_status_page(const uint8_t * resp, int len,
                                        const struct opts_t * op);
+static bool show_tapealert_response_page(const uint8_t * resp, int len,
+                                         const struct opts_t * op);
+static bool show_requested_recovery_page(const uint8_t * resp, int len,
+                                         const struct opts_t * op);
 static bool show_background_scan_results_page(const uint8_t * resp, int len,
                                               const struct opts_t * op);
 static bool show_pending_defects_page(const uint8_t * resp, int len,
@@ -211,6 +216,8 @@ static bool show_lps_misalignment_page(const uint8_t * resp, int len,
                                        const struct opts_t * op);
 static bool show_element_stats_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
+static bool show_service_buffer_info_page(const uint8_t * resp, int len,
+                                          const struct opts_t * op);
 static bool show_ata_pt_results_page(const uint8_t * resp, int len,
                                      const struct opts_t * op);
 static bool show_tape_diag_data_page(const uint8_t * resp, int len,
@@ -295,9 +302,9 @@ static struct log_elem log_arr[] = {
     {0x11, 0, 0, PDT_TAPE, 0, "DT Device status", "dtds",
      show_dt_device_status_page},       /* 0x11, 0x0  SSC,ADC */
     {0x12, 0, 0, PDT_TAPE, 0, "Tape alert response", "tar",
-     NULL},                             /* 0x12, 0x0  SSC,ADC */
+     show_tapealert_response_page},      /* 0x12, 0x0  SSC,ADC */
     {0x13, 0, 0, PDT_TAPE, 0, "Requested recovery", "rr",
-     NULL},                             /* 0x13, 0x0  SSC,ADC */
+     show_requested_recovery_page},     /* 0x13, 0x0  SSC,ADC */
     {0x14, 0, 0, PDT_TAPE, 0, "Device statistics", "ds",
      show_device_stats_page},           /* 0x14, 0x0  SSC,ADC */
     {0x14, 0, 0, PDT_MCHANGER, 0, "Media changer statistics", "mcs",
@@ -313,7 +320,7 @@ static struct log_elem log_arr[] = {
     {0x15, 0, 0, PDT_MCHANGER, 0, "Element statistics", "els",
      show_element_stats_page},          /* 0x15, 0x0  SMC */
     {0x15, 0, 0, PDT_ADC, 0, "Service buffers information", "sbi",
-     NULL},                             /* 0x15, 0x0  ADC */
+     show_service_buffer_info_page},    /* 0x15, 0x0  ADC */
     {BACKGROUND_SCAN_LPAGE, PENDING_DEFECTS_SUBPG, 0, 0, 0,
      "Pending defects", "pd", show_pending_defects_page}, /* 0x15, 0x1  SBC */
     {SAT_ATA_RESULTS_LPAGE, 0, 0, 0, 0, "ATA pass-through results", "aptr",
@@ -404,11 +411,11 @@ usage(int hval)
            "[--in=FN]\n"
            "               [--list] [--no_inq] [--maxlen=LEN] [--name] "
            "[--page=PG]\n"
-           "               [--paramp=PP] [--pcb] [--ppc] [--raw] "
-           "[--readonly]\n"
-           "               [--reset] [--select] [--sp] [--temperature] "
-           "[--transport]\n"
-           "               [--verbose] [--version] DEVICE\n"
+           "               [--paramp=PP] [--pcb] [--ppc] [--pdt=DT] "
+           "[--raw]\n"
+           "               [--readonly] [--reset] [--select] [--sp] "
+           "[--temperature]\n"
+           "               [--transport] [--verbose] [--version] DEVICE\n"
            "  where the main options are:\n"
            "    --All|-A        fetch and decode all log pages and "
            "subpages\n"
@@ -479,6 +486,9 @@ usage(int hval)
            "output\n"
            "    --ppc|-Q        set the Parameter Pointer Control (PPC) bit "
            "(def: 0)\n"
+           "    --pdt=DT|-D DT    DT is peripheral device type to use with "
+           "'--in=FN'\n"
+           "                      or when '--no_inq' is used\n"
            "    --readonly|-X    open DEVICE read-only (def: first "
            "read-write then if\n"
            "                     fails try open again read-only)\n"
@@ -491,17 +501,19 @@ usage(int hval)
            "    --version|-V    output version string then exit\n\n"
            "If DEVICE and --select are given, a LOG SELECT command will be "
            "issued. If\nDEVICE is not given and '--in=FN' is given then FN "
-           "will decoded as if it\nwere a log page. Pages defined in SPC "
-           "are common to all device types.\n");
+           "will decoded as if it\nwere a log page. The contents of FN "
+           "typically generated by a prior\n"
+           "'sg_logs -HHH ...' invocation.\nPages defined in SPC are common "
+           "to all device types.\n");
     }
 }
 
 static void
 usage_old()
 {
-    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-e] [-E] [-f=FL] [-h] "
-           "[-H]\n"
-           "               [-i=FN] [-l] [-L] [-m=LEN] [-n] [-p=PG] "
+    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-D=DT] [-e] [-E] [-f=FL] "
+           "[-h]\n"
+           "               [-H] [-i=FN] [-l] [-L] [-m=LEN] [-n] [-p=PG] "
            "[-paramp=PP]\n"
            "               [-pcb] [-ppc] [-r] [-select] [-sp] [-t] [-T] "
            "[-v] [-V]\n"
@@ -711,7 +723,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:eEf:hHi:lLm:nNOp:P:qQrRsStTvVxX",
+        c = getopt_long(argc, argv, "aAbc:D:eEf:hHi:lLm:nNOp:P:qQrRsStTvVxX",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -734,6 +746,14 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->page_control = n;
+            break;
+        case 'D':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 31)) {
+                pr2serr("bad argument to '--pdt='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->dev_pdt = n;
             break;
         case 'e':
             ++op->do_enumerate;
@@ -962,6 +982,14 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->page_control = u;
+            } else if (0 == strncmp("D=", cp, 2)) {
+                n = sg_get_num(cp + 2);
+                if ((n < 0) || (n > 31)) {
+                    pr2serr("Bad argument after '-D=' option\n");
+                    usage_old();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->dev_pdt = n;
             } else if (0 == strncmp("f=", cp, 2)) {
                 n = sg_get_num(cp + 2);
                 if ((n < 0) || (n > 0xffff)) {
@@ -4210,6 +4238,162 @@ skip:
     return true;
 }
 
+/* TapeAlert response [0x12] (adc,ssc) */
+static bool
+show_tapealert_response_page(const uint8_t * resp, int len,
+                             const struct opts_t * op)
+{
+    int num, pl, pc, pcb, k, mod, div;
+    const uint8_t * ucp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("TapeAlert response page (ssc-3, adc-3) [0x12]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(ucp + 0);
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            if (pl < 12) {
+
+            }
+            for (k = 1; k < 0x41; ++k) {
+                mod = ((k - 1) % 8);
+                div = (k - 1) / 8;
+                if (0 == mod) {
+                    if (div > 0)
+                        printf("\n");
+                    printf("  Flag%02Xh: %d", k, !! (ucp[4 + div] & 0x80));
+                } else
+                    printf("  %02Xh: %d", k,
+                           !! (ucp[4 + div] & (1 << (7 - mod))));
+            }
+            printf("\n");
+            break;
+        default:
+            if (pc <= 0x8000) {
+                printf("  Reserved [parameter_code=0x%x]:\n", pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            } else {
+                printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            }
+            break;
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
+#define NUM_REQ_REC_ARR_ELEMS 16
+static const char * req_rec_arr[NUM_REQ_REC_ARR_ELEMS] = {
+    "Recovery not requested",
+    "Recovery requested, no recovery procedure defined",
+    "Instruct operator to push volume",
+    "Instruct operator to remove and re-insert volume",
+    "Issue UNLOAD command. Instruct operator to remove and re-insert volume",
+    "Instruct operator to power cycle target device",
+    "Issue LOAD command",
+    "Issue UNLOAD command",
+    "Issue LOGICAL UNIT RESET task management function",        /* 0x8 */
+    "No recovery procedure defined. Contact service organization",
+    "Issue UNLOAD command. Instruct operator to remove and quarantine "
+        "volume",
+    "Instruct operator to not insert a volume. Contact service organization",
+    "Issue UNLOAD command. Instruct operator to remove volume. Contact "
+        "service organization",
+    "Request creation of target device error log",
+    "Retrieve a target device error log",
+    "Modify configuration to all microcode update and instruct operator to "
+        "re-insert volume",     /* 0xf */
+};
+
+/* Requested recovery [0x13] (ssc) */
+static bool
+show_requested_recovery_page(const uint8_t * resp, int len,
+                             const struct opts_t * op)
+{
+    int num, pl, pc, pcb, j, k;
+    const uint8_t * ucp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Requested recovery page (ssc-3) [0x13]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(ucp + 0);
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            printf("  Recovery procedures:\n");
+            for (k = 4; k < pl; ++ k) {
+                j = ucp[k];
+                if (j < NUM_REQ_REC_ARR_ELEMS)
+                    printf("    %s\n", req_rec_arr[j]);
+                else if (j < 0x80)
+                    printf("    Reserved [0x%x]\n", j);
+                else
+                    printf("    Vendor specific [0x%x]\n", j);
+            }
+            break;
+        default:
+            if (pc <= 0x8000) {
+                printf("  Reserved [parameter_code=0x%x]:\n", pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            } else {
+                printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
+                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            }
+            break;
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
+
 /* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] */
 static bool
 show_ata_pt_results_page(const uint8_t * resp, int len,
@@ -4240,22 +4424,27 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             }
         }
         if ((pc < 0xf) && (pl > 17)) {
-            int extend, sector_count;
+            int extend, count;
 
-            dp = ucp + 4;
             printf("  Log_index=0x%x (parameter_code=0x%x)\n", pc + 1, pc);
+            dp = ucp + 4;       /* dp is start of ATA Return descriptor
+                                 * which is 14 bytes long */
             extend = dp[2] & 1;
-            sector_count = dp[5] + (extend ? (dp[4] << 8) : 0);
-            printf("    extend=%d  error=0x%x sector_count=0x%x\n", extend,
-                   dp[3], sector_count);
+            count = dp[5] + (extend ? (dp[4] << 8) : 0);
+            printf("    extend=%d  error=0x%x count=0x%x\n", extend,
+                   dp[3], count);
             if (extend)
                 printf("    lba=0x%02x%02x%02x%02x%02x%02x\n", dp[10], dp[8],
                        dp[6], dp[11], dp[9], dp[7]);
             else
                 printf("    lba=0x%02x%02x%02x\n", dp[11], dp[9], dp[7]);
             printf("    device=0x%x  status=0x%x\n", dp[12], dp[13]);
-        } else {
+        } else if (pl > 17) {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
+            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+        } else {
+            printf("  short parameter length: %d [parameter_code=0x%x]:\n",
+                   pl, pc);
             dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
         }
         if (op->do_pcb) {
@@ -4622,6 +4811,63 @@ skip:
     return true;
 }
 
+/* Service buffer information [0x15] (adc) */
+static bool
+show_service_buffer_info_page(const uint8_t * resp, int len,
+                              const struct opts_t * op)
+{
+    int num, pl, pc, pcb;
+    const uint8_t * ucp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Service buffer information page (adc-3) [0x15]\n");
+    num = len - 4;
+    ucp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(ucp + 0);
+        pcb = ucp[2];
+        pl = ucp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)ucp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        if (pc < 0x100) {
+            printf("  Service buffer identifier: 0x%x\n", pc);
+            printf("    Buffer id: 0x%x, tu=%d, nmp=%d, nmm=%d, "
+                   "offline=%d\n", ucp[4], !!(0x10 & ucp[5]),
+                   !!(0x8 & ucp[5]), !!(0x4 & ucp[5]), !!(0x2 & ucp[5]));
+            printf("    pd=%d, code_set: %s, Service buffer title:\n",
+                   !!(0x1 & ucp[5]), sg_get_desig_code_set_str(0xf & ucp[6]));
+            printf("      %*s\n", pl - 8, ucp + 8);
+        } else if (pc < 0x8000) {
+            printf("  parameter_code=0x%x, Reserved, parameter in hex:\n",
+                   pc);
+            dStrHex((const char *)ucp + 4, pl - 4, 0);
+        } else {
+            printf("  parameter_code=0x%x, Vendor-specific, parameter in "
+                   "hex:\n", pc);
+            dStrHex((const char *)ucp + 4, pl - 4, 0);
+        }
+        if (op->do_pcb) {
+            get_pcb_str(pcb, str, sizeof(str));
+            printf("        <%s>\n", str);
+        }
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        ucp += pl;
+    }
+    return true;
+}
 
 /* Sequential access device page [0xc] for tape */
 static bool
@@ -5055,7 +5301,7 @@ skip:
     return true;
 }
 
-/* 0x15 for media changer */
+/* Element statistics page, 0x15 for SMC */
 static bool
 show_element_stats_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -6039,9 +6285,7 @@ main(int argc, char * argv[])
                             n);
                     n = in_len - k;
                 }
-                pdt = (op->filter_given && (op->filter >= 0)) ?
-                      op->filter : -1;
-                op->dev_pdt = pdt;
+                pdt = op->dev_pdt;
                 lep = pg_subpg_pdt_search(pg_code, subpg_code, pdt);
                 if (lep) {
                     if (lep->show_pagep)

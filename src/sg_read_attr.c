@@ -34,7 +34,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.00 20160207";
+static const char * version_str = "1.01 20160311";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -189,7 +189,7 @@ usage()
     pr2serr("Usage: sg_read_attr [--cache] [--element=EA] [--enumerate] "
             "[--filter=FL]\n"
             "                    [--first=FAI] [--help] [--hex] [--in=FN] "
-            "[--lvn-LVN]\n"
+            "[--lvn=LVN]\n"
             "                    [--maxlen=LEN] [--partition=PN] [--quiet] "
             "[--raw]\n"
             "                    [--readonly] [--sa=SA] [--verbose] "
