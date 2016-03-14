@@ -1,17 +1,18 @@
-.TH SG_OPCODES "8" "December 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_OPCODES "8" "March 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
 .B sg_opcodes
-[\fI\-\-alpha\fR] [\fI\-\-compact\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR]
-[\fI\-\-repd\fR] [\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-alpha\fR] [\fI\-\-compact\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-mask\fR] [\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP\fR]
+[\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR]
+[\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_opcodes
-[\fI\-a\fR] [\fI\-c\fR] [\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-q\fR] [\fI\-R\fR]
-[\fI\-s=SA\fR] [\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
-\fIDEVICE\fR
+[\fI\-a\fR] [\fI\-c\fR] [\fI\-e\fR] [\fI\-H\fR] [\fI\-m\fR] [\fI\-n\fR]
+[\fI\-o=OP\fR] [\fI\-p=DT\fR] [\fI\-q\fR] [\fI\-R\fR] [\fI\-s=SA\fR]
+[\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -58,12 +59,30 @@ action associated with the command, then the comma and the service action
 are not shown after the opcode. The CDB size field is not shown when this
 option is given.
 .TP
+\fB\-e\fR, \fB\-\-enumerate\fR
+this option prints the name of the SCSI command based on the given opcode,
+peripheral device type and optionally the service action. If given,
+\fIDEVICE\fR is ignored. The opcode, peripheral device type and service
+action default to zero if not given. Thus if this option is the only option
+given then "Test Unit ready" is output since its opcode is 0, it has no
+service action and it is common to all peripheral device types since it is
+defined in the SCSI Primary Commands (SPC) standard(s).
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs the usage message summarizing command line options
 then exits. Ignores \fIDEVICE\fR if given.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 outputs the response in ASCII hexadecimal to stdout.
+.TP
+\fB\-m\fR, \fB\-\-mask\fR
+additionally prints out the cdb mask in hex. So a 12 byte cdb will have
+a 12 byte hexadecimal mask. If the hexadecimal is expanded (mentally)
+to binary then a "1" means the corresponding position in the cdb may
+be set. And "0" means the corresponding position in the cdb must not
+be set. For "0" mask positions that a user tries to set in a cdb, the
+device may either ignore it or report an error, typically with a
+sense key of "illegal request".
 .TP
 \fB\-n\fR, \fB\-\-no-inquiry\fR
 Prior to calling a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT
@@ -78,11 +97,20 @@ is given then that summary is not printed on stdout.
 switch to older style options.
 .TP
 \fB\-o\fR, \fB\-\-opcode\fR=\fIOP\fR
-the \fIDEVICE\fR will be queried for the given operation code ( i.e. the
+the \fIDEVICE\fR will be queried for the given operation code (i.e. the
 \fIOP\fR value) which is the first byte of a SCSI command. \fIOP\fR is
 decimal unless prefixed by "0x" or it has a trailing "h". \fIOP\fR should
 be in the range 0 to 255 (0xff) inclusive. When this option is not given
 then all available SCSI commands supported by the \fIDEVICE\fR are listed.
+.TP
+\fB\-p\fR, \fB\-\-pdt\fR=\fIDT\fR
+where \fIDT\fR is the peripheral device type. This is used together with
+the \fI\-\-enumerate\fR to differentiate when a command opcode (and perhaps
+service action) is shared by multiple device types.
+.br
+This option may also be used with the \fI\-\-no-inquiry\fR option to
+suppress this utility doing an INQUIRY command since the main reason
+for doing that is to find the peripheral device type of the \fIDEVICE\fR.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings, if
@@ -128,12 +156,11 @@ increase level of verbosity. Can be used multiple times.
 \fB\-V\fR, \fB\-\-version\fR
 print out version string then exit.
 .SH NOTES
-As of SPC\-4 revision 7a the recognized task management functions are:
-abort set, abort task set, clear ACA, clear task set, I_T nexus reset,
-logical unit reset, query task, target reset and wakeup.
-As of SPC\-4 revision 26 target reset and wakeup have been made obsolete
-while query task set and query asynchronous event notification have been
-added.
+As of SPC\-5 revision 8 the recognized task management functions are:
+abort set, abort task set, clear ACA, clear task set, logical unit reset,
+query task, query asynchronous event, query task set, and I_T nexus reset.
+In SPC\-4 revision 26 target reset and wakeup task management functions
+were made obsolete.
 .PP
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
 generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
@@ -152,6 +179,18 @@ or using '\-\-old' (or '\-O) as the first option.
 sort command alphabetically. Equivalent to \fI\-\-alpha\fR in main
 description.
 .TP
+\fB\-c\fR
+see the \fI\-\-compact\fR option above.
+.TP
+\fB\-e\fR
+see the \fI\-\-enumerate\fR option above.
+.TP
+\fB\-H\fR
+see the \fI\-\-hex\fR option above.
+.TP
+\fB\-m\fR
+see the \fI\-\-mask\fR option above.
+.TP
 \fB\-n\fR
 don't print a summary of the SCSI INQUIRY response on stdout.
 .TP
@@ -164,6 +203,9 @@ the \fIDEVICE\fR will be queried for the given operation code (i.e.
 hexadecimal and expected to be in the range 0 to ff inclusive.
 When this option is not given then all available SCSI commands supported
 by the \fIDEVICE\fR are listed.
+.TP
+\fB\-p\fR=\fIDT\fR
+see the \fI\-\-pdt=DT\fR option above.
 .TP
 \fB\-q\fR
 set the read extended parameter data (REPD) bit in report TMF cdb.
@@ -237,7 +279,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Douglas Gilbert
+Copyright \(co 2004\-2016 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

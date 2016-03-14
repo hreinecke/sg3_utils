@@ -237,7 +237,7 @@ char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
  * Examples are PDT_ADC decaying to PDT_TAPE and PDT_ZBC to PDT_DISK.
  * If such a lesser used 'pdt' is given to this function, then it will
  * return the more used PDT (i.e. "decays to"); otherwise 'pdt' is returned.
- * Valid for 'pdt' 0 to 31, for other values returns 'pdt'. */
+ * Valid for 'pdt' 0 to 31, for other values returns 0. */
 int sg_lib_pdt_decay(int pdt);
 
 /* Yield string associated with transport protocol identifier (tpi). Returns

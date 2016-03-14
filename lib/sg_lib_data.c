@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.17 20160202";  /* spc5r08, sbc4r10 */
+const char * sg_lib_version_str = "2.18 20160312";  /* spc5r08, sbc4r10 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -229,7 +229,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
-/* Read buffer [0x3c] service actions, need prefix */
+/* Read buffer [0x3c] service actions (sa), need prefix */
 struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x0, 0, "combined header and data [or multiple modes]"},
     {0x2, 0, "data"},
@@ -271,8 +271,17 @@ struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
 
 /* Maintenance in [0xa3] service actions */
 struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
+    {0x0, PDT_SAC, "Report assigned/unassigned p_extent"},
+    {0x1, PDT_SAC, "Report component device"},
+    {0x2, PDT_SAC, "Report component device attachments"},
+    {0x3, PDT_SAC, "Report peripheral device"},
+    {0x4, PDT_SAC, "Report peripheral device associations"},
     {0x5, 0, "Report identifying information"},
                 /* was "Report device identifier" prior to spc4r07 */
+    {0x6, PDT_SAC, "Report states"},
+    {0x7, PDT_SAC, "Report device identification"},
+    {0x8, PDT_SAC, "Report unconfigured capacity"},
+    {0x9, PDT_SAC, "Report supported configuration method"},
     {0xa, 0, "Report target port groups"},
     {0xb, 0, "Report aliases"},
     {0xc, 0, "Report supported operation codes"},
@@ -280,21 +289,35 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0xe, 0, "Report priority"},
     {0xf, 0, "Report timestamp"},
     {0x10, 0, "Management protocol in"},
-    {0x1d, 0, "Report provisioning initialization pattern"},
+    {0x1d, PDT_DISK, "Report provisioning initialization pattern"},
+        /* added in sbc4r07, shares sa 0x1d with ssc5r01 (tape) */
+    {0x1d, PDT_TAPE, "Receive recommended access order"},
+    {0x1e, PDT_TAPE, "Read dynamic runtime attribute"},
+    {0x1e, PDT_ADC, "Report automation device attributes"},
     {0x1f, 0, "Maintenance in vendor specific"},
     {0xffff, 0, NULL},
 };
 
 /* Maintenance out [0xa4] service actions */
 struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
+    {0x0, PDT_SAC, "Add peripheral device / component device"},
+    {0x1, PDT_SAC, "Attach to component device"},
+    {0x2, PDT_SAC, "Exchange p_extent"},
+    {0x3, PDT_SAC, "Exchange peripheral device / component device"},
+    {0x4, PDT_SAC, "Instruct component device"},
+    {0x5, PDT_SAC, "Remove peripheral device / component device"},
     {0x6, 0, "Set identifying information"},
                 /* was "Set device identifier" prior to spc4r07 */
+    {0x7, PDT_SAC, "Break peripheral device / component device"},
     {0xa, 0, "Set target port groups"},
     {0xb, 0, "Change aliases"},
     {0xc, 0, "Remove I_T nexus"},
     {0xe, 0, "Set priority"},
     {0xf, 0, "Set timestamp"},
     {0x10, 0, "Management protocol out"},
+    {0x1d, PDT_TAPE, "Generate recommended access order"},
+    {0x1e, PDT_TAPE, "write dynamic runtime attribute"},
+    {0x1e, PDT_ADC, "Set automation device attributes"},
     {0x1f, 0, "Maintenance out vendor specific"},
     {0xffff, 0, NULL},
 };
@@ -414,6 +437,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
     {0x10, 0, "Write stream(32)"},   /* added sbc4r07 */
     {0x1800, 0, "Receive credential"},
+    {0x1ff0, 0, "ATA pass-through(32)"},  /* added sat4r05 */
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
     {0x8803, 0, "List (osd)"},

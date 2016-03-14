@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "February 2016" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_LOGS "8" "March 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -7,15 +7,15 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 [\fI\-\-enumerate\fR] [\fI\-\-enum_vendor\fR] [\fI\-\-filter=FL\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR] [\fI\-\-list\fR]
 [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR] [\fI\-\-sp\fR]
-[\fI\-\-temperature\fR] [\fI\-\-transport\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR]
+[\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-e\fR] [\fI\-E\fR]
-[\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
-[\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-D=DT\fR] [\fI\-c=PC\fR] [\fI\-e\fR]
+[\fI\-E\fR] [\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR]
+[\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
 [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
 [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
 [\fI\-x\fR] \fIDEVICE\fR
@@ -129,8 +129,8 @@ see the LOG SELECT section below.
 The other context is with no \fIDEVICE\fR argument given in which case
 the contents of \fIFN\fR are decoded as if it were the response of a LOG
 SENSE command (i.e. a log page). For decoding the page and subpage numbers
-are taken from \fIFN\fR while the device type is either generic (i.e. from
-SPC) or the value given by \fI\-\-filter=FL\fR.
+are taken from \fIFN\fR while the peripheral device type is either
+generic (i.e. from SPC) or the value given by \fI\-\-pdt=DT\fR.
 .br
 \fIFN\fR is treated as a file name (or '\-' for stdin) which contains ASCII
 hexadecimal or binary representing a log page. The hexadecimal should be
@@ -202,9 +202,19 @@ being output in ASCII).
 sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default
 is 0 (i.e. cleared). This bit was made obsolete in SPC\-4 revision 18.
 .TP
+\fB\-D\fR, \fB\-\-pdt\fR=\fIDT\fR
+\fIDT\fR is the peripheral device type that is used when it is not available
+from the \fIDEVICE\fR. There are two main cases of this: with the
+\fI\-\-pdt=DT\fR without a \fIDEVICE\fR and when \fI\-\-no_inq\fR is used
+with a \fIDEVICE\fR.
+.TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings are
 output to stderr.
+.br
+This option may also be given together with \fI\-\-in=FN\fR in which case
+the contents of \fIFN\fR are interpreted as binary data (and the response is
+decoded as normal, not dumped as binary).
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag). The

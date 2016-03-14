@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2015 D. Gilbert
+ *  Copyright (C) 2004-2016 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 
 #ifdef HAVE_CONFIG_H
@@ -28,7 +29,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.45 20151219";    /* spc5r07 */
+static const char * version_str = "0.46 20160313";    /* spc5r08 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -44,7 +45,7 @@ static const char * version_str = "0.45 20151219";    /* spc5r07 */
 #define NAME_BUFF_SZ 128
 
 
-static int peri_type = 0; /* ugly but not easy to pass to alpha compare */
+static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
 
 static int do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode,
                    int rq_servact, void * resp, int mx_resp_len, int noisy,
@@ -56,6 +57,7 @@ static int do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len,
 static struct option long_options[] = {
         {"alpha", 0, 0, 'a'},
         {"compact", 0, 0, 'c'},
+        {"enumerate", 0, 0, 'e'},
         {"help", 0, 0, 'h'},
         {"hex", 0, 0, 'H'},
         {"mask", 0, 0, 'm'},
@@ -77,16 +79,17 @@ static struct option long_options[] = {
 struct opts_t {
     int do_alpha;
     int do_compact;
+    int do_enumerate;
     int do_help;
     int do_hex;
     int no_inquiry;
     int do_mask;
-    int do_opcode;
+    int opcode;
     int do_raw;
     int do_rctd;
     int do_repd;
-    int do_servact;
-    int do_verbose;
+    int servact;
+    int verbose;
     int do_version;
     int do_unsorted;
     int do_taskman;
@@ -98,17 +101,20 @@ struct opts_t {
 static void
 usage()
 {
-    pr2serr("Usage:  sg_opcodes [--alpha] [--compact] [--help] [--hex] "
-            "[--mask]\n"
-            "                   [--no-inquiry] [--opcode=OP[,SA]] [--raw] "
-            "[--rctd]\n"
-            "                   [--repd] [--sa=SA] [--tmf] [--unsorted] "
-            "[--verbose]\n"
-            "                   [--version] DEVICE\n"
+    pr2serr("Usage:  sg_opcodes [--alpha] [--compact] [--enumerate] "
+            "[--help] [--hex]\n"
+            "                   [--mask] [--no-inquiry] [--opcode=OP[,SA]] "
+            "[--pdt=DT]\n"
+            "                   [--raw] [--rctd] [--repd] [--sa=SA] [--tmf] "
+            "[--unsorted]\n"
+            "                   [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
             "    --compact|-c    more compact output\n"
+            "    --enumerate|-e    use '--opcode=' and '--pdt=' to look up "
+            "name,\n"
+            "                      ignore DEVICE\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
             "    --mask|-m       and show cdb usage data (a mask) when "
@@ -120,6 +126,9 @@ usage()
             "(SA)\n"
             "                         (decimal, each prefix with '0x' for "
             "hex)\n"
+            "    --pdt=DT|-p DT    give peripheral device type for "
+            "'--no-inquiry'\n"
+            "                      '--enumerate'\n"
             "    --raw|-r        output response in binary to stdout\n"
             "    --rctd|-R       set RCTD (return command timeout "
             "descriptor) bit\n"
@@ -141,17 +150,22 @@ usage()
 static void
 usage_old()
 {
-    pr2serr("Usage:  sg_opcodes [-a] [-c] [-H] [-m] [-n] [-o=OP] [-q] [-r] "
-            "[-R] [-s=SA]\n"
-            "                   [-t] [-u] [-v] [-V] DEVICE\n"
+    pr2serr("Usage:  sg_opcodes [-a] [-c] [-e] [-H] [-m] [-n] [-o=OP] "
+            "[-p=DT] [-q]\n"
+            "                   [-r] [-R] [-s=SA] [-t] [-u] [-v] [-V] "
+            "DEVICE\n"
             "  where:\n"
             "    -a    output list of operation codes sorted "
             "alphabetically\n"
             "    -c    more compact output\n"
+            "    -e    use '--opcode=' and '--pdt=' to look up name, "
+            "ignore DEVICE\n"
             "    -H    print response in hex\n"
             "    -m    and show cdb usage data (a mask) when all listed\n"
             "    -n    don't output INQUIRY information\n"
             "    -o=OP    first byte of command to query (in hex)\n"
+            "    -p=DT    alternate source of pdt (normally obtained from "
+            "inquiry)\n"
             "    -q    set REPD bit for tmf_s\n"
             "    -r    output response in binary to stdout\n"
             "    -R    set RCTD (return command timeout "
@@ -167,7 +181,7 @@ usage_old()
 }
 
 static int
-process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
     char * cp;
@@ -176,30 +190,33 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "achHmnNo:OqrRs:tuvV", long_options,
+        c = getopt_long(argc, argv, "acehHmnNo:Op:qrRs:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'a':
-            ++optsp->do_alpha;
+            ++op->do_alpha;
             break;
         case 'c':
-            ++optsp->do_compact;
+            ++op->do_compact;
+            break;
+        case 'e':
+            ++op->do_enumerate;
             break;
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'H':
-            ++optsp->do_hex;
+            ++op->do_hex;
             break;
         case 'm':
-            ++optsp->do_mask;
+            ++op->do_mask;
             break;
         case 'n':
-            ++optsp->no_inquiry;
+            ++op->no_inquiry;
             break;
         case 'N':
             break;      /* ignore */
@@ -217,14 +234,14 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                     pr2serr("bad OP argument to '--opcode'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_opcode = n;
+                op->opcode = n;
                 n = sg_get_num(cp + 1);
                 if ((n < 0) || (n > 0xffff)) {
                     pr2serr("bad SA argument to '--opcode'\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_servact = n;
+                op->servact = n;
             } else {
                 n = sg_get_num(optarg);
                 if ((n < 0) || (n > 255)) {
@@ -232,20 +249,32 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_opcode = n;
+                op->opcode = n;
             }
             break;
         case 'O':
-            optsp->opt_new = 0;
+            op->opt_new = 0;
             return 0;
+        case 'p':
+            n = -2;
+            if (isdigit(optarg[0]))
+                n = sg_get_num(optarg);
+            else if ((2 == strlen(optarg)) && (0 == strcmp("-1", optarg)))
+                n = -1;
+            if ((n < -1) || (n > 0x1f)) {
+                pr2serr("bad argument to '--pdt=DT', expect -1 to 31\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            peri_dtype = n;
+            break;
         case 'q':
-            ++optsp->do_repd;
+            ++op->do_repd;
             break;
         case 'r':
-            ++optsp->do_raw;
+            ++op->do_raw;
             break;
         case 'R':
-            ++optsp->do_rctd;
+            ++op->do_rctd;
             break;
         case 's':
             n = sg_get_num(optarg);
@@ -254,31 +283,31 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_servact = n;
+            op->servact = n;
             break;
         case 't':
-            ++optsp->do_taskman;
+            ++op->do_taskman;
             break;
         case 'u':
-            ++optsp->do_unsorted;
+            ++op->do_unsorted;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            ++op->do_version;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            if (op->do_help)
                 break;
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == optsp->device_name) {
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -292,7 +321,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen, n, num;
     const char * cp;
@@ -306,46 +335,49 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
             for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'a':
-                    ++optsp->do_alpha;
+                    ++op->do_alpha;
                     break;
                 case 'c':
-                    ++optsp->do_compact;
+                    ++op->do_compact;
+                    break;
+                case 'e':
+                    ++op->do_enumerate;
                     break;
                 case 'H':
-                    ++optsp->do_hex;
+                    ++op->do_hex;
                     break;
                 case 'm':
-                    ++optsp->do_mask;
+                    ++op->do_mask;
                     break;
                 case 'n':
-                    ++optsp->no_inquiry;
+                    ++op->no_inquiry;
                     break;
                 case 'N':
-                    optsp->opt_new = 1;
+                    op->opt_new = 1;
                     return 0;
                 case 'O':
                     break;
                 case 'q':
-                    ++optsp->do_repd;
+                    ++op->do_repd;
                     break;
                 case 'R':
-                    ++optsp->do_rctd;
+                    ++op->do_rctd;
                     break;
                 case 't':
-                    ++optsp->do_taskman;
+                    ++op->do_taskman;
                     break;
                 case 'u':
-                    ++optsp->do_unsorted;
+                    ++op->do_unsorted;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    ++op->verbose;
                     break;
                 case 'V':
-                    ++optsp->do_version;
+                    ++op->do_version;
                     break;
                 case 'h':
                 case '?':
-                    ++optsp->do_help;
+                    ++op->do_help;
                     break;
                 default:
                     jmp_out = 1;
@@ -363,7 +395,15 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_opcode = n;
+                op->opcode = n;
+            } else if (0 == strncmp("p=", cp, 2)) {
+                num = sscanf(cp + 2, "%d", &n);
+                if ((1 != num) || (n > 0x1f) || (n < -1)) {
+                    pr2serr("Bad number after 'p=' option, expect -1 to "
+                            "31\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                peri_dtype = n;
             } else if (0 == strncmp("s=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", (unsigned int *)&n);
                 if (1 != num) {
@@ -371,7 +411,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_servact = n;
+                op->servact = n;
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
@@ -379,11 +419,11 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
                 usage_old();
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (NULL == optsp->device_name)
-            optsp->device_name = cp;
+        } else if (NULL == op->device_name)
+            op->device_name = cp;
         else {
             pr2serr("too many arguments, got: %s, not expecting: %s\n",
-                    optsp->device_name, cp);
+                    op->device_name, cp);
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -392,22 +432,22 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-process_cl(struct opts_t * optsp, int argc, char * argv[])
+process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
-        res = process_cl_old(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+        op->opt_new = 0;
+        res = process_cl_old(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = process_cl_new(op, argc, argv);
     } else {
-        optsp->opt_new = 1;
-        res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+        op->opt_new = 1;
+        res = process_cl_new(op, argc, argv);
+        if ((0 == res) && (0 == op->opt_new))
+            res = process_cl_old(op, argc, argv);
     }
     return res;
 }
@@ -472,13 +512,13 @@ opcode_alpha_compare(const void * left, const void * right)
     if (ll[5] & 1)
         l_serv_act = sg_get_unaligned_be16(ll + 2);
     l_name_buff[0] = '\0';
-    sg_get_opcode_sa_name(l_opc, l_serv_act, peri_type,
+    sg_get_opcode_sa_name(l_opc, l_serv_act, peri_dtype,
                           NAME_BUFF_SZ, l_name_buff);
     r_opc = rr[0];
     if (rr[5] & 1)
         r_serv_act = sg_get_unaligned_be16(rr + 2);
     r_name_buff[0] = '\0';
-    sg_get_opcode_sa_name(r_opc, r_serv_act, peri_type,
+    sg_get_opcode_sa_name(r_opc, r_serv_act, peri_dtype,
                           NAME_BUFF_SZ, r_name_buff);
     return strncmp(l_name_buff, r_name_buff, NAME_BUFF_SZ);
 }
@@ -552,14 +592,14 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         serv_act = 0;
         if (sa_v) {
             serv_act = sg_get_unaligned_be16(ucp + 2);
-            sg_get_opcode_sa_name(opcode, serv_act, peri_type, NAME_BUFF_SZ,
+            sg_get_opcode_sa_name(opcode, serv_act, peri_dtype, NAME_BUFF_SZ,
                                   name_buff);
             if (op->do_compact)
                 snprintf(sa_buff, sizeof(sa_buff), "%-4x", serv_act);
             else
                 snprintf(sa_buff, sizeof(sa_buff), "%4x", serv_act);
         } else {
-            sg_get_opcode_name(opcode, peri_type, NAME_BUFF_SZ, name_buff);
+            sg_get_opcode_name(opcode, peri_dtype, NAME_BUFF_SZ, name_buff);
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
@@ -602,7 +642,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
 
             memset(b, 0, sizeof(b));
             res = do_rsoc(sg_fd, 0, (sa_v ? 2 : 1), opcode, serv_act,
-                          b, sizeof(b), 1, op->do_verbose);
+                          b, sizeof(b), 1, op->verbose);
             if (0 == res) {
                 cdb_sz = sg_get_unaligned_be16(b + 2);
                 if ((cdb_sz > 0) && (cdb_sz <= 80)) {
@@ -664,13 +704,13 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
     int v = 0;
 
 
-    printf("\n  Opcode=0x%.2x", op->do_opcode);
+    printf("\n  Opcode=0x%.2x", op->opcode);
     if (rep_opts > 1)
-        printf("  Service_action=0x%.4x", op->do_servact);
+        printf("  Service_action=0x%.4x", op->servact);
     printf("\n");
-    sg_get_opcode_sa_name(((op->do_opcode > 0) ? op->do_opcode : 0),
-                          ((op->do_servact > 0) ? op->do_servact : 0),
-                          peri_type, NAME_BUFF_SZ, name_buff);
+    sg_get_opcode_sa_name(((op->opcode > 0) ? op->opcode : 0),
+                          ((op->servact > 0) ? op->servact : 0),
+                          peri_dtype, NAME_BUFF_SZ, name_buff);
     printf("  Command_name: %s\n", name_buff);
     switch((int)(rsoc_buff[1] & 7)) {
     case 0:
@@ -725,8 +765,8 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(op, 0, sizeof(opts));
-    op->do_opcode = -1;
-    op->do_servact = -1;
+    op->opcode = -1;
+    op->servact = -1;
     res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -742,7 +782,7 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    if (NULL == op->device_name) {
+    if ((NULL == op->device_name) && (0 == op->do_enumerate)) {
         pr2serr("No DEVICE argument given\n");
         if (op->opt_new)
             usage();
@@ -750,7 +790,7 @@ main(int argc, char * argv[])
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((-1 != op->do_servact) && (-1 == op->do_opcode)) {
+    if ((-1 != op->servact) && (-1 == op->opcode)) {
         pr2serr("When '-s' is chosen, so must '-o' be chosen\n");
         if (op->opt_new)
             usage();
@@ -761,32 +801,59 @@ main(int argc, char * argv[])
     if (op->do_unsorted && op->do_alpha)
         pr2serr("warning: unsorted ('-u') and alpha ('-a') options chosen, "
                 "ignoring alpha\n");
-    if (op->do_taskman && ((-1 != op->do_opcode) || op->do_alpha ||
+    if (op->do_taskman && ((-1 != op->opcode) || op->do_alpha ||
         op->do_unsorted)) {
         pr2serr("warning: task management functions ('-t') chosen so alpha "
                 "('-a'),\n          unsorted ('-u') and opcode ('-o') "
                 "options ignored\n");
     }
+    if (op->do_enumerate) {
+        char name_buff[NAME_BUFF_SZ];
+
+        if (op->do_taskman)
+            printf("enumerate not supported with task management "
+                   "functions\n");
+        else {  /* SCSI command */
+            if (op->opcode < 0)
+                op->opcode = 0;
+            if (op->servact < 0)
+                op->servact = 0;
+            if (peri_dtype < 0)
+                peri_dtype = 0;
+            printf("SCSI command:");
+            if (op->verbose)
+                printf(" [opcode=0x%x, sa=0x%x, pdt=0x%x]\n", op->opcode,
+                       op->servact, peri_dtype);
+            else
+                printf("\n");
+            sg_get_opcode_sa_name(op->opcode, op->servact, peri_dtype,
+                                  NAME_BUFF_SZ, name_buff);
+            printf("  %s\n", name_buff);
+        }
+        return 0;
+    }
     op_name = op->do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
-    if (op->do_opcode < 0) {
+    if (op->opcode < 0) {
         if ((sg_fd = scsi_pt_open_device(op->device_name, 1 /* RO */,
-                                         op->do_verbose)) < 0) {
+                                         op->verbose)) < 0) {
             pr2serr("sg_opcodes: error opening file (ro): %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->do_verbose)) {
-            peri_type = inq_resp.peripheral_type;
+        if (op->no_inquiry && (peri_dtype >= 0))
+            ;
+        else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
+            peri_dtype = inq_resp.peripheral_type;
             if (! (op->do_raw || op->no_inquiry)) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                        inq_resp.product, inq_resp.revision);
-                cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
+                cp = sg_get_pdt_str(peri_dtype, sizeof(buff), buff);
                 if (strlen(cp) > 0)
                     printf("  Peripheral device type: %s\n", cp);
                 else
-                    printf("  Peripheral device type: 0x%x\n", peri_type);
+                    printf("  Peripheral device type: 0x%x\n", peri_dtype);
             }
         } else {
             pr2serr("sg_opcodes: %s doesn't respond to a SCSI INQUIRY\n",
@@ -801,23 +868,23 @@ main(int argc, char * argv[])
     }
 
     if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */,
-                                     op->do_verbose)) < 0) {
+                                     op->verbose)) < 0) {
         pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
                 op->device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (op->do_opcode >= 0)
-        rep_opts = ((op->do_servact >= 0) ? 2 : 1);
+    if (op->opcode >= 0)
+        rep_opts = ((op->servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
     if (op->do_taskman)
         res = do_rstmf(sg_fd, op->do_repd, rsoc_buff,
-                       (op->do_repd ? 16 : 4), 1, op->do_verbose);
+                       (op->do_repd ? 16 : 4), 1, op->verbose);
     else
-        res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->do_opcode,
-                      op->do_servact, rsoc_buff, sizeof(rsoc_buff), 1,
-                      op->do_verbose);
+        res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->opcode,
+                      op->servact, rsoc_buff, sizeof(rsoc_buff), 1,
+                      op->verbose);
     if (res) {
-        sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
         pr2serr("%s: %s\n", op_name, b);
         goto err_out;
     }
@@ -844,9 +911,9 @@ main(int argc, char * argv[])
         if (rsoc_buff[0] & 0x4)
             printf("    Query task\n");
         if (rsoc_buff[0] & 0x2)
-            printf("    Target reset\n");
+            printf("    Target reset (obsolete)\n");
         if (rsoc_buff[0] & 0x1)
-            printf("    Wakeup\n");
+            printf("    Wakeup (obsolete)\n");
         if (rsoc_buff[1] & 0x4)
             printf("    Query asynchronous event\n");
         if (rsoc_buff[1] & 0x2)
@@ -871,9 +938,9 @@ main(int argc, char * argv[])
             printf("    QAETS=%d\n", !!(rsoc_buff[7] & 0x4));
             printf("    QTSTS=%d\n", !!(rsoc_buff[7] & 0x2));
             printf("    ITNRTS=%d\n", !!(rsoc_buff[7] & 0x1));
-            printf("    tmf long timeout: %d (100 ms units)\n",
+            printf("    tmf long timeout: %u (100 ms units)\n",
                    sg_get_unaligned_be32(rsoc_buff + 8));
-            printf("    tmf short timeout: %d (100 ms units)\n",
+            printf("    tmf short timeout: %u (100 ms units)\n",
                    sg_get_unaligned_be32(rsoc_buff + 12));
         }
     } else if (0 == rep_opts) {  /* list all supported operation codes */
