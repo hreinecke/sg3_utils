@@ -149,7 +149,7 @@ check_cmdline()
 
     if [ -n "$*" ]
     then
-        invalid_cmdline invalid parameter "$*"
+        invalid_cmdline invalid parameter "$@"
     fi
 
     if [ $GET = "1" -a $SET = "1" ]
@@ -248,7 +248,7 @@ create_logging_level()
     LEVEL=$((LEVEL|(LOG_ERROR & 7)))
 }
 
-check_cmdline "$*"
+check_cmdline "$@"
 
 if [ $SET = "1" ]
 then

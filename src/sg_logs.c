@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.40 20160313";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.41 20160323";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -6155,6 +6155,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }
 
+/* Returns 0 if successful else SG_LIB_SYNTAX_ERROR. */
 static int
 decode_pg_arg(struct opts_t * op)
 {
@@ -6304,6 +6305,11 @@ main(int argc, char * argv[])
                 }
             }
             return 0;
+        }
+        if (op->pg_arg) {         /* do this for 'sg_logs -p xxx' */
+            res = decode_pg_arg(op);
+            if (res)
+                return res;
         }
         pr2serr("No DEVICE argument given\n");
         usage_for(1, op);

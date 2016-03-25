@@ -118,18 +118,18 @@ const char * sg_lib_version();
 int sg_get_command_size(unsigned char cdb_byte0);
 
 /* Command name given pointer to the cdb. Certain command names
- * depend on peripheral type (give 0 if unknown). Places command
+ * depend on peripheral type (give 0 or -1 if unknown). Places command
  * name into buff and will write no more than buff_len bytes. */
 void sg_get_command_name(const unsigned char * cdbp, int peri_type,
                          int buff_len, char * buff);
 
 /* Command name given only the first byte (byte 0) of a cdb and
- * peripheral type. */
+ * peripheral type (give 0 or -1 if unknown). */
 void sg_get_opcode_name(unsigned char cdb_byte0, int peri_type, int buff_len,
                         char * buff);
 
 /* Command name given opcode (byte 0), service action and peripheral type.
- * If no service action give 0, if unknown peripheral type give 0. */
+ * If no service action give 0, if unknown peripheral type give 0 or -1 . */
 void sg_get_opcode_sa_name(unsigned char cdb_byte0, int service_action,
                            int peri_type, int buff_len, char * buff);
 

@@ -36,7 +36,7 @@ If the \fIDEVICE\fR argument is given with no options then the names of all
 diagnostic pages supported are listed. Most, but not necessarily all, of the
 named diagnostic pages are defined in the SES standards and drafts. The most
 recent reference for this utility is the draft SCSI Enclosure Services 3
-document T10/2149\-D Revision 11 at http://www.t10.org . Existing standards
+document T10/2149\-D Revision 13 at http://www.t10.org . Existing standards
 for SES and SES\-2 are ANSI INCITS 305\-1998 and ANSI INCITS 448\-2008
 respectively.
 .PP
@@ -131,14 +131,16 @@ DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
 \fIA_F\fR is either the string 'auto' or 'force'. There was some fuzziness
 in the interpretation of the 'element index' field in the Additional Element
 Status (AES) page between SES\-2 and SES\-3. The EIIOE bit was introduced to
-resolve the problem but not all enclosures have caught up.
-Using '\-\-eiioe=force' will decode the AES page as if the EIIOE bit is set.
-Using '\-\-eiioe=auto' will decode the AES page as if the EIIOE bit is set
-if the first element index in this page is 1 (in other words a heuristic to
-guess whether the EIIOE bit should be set or not).
+resolve the problem but not all enclosures have caught up. In the SES\-3
+revision 12 draft the EIIOE bit was expanded to a 2 bit EIIOE field.
+Using '\-\-eiioe=force' will decode the AES page as if the EIIOE field is set
+to 1.  Using '\-\-eiioe=auto' will decode the AES page as if the EIIOE field
+is set to 1 if the first AES descriptor has its EIP bit set and its element
+index field is 1 (in other words a heuristic to guess whether the EIIOE field
+should be set to 1 or 0).
 .br
-If the enclosure sets the EIIOE bit then this option has no effect. It is
-recommended that HP JBOD users set --eiioe=auto .
+If the enclosure sets the actual EIIOE field to 1 or more then this option has
+no effect. It is recommended that HP JBOD users set --eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known page names and SES elements when this option is given
@@ -308,7 +310,7 @@ warn about certain irregularities with warnings sent to stderr. The join
 is a complex operation that relies on information from several pages to be
 synchronized. The quality of SES devices vary and to be fair, the
 descriptions from T10 drafts and standards have been tweaked several
-times (see the EIIOE bit) in order to clear up confusion.
+times (see the EIIOE field) in order to clear up confusion.
 .SH INDEXES
 An enclosure can have information about its disk and tape drives plus other
 supporting components like power supplies spread across several pages.
@@ -481,8 +483,9 @@ misinterpreted the SES\-2 standard with its "element index" field. The
 code in this utility interprets the "element index" field as per the SES\-2
 standard and if that yields an inappropriate Element type, adjusts its
 indexing to follow that vendor's misinterpretation. The SES\-3 drafts have
-introduced the EIIOE (element index includes overall elements) to resolve
-this ambiguity. See the \fI\-\-eiioe=A_F\fR option.
+introduced the EIIOE (element index includes overall elements) bit which
+later became a 2 bit field to resolve this ambiguity. See the
+\fI\-\-eiioe=A_F\fR option.
 .PP
 In draft SES\-3 revision 5 the "Door Lock" element name was changed to
 the "Door" (and an OPEN field was added to the status element). As a

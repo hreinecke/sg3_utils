@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 Douglas Gilbert.
+ * Copyright (c) 2014-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.02 20151219";
+static const char * version_str = "1.03 20160324";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -98,13 +98,15 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, int noisy,
           {SG_ZONING_OUT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
+    char b[64];
 
     zoCmdBlk[1] = 0x1f & sa;
     sg_put_unaligned_be64(zid, zoCmdBlk + 2);
     if (all)
         zoCmdBlk[14] = 0x1;
+    sg_get_opcode_sa_name(zoCmdBlk[0], sa, -1, sizeof(b), b);
     if (verbose) {
-        pr2serr("    Reset write pointer cdb: ");
+        pr2serr("    %s cdb: ", b);
         for (k = 0; k < SG_ZONING_OUT_CMDLEN; ++k)
             pr2serr("%02x ", zoCmdBlk[k]);
         pr2serr("\n");
@@ -112,7 +114,7 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, int noisy,
 
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
-        pr2serr("Reset write pointer: out of memory\n");
+        pr2serr("%s: out of memory\n", b);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, zoCmdBlk, sizeof(zoCmdBlk));
