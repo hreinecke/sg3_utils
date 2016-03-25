@@ -2,10 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160313] [svn: r685]
+Changelog for sg3_utils-1.43 [20160324] [svn: r686]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
+  - sg_ses: handle 2 bit EIIOE field in aes dpage
+    - expand join handling of SAS connectors and others
+    - expand join debug code
   - sg_logs: fix volume statistics lpage when subpage
     is zero (ssc5r02a); decode mount history log parameter
     - decode Requested recovery, TapeAlert response, and
@@ -14,7 +17,7 @@ Changelog for sg3_utils-1.43 [20160313] [svn: r685]
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility
-  - sg_ses: expand join debug code
+  - sg_zone: fix debug cdb naming
   - sg_opcode: add '--enumerate' and '--pdt=' options
   - sg_lib: add SSC maintenance in/out sa names
   - rescan-scsi-bus.sh: harden code
