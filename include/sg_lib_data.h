@@ -32,7 +32,8 @@ extern "C" {
 #define SG_PERSISTENT_RESERVE_IN 0x5e
 #define SG_PERSISTENT_RESERVE_OUT 0x5f
 #define SG_READ_ATTRIBUTE 0x8c
-#define SG_READ_BUFFER 0x3c
+#define SG_READ_BUFFER 0x3c     /* now READ BUFFER(10) */
+#define SG_READ_BUFFER_16 0x9b
 #define SG_READ_POSITION 0x34   /* SSC command with service actions */
 #define SG_SANITIZE 0x48
 #define SG_SERVICE_ACTION_BIDI 0x9d

@@ -273,6 +273,16 @@ Task Management Functions supported by device:
     Logical unit reset
 .br
     Query task
+.PP
+Enumerate can be used to look up a SCSI command name in the absence of a
+device that supports that command. The opcode and service action (if
+required) should be supplied:
+.PP
+   # sg_opcodes \-\-enumerate \-\-op=0x9b,0xa
+.PP
+  SCSI command:
+.br
+    Read buffer(16), read data from echo buffer
 .br
 .SH AUTHOR
 Written by Douglas Gilbert

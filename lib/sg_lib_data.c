@@ -229,7 +229,8 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
-/* Read buffer [0x3c] service actions (sa), need prefix */
+/* Read buffer(10) [0x3c] and Read buffer(16) [0x9b] service actions (sa),
+ * need prefix */
 struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x0, 0, "combined header and data [or multiple modes]"},
     {0x2, 0, "data"},
