@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.09 20160324";    /* ses3r13 */
+static const char * version_str = "2.10 20160325";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -3756,19 +3756,32 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, const uint8_t * ae_bp)
     }
 }
 
+static const char *
+offset_str(long offset, bool in_hex, char * b, int blen)
+{
+    if (in_hex && (offset >= 0))
+        snprintf(b, blen, "0x%lx", offset);
+    else
+        snprintf(b, blen, "%ld", offset);
+    return b;
+}
+
 /* Returns broken_ei which is only true when EIP=1 and EIIOE=0 is overridden
- * as outlined in join array description near the top of this file . */
+ * as outlined in join array description near the top of this file. */
 static bool
 join_aes_helper(const uint8_t * ae_bp, const uint8_t * ae_last_bp,
                 const struct th_es_t * tesp, const struct opts_t * op)
 {
-    int k, j, ei, eiioe, aes_i;
+    int k, j, ei, eiioe, aes_i, hex, blen;
     bool eip, broken_ei;
     struct join_row_t * jrp;
     struct join_row_t * jr2p;
     const struct type_desc_hdr_t * tdhp = tesp->th_base;
+    char b[20];
 
     jrp = tesp->j_base;
+    blen = sizeof(b);
+    hex = op->do_hex;
     broken_ei = false;
     /* loop over all type descritor headers in the Configuration dpge */
     for (k = 0, aes_i = 0; k < tesp->num_ths; ++k, ++tdhp) {
@@ -3804,11 +3817,13 @@ join_aes_helper(const uint8_t * ae_bp, const uint8_t * ae_last_bp,
                     if (jr2p->ae_statp) {
                         if (op->warn || op->verbose) {
                             pr2serr("warning: aes slot already in use, "
-                                    "keep existing AES+%ld\n\t",
-                                    jr2p->ae_statp - add_elem_rsp);
-                            pr2serr("dropping AES+%ld [length=%d, oi=%d, "
+                                    "keep existing AES+%s\n\t",
+                                    offset_str(jr2p->ae_statp - add_elem_rsp,
+                                               hex, b, blen));
+                            pr2serr("dropping AES+%s [length=%d, oi=%d, "
                                     "ei=%d, aes_i=%d]\n",
-                                    ae_bp - add_elem_rsp,
+                                    offset_str(ae_bp - add_elem_rsp, hex, b,
+                                               blen),
                                     ae_bp[1] + 2, k, ei, aes_i);
                         }
                     } else
@@ -3854,16 +3869,20 @@ try_again:
                             }
                             if ((NULL == jr2p->enc_statp) &&
                                 (op->warn || op->verbose))
-                                pr2serr("warning2: dropping AES+%ld [length="
+                                pr2serr("warning2: dropping AES+%s [length="
                                         "%d, oi=%d, ei=%d, aes_i=%d]\n",
-                                        ae_bp - add_elem_rsp,
+                                        offset_str(ae_bp - add_elem_rsp, hex,
+                                                   b, blen),
                                         ae_bp[1] + 2, k, ei, aes_i);
                         } else if (op->warn || op->verbose) {
                             pr2serr("warning3: aes slot already in use, "
-                                    "keep existing AES+%ld\n\t",
-                                    jr2p->ae_statp - add_elem_rsp);
-                            pr2serr("dropping AES+%ld [length=%d, oi=%d, ei="
-                                    "%d, aes_i=%d]\n", ae_bp - add_elem_rsp,
+                                    "keep existing AES+%s\n\t",
+                                    offset_str(jr2p->ae_statp - add_elem_rsp,
+                                               hex, b, blen));
+                            pr2serr("dropping AES+%s [length=%d, oi=%d, ei="
+                                    "%d, aes_i=%d]\n",
+                                    offset_str(ae_bp - add_elem_rsp, hex, b,
+                                               blen),
                                     ae_bp[1] + 2, k, ei, aes_i);
                         }
                     } else
@@ -3889,10 +3908,13 @@ try_again:
                     if (jr2p->ae_statp) {
                         if (op->warn || op->verbose) {
                             pr2serr("warning3: aes slot already in use, "
-                                    "keep existing AES+%ld\n\t",
-                                    jr2p->ae_statp - add_elem_rsp);
-                            pr2serr("dropping AES+%ld [length=%d, oi=%d, ei="
-                                    "%d, aes_i=%d]\n", ae_bp - add_elem_rsp,
+                                    "keep existing AES+%s\n\t",
+                                    offset_str(jr2p->ae_statp - add_elem_rsp,
+                                               hex, b, blen));
+                            pr2serr("dropping AES+%s [length=%d, oi=%d, ei="
+                                    "%d, aes_i=%d]\n",
+                                    offset_str(ae_bp - add_elem_rsp, hex, b,
+                                               blen),
                                     ae_bp[1] + 2, k, ei, aes_i);
                         }
                     } else
@@ -3938,7 +3960,7 @@ static int
 join_work(int sg_fd, struct opts_t * op, bool display)
 {
     int k, j, res, num_ths, eoe, desc_len, dn_len, ei4aess;
-    int mlen, eip_count, eiioe_count;
+    int mlen, hex, blen, eip_count, eiioe_count;
     uint32_t ref_gen_code, gen_code;
     bool broken_ei, et_used_by_aes, got1;
     struct join_row_t * jrp;
@@ -3961,6 +3983,8 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     eip_count = 0;
     eiioe_count = 0;
     memset(&primary_info, 0, sizeof(primary_info));
+    hex = op->do_hex;
+    blen = sizeof(b);
     num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
                                          MX_ELEM_HDR, &ref_gen_code,
                                          &primary_info, op);
@@ -4152,13 +4176,18 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         broken_ei = join_aes_helper(ae_bp, ae_last_bp, &tes, op);
 
     if (op->verbose > 3) {
+        pr2serr("Dump of join array, each line is a row. Lines start with\n");
+        pr2serr("[<element_type>: <type_hdr_index>,<elem_ind_within>]\n");
+        pr2serr("'-1' indicates overall element or not applicable.\n");
         jrp = tes.j_base;
         for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
             pr2serr("[0x%x: %d,%d] ", jrp->etype, jrp->th_i, jrp->indiv_i);
             if (jrp->se_id > 0)
                 pr2serr("se_id=%d ", jrp->se_id);
-            pr2serr("ei_ioe,_eoe,_aess=%d,%d,%d dsn=%d", k, jrp->ei_eoe,
-                    jrp->ei_aess, jrp->dev_slot_num);
+            pr2serr("ei_ioe,_eoe,_aess=%s", offset_str(k, hex, b, blen));
+            pr2serr(",%s", offset_str(jrp->ei_eoe, hex, b, blen));
+            pr2serr(",%s", offset_str(jrp->ei_aess, hex, b, blen));
+            pr2serr(" dsn=%s", offset_str(jrp->dev_slot_num, hex, b, blen));
             if (op->do_join > 2) {
                 pr2serr(" sa=0x");
                 if (saddr_non_zero(jrp->sas_addr)) {
@@ -4168,11 +4197,14 @@ join_work(int sg_fd, struct opts_t * op, bool display)
                     pr2serr("0");
             }
             if (jrp->enc_statp)
-                pr2serr(" ES+%ld", jrp->enc_statp - enc_stat_rsp);
+                pr2serr(" ES+%s", offset_str(jrp->enc_statp - enc_stat_rsp,
+                                             hex, b, blen));
             if (jrp->elem_descp)
-                pr2serr(" ED+%ld", jrp->elem_descp - elem_desc_rsp);
+                pr2serr(" ED+%s", offset_str(jrp->elem_descp - elem_desc_rsp,
+                                             hex, b, blen));
             if (jrp->ae_statp) {
-                pr2serr(" AES+%ld", jrp->ae_statp - add_elem_rsp);
+                pr2serr(" AES+%s", offset_str(jrp->ae_statp - add_elem_rsp,
+                                              hex, b, blen));
                 if (jrp->ae_statp[0] & 0x10) {
                     ++eip_count;
                     if (jrp->ae_statp[2] & 0x3)
@@ -4183,11 +4215,14 @@ join_work(int sg_fd, struct opts_t * op, bool display)
                 pr2serr(" TI+%ld", jrp->thresh_inp - threshold_rsp);
             pr2serr("\n");
         }
-        pr2serr(">> ES len=%d, ED len=%d, AES len=%d, TI len=%d\n",
-                enc_stat_rsp_len, elem_desc_rsp_len, add_elem_rsp_len,
-                threshold_rsp_len);
-        pr2serr(">> join_arr elements=%d, eip_count=%d, eiioe_count=%d "
-                "broken_ei=%d\n", k, eip_count, eiioe_count, broken_ei);
+        pr2serr(">> ES len=%s, ", offset_str(enc_stat_rsp_len, hex, b, blen));
+        pr2serr("ED len=%s, ", offset_str(elem_desc_rsp_len, hex, b, blen));
+        pr2serr("AES len=%s, ", offset_str(add_elem_rsp_len, hex, b, blen));
+        pr2serr("TI len=%s\n", offset_str(threshold_rsp_len, hex, b, blen));
+        pr2serr(">> join_arr elements=%s, ", offset_str(k, hex, b, blen));
+        pr2serr("eip_count=%s, ", offset_str(eip_count, hex, b, blen));
+        pr2serr("eiioe_count=%s ", offset_str(eiioe_count, hex, b, blen));
+        pr2serr("broken_ei=%d\n", (int)broken_ei);
     }
 
     if (! display)      /* probably wanted join_arr[] built only */
@@ -4231,7 +4266,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         got1 = true;
         if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
             continue;   /* when '-ff' and status!=OK, skip */
-        cp = etype_str(jrp->etype, b, sizeof(b));
+        cp = etype_str(jrp->etype, b, blen);
         if (ed_bp) {
             desc_len = sg_get_unaligned_be16(ed_bp + 2) + 4;
             if (desc_len > 4)

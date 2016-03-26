@@ -408,10 +408,58 @@ into a 64 bit unsigned integer. Making sure there is no conversion to 'int'
 solves the problem. In this case if uc is declared as unsigned int the
 result will be as expected (i.e. 0x80000000).
 
+
+Bypassing the somewhat dangerous shift operators
+================================================
+The shift operators in C are "<<" and ">>". They can be dangerous (as shown
+in the above section) or tedious and hence error prone to use. However they
+are often needed to cope with the translation of integers on the host OS to
+the corresponding representation within a SCSI command or parameter data
+moved to or from a SCSI device. The Logical Block Address (LBA) is a good
+example; it is either 32 or 64 bits long typically (i.e. 4 or 8 bytes
+respectively). The host machine representation may be big or little endian
+and may prefer or require alignment to a particular memory address boundary
+(e.g. module 4 (or in 'C' code: "(lba % 4) == 0")). For SCSI commands and
+the parameter data moved to or from a SCSI device, the integer
+representation is big endian and it is unaligned.
+
+Recent versions of this package have replaced the explicit use of the C
+shift operators with a group of functions modelled on those found in the
+Linux kernel. These functions contain either "get_unaligned" or
+"put_unaligned" in their names and are found in the asm/unaligned.h
+header. This package contains the sg_unaligned.h header that implements
+a similar set of functions. The current implementation favours correctness
+over speed. The functions in the package use a "sg_" prefix but otherwise
+use the same function name as the Linux kernel for the same action.
+
+An example of the change made to a snippet of sg_write_buffer.c may
+clarify this change. The old code was:
+
+   wbufCmdBlk[3] = (unsigned char)((buffer_offset >> 16) & 0xff);
+   wbufCmdBlk[4] = (unsigned char)((buffer_offset >> 8) & 0xff);
+   wbufCmdBlk[5] = (unsigned char)(buffer_offset & 0xff);
+
+and it has been replaced by:
+
+   sg_put_unaligned_be24(buffer_offset, wbufCmdBlk + 3);
+
+The Linux kernel only supplies "unaligned" functions for 16, 32 and 64
+bit quantities. SCSI commands also have cases of 24 and 48 bit numbers
+so sg_unaligned.h contains support for those plus a variant where the
+bit length is passed as an argument.
+
+Associated with the above change fixed length integer types seem a better
+fit for SCSI command and parameter integers than the traditional integer
+types in the C language. Fixed length integer types were standardized in
+C99 and require the inclusion of <stdint.h>. For example this means for
+an integer that will represent a 64 bit LBA, to favour using "uint64_t"
+over the "unsigned long long" type.
+
+
 Other SCSI and storage tools
 ============================
 See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-24th February 2016
+25th March 2016
