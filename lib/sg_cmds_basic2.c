@@ -538,9 +538,7 @@ int
 sg_mode_page_offset(const unsigned char * resp, int resp_len,
                     int mode_sense_6, char * err_buff, int err_buff_len)
 {
-    int bd_len;
-    int calc_len;
-    int offset;
+    int bd_len, calc_len, offset;
 
     if ((NULL == resp) || (resp_len < 4) ||
         ((! mode_sense_6) && (resp_len < 8))) {
@@ -838,10 +836,10 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
                       int power_cond, int noflush__fl, int loej, int start,
                       int noisy, int verbose)
 {
-    unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
     int k, res, ret, sense_cat;
     struct sg_pt_base * ptvp;
+    unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
+    unsigned char sense_b[SENSE_BUFF_LEN];
 
     ssuBlk[1] = immed & 1;
     ssuBlk[3] = pc_mod__fl_num & 0xf;  /* bits 2 and 3 are reserved in MMC */

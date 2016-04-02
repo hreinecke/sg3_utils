@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #define __STDC_FORMAT_MACROS 1
@@ -158,7 +159,7 @@ void
 sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {
     const char * ccp = NULL;
-    int unknown = 0;
+    bool unknown = false;
 
     if ((NULL == buff) || (buff_len < 1))
         return;
@@ -180,7 +181,7 @@ sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
         case 0x30: ccp = "ACA Active"; break;
         case 0x40: ccp = "Task Aborted"; break;
         default:
-            unknown = 1;
+            unknown = true;
             break;
     }
     if (unknown)
@@ -238,7 +239,7 @@ char *
 sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
     int k, num, rlen;
-    int found = 0;
+    bool found = false;
     struct sg_lib_asc_ascq_t * eip;
     struct sg_lib_asc_ascq_range_t * ei2p;
 
@@ -251,7 +252,7 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
         if ((ei2p->asc == asc) &&
             (ascq >= ei2p->ascq_min)  &&
             (ascq <= ei2p->ascq_max)) {
-            found = 1;
+            found = true;
             num = my_snprintf(buff, buff_len, "Additional sense: ");
             rlen = buff_len - num;
             num += my_snprintf(buff + num, ((rlen > 0) ? rlen : 0),
@@ -265,7 +266,7 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
         eip = &sg_lib_asc_ascq[k];
         if (eip->asc == asc &&
             eip->ascq == ascq) {
-            found = 1;
+            found = true;
             my_snprintf(buff, buff_len, "Additional sense: %s", eip->text);
         }
     }
@@ -852,19 +853,26 @@ sg_get_designation_descriptor_str(const char * leadin,
         n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
         break;
     case 8: /* SCSI name string */
-        if (3 != c_set) {
-            n += my_snprintf(b + n, blen - n, "%s      << expected UTF-8 "
-                             "code_set >>\n", lip);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
-            break;
+        if (3 != c_set) {       /* accept ASCII as subset of UTF-8 */
+            if (2 == c_set) {
+                if (do_long)
+                    n += my_snprintf(b + n, blen - n, "%s      << expected "
+                                     "UTF-8, use ASCII >>\n", lip);
+            } else {
+                n += my_snprintf(b + n, blen - n, "%s      << expected UTF-8 "
+                                 "code_set >>\n", lip);
+                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                                b + n);
+                break;
+            }
         }
         n += my_snprintf(b + n, blen - n, "%s      SCSI name string:\n", lip);
         /* does %s print out UTF-8 ok??
          * Seems to depend on the locale. Looks ok here with my
          * locale setting: en_AU.UTF-8
          */
-        n += my_snprintf(b + n, blen - n, "%s      %s\n", lip,
-                         (const char *)ip);
+        n += my_snprintf(b + n, blen - n, "%s      %.*s\n", lip,
+                         dlen, (const char *)ip);
         break;
     case 9: /* Protocol specific port identifier */
         /* added in spc4r36, PIV must be set, proto_id indicates */
@@ -933,7 +941,7 @@ sg_get_designation_descriptor_str(const char * leadin,
 
 static int
 decode_sks(const char * leadin, const unsigned char * descp, int add_d_len,
-           int sense_key, int * processedp, int blen, char * b)
+           int sense_key, bool * processedp, int blen, char * b)
 {
     int progress, pr, rem, n;
     const char * lip = "";
@@ -1002,14 +1010,14 @@ decode_sks(const char * leadin, const unsigned char * descp, int add_d_len,
     default:
         n += my_snprintf(b + n, blen - n, "Sense_key: 0x%x "
                          "unexpected\n", sense_key);
-        *processedp = 0;
+        *processedp = false;
         break;
     }
     return n;
 
 too_short:
     n += my_snprintf(b + n, blen - n, "%s\n", "   >> descriptor too short");
-    *processedp = 0;
+    *processedp = false;
     return n;
 }
 
@@ -1099,8 +1107,9 @@ sg_get_sense_descriptors_str(const char * leadin,
                              const unsigned char * sense_buffer, int sb_len,
                              int blen, char * b)
 {
-    int add_sb_len, add_d_len, desc_len, k, j, sense_key, processed;
+    int add_sb_len, add_d_len, desc_len, k, j, sense_key;
     int n, progress, pr, rem;
+    bool processed;
     const unsigned char * descp;
     const char * lip = "";
     const char * dtsp = "   >> descriptor too short";
@@ -1129,7 +1138,7 @@ sg_get_sense_descriptors_str(const char * leadin,
             add_d_len = add_sb_len - k - 2;
         desc_len = add_d_len + 2;
         n += my_snprintf(b + n, blen - n, "%s  Descriptor type: ", lip);
-        processed = 1;
+        processed = true;
         switch (descp[0]) {
         case 0:
             n += my_snprintf(b + n, blen - n, "Information: ");
@@ -1140,7 +1149,7 @@ sg_get_sense_descriptors_str(const char * leadin,
                 n += my_snprintf(b + n, blen - n, "\n");
             } else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
             }
             break;
         case 1:
@@ -1152,7 +1161,7 @@ sg_get_sense_descriptors_str(const char * leadin,
                 n += my_snprintf(b + n, blen - n, "\n");
             } else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
             }
             break;
         case 2:         /* Sense Key Specific */
@@ -1166,7 +1175,7 @@ sg_get_sense_descriptors_str(const char * leadin,
                 n += my_snprintf(b + n, blen - n, "0x%x\n", descp[3]);
             else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
             }
             break;
         case 4:
@@ -1182,7 +1191,7 @@ sg_get_sense_descriptors_str(const char * leadin,
                 n += my_snprintf(b + n, blen - n, "\n");
             } else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
             }
             break;
         case 5:
@@ -1193,22 +1202,22 @@ sg_get_sense_descriptors_str(const char * leadin,
                                  (descp[3] & 0x20) ? "set" : "clear");
             else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
             }
             break;
         case 6:
             n += my_snprintf(b + n, blen - n, "OSD object identification\n");
-            processed = 0;
+            processed = false;
             break;
         case 7:
             n += my_snprintf(b + n, blen - n, "OSD response integrity check "
                              "value\n");
-            processed = 0;
+            processed = false;
             break;
         case 8:
             n += my_snprintf(b + n, blen - n, "OSD attribute "
                              "identification\n");
-            processed = 0;
+            processed = false;
             break;
         case 9:         /* this is defined in SAT (SAT-2) */
             n += my_snprintf(b + n, blen - n, "ATA Status Return: ");
@@ -1233,7 +1242,7 @@ sg_get_sense_descriptors_str(const char * leadin,
                                  descp[12], descp[13]);
             } else {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
             }
             break;
         case 0xa:
@@ -1242,7 +1251,7 @@ sg_get_sense_descriptors_str(const char * leadin,
                              "indication: ");
             if (add_d_len < 6) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
                 break;
             }
             progress = sg_get_unaligned_be16(descp + 6);
@@ -1257,7 +1266,7 @@ sg_get_sense_descriptors_str(const char * leadin,
             n += my_snprintf(b + n, blen - n, "User data segment referral: ");
             if (add_d_len < 2) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
                 break;
             }
             n += my_snprintf(b + n, blen - n, "\n");
@@ -1268,7 +1277,7 @@ sg_get_sense_descriptors_str(const char * leadin,
             n += my_snprintf(b + n, blen - n, "Forwarded sense data\n");
             if (add_d_len < 2) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
                 break;
             }
             n += my_snprintf(b + n, blen - n, "%s    FSDT: %s\n", lip,
@@ -1317,7 +1326,7 @@ sg_get_sense_descriptors_str(const char * leadin,
             n += my_snprintf(b + n, blen - n, "Direct-access block device\n");
             if (add_d_len < 28) {
                 n += my_snprintf(b + n, blen - n, "%s\n", dtsp);
-                processed = 0;
+                processed = false;
                 break;
             }
             if (0x20 & descp[2])
@@ -1364,7 +1373,7 @@ sg_get_sense_descriptors_str(const char * leadin,
             else
                 n += my_snprintf(b + n, blen - n, "Unknown [0x%x]\n",
                                  descp[0]);
-            processed = 0;
+            processed = false;
             break;
         }
         if (! processed) {
@@ -1393,7 +1402,7 @@ sg_get_sense_sat_pt_fixed_str(const char * leadin, const unsigned char * sp,
                               int slen, int blen, char * b)
 {
     int n = 0;
-    int extend, count_upper_nz, lba_upper_nz;
+    bool extend, count_upper_nz, lba_upper_nz;
     const char * lip = "";
 
     if ((blen < 1) || (slen < 12))
@@ -1413,7 +1422,7 @@ sg_get_sense_sat_pt_fixed_str(const char * leadin, const unsigned char * sp,
                      sp[4], sp[5], sp[6], (count_upper_nz ? '+' : ' '));
     n += my_snprintf(b + n, blen - n, "%s  extend=%d, log_index=0x%x, "
                      "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n", lip,
-                     extend, (0xf & sp[8]), sp[9], sp[10], sp[11],
+                     (int)extend, (0xf & sp[8]), sp[9], sp[10], sp[11],
                      (lba_upper_nz ? '+' : ' '));
     return n;
 }
@@ -1423,10 +1432,11 @@ int
 sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                  int sb_len, int raw_sinfo, int buff_len, char * buff)
 {
-    int len, valid, progress, n, r, pr, rem, blen;
+    int len, progress, n, r, pr, rem, blen;
     unsigned int info;
     int descriptor_format = 0;
     int sdat_ovfl = 0;
+    bool valid;
     const char * ebp = NULL;
     char error_buff[64];
     char b[256];
@@ -1508,7 +1518,7 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                                  sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
                                                      sizeof(b), b));
             r = 0;
-            valid = sense_buffer[0] & 0x80;
+            valid = !!(sense_buffer[0] & 0x80);
             if (strlen(lip) > 0)
                 r += my_snprintf(b + r, blen - r, "%s", lip);
             if (len > 6) {
@@ -1902,22 +1912,28 @@ int
 sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
                    int * off, int m_assoc, int m_desig_type, int m_code_set)
 {
-    const unsigned char * ucp;
-    int k, c_set, assoc, desig_type;
+    bool fltr = ((m_assoc >= 0) || (m_desig_type >= 0) || (m_code_set >= 0));
+    int k = *off;
+    const unsigned char * ucp = initial_desig_desc;
 
-    for (k = *off, ucp = initial_desig_desc ; (k + 3) < page_len; ) {
+    while ((k + 3) < page_len) {
         k = (k < 0) ? 0 : (k + ucp[k + 3] + 4);
         if ((k + 4) > page_len)
             break;
-        c_set = (ucp[k] & 0xf);
-        if ((m_code_set >= 0) && (m_code_set != c_set))
-            continue;
-        assoc = ((ucp[k + 1] >> 4) & 0x3);
-        if ((m_assoc >= 0) && (m_assoc != assoc))
-            continue;
-        desig_type = (ucp[k + 1] & 0xf);
-        if ((m_desig_type >= 0) && (m_desig_type != desig_type))
-            continue;
+        if (fltr) {
+            if (m_code_set >= 0) {
+                if ((ucp[k] & 0xf) != m_code_set)
+                    continue;
+            }
+            if (m_assoc >= 0) {
+                if (((ucp[k + 1] >> 4) & 0x3) != m_assoc)
+                    continue;
+            }
+            if (m_desig_type >= 0) {
+                if ((ucp[k + 1] & 0xf) != m_desig_type)
+                    continue;
+            }
+        }
         *off = k;
         return 0;
     }
@@ -2571,7 +2587,7 @@ sg_get_llnum(const char * buf)
         if (n == len)
             return -1LL;
         buf += n;
-        len -=n;
+        len -= n;
     }
     /* following hack to keep C++ happy */
     cp = strpbrk((char *)buf, " \t,#");

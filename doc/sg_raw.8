@@ -1,8 +1,13 @@
-.TH SG_RAW "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_RAW "8" "March 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_raw \- send arbitrary SCSI command to a device
 .SH SYNOPSIS
-.B sg_raw [\fIOPTIONS\fR] \fIDEVICE\fR CDB0 CDB1 ...
+.B sg_raw
+[\fI\-\-binary\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR]
+[\fI\-\-infile=IFILE\fR] [\fI\-\-nosense\fR] [\fI\-\-outfile=OFILE\fR]
+[\fI\-\-readonly\fR] [\fI\-\-request=RLEN\fR] [\fI\-\-send=SLEN\fR]
+[\fI\-\-skip=KLEN\fR] [\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR CDB0 CDB1 ...
 .SH DESCRIPTION
 This utility sends an arbitrary SCSI command (between 6 and 256 bytes) to
 the \fIDEVICE\fR. There may be no associated data transfer; or data may be
@@ -20,6 +25,8 @@ The commands pass through a generic SCSI interface which is implemented
 for several operating systems including Linux, FreeBSD and Windows.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-b\fR, \fB\-\-binary\fR
 Dump data in binary form, even when writing to stdout.
@@ -31,10 +38,6 @@ Display usage information and exit.
 Read data from \fIIFILE\fR instead of stdin. This option is ignored if
 \fB\-\-send\fR is not specified.
 .TP
-\fB\-k\fR, \fB\-\-skip\fR=\fILEN\fR
-Skip the first \fILEN\fR bytes of the input file or stream. This option
-is ignored if \fB\-\-send\fR is not specified.
-.TP
 \fB\-n\fR, \fB\-\-nosense\fR
 Don't display SCSI Sense information.
 .TP
@@ -42,7 +45,11 @@ Don't display SCSI Sense information.
 Write data received from the \fIDEVICE\fR to \fIOFILE\fR. The data is
 written in binary. By default, data is dumped in hex format to stdout.
 If \fIOFILE\fR is '\-' then data is dumped in binary to stdout.
-This option is ignored if \fB\-\-request\fR is not specified.
+This option is ignored if \fI\-\-request\fR is not specified.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+Open \fIDEVICE\fR read\-only. The default (without this option) is to open
+it read\-write.
 .TP
 \fB\-r\fR, \fB\-\-request\fR=\fIRLEN\fR
 Expect to receive up to \fIRLEN\fR bytes of data from the \fIDEVICE\fR.
@@ -60,10 +67,6 @@ the "allocation length" field in the cdb is large enough. In practice, the
 \fIDEVICE\fR will return no more bytes than indicated in the "allocation
 length" field of the cdb.
 .TP
-\fB\-R\fR, \fB\-\-readonly\fR
-Open \fIDEVICE\fR read\-only. The default (without this option) is to open
-it read\-write.
-.TP
 \fB\-s\fR, \fB\-\-send\fR=\fISLEN\fR
 Read \fISLEN\fR bytes of data, either from stdin or from a file, and send
 them to the \fIDEVICE\fR. In the SCSI transport, \fISLEN\fR becomes the
@@ -74,6 +77,11 @@ It is the responsibility of the user to make sure that the "data\-out"
 length implied or stated in the cdb matches \fISLEN\fR. Note that some
 common SCSI commands such as WRITE(10) have a "transfer length" field whose
 units are logical blocks (which are often 512 bytes long).
+.TP
+\fB\-k\fR, \fB\-\-skip\fR=\fIKLEN\fR
+Skip the first \fIKLEN\fR bytes of the input file or stream. This option
+is ignored if \fI\-\-send\fR is not specified. If \fI\-\-send\fR is given
+and this option is not given, then zero bytes are skipped.
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
 Wait up to \fISEC\fR seconds for command completion (default: 20).
@@ -90,8 +98,8 @@ Display version and license information and exit.
 The sg_inq utility can be used to send an INQUIRY command to a device
 to determine its peripheral device type (e.g. '1' for a streaming
 device (tape drive)) which determines which SCSI command sets a device
-should support (e.g. SPC and SSC). The sg_vpd utility probes the Vital
-Product Pages of a devices which may contain useful information.
+should support (e.g. SPC and SSC). The sg_vpd utility reads and decodes
+a device's Vital Product Pages which may contain useful information.
 .PP
 The ability to send more than a 16 byte CDB (in some cases 12 byte CDB)
 may be restricted by the pass\-through interface, the low level driver
@@ -151,7 +159,7 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2015 Ingo van Lil
+Copyright \(co 2001\-2016 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
