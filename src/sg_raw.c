@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2015 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2016 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
 #define _XOPEN_SOURCE 600       /* clear up posix_memalign() warning */
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -29,7 +30,7 @@
 #include "sg_pt.h"
 #include "sg_pr2serr.h"
 
-#define SG_RAW_VERSION "0.4.14 (2015-12-19)"
+#define SG_RAW_VERSION "0.4.15 (2016-03-31)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -53,6 +54,7 @@ win_pagesize(void)
 
 static struct option long_options[] = {
     { "binary",  no_argument,       NULL, 'b' },
+    { "enumerate", no_argument,     NULL, 'e' },
     { "help",    no_argument,       NULL, 'h' },
     { "infile",  required_argument, NULL, 'i' },
     { "skip",    required_argument, NULL, 'k' },
@@ -71,20 +73,21 @@ struct opts_t {
     char *device_name;
     unsigned char cdb[MAX_SCSI_CDBSZ];
     int cdb_length;
-    int do_datain;
+    bool do_datain;
     int datain_len;
     const char *datain_file;
-    int datain_binary;
-    int do_dataout;
+    bool datain_binary;
+    bool do_dataout;
     int dataout_len;
     const char *dataout_file;
     off_t dataout_offset;
+    bool do_enumerate;
     int timeout;
-    int no_sense;
+    bool no_sense;
     int readonly;
-    int do_help;
-    int do_verbose;
-    int do_version;
+    bool do_help;
+    int verbose;
+    bool do_version;
 };
 
 
@@ -106,24 +109,31 @@ usage()
     pr2serr("Usage: sg_raw [OPTION]* DEVICE CDB0 CDB1 ...\n"
             "\n"
             "Options:\n"
-            "  -b, --binary           Dump data in binary form, even when "
-            "writing to stdout\n"
-            "  -h, --help             Show this message and exit\n"
-            "  -i, --infile=IFILE     Read data to send from IFILE (default: "
-            "stdin)\n"
-            "  -k, --skip=LEN         Skip the first LEN bytes when reading "
-            "data to send\n"
-            "  -n, --nosense          Don't display sense information\n"
-            "  -o, --outfile=OFILE    Write binary data to OFILE (def: "
-            "hexdump to stdout)\n"
-            "  -r, --request=RLEN     Request up to RLEN bytes of data "
-            "(data-in)\n"
-            "  -R, --readonly         Open DEVICE read-only (default: "
+            "  --binary|-b            Dump data in binary form, even when "
+            "writing to\n"
+            "                         stdout\n"
+            "  --enumerate|-e         Decodes cdb name then exits; requires "
+            "DEVICE but\n"
+            "                         ignores it\n"
+            "  --help|-h              Show this message and exit\n"
+            "  --infile=IFILE|-i IFILE    Read data to send from IFILE "
+            "(default:\n"
+            "                             stdin)\n"
+            "  --nosense|-n           Don't display sense information\n"
+            "  --outfile=OFILE|-o OFILE    Write binary data to OFILE (def: "
+            "hexdump\n"
+            "                              to stdout)\n"
+            "  --readonly|-R          Open DEVICE read-only (default: "
             "read-write)\n"
-            "  -s, --send=SLEN        Send SLEN bytes of data (data-out)\n"
-            "  -t, --timeout=SEC      Timeout in seconds (default: 20)\n"
-            "  -v, --verbose          Increase verbosity\n"
-            "  -V, --version          Show version information and exit\n"
+            "  --request=RLEN|-r RLEN    Request up to RLEN bytes of data "
+            "(data-in)\n"
+            "  --send=SLEN|-s SLEN    Send SLEN bytes of data (data-out)\n"
+            "  --skip=KLEN|-k KLEN    Skip the first KLEN bytes when "
+            "reading\n"
+            "                         data to send (default: 0)\n"
+            "  --timeout=SEC|-t SEC    Timeout in seconds (default: 20)\n"
+            "  --verbose|-v           Increase verbosity\n"
+            "  --version|-V           Show version information and exit\n"
             "\n"
             "Between 6 and 256 command bytes (two hex digits each) can be "
             "specified\nand will be sent to DEVICE. Lengths RLEN and SLEN "
@@ -138,17 +148,20 @@ process_cl(struct opts_t * op, int argc, char *argv[])
     while (1) {
         int c, n;
 
-        c = getopt_long(argc, argv, "bhi:k:no:r:Rs:t:vV", long_options, NULL);
+        c = getopt_long(argc, argv, "behi:k:no:r:Rs:t:vV", long_options, NULL);
         if (c == -1)
             break;
 
         switch (c) {
         case 'b':
-            op->datain_binary = 1;
+            op->datain_binary = true;
+            break;
+        case 'e':
+            op->do_enumerate = true;
             break;
         case 'h':
         case '?':
-            op->do_help = 1;
+            op->do_help = true;
             return 0;
         case 'i':
             if (op->dataout_file) {
@@ -166,7 +179,7 @@ process_cl(struct opts_t * op, int argc, char *argv[])
             op->dataout_offset = n;
             break;
         case 'n':
-            op->no_sense = 1;
+            op->no_sense = true;
             break;
         case 'o':
             if (op->datain_file) {
@@ -176,7 +189,7 @@ process_cl(struct opts_t * op, int argc, char *argv[])
             op->datain_file = optarg;
             break;
         case 'r':
-            op->do_datain = 1;
+            op->do_datain = true;
             n = sg_get_num(optarg);
             if (n < 0 || n > MAX_SCSI_DXLEN) {
                 pr2serr("Invalid argument to '--request'\n");
@@ -188,7 +201,7 @@ process_cl(struct opts_t * op, int argc, char *argv[])
             ++op->readonly;
             break;
         case 's':
-            op->do_dataout = 1;
+            op->do_dataout = true;
             n = sg_get_num(optarg);
             if (n < 0 || n > MAX_SCSI_DXLEN) {
                 pr2serr("Invalid argument to '--send'\n");
@@ -205,10 +218,10 @@ process_cl(struct opts_t * op, int argc, char *argv[])
             op->timeout = n;
             break;
         case 'v':
-            ++op->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
-            op->do_version = 1;
+            op->do_version = true;
             return 0;
         default:
             return SG_LIB_SYNTAX_ERROR;
@@ -243,7 +256,7 @@ process_cl(struct opts_t * op, int argc, char *argv[])
         pr2serr("CDB too short (min. %d bytes)\n", MIN_SCSI_CDBSZ);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (op->do_verbose > 1) {
+    if (op->do_enumerate || (op->verbose > 1)) {
         int sa;
         char b[80];
 
@@ -289,7 +302,7 @@ my_memalign(int length, unsigned char ** wrkBuffp, const struct opts_t * op)
         if (wrkBuffp)
             *wrkBuffp = (unsigned char *)wp;
         res = (unsigned char *)wp;
-        if (op->do_verbose > 3)
+        if (op->verbose > 3)
             pr2serr("%s: posix, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
                     __func__, length, *wrkBuffp, (int)psz, res);
         return res;
@@ -307,7 +320,7 @@ my_memalign(int length, unsigned char ** wrkBuffp, const struct opts_t * op)
             *wrkBuffp = wrkBuff;
         res = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
                                 (~(psz - 1)));
-        if (op->do_verbose > 3)
+        if (op->verbose > 3)
             pr2serr("%s: hack, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
                     __func__, length, *wrkBuffp, (int)psz, res);
         return res;
@@ -465,10 +478,11 @@ main(int argc, char *argv[])
     } else if (op->do_version) {
         version();
         goto done;
-    }
+    } else if (op->do_enumerate)
+        goto done;
 
     sg_fd = scsi_pt_open_device(op->device_name, op->readonly,
-                                op->do_verbose);
+                                op->verbose);
     if (sg_fd < 0) {
         pr2serr("%s: %s\n", op->device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
@@ -481,19 +495,19 @@ main(int argc, char *argv[])
         ret = SG_LIB_CAT_OTHER;
         goto done;
     }
-    if (op->do_verbose) {
+    if (op->verbose) {
         pr2serr("    cdb to send: ");
         for (k = 0; k < op->cdb_length; ++k)
             pr2serr("%02x ", op->cdb[k]);
         pr2serr("\n");
-        if (op->do_verbose > 1) {
+        if (op->verbose > 1) {
             sg_get_command_name(op->cdb, 0, sizeof(b) - 1, b);
             b[sizeof(b) - 1] = '\0';
             pr2serr("    Command name: %s\n", b);
         }
     }
     set_scsi_pt_cdb(ptvp, op->cdb, op->cdb_length);
-    if (op->do_verbose > 2)
+    if (op->verbose > 2)
         pr2serr("sense_buffer=%p, length=%d\n", sense_buffer,
                 (int)sizeof(sense_buffer));
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
@@ -504,7 +518,7 @@ main(int argc, char *argv[])
             ret = SG_LIB_CAT_OTHER;
             goto done;
         }
-        if (op->do_verbose > 2)
+        if (op->verbose > 2)
             pr2serr("dxfer_buffer_out=%p, length=%d\n", dxfer_buffer_out,
                     op->dataout_len);
         set_scsi_pt_data_out(ptvp, dxfer_buffer_out, op->dataout_len);
@@ -516,13 +530,13 @@ main(int argc, char *argv[])
             ret = SG_LIB_CAT_OTHER;
             goto done;
         }
-        if (op->do_verbose > 2)
+        if (op->verbose > 2)
             pr2serr("dxfer_buffer_in=%p, length=%d\n", dxfer_buffer_in,
                     op->datain_len);
         set_scsi_pt_data_in(ptvp, dxfer_buffer_in, op->datain_len);
     }
 
-    ret = do_scsi_pt(ptvp, sg_fd, op->timeout, op->do_verbose);
+    ret = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
     if (ret > 0) {
         if (SCSI_PT_DO_BAD_PARAMS == ret) {
             pr2serr("do_scsi_pt: bad pass through setup\n");
@@ -577,7 +591,7 @@ main(int argc, char *argv[])
                     "Information\n");
         else {
             pr2serr("Sense Information:\n");
-            sg_print_sense(NULL, sense_buffer, slen, (op->do_verbose > 0));
+            sg_print_sense(NULL, sense_buffer, slen, (op->verbose > 0));
             pr2serr("\n");
         }
     }
@@ -616,8 +630,8 @@ main(int argc, char *argv[])
     }
 
 done:
-    if (op->do_verbose) {
-        sg_get_category_sense_str(ret, sizeof(b), b, op->do_verbose - 1);
+    if (op->verbose) {
+        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose - 1);
         pr2serr("%s\n", b);
     }
     if (wrkBuf)

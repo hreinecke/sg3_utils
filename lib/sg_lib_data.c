@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.18 20160312";  /* spc5r08, sbc4r10 */
+const char * sg_lib_version_str = "2.19 20160401";  /* spc5r08, sbc4r10 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1430,7 +1430,7 @@ const char * sg_lib_sense_key_desc[] = {
     "Completed"                 /* may occur for successful cmd (spc4r23) */
 };
 
-const char * sg_lib_pdt_strs[] = {
+const char * sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
     /* 0 */ "disk",
     "tape",
     "printer",                  /* obsolete, spc5r01 */

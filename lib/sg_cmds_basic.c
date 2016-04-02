@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include "sg_lib.h"
@@ -34,7 +35,7 @@
 #endif
 
 
-static const char * version_str = "1.72 20160126";
+static const char * version_str = "1.73 20160331";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -118,7 +119,7 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
 {
     int scat, got;
     int n = 0;
-    int check_data_in = 0;
+    bool check_data_in = false;
     char b[512];
 
     scat = sg_err_category_sense(sbp, slen);
@@ -136,7 +137,7 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
         break;
     case SG_LIB_CAT_RECOVERED:
     case SG_LIB_CAT_MEDIUM_HARD:
-        ++check_data_in;
+        check_data_in = true;
         /* drop through */
     case SG_LIB_CAT_UNIT_ATTENTION:
     case SG_LIB_CAT_SENSE:

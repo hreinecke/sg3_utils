@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.41 20160323";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.42 20160329";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -4846,7 +4846,7 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
                    !!(0x8 & ucp[5]), !!(0x4 & ucp[5]), !!(0x2 & ucp[5]));
             printf("    pd=%d, code_set: %s, Service buffer title:\n",
                    !!(0x1 & ucp[5]), sg_get_desig_code_set_str(0xf & ucp[6]));
-            printf("      %*s\n", pl - 8, ucp + 8);
+            printf("      %.*s\n", pl - 8, ucp + 8);
         } else if (pc < 0x8000) {
             printf("  parameter_code=0x%x, Reserved, parameter in hex:\n",
                    pc);

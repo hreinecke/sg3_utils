@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.15 20160312";  /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.16 20160327";  /* spc5r08 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -267,7 +267,7 @@ usage()
             "also\n"
             "                    given, FN is in binary (else FN is in "
             "hex)\n"
-            "    --vendor=VP | -M VP    vendor/product abbreviation [or "
+            "    --vendor=VP|-M VP    vendor/product abbreviation [or "
             "number]\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n\n"
@@ -1122,7 +1122,7 @@ skip_1st_iter:
         case 7: /* MD5 logical unit identifier */
             break;
         case 8: /* SCSI name string */
-            if (3 != c_set) {
+            if (c_set < 2) {    /* quietly accept ASCII for UTF-8 */
                 pr2serr("      << expected UTF-8 code_set>>\n");
                 dStrHexErr((const char *)ip, i_len, 0);
                 break;
@@ -1140,7 +1140,7 @@ skip_1st_iter:
              * Seems to depend on the locale. Looks ok here with my
              * locale setting: en_AU.UTF-8
              */
-            printf("  %s\n", (const char *)ip);
+            printf("  %.*s\n", i_len, (const char *)ip);
             break;
         case 9: /* Protocol specific port identifier */
             break;
@@ -1436,7 +1436,7 @@ decode_designation_descriptor(const unsigned char * ip, int i_len,
          * Seems to depend on the locale. Looks ok here with my
          * locale setting: en_AU.UTF-8
          */
-        printf("      %s\n", (const char *)ip);
+        printf("      %.*s\n", i_len, (const char *)ip);
         break;
     case 9: /* Protocol specific port identifier */
         /* added in spc4r36, PIV must be set, proto_id indicates */
@@ -2606,7 +2606,7 @@ decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
     printf("  Write same (10) with unmap bit supported (LBWS10): %d\n",
            !!(0x20 & b[5]));
     printf("  Logical block provisioning read zeros (LBPRZ): %d\n",
-           (0x7 & (b[5] >> 2)));
+           (0x7 & (b[5] >> 2)));  /* expanded from 1 to 3 bits in sbc4r07 */
     printf("  Anchored LBAs supported (ANC_SUP): %d\n", !!(0x2 & b[5]));
     dp = !!(b[5] & 0x1);
     printf("  Threshold exponent: %d\n", b[4]);

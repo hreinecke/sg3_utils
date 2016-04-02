@@ -123,13 +123,13 @@ static char usn_buff[MX_ALLOC_LEN + 1];
 
 static const char * find_version_descriptor_str(int value);
 static void decode_dev_ids(const char * leadin, unsigned char * buff,
-                           int len, int do_hex);
+                           int len, int do_hex, int verbose);
 static void decode_transport_id(const char * leadin, unsigned char * ucp,
                                 int len);
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
-                            int do_verbose);
+                            int verbose);
 #endif
 
 /* This structure is a duplicate of one of the same name in sg_vpd_vendor.c .
@@ -1272,14 +1272,15 @@ decode_ascii_inf(unsigned char * buff, int len, int do_hex)
 }
 
 static void
-decode_id_vpd(unsigned char * buff, int len, int do_hex)
+decode_id_vpd(unsigned char * buff, int len, int do_hex, int verbose)
 {
     if (len < 4) {
         pr2serr("Device identification VPD page length too "
                 "short=%d\n", len);
         return;
     }
-    decode_dev_ids("Device identification", buff + 4, len - 4, do_hex);
+    decode_dev_ids("Device identification", buff + 4, len - 4, do_hex,
+                   verbose);
 }
 
 static const char * assoc_arr[] =
@@ -1393,7 +1394,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_SCSI_PORTS */
 static void
-decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
+decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
     unsigned char * ucp;
@@ -1439,7 +1440,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
                         (1 == do_hex) ? 1 : -1);
             else
                 decode_dev_ids("SCSI Ports", ucp + bump + 4, tpd_len,
-                               do_hex);
+                               do_hex, verbose);
         }
         bump += tpd_len + 4;
     }
@@ -1447,7 +1448,8 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex)
 
 /* These are target port, device server (i.e. target) and LU identifiers */
 static void
-decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
+decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
+               int verbose)
 {
     int u, j, m, id_len, p_id, c_set, piv, assoc, desig_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi, k;
@@ -1717,16 +1719,21 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex)
             break;
         case 8: /* SCSI name string */
             if (3 != c_set) {
-                pr2serr("      << expected UTF-8 code_set>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
-                break;
+                if (2 == c_set) {
+                    if (verbose)
+                        pr2serr("      << expected UTF-8, use ASCII>>\n");
+                } else {
+                    pr2serr("      << expected UTF-8 code_set>>\n");
+                    dStrHexErr((const char *)ip, i_len, -1);
+                    break;
+                }
             }
             printf("      SCSI name string:\n");
             /* does %s print out UTF-8 ok??
              * Seems to depend on the locale. Looks ok here with my
              * locale setting: en_AU.UTF-8
              */
-            printf("      %s\n", (const char *)ip);
+            printf("      %.*s\n", i_len, (const char *)ip);
             break;
         case 9: /* Protocol specific port identifier */
             /* added in spc4r36, PIV must be set, proto_id indicates */
@@ -3141,6 +3148,8 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
         return SG_LIB_CAT_MALFORMED;
     } else {
+        /* First response indicated that not enough bytes of response were
+         * requested, so try again, this time requesting more. */
         res = pt_inquiry(sg_fd, 1, page, rp, len, &resid, 1, vb);
         if (res)
             return res;
@@ -3525,7 +3534,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         else if (op->do_export)
             export_dev_ids(rp + 4, len - 4, op->do_verbose);
         else
-            decode_id_vpd(rp, len, op->do_hex);
+            decode_id_vpd(rp, len, op->do_hex, op->do_verbose);
         break;
     case VPD_SOFTW_INF_ID:
         if (! op->do_raw && (op->do_hex < 2))
@@ -3726,7 +3735,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else
-            decode_scsi_ports_vpd(rp, len, op->do_hex);
+            decode_scsi_ports_vpd(rp, len, op->do_hex, op->do_verbose);
         break;
     default:
         if ((pn > 0) && (pn < 0x80)) {
