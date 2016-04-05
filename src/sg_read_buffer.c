@@ -210,7 +210,7 @@ ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
 {
     int k, ret, res, sense_cat;
     uint8_t rb16_cb[SG_READ_BUFFER_16_CMDLEN] =
-          {SG_READ_BUFFER_16_CMD, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
+          {SG_READ_BUFFER_16_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -418,15 +418,13 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (rb_len > 0) {
-        resp = (unsigned char *)malloc(rb_len);
-        if (NULL == resp) {
-            pr2serr("unable to allocate %d bytes on the heap\n", rb_len);
-            return SG_LIB_CAT_OTHER;
-        }
-        memset(resp, 0, rb_len);
-    } else
-        resp = NULL;
+    len = rb_len ? rb_len : 8;
+    resp = (unsigned char *)malloc(len);
+    if (NULL == resp) {
+        pr2serr("unable to allocate %d bytes on the heap\n", len);
+        return SG_LIB_CAT_OTHER;
+    }
+    memset(resp, 0, len);
 
     if (do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {

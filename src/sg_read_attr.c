@@ -1057,27 +1057,32 @@ main(int argc, char * argv[])
 
     if (NULL == device_name) {
         if (fname) {
-            if (f2hex_arr(fname, op->do_raw, 0, rabp, &in_len, op->maxlen))
-                return SG_LIB_FILE_ERROR;
+            if (f2hex_arr(fname, op->do_raw, 0, rabp, &in_len, op->maxlen)) {
+                ret = SG_LIB_FILE_ERROR;
+                goto clean_up;
+            }
             if (op->do_raw)
                 op->do_raw = 0;    /* can interfere on decode */
             if (in_len < 4) {
                 pr2serr("--in=%s only decoded %d bytes (needs 4 at least)\n",
                         fname, in_len);
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto clean_up;
             }
             decode_all_sa_s(rabp, in_len, op);
             goto clean_up;
         }
         pr2serr("missing device name!\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto clean_up;
     }
 
     if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+                goto clean_up;
         }
     }
 
@@ -1085,7 +1090,8 @@ main(int argc, char * argv[])
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = SG_LIB_FILE_ERROR;
+        goto clean_up;
     }
 
     res = sg_ll_read_attr(sg_fd, rabp, &resid, op);

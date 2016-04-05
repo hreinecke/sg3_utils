@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.10 20160325";    /* ses3r13 */
+static const char * version_str = "2.11 20160404";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2810,7 +2810,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
             aep = ae_bp + 14 + eip_offset;
             for (j = 0; j < phys; ++j, aep += 2) {
                 printf("%s  [%d] ", pad, j);
-                m = aep[0];
+                m = aep[0];     /* connector element index */
                 if (0xff == m)
                     printf("no connector");
                 else {
@@ -2832,7 +2832,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                     } else
                         printf("connector ei: %d", m);
                 }
-                m = aep[1];
+                m = aep[1];     /* other element index */
                 if (0xff != m) {
                     printf("; ");
                     if (tesp->j_base) {
@@ -2875,7 +2875,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                 printf("%sphy index: %d\n", pad, j);
                 printf("%s  phy_id: 0x%x\n", pad, aep[0]);
                 printf("%s  ", pad);
-                m = aep[2];
+                m = aep[2];     /* connector element index */
                 if (0xff == m)
                     printf("no connector");
                 else {
@@ -2897,16 +2897,16 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                     } else
                         printf("connector ei: %d", m);
                 }
-                m = aep[3];
+                m = aep[3];     /* other element index */
                 if (0xff != m) {
                     printf("; ");
                     if (tesp->j_base) {
                         if (0 == eiioe)
-                            jrp = find_join_row_cnst(tesp, m, 2);
+                            jrp = find_join_row_cnst(tesp, m, FJ_AESS);
                         else if ((1 == eiioe) || (3 == eiioe))
-                            jrp = find_join_row_cnst(tesp, m, 0);
+                            jrp = find_join_row_cnst(tesp, m, FJ_IOE);
                         else
-                            jrp = find_join_row_cnst(tesp, m, 1);
+                            jrp = find_join_row_cnst(tesp, m, FJ_EOE);
                         if (NULL == jrp)
                             printf("broken");
                         else if (jrp->elem_descp) {

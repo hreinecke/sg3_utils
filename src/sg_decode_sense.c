@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2015 Douglas Gilbert.
+ * Copyright (c) 2010-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.08 20151219";
+static const char * version_str = "1.09 20160403";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -369,12 +369,18 @@ write2wfn(FILE * fp, struct opts_t * optsp)
             if (15 == (k % 16)) {
                 b[n] = '\n';
                 s = fwrite(b, 1, n + 1, fp);
+                if ((int)s != (n + 1))
+                    pr2serr("only able to write %d of %d bytes to %s\n",
+                            (int)s, n + 1);
                 n = 0;
             }
         }
         if (n > 0) {
             b[n] = '\n';
             s = fwrite(b, 1, n + 1, fp);
+            if ((int)s != (n + 1))
+                pr2serr("only able to write %d of %d bytes to %s\n", (int)s,
+                        n + 1);
         }
     } else {
         s = fwrite(optsp->sense, 1, optsp->sense_len, fp);

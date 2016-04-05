@@ -194,13 +194,13 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;
-            pr2ws("    get configuration: response");
+            pr2ws("    get configuration: response:\n");
             if (3 == verbose) {
-                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                pr2ws("%s:\n", (len > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (len > 256 ? 256 : len), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                dStrHexErr((const char *)resp, len, 0);
             }
         }
         ret = 0;
@@ -289,11 +289,11 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
             len = (ret < len) ? ret : len;
             pr2ws("    get performance:: response");
             if (3 == verbose) {
-                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                pr2ws("%s:\n", (len > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (len > 256 ? 256 : len), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                dStrHexErr((const char *)resp, len, 0);
             }
         }
         ret = 0;

@@ -40,7 +40,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.11 20160121";
+static const char * version_str = "1.12 20160404";
 
 #define ME "sg_map26: "
 
@@ -300,7 +300,7 @@ nt_typ_from_major(int ma)
 
 
 struct node_match_item {
-        const char * dir_name;
+        char dir_name[D_NAME_LEN_MAX];
         int file_type;
         int majj;
         int minn;
@@ -369,7 +369,7 @@ list_matching_nodes(const char * dir_name, int file_type, int majj, int minn,
         struct dirent ** namelist;
         int num, k;
 
-        nd_match.dir_name = dir_name;
+        strncpy(nd_match.dir_name, dir_name, D_NAME_LEN_MAX);
         nd_match.file_type = file_type;
         nd_match.majj = majj;
         nd_match.minn = minn;

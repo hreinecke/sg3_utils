@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -412,7 +413,7 @@ dd_filetype_str(int ft, char * buff)
     if (FT_OTHER & ft)
         off += snprintf(buff + off, 32, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
-        off += snprintf(buff + off, 32, "unable to 'stat' file ");
+        snprintf(buff + off, 32, "unable to 'stat' file ");
     return buff;
 }
 
@@ -1304,8 +1305,8 @@ main(int argc, char * argv[])
     int src_desc_len;
     int dst_desc_len;
     int seg_desc_type;
-    int on_src = 0;
-    int on_dst = 0;
+    bool on_src = false;
+    bool on_src_dst_given = false;
 
     ixcf.fname[0] = '\0';
     oxcf.fname[0] = '\0';
@@ -1433,11 +1434,25 @@ main(int argc, char * argv[])
         /* look for long options that start with '--' */
         else if (0 == strncmp(key, "--help", 6))
             ++num_help;
-        else if (0 == strncmp(key, "--on_dst", 8))
-            ++on_dst;
-        else if (0 == strncmp(key, "--on_src", 8))
-            ++on_src;
-        else if (0 == strncmp(key, "--verb", 6))
+        else if (0 == strncmp(key, "--on_dst", 8)) {
+            on_src = false;
+            if (on_src_dst_given) {
+                pr2serr("Syntax error - either specify --on_src OR "
+                        "--on_dst\n");
+                pr2serr("For more information use '--help'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            on_src_dst_given = true;
+        } else if (0 == strncmp(key, "--on_src", 8)) {
+            on_src = true;
+            if (on_src_dst_given) {
+                pr2serr("Syntax error - either specify --on_src OR "
+                        "--on_dst\n");
+                pr2serr("For more information use '--help'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            on_src_dst_given = true;
+        } else if (0 == strncmp(key, "--verb", 6))
             verbose += 1;
         else if (0 == strncmp(key, "--vers", 6)) {
             pr2serr(ME "%s\n", version_str);
@@ -1481,13 +1496,7 @@ main(int argc, char * argv[])
         usage(num_help);
         return 0;
     }
-    if (on_src && on_dst) {
-        pr2serr("Syntax error - either specify --on_src OR "
-                "--on_dst\n");
-        pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    if ((! on_src) && (! on_dst)) {
+    if (! on_src_dst_given) {
         if ((!! ixcf.xcopy_given) == (!! oxcf.xcopy_given)) {
             char * csp;
             char * cdp;
@@ -1496,18 +1505,18 @@ main(int argc, char * argv[])
             cdp = getenv(XCOPY_TO_DST);
             if ((!! csp) == (!! cdp)) {
 #if DEF_XCOPY_SRC0_DST1 == 0
-                on_src = 1;
+                on_src = true;
 #else
-                on_dst = 1;
+                on_src = false;
 #endif
             } else if (csp)
-                on_src = 1;
+                on_src = true;
             else
-                on_dst = 1;
+                on_src = false;
         } else if (ixcf.xcopy_given)
-            on_src = 1;
+            on_src = true;
         else
-            on_dst = 1;
+            on_src = false;
     }
     if (verbose > 1)
         pr2serr(" >>> Extended Copy(LID1) command will be sent to %s device "
@@ -1559,8 +1568,6 @@ main(int argc, char * argv[])
     install_handler(SIGPIPE, interrupt_handler);
     install_handler(SIGUSR1, siginfo_handler);
 
-    infd = STDIN_FILENO;
-    outfd = STDOUT_FILENO;
     ixcf.pdt = -1;
     oxcf.pdt = -1;
     if (ixcf.fname[0] && ('-' != ixcf.fname[0])) {

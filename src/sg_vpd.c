@@ -704,15 +704,15 @@ dStrRaw(const char * str, int len)
 }
 
 /* Assume index is less than 16 */
-const char * sg_ansi_version_arr[] =
+const char * sg_ansi_version_arr[16] =
 {
     "no conformance claimed",
     "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
     "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
-    "SPC",              /* withdrawn */
-    "SPC-2",
-    "SPC-3",
-    "SPC-4",
+    "SPC",              /* withdrawn, ANSI INCITS 301-1997 */
+    "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
+    "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
+    "SPC-4",            /* ANSI INCITS 513-2015 */
     "SPC-5",
     "ecma=1, [8h]",
     "ecma=1, [9h]",
@@ -979,7 +979,7 @@ static int
 decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                      int m_desig_type, int m_code_set)
 {
-    int m, p_id, c_set, piv, desig_type, i_len, naa, off, u;
+    int k, m, p_id, c_set, piv, desig_type, i_len, naa, off, u;
     int assoc, is_sas, rtp;
     const unsigned char * ucp;
     const unsigned char * ip;
@@ -987,38 +987,37 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
 
     rtp = 0;
     memset(sas_tport_addr, 0, sizeof(sas_tport_addr));
-    off = -1;
-    if (buff[2] != 0) {
-        if (m_assoc != VPD_ASSOC_LU)
-            return 0;
-        ip = buff;
-        p_id = 0;
-        c_set = 1;
-        assoc = VPD_ASSOC_LU;
-        piv = 0;
-        is_sas = 0;
-        desig_type = 3;
-        i_len = 16;
-        off = 16;
-        goto skip_1st_iter;
-    }
-    while ((u = sg_vpd_dev_id_iter(buff, len, &off, m_assoc, m_desig_type,
-                                   m_code_set)) == 0) {
-        ucp = buff + off;
-        i_len = ucp[3];
-        if ((off + i_len + 4) > len) {
-            pr2serr("    VPD page error: designator length longer than\n"
-                    "     remaining response length=%d\n", (len - off));
-            return SG_LIB_CAT_MALFORMED;
+    for (k = 0, off = -1; true; ++k) {
+        if ((0 == k) && (0 != buff[2])) {
+            /* first already in buff */
+            if (m_assoc != VPD_ASSOC_LU)
+                return 0;
+            ip = buff;
+            c_set = 1;
+            assoc = VPD_ASSOC_LU;
+            is_sas = 0;
+            desig_type = 3;
+            i_len = 16;
+        } else {
+            u = sg_vpd_dev_id_iter(buff, len, &off, m_assoc, m_desig_type,
+                                   m_code_set);
+            if (0 != u)
+                break;
+            ucp = buff + off;
+            i_len = ucp[3];
+            if ((off + i_len + 4) > len) {
+                pr2serr("    VPD page error: designator length longer than\n"
+                        "     remaining response length=%d\n", (len - off));
+                return SG_LIB_CAT_MALFORMED;
+            }
+            ip = ucp + 4;
+            p_id = ((ucp[0] >> 4) & 0xf);
+            c_set = (ucp[0] & 0xf);
+            piv = ((ucp[1] & 0x80) ? 1 : 0);
+            is_sas = (piv && (6 == p_id)) ? 1 : 0;
+            assoc = ((ucp[1] >> 4) & 0x3);
+            desig_type = (ucp[1] & 0xf);
         }
-        ip = ucp + 4;
-        p_id = ((ucp[0] >> 4) & 0xf);
-        c_set = (ucp[0] & 0xf);
-        piv = ((ucp[1] & 0x80) ? 1 : 0);
-        is_sas = (piv && (6 == p_id)) ? 1 : 0;
-        assoc = ((ucp[1] >> 4) & 0x3);
-        desig_type = (ucp[1] & 0xf);
-skip_1st_iter:
         switch (desig_type) {
         case 0: /* vendor specific */
             break;
@@ -3700,7 +3699,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
         int in_len = op->maxlen;
         int prev_pn = -1;
 
-        rp = rsp_buff;
+        res = 0;
         for (k = 0, off = 0; off < in_len; ++k, off += bump) {
             rp = rsp_buff + off;
             pn = rp[1];
@@ -3734,7 +3733,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             }
         }
     }
-    return 0;
+    return res;
 }
 
 
@@ -3747,7 +3746,6 @@ main(int argc, char * argv[])
     int inhex_len = 0;
     int ret = 0;
     int subvalue = 0;
-    int page_pdt = -1;
     struct opts_t opts;
     struct opts_t * op;
 
@@ -3913,7 +3911,6 @@ main(int argc, char * argv[])
             op->num_vpd = vnp->value;
             subvalue = vnp->subvalue;
             op->vend_prod_num = subvalue;
-            page_pdt = vnp->pdt;
         } else {
             cp = strchr(op->page_str, ',');
             if (cp && op->vend_prod) {
@@ -3988,20 +3985,14 @@ main(int argc, char * argv[])
                 if (op->verbose)
                     pr2serr("Guessing from --inhex= this is a standard "
                             "INQUIRY\n");
-                if (page_pdt < 0)
-                    page_pdt = 0x1f & rsp_buff[0];
             } else if (rsp_buff[2] <= 2) {
                 if (op->verbose)
                     pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
                             rsp_buff[1]);
                 op->num_vpd = rsp_buff[1];
-                if (page_pdt < 0)
-                    page_pdt = 0x1f & rsp_buff[0];
             } else {
                 if (op->num_vpd > 0x80) {
                     op->num_vpd = rsp_buff[1];
-                    if (page_pdt < 0)
-                        page_pdt = 0x1f & rsp_buff[0];
                     if (op->verbose)
                         pr2serr("Guessing from --inhex this is VPD page "
                                 "0x%x\n", rsp_buff[1]);

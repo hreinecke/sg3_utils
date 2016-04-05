@@ -258,7 +258,7 @@ dd_filetype_str(int ft, char * buff)
     if (FT_OTHER & ft)
         off += snprintf(buff + off, 32, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
-        off += snprintf(buff + off, 32, "unable to 'stat' file ");
+        snprintf(buff + off, 32, "unable to 'stat' file ");
     return buff;
 }
 

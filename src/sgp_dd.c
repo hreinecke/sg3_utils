@@ -1059,7 +1059,6 @@ sg_prepare(int fd, int bs, int bpt)
         pr2serr(ME "sg driver prior to 3.x.y\n");
         return 1;
     }
-    res = 0;
     t = bs * bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)

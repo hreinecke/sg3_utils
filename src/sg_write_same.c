@@ -319,7 +319,6 @@ main(int argc, char * argv[])
     op->numblocks = DEF_WS_NUMBLOCKS;
     op->pref_cdb_size = DEF_WS_CDB_SIZE;
     op->timeout = DEF_TIMEOUT_SECS;
-    vb = 0;
     while (1) {
         int option_index = 0;
 
