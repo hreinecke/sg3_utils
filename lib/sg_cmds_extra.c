@@ -91,7 +91,7 @@
 #define REPORT_REFERRALS_SA 0x13
 #define EXTENDED_COPY_LID1_SA 0x0
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

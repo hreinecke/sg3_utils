@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -62,7 +62,7 @@ struct sg_pt_base {
     struct sg_pt_osf1_scsi impl;
 };
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

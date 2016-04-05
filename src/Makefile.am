@@ -45,7 +45,7 @@ AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET
 AM_CFLAGS = -Wall -W @os_cflags@
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11 --analyze
-# AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c++11
+# AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c++14
 
 sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@
 

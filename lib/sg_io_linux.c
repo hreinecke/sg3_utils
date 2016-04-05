@@ -21,9 +21,9 @@
 #include "sg_io_linux.h"
 
 
-/* Version 1.06 20151217 */
+/* Version 1.07 20160405 */
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

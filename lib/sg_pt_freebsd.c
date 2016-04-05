@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.13 20150511 */
+/* sg_pt_freebsd version 1.14 20160405 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +72,7 @@ struct sg_pt_base {
     struct sg_pt_freebsd_scsi impl;
 };
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.25 20151217 */
+/* sg_pt_linux version 1.26 20160405 */
 
 
 #include <stdio.h>
@@ -86,7 +86,7 @@ static const char * linux_driver_suggests[] = {
 #define SG_LIB_DRIVER_SENSE    DRIVER_SENSE
 
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

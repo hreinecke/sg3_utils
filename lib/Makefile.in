@@ -353,7 +353,7 @@ AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET
 AM_CFLAGS = -Wall -W
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
-# AM_CFLAGS = -Wall -W -pedantic -std=c++14 --analyze
+# AM_CFLAGS = -Wall -W -pedantic -std=c++14
 lib_LTLIBRARIES = libsgutils2.la
 libsgutils2_la_LDFLAGS = -version-info 2:0:0 -no-undefined
 libsgutils2_la_LIBADD = @GETOPT_O_FILES@ @os_libs@
