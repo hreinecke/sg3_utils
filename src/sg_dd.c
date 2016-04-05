@@ -336,7 +336,7 @@ dd_filetype_str(int ft, char * buff)
     if (FT_OTHER & ft)
         off += snprintf(buff + off, 32, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
-        off += snprintf(buff + off, 32, "unable to 'stat' file ");
+        snprintf(buff + off, 32, "unable to 'stat' file ");
     return buff;
 }
 
@@ -673,7 +673,7 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 (0x64 == ssh.asc) && (0x0 == ssh.ascq)) {
                 if (sg_get_sense_filemark_eom_ili(sbp, slen, NULL, NULL,
                                                   &ili) && ili) {
-                    info_valid = sg_get_sense_info_fld(sbp, slen, io_addrp);
+                    sg_get_sense_info_fld(sbp, slen, io_addrp);
                     if (*io_addrp > 0) {
                         ++unrecovered_errs;
                         return SG_LIB_CAT_MEDIUM_HARD_WITH_INFO;

@@ -2633,7 +2633,8 @@ sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 static int
 common_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 {
-    int status, proto_id;
+    int status;
+    int proto_id = 0;
 
     status = get_protocol_id(0, cbuffer, &proto_id, NULL);
     if (status)
@@ -2737,7 +2738,8 @@ sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 static int
 common_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
-    int status, proto_id;
+    int status;
+    int proto_id = 0;
 
     status = get_protocol_id(1, cbuffer, &proto_id, NULL);
     if (status)
@@ -2840,7 +2842,8 @@ sas_phy_control_discover(struct mpage_info * mpi, const char * prefix)
 static int
 common_proto_spec_port_sp1(struct mpage_info * mpi, const char * prefix)
 {
-    int status, proto_id;
+    int status;
+    int proto_id = 0;
 
     status = get_protocol_id(1, cbuffer, &proto_id, NULL);
     if (status)
@@ -2935,7 +2938,8 @@ sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
 static int
 common_proto_spec_port_sp2(struct mpage_info * mpi, const char * prefix)
 {
-    int status, proto_id;
+    int status;
+    int proto_id = 0;
 
     status = get_protocol_id(1, cbuffer, &proto_id, NULL);
     if (status)

@@ -21,7 +21,7 @@
 
 
 /* Assume index is less than 16 */
-const char * sg_ansi_version_arr[] =
+const char * sg_ansi_version_arr[16] =
 {
     "no conformance claimed",
     "SCSI-1",           /* obsolete, ANSI X3.131-1986 */

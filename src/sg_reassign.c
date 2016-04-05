@@ -430,7 +430,6 @@ main(int argc, char * argv[])
             dStrHex((const char *)param_arr, param_len, 1);
             goto err_out;       /* ret is zero */
         }
-        lstp = "";
         got_grown = !!(param_arr[1] & 0x8);
         got_primary = !!(param_arr[1] & 0x10);
         if (got_grown && got_primary)

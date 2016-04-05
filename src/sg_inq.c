@@ -2911,8 +2911,6 @@ std_inq_response(const struct opts_t * op, int act_len)
 
     rp = rsp_buff;
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
-    len = rp[4] + 5;
-
     if (op->do_raw) {
         dStrRaw((const char *)rp, act_len);
         return 0;
@@ -3169,7 +3167,6 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
     int len, k, res;
     unsigned char b[DEF_ALLOC_LEN];
 
-    res = 0;
     memset(b, 0xff, 4); /* guard against empty response */
     res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, -1, verbose,
                                   &len);
@@ -3222,7 +3219,6 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
             if (len != (rsp_buff[4] + 5)) {
                 pr2serr("strange, consecutive INQUIRYs yield different "
                         "'additional lengths'\n");
-                res = SG_LIB_CAT_MALFORMED;
                 len = rsp_buff[4] + 5;
             }
         }

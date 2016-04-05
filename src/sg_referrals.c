@@ -320,7 +320,6 @@ main(int argc, char * argv[])
             res = decode_referral_desc(ucp + k, rlen - 4 - k);
             if (res < 0) {
                 pr2serr("bad user data segment referral descriptor\n");
-                k = rlen - 4;
                 break;
             }
             k += res;

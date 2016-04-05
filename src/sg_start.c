@@ -532,7 +532,6 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = 0;
     if (op->do_fl >= 0)
         res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_fl, 0 /* pc */,
                                     1 /* fl */, 1 /* loej */,

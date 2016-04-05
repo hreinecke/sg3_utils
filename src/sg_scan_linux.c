@@ -373,8 +373,11 @@ int main(int argc, char * argv[])
                     (f >= 30000))
                     sg_ver3 = 1;
             }
-            if (1 == sg_ver3)
+            if (1 == sg_ver3) {
                 res = sg3_inq(sg_fd, inqBuff, do_extra);
+                if (res)
+                    ++num_errors;
+            }
         }
     }
     if ((num_errors >= MAX_ERRORS) && (num_silent < num_errors) &&
@@ -522,7 +525,7 @@ void swapbytes(char *out, const char *in, size_t n)
 /* Copies in to out, but removes leading and trailing whitespace. */
 void trim(char *out, const char *in)
 {
-    int k, first, last;
+    int k, first, last, num;
 
     /* Find the first non-space character (maybe none). */
     first = -1;
@@ -543,8 +546,10 @@ void trim(char *out, const char *in)
     for (k = strlen(in) - 1; k >= first && isspace((int)in[k]); k--)
         ;
     last = k;
-    strncpy(out, in + first, last - first + 1);
-    out[last - first + 1] = '\0';
+    num = last - first + 1;
+    for (k = 0; k < num; ++k)
+        out[k] = in[first + k];
+    out[num] = '\0';
 }
 
 /* Convenience function for formatting strings from ata_identify_device */

@@ -809,7 +809,6 @@ int main(int argc, char * argv[])
         free(wrkBuff);
 
     close(infd);
-    res = 0;
     if (0 != dd_count) {
         pr2serr("Some error occurred,");
         if (0 == ret)

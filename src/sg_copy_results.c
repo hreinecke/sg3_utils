@@ -432,25 +432,20 @@ main(int argc, char * argv[])
     }
     if (1 == do_hex) {
         dStrHex((const char *)cpResultBuff, xfer_len, 1);
-        res = 0;
         goto finish;
     }
     switch (sa) {
     case 4: /* Failed segment details */
         scsi_failed_segment_details(cpResultBuff, xfer_len);
-        res = 0;
         break;
     case 3: /* Operating parameters */
         scsi_operating_parameters(cpResultBuff, xfer_len);
-        res = 0;
         break;
     case 0: /* Copy status */
         scsi_copy_status(cpResultBuff, xfer_len);
-        res = 0;
         break;
     default:
         dStrHex((const char *)cpResultBuff, xfer_len, 1);
-        res = 0;
         break;
     }
 

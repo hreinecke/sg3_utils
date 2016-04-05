@@ -240,13 +240,14 @@ do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
 
     offset++;
     for (i = 0; i < safte_cfg.temps; i++) {
-        int temp = 0;
+        int temp = rb_buff[i + offset];
+        int is_celsius = !!(safte_cfg.flags & SAFTE_CFG_FLAG_CELSIUS);
 
-        if (!(safte_cfg.flags & SAFTE_CFG_FLAG_CELSIUS))
+        if (! is_celsius)
             temp -= 10;
 
-        printf("\tTemperature sensor %d: %d deg %c\n", i, rb_buff[i + offset],
-               safte_cfg.flags & SAFTE_CFG_FLAG_CELSIUS?'C':'F');
+        printf("\tTemperature sensor %d: %d deg %c\n", i, temp,
+               is_celsius ? 'C' : 'F');
     }
 
     offset += safte_cfg.temps;
@@ -643,12 +644,10 @@ main(int argc, char * argv[])
     }
     if (1 == do_raw) {
         dStrRaw((const char *)rb_buff, buf_capacity);
-        res = 0;
         goto finish;
     }
     if (1 == do_hex) {
         dStrHex((const char *)rb_buff, buf_capacity, 1);
-        res = 0;
         goto finish;
     }
 

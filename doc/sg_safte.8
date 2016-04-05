@@ -1,4 +1,4 @@
-.TH SG_SAFTE "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_SAFTE "8" "April 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_safte \- access SCSI Accessed Fault\-Tolerant Enclosure (SAF\-TE) device
 .SH SYNOPSIS
@@ -96,15 +96,15 @@ increase the level of verbosity, (i.e. debug output).
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .SH NOTES
-The implementation is based on the intermediate review document eg as
-found at
+This implementation is based on the intermediate review document dated
+19970414 and named "SR041497.pdf". So it is quite old. Intel and nStor
+are the authors. Intel have a zip archive containing this and related
+documents in the "SAF\-TE: SCSI Accessed Fault Tolerant Enclosures
+Interface Specification" section of this page:
 .PP
-http://www.intel.com/design/servers/ipmi/saf\-te.htm
+http://www.intel.com/content/www/us/en/servers/ipmi/ipmi\-technical\-resources.html
 .PP
-As the specification was never finalized this document serves as the
-de\-facto standard.
-.PP
-Similar functionality is provided by SPC\-4 SCSI Enclosure Services
+Similar functionality is provided by SPC\-4 SCSI Enclosure Services (SES)
 devices (Peripheral device type 0xd), which can be queried with the
 sg_ses utility.
 .SH EXAMPLES
@@ -124,7 +124,7 @@ Written by Hannes Reinecke and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2012 Hannes Reinecke and Douglas Gilbert
+Copyright \(co 2004\-2016 Hannes Reinecke and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

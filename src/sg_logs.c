@@ -1464,16 +1464,16 @@ show_supported_pgs_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
     int num, k, pg_code;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const struct log_elem * lep;
     char b[64];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Supported log pages  [0x0]:\n");  /* introduced: SPC-2 */
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     for (k = 0; k < num; ++k) {
-        pg_code = ucp[k];
+        pg_code = bp[k];
         snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
         lep = pg_subpg_pdt_search(pg_code, 0, op->dev_pdt);
         if (lep) {
@@ -1496,7 +1496,7 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
     int num, k, pg_code, subpg_code;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const struct log_elem * lep;
     char b[64];
 
@@ -1507,10 +1507,10 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
             printf("Supported log pages and subpages  [0x0, 0xff]:\n");
     }
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     for (k = 0; k < num; k += 2) {
-        pg_code = ucp[k];
-        subpg_code = ucp[k + 1];
+        pg_code = bp[k];
+        subpg_code = bp[k + 1];
         if (NOT_SPG_SUBPG == subpg_code)
             snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
         else
@@ -1537,27 +1537,27 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
 {
     int num, pl, pcb, pc;
     uint64_t count;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const char * cp;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Buffer over-run/under-run page  [0x1]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
         cp = NULL;
-        pl = ucp[3] + 4;
-        count = (pl > 4) ? sg_get_unaligned_be(pl - 4, ucp + 4) : 0;
-        pc = sg_get_unaligned_be16(ucp + 0);
+        pl = bp[3] + 4;
+        count = (pl > 4) ? sg_get_unaligned_be(pl - 4, bp + 4) : 0;
+        pc = sg_get_unaligned_be16(bp + 0);
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1643,7 +1643,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             printf("  %s = %" PRIu64 "", cp, count);
 
         if (op->do_pcb) {
-            pcb = ucp[2];
+            pcb = bp[2];
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
         } else
@@ -1652,7 +1652,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -1664,7 +1664,7 @@ show_error_counter_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
     int num, pl, pc, pcb, pg_code;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     pg_code = resp[0] & 0x3f;
@@ -1690,19 +1690,19 @@ show_error_counter_page(const uint8_t * resp, int len,
         }
     }
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1718,7 +1718,7 @@ show_error_counter_page(const uint8_t * resp, int len,
         case 0x8015: printf("  Positioning errors [Hitachi]"); break;
         default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1728,7 +1728,7 @@ show_error_counter_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -1739,25 +1739,25 @@ show_non_medium_error_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Non-medium error page  [0x6]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1772,7 +1772,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
                 printf("  Vendor specific [0x%x]", pc);
             break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1782,7 +1782,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -1793,25 +1793,25 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
                                       const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Power condition transitions page  [0x1a]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1831,7 +1831,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
         default:
             printf("  Reserved [0x%x]", pc);
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -1841,7 +1841,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -1880,7 +1880,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
     int num, pl, pc, pcb, blen;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
     char b[32];
 
@@ -1888,19 +1888,19 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Environmental reporting page  [0xd,0x1]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1911,26 +1911,26 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                 goto skip;
             }
             printf("  Temperature: %s\n",
-                   temperature_str(ucp[5], true, b, blen));
+                   temperature_str(bp[5], true, b, blen));
             printf("  Lifetime maximum temperature: %s\n",
-                   temperature_str(ucp[6], true, b, blen));
+                   temperature_str(bp[6], true, b, blen));
             printf("  Lifetime minimum temperature: %s\n",
-                   temperature_str(ucp[7], true, b, blen));
+                   temperature_str(bp[7], true, b, blen));
             printf("  Maximum temperature since power on: %s\n",
-                   temperature_str(ucp[8], true, b, blen));
+                   temperature_str(bp[8], true, b, blen));
             printf("  Minimum temperature since power on: %s\n",
-                   temperature_str(ucp[9], true, b, blen));
+                   temperature_str(bp[9], true, b, blen));
         } else if (pc < 0x200) {
             printf("  Relative humidity: %s\n",
-                   humidity_str(ucp[5], true, b, blen));
+                   humidity_str(bp[5], true, b, blen));
             printf("  Lifetime maximum relative humidity: %s\n",
-                   humidity_str(ucp[6], true, b, blen));
+                   humidity_str(bp[6], true, b, blen));
             printf("  Lifetime minimum relative humidity: %s\n",
-                   humidity_str(ucp[7], true, b, blen));
+                   humidity_str(bp[7], true, b, blen));
             printf("  Maximum relative humidity since power on: %s\n",
-                   humidity_str(ucp[8], true, b, blen));
+                   humidity_str(bp[8], true, b, blen));
             printf("  Minimum relative humidity since power on: %s\n",
-                   humidity_str(ucp[9], true, b, blen));
+                   humidity_str(bp[9], true, b, blen));
         } else
             printf("  <<unexpect parameter code 0x%x\n", pc);
         if (op->do_pcb) {
@@ -1942,7 +1942,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -1953,7 +1953,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
                                const struct opts_t * op)
 {
     int num, pl, pc, pcb, blen;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
     char b[32];
 
@@ -1961,19 +1961,19 @@ show_environmental_limits_page(const uint8_t * resp, int len,
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Environmental limits page  [0xd,0x2]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1984,38 +1984,38 @@ show_environmental_limits_page(const uint8_t * resp, int len,
                 goto skip;
             }
             printf("  High critical temperature limit trigger: %s\n",
-                   temperature_str(ucp[4], false, b, blen));
+                   temperature_str(bp[4], false, b, blen));
             printf("  High critical temperature limit reset: %s\n",
-                   temperature_str(ucp[5], false, b, blen));
+                   temperature_str(bp[5], false, b, blen));
             printf("  Low critical temperature limit reset: %s\n",
-                   temperature_str(ucp[6], false, b, blen));
+                   temperature_str(bp[6], false, b, blen));
             printf("  Low critical temperature limit trigger: %s\n",
-                   temperature_str(ucp[7], false, b, blen));
+                   temperature_str(bp[7], false, b, blen));
             printf("  High operating temperature limit trigger: %s\n",
-                   temperature_str(ucp[8], false, b, blen));
+                   temperature_str(bp[8], false, b, blen));
             printf("  High operating temperature limit reset: %s\n",
-                   temperature_str(ucp[9], false, b, blen));
+                   temperature_str(bp[9], false, b, blen));
             printf("  Low operating temperature limit reset: %s\n",
-                   temperature_str(ucp[10], false, b, blen));
+                   temperature_str(bp[10], false, b, blen));
             printf("  Low operating temperature limit trigger: %s\n",
-                   temperature_str(ucp[11], false, b, blen));
+                   temperature_str(bp[11], false, b, blen));
         } else if (pc < 0x200) {
             printf("  High critical relative humidity limit trigger: %s\n",
-                   humidity_str(ucp[4], false, b, blen));
+                   humidity_str(bp[4], false, b, blen));
             printf("  High critical relative humidity limit reset: %s\n",
-                   humidity_str(ucp[5], false, b, blen));
+                   humidity_str(bp[5], false, b, blen));
             printf("  Low critical relative humidity limit reset: %s\n",
-                   humidity_str(ucp[6], false, b, blen));
+                   humidity_str(bp[6], false, b, blen));
             printf("  Low critical relative humidity limit trigger: %s\n",
-                   humidity_str(ucp[7], false, b, blen));
+                   humidity_str(bp[7], false, b, blen));
             printf("  High operating relative humidity limit trigger: %s\n",
-                   humidity_str(ucp[8], false, b, blen));
+                   humidity_str(bp[8], false, b, blen));
             printf("  High operating relative humidity limit reset: %s\n",
-                   humidity_str(ucp[9], false, b, blen));
+                   humidity_str(bp[9], false, b, blen));
             printf("  Low operating relative humidity limit reset: %s\n",
-                   humidity_str(ucp[10], false, b, blen));
+                   humidity_str(bp[10], false, b, blen));
             printf("  Low operating relative humidity limit trigger: %s\n",
-                   humidity_str(ucp[11], false, b, blen));
+                   humidity_str(bp[11], false, b, blen));
         } else
             printf("  <<unexpect parameter code 0x%x\n", pc);
         if (op->do_pcb) {
@@ -2027,7 +2027,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -2039,43 +2039,43 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
     int k, num, extra, pc, pcb;
     unsigned int n;
     uint64_t ull;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed tape usage page\n");
         return false;
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Tape usage page  (LTO-5 and LTO-6 specific) [0x30]\n");
-    for (k = num; k > 0; k -= extra, ucp += extra) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        extra = ucp[3] + 4;
+    for (k = num; k > 0; k -= extra, bp += extra) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        extra = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         ull = n = 0;
-        switch (ucp[3]) {
+        switch (bp[3]) {
         case 2:
-            n = sg_get_unaligned_be16(ucp + 4);
+            n = sg_get_unaligned_be16(bp + 4);
             break;
         case 4:
-            n = sg_get_unaligned_be32(ucp + 4);
+            n = sg_get_unaligned_be32(bp + 4);
             break;
         case 8:
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             break;
         }
         switch (pc) {
@@ -2126,7 +2126,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                    "hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)bp, extra, 1);
             break;
         }
         if (op->do_pcb) {
@@ -2147,36 +2147,36 @@ show_tape_capacity_page(const uint8_t * resp, int len,
 {
     int k, num, extra, pc, pcb;
     unsigned int n;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed tape capacity page\n");
         return false;
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Tape capacity page  (LTO-5 and LTO-6 specific) [0x31]\n");
-    for (k = num; k > 0; k -= extra, ucp += extra) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        extra = ucp[3] + 4;
+    for (k = num; k > 0; k -= extra, bp += extra) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        extra = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         if (extra != 8)
             continue;
-        n = sg_get_unaligned_be32(ucp + 4);
+        n = sg_get_unaligned_be32(bp + 4);
         switch (pc) {
         case 0x01:
             printf("  Main partition remaining capacity (in MiB): %u", n);
@@ -2193,7 +2193,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                     "hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)bp, extra, 1);
             break;
         }
         if (op->do_pcb) {
@@ -2215,12 +2215,12 @@ show_data_compression_page(const uint8_t * resp, int len,
 {
     int k, j, pl, num, extra, pc, pcb, pg_code;
     uint64_t n;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     pg_code = resp[0] & 0x3f;
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed data compression page\n");
         return false;
@@ -2232,19 +2232,19 @@ show_data_compression_page(const uint8_t * resp, int len,
             printf("Data compression page  (LTO-5 specific) [0x%x]\n",
                    pg_code);
     }
-    for (k = num; k > 0; k -= extra, ucp += extra) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3];
+    for (k = num; k > 0; k -= extra, bp += extra) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3];
         extra = pl + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
@@ -2252,14 +2252,14 @@ show_data_compression_page(const uint8_t * resp, int len,
         if ((0 == pl) || (pl > 8)) {
             printf("badly formed data compression log parameter\n");
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)bp, extra, 1);
             goto skip_para;
         }
         /* variable length integer, max length 8 bytes */
         for (j = 0, n = 0; j < pl; ++j) {
             if (j > 0)
                 n <<= 8;
-            n |= ucp[4 + j];
+            n |= bp[4 + j];
         }
         switch (pc) {
         case 0x00:
@@ -2298,7 +2298,7 @@ show_data_compression_page(const uint8_t * resp, int len,
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                     "hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)bp, extra, 1);
             break;
         }
 skip_para:
@@ -2319,33 +2319,33 @@ show_last_n_error_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
     int k, num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         printf("No error events logged\n");
         return true;
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Last n error events page  [0x7]\n");
-    for (k = num; k > 0; k -= pl, ucp += pl) {
+    for (k = num; k > 0; k -= pl, bp += pl) {
         if (k < 3) {
             printf("short Last n error events page\n");
             return false;
         }
-        pl = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        pl = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2353,12 +2353,12 @@ show_last_n_error_page(const uint8_t * resp, int len,
         if (pl > 4) {
             if ((pcb & 0x1) && (pcb & 0x2)) {
                 printf("    [binary]:\n");
-                dStrHex((const char *)ucp + 4, pl - 4, 1);
+                dStrHex((const char *)bp + 4, pl - 4, 1);
             } else if (pcb & 0x1)
-                printf("    %.*s\n", pl - 4, (const char *)(ucp + 4));
+                printf("    %.*s\n", pl - 4, (const char *)(bp + 4));
             else {
                 printf("    [data counter?? (LP bit should be set)]:\n");
-                dStrHex((const char *)ucp + 4, pl - 4, 1);
+                dStrHex((const char *)bp + 4, pl - 4, 1);
             }
         }
         if (op->do_pcb) {
@@ -2377,38 +2377,38 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
 {
     int k, num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         printf("No deferred errors logged\n");
         return true;
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Last n deferred errors page  [0xb]\n");
-    for (k = num; k > 0; k -= pl, ucp += pl) {
+    for (k = num; k > 0; k -= pl, bp += pl) {
         if (k < 3) {
             printf("short Last n deferred errors page\n");
             return true;
         }
-        pl = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        pl = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         printf("  Deferred error %d:\n", pc);
-        dStrHex((const char *)ucp + 4, pl - 4, 1);
+        dStrHex((const char *)bp + 4, pl - 4, 1);
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("        <%s>\n", pcb_str);
@@ -2443,7 +2443,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, n, res, pc, pl, pcb;
     unsigned int v;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
     char b[80];
@@ -2456,44 +2456,44 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Self-test results page  [0x10]\n");
-    for (k = 0, ucp = resp + 4; k < 20; ++k, ucp += 20 ) {
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
+    for (k = 0, bp = resp + 4; k < 20; ++k, bp += 20 ) {
+        pcb = bp[2];
+        pl = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
-        n = sg_get_unaligned_be16(ucp + 6);
-        if ((0 == n) && (0 == ucp[4]))
+        n = sg_get_unaligned_be16(bp + 6);
+        if ((0 == n) && (0 == bp[4]))
             break;
         printf("  Parameter code = %d, accumulated power-on hours = %d\n",
                pc, n);
         printf("    self-test code: %s [%d]\n",
-               self_test_code[(ucp[4] >> 5) & 0x7], (ucp[4] >> 5) & 0x7);
-        res = ucp[4] & 0xf;
+               self_test_code[(bp[4] >> 5) & 0x7], (bp[4] >> 5) & 0x7);
+        res = bp[4] & 0xf;
         printf("    self-test result: %s [%d]\n", self_test_result[res], res);
-        if (ucp[5])
-            printf("    self-test number = %d\n", (int)ucp[5]);
-        if (! all_bits_set(ucp + 8, 8)) {
-            ull = sg_get_unaligned_be64(ucp + 8);
+        if (bp[5])
+            printf("    self-test number = %d\n", (int)bp[5]);
+        if (! all_bits_set(bp + 8, 8)) {
+            ull = sg_get_unaligned_be64(bp + 8);
             if ((res > 0) && ( res < 0xf))
                 printf("    address of first error = 0x%" PRIx64 "\n", ull);
         }
-        v = ucp[16] & 0xf;
+        v = bp[16] & 0xf;
         if (v) {
             printf("    sense key = 0x%x [%s] , asc = 0x%x, ascq = 0x%x",
-                   v, sg_get_sense_key_str(v, sizeof(b), b), ucp[17],
-                   ucp[18]);
-            if (ucp[17] || ucp[18])
-                printf("      [%s]\n", sg_get_asc_ascq_str(ucp[17], ucp[18],
+                   v, sg_get_sense_key_str(v, sizeof(b), b), bp[17],
+                   bp[18]);
+            if (bp[17] || bp[18])
+                printf("      [%s]\n", sg_get_asc_ascq_str(bp[17], bp[18],
                        sizeof(b), b));
         }
         if (op->do_pcb) {
@@ -2512,11 +2512,11 @@ static bool
 show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed Temperature page\n");
         return false;
@@ -2525,22 +2525,22 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (! op->do_temperature)
             printf("Temperature page  [0xd]\n");
     }
-    for (k = num; k > 0; k -= extra, ucp += extra) {
+    for (k = num; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
             pr2serr("short Temperature page\n");
             return true;
         }
-        extra = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        extra = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
@@ -2548,16 +2548,16 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         switch (pc) {
         case 0:
             if ((extra > 5) && (k > 5)) {
-                if (ucp[5] < 0xff)
-                    printf("  Current temperature = %d C", ucp[5]);
+                if (bp[5] < 0xff)
+                    printf("  Current temperature = %d C", bp[5]);
                 else
                     printf("  Current temperature = <not available>");
             }
             break;
         case 1:
             if ((extra > 5) && (k > 5)) {
-                if (ucp[5] < 0xff)
-                    printf("  Reference temperature = %d C", ucp[5]);
+                if (bp[5] < 0xff)
+                    printf("  Reference temperature = %d C", bp[5]);
                 else
                     printf("  Reference temperature = <not available>");
             }
@@ -2566,7 +2566,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (! op->do_temperature) {
                 printf("  unknown parameter code = 0x%x, contents in "
                        "hex:\n", pc);
-                dStrHex((const char *)ucp, extra, 1);
+                dStrHex((const char *)bp, extra, 1);
             } else
                 continue;
             break;
@@ -2587,33 +2587,33 @@ static bool
 show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed Start-stop cycle counter page\n");
         return false;
     }
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Start-stop cycle counter page  [0xe]\n");
-    for (k = num; k > 0; k -= extra, ucp += extra) {
+    for (k = num; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
             pr2serr("short Start-stop cycle counter page\n");
             return true;
         }
-        extra = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        extra = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
@@ -2622,65 +2622,65 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
         case 1:
             if (10 == extra)
                 printf("  Date of manufacture, year: %.4s, week: %.2s",
-                       &ucp[4], &ucp[8]);
+                       &bp[4], &bp[8]);
             else if (op->verbose) {
                 pr2serr("  Date of manufacture parameter length strange: "
                         "%d\n", extra - 4);
-                dStrHexErr((const char *)ucp, extra, 1);
+                dStrHexErr((const char *)bp, extra, 1);
             }
             break;
         case 2:
             if (10 == extra)
                 printf("  Accounting date, year: %.4s, week: %.2s",
-                       &ucp[4], &ucp[8]);
+                       &bp[4], &bp[8]);
             else if (op->verbose) {
                 pr2serr("  Accounting date parameter length strange: %d\n",
                         extra - 4);
-                dStrHexErr((const char *)ucp, extra, 1);
+                dStrHexErr((const char *)bp, extra, 1);
             }
             break;
         case 3:
             if (extra > 7) {
-                if (all_bits_set(ucp + 4, 4))
+                if (all_bits_set(bp + 4, 4))
                     printf("  Specified cycle count over device lifetime "
                            "= -1");
                 else
                     printf("  Specified cycle count over device lifetime "
-                           "= %u", sg_get_unaligned_be32(ucp + 4));
+                           "= %u", sg_get_unaligned_be32(bp + 4));
             }
             break;
         case 4:
             if (extra > 7) {
-                if (all_bits_set(ucp + 4, 4))
+                if (all_bits_set(bp + 4, 4))
                     printf("  Accumulated start-stop cycles = -1");
                 else
                     printf("  Accumulated start-stop cycles = %u",
-                           sg_get_unaligned_be32(ucp + 4));
+                           sg_get_unaligned_be32(bp + 4));
             }
             break;
         case 5:
             if (extra > 7) {
-                if (all_bits_set(ucp + 4, 4))
+                if (all_bits_set(bp + 4, 4))
                     printf("  Specified load-unload count over device "
                            "lifetime = -1");
                 else
                     printf("  Specified load-unload count over device "
-                           "lifetime = %u", sg_get_unaligned_be32(ucp + 4));
+                           "lifetime = %u", sg_get_unaligned_be32(bp + 4));
             }
             break;
         case 6:
             if (extra > 7) {
-                if (all_bits_set(ucp + 4, 4))
+                if (all_bits_set(bp + 4, 4))
                     printf("  Accumulated load-unload cycles = -1");
                 else
                     printf("  Accumulated load-unload cycles = %u",
-                           sg_get_unaligned_be32(ucp + 4));
+                           sg_get_unaligned_be32(bp + 4));
             }
             break;
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                    "hex:\n", pc);
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)bp, extra, 1);
             break;
         }
         if (op->do_pcb) {
@@ -2699,11 +2699,11 @@ static bool
 show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed Application Client page\n");
         return false;
@@ -2721,24 +2721,24 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         return true;
     }
     /* only here if filter_given set */
-    for (k = num; k > 0; k -= extra, ucp += extra) {
+    for (k = num; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
             pr2serr("short Application client page\n");
             return true;
         }
-        extra = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        extra = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter != pc)
             continue;
         if (op->do_raw)
-            dStrRaw((const char *)ucp, extra);
+            dStrRaw((const char *)bp, extra);
         else if (0 == op->do_hex)
-            dStrHex((const char *)ucp, extra, 0);
+            dStrHex((const char *)bp, extra, 0);
         else if (1 == op->do_hex)
-            dStrHex((const char *)ucp, extra, 1);
+            dStrHex((const char *)bp, extra, 1);
         else
-            dStrHex((const char *)ucp, extra, -1);
+            dStrHex((const char *)bp, extra, -1);
 
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
@@ -2755,13 +2755,13 @@ static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int k, num, extra, pc, pcb, full;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
     char b[256];
 
     full = ! op->do_temperature;
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     if (num < 4) {
         pr2serr("badly formed Informational Exceptions page\n");
         return false;
@@ -2770,22 +2770,22 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (full)
             printf("Informational Exceptions page  [0x2f]\n");
     }
-    for (k = num; k > 0; k -= extra, ucp += extra) {
+    for (k = num; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
             printf("short Informational Exceptions page\n");
             return false;
         }
-        extra = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        extra = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
@@ -2794,20 +2794,20 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         case 0:
             if (extra > 5) {
                 if (full) {
-                    printf("  IE asc = 0x%x, ascq = 0x%x", ucp[4], ucp[5]);
-                    if (ucp[4] || ucp[5])
-                        if(sg_get_asc_ascq_str(ucp[4], ucp[5], sizeof(b), b))
+                    printf("  IE asc = 0x%x, ascq = 0x%x", bp[4], bp[5]);
+                    if (bp[4] || bp[5])
+                        if(sg_get_asc_ascq_str(bp[4], bp[5], sizeof(b), b))
                             printf("\n    [%s]", b);
                 }
                 if (extra > 6) {
-                    if (ucp[6] < 0xff)
-                        printf("\n  Current temperature = %d C", ucp[6]);
+                    if (bp[6] < 0xff)
+                        printf("\n  Current temperature = %d C", bp[6]);
                     else
                         printf("\n  Current temperature = <not available>");
                     if (extra > 7) {
-                        if (ucp[7] < 0xff)
+                        if (bp[7] < 0xff)
                             printf("\n  Threshold temperature = %d C  [IBM "
-                                   "extension]", ucp[7]);
+                                   "extension]", bp[7]);
                         else
                             printf("\n  Threshold temperature = <not "
                                    "available>");
@@ -2818,7 +2818,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         default:
             if (full) {
                 printf("  parameter code = 0x%x, contents in hex:\n", pc);
-                dStrHex((const char *)ucp, extra, 1);
+                dStrHex((const char *)bp, extra, 1);
             }
             break;
         }
@@ -3009,7 +3009,7 @@ sas_negot_link_rate(int lrate, char * b, int blen)
 
 /* helper for SAS port of PROTO_SPECIFIC_LPAGE [0x18] */
 static void
-show_sas_port_param(const uint8_t * ucp, int param_len,
+show_sas_port_param(const uint8_t * bp, int param_len,
                     const struct opts_t * op)
 {
     int j, m, nphys, pcb, t, sz, spld_len;
@@ -3020,17 +3020,17 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
     char s[64];
 
     sz = sizeof(s);
-    pcb = ucp[2];
-    t = sg_get_unaligned_be16(ucp + 0);
+    pcb = bp[2];
+    t = sg_get_unaligned_be16(bp + 0);
     if (op->do_name)
         printf("rel_target_port=%d\n", t);
     else
         printf("relative target port id = %d\n", t);
     if (op->do_name)
-        printf("  gen_code=%d\n", ucp[6]);
+        printf("  gen_code=%d\n", bp[6]);
     else
-        printf("  generation code = %d\n", ucp[6]);
-    nphys = ucp[7];
+        printf("  generation code = %d\n", bp[6]);
+    nphys = bp[7];
     if (op->do_name)
         printf("  num_phys=%d\n", nphys);
     else {
@@ -3042,7 +3042,7 @@ show_sas_port_param(const uint8_t * ucp, int param_len,
             printf("\n");
     }
 
-    for (j = 0, vcp = ucp + 8; j < (param_len - 8);
+    for (j = 0, vcp = bp + 8; j < (param_len - 8);
          vcp += spld_len, j += spld_len) {
         if (op->do_name)
             printf("    phy_id=%d\n", vcp[1]);
@@ -3176,28 +3176,28 @@ show_protocol_specific_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
     int k, num, pl, pc, pid;
-    const uint8_t * ucp;
+    const uint8_t * bp;
 
     num = len - 4;
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
         if (op->do_name)
             printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
     }
-    for (k = 0, ucp = resp + 4; k < num; ) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pl = ucp[3] + 4;
+    for (k = 0, bp = resp + 4; k < num; ) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
-        pid = 0xf & ucp[4];
+        pid = 0xf & bp[4];
         if (6 != pid) {
             pr2serr("Protocol identifier: %d, only support SAS (SPL) which "
                     "is 6\n", pid);
@@ -3206,12 +3206,12 @@ show_protocol_specific_page(const uint8_t * resp, int len,
         if ((0 == k) && (0 == op->do_name))
             printf("Protocol Specific port page for SAS SSP  (sas-2) "
                    "[0x18]\n");
-        show_sas_port_param(ucp, pl, op);
+        show_sas_port_param(bp, pl, op);
         if (op->filter_given)
             break;
 skip:
         k += pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -3225,14 +3225,14 @@ show_stats_perform_pages(const uint8_t * resp, int len,
     int k, num, param_len, param_code, spf, subpg_code, extra;
     int pcb, nam;
     unsigned int ui;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const char * ccp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     nam = op->do_name;
     num = len - 4;
-    ucp = resp + 4;
+    bp = resp + 4;
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
@@ -3253,21 +3253,21 @@ show_stats_perform_pages(const uint8_t * resp, int len,
     if (0 == subpg_code) { /* General statistics and performance log page */
         if (num < 0x5c)
             return false;
-        for (k = num; k > 0; k -= extra, ucp += extra) {
+        for (k = num; k > 0; k -= extra, bp += extra) {
             if (k < 3)
                 return false;
-            param_len = ucp[3];
+            param_len = bp[3];
             extra = param_len + 4;
-            param_code = sg_get_unaligned_be16(ucp + 0);
-            pcb = ucp[2];
+            param_code = sg_get_unaligned_be16(bp + 0);
+            pcb = bp[2];
             if (op->filter_given) {
                 if (param_code != op->filter)
                     continue;
                 if (op->do_raw) {
-                    dStrRaw((const char *)ucp, extra);
+                    dStrRaw((const char *)bp, extra);
                     break;
                 } else if (op->do_hex) {
-                    dStrHex((const char *)ucp, extra,
+                    dStrHex((const char *)bp, extra,
                             ((1 == op->do_hex) ? 1 : -1));
                     break;
                 }
@@ -3277,33 +3277,33 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=1" : "Statistics and performance "
                         "log parameter";
                 printf("%s\n", ccp);
-                ull = sg_get_unaligned_be64(ucp + 4);
+                ull = sg_get_unaligned_be64(bp + 4);
                 ccp = nam ? "read_commands=" : "number of read commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 12);
+                ull = sg_get_unaligned_be64(bp + 12);
                 ccp = nam ? "write_commands=" : "number of write commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 20);
+                ull = sg_get_unaligned_be64(bp + 20);
                 ccp = nam ? "lb_received="
                           : "number of logical blocks received = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 28);
+                ull = sg_get_unaligned_be64(bp + 28);
                 ccp = nam ? "lb_transmitted="
                           : "number of logical blocks transmitted = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 36);
+                ull = sg_get_unaligned_be64(bp + 36);
                 ccp = nam ? "read_proc_intervals="
                           : "read command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 44);
+                ull = sg_get_unaligned_be64(bp + 44);
                 ccp = nam ? "write_proc_intervals="
                           : "write command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 52);
+                ull = sg_get_unaligned_be64(bp + 52);
                 ccp = nam ? "weight_rw_commands=" : "weighted number of "
                                 "read commands plus write commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 60);
+                ull = sg_get_unaligned_be64(bp + 60);
                 ccp = nam ? "weight_rw_processing=" : "weighted read command "
                                 "processing plus write command processing = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3311,7 +3311,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             case 2:     /* Idle time log parameter */
                 ccp = nam ? "parameter_code=2" : "Idle time log parameter";
                 printf("%s\n", ccp);
-                ull = sg_get_unaligned_be64(ucp + 4);
+                ull = sg_get_unaligned_be64(bp + 4);
                 ccp = nam ? "idle_time_intervals=" : "idle time "
                                 "intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3320,11 +3320,11 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=3" : "Time interval log "
                         "parameter for general stats";
                 printf("%s\n", ccp);
-                ui = sg_get_unaligned_be32(ucp + 4);
+                ui = sg_get_unaligned_be32(bp + 4);
                 ccp = nam ? "time_interval_neg_exp=" : "time interval "
                                 "negative exponent = ";
                 printf("  %s%u\n", ccp, ui);
-                ui = sg_get_unaligned_be32(ucp + 8);
+                ui = sg_get_unaligned_be32(bp + 8);
                 ccp = nam ? "time_interval_int=" : "time interval "
                                 "integer = ";
                 printf("  %s%u\n", ccp, ui);
@@ -3333,35 +3333,35 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=4" : "Force unit access "
                         "statistics and performance log parameter ";
                 printf("%s\n", ccp);
-                ull = sg_get_unaligned_be64(ucp + 4);
+                ull = sg_get_unaligned_be64(bp + 4);
                 ccp = nam ? "read_fua_commands=" : "number of read FUA "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 12);
+                ull = sg_get_unaligned_be64(bp + 12);
                 ccp = nam ? "write_fua_commands=" : "number of write FUA "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 20);
+                ull = sg_get_unaligned_be64(bp + 20);
                 ccp = nam ? "read_fua_nv_commands="
                           : "number of read FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 28);
+                ull = sg_get_unaligned_be64(bp + 28);
                 ccp = nam ? "write_fua_nv_commands="
                           : "number of write FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 36);
+                ull = sg_get_unaligned_be64(bp + 36);
                 ccp = nam ? "read_fua_proc_intervals="
                           : "read FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 44);
+                ull = sg_get_unaligned_be64(bp + 44);
                 ccp = nam ? "write_fua_proc_intervals="
                           : "write FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 52);
+                ull = sg_get_unaligned_be64(bp + 52);
                 ccp = nam ? "read_fua_nv_proc_intervals="
                           : "read FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 60);
+                ull = sg_get_unaligned_be64(bp + 60);
                 ccp = nam ? "write_fua_nv_proc_intervals="
                           : "write FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3370,11 +3370,11 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=6" : "Time interval log "
                         "parameter for cache stats";
                 printf("%s\n", ccp);
-                ull = sg_get_unaligned_be64(ucp + 4);
+                ull = sg_get_unaligned_be64(bp + 4);
                 ccp = nam ? "time_interval_neg_exp=" : "time interval "
                                 "negative exponent = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 8);
+                ull = sg_get_unaligned_be64(bp + 8);
                 ccp = nam ? "time_interval_int=" : "time interval "
                                 "integer = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3387,7 +3387,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     pr2serr("show_performance...  unknown parameter code "
                             "%d\n", param_code);
                 if (op->verbose)
-                    dStrHexErr((const char *)ucp, extra, 1);
+                    dStrHexErr((const char *)bp, extra, 1);
                 break;
             }
             if ((op->do_pcb) && (0 == op->do_name)) {
@@ -3400,21 +3400,21 @@ show_stats_perform_pages(const uint8_t * resp, int len,
     } else {    /* Group statistics and performance (n) log page */
         if (num < 0x34)
             return false;
-        for (k = num; k > 0; k -= extra, ucp += extra) {
+        for (k = num; k > 0; k -= extra, bp += extra) {
             if (k < 3)
                 return false;
-            param_len = ucp[3];
+            param_len = bp[3];
             extra = param_len + 4;
-            param_code = sg_get_unaligned_be16(ucp + 0);
-            pcb = ucp[2];
+            param_code = sg_get_unaligned_be16(bp + 0);
+            pcb = bp[2];
             if (op->filter_given) {
                 if (param_code != op->filter)
                     continue;
                 if (op->do_raw) {
-                    dStrRaw((const char *)ucp, extra);
+                    dStrRaw((const char *)bp, extra);
                     break;
                 } else if (op->do_hex) {
-                    dStrHex((const char *)ucp, extra,
+                    dStrHex((const char *)bp, extra,
                             ((1 == op->do_hex) ? 1 : -1));
                     break;
                 }
@@ -3426,27 +3426,27 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 else
                     printf("Group %d Statistics and performance log "
                            "parameter\n", subpg_code);
-                ull = sg_get_unaligned_be64(ucp + 4);
+                ull = sg_get_unaligned_be64(bp + 4);
                 ccp = nam ? "gn_read_commands=" : "group n number of read "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 12);
+                ull = sg_get_unaligned_be64(bp + 12);
                 ccp = nam ? "gn_write_commands=" : "group n number of write "
                                 "commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 20);
+                ull = sg_get_unaligned_be64(bp + 20);
                 ccp = nam ? "gn_lb_received="
                           : "group n number of logical blocks received = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 28);
+                ull = sg_get_unaligned_be64(bp + 28);
                 ccp = nam ? "gn_lb_transmitted="
                           : "group n number of logical blocks transmitted = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 36);
+                ull = sg_get_unaligned_be64(bp + 36);
                 ccp = nam ? "gn_read_proc_intervals="
                           : "group n read command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 44);
+                ull = sg_get_unaligned_be64(bp + 44);
                 ccp = nam ? "gn_write_proc_intervals="
                           : "group n write command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3455,35 +3455,35 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 ccp = nam ? "parameter_code=4" : "Group n force unit access "
                         "statistics and performance log parameter";
                 printf("%s\n", ccp);
-                ull = sg_get_unaligned_be64(ucp + 4);
+                ull = sg_get_unaligned_be64(bp + 4);
                 ccp = nam ? "gn_read_fua_commands="
                           : "group n number of read FUA commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 12);
+                ull = sg_get_unaligned_be64(bp + 12);
                 ccp = nam ? "gn_write_fua_commands="
                           : "group n number of write FUA commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 20);
+                ull = sg_get_unaligned_be64(bp + 20);
                 ccp = nam ? "gn_read_fua_nv_commands="
                           : "group n number of read FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 28);
+                ull = sg_get_unaligned_be64(bp + 28);
                 ccp = nam ? "gn_write_fua_nv_commands="
                           : "group n number of write FUA_NV commands = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 36);
+                ull = sg_get_unaligned_be64(bp + 36);
                 ccp = nam ? "gn_read_fua_proc_intervals="
                           : "group n read FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 44);
+                ull = sg_get_unaligned_be64(bp + 44);
                 ccp = nam ? "gn_write_fua_proc_intervals=" : "group n write "
                             "FUA command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 52);
+                ull = sg_get_unaligned_be64(bp + 52);
                 ccp = nam ? "gn_read_fua_nv_proc_intervals=" : "group n "
                             "read FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
-                ull = sg_get_unaligned_be64(ucp + 60);
+                ull = sg_get_unaligned_be64(bp + 60);
                 ccp = nam ? "gn_write_fua_nv_proc_intervals=" : "group n "
                             "write FUA_NV command processing intervals = ";
                 printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3496,7 +3496,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     pr2serr("show_performance...  unknown parameter code "
                             "%d\n", param_code);
                 if (op->verbose)
-                    dStrHexErr((const char *)ucp, extra, 1);
+                    dStrHexErr((const char *)bp, extra, 1);
                 break;
             }
             if ((op->do_pcb) && (0 == op->do_name)) {
@@ -3518,14 +3518,14 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     int k, num, pc, spf, subpg_code, extra;
     int pcb, nam;
     unsigned int ui;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const char * ccp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     nam = op->do_name;
     num = len - 4;
-    ucp = resp + 4;
+    bp = resp + 4;
     if (num < 4) {
         pr2serr("badly formed Cache memory statistics page\n");
         return false;
@@ -3541,27 +3541,27 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             printf("Cache memory statistics page  [0x19,0x20]\n");
     }
 
-    for (k = num; k > 0; k -= extra, ucp += extra) {
+    for (k = num; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
             pr2serr("short Cache memory statistics page\n");
             return false;
         }
-        if (8 != ucp[3]) {
+        if (8 != bp[3]) {
             printf("Cache memory statistics page parameter length not "
                    "8\n");
             return false;
         }
-        extra = ucp[3] + 4;
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
+        extra = bp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, extra);
+                dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, extra,
+                dStrHex((const char *)bp, extra,
                         ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
@@ -3571,7 +3571,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=1" :
                         "Read cache memory hits log parameter";
             printf("%s\n", ccp);
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             ccp = nam ? "read_cache_memory_hits=" :
                         "read cache memory hits = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3580,7 +3580,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=2" :
                         "Reads to cache memory log parameter";
             printf("%s\n", ccp);
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             ccp = nam ? "reads_to_cache_memory=" :
                         "reads to cache memory = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3589,7 +3589,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=3" :
                         "Write cache memory hits log parameter";
             printf("%s\n", ccp);
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             ccp = nam ? "write_cache_memory_hits=" :
                         "write cache memory hits = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3598,7 +3598,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=4" :
                         "Writes from cache memory log parameter";
             printf("%s\n", ccp);
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             ccp = nam ? "writes_from_cache_memory=" :
                         "writes from cache memory = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3607,7 +3607,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=5" :
                         "Time from last hard reset log parameter";
             printf("%s\n", ccp);
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             ccp = nam ? "time_from_last_hard_reset=" :
                         "time from last hard reset = ";
             printf("  %s%" PRIu64 "\n", ccp, ull);
@@ -3616,11 +3616,11 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             ccp = nam ? "parameter_code=6" :
                         "Time interval log parameter";
             printf("%s\n", ccp);
-            ui = sg_get_unaligned_be32(ucp + 4);
+            ui = sg_get_unaligned_be32(bp + 4);
             ccp = nam ? "time_interval_neg_exp=" : "time interval "
                             "negative exponent = ";
             printf("  %s%u\n", ccp, ui);
-            ui = sg_get_unaligned_be32(ucp + 8);
+            ui = sg_get_unaligned_be32(bp + 8);
             ccp = nam ? "time_interval_int=" : "time interval "
                             "integer = ";
             printf("  %s%u\n", ccp, ui);
@@ -3633,7 +3633,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 pr2serr("show_performance...  unknown parameter code %d\n",
                         pc);
             if (op->verbose)
-                dStrHexErr((const char *)ucp, extra, 1);
+                dStrHexErr((const char *)bp, extra, 1);
             break;
         }
         if ((op->do_pcb) && (0 == op->do_name)) {
@@ -3652,7 +3652,7 @@ show_format_status_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
     int k, j, num, pl, pc, pcb, all_ff, counter;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const uint8_t * xp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
@@ -3660,19 +3660,19 @@ show_format_status_page(const uint8_t * resp, int len,
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Format status page  [0x8]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -3683,7 +3683,7 @@ show_format_status_page(const uint8_t * resp, int len,
                 printf("  Format data out: <empty>\n");
             else {
                 for (all_ff = 1, j = 4; j < pl; ++j) {
-                    if (0xff != ucp[j]) {
+                    if (0xff != bp[j]) {
                         all_ff = 0;
                         break;
                     }
@@ -3692,7 +3692,7 @@ show_format_status_page(const uint8_t * resp, int len,
                     printf("  Format data out: <not available>\n");
                 else {
                     printf("  Format data out:\n");
-                    dStrHex((const char *)ucp + 4, pl - 4, 0);
+                    dStrHex((const char *)bp + 4, pl - 4, 0);
                 }
             }
             counter = 0;
@@ -3712,12 +3712,12 @@ show_format_status_page(const uint8_t * resp, int len,
         default:
             printf("  Unknown Format status code = 0x%x\n", pc);
             counter = 0;
-            dStrHex((const char *)ucp, pl, 0);
+            dStrHex((const char *)bp, pl, 0);
             break;
         }
         if (counter) {
             k = pl - 4;
-            xp = ucp + 4;
+            xp = bp + 4;
             if (k > (int)sizeof(ull)) {
                 xp += (k - sizeof(ull));
                 k = sizeof(ull);
@@ -3751,7 +3751,7 @@ show_format_status_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -3762,33 +3762,33 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
     int j, num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Non-volatile cache page  [0x17]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         switch (pc) {
         case 0:
             printf("  Remaining non-volatile time: ");
-            if (3 == ucp[4]) {
-                j = sg_get_unaligned_be24(ucp + 5);
+            if (3 == bp[4]) {
+                j = sg_get_unaligned_be24(bp + 5);
                 switch (j) {
                 case 0:
                     printf("0 (i.e. it is now volatile)\n");
@@ -3804,12 +3804,12 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
                     break;
                 }
             } else
-                printf("<unexpected parameter length=%d>\n", ucp[4]);
+                printf("<unexpected parameter length=%d>\n", bp[4]);
             break;
         case 1:
             printf("  Maximum non-volatile time: ");
-            if (3 == ucp[4]) {
-                j = sg_get_unaligned_be24(ucp + 5);
+            if (3 == bp[4]) {
+                j = sg_get_unaligned_be24(bp + 5);
                 switch (j) {
                 case 0:
                     printf("0 (i.e. it is now volatile)\n");
@@ -3825,11 +3825,11 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
                     break;
                 }
             } else
-                printf("<unexpected parameter length=%d>\n", ucp[4]);
+                printf("<unexpected parameter length=%d>\n", bp[4]);
             break;
         default:
             printf("  Unknown Format status code = 0x%x\n", pc);
-            dStrHex((const char *)ucp, pl, 0);
+            dStrHex((const char *)bp, pl, 0);
             break;
         }
         if (op->do_pcb) {
@@ -3840,7 +3840,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -3851,26 +3851,26 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const char * cp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Logical block provisioning page  [0xc]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -3908,13 +3908,13 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                 break;
             }
             if (0x3 == pc)
-                printf("  %s: %u %%\n", cp, sg_get_unaligned_be16(ucp + 4));
+                printf("  %s: %u %%\n", cp, sg_get_unaligned_be16(bp + 4));
             else {
                 printf("  %s resource count:", cp);
-                printf(" %u\n", sg_get_unaligned_be32(ucp + 4));
+                printf(" %u\n", sg_get_unaligned_be32(bp + 4));
             }
             if (pl > 8) {
-                switch (ucp[8] & 0x3) {
+                switch (bp[8] & 0x3) {
                 case 0: cp = "not reported"; break;
                 case 1: cp = "dedicated to lu"; break;
                 case 2: cp = "not dedicated to lu"; break;
@@ -3924,10 +3924,10 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
             printf("  Vendor specific [0x%x]:", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
         } else {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -3937,7 +3937,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -3947,25 +3947,25 @@ static bool
 show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int num, pl, pc, pcb, k;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Utilization page  [0xe,0x1]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -3981,7 +3981,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
                             pl);
                 break;
             }
-            k = sg_get_unaligned_be16(ucp + 4);
+            k = sg_get_unaligned_be16(bp + 4);
             printf(" %d.%02d %%\n", k / 100, k % 100);
             break;
         case 0x1:
@@ -3995,11 +3995,11 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
                             pl);
                 break;
             }
-            printf(" %d %%\n", ucp[4]);
+            printf(" %d %%\n", bp[4]);
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb) {
@@ -4010,7 +4010,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4021,25 +4021,25 @@ show_solid_state_media_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Solid state media page  [0x11]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4055,11 +4055,11 @@ show_solid_state_media_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %u %%\n", ucp[7]);
+            printf(" %u %%\n", bp[7]);
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb) {
@@ -4070,7 +4070,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4101,26 +4101,26 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
     int num, pl, pc, pcb, j;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
     char b[64];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("DT device status page (ssc-3, adc-3) [0x11]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4136,16 +4136,16 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf("  PAMR=%d HUI=%d MACC=%d CMPR=%d ", !!(0x80 & ucp[4]),
-                   !!(0x40 & ucp[4]), !!(0x20 & ucp[4]), !!(0x10 & ucp[4]));
-            printf("WRTP=%d CRQST=%d CRQRD=%d DINIT=%d\n", !!(0x8 & ucp[4]),
-                   !!(0x4 & ucp[4]), !!(0x2 & ucp[4]), !!(0x1 & ucp[4]));
-            printf("  INXTN=%d RAA=%d MPRSNT=%d ", !!(0x80 & ucp[5]),
-                   !!(0x20 & ucp[5]), !!(0x10 & ucp[5]));
+            printf("  PAMR=%d HUI=%d MACC=%d CMPR=%d ", !!(0x80 & bp[4]),
+                   !!(0x40 & bp[4]), !!(0x20 & bp[4]), !!(0x10 & bp[4]));
+            printf("WRTP=%d CRQST=%d CRQRD=%d DINIT=%d\n", !!(0x8 & bp[4]),
+                   !!(0x4 & bp[4]), !!(0x2 & bp[4]), !!(0x1 & bp[4]));
+            printf("  INXTN=%d RAA=%d MPRSNT=%d ", !!(0x80 & bp[5]),
+                   !!(0x20 & bp[5]), !!(0x10 & bp[5]));
             printf("MSTD=%d MTHRD=%d MOUNTED=%d\n",
-                   !!(0x4 & ucp[5]), !!(0x2 & ucp[5]), !!(0x1 & ucp[5]));
+                   !!(0x4 & bp[5]), !!(0x2 & bp[5]), !!(0x1 & bp[5]));
             printf("  DT device activity: ");
-            j = ucp[6];
+            j = bp[6];
             if (j < (int)(sizeof(dt_dev_activity) /
                           sizeof(dt_dev_activity[0])))
                 printf("%s\n", dt_dev_activity[j]);
@@ -4153,10 +4153,10 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                 printf("Reserved [0x%x]\n", j);
             else
                 printf("Vendor specific [0x%x]\n", j);
-            printf("  VS=%d TDDEC=%d EPP=%d ", !!(0x80 & ucp[7]),
-                   !!(0x20 & ucp[7]), !!(0x10 & ucp[7]));
-            printf("ESR=%d RRQST=%d INTFC=%d TAFC=%d\n", !!(0x8 & ucp[7]),
-                   !!(0x4 & ucp[7]), !!(0x2 & ucp[7]), !!(0x1 & ucp[7]));
+            printf("  VS=%d TDDEC=%d EPP=%d ", !!(0x80 & bp[7]),
+                   !!(0x20 & bp[7]), !!(0x10 & bp[7]));
+            printf("ESR=%d RRQST=%d INTFC=%d TAFC=%d\n", !!(0x8 & bp[7]),
+                   !!(0x4 & bp[7]), !!(0x2 & bp[7]), !!(0x1 & bp[7]));
             break;
         case 0x1:
             printf("  Very high frequency polling delay: ");
@@ -4169,7 +4169,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %d milliseconds\n", sg_get_unaligned_be16(ucp + 4));
+            printf(" %d milliseconds\n", sg_get_unaligned_be16(bp + 4));
             break;
         case 0x2:
             printf("   DT device ADC data encryption control status (hex "
@@ -4183,7 +4183,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            dStrHex((const char *)ucp + 4, 8, 1);
+            dStrHex((const char *)bp + 4, 8, 1);
             break;
         case 0x3:
             printf("   Key management error data (hex only now):\n");
@@ -4196,32 +4196,32 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            dStrHex((const char *)ucp + 4, 12, 1);
+            dStrHex((const char *)bp + 4, 12, 1);
             break;
         default:
             if ((pc >= 0x101) && (pc <= 0x1ff)) {
                 printf("  Primary port %d status:\n", pc - 0x100);
-                if (12 == ucp[3]) { /* if length of desc is 12, assume SAS */
+                if (12 == bp[3]) { /* if length of desc is 12, assume SAS */
                     printf("    SAS: negotiated physical link rate: %s\n",
-                           sas_negot_link_rate((0xf & (ucp[4] >> 4)), b,
+                           sas_negot_link_rate((0xf & (bp[4] >> 4)), b,
                                                sizeof(b)));
-                    printf("    signal=%d, pic=%d, ", !!(0x2 & ucp[4]),
-                           !!(0x1 & ucp[4]));
+                    printf("    signal=%d, pic=%d, ", !!(0x2 & bp[4]),
+                           !!(0x1 & bp[4]));
                     printf("hashed SAS addr: 0x%u\n",
-                            sg_get_unaligned_be24(ucp + 5));
+                            sg_get_unaligned_be24(bp + 5));
                     printf("    SAS addr: 0x%" PRIx64 "\n",
-                            sg_get_unaligned_be64(ucp + 8));
+                            sg_get_unaligned_be64(bp + 8));
                 } else {
                     printf("    non-SAS transport, in hex:\n");
-                    dStrHex((const char *)ucp + 4,
+                    dStrHex((const char *)bp + 4,
                             ((pl < num) ? pl : num) - 4, 0);
                 }
             } else if (pc >= 0x8000) {
                 printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             } else {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             }
             break;
         }
@@ -4233,7 +4233,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4244,25 +4244,25 @@ show_tapealert_response_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
     int num, pl, pc, pcb, k, mod, div;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("TapeAlert response page (ssc-3, adc-3) [0x12]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4277,20 +4277,20 @@ show_tapealert_response_page(const uint8_t * resp, int len,
                 if (0 == mod) {
                     if (div > 0)
                         printf("\n");
-                    printf("  Flag%02Xh: %d", k, !! (ucp[4 + div] & 0x80));
+                    printf("  Flag%02Xh: %d", k, !! (bp[4 + div] & 0x80));
                 } else
                     printf("  %02Xh: %d", k,
-                           !! (ucp[4 + div] & (1 << (7 - mod))));
+                           !! (bp[4 + div] & (1 << (7 - mod))));
             }
             printf("\n");
             break;
         default:
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             } else {
                 printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             }
             break;
         }
@@ -4302,7 +4302,7 @@ show_tapealert_response_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4336,25 +4336,25 @@ show_requested_recovery_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
     int num, pl, pc, pcb, j, k;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Requested recovery page (ssc-3) [0x13]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4362,7 +4362,7 @@ show_requested_recovery_page(const uint8_t * resp, int len,
         case 0x0:
             printf("  Recovery procedures:\n");
             for (k = 4; k < pl; ++ k) {
-                j = ucp[k];
+                j = bp[k];
                 if (j < NUM_REQ_REC_ARR_ELEMS)
                     printf("    %s\n", req_rec_arr[j]);
                 else if (j < 0x80)
@@ -4374,10 +4374,10 @@ show_requested_recovery_page(const uint8_t * resp, int len,
         default:
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             } else {
                 printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             }
             break;
         }
@@ -4389,7 +4389,7 @@ show_requested_recovery_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4400,26 +4400,26 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     const uint8_t * dp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("ATA pass-through results page (sat-2) [0x16]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4427,7 +4427,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             int extend, count;
 
             printf("  Log_index=0x%x (parameter_code=0x%x)\n", pc + 1, pc);
-            dp = ucp + 4;       /* dp is start of ATA Return descriptor
+            dp = bp + 4;       /* dp is start of ATA Return descriptor
                                  * which is 14 bytes long */
             extend = dp[2] & 1;
             count = dp[5] + (extend ? (dp[4] << 8) : 0);
@@ -4441,11 +4441,11 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             printf("    device=0x%x  status=0x%x\n", dp[12], dp[13]);
         } else if (pl > 17) {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
         } else {
             printf("  short parameter length: %d [parameter_code=0x%x]:\n",
                    pl, pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -4455,7 +4455,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4493,25 +4493,25 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
     int j, m, num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Background scan results page  [0x15]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4528,17 +4528,17 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 break;
             }
             printf("    Accumulated power on minutes: ");
-            j = sg_get_unaligned_be32(ucp + 4);
+            j = sg_get_unaligned_be32(bp + 4);
             printf("%d [h:m  %d:%d]\n", j, (j / 60), (j % 60));
             printf("    Status: ");
-            j = ucp[9];
+            j = bp[9];
             if (j < (int)(sizeof(bms_status) / sizeof(bms_status[0])))
                 printf("%s\n", bms_status[j]);
             else
                 printf("unknown [0x%x] background scan status value\n", j);
-            j = sg_get_unaligned_be16(ucp + 10);
+            j = sg_get_unaligned_be16(bp + 10);
             printf("    Number of background scans performed: %d\n", j);
-            j = sg_get_unaligned_be16(ucp + 12);
+            j = sg_get_unaligned_be16(bp + 12);
 #ifdef SG_LIB_MINGW
             printf("    Background medium scan progress: %g %%\n",
                    (double)(j * 100.0 / 65536.0));
@@ -4546,7 +4546,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             printf("    Background medium scan progress: %.2f %%\n",
                    (double)(j * 100.0 / 65536.0));
 #endif
-            j = sg_get_unaligned_be16(ucp + 14);
+            j = sg_get_unaligned_be16(bp + 14);
             if (0 == j)
                 printf("    Number of background medium scans performed: 0 "
                        "[not reported]\n");
@@ -4562,7 +4562,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 else
                     printf("  Medium scan parameter # %d [0x%x], "
                            "reserved\n", pc, pc);
-                dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
                 break;
             } else
                 printf("  Medium scan parameter # %d [0x%x]\n", pc, pc);
@@ -4576,29 +4576,29 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 break;
             }
             printf("    Power on minutes when error detected: ");
-            j = sg_get_unaligned_be32(ucp + 4);
+            j = sg_get_unaligned_be32(bp + 4);
             printf("%d [%d:%d]\n", j, (j / 60), (j % 60));
-            j = (ucp[8] >> 4) & 0xf;
+            j = (bp[8] >> 4) & 0xf;
             if (j <
                 (int)(sizeof(reassign_status) / sizeof(reassign_status[0])))
                 printf("    %s\n", reassign_status[j]);
             else
                 printf("    Reassign status: reserved [0x%x]\n", j);
             printf("    sense key: %s  [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
-                   sg_get_sense_key_str(ucp[8] & 0xf, sizeof(str), str),
-                   ucp[8] & 0xf, ucp[9], ucp[10]);
-            if (ucp[9] || ucp[10])
-                printf("      %s\n", sg_get_asc_ascq_str(ucp[9], ucp[10],
+                   sg_get_sense_key_str(bp[8] & 0xf, sizeof(str), str),
+                   bp[8] & 0xf, bp[9], bp[10]);
+            if (bp[9] || bp[10])
+                printf("      %s\n", sg_get_asc_ascq_str(bp[9], bp[10],
                                                          sizeof(str), str));
             if (op->verbose) {
                 printf("    vendor bytes [11 -> 15]: ");
                 for (m = 0; m < 5; ++m)
-                    printf("0x%02x ", ucp[11 + m]);
+                    printf("0x%02x ", bp[11 + m]);
                 printf("\n");
             }
             printf("    LBA (associated with medium error): 0x");
             for (m = 0; m < 8; ++m)
-                printf("%02x", ucp[16 + m]);
+                printf("%02x", bp[16 + m]);
             printf("\n");
             break;
         }
@@ -4610,7 +4610,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4621,25 +4621,25 @@ show_pending_defects_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Pending defects page  [0x15,0x1]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4655,7 +4655,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %u\n", sg_get_unaligned_be32(ucp + 4));
+            printf(" %u\n", sg_get_unaligned_be32(bp + 4));
             break;
         default:
             printf("  Pending defect: %d\n", pc);
@@ -4669,8 +4669,8 @@ show_pending_defects_page(const uint8_t * resp, int len,
                 break;
             }
             printf("    LBA: 0x%" PRIx64 " accumulated_power_on_hours: %u\n",
-                   sg_get_unaligned_be64(ucp + 8),
-                   sg_get_unaligned_be32(ucp + 4));
+                   sg_get_unaligned_be64(bp + 8),
+                   sg_get_unaligned_be32(bp + 4));
             break;
         }
         if (op->do_pcb) {
@@ -4681,7 +4681,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4692,25 +4692,25 @@ show_background_op_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Background operation page  [0x15,0x2]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4726,11 +4726,11 @@ show_background_op_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" BO_STATUS=%d\n", ucp[4]);
+            printf(" BO_STATUS=%d\n", bp[4]);
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)ucp, ((pl < num) ? pl : num), 0);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb) {
@@ -4741,7 +4741,7 @@ show_background_op_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4752,49 +4752,49 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("LPS misalignment page  [0x15,0x3]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         switch (pc) {
         case 0x0:
             printf("  LPS misalignment count: ");
-            if (4 == ucp[3])
+            if (4 == bp[3])
                 printf("max lpsm: %" PRIu16 ", count=%" PRIu16 "\n",
-                       sg_get_unaligned_be16(ucp + 4),
-                       sg_get_unaligned_be16(ucp + 6));
+                       sg_get_unaligned_be16(bp + 4),
+                       sg_get_unaligned_be16(bp + 6));
             else
-                printf("<unexpected pc=0 parameter length=%d>\n", ucp[4]);
+                printf("<unexpected pc=0 parameter length=%d>\n", bp[4]);
             break;
         default:
             if (pc <= 0xf000) {
-                if (8 == ucp[3])
+                if (8 == bp[3])
                     printf("  LBA of misaligned block: 0x%" PRIx64 "\n",
-                           sg_get_unaligned_be64(ucp + 8));
+                           sg_get_unaligned_be64(bp + 8));
                 else
                     printf("<unexpected pc=0x%x parameter length=%d>\n",
-                           pc, ucp[4]);
+                           pc, bp[4]);
             } else {
                 printf("<unexpected pc=0x%x>\n", pc);
-                dStrHex((const char *)ucp, pl, 0);
+                dStrHex((const char *)bp, pl, 0);
             }
             break;
         }
@@ -4806,7 +4806,7 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4817,44 +4817,44 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
                               const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Service buffer information page (adc-3) [0x15]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         if (pc < 0x100) {
             printf("  Service buffer identifier: 0x%x\n", pc);
             printf("    Buffer id: 0x%x, tu=%d, nmp=%d, nmm=%d, "
-                   "offline=%d\n", ucp[4], !!(0x10 & ucp[5]),
-                   !!(0x8 & ucp[5]), !!(0x4 & ucp[5]), !!(0x2 & ucp[5]));
+                   "offline=%d\n", bp[4], !!(0x10 & bp[5]),
+                   !!(0x8 & bp[5]), !!(0x4 & bp[5]), !!(0x2 & bp[5]));
             printf("    pd=%d, code_set: %s, Service buffer title:\n",
-                   !!(0x1 & ucp[5]), sg_get_desig_code_set_str(0xf & ucp[6]));
-            printf("      %.*s\n", pl - 8, ucp + 8);
+                   !!(0x1 & bp[5]), sg_get_desig_code_set_str(0xf & bp[6]));
+            printf("      %.*s\n", pl - 8, bp + 8);
         } else if (pc < 0x8000) {
             printf("  parameter_code=0x%x, Reserved, parameter in hex:\n",
                    pc);
-            dStrHex((const char *)ucp + 4, pl - 4, 0);
+            dStrHex((const char *)bp + 4, pl - 4, 0);
         } else {
             printf("  parameter_code=0x%x, Vendor-specific, parameter in "
                    "hex:\n", pc);
-            dStrHex((const char *)ucp + 4, pl - 4, 0);
+            dStrHex((const char *)bp + 4, pl - 4, 0);
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -4864,7 +4864,7 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4875,7 +4875,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     uint64_t ull, gbytes;
     bool all_set;
     char pcb_str[PCB_STR_LEN];
@@ -4883,24 +4883,24 @@ show_sequential_access_page(const uint8_t * resp, int len,
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Sequential access device page (ssc-3)\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
-        ull = sg_get_unaligned_be(pl - 4, ucp + 4);
-        all_set = all_bits_set(ucp + 4, pl - 4);
+        ull = sg_get_unaligned_be(pl - 4, bp + 4);
+        all_set = all_bits_set(bp + 4, pl - 4);
         gbytes = ull / 1000000000;
         switch (pc) {
         case 0:
@@ -4981,7 +4981,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -4992,31 +4992,31 @@ show_device_stats_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Device statistics page (ssc-3 and adc)\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         if (pc < 0x1000) {
-            ull = sg_get_unaligned_be(pl - 4, ucp + 4);
+            ull = sg_get_unaligned_be(pl - 4, bp + 4);
             switch (pc) {
             case 0:
                 printf("  Lifetime media loads: %" PRIu64 "\n", ull);
@@ -5128,7 +5128,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             }
         } else {
             int k;
-            const uint8_t * p = ucp + 4;
+            const uint8_t * p = bp + 4;
 
             switch (pc) {
             case 0x1000:
@@ -5146,7 +5146,7 @@ show_device_stats_page(const uint8_t * resp, int len,
                            "hex:\n", pc);
                 else
                     printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
-                dStrHex((const char *)ucp, pl, 0);
+                dStrHex((const char *)bp, pl, 0);
                 break;
             }
         }
@@ -5158,7 +5158,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5168,30 +5168,30 @@ static bool
 show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Media statistics page (smc-3)\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
-        ull = sg_get_unaligned_be(pl - 4, ucp + 4);
+        ull = sg_get_unaligned_be(pl - 4, bp + 4);
         switch (pc) {
         case 0:
             printf("  Number of moves: %" PRIu64 "\n", ull);
@@ -5296,7 +5296,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5308,40 +5308,40 @@ show_element_stats_page(const uint8_t * resp, int len,
 {
     int num, pl, pc, pcb;
     unsigned int v;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Element statistics page (smc-3) [0x15]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         printf("  Element address: %d\n", pc);
-        v = sg_get_unaligned_be32(ucp + 4);
+        v = sg_get_unaligned_be32(bp + 4);
         printf("    Number of places: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 8);
+        v = sg_get_unaligned_be32(bp + 8);
         printf("    Number of place retries: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 12);
+        v = sg_get_unaligned_be32(bp + 12);
         printf("    Number of picks: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 16);
+        v = sg_get_unaligned_be32(bp + 16);
         printf("    Number of pick retries: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 20);
+        v = sg_get_unaligned_be32(bp + 20);
         printf("    Number of determined volume identifiers: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 24);
+        v = sg_get_unaligned_be32(bp + 24);
         printf("    Number of unreadable volume identifiers: %u\n", v);
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -5351,7 +5351,7 @@ show_element_stats_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5363,78 +5363,78 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
 {
     int k, num, pl, pc, pcb;
     unsigned int v;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
     char b[80];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Tape diagnostics data page (ssc-3) [0x16]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         printf("  Parameter code: %d\n", pc);
-        printf("    Density code: 0x%x\n", ucp[6]);
-        printf("    Medium type: 0x%x\n", ucp[7]);
-        v = sg_get_unaligned_be32(ucp + 8);
+        printf("    Density code: 0x%x\n", bp[6]);
+        printf("    Medium type: 0x%x\n", bp[7]);
+        v = sg_get_unaligned_be32(bp + 8);
         printf("    Lifetime media motion hours: %u\n", v);
-        printf("    Repeat: %d\n", !!(ucp[13] & 0x80));
-        v = ucp[13] & 0xf;
+        printf("    Repeat: %d\n", !!(bp[13] & 0x80));
+        v = bp[13] & 0xf;
         printf("    Sense key: 0x%x [%s]\n", v,
                sg_get_sense_key_str(v, sizeof(b), b));
-        printf("    Additional sense code: 0x%x\n", ucp[14]);
-        printf("    Additional sense code qualifier: 0x%x\n", ucp[15]);
-        if (ucp[14] || ucp[15])
-            printf("      [%s]\n", sg_get_asc_ascq_str(ucp[14], ucp[15],
+        printf("    Additional sense code: 0x%x\n", bp[14]);
+        printf("    Additional sense code qualifier: 0x%x\n", bp[15]);
+        if (bp[14] || bp[15])
+            printf("      [%s]\n", sg_get_asc_ascq_str(bp[14], bp[15],
                    sizeof(b), b));
-        v = sg_get_unaligned_be32(ucp + 16);
+        v = sg_get_unaligned_be32(bp + 16);
         printf("    Vendor specific code qualifier: 0x%x\n", v);
-        v = sg_get_unaligned_be32(ucp + 20);
+        v = sg_get_unaligned_be32(bp + 20);
         printf("    Product revision level: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 24);
+        v = sg_get_unaligned_be32(bp + 24);
         printf("    Hours since last clean: %u\n", v);
-        printf("    Operation code: 0x%x\n", ucp[28]);
-        printf("    Service action: 0x%x\n", ucp[29] & 0xf);
+        printf("    Operation code: 0x%x\n", bp[28]);
+        printf("    Service action: 0x%x\n", bp[29] & 0xf);
         // Check Medium id number for all zeros
         // ssc4r03.pdf does not define this field, why? xxxxxx
         for (k = 32; k < 64; ++k) {
-            if(ucp[k])
+            if(bp[k])
                 break;
         }
         if (64 == k)
             printf("    Medium id number is 32 bytes of zero\n");
         else {
             printf("    Medium id number (in hex):\n");
-            dStrHex((const char *)(ucp + 32), 32, 0);
+            dStrHex((const char *)(bp + 32), 32, 0);
         }
-        printf("    Timestamp origin: 0x%x\n", ucp[64] & 0xf);
+        printf("    Timestamp origin: 0x%x\n", bp[64] & 0xf);
         // Check Timestamp for all zeros
         for (k = 66; k < 72; ++k) {
-            if(ucp[k])
+            if(bp[k])
                 break;
         }
         if (72 == k)
             printf("    Timestamp is all zeros:\n");
         else {
             printf("    Timestamp:\n");
-            dStrHex((const char *)(ucp + 66), 6, 1);
+            dStrHex((const char *)(bp + 66), 6, 1);
         }
         if (pl > 72) {
             printf("    Vendor specific:\n");
-            dStrHex((const char *)(ucp + 72), pl - 72, 0);
+            dStrHex((const char *)(bp + 72), pl - 72, 0);
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -5444,7 +5444,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5456,80 +5456,80 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
 {
     int num, pl, pc, pcb;
     unsigned int v;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
     char b[80];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Media changer diagnostics data page (smc-3) [0x16]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         printf("  Parameter code: %d\n", pc);
-        printf("    Repeat: %d\n", !!(ucp[5] & 0x80));
-        v = ucp[5] & 0xf;
+        printf("    Repeat: %d\n", !!(bp[5] & 0x80));
+        v = bp[5] & 0xf;
         printf("    Sense key: 0x%x [%s]\n", v,
                sg_get_sense_key_str(v, sizeof(b), b));
-        printf("    Additional sense code: 0x%x\n", ucp[6]);
-        printf("    Additional sense code qualifier: 0x%x\n", ucp[7]);
-        if (ucp[6] || ucp[7])
-            printf("      [%s]\n", sg_get_asc_ascq_str(ucp[6], ucp[7],
+        printf("    Additional sense code: 0x%x\n", bp[6]);
+        printf("    Additional sense code qualifier: 0x%x\n", bp[7]);
+        if (bp[6] || bp[7])
+            printf("      [%s]\n", sg_get_asc_ascq_str(bp[6], bp[7],
                    sizeof(b), b));
-        v = sg_get_unaligned_be32(ucp + 8);
+        v = sg_get_unaligned_be32(bp + 8);
         printf("    Vendor specific code qualifier: 0x%x\n", v);
-        v = sg_get_unaligned_be32(ucp + 12);
+        v = sg_get_unaligned_be32(bp + 12);
         printf("    Product revision level: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 16);
+        v = sg_get_unaligned_be32(bp + 16);
         printf("    Number of moves: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 20);
+        v = sg_get_unaligned_be32(bp + 20);
         printf("    Number of pick: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 24);
+        v = sg_get_unaligned_be32(bp + 24);
         printf("    Number of pick retries: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 28);
+        v = sg_get_unaligned_be32(bp + 28);
         printf("    Number of places: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 32);
+        v = sg_get_unaligned_be32(bp + 32);
         printf("    Number of place retries: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 36);
+        v = sg_get_unaligned_be32(bp + 36);
         printf("    Number of determined volume identifiers: %u\n", v);
-        v = sg_get_unaligned_be32(ucp + 40);
+        v = sg_get_unaligned_be32(bp + 40);
         printf("    Number of unreadable volume identifiers: %u\n", v);
-        printf("    Operation code: 0x%x\n", ucp[44]);
-        printf("    Service action: 0x%x\n", ucp[45] & 0xf);
-        printf("    Media changer error type: 0x%x\n", ucp[46]);
-        printf("    MTAV: %d\n", !!(ucp[47] & 0x8));
-        printf("    IAV: %d\n", !!(ucp[47] & 0x4));
-        printf("    LSAV: %d\n", !!(ucp[47] & 0x2));
-        printf("    DAV: %d\n", !!(ucp[47] & 0x1));
-        v = sg_get_unaligned_be16(ucp + 48);
+        printf("    Operation code: 0x%x\n", bp[44]);
+        printf("    Service action: 0x%x\n", bp[45] & 0xf);
+        printf("    Media changer error type: 0x%x\n", bp[46]);
+        printf("    MTAV: %d\n", !!(bp[47] & 0x8));
+        printf("    IAV: %d\n", !!(bp[47] & 0x4));
+        printf("    LSAV: %d\n", !!(bp[47] & 0x2));
+        printf("    DAV: %d\n", !!(bp[47] & 0x1));
+        v = sg_get_unaligned_be16(bp + 48);
         printf("    Medium transport address: 0x%x\n", v);
-        v = sg_get_unaligned_be16(ucp + 50);
+        v = sg_get_unaligned_be16(bp + 50);
         printf("    Intial address: 0x%x\n", v);
-        v = sg_get_unaligned_be16(ucp + 52);
+        v = sg_get_unaligned_be16(bp + 52);
         printf("    Last successful address: 0x%x\n", v);
-        v = sg_get_unaligned_be16(ucp + 54);
+        v = sg_get_unaligned_be16(bp + 54);
         printf("    Destination address: 0x%x\n", v);
         if (pl > 91) {
             printf("    Volume tag information:\n");
-            dStrHex((const char *)(ucp + 56), 36, 0);
+            dStrHex((const char *)(bp + 56), 36, 0);
         }
         if (pl > 99) {
-            printf("    Timestamp origin: 0x%x\n", ucp[92] & 0xf);
+            printf("    Timestamp origin: 0x%x\n", bp[92] & 0xf);
             printf("    Timestamp:\n");
-            dStrHex((const char *)(ucp + 94), 6, 1);
+            dStrHex((const char *)(bp + 94), 6, 1);
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, str, sizeof(str));
@@ -5539,7 +5539,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5620,7 +5620,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
     int num, pl, pc, pcb, spf, subpg_code;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
     char b[64];
 
@@ -5637,19 +5637,19 @@ show_volume_stats_pages(const uint8_t * resp, int len,
         }
     }
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5657,167 +5657,167 @@ show_volume_stats_pages(const uint8_t * resp, int len,
         switch (pc) {
         case 0:
             printf("  Page valid: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 1:
             printf("  Thread count: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 2:
             printf("  Total data sets written: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 3:
             printf("  Total write retries: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 4:
             printf("  Total unrecovered write errors: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 5:
             printf("  Total suspended writes: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 6:
             printf("  Total fatal suspended writes: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 7:
             printf("  Total data sets read: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 8:
             printf("  Total read retries: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 9:
             printf("  Total unrecovered read errors: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0xa:
             printf("  Total suspended reads: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0xb:
             printf("  Total fatal suspended reads: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0xc:
             printf("  Last mount unrecovered write errors: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0xd:
             printf("  Last mount unrecovered read errors: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0xe:
             printf("  Last mount megabytes written: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0xf:
             printf("  Last mount megabytes read: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x10:
             printf("  Lifetime megabytes written: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x11:
             printf("  Lifetime megabytes read: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x12:
             printf("  Last load write compression ratio: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x13:
             printf("  Last load read compression ratio: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x14:
             printf("  Medium mount time: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x15:
             printf("  Medium ready time: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x16:
             printf("  Total native capacity [MB]: %s\n",
-                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
+                   num_or_unknown(bp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x17:
             printf("  Total used native capacity [MB]: %s\n",
-                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
+                   num_or_unknown(bp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x40:
-            printf("  Volume serial number: %.*s\n", pl - 4, ucp + 4);
+            printf("  Volume serial number: %.*s\n", pl - 4, bp + 4);
             break;
         case 0x41:
-            printf("  Tape lot identifier: %.*s\n", pl - 4, ucp + 4);
+            printf("  Tape lot identifier: %.*s\n", pl - 4, bp + 4);
             break;
         case 0x42:
-            printf("  Volume barcode: %.*s\n", pl - 4, ucp + 4);
+            printf("  Volume barcode: %.*s\n", pl - 4, bp + 4);
             break;
         case 0x43:
-            printf("  Volume manufacturer: %.*s\n", pl - 4, ucp + 4);
+            printf("  Volume manufacturer: %.*s\n", pl - 4, bp + 4);
             break;
         case 0x44:
-            printf("  Volume license code: %.*s\n", pl - 4, ucp + 4);
+            printf("  Volume license code: %.*s\n", pl - 4, bp + 4);
             break;
         case 0x45:
-            printf("  Volume personality: %.*s\n", pl - 4, ucp + 4);
+            printf("  Volume personality: %.*s\n", pl - 4, bp + 4);
             break;
         case 0x80:
             printf("  Write protect: %s\n",
-                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
+                   num_or_unknown(bp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x81:
             printf("  WORM: %s\n",
-                   num_or_unknown(ucp + 4, pl - 4, false, b, sizeof(b)));
+                   num_or_unknown(bp + 4, pl - 4, false, b, sizeof(b)));
             break;
         case 0x82:
             printf("  Maximum recommended tape path temperature exceeded: "
-                   "%s\n", num_or_unknown(ucp + 4, pl - 4, false, b,
+                   "%s\n", num_or_unknown(bp + 4, pl - 4, false, b,
                                           sizeof(b)));
             break;
         case 0x100:
             printf("  Volume write mounts: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x101:
             printf("  Beginning of medium passes: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x102:
             printf("  Middle of medium passes: %" PRIu64 "\n",
-                   sg_get_unaligned_be(pl - 4, ucp + 4));
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x200:
             printf("  Logical position of first encrypted logical object:\n");
-            volume_stats_partition(ucp + 4, pl - 4, true);
+            volume_stats_partition(bp + 4, pl - 4, true);
             break;
         case 0x201:
             printf("  Logical position of first unencrypted logical object "
                    "after first\n  encrypted logical object:\n");
-            volume_stats_partition(ucp + 4, pl - 4, true);
+            volume_stats_partition(bp + 4, pl - 4, true);
             break;
         case 0x202:
             printf("  Native capacity partition(s) [MB]:\n");
-            volume_stats_partition(ucp + 4, pl - 4, false);
+            volume_stats_partition(bp + 4, pl - 4, false);
             break;
         case 0x203:
             printf("  Used native capacity partition(s) [MB]:\n");
-            volume_stats_partition(ucp + 4, pl - 4, false);
+            volume_stats_partition(bp + 4, pl - 4, false);
             break;
         case 0x204:
             printf("  Remaining native capacity partition(s) [MB]:\n");
-            volume_stats_partition(ucp + 4, pl - 4, false);
+            volume_stats_partition(bp + 4, pl - 4, false);
             break;
         case 0x300:
             printf("  Mount history:\n");
-            volume_stats_history(ucp + 4, pl - 4);
+            volume_stats_history(bp + 4, pl - 4);
             break;
 
         default:
@@ -5827,7 +5827,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             else
                 printf("  Reserved parameter code (0x%x), payload in hex\n",
                        pc);
-            dStrHex((const char *)(ucp + 4), pl - 4, 0);
+            dStrHex((const char *)(bp + 4), pl - 4, 0);
             break;
         }
         if (op->do_pcb) {
@@ -5838,7 +5838,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5913,30 +5913,30 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
     int num, pl, pc, pcb, flag;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char str[PCB_STR_LEN];
 
     /* N.B. the Tape alert log page for smc-3 is different */
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Tape alert page (ssc-3) [0x2e]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
-        flag = ucp[4] & 1;
+        flag = bp[4] & 1;
         if (op->verbose && (0 == op->do_brief) && flag)
             printf("  >>>> ");
         if ((0 == op->do_brief) || op->verbose || flag) {
@@ -5955,7 +5955,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -5966,25 +5966,25 @@ show_seagate_cache_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
     int num, pl, pc, pcb;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Seagate cache page [0x37]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6003,7 +6003,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
                    "> segment size"); break;
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, ucp + 4));
+        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
             printf("\n        <%s>\n", pcb_str);
@@ -6013,7 +6013,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -6024,26 +6024,26 @@ show_seagate_factory_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
     int num, pl, pc, pcb, valid;
-    const uint8_t * ucp;
+    const uint8_t * bp;
     uint64_t ull;
     char pcb_str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Seagate/Hitachi factory page [0x3e]\n");
     num = len - 4;
-    ucp = &resp[0] + 4;
+    bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(ucp + 0);
-        pcb = ucp[2];
-        pl = ucp[3] + 4;
+        pc = sg_get_unaligned_be16(bp + 0);
+        pcb = bp[2];
+        pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)ucp, pl);
+                dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)ucp, pl, ((1 == op->do_hex) ? 1 : -1));
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6058,7 +6058,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
             break;
         }
         if (valid) {
-            ull = sg_get_unaligned_be(pl - 4, ucp + 4);
+            ull = sg_get_unaligned_be(pl - 4, bp + 4);
             if (0 == pc)
                 printf(" = %.2f", ((double)ull) / 60.0 );
             else
@@ -6073,7 +6073,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
             break;
 skip:
         num -= pl;
-        ucp += pl;
+        bp += pl;
     }
     return true;
 }
@@ -6258,7 +6258,7 @@ main(int argc, char * argv[])
     if (NULL == op->device_name) {
         if (op->in_fn) {
             const struct log_elem * lep;
-            const unsigned char * ucp;
+            const unsigned char * bp;
             int pg_code, subpg_code, pdt, n;
             uint16_t u;
 
@@ -6275,10 +6275,10 @@ main(int argc, char * argv[])
             if (op->pg_arg && (0 == op->do_brief))
                 pr2serr(">>> --page=%s option is being ignored, using values "
                         "in file: %s\n", op->pg_arg, op->in_fn);
-            for (ucp = rsp_buff, k = 0; k < in_len; ucp += n, k += n) {
-                pg_code = ucp[0] & 0x3f;
-                subpg_code = (ucp[0] & 0x40) ? ucp[1] : 0;
-                u = sg_get_unaligned_be16(ucp + 2);
+            for (bp = rsp_buff, k = 0; k < in_len; bp += n, k += n) {
+                pg_code = bp[0] & 0x3f;
+                subpg_code = (bp[0] & 0x40) ? bp[1] : 0;
+                u = sg_get_unaligned_be16(bp + 2);
                 n = u + 4;
                 if (n > (in_len - k)) {
                     pr2serr("bytes decoded remaining (%d) less than lpage "
@@ -6290,7 +6290,7 @@ main(int argc, char * argv[])
                 lep = pg_subpg_pdt_search(pg_code, subpg_code, pdt);
                 if (lep) {
                     if (lep->show_pagep)
-                        (*lep->show_pagep)(ucp, n, op);
+                        (*lep->show_pagep)(bp, n, op);
                     else
                         printf("Unable to decode %s [%s]\n", lep->name,
                                lep->acron);

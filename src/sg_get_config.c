@@ -241,35 +241,34 @@ dStrRaw(const char * str, int len)
 }
 
 static void
-decode_feature(int feature, unsigned char * ucp, int len)
+decode_feature(int feature, unsigned char * bp, int len)
 {
     int k, num, n, profile;
     char buff[128];
     const char * cp;
 
-    cp = "";
     switch (feature) {
     case 0:     /* Profile list */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 2), !!(bp[2] & 1),
                feature);
         printf("    available profiles [more recent typically higher "
                "in list]:\n");
         for (k = 4; k < len; k += 4) {
-            profile = sg_get_unaligned_be16(ucp + k);
+            profile = sg_get_unaligned_be16(bp + k);
             printf("      profile: %s , currentP=%d\n",
-                   get_profile_str(profile, buff), !!(ucp[k + 2] & 1));
+                   get_profile_str(profile, buff), !!(bp[k + 2] & 1));
         }
         break;
     case 1:     /* Core */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 2), !!(bp[2] & 1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = sg_get_unaligned_be32(ucp + 4);
+        num = sg_get_unaligned_be32(bp + 4);
         switch (num) {
         case 0: cp = "unspecified"; break;
         case 1: cp = "SCSI family"; break;
@@ -288,30 +287,29 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      Physical interface standard: %s", cp);
         if (len > 8)
-            printf(", INQ2=%d, DBE=%d\n", !!(ucp[8] & 2), !!(ucp[8] & 1));
+            printf(", INQ2=%d, DBE=%d\n", !!(bp[8] & 2), !!(bp[8] & 1));
         else
             printf("\n");
         break;
     case 2:     /* Morphing */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 2), !!(bp[2] & 1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      OCEvent=%d, ASYNC=%d\n", !!(ucp[4] & 2),
-               !!(ucp[4] & 1));
+        printf("      OCEvent=%d, ASYNC=%d\n", !!(bp[4] & 2), !!(bp[4] & 1));
         break;
     case 3:     /* Removable medium */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 2), !!(ucp[2] & 1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 2), !!(bp[2] & 1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = (ucp[4] >> 5) & 0x7;
+        num = (bp[4] >> 5) & 0x7;
         switch (num) {
         case 0: cp = "Caddy/slot type"; break;
         case 1: cp = "Tray type"; break;
@@ -326,31 +324,31 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      Loading mechanism: %s\n", cp);
         printf("      Load=%d, Eject=%d, Prevent jumper=%d, Lock=%d\n",
-               !!(ucp[4] & 0x10), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
-               !!(ucp[4] & 0x1));
+               !!(bp[4] & 0x10), !!(bp[4] & 0x8), !!(bp[4] & 0x4),
+               !!(bp[4] & 0x1));
         break;
     case 4:     /* Write protect */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      DWP=%d, WDCB=%d, SPWP=%d, SSWPP=%d\n", !!(ucp[4] & 0x8),
-               !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+        printf("      DWP=%d, WDCB=%d, SPWP=%d, SSWPP=%d\n", !!(bp[4] & 0x8),
+               !!(bp[4] & 0x4), !!(bp[4] & 0x2), !!(bp[4] & 0x1));
         break;
     case 0x10:     /* Random readable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 12) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = sg_get_unaligned_be32(ucp + 4);
+        num = sg_get_unaligned_be32(bp + 4);
         printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
-               num, sg_get_unaligned_be16(ucp + 8), !!(ucp[10] & 0x1));
+               num, sg_get_unaligned_be16(bp + 8), !!(bp[10] & 0x1));
         break;
     case 0x1d:     /* Multi-read */
     case 0x22:     /* Sector erasable */
@@ -364,247 +362,247 @@ decode_feature(int feature, unsigned char * ucp, int len)
     case 0x110:    /* VCPS */
     case 0x113:    /* SecurDisc */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         break;
     case 0x1e:     /* CD read */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      DAP=%d, C2 flags=%d, CD-Text=%d\n", !!(ucp[4] & 0x80),
-               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+        printf("      DAP=%d, C2 flags=%d, CD-Text=%d\n", !!(bp[4] & 0x80),
+               !!(bp[4] & 0x2), !!(bp[4] & 0x1));
         break;
     case 0x1f:     /* DVD read */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len > 7)
             printf("      MULTI110=%d, Dual-RW=%d, Dual-R=%d\n",
-                   !!(ucp[4] & 0x1), !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
+                   !!(bp[4] & 0x1), !!(bp[6] & 0x2), !!(bp[6] & 0x1));
         break;
     case 0x20:     /* Random writable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 16) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = sg_get_unaligned_be32(ucp + 4);
-        n = sg_get_unaligned_be32(ucp + 8);
+        num = sg_get_unaligned_be32(bp + 4);
+        n = sg_get_unaligned_be32(bp + 8);
         printf("      Last lba=0x%x, Logical block size=0x%x, blocking=0x%x,"
-               " PP=%d\n", num, n, sg_get_unaligned_be16(ucp + 12),
-               !!(ucp[14] & 0x1));
+               " PP=%d\n", num, n, sg_get_unaligned_be16(bp + 12),
+               !!(bp[14] & 0x1));
         break;
     case 0x21:     /* Incremental streaming writable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      Data block types supported=0x%x, TRIO=%d, ARSV=%d, "
-               "BUF=%d\n", sg_get_unaligned_be16(ucp + 4), !!(ucp[6] & 0x4),
-               !!(ucp[6] & 0x2), !!(ucp[6] & 0x1));
-        num = ucp[7];
+               "BUF=%d\n", sg_get_unaligned_be16(bp + 4), !!(bp[6] & 0x4),
+               !!(bp[6] & 0x2), !!(bp[6] & 0x1));
+        num = bp[7];
         printf("      Number of link sizes=%d\n", num);
         for (k = 0; k < num; ++k)
-            printf("        %d\n", ucp[8 + k]);
+            printf("        %d\n", bp[8 + k]);
         break;
     /* case 0x22:     Sector erasable -> see 0x1d entry */
     case 0x23:     /* Formattable */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len > 4)
             printf("      BD-RE: RENoSA=%d, Expand=%d, QCert=%d, Cert=%d, "
-                   "FRF=%d\n", !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
-                   !!(ucp[4] & 0x2), !!(ucp[4] & 0x1), !!(ucp[5] & 0x80));
+                   "FRF=%d\n", !!(bp[4] & 0x8), !!(bp[4] & 0x4),
+                   !!(bp[4] & 0x2), !!(bp[4] & 0x1), !!(bp[5] & 0x80));
         if (len > 8)
-            printf("      BD-R: RRM=%d\n", !!(ucp[8] & 0x1));
+            printf("      BD-R: RRM=%d\n", !!(bp[8] & 0x1));
         break;
     case 0x24:     /* Hardware defect management */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len > 4)
-            printf("      SSA=%d\n", !!(ucp[4] & 0x80));
+            printf("      SSA=%d\n", !!(bp[4] & 0x80));
         break;
     case 0x25:     /* Write once */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 12) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = sg_get_unaligned_be16(ucp + 4);
+        num = sg_get_unaligned_be16(bp + 4);
         printf("      Logical block size=0x%x, blocking=0x%x, PP=%d\n",
-               num, sg_get_unaligned_be16(ucp + 8), !!(ucp[10] & 0x1));
+               num, sg_get_unaligned_be16(bp + 8), !!(bp[10] & 0x1));
         break;
     /* case 0x26:     Restricted overwrite -> see 0x1d entry */
     /* case 0x27:     CDRW CAV write -> see 0x1d entry */
     case 0x28:     /* MRW  (Mount Rainier reWriteable) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len > 4)
             printf("      DVD+Write=%d, DVD+Read=%d, Write=%d\n",
-                   !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+                   !!(bp[4] & 0x4), !!(bp[4] & 0x2), !!(bp[4] & 0x1));
         break;
     case 0x29:     /* Enhanced defect reporting */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      DRT-DM=%d, number of DBI cache zones=0x%x, number of "
-               "entries=0x%x\n", !!(ucp[4] & 0x1), ucp[5],
-               sg_get_unaligned_be16(ucp + 6));
+               "entries=0x%x\n", !!(bp[4] & 0x1), bp[5],
+               sg_get_unaligned_be16(bp + 6));
         break;
     case 0x2a:     /* DVD+RW */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      Write=%d, Quick start=%d, Close only=%d\n",
-               !!(ucp[4] & 0x1), !!(ucp[5] & 0x2), !!(ucp[5] & 0x1));
+               !!(bp[4] & 0x1), !!(bp[5] & 0x2), !!(bp[5] & 0x1));
         break;
     case 0x2b:     /* DVD+R */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      Write=%d\n", !!(ucp[4] & 0x1));
+        printf("      Write=%d\n", !!(bp[4] & 0x1));
         break;
     case 0x2c:     /* Rigid restricted overwrite */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      DSDG=%d, DSDR=%d, Intermediate=%d, Blank=%d\n",
-               !!(ucp[4] & 0x8), !!(ucp[4] & 0x4), !!(ucp[4] & 0x2),
-               !!(ucp[4] & 0x1));
+               !!(bp[4] & 0x8), !!(bp[4] & 0x4), !!(bp[4] & 0x2),
+               !!(bp[4] & 0x1));
         break;
     case 0x2d:     /* CD Track at once */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      BUF=%d, R-W raw=%d, R-W pack=%d, Test write=%d\n",
-               !!(ucp[4] & 0x40), !!(ucp[4] & 0x10), !!(ucp[4] & 0x8),
-               !!(ucp[4] & 0x4));
+               !!(bp[4] & 0x40), !!(bp[4] & 0x10), !!(bp[4] & 0x8),
+               !!(bp[4] & 0x4));
         printf("      CD-RW=%d, R-W sub-code=%d, Data type supported=%d\n",
-               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1),
-               sg_get_unaligned_be16(ucp + 6));
+               !!(bp[4] & 0x2), !!(bp[4] & 0x1),
+               sg_get_unaligned_be16(bp + 6));
         break;
     case 0x2e:     /* CD mastering (session at once) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      BUF=%d, SAO=%d, Raw MS=%d, Raw=%d\n",
-               !!(ucp[4] & 0x40), !!(ucp[4] & 0x20), !!(ucp[4] & 0x10),
-               !!(ucp[4] & 0x8));
+               !!(bp[4] & 0x40), !!(bp[4] & 0x20), !!(bp[4] & 0x10),
+               !!(bp[4] & 0x8));
         printf("      Test write=%d, CD-RW=%d, R-W=%d\n",
-               !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+               !!(bp[4] & 0x4), !!(bp[4] & 0x2), !!(bp[4] & 0x1));
         printf("      Maximum cue sheet length=0x%x\n",
-               sg_get_unaligned_be24(ucp + 5));
+               sg_get_unaligned_be24(bp + 5));
         break;
     case 0x2f:     /* DVD-R/-RW write */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      BUF=%d, RDL=%d, Test write=%d, DVD-RW SL=%d\n",
-               !!(ucp[4] & 0x40), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
-               !!(ucp[4] & 0x2));
+               !!(bp[4] & 0x40), !!(bp[4] & 0x8), !!(bp[4] & 0x4),
+               !!(bp[4] & 0x2));
         break;
     case 0x33:     /* Layer jump recording */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        num = ucp[7];
+        num = bp[7];
         printf("      Number of link sizes=%d\n", num);
         for (k = 0; k < num; ++k)
-            printf("        %d\n", ucp[8 + k]);
+            printf("        %d\n", bp[8 + k]);
         break;
     case 0x34:     /* Layer jump rigid restricted overwrite */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      CLJB=%d\n", !!(ucp[4] & 0x1));
-        printf("      Buffer block size=%d\n", ucp[7]);
+        printf("      CLJB=%d\n", !!(bp[4] & 0x1));
+        printf("      Buffer block size=%d\n", bp[7]);
         break;
     /* case 0x35:     Stop long operation -> see 0x1d entry */
     case 0x37:     /* CD-RW media write support */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      CD-RW media sub-type support (bitmask)=0x%x\n", ucp[5]);
+        printf("      CD-RW media sub-type support (bitmask)=0x%x\n", bp[5]);
         break;
     /* case 0x38:     BD-R pseudo-overwrite (POW) -> see 0x1d entry */
     case 0x3a:     /* DVD+RW dual layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      write=%d, quick_start=%d, close_only=%d\n",
-               !!(ucp[4] & 0x1), !!(ucp[5] & 0x2), !!(ucp[5] & 0x1));
+               !!(bp[4] & 0x1), !!(bp[5] & 0x2), !!(bp[5] & 0x1));
         break;
     case 0x3b:     /* DVD+R dual layer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      write=%d\n", !!(ucp[4] & 0x1));
+        printf("      write=%d\n", !!(bp[4] & 0x1));
         break;
     case 0x40:     /* BD Read */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 32) {
             printf("      additional length [%d] too short\n", len - 4);
@@ -612,271 +610,271 @@ decode_feature(int feature, unsigned char * ucp, int len)
         }
         printf("      Bitmaps for BD-RE read support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 8),
-               sg_get_unaligned_be16(ucp + 10),
-               sg_get_unaligned_be16(ucp + 12),
-               sg_get_unaligned_be16(ucp + 14));
+               "Class 3=0x%x\n", sg_get_unaligned_be16(bp + 8),
+               sg_get_unaligned_be16(bp + 10),
+               sg_get_unaligned_be16(bp + 12),
+               sg_get_unaligned_be16(bp + 14));
         printf("      Bitmaps for BD-R read support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 16),
-               sg_get_unaligned_be16(ucp + 18),
-               sg_get_unaligned_be16(ucp + 20),
-               sg_get_unaligned_be16(ucp + 22));
+               "Class 3=0x%x\n", sg_get_unaligned_be16(bp + 16),
+               sg_get_unaligned_be16(bp + 18),
+               sg_get_unaligned_be16(bp + 20),
+               sg_get_unaligned_be16(bp + 22));
         printf("      Bitmaps for BD-ROM read support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 24),
-               sg_get_unaligned_be16(ucp + 26),
-               sg_get_unaligned_be16(ucp + 28),
-               sg_get_unaligned_be16(ucp + 30));
+               "Class 3=0x%x\n", sg_get_unaligned_be16(bp + 24),
+               sg_get_unaligned_be16(bp + 26),
+               sg_get_unaligned_be16(bp + 28),
+               sg_get_unaligned_be16(bp + 30));
         break;
     case 0x41:     /* BD Write */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 32) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      SVNR=%d\n", !!(ucp[4] & 0x1));
+        printf("      SVNR=%d\n", !!(bp[4] & 0x1));
         printf("      Bitmaps for BD-RE write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 8),
-               sg_get_unaligned_be16(ucp + 10),
-               sg_get_unaligned_be16(ucp + 12),
-               sg_get_unaligned_be16(ucp + 14));
+               "Class 3=0x%x\n", sg_get_unaligned_be16(bp + 8),
+               sg_get_unaligned_be16(bp + 10),
+               sg_get_unaligned_be16(bp + 12),
+               sg_get_unaligned_be16(bp + 14));
         printf("      Bitmaps for BD-R write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 16),
-               sg_get_unaligned_be16(ucp + 18),
-               sg_get_unaligned_be16(ucp + 20),
-               sg_get_unaligned_be16(ucp + 22));
+               "Class 3=0x%x\n", sg_get_unaligned_be16(bp + 16),
+               sg_get_unaligned_be16(bp + 18),
+               sg_get_unaligned_be16(bp + 20),
+               sg_get_unaligned_be16(bp + 22));
         printf("      Bitmaps for BD-ROM write support:\n");
         printf("        Class 0=0x%x, Class 1=0x%x, Class 2=0x%x, "
-               "Class 3=0x%x\n", sg_get_unaligned_be16(ucp + 24),
-               sg_get_unaligned_be16(ucp + 26),
-               sg_get_unaligned_be16(ucp + 28),
-               sg_get_unaligned_be16(ucp + 30));
+               "Class 3=0x%x\n", sg_get_unaligned_be16(bp + 24),
+               sg_get_unaligned_be16(bp + 26),
+               sg_get_unaligned_be16(bp + 28),
+               sg_get_unaligned_be16(bp + 30));
         break;
     /* case 0x42:     TSR (timely safe recording) -> see 0x1d entry */
     case 0x50:     /* HD DVD Read */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(ucp[4] & 0x1),
-               !!(ucp[6] & 0x1));
+        printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(bp[4] & 0x1),
+               !!(bp[6] & 0x1));
         break;
     case 0x51:     /* HD DVD Write */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(ucp[4] & 0x1),
-               !!(ucp[6] & 0x1));
+        printf("      HD DVD-R=%d, HD DVD-RAM=%d\n", !!(bp[4] & 0x1),
+               !!(bp[6] & 0x1));
         break;
     case 0x52:     /* HD DVD-RW fragment recording */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      BGP=%d\n", !!(ucp[4] & 0x1));
+        printf("      BGP=%d\n", !!(bp[4] & 0x1));
         break;
     case 0x80:     /* Hybrid disc */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      RI=%d\n", !!(ucp[4] & 0x1));
+        printf("      RI=%d\n", !!(bp[4] & 0x1));
         break;
     /* case 0x100:    Power management -> see 0x1d entry */
     case 0x101:    /* SMART */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      PP=%d\n", !!(ucp[4] & 0x1));
+        printf("      PP=%d\n", !!(bp[4] & 0x1));
         break;
     case 0x102:    /* Embedded changer */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      SCC=%d, SDP=%d, highest slot number=%d\n",
-               !!(ucp[4] & 0x10), !!(ucp[4] & 0x4), (ucp[7] & 0x1f));
+               !!(bp[4] & 0x10), !!(bp[4] & 0x4), (bp[7] & 0x1f));
         break;
     case 0x103:    /* CD audio external play (obsolete) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      Scan=%d, SCM=%d, SV=%d, number of volume levels=%d\n",
-               !!(ucp[4] & 0x4), !!(ucp[4] & 0x2), !!(ucp[4] & 0x1),
-               sg_get_unaligned_be16(ucp + 6));
+               !!(bp[4] & 0x4), !!(bp[4] & 0x2), !!(bp[4] & 0x1),
+               sg_get_unaligned_be16(bp + 6));
         break;
     case 0x104:    /* Firmware upgrade */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 4) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         if (len > 4)
-            printf("      M5=%d\n", !!(ucp[4] & 0x1));
+            printf("      M5=%d\n", !!(bp[4] & 0x1));
         break;
     case 0x105:    /* Timeout */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len > 7) {
             printf("      Group 3=%d, unit length=%d\n",
-                   !!(ucp[4] & 0x1), sg_get_unaligned_be16(ucp + 6));
+                   !!(bp[4] & 0x1), sg_get_unaligned_be16(bp + 6));
         }
         break;
     case 0x106:    /* DVD CSS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      CSS version=%d\n", ucp[7]);
+        printf("      CSS version=%d\n", bp[7]);
         break;
     case 0x107:    /* Real time streaming */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      RBCB=%d, SCS=%d, MP2A=%d, WSPD=%d, SW=%d\n",
-               !!(ucp[4] & 0x10), !!(ucp[4] & 0x8), !!(ucp[4] & 0x4),
-               !!(ucp[4] & 0x2), !!(ucp[4] & 0x1));
+               !!(bp[4] & 0x10), !!(bp[4] & 0x8), !!(bp[4] & 0x4),
+               !!(bp[4] & 0x2), !!(bp[4] & 0x1));
         break;
     case 0x108:    /* Drive serial number */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         num = len - 4;
         n = sizeof(buff) - 1;
         n = ((num < n) ? num : n);
-        strncpy(buff, (const char *)(ucp + 4), n);
+        strncpy(buff, (const char *)(bp + 4), n);
         buff[n] = '\0';
         printf("      Drive serial number: %s\n", buff);
         break;
     /* case 0x109:    Media serial number -> see 0x1d entry */
     case 0x10a:    /* Disc control blocks */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         printf("      Disc control blocks:\n");
         for (k = 4; k < len; k += 4) {
-            printf("        0x%x\n", sg_get_unaligned_be32(ucp + k));
+            printf("        0x%x\n", sg_get_unaligned_be32(bp + k));
         }
         break;
     case 0x10b:    /* DVD CPRM */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      CPRM version=%d\n", ucp[7]);
+        printf("      CPRM version=%d\n", bp[7]);
         break;
     case 0x10c:    /* firmware information */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 20) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("      %.2s%.2s/%.2s/%.2s %.2s:%.2s:%.2s\n", ucp + 4,
-               ucp + 6, ucp + 8, ucp + 10, ucp + 12, ucp + 14, ucp + 16);
+        printf("      %.2s%.2s/%.2s/%.2s %.2s:%.2s:%.2s\n", bp + 4,
+               bp + 6, bp + 8, bp + 10, bp + 12, bp + 14, bp + 16);
         break;
     case 0x10d:    /* AACS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      BNG=%d, Block count for binding nonce=%d\n",
-               !!(ucp[4] & 0x1), ucp[5]);
+               !!(bp[4] & 0x1), bp[5]);
         printf("      Number of AGIDs=%d, AACS version=%d\n",
-               (ucp[6] & 0xf), ucp[7]);
+               (bp[6] & 0xf), bp[7]);
         break;
     case 0x10e:    /* DVD CSS managed recording */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      Maximum number of scrambled extent information "
-               "entries=%d\n", ucp[4]);
+               "entries=%d\n", bp[4]);
         break;
     /* case 0x110:    VCPS -> see 0x1d entry */
     /* case 0x113:    SecurDisc -> see 0x1d entry */
     case 0x120:    /* BD CPS */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
         printf("      BD CPS major:minor version number=%d:%d, max open "
-               "SACs=%d\n", ((ucp[5] >> 4) & 0xf), (ucp[5] & 0xf),
-               ucp[6] & 0x3);
+               "SACs=%d\n", ((bp[5] >> 4) & 0xf), (bp[5] & 0xf),
+               bp[6] & 0x3);
         break;
     case 0x142:    /* OSSC (Optical Security Subsystem Class) */
         printf("    version=%d, persist=%d, current=%d [0x%x]\n",
-               ((ucp[2] >> 2) & 0xf), !!(ucp[2] & 0x2), !!(ucp[2] & 0x1),
+               ((bp[2] >> 2) & 0xf), !!(bp[2] & 0x2), !!(bp[2] & 0x1),
                feature);
         if (len < 8) {
             printf("      additional length [%d] too short\n", len - 4);
             break;
         }
-        printf("    PSAU=%d, LOSPB=%d, ME=%d\n", !!(ucp[4] & 0x80),
-               !!(ucp[4] & 0x40), !!(ucp[4] & 0x1));
-        num = ucp[5];
+        printf("    PSAU=%d, LOSPB=%d, ME=%d\n", !!(bp[4] & 0x80),
+               !!(bp[4] & 0x40), !!(bp[4] & 0x1));
+        num = bp[5];
         printf("      Profile numbers:\n");
         for (k = 6; (num > 0) && (k < len); --num, k += 2) {
-            printf("        %u\n", sg_get_unaligned_be16(ucp + k));
+            printf("        %u\n", sg_get_unaligned_be16(bp + k));
         }
         break;
     default:
         pr2serr("    Unknown feature [0x%x], version=%d persist=%d, "
-                "current=%d\n", feature, ((ucp[2] >> 2) & 0xf),
-                !!(ucp[2] & 0x2), !!(ucp[2] & 0x1));
-        dStrHexErr((const char *)ucp, len, 1);
+                "current=%d\n", feature, ((bp[2] >> 2) & 0xf),
+                !!(bp[2] & 0x2), !!(bp[2] & 0x1));
+        dStrHexErr((const char *)bp, len, 1);
         break;
     }
 }

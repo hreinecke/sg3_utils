@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2015 Douglas Gilbert.
+ * Copyright (c) 1999-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -119,8 +120,8 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
                      int driver_status, const unsigned char * sense_buffer,
                      int sb_len, int raw_sinfo)
 {
-    int done_leadin = 0;
-    int done_sense = 0;
+    bool done_leadin = false;
+    bool done_sense = false;
 
     scsi_status &= 0x7e; /*sanity */
     if ((0 == scsi_status) && (0 == host_status) && (0 == driver_status))
@@ -128,7 +129,7 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
     if (0 != scsi_status) {
         if (leadin)
             pr2ws("%s: ", leadin);
-        done_leadin = 1;
+        done_leadin = true;
         pr2ws("SCSI status: ");
         sg_print_scsi_status(scsi_status);
         pr2ws("\n");
@@ -136,7 +137,7 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
                              (scsi_status == SAM_STAT_COMMAND_TERMINATED))) {
             /* SAM_STAT_COMMAND_TERMINATED is obsolete */
             sg_print_sense(0, sense_buffer, sb_len, raw_sinfo);
-            done_sense = 1;
+            done_sense = true;
         }
     }
     if (0 != host_status) {
@@ -145,7 +146,7 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
         if (done_leadin)
             pr2ws("plus...: ");
         else
-            done_leadin = 1;
+            done_leadin = true;
         sg_print_host_status(host_status);
         pr2ws("\n");
     }
@@ -157,8 +158,6 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
             pr2ws("%s: ", leadin);
         if (done_leadin)
             pr2ws("plus...: ");
-        else
-            done_leadin = 1;
         sg_print_driver_status(driver_status);
         pr2ws("\n");
         if (sense_buffer && (! done_sense) &&

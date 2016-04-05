@@ -709,7 +709,8 @@ main(int argc, char * argv[])
                 printf("Bad sequence after '-raw=' option\n");
                 usage_old();
             }
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+	    goto fini;
         }
     }
 
@@ -721,7 +722,8 @@ main(int argc, char * argv[])
             printf("setting -doff or -uoff only useful when -t is set\n");
             usage_old();
         }
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+	goto fini;
     }
     if ((op->do_selftest > 0) && op->do_deftest) {
         if (op->opt_new) {
@@ -731,7 +733,8 @@ main(int argc, char * argv[])
             printf("either set -s=SF or -t (not both)\n");
             usage_old();
         }
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+	goto fini;
     }
     if (op->do_raw) {
         if ((op->do_selftest > 0) || op->do_deftest || op->do_extdur ||
@@ -745,7 +748,8 @@ main(int argc, char * argv[])
                        "'-l'\n");
                 usage_old();
             }
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+	    goto fini;
         }
         if (! op->do_pf) {
             if (op->opt_new)
@@ -770,12 +774,14 @@ main(int argc, char * argv[])
                                      op->do_verbose)) < 0) {
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = SG_LIB_FILE_ERROR;
+	goto fini;
     }
     rsp_buff = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == rsp_buff) {
         pr2serr("unable to allocate %d bytes (2)\n", op->maxlen);
-        return SG_LIB_CAT_OTHER;
+        ret = SG_LIB_CAT_OTHER;
+	goto close_fini;
     }
     if (op->do_extdur) {
         res = do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, op->do_verbose);
@@ -865,10 +871,7 @@ main(int argc, char * argv[])
             goto err_out;
         }
     }
-    res = sg_cmds_close_device(sg_fd);
-    if ((res < 0) && (0 == ret))
-        return SG_LIB_SYNTAX_ERROR;
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    goto close_fini;
 
 err_out:
     if (SG_LIB_CAT_UNIT_ATTENTION == res)
@@ -882,9 +885,11 @@ err_out:
 err_out9:
     if (op->do_verbose < 2)
         pr2serr("  try again with '-vv' for more information\n");
+close_fini:
     res = sg_cmds_close_device(sg_fd);
     if ((res < 0) && (0 == ret))
-        return SG_LIB_FILE_ERROR;
+        ret = SG_LIB_FILE_ERROR;
+fini:
     if (read_in)
         free(read_in);
     if (rsp_buff)

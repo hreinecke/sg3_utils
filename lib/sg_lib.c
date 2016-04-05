@@ -255,8 +255,8 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
             found = true;
             num = my_snprintf(buff, buff_len, "Additional sense: ");
             rlen = buff_len - num;
-            num += my_snprintf(buff + num, ((rlen > 0) ? rlen : 0),
-                               ei2p->text, ascq);
+            my_snprintf(buff + num, ((rlen > 0) ? rlen : 0), ei2p->text,
+                        ascq);
         }
     }
     if (found)
@@ -1434,8 +1434,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
 {
     int len, progress, n, r, pr, rem, blen;
     unsigned int info;
-    int descriptor_format = 0;
-    int sdat_ovfl = 0;
+    bool descriptor_format = false;
+    bool sdat_ovfl = false;
     bool valid;
     const char * ebp = NULL;
     char error_buff[64];
@@ -1465,24 +1465,24 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
             ebp = "Fixed format, current";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
-            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : 0;
+            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : false;
             break;
         case 0x71:      /* fixed, deferred */
             /* error related to a previous command */
             ebp = "Fixed format, <<<deferred>>>";
             len = (sb_len > 7) ? (sense_buffer[7] + 8) : sb_len;
             len = (len > sb_len) ? sb_len : len;
-            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : 0;
+            sdat_ovfl = (len > 2) ? !!(sense_buffer[2] & 0x10) : false;
             break;
         case 0x72:      /* descriptor, current */
-            descriptor_format = 1;
+            descriptor_format = true;
             ebp = "Descriptor format, current";
-            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : 0;
+            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : false;
             break;
         case 0x73:      /* descriptor, deferred */
-            descriptor_format = 1;
+            descriptor_format = true;
             ebp = "Descriptor format, <<<deferred>>>";
-            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : 0;
+            sdat_ovfl = (sb_len > 4) ? !!(sense_buffer[4] & 0x80) : false;
             break;
         case 0x0:
             ebp = "Response code: 0x0 (?)";
@@ -1624,8 +1624,8 @@ sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
                          ((sense_buffer[0] >> 4) & 0x7),
                          (sense_buffer[0] & 0xf));
         if (sense_buffer[0] & 0x80)
-            r += my_snprintf(b + r, blen - r, "%s  lba=0x%x\n", lip,
-                     sg_get_unaligned_be24(sense_buffer + 1) & 0x1fffff);
+            my_snprintf(b + r, blen - r, "%s  lba=0x%x\n", lip,
+                        sg_get_unaligned_be24(sense_buffer + 1) & 0x1fffff);
         n += my_snprintf(buff + n, buff_len - n, "%s\n", b);
         len = sb_len;
         if (len > 32)
@@ -2441,7 +2441,8 @@ sg_get_num(const char * buf)
     char * cp;
     const char * b;
     char c = 'c';
-    char c2, c3;
+    char c2 = '\0';     /* keep static checker happy */
+    char c3 = '\0';     /* keep static checker happy */
     char lb[16];
 
     if ((NULL == buf) || ('\0' == buf[0]))
@@ -2576,7 +2577,8 @@ sg_get_llnum(const char * buf)
     char * cp;
     const char * b;
     char c = 'c';
-    char c2, c3;
+    char c2 = '\0';     /* keep static checker happy */
+    char c3 = '\0';     /* keep static checker happy */
     char lb[32];
 
     if ((NULL == buf) || ('\0' == buf[0]))

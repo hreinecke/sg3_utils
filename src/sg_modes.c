@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2015 D. Gilbert
+ *  Copyright (C) 2000-2016 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -82,7 +83,7 @@ struct opts_t {
     int page_control;
     int pg_code;
     int subpg_code;
-    int subpg_code_set;
+    bool subpg_code_given;
     const char * device_name;
     int opt_new;
 };
@@ -277,9 +278,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->subpg_code = nn;
-                op->subpg_code_set = 1;
-            } else
-                nn = 0;
+                op->subpg_code_given = true;
+            }
             op->pg_code = n;
             break;
         case 'r':
@@ -326,8 +326,9 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num, n;
+    int k, plen, num, n;
     unsigned int u, uu;
+    bool jmp_out;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
@@ -336,7 +337,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case '6':
                     ++op->do_six;
@@ -387,7 +388,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     ++op->do_help;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -428,7 +429,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     }
                     op->pg_code = u;
                     op->subpg_code = uu;
-                    op->subpg_code_set = 1;
+                    op->subpg_code_given = true;
                 } else {
                     pr2serr("Bad page code, subpage code sequence after 'p=' "
                             "option\n");
@@ -443,7 +444,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->subpg_code = u;
-                op->subpg_code_set = 1;
+                op->subpg_code_given = true;
                 if (-1 == op->pg_code)
                     op->pg_code = 0;
             } else if (0 == strncmp("-old", cp, 4))
@@ -603,43 +604,47 @@ static struct page_code_desc pc_desc_adc[] = {
     {0xe, 0x4, "Target device serial number"},
 };
 
+/* Returns pointer to base of table for scsi_ptype or pointer to common
+ * table if scsi_ptype is -1. Yields numbers of elements in returned
+ * table via pointer sizep. If scsi_ptype not known then returns NULL
+ * with *sizep set to zero. */
 static struct page_code_desc *
-mode_page_cs_table(int scsi_ptype, int * size)
+get_mpage_tbl_size(int scsi_ptype, int * sizep)
 {
     switch (scsi_ptype)
     {
         case -1:        /* common list */
-            *size = sizeof(pc_desc_common) / sizeof(pc_desc_common[0]);
+            *sizep = sizeof(pc_desc_common) / sizeof(pc_desc_common[0]);
             return &pc_desc_common[0];
         case PDT_DISK:         /* disk (direct access) type devices */
         case PDT_WO:
         case PDT_OPTICAL:
-            *size = sizeof(pc_desc_disk) / sizeof(pc_desc_disk[0]);
+            *sizep = sizeof(pc_desc_disk) / sizeof(pc_desc_disk[0]);
             return &pc_desc_disk[0];
         case PDT_TAPE:         /* tape devices */
         case PDT_PRINTER:
-            *size = sizeof(pc_desc_tape) / sizeof(pc_desc_tape[0]);
+            *sizep = sizeof(pc_desc_tape) / sizeof(pc_desc_tape[0]);
             return &pc_desc_tape[0];
         case PDT_MMC:         /* cd/dvd/bd devices */
-            *size = sizeof(pc_desc_cddvd) / sizeof(pc_desc_cddvd[0]);
+            *sizep = sizeof(pc_desc_cddvd) / sizeof(pc_desc_cddvd[0]);
             return &pc_desc_cddvd[0];
         case PDT_MCHANGER:         /* medium changer devices */
-            *size = sizeof(pc_desc_smc) / sizeof(pc_desc_smc[0]);
+            *sizep = sizeof(pc_desc_smc) / sizeof(pc_desc_smc[0]);
             return &pc_desc_smc[0];
         case PDT_SAC:       /* storage array devices */
-            *size = sizeof(pc_desc_scc) / sizeof(pc_desc_scc[0]);
+            *sizep = sizeof(pc_desc_scc) / sizeof(pc_desc_scc[0]);
             return &pc_desc_scc[0];
         case PDT_SES:       /* enclosure services devices */
-            *size = sizeof(pc_desc_ses) / sizeof(pc_desc_ses[0]);
+            *sizep = sizeof(pc_desc_ses) / sizeof(pc_desc_ses[0]);
             return &pc_desc_ses[0];
         case PDT_RBC:       /* simplified direct access device */
-            *size = sizeof(pc_desc_rbc) / sizeof(pc_desc_rbc[0]);
+            *sizep = sizeof(pc_desc_rbc) / sizeof(pc_desc_rbc[0]);
             return &pc_desc_rbc[0];
         case PDT_ADC:       /* automation device/interface */
-            *size = sizeof(pc_desc_adc) / sizeof(pc_desc_adc[0]);
+            *sizep = sizeof(pc_desc_adc) / sizeof(pc_desc_adc[0]);
             return &pc_desc_adc[0];
     }
-    *size = 0;
+    *sizep = 0;
     return NULL;
 }
 
@@ -674,24 +679,24 @@ static struct page_code_desc pc_desc_t_adc[] = {
 };
 
 static struct page_code_desc *
-mode_page_transp_table(int t_proto, int * size)
+get_mpage_trans_tbl_size(int t_proto, int * sizep)
 {
     switch (t_proto)
     {
         case TPROTO_FCP:
-            *size = sizeof(pc_desc_t_fcp) / sizeof(pc_desc_t_fcp[0]);
+            *sizep = sizeof(pc_desc_t_fcp) / sizeof(pc_desc_t_fcp[0]);
             return &pc_desc_t_fcp[0];
         case TPROTO_SPI:
-            *size = sizeof(pc_desc_t_spi4) / sizeof(pc_desc_t_spi4[0]);
+            *sizep = sizeof(pc_desc_t_spi4) / sizeof(pc_desc_t_spi4[0]);
             return &pc_desc_t_spi4[0];
         case TPROTO_SAS:
-            *size = sizeof(pc_desc_t_sas) / sizeof(pc_desc_t_sas[0]);
+            *sizep = sizeof(pc_desc_t_sas) / sizeof(pc_desc_t_sas[0]);
             return &pc_desc_t_sas[0];
         case TPROTO_ADT:
-            *size = sizeof(pc_desc_t_adc) / sizeof(pc_desc_t_adc[0]);
+            *sizep = sizeof(pc_desc_t_adc) / sizeof(pc_desc_t_adc[0]);
             return &pc_desc_t_adc[0];
     }
-    *size = 0;
+    *sizep = 0;
     return NULL;
 }
 
@@ -704,7 +709,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
     const struct page_code_desc * pcdp;
 
     if (t_proto >= 0) {
-        pcdp = mode_page_transp_table(t_proto, &num);
+        pcdp = get_mpage_trans_tbl_size(t_proto, &num);
         if (pcdp) {
             for (k = 0; k < num; ++k, ++pcdp) {
                 if ((page_num == pcdp->page_code) &&
@@ -715,7 +720,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
             }
         }
     }
-    pcdp = mode_page_cs_table(scsi_ptype, &num);
+    pcdp = get_mpage_tbl_size(scsi_ptype, &num);
     if (pcdp) {
         for (k = 0; k < num; ++k, ++pcdp) {
             if ((page_num == pcdp->page_code) &&
@@ -727,7 +732,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
     }
     if ((0xd != scsi_ptype) && (inq_byte6 & 0x40)) {
         /* check for attached enclosure services processor */
-        pcdp = mode_page_cs_table(0xd, &num);
+        pcdp = get_mpage_tbl_size(0xd, &num);
         if (pcdp) {
             for (k = 0; k < num; ++k, ++pcdp) {
                 if ((page_num == pcdp->page_code) &&
@@ -740,7 +745,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
     }
     if ((0x8 != scsi_ptype) && (inq_byte6 & 0x8)) {
         /* check for attached medium changer device */
-        pcdp = mode_page_cs_table(0x8, &num);
+        pcdp = get_mpage_tbl_size(0x8, &num);
         if (pcdp) {
             for (k = 0; k < num; ++k, ++pcdp) {
                 if ((page_num == pcdp->page_code) &&
@@ -751,7 +756,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
             }
         }
     }
-    pcdp = mode_page_cs_table(-1, &num);
+    pcdp = get_mpage_tbl_size(-1, &num);
     for (k = 0; k < num; ++k, ++pcdp) {
         if ((page_num == pcdp->page_code) &&
             (subpage_num == pcdp->subpage_code))
@@ -765,16 +770,17 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
 static void
 list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
 {
-    int num, num_ptype, pg, spg, c, d, valid_transport;
+    int num, num_ptype, pg, spg, c, d;
+    bool valid_transport;
     const struct page_code_desc * dp;
     const struct page_code_desc * pe_dp;
     char b[64];
 
-    valid_transport = ((t_proto >= 0) && (t_proto <= 0xf)) ? 1 : 0;
+    valid_transport = ((t_proto >= 0) && (t_proto <= 0xf));
     printf("Page[,subpage]   Name\n");
     printf("=====================\n");
-    dp = mode_page_cs_table(-1, &num);
-    pe_dp = mode_page_cs_table(scsi_ptype, &num_ptype);
+    dp = get_mpage_tbl_size(-1, &num);
+    pe_dp = get_mpage_tbl_size(scsi_ptype, &num_ptype);
     while (1) {
         pg = dp ? dp->page_code : PG_CODE_ALL + 1;
         spg = dp ? dp->subpage_code : SPG_CODE_ALL;
@@ -786,30 +792,37 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
             ((PROTO_SPECIFIC_1 == c) || (PROTO_SPECIFIC_2 == c)))
             dp = (--num <= 0) ? NULL : (dp + 1); /* skip protocol specific */
         else if (c == d) {
-            if (pe_dp->subpage_code)
-                printf(" 0x%02x,0x%02x    *  %s\n", pe_dp->page_code,
-                       pe_dp->subpage_code, pe_dp->desc);
-            else
-                printf(" 0x%02x         *  %s\n", pe_dp->page_code,
-                       pe_dp->desc);
-            dp = (--num <= 0) ? NULL : (dp + 1);
-            pe_dp = (--num_ptype <= 0) ? NULL : (pe_dp + 1);
+            if (pe_dp) {
+                if (pe_dp->subpage_code)
+                    printf(" 0x%02x,0x%02x    *  %s\n", pe_dp->page_code,
+                           pe_dp->subpage_code, pe_dp->desc);
+                else
+                    printf(" 0x%02x         *  %s\n", pe_dp->page_code,
+                           pe_dp->desc);
+                pe_dp = (--num_ptype <= 0) ? NULL : (pe_dp + 1);
+            }
+            if (dp)
+                dp = (--num <= 0) ? NULL : (dp + 1);
         } else if (c < d) {
-            if (dp->subpage_code)
-                printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
-                       dp->subpage_code, dp->desc);
-            else
-                printf(" 0x%02x            %s\n", dp->page_code,
-                       dp->desc);
-            dp = (--num <= 0) ? NULL : (dp + 1);
+            if (dp) {
+                if (dp->subpage_code)
+                    printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
+                           dp->subpage_code, dp->desc);
+                else
+                    printf(" 0x%02x            %s\n", dp->page_code,
+                           dp->desc);
+                dp = (--num <= 0) ? NULL : (dp + 1);
+            }
         } else {
-            if (pe_dp->subpage_code)
-                printf(" 0x%02x,0x%02x       %s\n", pe_dp->page_code,
-                       pe_dp->subpage_code, pe_dp->desc);
-            else
-                printf(" 0x%02x            %s\n", pe_dp->page_code,
-                       pe_dp->desc);
-            pe_dp = (--num_ptype <= 0) ? NULL : (pe_dp + 1);
+            if (pe_dp) {
+                if (pe_dp->subpage_code)
+                    printf(" 0x%02x,0x%02x       %s\n", pe_dp->page_code,
+                           pe_dp->subpage_code, pe_dp->desc);
+                else
+                    printf(" 0x%02x            %s\n", pe_dp->page_code,
+                           pe_dp->desc);
+                pe_dp = (--num_ptype <= 0) ? NULL : (pe_dp + 1);
+            }
         }
         if ((NULL == dp) && (NULL == pe_dp))
             break;
@@ -817,7 +830,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     if ((0xd != scsi_ptype) && (inq_byte6 & 0x40)) {
         /* check for attached enclosure services processor */
         printf("\n    Attached enclosure services processor\n");
-        dp = mode_page_cs_table(0xd, &num);
+        dp = get_mpage_tbl_size(0xd, &num);
         while (dp) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
@@ -831,7 +844,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     if ((0x8 != scsi_ptype) && (inq_byte6 & 0x8)) {
         /* check for attached medium changer device */
         printf("\n    Attached medium changer device\n");
-        dp = mode_page_cs_table(0x8, &num);
+        dp = get_mpage_tbl_size(0x8, &num);
         while (dp) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
@@ -845,7 +858,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     if (valid_transport) {
         printf("\n    Transport protocol: %s\n",
                sg_get_trans_proto_str(t_proto, sizeof(b), b));
-        dp = mode_page_transp_table(t_proto, &num);
+        dp = get_mpage_trans_tbl_size(t_proto, &num);
         while (dp) {
             if (dp->subpage_code)
                 printf(" 0x%02x,0x%02x       %s\n", dp->page_code,
@@ -859,8 +872,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
 }
 
 static int
-examine_pages(int sg_fd, int inq_pdt, int inq_byte6,
-              const struct opts_t * op)
+examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
 {
     int k, res, header, mresp_len, len;
     unsigned char rbuf[256];
@@ -947,7 +959,7 @@ main(int argc, char * argv[])
     int ret = 0;
     int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
     int num_ua_pages;
-    unsigned char * ucp;
+    unsigned char * bp;
     unsigned char uc;
     struct sg_simple_inquiry_resp inq_out;
     char pdt_name[64];
@@ -979,7 +991,7 @@ main(int argc, char * argv[])
                 printf("    peripheral device type: %s\n",
                        sg_get_pdt_str(op->pg_code, sizeof(pdt_name),
                                       pdt_name));
-                if (op->subpg_code_set)
+                if (op->subpg_code_given)
                     list_page_codes(op->pg_code, 0, op->subpg_code);
                 else
                     list_page_codes(op->pg_code, 0, -1);
@@ -1051,7 +1063,7 @@ main(int argc, char * argv[])
                inq_out.vendor, inq_out.product, inq_out.revision,
                sg_get_pdt_str(inq_pdt, sizeof(pdt_name), pdt_name), inq_pdt);
     if (op->do_list) {
-        if (op->subpg_code_set)
+        if (op->subpg_code_given)
             list_page_codes(inq_pdt, inq_byte6, op->subpg_code);
         else
             list_page_codes(inq_pdt, inq_byte6, -1);
@@ -1167,14 +1179,14 @@ main(int argc, char * argv[])
             if (1 == op->do_raw)
                 dStrRaw((const char *)rsp_buff, md_len);
             else if (op->do_raw > 1) {
-                ucp = rsp_buff + bd_len + headerlen;
+                bp = rsp_buff + bd_len + headerlen;
                 md_len -= bd_len + headerlen;
-                spf = ((ucp[0] & 0x40) ? 1 : 0);
-                len = (spf ? (sg_get_unaligned_be16(ucp + 2) + 4) :
-                             (ucp[1] + 2));
+                spf = ((bp[0] & 0x40) ? 1 : 0);
+                len = (spf ? (sg_get_unaligned_be16(bp + 2) + 4) :
+                             (bp[1] + 2));
                 len = (len < md_len) ? len : md_len;
                 for (k = 0; k < len; ++k)
-                    printf("%02x\n", ucp[k]);
+                    printf("%02x\n", bp[k]);
             } else
                 dStrHex((const char *)rsp_buff, md_len, -1);
             goto finish;
@@ -1218,18 +1230,18 @@ main(int argc, char * argv[])
                 else
                     printf("> General mode parameter block descriptors:\n");
 
-                ucp = rsp_buff + headerlen;
+                bp = rsp_buff + headerlen;
                 while (num > 0) {
                     printf("   Density code=0x%x\n",
-                           *(ucp + density_code_off));
-                    dStrHex((const char *)ucp, len, 1);
-                    ucp += len;
+                           *(bp + density_code_off));
+                    dStrHex((const char *)bp, len, 1);
+                    bp += len;
                     num -= len;
                 }
                 printf("\n");
             }
         }
-        ucp = rsp_buff + bd_len + headerlen;    /* start of mode page(s) */
+        bp = rsp_buff + bd_len + headerlen;    /* start of mode page(s) */
         md_len -= bd_len + headerlen;           /* length of mode page(s) */
         num_ua_pages = 0;
         for (k = 0; md_len > 0; ++k) { /* got mode page(s) */
@@ -1239,10 +1251,10 @@ main(int argc, char * argv[])
                         "ignore\n");
                 break;
             }
-            uc = *ucp;
+            uc = *bp;
             spf = ((uc & 0x40) ? 1 : 0);
-            len = (spf ? (sg_get_unaligned_be16(ucp + 2) + 4) : (ucp[1] + 2));
-            page_num = ucp[0] & PG_CODE_MASK;
+            len = (spf ? (sg_get_unaligned_be16(bp + 2) + 4) : (bp[1] + 2));
+            page_num = bp[0] & PG_CODE_MASK;
             if (0x0 == page_num) {
                 ++num_ua_pages;
                 if((num_ua_pages > 3) && (md_len > 0xa00)) {
@@ -1255,23 +1267,23 @@ main(int argc, char * argv[])
             if (op->do_hex) {
                 if (spf)
                     printf(">> page_code=0x%x, subpage_code=0x%x, page_cont"
-                           "rol=%d\n", page_num, ucp[1], op->page_control);
+                           "rol=%d\n", page_num, bp[1], op->page_control);
                 else
                     printf(">> page_code=0x%x, page_control=%d\n", page_num,
                            op->page_control);
             } else {
                 descp = NULL;
                 if ((0x18 == page_num) || (0x19 == page_num)) {
-                    t_proto = (spf ? ucp[5] : ucp[2]) & 0xf;
-                    descp = find_page_code_desc(page_num, (spf ? ucp[1] : 0),
+                    t_proto = (spf ? bp[5] : bp[2]) & 0xf;
+                    descp = find_page_code_desc(page_num, (spf ? bp[1] : 0),
                                                 inq_pdt, inq_byte6, t_proto);
                 } else
-                    descp = find_page_code_desc(page_num, (spf ? ucp[1] : 0),
+                    descp = find_page_code_desc(page_num, (spf ? bp[1] : 0),
                                                 inq_pdt, inq_byte6, -1);
                 if (NULL == descp) {
                     if (spf)
                         snprintf(ebuff, EBUFF_SZ, "0x%x, subpage_code: 0x%x",
-                                 page_num, ucp[1]);
+                                 page_num, bp[1]);
                     else
                         snprintf(ebuff, EBUFF_SZ, "0x%x", page_num);
                 }
@@ -1288,8 +1300,8 @@ main(int argc, char * argv[])
                 pr2serr(">>> page length (%d) > 256 bytes, unlikely trim\n"
                         "    Try '-f' option\n", len);
             }
-            dStrHex((const char *)ucp, num , 1);
-            ucp += len;
+            dStrHex((const char *)bp, num , 1);
+            bp += len;
             md_len -= len;
         }
     }
