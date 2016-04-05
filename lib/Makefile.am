@@ -37,7 +37,7 @@ endif
 ## CC = gcc
 ## CC = g++
 ## CC = clang
-## CC = clang++-3.7
+## CC = clang++
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu89 (gnu90 is the same)
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
@@ -45,7 +45,7 @@ AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET
 AM_CFLAGS = -Wall -W
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
-# AM_CFLAGS = -Wall -W -pedantic -std=c++14 --analyze
+# AM_CFLAGS = -Wall -W -pedantic -std=c++14
 
 lib_LTLIBRARIES = libsgutils2.la
 

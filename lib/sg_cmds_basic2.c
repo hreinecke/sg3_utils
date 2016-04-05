@@ -68,7 +68,7 @@
 #define INQUIRY_RESP_INITIAL_LEN 36
 
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

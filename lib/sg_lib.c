@@ -50,7 +50,7 @@
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else
@@ -70,7 +70,7 @@ pr2ws(const char * fmt, ...)
     return n;
 }
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
                        __attribute__ ((format (printf, 3, 4)));
 #else

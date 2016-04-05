@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2015 D. Gilbert
+ *  Copyright (C) 1999-2016 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.60 20151219";
+static const char * version_str = "0.61 20160405";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -63,7 +63,7 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2serr(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else

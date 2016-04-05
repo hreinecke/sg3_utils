@@ -26,7 +26,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.09 20160403";
+static const char * version_str = "1.10 20160405";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -371,7 +371,7 @@ write2wfn(FILE * fp, struct opts_t * optsp)
                 s = fwrite(b, 1, n + 1, fp);
                 if ((int)s != (n + 1))
                     pr2serr("only able to write %d of %d bytes to %s\n",
-                            (int)s, n + 1);
+                            (int)s, n + 1, optsp->wfname);
                 n = 0;
             }
         }
@@ -380,7 +380,7 @@ write2wfn(FILE * fp, struct opts_t * optsp)
             s = fwrite(b, 1, n + 1, fp);
             if ((int)s != (n + 1))
                 pr2serr("only able to write %d of %d bytes to %s\n", (int)s,
-                        n + 1);
+                        n + 1, optsp->wfname);
         }
     } else {
         s = fwrite(optsp->sense, 1, optsp->sense_len, fp);

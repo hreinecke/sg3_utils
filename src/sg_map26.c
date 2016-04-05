@@ -124,7 +124,7 @@ static const char * nt_names[] = {
         "directory",
 };
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 static int pr2serr(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
 #else
