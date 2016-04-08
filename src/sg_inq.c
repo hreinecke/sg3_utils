@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.57 20160208";    /* SPC-5 rev 08 */
+static const char * version_str = "1.58 20160407";    /* SPC-5 rev 08 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1032,17 +1032,18 @@ static int
 encode_whitespaces(unsigned char *str, int inlen)
 {
     int k, res;
-    int j = 0;
-    int valid = 0;
+    int j;
+    bool valid = false;
     int outlen = inlen, zeroes = 0;
 
     /* Skip initial whitespaces */
-    while (isblank(str[j]))
-        j++;
-    /* Skip possible unicode prefix characters */
-    while (str[j] < 0x20)
-        j++;
-
+    for (j = 0; (j < inlen) && isblank(str[j]); ++j)
+        ;
+    if (j < inlen) {
+        /* Skip possible unicode prefix characters */
+        for ( ; (j < inlen) && (str[j] < 0x20); ++j)
+            ;
+    }
     k = j;
     /* Strip trailing whitespaces */
     while ((outlen > k) &&
@@ -1069,7 +1070,7 @@ encode_whitespaces(unsigned char *str, int inlen)
             zeroes = 0;
         } else {
             str[res++] = str[k];
-            valid++;
+            valid = true;
             zeroes = 0;
         }
     }
