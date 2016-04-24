@@ -1055,7 +1055,7 @@ encode_whitespaces(unsigned char *str, int inlen)
         if (isblank(str[k])) {
             if ((res > 0) && ('_' != str[res - 1])) {
                 str[res++] = '_';
-                valid++;
+                valid = true;
             }
             zeroes = 0;
         } else if (! isprint(str[k])) {
