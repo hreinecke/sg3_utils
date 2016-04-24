@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2012 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,7 +56,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.04 20120319";
+static const char * version_str = "1.05 20160423";
 
 
 #if 0
@@ -112,7 +112,7 @@ int main(int argc, char * argv[])
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
-    const unsigned char * ucp = NULL;
+    const unsigned char * bp = NULL;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp(argv[k], "-v"))
@@ -189,9 +189,9 @@ int main(int argc, char * argv[])
     case SG_LIB_CAT_RECOVERED:  /* sat-r09 (latest) uses this sk */
     case SG_LIB_CAT_NO_SENSE:   /* earlier SAT drafts used this */
         /* XXX: Until the spec decides which one to go with. 20060607 */
-        ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_ATA_RETURN_DESC);
-        if (NULL == ucp) {
+        bp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
+                                     SAT_ATA_RETURN_DESC);
+        if (NULL == bp) {
             if (verbose > 1)
                 printf("ATA Return Descriptor expected in sense but not "
                        "found\n");
@@ -199,33 +199,33 @@ int main(int argc, char * argv[])
         } else if (verbose)
             sg_chk_n_print3("ATA Return Descriptor, as expected",
                              &io_hdr, 1);
-        if (ucp && ucp[3]) {
-            if (ucp[3] & 0x4)
+        if (bp && bp[3]) {
+            if (bp[3] & 0x4)
                 printf("error in returned FIS: aborted command\n");
             else
-                printf("error=0x%x, status=0x%x\n", ucp[3], ucp[13]);
+                printf("error=0x%x, status=0x%x\n", bp[3], bp[13]);
         }
         break;
     default:
         fprintf(stderr, "unexpected SCSI sense category\n");
-        ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_ATA_RETURN_DESC);
-        if (NULL == ucp)
+        bp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
+                                     SAT_ATA_RETURN_DESC);
+        if (NULL == bp)
             sg_chk_n_print3("ATA_16 command error", &io_hdr, 1);
         else if (verbose)
             sg_chk_n_print3("ATA Return Descriptor, as expected",
                              &io_hdr, 1);
-        if (ucp && ucp[3]) {
-            if (ucp[3] & 0x4)
+        if (bp && bp[3]) {
+            if (bp[3] & 0x4)
                 printf("error in returned FIS: aborted command\n");
             else
-                printf("error=0x%x, status=0x%x\n", ucp[3], ucp[13]);
+                printf("error=0x%x, status=0x%x\n", bp[3], bp[13]);
         }
         break;
     }
 
-    if (ucp) {
-        switch (ucp[5]) {       /* sector_count (7:0) */
+    if (bp) {
+        switch (bp[5]) {       /* sector_count (7:0) */
         case 0xff:
             printf("In active mode or idle mode\n");
             break;
@@ -242,7 +242,7 @@ int main(int argc, char * argv[])
             printf("In standby mode\n");
             break;
         default:
-            printf("unknown power mode (sector count) value=0x%x\n", ucp[5]);
+            printf("unknown power mode (sector count) value=0x%x\n", bp[5]);
             break;
         }
     } else

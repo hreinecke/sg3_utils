@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.03 20070719";
+static char * version_str = "1.04 20160423";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -117,7 +117,7 @@ int main(int argc, char * argv[])
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
-    const unsigned char * ucp = NULL;
+    const unsigned char * bp = NULL;
 
     memset(device_name, 0, sizeof(device_name));
     while (1) {
@@ -241,36 +241,36 @@ int main(int argc, char * argv[])
         break;
     case SG_LIB_CAT_RECOVERED:  /* sat-r09 uses this sk */
     case SG_LIB_CAT_NO_SENSE:   /* earlier SAT drafts used this */
-        ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_ATA_RETURN_DESC);
-        if (NULL == ucp) {
+        bp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
+                                     SAT_ATA_RETURN_DESC);
+        if (NULL == bp) {
             if (verbose > 1)
                 printf("ATA Return Descriptor expected in sense but not "
                        "found\n");
             sg_chk_n_print3("ATA_16 command error", &io_hdr, 1);
         } else if (verbose)
             sg_chk_n_print3("ATA Return Descriptor", &io_hdr, 1);
-        if (ucp && ucp[3]) {
-            if (ucp[3] & 0x4)
+        if (bp && bp[3]) {
+            if (bp[3] & 0x4)
                 printf("error in returned FIS: aborted command\n");
             else
-                printf("error=0x%x, status=0x%x\n", ucp[3], ucp[13]);
+                printf("error=0x%x, status=0x%x\n", bp[3], bp[13]);
         }
         break;
     default:
         fprintf(stderr, "unexpected SCSI sense category\n");
-        ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_ATA_RETURN_DESC);
-        if (NULL == ucp)
+        bp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
+                                     SAT_ATA_RETURN_DESC);
+        if (NULL == bp)
             sg_chk_n_print3("ATA_16 command error", &io_hdr, 1);
         else if (verbose)
             sg_chk_n_print3("ATA Return Descriptor, as expected",
                              &io_hdr, 1);
-        if (ucp && ucp[3]) {
-            if (ucp[3] & 0x4)
+        if (bp && bp[3]) {
+            if (bp[3] & 0x4)
                 printf("error in returned FIS: aborted command\n");
             else
-                printf("error=0x%x, status=0x%x\n", ucp[3], ucp[13]);
+                printf("error=0x%x, status=0x%x\n", bp[3], bp[13]);
         }
         break;
     }

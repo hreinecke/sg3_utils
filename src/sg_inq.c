@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.58 20160407";    /* SPC-5 rev 08 */
+static const char * version_str = "1.58 20160423";    /* SPC-5 rev 08 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -124,7 +124,7 @@ static char usn_buff[MX_ALLOC_LEN + 1];
 static const char * find_version_descriptor_str(int value);
 static void decode_dev_ids(const char * leadin, unsigned char * buff,
                            int len, int do_hex, int verbose);
-static void decode_transport_id(const char * leadin, unsigned char * ucp,
+static void decode_transport_id(const char * leadin, unsigned char * bp,
                                 int len);
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
@@ -1240,7 +1240,7 @@ static void
 decode_ascii_inf(unsigned char * buff, int len, int do_hex)
 {
     int al, k, bump;
-    unsigned char * ucp;
+    unsigned char * bp;
     unsigned char * p;
 
     if (do_hex) {
@@ -1256,19 +1256,19 @@ decode_ascii_inf(unsigned char * buff, int len, int do_hex)
     al = buff[4];
     if ((al + 5) > len)
         al = len - 5;
-    for (k = 0, ucp = buff + 5; k < al; k += bump, ucp += bump) {
-        p = (unsigned char *)memchr(ucp, 0, al - k);
+    for (k = 0, bp = buff + 5; k < al; k += bump, bp += bump) {
+        p = (unsigned char *)memchr(bp, 0, al - k);
         if (! p) {
-            printf("  %.*s\n", al - k, (const char *)ucp);
+            printf("  %.*s\n", al - k, (const char *)bp);
             break;
         }
-        printf("  %s\n", (const char *)ucp);
-        bump = (p - ucp) + 1;
+        printf("  %s\n", (const char *)bp);
+        bump = (p - bp) + 1;
     }
-    ucp = buff + 5 + al;
-    if (ucp < (buff + len)) {
+    bp = buff + 5 + al;
+    if (bp < (buff + len)) {
         printf("Vendor specific information in hex:\n");
-        dStrHex((const char *)ucp, len - (al + 5), 0);
+        dStrHex((const char *)bp, len - (al + 5), 0);
     }
 }
 
@@ -1313,7 +1313,7 @@ static void
 decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump, na_len;
-    unsigned char * ucp;
+    unsigned char * bp;
 
     if (len < 4) {
         pr2serr("Management network addresses VPD page length too short=%d\n",
@@ -1325,12 +1325,12 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     len -= 4;
-    ucp = buff + 4;
-    for (k = 0; k < len; k += bump, ucp += bump) {
+    bp = buff + 4;
+    for (k = 0; k < len; k += bump, bp += bump) {
         printf("  %s, Service type: %s\n",
-               assoc_arr[(ucp[0] >> 5) & 0x3],
-               network_service_type_arr[ucp[0] & 0x1f]);
-        na_len = sg_get_unaligned_be16(ucp + 2);
+               assoc_arr[(bp[0] >> 5) & 0x3],
+               network_service_type_arr[bp[0] & 0x1f]);
+        na_len = sg_get_unaligned_be16(bp + 2);
         bump = 4 + na_len;
         if ((k + bump) > len) {
             pr2serr("Management network addresses VPD page, short "
@@ -1340,9 +1340,9 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         if (na_len > 0) {
             if (do_hex) {
                 printf("    Network address:\n");
-                dStrHex((const char *)(ucp + 4), na_len, 0);
+                dStrHex((const char *)(bp + 4), na_len, 0);
             } else
-                printf("    %s\n", ucp + 4);
+                printf("    %s\n", bp + 4);
         }
     }
 }
@@ -1360,7 +1360,7 @@ static void
 decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 {
     int k, bump;
-    unsigned char * ucp;
+    unsigned char * bp;
 
     if (len < 4) {
         pr2serr("Mode page policy VPD page length too short=%d\n", len);
@@ -1371,8 +1371,8 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     len -= 4;
-    ucp = buff + 4;
-    for (k = 0; k < len; k += bump, ucp += bump) {
+    bp = buff + 4;
+    for (k = 0; k < len; k += bump, bp += bump) {
         bump = 4;
         if ((k + bump) > len) {
             pr2serr("Mode page policy VPD page, short "
@@ -1380,15 +1380,15 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
             return;
         }
         if (do_hex)
-            dStrHex((const char *)ucp, 4, (1 == do_hex) ? 1 : -1);
+            dStrHex((const char *)bp, 4, (1 == do_hex) ? 1 : -1);
         else {
-            printf("  Policy page code: 0x%x", (ucp[0] & 0x3f));
-            if (ucp[1])
-                printf(",  subpage code: 0x%x\n", ucp[1]);
+            printf("  Policy page code: 0x%x", (bp[0] & 0x3f));
+            if (bp[1])
+                printf(",  subpage code: 0x%x\n", bp[1]);
             else
                 printf("\n");
-            printf("    MLUS=%d,  Policy: %s\n", !!(ucp[2] & 0x80),
-                   mode_page_policy_arr[ucp[2] & 0x3]);
+            printf("    MLUS=%d,  Policy: %s\n", !!(bp[2] & 0x80),
+                   mode_page_policy_arr[bp[2] & 0x3]);
         }
     }
 }
@@ -1398,7 +1398,7 @@ static void
 decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
-    unsigned char * ucp;
+    unsigned char * bp;
 
     if (len < 4) {
         pr2serr("SCSI Ports VPD page length too short=%d\n", len);
@@ -1409,11 +1409,11 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         return;
     }
     len -= 4;
-    ucp = buff + 4;
-    for (k = 0; k < len; k += bump, ucp += bump) {
-        rel_port = sg_get_unaligned_be16(ucp + 2);
+    bp = buff + 4;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        rel_port = sg_get_unaligned_be16(bp + 2);
         printf("Relative port=%d\n", rel_port);
-        ip_tid_len = sg_get_unaligned_be16(ucp + 6);
+        ip_tid_len = sg_get_unaligned_be16(bp + 6);
         bump = 8 + ip_tid_len;
         if ((k + bump) > len) {
             pr2serr("SCSI Ports VPD page, short descriptor "
@@ -1423,12 +1423,12 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         if (ip_tid_len > 0) {
             if (do_hex) {
                 printf(" Initiator port transport id:\n");
-                dStrHex((const char *)(ucp + 8), ip_tid_len,
+                dStrHex((const char *)(bp + 8), ip_tid_len,
                         (1 == do_hex) ? 1 : -1);
             } else
-                decode_transport_id(" ", ucp + 8, ip_tid_len);
+                decode_transport_id(" ", bp + 8, ip_tid_len);
         }
-        tpd_len = sg_get_unaligned_be16(ucp + bump + 2);
+        tpd_len = sg_get_unaligned_be16(bp + bump + 2);
         if ((k + bump + tpd_len + 4) > len) {
             pr2serr("SCSI Ports VPD page, short descriptor(tgt) "
                     "length=%d, left=%d\n", bump, (len - k));
@@ -1437,10 +1437,10 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         if (tpd_len > 0) {
             printf(" Target port descriptor(s):\n");
             if (do_hex)
-                dStrHex((const char *)(ucp + bump + 4), tpd_len,
+                dStrHex((const char *)(bp + bump + 4), tpd_len,
                         (1 == do_hex) ? 1 : -1);
             else
-                decode_dev_ids("SCSI Ports", ucp + bump + 4, tpd_len,
+                decode_dev_ids("SCSI Ports", bp + bump + 4, tpd_len,
                                do_hex, verbose);
         }
         bump += tpd_len + 4;
@@ -1456,7 +1456,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
     int off, ci_off, c_id, d_id, naa, vsi, k;
     uint64_t vsei;
     uint64_t id_ext;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     const unsigned char * ip;
     char b[64];
     const char * cp;
@@ -1473,7 +1473,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
          * nibbles of the 6-byte OUI for EMC, that is, 0x006048.
          */
         i_len = len;
-        ip = ucp = buff;
+        ip = bp = buff;
         c_set = 1;
         assoc = 0;
         piv = 0;
@@ -1488,8 +1488,8 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
     for (j = 1, off = -1;
          (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
          ++j) {
-        ucp = buff + off;
-        i_len = ucp[3];
+        bp = buff + off;
+        i_len = bp[3];
         id_len = i_len + 4;
         printf("  Designation descriptor number %d, "
                "descriptor length: %d\n", j, id_len);
@@ -1499,12 +1499,12 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                     (len - off));
             return;
         }
-        ip = ucp + 4;
-        p_id = ((ucp[0] >> 4) & 0xf);   /* protocol identifier */
-        c_set = (ucp[0] & 0xf);         /* code set */
-        piv = ((ucp[1] & 0x80) ? 1 : 0); /* protocol identifier valid */
-        assoc = ((ucp[1] >> 4) & 0x3);
-        desig_type = (ucp[1] & 0xf);
+        ip = bp + 4;
+        p_id = ((bp[0] >> 4) & 0xf);   /* protocol identifier */
+        c_set = (bp[0] & 0xf);         /* code set */
+        piv = ((bp[1] & 0x80) ? 1 : 0); /* protocol identifier valid */
+        assoc = ((bp[1] >> 4) & 0x3);
+        desig_type = (bp[1] & 0xf);
   decode:
         if (piv && ((1 == assoc) || (2 == assoc)))
             printf("    transport: %s\n",
@@ -1517,7 +1517,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
         printf("    associated with the %s\n", cp ? cp : "-");
         if (do_hex) {
             printf("    designator header(hex): %.2x %.2x %.2x %.2x\n",
-                   ucp[0], ucp[1], ucp[2], ucp[3]);
+                   bp[0], bp[1], bp[2], bp[3]);
             printf("    designator:\n");
             dStrHex((const char *)ip, i_len, 0);
             continue;
@@ -1792,7 +1792,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
 {
     int u, j, m, id_len, c_set, assoc, desig_type, i_len;
     int off, d_id, naa, k, p_id;
-    unsigned char * ucp;
+    unsigned char * bp;
     unsigned char * ip;
     const char * assoc_str;
 
@@ -1814,8 +1814,8 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
     for (j = 1, off = -1;
          (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
          ++j) {
-        ucp = buff + off;
-        i_len = ucp[3];
+        bp = buff + off;
+        i_len = bp[3];
         id_len = i_len + 4;
         if ((off + id_len) > len) {
             if (verbose)
@@ -1824,11 +1824,11 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                         "length=%d\n", (len - off));
             return;
         }
-        ip = ucp + 4;
-        p_id = ((ucp[0] >> 4) & 0xf);   /* protocol identifier */
-        c_set = (ucp[0] & 0xf);
-        assoc = ((ucp[1] >> 4) & 0x3);
-        desig_type = (ucp[1] & 0xf);
+        ip = bp + 4;
+        p_id = ((bp[0] >> 4) & 0xf);   /* protocol identifier */
+        c_set = (bp[0] & 0xf);
+        assoc = ((bp[1] >> 4) & 0x3);
+        desig_type = (bp[1] & 0xf);
   decode:
         switch (assoc) {
             case 0:
@@ -2122,43 +2122,43 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
 /* Transport IDs are initiator port identifiers, typically other than the
    initiator port issuing a SCSI command. */
 static void
-decode_transport_id(const char * leadin, unsigned char * ucp, int len)
+decode_transport_id(const char * leadin, unsigned char * bp, int len)
 {
     int format_code, proto_id, num, k;
     uint64_t ull;
     int bump;
 
-    for (k = 0, bump = 24; k < len; k += bump, ucp += bump) {
+    for (k = 0, bump = 24; k < len; k += bump, bp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
                    "[length=%d]:\n", leadin, len);
         else
             printf("%sTransport Id of initiator:\n", leadin);
-        format_code = ((ucp[0] >> 6) & 0x3);
-        proto_id = (ucp[0] & 0xf);
+        format_code = ((bp[0] >> 6) & 0x3);
+        proto_id = (bp[0] & 0xf);
         switch (proto_id) {
         case TPROTO_FCP:
             printf("%s  FCP-2 World Wide Name:\n", leadin);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, -1);
+            dStrHex((const char *)&bp[8], 8, -1);
             bump = 24;
             break;
         case TPROTO_SPI:
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
-                   leadin, sg_get_unaligned_be16(ucp + 2));
+                   leadin, sg_get_unaligned_be16(bp + 2));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin, sg_get_unaligned_be16(ucp + 6));
+                   "0x%x\n", leadin, sg_get_unaligned_be16(bp + 6));
             bump = 24;
             break;
         case TPROTO_SSA: /* SSA */
             printf("%s  SSA (transport id not defined):\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             bump = 24;
             break;
         case TPROTO_1394:
@@ -2166,7 +2166,7 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, -1);
+            dStrHex((const char *)&bp[8], 8, -1);
             bump = 24;
             break;
         case TPROTO_SRP:
@@ -2174,24 +2174,24 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 16, -1);
+            dStrHex((const char *)&bp[8], 16, -1);
             bump = 24;
             break;
         case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
-            num = sg_get_unaligned_be16(ucp + 2);
+            num = sg_get_unaligned_be16(bp + 2);
             if (0 == format_code)
-                printf("name: %.*s\n", num, &ucp[4]);
+                printf("name: %.*s\n", num, &bp[4]);
             else if (1 == format_code)
-                printf("world wide unique port id: %.*s\n", num, &ucp[4]);
+                printf("world wide unique port id: %.*s\n", num, &bp[4]);
             else {
                 printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)ucp, num + 4, -1);
+                dStrHex((const char *)bp, num + 4, -1);
             }
             bump = (((num + 4) < 24) ? 24 : num + 4);
             break;
         case TPROTO_SAS:
-            ull = sg_get_unaligned_be64(ucp + 4);
+            ull = sg_get_unaligned_be64(bp + 4);
             printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
@@ -2201,41 +2201,41 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len)
         case TPROTO_ADT:
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             bump = 24;
             break;
         case TPROTO_ATA:
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             bump = 24;
             break;
         case TPROTO_UAS:
             printf("%s  UAS:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             bump = 24;
             break;
         case TPROTO_SOP:
             printf("%s  SOP ", leadin);
-            num = sg_get_unaligned_be16(ucp + 2);
+            num = sg_get_unaligned_be16(bp + 2);
             if (0 == format_code)
                 printf("Routing ID: 0x%x\n", num);
             else {
                 printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)ucp, 24, -1);
+                dStrHex((const char *)bp, 24, -1);
             }
             bump = 24;
             break;
         case TPROTO_NONE:
             pr2serr("%s  No specified protocol\n", leadin);
-            /* dStrHexErr((const char *)ucp, ((len > 24) ? 24 : len), 0); */
+            /* dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), 0); */
             bump = 24;
             break;
         default:
             pr2serr("%s  unknown protocol id=0x%x  "
                     "format_code=%d\n", leadin, proto_id, format_code);
-            dStrHexErr((const char *)ucp, ((len > 24) ? 24 : len), 0);
+            dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), 0);
             bump = 24;
             break;
         }

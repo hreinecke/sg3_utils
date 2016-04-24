@@ -64,7 +64,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.53 20160201";
+static const char * version_str = "0.54 20160423";
 
 #define ME "sg_xcopy: "
 
@@ -992,11 +992,11 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
 }
 
 static void
-decode_designation_descriptor(const unsigned char * ucp, int i_len)
+decode_designation_descriptor(const unsigned char * bp, int i_len)
 {
     char c[2048];
 
-    sg_get_designation_descriptor_str(NULL, ucp, i_len, 1, verbose,
+    sg_get_designation_descriptor_str(NULL, bp, i_len, 1, verbose,
                                       sizeof(c), c);
     pr2serr("%s", c);
 }
@@ -1006,7 +1006,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
                  unsigned int block_size, int pad)
 {
     int res, verb;
-    unsigned char rcBuff[256], *ucp, *best = NULL;
+    unsigned char rcBuff[256], *bp, *best = NULL;
     unsigned int len = 254;
     int off = -1, u, i_len, best_len = 0, assoc, desig, f_desig = 0;
     char b[80];
@@ -1044,16 +1044,16 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
 
     while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) ==
            0) {
-        ucp = rcBuff + 4 + off;
-        i_len = ucp[3];
+        bp = rcBuff + 4 + off;
+        i_len = bp[3];
         if (((unsigned int)off + i_len + 4) > len) {
             pr2serr("    VPD page error: designator length %d longer "
                     "than\n     remaining response length=%d\n", i_len,
                     (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
-        assoc = ((ucp[1] >> 4) & 0x3);
-        desig = (ucp[1] & 0xf);
+        assoc = ((bp[1] >> 4) & 0x3);
+        desig = (bp[1] & 0xf);
         if (verbose > 2)
             pr2serr("    Desc %d: assoc %u desig %u len %d\n", off, assoc,
                     desig, i_len);
@@ -1061,25 +1061,25 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         if (i_len > 16)
             continue;
         if (desig == 3) {
-            best = ucp;
+            best = bp;
             best_len = i_len;
             break;
         }
         if (desig == 2) {
             if (!best || f_desig < 2) {
-                best = ucp;
+                best = bp;
                 best_len = i_len;
                 f_desig = 2;
             }
         } else if (desig == 1) {
             if (!best || f_desig == 0) {
-                best = ucp;
+                best = bp;
                 best_len = i_len;
                 f_desig = desig;
             }
         } else if (desig == 0) {
             if (!best) {
-                best = ucp;
+                best = bp;
                 best_len = i_len;
                 f_desig = desig;
             }

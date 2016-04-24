@@ -8,6 +8,8 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

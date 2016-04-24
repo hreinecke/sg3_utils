@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.11 20151219";
+static const char * version_str = "1.12 20160423";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -62,7 +62,7 @@ int main(int argc, char * argv[])
 {
     int sg_fd, res, c, sn_len, n;
     unsigned char rmsn_buff[4];
-    unsigned char * ucp = NULL;
+    unsigned char * bp = NULL;
     int raw = 0;
     int readonly = 0;
     int verbose = 0;
@@ -150,23 +150,23 @@ int main(int argc, char * argv[])
             goto err_out;
         }
         sn_len += 4;
-        ucp = (unsigned char *)malloc(sn_len);
-        if (NULL == ucp) {
+        bp = (unsigned char *)malloc(sn_len);
+        if (NULL == bp) {
             pr2serr("    Out of memory (ram)\n");
             goto err_out;
         }
-        res = sg_ll_read_media_serial_num(sg_fd, ucp, sn_len, 1, verbose);
+        res = sg_ll_read_media_serial_num(sg_fd, bp, sn_len, 1, verbose);
         if (0 == res) {
-            sn_len = sg_get_unaligned_be32(ucp + 0);
+            sn_len = sg_get_unaligned_be32(bp + 0);
             if (raw) {
                 if (sn_len > 0) {
-                    n = fwrite(ucp + 4, 1, sn_len, stdout);
+                    n = fwrite(bp + 4, 1, sn_len, stdout);
                     if (n) { ; }  /* unused, dummy to suppress warning */
                 }
             } else {
                 printf("Serial number:\n");
                 if (sn_len > 0)
-                    dStrHex((const char *)ucp + 4, sn_len, 0);
+                    dStrHex((const char *)bp + 4, sn_len, 0);
             }
         }
     }
@@ -180,8 +180,8 @@ int main(int argc, char * argv[])
     }
 
 err_out:
-    if (ucp)
-        free(ucp);
+    if (bp)
+        free(bp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));

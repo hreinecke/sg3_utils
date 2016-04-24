@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.52 20160201";
+static const char * version_str = "0.53 20160423";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -241,7 +241,7 @@ usage(int help)
  * element that is MX_TID_LEN bytes long (and the 'len' argument is
  * ignored). */
 static void
-decode_transport_id(const char * leadin, unsigned char * ucp, int len,
+decode_transport_id(const char * leadin, unsigned char * bp, int len,
                     int num_tids)
 {
     int format_code, proto_id, num, k;
@@ -249,65 +249,65 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
 
     if (num_tids > 0)
         len = num_tids * MX_TID_LEN;
-    for (k = 0, bump = MX_TID_LEN; k < len; k += bump, ucp += bump) {
+    for (k = 0, bump = MX_TID_LEN; k < len; k += bump, bp += bump) {
         if ((len < 24) || (0 != (len % 4)))
             printf("%sTransport Id short or not multiple of 4 "
                    "[length=%d]:\n", leadin, len);
         else
             printf("%sTransport Id of initiator:\n", leadin);
-        format_code = ((ucp[0] >> 6) & 0x3);
-        proto_id = (ucp[0] & 0xf);
+        format_code = ((bp[0] >> 6) & 0x3);
+        proto_id = (bp[0] & 0xf);
         switch (proto_id) {
         case TPROTO_FCP: /* Fibre channel */
             printf("%s  FCP-2 World Wide Name:\n", leadin);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, -1);
+            dStrHex((const char *)&bp[8], 8, -1);
             break;
         case TPROTO_SPI: /* Parallel SCSI */
             printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
-                   leadin, sg_get_unaligned_be16(ucp + 2));
+                   leadin, sg_get_unaligned_be16(bp + 2));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
             printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin,  sg_get_unaligned_be16(ucp + 6));
+                   "0x%x\n", leadin,  sg_get_unaligned_be16(bp + 6));
             break;
         case TPROTO_SSA:
             printf("%s  SSA (transport id not defined):\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             break;
         case TPROTO_1394: /* IEEE 1394 */
             printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 8, -1);
+            dStrHex((const char *)&bp[8], 8, -1);
             break;
         case TPROTO_SRP:
             printf("%s  RDMA initiator port identifier:\n", leadin);
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
-            dStrHex((const char *)&ucp[8], 16, -1);
+            dStrHex((const char *)&bp[8], 16, -1);
             break;
         case TPROTO_ISCSI:
             printf("%s  iSCSI ", leadin);
-            num =  sg_get_unaligned_be16(ucp + 2);
+            num =  sg_get_unaligned_be16(bp + 2);
             if (0 == format_code)
-                printf("name: %.*s\n", num, &ucp[4]);
+                printf("name: %.*s\n", num, &bp[4]);
             else if (1 == format_code)
-                printf("name and session id: %.*s\n", num, &ucp[4]);
+                printf("name and session id: %.*s\n", num, &bp[4]);
             else {
                 printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)ucp, num + 4, -1);
+                dStrHex((const char *)bp, num + 4, -1);
             }
             break;
         case TPROTO_SAS:
             printf("%s  SAS address: 0x%016" PRIx64 "\n", leadin,
-                   sg_get_unaligned_be64(ucp + 4));
+                   sg_get_unaligned_be64(bp + 4));
             if (0 != format_code)
                 printf("%s  [Unexpected format code: %d]\n", leadin,
                        format_code);
@@ -315,36 +315,36 @@ decode_transport_id(const char * leadin, unsigned char * ucp, int len,
         case TPROTO_ADT:
             printf("%s  ADT:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             break;
         case TPROTO_ATA:
             printf("%s  ATAPI:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             break;
         case TPROTO_UAS:
             printf("%s  UAS:\n", leadin);
             printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             break;
         case TPROTO_SOP:
             printf("%s  SOP ", leadin);
-            num =  sg_get_unaligned_be16(ucp + 2);
+            num =  sg_get_unaligned_be16(bp + 2);
             if (0 == format_code)
                 printf("Routing ID: 0x%x\n", num);
             else {
                 printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)ucp, ((len > 24) ? 24 : len), -1);
+                dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
             }
             break;
         case TPROTO_NONE:
             pr2serr("%s  No specified protocol\n", leadin);
-            /* dStrHexErr((const char *)ucp, ((len > 24) ? 24 : len), -1); */
+            /* dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), -1); */
             break;
         default:
             pr2serr("%s  unknown protocol id=0x%x  format_code=%d\n",
                     leadin, proto_id, format_code);
-            dStrHexErr((const char *)ucp, ((len > 24) ? 24 : len), -1);
+            dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), -1);
             break;
         }
     }
@@ -355,7 +355,7 @@ prin_work(int sg_fd, const struct opts_t * op)
 {
     int k, j, num, res, add_len, add_desc_len;
     unsigned int pr_gen;
-    unsigned char * ucp;
+    unsigned char * bp;
     unsigned char pr_buff[MX_ALLOC_LEN];
 
     memset(pr_buff, 0, sizeof(pr_buff));
@@ -449,10 +449,10 @@ prin_work(int sg_fd, const struct opts_t * op)
                     printf("1 registered reservation key follows:\n");
                 else
                     printf("%d registered reservation keys follow:\n", num);
-                ucp = pr_buff + 8;
-                for (k = 0; k < num; ++k, ucp += 8)
+                bp = pr_buff + 8;
+                for (k = 0; k < num; ++k, bp += 8)
                     printf("    0x%" PRIx64 "\n",
-                           sg_get_unaligned_be64(ucp + 0));
+                           sg_get_unaligned_be64(bp + 0));
             } else
                 printf("there are NO registered reservation keys\n");
         } else if (PRIN_RRES_SA == op->prin_sa) {
@@ -460,49 +460,49 @@ prin_work(int sg_fd, const struct opts_t * op)
             num = add_len / 16;
             if (num > 0) {
                 printf("Reservation follows:\n");
-                ucp = pr_buff + 8;
-                printf("    Key=0x%" PRIx64 "\n", sg_get_unaligned_be64(ucp));
-                j = ((ucp[13] >> 4) & 0xf);
+                bp = pr_buff + 8;
+                printf("    Key=0x%" PRIx64 "\n", sg_get_unaligned_be64(bp));
+                j = ((bp[13] >> 4) & 0xf);
                 if (0 == j)
                     printf("    scope: LU_SCOPE, ");
                 else
                     printf("    scope: %d ", j);
-                j = (ucp[13] & 0xf);
+                j = (bp[13] & 0xf);
                 printf(" type: %s\n", pr_type_strs[j]);
             } else
                 printf("there is NO reservation held\n");
         } else if (PRIN_RFSTAT_SA == op->prin_sa) {
             printf("  PR generation=0x%x\n", pr_gen);
-            ucp = pr_buff + 8;
+            bp = pr_buff + 8;
             if (0 == add_len) {
                 printf("  No full status descriptors\n");
                 if (op->verbose)
                 printf("  So there are no registered IT nexuses\n");
             }
-            for (k = 0; k < add_len; k += num, ucp += num) {
-                add_desc_len = sg_get_unaligned_be32(ucp + 20);
+            for (k = 0; k < add_len; k += num, bp += num) {
+                add_desc_len = sg_get_unaligned_be32(bp + 20);
                 num = 24 + add_desc_len;
-                printf("    Key=0x%" PRIx64 "\n", sg_get_unaligned_be64(ucp));
-                if (ucp[12] & 0x2)
+                printf("    Key=0x%" PRIx64 "\n", sg_get_unaligned_be64(bp));
+                if (bp[12] & 0x2)
                     printf("      All target ports bit set\n");
                 else {
                     printf("      All target ports bit clear\n");
                     printf("      Relative port address: 0x%x\n",
-                           sg_get_unaligned_be16(ucp + 18));
+                           sg_get_unaligned_be16(bp + 18));
                 }
-                if (ucp[12] & 0x1) {
+                if (bp[12] & 0x1) {
                     printf("      << Reservation holder >>\n");
-                    j = ((ucp[13] >> 4) & 0xf);
+                    j = ((bp[13] >> 4) & 0xf);
                     if (0 == j)
                         printf("      scope: LU_SCOPE, ");
                     else
                         printf("      scope: %d ", j);
-                    j = (ucp[13] & 0xf);
+                    j = (bp[13] & 0xf);
                     printf(" type: %s\n", pr_type_strs[j]);
                 } else
                     printf("      not reservation holder\n");
                 if (add_desc_len > 0)
-                    decode_transport_id("      ", &ucp[24], add_desc_len, 0);
+                    decode_transport_id("      ", &bp[24], add_desc_len, 0);
             }
         }
     }
@@ -516,22 +516,22 @@ compact_transportid_array(struct opts_t * op)
 {
     int k, off, protocol_id, len;
     int compact_len = 0;
-    unsigned char * ucp = op->transportid_arr;
+    unsigned char * bp = op->transportid_arr;
 
     for (k = 0, off = 0; ((k < op->num_transportids) && (k < MX_TIDS));
          ++k, off += MX_TID_LEN) {
-        protocol_id = ucp[off] & 0xf;
+        protocol_id = bp[off] & 0xf;
         if (TPROTO_ISCSI == protocol_id) {
-            len = sg_get_unaligned_be16(ucp + off + 2) + 4;
+            len = sg_get_unaligned_be16(bp + off + 2) + 4;
             if (len < 24)
                 len = 24;
             if (off > compact_len)
-                memmove(ucp + compact_len, ucp + off, len);
+                memmove(bp + compact_len, bp + off, len);
             compact_len += len;
 
         } else {
             if (off > compact_len)
-                memmove(ucp + compact_len, ucp + off, 24);
+                memmove(bp + compact_len, bp + off, 24);
             compact_len += 24;
         }
     }

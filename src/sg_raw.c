@@ -29,8 +29,9 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_pr2serr.h"
+#include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.15 (2016-03-31)"
+#define SG_RAW_VERSION "0.4.16 (2016-04-15)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -261,10 +262,10 @@ process_cl(struct opts_t * op, int argc, char *argv[])
         char b[80];
 
         if (op->cdb_length > 16) {
-            sa = (op->cdb[8] << 8) + op->cdb[9];
-            if (0x7f != op->cdb[0])
+            sa = sg_get_unaligned_be16(op->cdb + 8);
+            if ((0x7f != op->cdb[0]) && (0x7e != op->cdb[0]))
                 printf(">>> Unlikely to be SCSI CDB since all over 16 "
-                       "bytes long should\n>>> start with 0x7f\n");
+                       "bytes long should\n>>> start with 0x7f or 0x7e\n");
         } else
             sa = op->cdb[1] & 0x1f;
         sg_get_opcode_sa_name(op->cdb[0], sa, 0, sizeof(b), b);

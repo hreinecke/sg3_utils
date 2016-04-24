@@ -2,7 +2,7 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,6 +20,8 @@
  * of 'verbose' send increasing amounts of (debug) output to
  * sg_warnings_strm.
  */
+
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

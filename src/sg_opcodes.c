@@ -29,7 +29,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.46 20160313";    /* spc5r08 */
+static const char * version_str = "0.47 20160423";    /* spc5r08 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -529,7 +529,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
 {
     int k, j, m, cd_len, serv_act, len, sa_v, opcode, res;
     unsigned int to;
-    unsigned char * ucp;
+    unsigned char * bp;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
     unsigned char ** sort_arr = NULL;
@@ -576,22 +576,22 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             return;
         }
         memset(sort_arr, 0, cd_len * sizeof(unsigned char *));
-        ucp = rsoc_buff + 4;
-        for (k = 0, j = 0; k < cd_len; ++j, k += len, ucp += len) {
-            sort_arr[j] = ucp;
-            len = (ucp[5] & 0x2) ? 20 : 8;
+        bp = rsoc_buff + 4;
+        for (k = 0, j = 0; k < cd_len; ++j, k += len, bp += len) {
+            sort_arr[j] = bp;
+            len = (bp[5] & 0x2) ? 20 : 8;
         }
         qsort(sort_arr, j, sizeof(unsigned char *),
               (op->do_alpha ? opcode_alpha_compare : opcode_num_compare));
     }
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
-        ucp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
-        len = (ucp[5] & 0x2) ? 20 : 8;
-        opcode = ucp[0];
-        sa_v = ucp[5] & 1;
+        bp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
+        len = (bp[5] & 0x2) ? 20 : 8;
+        opcode = bp[0];
+        sa_v = bp[5] & 1;
         serv_act = 0;
         if (sa_v) {
-            serv_act = sg_get_unaligned_be16(ucp + 2);
+            serv_act = sg_get_unaligned_be16(bp + 2);
             sg_get_opcode_sa_name(opcode, serv_act, peri_dtype, NAME_BUFF_SZ,
                                   name_buff);
             if (op->do_compact)
@@ -603,19 +603,19 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
-            if (ucp[5] & 0x2) {
+            if (bp[5] & 0x2) {
                 if (op->do_compact)
                     printf(" %.2x%c%.4s", opcode, (sa_v ? ',' : ' '),
                            sa_buff);
                 else
                     printf(" %.2x     %.4s       %3d", opcode, sa_buff,
-                           sg_get_unaligned_be16(ucp + 6));
-                to = sg_get_unaligned_be32(ucp + 12);
+                           sg_get_unaligned_be16(bp + 6));
+                to = sg_get_unaligned_be32(bp + 12);
                 if (0 == to)
                     printf("         -");
                 else
                     printf("  %8u", to);
-                to = sg_get_unaligned_be32(ucp + 16);
+                to = sg_get_unaligned_be32(bp + 16);
                 if (0 == to)
                     printf("          -");
                 else
@@ -628,14 +628,14 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                 else
                     printf(" %.2x     %.4s       %3d                         "
                            "%s\n", opcode, sa_buff,
-                           sg_get_unaligned_be16(ucp + 6), name_buff);
+                           sg_get_unaligned_be16(bp + 6), name_buff);
         } else
             if (op->do_compact)
-                printf(" %.2x%c%.4s   %s\n", ucp[0], (sa_v ? ',' : ' '),
+                printf(" %.2x%c%.4s   %s\n", bp[0], (sa_v ? ',' : ' '),
                        sa_buff, name_buff);
             else
-                printf(" %.2x     %.4s       %3d    %s\n", ucp[0], sa_buff,
-                       sg_get_unaligned_be16(ucp + 6), name_buff);
+                printf(" %.2x     %.4s       %3d    %s\n", bp[0], sa_buff,
+                       sg_get_unaligned_be16(bp + 6), name_buff);
         if (op->do_mask) {
             int cdb_sz;
             unsigned char b[64];
@@ -699,7 +699,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
 {
     int k;
     char name_buff[NAME_BUFF_SZ];
-    unsigned char * ucp;
+    unsigned char * bp;
     const char * cp;
     int v = 0;
 
@@ -736,14 +736,14 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
     printf("  Command %s\n", cp);
     if (v) {
         printf("  Usage data: ");
-        ucp = rsoc_buff + 4;
+        bp = rsoc_buff + 4;
         for (k = 0; k < cd_len; ++k)
-            printf("%.2x ", ucp[k]);
+            printf("%.2x ", bp[k]);
         printf("\n");
     }
     if (0x80 & rsoc_buff[1]) {      /* CTDP */
-        ucp = rsoc_buff + 4 + cd_len;
-        decode_cmd_to_descriptor(ucp, NAME_BUFF_SZ, name_buff);
+        bp = rsoc_buff + 4 + cd_len;
+        decode_cmd_to_descriptor(bp, NAME_BUFF_SZ, name_buff);
         printf("  %s\n", name_buff);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,7 +57,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.02 20070130";
+static char * version_str = "1.03 20160423";
 
 int main(int argc, char * argv[])
 {
@@ -77,7 +77,7 @@ int main(int argc, char * argv[])
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
-    const unsigned char * ucp = NULL;
+    const unsigned char * bp = NULL;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp(argv[k], "-v"))
@@ -158,17 +158,17 @@ int main(int argc, char * argv[])
         ok = 1;
         break;
     case SG_LIB_CAT_RECOVERED:
-        ucp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
-                                      SAT_ATA_RETURN_DESC);
-        if (NULL == ucp) {
+        bp = sg_scsi_sense_desc_find(sense_buffer, sizeof(sense_buffer),
+                                     SAT_ATA_RETURN_DESC);
+        if (NULL == bp) {
             if (verbose > 1)
                 printf("ATA Return Descriptor expected in sense but not "
                        "found\n");
             sg_chk_n_print3("ATA_16 command error", &io_hdr, 1);
         } else if (verbose)
             sg_chk_n_print3("ATA Return Descriptor", &io_hdr, 1);
-        if (ucp && ucp[3])
-            printf("error=0x%x, status=0x%x\n", ucp[3], ucp[13]);
+        if (bp && bp[3])
+            printf("error=0x%x, status=0x%x\n", bp[3], bp[13]);
         else
             ok = 1;
         break;
