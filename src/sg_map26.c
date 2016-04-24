@@ -27,6 +27,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <getopt.h>
 #include <dirent.h>
 #include <libgen.h>
@@ -40,7 +41,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.12 20160404";
+static const char * version_str = "1.13 20160423";
 
 #define ME "sg_map26: "
 
@@ -88,7 +89,7 @@ static const char * version_str = "1.12 20160404";
 #define ST_NBR_MODE_BITS 2
 #define ST_MODE_SHIFT (7 - ST_NBR_MODE_BITS)
 #define TAPE_NR(minor) ( (((minor) & ~255) >> (ST_NBR_MODE_BITS + 1)) | \
-    ((minor) & ~(-1 << ST_MODE_SHIFT)) )
+    ((minor) & ~(UINT_MAX << ST_MODE_SHIFT)) )
 
 static const char * sys_sg_dir = "/sys/class/scsi_generic/";
 static const char * sys_sd_dir = "/sys/block/";

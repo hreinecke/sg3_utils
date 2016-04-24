@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.16 (2016-04-15)"
+#define SG_RAW_VERSION "0.4.17 (2016-04-23)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -305,7 +305,8 @@ my_memalign(int length, unsigned char ** wrkBuffp, const struct opts_t * op)
         res = (unsigned char *)wp;
         if (op->verbose > 3)
             pr2serr("%s: posix, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
-                    __func__, length, *wrkBuffp, (int)psz, res);
+                    __func__, length, (void *)*wrkBuffp, (int)psz,
+                    (void *)res);
         return res;
     }
 #else
@@ -323,7 +324,8 @@ my_memalign(int length, unsigned char ** wrkBuffp, const struct opts_t * op)
                                 (~(psz - 1)));
         if (op->verbose > 3)
             pr2serr("%s: hack, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
-                    __func__, length, *wrkBuffp, (int)psz, res);
+                    __func__, length, (void *)*wrkBuffp, (int)psz,
+                    (void *)res);
         return res;
     }
 #endif
@@ -509,7 +511,7 @@ main(int argc, char *argv[])
     }
     set_scsi_pt_cdb(ptvp, op->cdb, op->cdb_length);
     if (op->verbose > 2)
-        pr2serr("sense_buffer=%p, length=%d\n", sense_buffer,
+        pr2serr("sense_buffer=%p, length=%d\n", (void *)sense_buffer,
                 (int)sizeof(sense_buffer));
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
@@ -520,8 +522,8 @@ main(int argc, char *argv[])
             goto done;
         }
         if (op->verbose > 2)
-            pr2serr("dxfer_buffer_out=%p, length=%d\n", dxfer_buffer_out,
-                    op->dataout_len);
+            pr2serr("dxfer_buffer_out=%p, length=%d\n",
+                    (void *)dxfer_buffer_out, op->dataout_len);
         set_scsi_pt_data_out(ptvp, dxfer_buffer_out, op->dataout_len);
     }
     if (op->do_datain) {
@@ -532,8 +534,8 @@ main(int argc, char *argv[])
             goto done;
         }
         if (op->verbose > 2)
-            pr2serr("dxfer_buffer_in=%p, length=%d\n", dxfer_buffer_in,
-                    op->datain_len);
+            pr2serr("dxfer_buffer_in=%p, length=%d\n",
+                    (void *)dxfer_buffer_in, op->datain_len);
         set_scsi_pt_data_in(ptvp, dxfer_buffer_in, op->datain_len);
     }
 
