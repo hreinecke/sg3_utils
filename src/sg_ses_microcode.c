@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 Douglas Gilbert.
+ * Copyright (c) 2014-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.03 20151219";    /* ses3r07 */
+static const char * version_str = "1.04 20160423";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -216,7 +216,7 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len,
                       uint32_t gen_code)
 {
     int k, num_subs, num;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     const char * cp;
 
     printf("Download microcode status diagnostic page:\n");
@@ -229,23 +229,23 @@ ses_download_code_sdg(const unsigned char * resp, int resp_len,
                 "is residual\n", num);
     printf("  number of secondary subenclosures: %d\n", num_subs);
     printf("  generation code: 0x%" PRIx32 "\n", gen_code);
-    ucp = resp + 8;
-    for (k = 0; k < num; ++k, ucp += 16) {
-        cp = (0 == ucp[1]) ? " [primary]" : "";
-        printf("   subenclosure identifier: %d%s\n", ucp[1], cp);
-        cp = get_mc_status_str(ucp[2]);
+    bp = resp + 8;
+    for (k = 0; k < num; ++k, bp += 16) {
+        cp = (0 == bp[1]) ? " [primary]" : "";
+        printf("   subenclosure identifier: %d%s\n", bp[1], cp);
+        cp = get_mc_status_str(bp[2]);
         if (strlen(cp) > 0) {
-            printf("     download microcode status: %s [0x%x]\n", cp, ucp[2]);
+            printf("     download microcode status: %s [0x%x]\n", cp, bp[2]);
             printf("     download microcode additional status: 0x%x\n",
-                   ucp[3]);
+                   bp[3]);
         } else
             printf("     download microcode status: 0x%x [additional "
-                   "status: 0x%x]\n", ucp[2], ucp[3]);
+                   "status: 0x%x]\n", bp[2], bp[3]);
         printf("     download microcode maximum size: %" PRIu32 " bytes\n",
-               sg_get_unaligned_be32(ucp + 4));
-        printf("     download microcode expected buffer id: 0x%x\n", ucp[11]);
+               sg_get_unaligned_be32(bp + 4));
+        printf("     download microcode expected buffer id: 0x%x\n", bp[11]);
         printf("     download microcode expected buffer id offset: %" PRIu32
-               "\n", sg_get_unaligned_be32(ucp + 12));
+               "\n", sg_get_unaligned_be32(bp + 12));
     }
     return;
 truncated:
@@ -268,7 +268,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     int send_data = 0;
     int ret = 0;
     uint32_t rec_gen_code;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     const char * cp;
 
     verb = (op->verbose > 1) ? op->verbose - 1 : 0;
@@ -370,18 +370,18 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     if ((rsp_len - 8) % 16)
         pr2serr("Found %d Download microcode status descriptors, but there "
                 "is residual\n", num);
-    ucp = dip + 8;
-    for (k = 0; k < num; ++k, ucp += 16) {
-        if ((unsigned int)op->mc_subenc == (unsigned int)ucp[1]) {
-            mc_status = ucp[2];
+    bp = dip + 8;
+    for (k = 0; k < num; ++k, bp += 16) {
+        if ((unsigned int)op->mc_subenc == (unsigned int)bp[1]) {
+            mc_status = bp[2];
             cp = get_mc_status_str(mc_status);
             if ((mc_status >= 0x80) || op->verbose)
                 pr2serr("mc offset=%d: status: %s [0x%x, additional=0x%x]\n",
-                        off_off, cp, mc_status, ucp[3]);
+                        off_off, cp, mc_status, bp[3]);
             if (op->verbose > 1)
                 pr2serr("  subenc_id=%d, expected_buffer_id=%d, "
-                        "expected_offset=0x%" PRIx32 "\n", ucp[1], ucp[11],
-                        sg_get_unaligned_be32(ucp + 12));
+                        "expected_offset=0x%" PRIx32 "\n", bp[1], bp[11],
+                        sg_get_unaligned_be32(bp + 12));
             if (mc_status >= 0x80)
                 ret = ret ? ret : SG_LIB_CAT_OTHER;
         }

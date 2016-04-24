@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2015 Douglas Gilbert.
+ * Copyright (c) 2009-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.07 20151219";
+static const char * version_str = "1.08 20160423";
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
@@ -94,21 +94,21 @@ dStrRaw(const char* str, int len)
  * the number of blocks and returns the provisioning status, -1 for error.
  */
 static int
-decode_lba_status_desc(const unsigned char * ucp, uint64_t * slbap,
+decode_lba_status_desc(const unsigned char * bp, uint64_t * slbap,
                        uint32_t * blocksp)
 {
     uint32_t blocks;
     uint64_t ull;
 
-    if (NULL == ucp)
+    if (NULL == bp)
         return -1;
-    ull = sg_get_unaligned_be64(ucp + 0);
-    blocks = sg_get_unaligned_be32(ucp + 8);
+    ull = sg_get_unaligned_be64(bp + 0);
+    blocks = sg_get_unaligned_be32(bp + 8);
     if (slbap)
         *slbap = ull;
     if (blocksp)
         *blocksp = blocks;
-    return ucp[12] & 0xf;
+    return bp[12] & 0xf;
 }
 
 
@@ -127,7 +127,7 @@ main(int argc, char * argv[])
     int o_readonly = 0;
     int verbose = 0;
     const char * device_name = NULL;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     int ret = 0;
 
     while (1) {
@@ -291,20 +291,20 @@ main(int argc, char * argv[])
         num_descs = (rlen - 8) / 16;
         if (verbose)
             pr2serr("%d complete LBA status descriptors found\n", num_descs);
-        for (ucp = glbasBuffp + 8, k = 0; k < num_descs; ucp += 16, ++k) {
-            res = decode_lba_status_desc(ucp, &d_lba, &d_blocks);
+        for (bp = glbasBuffp + 8, k = 0; k < num_descs; bp += 16, ++k) {
+            res = decode_lba_status_desc(bp, &d_lba, &d_blocks);
             if ((res < 0) || (res > 15))
                 pr2serr("descriptor %d: bad LBA status descriptor returned "
                         "%d\n", k + 1, res);
             if (do_brief) {
                 printf("0x");
                 for (j = 0; j < 8; ++j)
-                    printf("%02x", ucp[j]);
+                    printf("%02x", bp[j]);
                 printf("  0x%x  %d\n", (unsigned int)d_blocks, res);
             } else {
                 printf("descriptor LBA: 0x");
                 for (j = 0; j < 8; ++j)
-                    printf("%02x", ucp[j]);
+                    printf("%02x", bp[j]);
                 printf("  blocks: %u", (unsigned int)d_blocks);
                 switch (res) {
                 case 0:

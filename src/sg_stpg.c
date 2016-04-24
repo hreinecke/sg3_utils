@@ -30,7 +30,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.11 20160218";
+static const char * version_str = "1.12 20160423";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -140,25 +140,25 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
 {
     int c_set, assoc, desig_type, i_len;
     int off, u;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     const unsigned char * ip;
 
     *d_id = -1;
     *d_tpg = -1;
     off = -1;
     while ((u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0) {
-        ucp = buff + off;
-        i_len = ucp[3];
+        bp = buff + off;
+        i_len = bp[3];
         if ((off + i_len + 4) > len) {
             pr2serr("    VPD page error: designator length longer than\n     "
                     "remaining response length=%d\n", (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
-        ip = ucp + 4;
-        c_set = (ucp[0] & 0xf);
-        /* piv = ((ucp[1] & 0x80) ? 1 : 0); */
-        assoc = ((ucp[1] >> 4) & 0x3);
-        desig_type = (ucp[1] & 0xf);
+        ip = bp + 4;
+        c_set = (bp[0] & 0xf);
+        /* piv = ((bp[1] & 0x80) ? 1 : 0); */
+        assoc = ((bp[1] >> 4) & 0x3);
+        desig_type = (bp[1] & 0xf);
         switch (desig_type) {
         case 4: /* Relative target port */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
@@ -376,7 +376,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 break;
             default:
                 pr2serr("%s: expected 'ao', 'an', 'o', 's' or 'u' at pos "
-			"%d\n", __func__, (int)(lcp - inp + 1));
+                        "%d\n", __func__, (int)(lcp - inp + 1));
                 return 1;
             }
         }
@@ -414,7 +414,7 @@ main(int argc, char * argv[])
     unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char setTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char rsp_buff[MX_ALLOC_LEN + 2];
-    unsigned char * ucp;
+    unsigned char * bp;
     struct tgtgrp tgtGrpState[256], *tgtStatePtr;
     int state = -1;
     const char * state_arg = NULL;
@@ -621,19 +621,19 @@ main(int argc, char * argv[])
             memset(tgtGrpState, 0, sizeof(struct tgtgrp) * 256);
             tgtStatePtr = tgtGrpState;
             printf("Current target port groups:\n");
-            for (k = 4, ucp = reportTgtGrpBuff + 4, numgrp = 0; k < report_len;
-                 k += off, ucp += off, numgrp ++) {
+            for (k = 4, bp = reportTgtGrpBuff + 4, numgrp = 0; k < report_len;
+                 k += off, bp += off, numgrp ++) {
 
                 printf("  target port group id : 0x%x , Pref=%d\n",
-                       sg_get_unaligned_be16(ucp + 2), !!(ucp[0] & 0x80));
+                       sg_get_unaligned_be16(bp + 2), !!(bp[0] & 0x80));
                 printf("    target port group asymmetric access state : ");
-                printf("0x%02x", ucp[0] & 0x0f);
+                printf("0x%02x", bp[0] & 0x0f);
                 printf("\n");
-                tgtStatePtr->id = sg_get_unaligned_be16(ucp + 2);
-                tgtStatePtr->current = ucp[0] & 0x0f;
-                tgtStatePtr->valid = ucp[1];
+                tgtStatePtr->id = sg_get_unaligned_be16(bp + 2);
+                tgtStatePtr->current = bp[0] & 0x0f;
+                tgtStatePtr->valid = bp[1];
 
-                tgt_port_count = ucp[7];
+                tgt_port_count = bp[7];
 
                 tgtStatePtr++;
                 off = 8 + tgt_port_count * 4;
@@ -660,9 +660,9 @@ main(int argc, char * argv[])
         report_len = numgrp * 4 + 4;
     } else { /* port_arr_len > 0 */
         memset(setTgtGrpBuff, 0x0, sizeof(setTgtGrpBuff));
-        for (k = 0, ucp = setTgtGrpBuff + 4; k < port_arr_len; ++k, ucp +=4) {
-            ucp[0] = state_arr[k] & 0xf;
-            sg_put_unaligned_be16((uint16_t)port_arr[k], ucp + 2);
+        for (k = 0, bp = setTgtGrpBuff + 4; k < port_arr_len; ++k, bp +=4) {
+            bp[0] = state_arr[k] & 0xf;
+            sg_put_unaligned_be16((uint16_t)port_arr[k], bp + 2);
         }
         report_len = port_arr_len * 4 + 4;
     }

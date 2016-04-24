@@ -29,7 +29,7 @@
 
 */
 
-static const char * version_str = "0.41 20160131";    /* mmc6r02 */
+static const char * version_str = "0.42 20160423";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -884,7 +884,7 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
               int inner_hex)
 {
     int k, curr_profile, extra_len, feature;
-    unsigned char * ucp;
+    unsigned char * bp;
     char buff[128];
 
     if (max_resp_len < len) {
@@ -902,23 +902,23 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
     else
         printf("Current profile: %s\n", get_profile_str(curr_profile, buff));
     printf("Features%s:\n", (brief ? " (in brief)" : ""));
-    ucp = resp + 8;
+    bp = resp + 8;
     len -= 8;
-    for (k = 0; k < len; k += extra_len, ucp += extra_len) {
-        extra_len = 4 + ucp[3];
-        feature = sg_get_unaligned_be16(ucp + 0);
+    for (k = 0; k < len; k += extra_len, bp += extra_len) {
+        extra_len = 4 + bp[3];
+        feature = sg_get_unaligned_be16(bp + 0);
         printf("  %s feature\n", get_feature_str(feature, buff));
         if (brief)
             continue;
         if (inner_hex) {
-            dStrHex((const char *)ucp, extra_len, 1);
+            dStrHex((const char *)bp, extra_len, 1);
             continue;
         }
         if (0 != (extra_len % 4))
             printf("    additional length [%d] not a multiple of 4, ignore\n",
                    extra_len - 4);
         else
-            decode_feature(feature, ucp, extra_len);
+            decode_feature(feature, bp, extra_len);
     }
 }
 

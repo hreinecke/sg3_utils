@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -24,14 +25,16 @@
 #endif
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
+#include "sg_unaligned.h"
 
 
-static const char * version_str = "1.10 20160405";
+static const char * version_str = "1.11 20160418";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
 static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
+    {"cdb", no_argument, 0, 'c'},
     {"file", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
@@ -46,10 +49,11 @@ static struct option long_options[] = {
 struct opts_t {
     int do_binary;
     const char * fname;
+    bool do_cdb;
     int do_file;
     int do_help;
     int do_hex;
-    int no_space;
+    bool no_space;
     int do_status;
     int sstatus;
     int do_verbose;
@@ -66,16 +70,18 @@ static char concat_buff[1024];
 static void
 usage()
 {
-  pr2serr("Usage: sg_decode_sense [--binary=FN] [--file=FN] [--help] [--hex] "
-          "[--nospace]\n"
-          "                       [--status=SS] [--verbose] [--version] "
-          "[--write=WFN]\n"
-          "                       [H1 H2 H3 ...]\n"
+  pr2serr("Usage: sg_decode_sense [--binary=FN] [--cdb] [--file=FN] "
+          "[--help] [--hex]\n"
+          "                       [--nospace] [--status=SS] [--verbose] "
+          "[--version]\n"
+          "                       [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=FN|-b FN     FN is a file name to read sense "
           "data in\n"
           "                          binary from. If FN is '-' then read "
           "from stdin\n"
+          "    --cdb|-c              decode given hex as cdb rather than "
+          "sense data\n"
           "    --file=FN|-f FN       FN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
@@ -98,52 +104,56 @@ usage()
           "Decodes SCSI sense data given on the command line as a sequence "
           "of\nhexadecimal bytes (H1 H2 H3 ...) . Alternatively the sense "
           "data can\nbe in a binary file or in a file containing ASCII "
-          "hexadecimal.\n"
+          "hexadecimal. If\n'--cdb' is given then interpret hex as SCSI CDB "
+          "rather than sense data.\n"
           );
 }
 
 static int
-process_cl(struct opts_t *optsp, int argc, char *argv[])
+process_cl(struct opts_t *op, int argc, char *argv[])
 {
     int c;
     unsigned int ui;
-    char * opt;
-    char *endptr;
     long val;
+    char * avp;
+    char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:f:hHns:vVw:", long_options, NULL);
+        c = getopt_long(argc, argv, "b:cf:hHns:vVw:", long_options, NULL);
         if (c == -1)
             break;
 
         switch (c) {
         case 'b':
-            if (optsp->fname) {
+            if (op->fname) {
                 pr2serr("expect only one '--binary=FN' or '--file=FN' "
                         "option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++optsp->do_binary;
-            optsp->fname = optarg;
+            ++op->do_binary;
+            op->fname = optarg;
+            break;
+        case 'c':
+            op->do_cdb = true;
             break;
         case 'f':
-            if (optsp->fname) {
+            if (op->fname) {
                 pr2serr("expect only one '--binary=FN' or '--file=FN' "
                         "option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++optsp->do_file;
-            optsp->fname = optarg;
+            ++op->do_file;
+            op->fname = optarg;
             break;
         case 'h':
         case '?':
-            optsp->do_help = 1;
+            op->do_help = 1;
             return 0;
         case 'H':
-            ++optsp->do_hex;
+            ++op->do_hex;
             break;
         case 'n':
-            ++optsp->no_space;
+            op->no_space = true;
             break;
         case 's':
             if (1 != sscanf(optarg, "%x", &ui)) {
@@ -154,17 +164,17 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
                 pr2serr("'--status=SS' byte value exceeds FF\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++optsp->do_status;
-            optsp->sstatus = ui;
+            ++op->do_status;
+            op->sstatus = ui;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            ++op->do_verbose;
             break;
         case 'V':
-            optsp->do_version = 1;
+            op->do_version = 1;
             return 0;
         case 'w':
-            optsp->wfname = optarg;
+            op->wfname = optarg;
             break;
         default:
             return SG_LIB_SYNTAX_ERROR;
@@ -172,41 +182,41 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
     }
 
     while (optind < argc) {
-        opt = argv[optind++];
-        if (optsp->no_space) {
-            if (optsp->no_space_str) {
+        avp = argv[optind++];
+        if (op->no_space) {
+            if (op->no_space_str) {
                 if ('\0' == concat_buff[0]) {
-                    if (strlen(optsp->no_space_str) > sizeof(concat_buff)) {
+                    if (strlen(op->no_space_str) > sizeof(concat_buff)) {
                         pr2serr("'--nospace' concat_buff overflow\n");
                         return SG_LIB_SYNTAX_ERROR;
                     }
-                    strcpy(concat_buff, optsp->no_space_str);
+                    strcpy(concat_buff, op->no_space_str);
                 }
-                if ((strlen(concat_buff) + strlen(opt)) >=
+                if ((strlen(concat_buff) + strlen(avp)) >=
                     sizeof(concat_buff)) {
                     pr2serr("'--nospace' concat_buff overflow\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                if (optsp->do_version)
+                if (op->do_version)
                     pr2serr("'--nospace' and found whitespace so "
                             "concatenate\n");
-                strcat(concat_buff, opt);
-                optsp->no_space_str = concat_buff;
+                strcat(concat_buff, avp);
+                op->no_space_str = concat_buff;
             } else
-                optsp->no_space_str = opt;
+                op->no_space_str = avp;
             continue;
         }
-        val = strtol(opt, &endptr, 16);
-        if (*opt == '\0' || *endptr != '\0' || val < 0x00 || val > 0xff) {
-            pr2serr("Invalid byte '%s'\n", opt);
+        val = strtol(avp, &endptr, 16);
+        if (*avp == '\0' || *endptr != '\0' || val < 0x00 || val > 0xff) {
+            pr2serr("Invalid byte '%s'\n", avp);
             return SG_LIB_SYNTAX_ERROR;
         }
 
-        if (optsp->sense_len > MAX_SENSE_LEN) {
+        if (op->sense_len > MAX_SENSE_LEN) {
             pr2serr("sense data too long (max. %d bytes)\n", MAX_SENSE_LEN);
             return SG_LIB_SYNTAX_ERROR;
         }
-        optsp->sense[optsp->sense_len++] = (unsigned char)val;
+        op->sense[op->sense_len++] = (unsigned char)val;
     }
     return 0;
 }
@@ -217,7 +227,7 @@ process_cl(struct opts_t *optsp, int argc, char *argv[])
  * digits is expected, 2 per byte. Everything from and including a '#'
  * on a line is ignored.  Returns 0 if ok, or 1 if error. */
 static int
-f2hex_arr(const char * fname, int no_space, unsigned char * mp_arr,
+f2hex_arr(const char * fname, bool no_space, unsigned char * mp_arr,
           int * mp_arr_len, int max_arr_len)
 {
     int fn_len, in_len, k, j, m, split_line;
@@ -357,21 +367,21 @@ bad:
 }
 
 static void
-write2wfn(FILE * fp, struct opts_t * optsp)
+write2wfn(FILE * fp, struct opts_t * op)
 {
     int k, n;
     size_t s;
     char b[128];
 
-    if (optsp->do_hex) {
-        for (k = 0, n = 0; k < optsp->sense_len; ++k) {
-            n += sprintf(b + n, "0x%02x,", optsp->sense[k]);
+    if (op->do_hex) {
+        for (k = 0, n = 0; k < op->sense_len; ++k) {
+            n += sprintf(b + n, "0x%02x,", op->sense[k]);
             if (15 == (k % 16)) {
                 b[n] = '\n';
                 s = fwrite(b, 1, n + 1, fp);
                 if ((int)s != (n + 1))
                     pr2serr("only able to write %d of %d bytes to %s\n",
-                            (int)s, n + 1, optsp->wfname);
+                            (int)s, n + 1, op->wfname);
                 n = 0;
             }
         }
@@ -380,13 +390,13 @@ write2wfn(FILE * fp, struct opts_t * optsp)
             s = fwrite(b, 1, n + 1, fp);
             if ((int)s != (n + 1))
                 pr2serr("only able to write %d of %d bytes to %s\n", (int)s,
-                        n + 1, optsp->wfname);
+                        n + 1, op->wfname);
         }
     } else {
-        s = fwrite(optsp->sense, 1, optsp->sense_len, fp);
-        if ((int)s != optsp->sense_len)
+        s = fwrite(op->sense, 1, op->sense_len, fp);
+        if ((int)s != op->sense_len)
             pr2serr("only able to write %d of %d bytes to %s\n", (int)s,
-                    optsp->sense_len, optsp->wfname);
+                    op->sense_len, op->wfname);
     }
 }
 
@@ -399,95 +409,109 @@ main(int argc, char *argv[])
     unsigned int ui;
     size_t s;
     struct opts_t opts;
+    struct opts_t * op;
     char b[2048];
     FILE * fp = NULL;
     const char * cp;
 
-    memset(&opts, 0, sizeof(opts));
+    op = &opts;
+    memset(op, 0, sizeof(opts));
     memset(b, 0, sizeof(b));
-    ret = process_cl(&opts, argc, argv);
+    ret = process_cl(op, argc, argv);
     if (ret != 0) {
         usage();
         return ret;
-    } else if (opts.do_help) {
+    } else if (op->do_help) {
         usage();
         return 0;
-    } else if (opts.do_version) {
+    } else if (op->do_version) {
         pr2serr("version: %s\n", version_str);
         return 0;
     }
 
 
-    if (opts.do_status) {
-        sg_get_scsi_status_str(opts.sstatus, sizeof(b) - 1, b);
+    if (op->do_status) {
+        sg_get_scsi_status_str(op->sstatus, sizeof(b) - 1, b);
         printf("SCSI status: %s\n", b);
     }
 
-    if ((0 == opts.sense_len) && opts.no_space_str) {
-        if (opts.do_verbose > 2)
-            pr2serr("no_space str: %s\n", opts.no_space_str);
-        cp = opts.no_space_str;
+    if ((0 == op->sense_len) && op->no_space_str) {
+        if (op->do_verbose > 2)
+            pr2serr("no_space str: %s\n", op->no_space_str);
+        cp = op->no_space_str;
         for (k = 0; isxdigit(cp[k]) && isxdigit(cp[k + 1]); k += 2) {
             if (1 != sscanf(cp + k, "%2x", &ui)) {
                 pr2serr("bad no_space hex string: %s\n", cp);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            opts.sense[opts.sense_len++] = (unsigned char)ui;
+            op->sense[op->sense_len++] = (unsigned char)ui;
         }
     }
 
-    if ((0 == opts.sense_len) && (! opts.do_binary) && (! opts.do_file)) {
-        if (opts.do_status)
+    if ((0 == op->sense_len) && (! op->do_binary) && (! op->do_file)) {
+        if (op->do_status)
             return 0;
         pr2serr(">> Need sense data on the command line or in a file\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.sense_len && (opts.do_binary || opts.do_file)) {
+    if (op->sense_len && (op->do_binary || op->do_file)) {
         pr2serr(">> Need sense data on command line or in a file, not "
                 "both\n\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (opts.do_binary && opts.do_file) {
+    if (op->do_binary && op->do_file) {
         pr2serr(">> Either a binary file or a ASCII hexadecimal, file not "
                 "both\n\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (opts.do_binary) {
-        fp = fopen(opts.fname, "r");
+    if (op->do_binary) {
+        fp = fopen(op->fname, "r");
         if (NULL == fp) {
-            pr2serr("unable to open file: %s\n", opts.fname);
+            pr2serr("unable to open file: %s\n", op->fname);
             return SG_LIB_SYNTAX_ERROR;
         }
-        s = fread(opts.sense, 1, MAX_SENSE_LEN, fp);
+        s = fread(op->sense, 1, MAX_SENSE_LEN, fp);
         fclose(fp);
         if (0 == s) {
-            pr2serr("read nothing from file: %s\n", opts.fname);
+            pr2serr("read nothing from file: %s\n", op->fname);
             return SG_LIB_SYNTAX_ERROR;
         }
-        opts.sense_len = s;
-    } else if (opts.do_file) {
-        ret = f2hex_arr(opts.fname, opts.no_space, opts.sense,
-                        &opts.sense_len, MAX_SENSE_LEN);
+        op->sense_len = s;
+    } else if (op->do_file) {
+        ret = f2hex_arr(op->fname, op->no_space, op->sense, &op->sense_len,
+                        MAX_SENSE_LEN);
         if (ret) {
-            pr2serr("unable to decode ASCII hex from file: %s\n", opts.fname);
+            pr2serr("unable to decode ASCII hex from file: %s\n", op->fname);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
-    if (opts.sense_len) {
-        if (opts.wfname) {
-            if ((fp = fopen(opts.wfname, "w"))) {
-                write2wfn(fp, &opts);
+    if (op->sense_len) {
+        if (op->wfname) {
+            if ((fp = fopen(op->wfname, "w"))) {
+                write2wfn(fp, op);
                 fclose(fp);
             } else {
                 perror("open");
-                pr2serr("trying to write to %s\n", opts.wfname);
+                pr2serr("trying to write to %s\n", op->wfname);
             }
         }
-        sg_get_sense_str(NULL, opts.sense, opts.sense_len, opts.do_verbose,
-                         sizeof(b) - 1, b);
+        if (op->do_cdb) {
+            int sa, opcode;
+
+            opcode = op->sense[0];
+            if ((0x75 == opcode) || (0x7e == opcode) || (op->sense_len > 16))
+                sa = sg_get_unaligned_be16(op->sense + 8);
+            else if (op->sense_len > 1)
+                sa = op->sense[1] & 0x1f;
+            else
+                sa = 0;
+            sg_get_opcode_sa_name(opcode, sa, 0, sizeof(b), b);
+        } else
+            sg_get_sense_str(NULL, op->sense, op->sense_len,
+                             op->do_verbose, sizeof(b) - 1, b);
         printf("%s\n", b);
     }
 

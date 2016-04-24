@@ -186,11 +186,11 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
         }
     } else {
         if ((verbose > 2) && (ret > 3)) {
-            unsigned char * ucp;
+            unsigned char * bp;
             int len;
 
-            ucp = (unsigned char *)resp;
-            len = sg_get_unaligned_be32(ucp + 0);
+            bp = (unsigned char *)resp;
+            len = sg_get_unaligned_be32(bp + 0);
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;
@@ -279,11 +279,11 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
         }
     } else {
         if ((verbose > 2) && (ret > 3)) {
-            unsigned char * ucp;
+            unsigned char * bp;
             int len;
 
-            ucp = (unsigned char *)resp;
-            len = sg_get_unaligned_be32(ucp + 0);
+            bp = (unsigned char *)resp;
+            len = sg_get_unaligned_be32(bp + 0);
             if (len < 0)
                 len = 0;
             len = (ret < len) ? ret : len;

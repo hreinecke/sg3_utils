@@ -34,7 +34,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.01 20160311";
+static const char * version_str = "1.02 20160423";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -544,15 +544,15 @@ bad:
     return 1;
 }
 
-/* Returns 1 if 'ucp' all 0xff bytes, returns 2 is all 0xff bytes apart
+/* Returns 1 if 'bp' all 0xff bytes, returns 2 is all 0xff bytes apart
  * from last being 0xfe; otherwise returns 0. */
 static int
-all_ffs_or_last_fe(const unsigned char * ucp, int len)
+all_ffs_or_last_fe(const unsigned char * bp, int len)
 {
-    for ( ; len > 0; ++ucp, --len) {
-        if (*ucp < 0xfe)
+    for ( ; len > 0; ++bp, --len) {
+        if (*bp < 0xfe)
             return 0;
-        if (0xfe == *ucp)
+        if (0xfe == *bp)
             return (1 == len) ? 2 : 0;
 
     }
@@ -637,7 +637,7 @@ helper_full_attr(const unsigned char * alp, int len, int id,
                  const struct opts_t * op)
 {
     int k;
-    const unsigned char * ucp;
+    const unsigned char * bp;
 
     if (op->verbose)
         printf("[r%c] ", (0x80 & alp[2]) ? 'o' : 'w');
@@ -677,80 +677,80 @@ helper_full_attr(const unsigned char * alp, int len, int id,
         }
         break;
     case 0x340:         /* Medium Usage history */
-        ucp = alp + 5;
+        bp = alp + 5;
         printf("\n");
         if ((len - 5) < 90) {
             pr2serr("%s: expected 90 bytes, got %d\n", __func__, len - 5);
             break;
         }
         printf("    Current amount of data written [MiB]: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 0));
+               sg_get_unaligned_be48(bp + 0));
         printf("    Current write retry count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 6));
+               sg_get_unaligned_be48(bp + 6));
         printf("    Current amount of data read [MiB]: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 12));
+               sg_get_unaligned_be48(bp + 12));
         printf("    Current read retry count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 18));
+               sg_get_unaligned_be48(bp + 18));
         printf("    Previous amount of data written [MiB]: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 24));
+               sg_get_unaligned_be48(bp + 24));
         printf("    Previous write retry count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 30));
+               sg_get_unaligned_be48(bp + 30));
         printf("    Previous amount of data read [MiB]: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 36));
+               sg_get_unaligned_be48(bp + 36));
         printf("    Previous read retry count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 42));
+               sg_get_unaligned_be48(bp + 42));
         printf("    Total amount of data written [MiB]: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 48));
+               sg_get_unaligned_be48(bp + 48));
         printf("    Total write retry count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 54));
+               sg_get_unaligned_be48(bp + 54));
         printf("    Total amount of data read [MiB]: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 60));
+               sg_get_unaligned_be48(bp + 60));
         printf("    Total read retry count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 66));
+               sg_get_unaligned_be48(bp + 66));
         printf("    Load count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 72));
+               sg_get_unaligned_be48(bp + 72));
         printf("    Total change partition count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 78));
+               sg_get_unaligned_be48(bp + 78));
         printf("    Total partition initialization count: %" PRIu64 "\n",
-               sg_get_unaligned_be48(ucp + 84));
+               sg_get_unaligned_be48(bp + 84));
         break;
     case 0x341:         /* Partition Usage history */
-        ucp = alp + 5;
+        bp = alp + 5;
         printf("\n");
         if ((len - 5) < 60) {
             pr2serr("%s: expected 60 bytes, got %d\n", __func__, len - 5);
             break;
         }
         printf("    Current amount of data written [MiB]: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 0));
+               sg_get_unaligned_be32(bp + 0));
         printf("    Current write retry count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 4));
+               sg_get_unaligned_be32(bp + 4));
         printf("    Current amount of data read [MiB]: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 8));
+               sg_get_unaligned_be32(bp + 8));
         printf("    Current read retry count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 12));
+               sg_get_unaligned_be32(bp + 12));
         printf("    Previous amount of data written [MiB]: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 16));
+               sg_get_unaligned_be32(bp + 16));
         printf("    Previous write retry count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 20));
+               sg_get_unaligned_be32(bp + 20));
         printf("    Previous amount of data read [MiB]: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 24));
+               sg_get_unaligned_be32(bp + 24));
         printf("    Previous read retry count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 28));
+               sg_get_unaligned_be32(bp + 28));
         printf("    Total amount of data written [MiB]: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 32));
+               sg_get_unaligned_be32(bp + 32));
         printf("    Total write retry count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 36));
+               sg_get_unaligned_be32(bp + 36));
         printf("    Total amount of data read [MiB]: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 40));
+               sg_get_unaligned_be32(bp + 40));
         printf("    Total read retry count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 44));
+               sg_get_unaligned_be32(bp + 44));
         printf("    Load count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 48));
+               sg_get_unaligned_be32(bp + 48));
         printf("    change partition count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 52));
+               sg_get_unaligned_be32(bp + 52));
         printf("    partition initialization count: %" PRIu32 "\n",
-               sg_get_unaligned_be32(ucp + 56));
+               sg_get_unaligned_be32(bp + 56));
         break;
     default:
         pr2serr("%s: unknown attribute id: 0x%x\n", __func__, id);

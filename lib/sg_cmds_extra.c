@@ -1561,7 +1561,7 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
                 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * sp;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     struct sg_pt_base * ptvp;
     const char * cnamep;
     char b[256];
@@ -1654,11 +1654,11 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
         }
         if (ata_return_dp && (max_ata_return_len > 0))  {
             /* search for ATA return descriptor */
-            ucp = sg_scsi_sense_desc_find(sp, slen, 0x9);
-            if (ucp) {
-                k = ucp[1] + 2;
+            bp = sg_scsi_sense_desc_find(sp, slen, 0x9);
+            if (bp) {
+                k = bp[1] + 2;
                 k = (k > max_ata_return_len) ? max_ata_return_len : k;
-                memcpy(ata_return_dp, ucp, k);
+                memcpy(ata_return_dp, bp, k);
             } else
                 ata_return_dp[0] = 0x0;
         }

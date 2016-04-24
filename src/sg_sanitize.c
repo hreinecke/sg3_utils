@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.02 20160227";
+static const char * version_str = "1.02 20160423";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -263,51 +263,51 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
 #define TPROTO_ISCSI 5
 
 static char *
-get_lu_name(const unsigned char * ucp, int u_len, char * b, int b_len)
+get_lu_name(const unsigned char * bp, int u_len, char * b, int b_len)
 {
     int len, off, sns_dlen, dlen, k;
     unsigned char u_sns[512];
     char * cp;
 
     len = u_len - 4;
-    ucp += 4;
+    bp += 4;
     off = -1;
-    if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+    if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                 8 /* SCSI name string (sns) */,
                                 3 /* UTF-8 */)) {
-        sns_dlen = ucp[off + 3];
-        memcpy(u_sns, ucp + off + 4, sns_dlen);
+        sns_dlen = bp[off + 3];
+        memcpy(u_sns, bp + off + 4, sns_dlen);
         /* now want to check if this is iSCSI */
         off = -1;
-        if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_TPORT,
+        if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_TPORT,
                                     8 /* SCSI name string (sns) */,
                                     3 /* UTF-8 */)) {
-            if ((0x80 & ucp[1]) && (TPROTO_ISCSI == (ucp[0] >> 4))) {
+            if ((0x80 & bp[1]) && (TPROTO_ISCSI == (bp[0] >> 4))) {
                 snprintf(b, b_len, "%.*s", sns_dlen, u_sns);
                 return b;
             }
         }
     } else
         sns_dlen = 0;
-    if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+    if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                 3 /* NAA */, 1 /* binary */)) {
-        dlen = ucp[off + 3];
+        dlen = bp[off + 3];
         if (! ((8 == dlen) || (16 ==dlen)))
             return b;
         cp = b;
         for (k = 0; ((k < dlen) && (b_len > 1)); ++k) {
-            snprintf(cp, b_len, "%02x", ucp[off + 4 + k]);
+            snprintf(cp, b_len, "%02x", bp[off + 4 + k]);
             cp += 2;
             b_len -= 2;
         }
-    } else if (0 == sg_vpd_dev_id_iter(ucp, len, &off, VPD_ASSOC_LU,
+    } else if (0 == sg_vpd_dev_id_iter(bp, len, &off, VPD_ASSOC_LU,
                                        2 /* EUI */, 1 /* binary */)) {
-        dlen = ucp[off + 3];
+        dlen = bp[off + 3];
         if (! ((8 == dlen) || (12 == dlen) || (16 ==dlen)))
             return b;
         cp = b;
         for (k = 0; ((k < dlen) && (b_len > 1)); ++k) {
-            snprintf(cp, b_len, "%02x", ucp[off + 4 + k]);
+            snprintf(cp, b_len, "%02x", bp[off + 4 + k]);
             cp += 2;
             b_len -= 2;
         }

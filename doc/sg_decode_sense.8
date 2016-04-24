@@ -1,9 +1,9 @@
-.TH SG_DECODE_SENSE "8" "August 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "April 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense data
 .SH SYNOPSIS
 .B sg_decode_sense
-[\fI\-\-binary=FN\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR]
+[\fI\-\-binary=FN\fR] [\fI\-\-cdb\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR]
 [\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR]
 [H1 H2 H3 ...]
@@ -11,8 +11,8 @@ sg_decode_sense \- decode SCSI sense data
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of
 ASCII hexadecimal bytes and decodes it. The primary reference for the
-decoding is SPC\-3 ANSI INCITS 408-2005 and the most recent draft
-SPC\-4 revision 37 which can be found at http://www.t10.org and other
+decoding is SPC\-4 ANSI INCITS 513-2015 and the most recent draft
+SPC\-5 revision 8 which can be found at http://www.t10.org and other
 locations on the internet.
 .PP
 SCSI sense data is often found in kernel log files as a result of
@@ -22,19 +22,28 @@ Sense data could be up to 252 bytes long but typically is much shorter
 than that, 18 bytes long is often seen and is usually associated with
 the older "fixed" format sense data.
 .PP
-The sense data can be provided on the command line or in a file. If
-given on the command line the sense data should be a sequence of
-hexadecimal bytes separated by space. Alternatively a file can be
-given with the contents in binary or ASCII hexadecimal bytes. The
-latter form can contain several lines each with none, one or more
-ASCII hexadecimal bytes separated by space (comma or tab). The
-hash symbol may appear and it and the rest of the line is ignored
-making it useful for comments.
+The sense data can be provided on the command line or in a file. If given
+on the command line the sense data should be a sequence of hexadecimal bytes
+separated by space. Alternatively a file can be given with the contents in
+binary or ASCII hexadecimal bytes. The latter form can contain several lines
+each with none, one or more ASCII hexadecimal bytes separated by
+space (comma or tab). The hash symbol may appear and it and the rest of the
+line is ignored making it useful for comments.
+.PP
+If the \fI\-\-cdb\fR option is given then rather than viewing the given hex
+arguments as sense data, it is viewed as a SCSI command descriptor
+block (CDB). In this case the command name is printed out. That name is
+based on the first hex byte given (know as the opcode) and optionally on
+another field called the "service action". 
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-b\fR, \fB\-\-binary\fR=\fIFN\fR
 the sense data is read in binary from a file called \fIFN\fR.
+.TP
+\fB\-c\fR, \fB\-\-cdb\fR
+treat the given string of hex arguments as bytes in a SCSI CDB and
+decode the command name.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -123,7 +132,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2010\-2014 Douglas Gilbert
+Copyright \(co 2010\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

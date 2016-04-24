@@ -31,7 +31,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.06 20160131";    /* sbc4r10 */
+static const char * version_str = "1.06 20160423";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -130,32 +130,32 @@ dStrRaw(const char* str, int len)
  * -1 for error.
  */
 static int
-decode_referral_desc(const unsigned char * ucp, int bytes)
+decode_referral_desc(const unsigned char * bp, int bytes)
 {
     int j, n;
     uint64_t first, last;
 
-    if (NULL == ucp)
+    if (NULL == bp)
         return -1;
 
     if (bytes < 20)
         return -1;
 
-    first = sg_get_unaligned_be64(ucp + 4);
-    last = sg_get_unaligned_be64(ucp + 12);
+    first = sg_get_unaligned_be64(bp + 4);
+    last = sg_get_unaligned_be64(bp + 12);
 
-    printf("    target port descriptors: %d\n", ucp[3]);
+    printf("    target port descriptors: %d\n", bp[3]);
     printf("    user data segment: first lba %" PRIu64 ", last lba %"
           PRIu64 "\n", first, last);
     n = 20;
     bytes -= n;
-    for (j = 0; j < ucp[3]; j++) {
+    for (j = 0; j < bp[3]; j++) {
         if (bytes < 4)
             return -1;
         printf("      target port descriptor %d:\n", j);
         printf("        port group %x state (%s)\n",
-               sg_get_unaligned_be16(ucp + n + 2),
-               decode_tpgs_state(ucp[n] & 0xf));
+               sg_get_unaligned_be16(bp + n + 2),
+               decode_tpgs_state(bp[n] & 0xf));
         n += 4;
         bytes -= 4;
     }
@@ -177,7 +177,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     int desc = 0;
     const char * device_name = NULL;
-    const unsigned char * ucp;
+    const unsigned char * bp;
     int ret = 0;
 
     while (1) {
@@ -312,12 +312,12 @@ main(int argc, char * argv[])
         if (rlen > maxlen)
             rlen = maxlen;
 
-        ucp = referralBuffp + 4;
+        bp = referralBuffp + 4;
         k = 0;
         printf("Report referrals:\n");
         while (k < rlen - 4) {
             printf("  descriptor %d:\n", desc);
-            res = decode_referral_desc(ucp + k, rlen - 4 - k);
+            res = decode_referral_desc(bp + k, rlen - 4 - k);
             if (res < 0) {
                 pr2serr("bad user data segment referral descriptor\n");
                 break;

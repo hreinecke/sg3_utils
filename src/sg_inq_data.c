@@ -6,7 +6,7 @@
 *  any later version.
 
    This is an auxiliary file holding data tables for the sg_inq utility.
-   It is mainly based on the SCSI SPC-4 document at http://www.t10.org .
+   It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
 
 */
 

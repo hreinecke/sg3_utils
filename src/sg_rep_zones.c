@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.08 20160203";
+static const char * version_str = "1.09 20160423";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -257,7 +257,7 @@ main(int argc, char * argv[])
     int64_t ll;
     const char * device_name = NULL;
     unsigned char * reportZonesBuff = NULL;
-    unsigned char * ucp;
+    unsigned char * bp;
     int ret = 0;
     char b[80];
 
@@ -402,26 +402,26 @@ main(int argc, char * argv[])
         printf("  Maximum LBA: 0x%" PRIx64 "\n",
                sg_get_unaligned_be64(reportZonesBuff + 8));
         zones = (len - 64) / 64;
-        for (k = 0, ucp = reportZonesBuff + 64; k < zones; ++k, ucp += 64) {
+        for (k = 0, bp = reportZonesBuff + 64; k < zones; ++k, bp += 64) {
             printf(" Zone descriptor: %d\n", k);
             if (do_hex) {
-                dStrHex((const char *)ucp, len, -1);
+                dStrHex((const char *)bp, len, -1);
                 continue;
             }
-            zt = ucp[0] & 0xf;
-            zc = (ucp[1] >> 4) & 0xf;
+            zt = bp[0] & 0xf;
+            zc = (bp[1] >> 4) & 0xf;
             printf("   Zone type: %s\n", zone_type_str(zt, b, sizeof(b),
                    verbose));
             printf("   Zone condition: %s\n", zone_condition_str(zc, b,
                    sizeof(b), verbose));
-            printf("   Non_seq: %d\n", !!(ucp[1] & 0x2));
-            printf("   Reset: %d\n", ucp[1] & 0x1);
+            printf("   Non_seq: %d\n", !!(bp[1] & 0x2));
+            printf("   Reset: %d\n", bp[1] & 0x1);
             printf("   Zone Length: 0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(ucp + 8));
+                   sg_get_unaligned_be64(bp + 8));
             printf("   Zone start LBA: 0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(ucp + 16));
+                   sg_get_unaligned_be64(bp + 16));
             printf("   Write pointer LBA: 0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(ucp + 24));
+                   sg_get_unaligned_be64(bp + 24));
         }
         if ((64 + (64 * zones)) < zl_len)
             printf("\n>>> Beware: Zone list truncated, may need another "

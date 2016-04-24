@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.11 20160404";    /* ses3r13 */
+static const char * version_str = "2.12 20160413";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -266,14 +266,14 @@ static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
  *  Algorithm |              Indexes                  |    Notes
  *            |Element|Connector element|Other element|
  *  ==========|=======|=================|=============|=======================
- *   [A]      |  [2]  |       [4]       |    [3]      | SAS-2, OR
- *   [A]      |  [2]  |       [4]       |    [3]      | SAS-3,EIIOE=0
+ *   [A]      |  [2]  |       [4]       |    [3]      | SES-2, OR
+ *   [A]      |  [2]  |       [4]       |    [3]      | SES-3,EIIOE=0
  *  ----------|-------|-----------------|-------------|-----------------------
- *   [B]      |  [1]  |       [1]       |    [1]      | SAS-3, EIIOE=1
+ *   [B]      |  [1]  |       [1]       |    [1]      | SES-3, EIIOE=1
  *  ----------|-------|-----------------|-------------|-----------------------
- *   [C]      |  [2]  |       [2]       |    [2]      | SAS-3, EIIOE=2
+ *   [C]      |  [2]  |       [2]       |    [2]      | SES-3, EIIOE=2
  *  ----------|-------|-----------------|-------------|-----------------------
- *   [D]      |  [2]  |       [1]       |    [1]      | SAS-3, EIIOE=3
+ *   [D]      |  [2]  |       [1]       |    [1]      | SES-3, EIIOE=3
  *  ----------|-------|-----------------|-------------|-----------------------
  *   [E]      |  [1]  |       [4]       |    [3]      | EIIOE=0 and
  *            |       |                 |             | --eiioe=force, OR
@@ -4212,7 +4212,8 @@ join_work(int sg_fd, struct opts_t * op, bool display)
                 }
             }
             if (jrp->thresh_inp)
-                pr2serr(" TI+%ld", jrp->thresh_inp - threshold_rsp);
+                pr2serr(" TI+%s", offset_str(jrp->thresh_inp - threshold_rsp,
+                                             hex, b, blen));
             pr2serr("\n");
         }
         pr2serr(">> ES len=%s, ", offset_str(enc_stat_rsp_len, hex, b, blen));

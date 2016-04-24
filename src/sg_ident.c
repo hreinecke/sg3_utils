@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2015 Douglas Gilbert.
+ * Copyright (c) 2005-2016 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.14 20151219";
+static const char * version_str = "1.15 20160423";
 
 #define ME "sg_ident: "
 
@@ -113,7 +113,7 @@ int main(int argc, char * argv[])
     int sg_fd, res, c, ii_len;
     unsigned char rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
     char b[80];
-    unsigned char * ucp = NULL;
+    unsigned char * bp = NULL;
     int ascii = 0;
     int do_clear = 0;
     int itype = 0;
@@ -251,12 +251,12 @@ int main(int argc, char * argv[])
                 ret = -1;
                 goto err_out;
             }
-            ucp = rdi_buff;
-            res = sg_ll_report_id_info(sg_fd, itype, ucp, ii_len + 4, 1,
+            bp = rdi_buff;
+            res = sg_ll_report_id_info(sg_fd, itype, bp, ii_len + 4, 1,
                                        verbose);
             if (0 == res) {
-                ii_len = sg_get_unaligned_be32(ucp + 0);
-                decode_ii(ucp + 4, ii_len, itype, ascii, raw, verbose);
+                ii_len = sg_get_unaligned_be32(bp + 0);
+                decode_ii(bp + 4, ii_len, itype, ascii, raw, verbose);
             } else
                 ret = res;
         } else

@@ -320,7 +320,7 @@ int
 sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
                       uint64_t * info_outp)
 {
-    const unsigned char * ucp;
+    const unsigned char * bp;
     uint64_t ull;
 
     if (info_outp)
@@ -335,12 +335,12 @@ sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
         return (sensep[0] & 0x80) ? 1 : 0;
     case 0x72:
     case 0x73:
-        ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0 /* info desc */);
-        if (ucp && (0xa == ucp[1])) {
-            ull = sg_get_unaligned_be64(ucp + 4);
+        bp = sg_scsi_sense_desc_find(sensep, sb_len, 0 /* info desc */);
+        if (bp && (0xa == bp[1])) {
+            ull = sg_get_unaligned_be64(bp + 4);
             if (info_outp)
                 *info_outp = ull;
-            return !!(ucp[2] & 0x80);   /* since spc3r23 should be set */
+            return !!(bp[2] & 0x80);   /* since spc3r23 should be set */
         } else
             return 0;
     default:
@@ -356,7 +356,7 @@ int
 sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
                               int * filemark_p, int * eom_p, int * ili_p)
 {
-    const unsigned char * ucp;
+    const unsigned char * bp;
 
     if (sb_len < 7)
         return 0;
@@ -376,15 +376,15 @@ sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
     case 0x72:
     case 0x73:
        /* Look for stream commands sense data descriptor */
-        ucp = sg_scsi_sense_desc_find(sensep, sb_len, 4);
-        if (ucp && (ucp[1] >= 2)) {
-            if (ucp[3] & 0xe0) {
+        bp = sg_scsi_sense_desc_find(sensep, sb_len, 4);
+        if (bp && (bp[1] >= 2)) {
+            if (bp[3] & 0xe0) {
                 if (filemark_p)
-                    *filemark_p = !!(ucp[3] & 0x80);
+                    *filemark_p = !!(bp[3] & 0x80);
                 if (eom_p)
-                    *eom_p = !!(ucp[3] & 0x40);
+                    *eom_p = !!(bp[3] & 0x40);
                 if (ili_p)
-                    *ili_p = !!(ucp[3] & 0x20);
+                    *ili_p = !!(bp[3] & 0x20);
                 return 1;
             }
         }
@@ -405,7 +405,7 @@ int
 sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
                           int * progress_outp)
 {
-    const unsigned char * ucp;
+    const unsigned char * bp;
     int sk, sk_pr;
 
     if (sb_len < 7)
@@ -428,15 +428,15 @@ sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
         /* sense key specific progress (0x2) or progress descriptor (0xa) */
         sk = (sensep[1] & 0xf);
         sk_pr = (SPC_SK_NO_SENSE == sk) || (SPC_SK_NOT_READY == sk);
-        if (sk_pr && ((ucp = sg_scsi_sense_desc_find(sensep, sb_len, 2))) &&
-            (0x6 == ucp[1]) && (0x80 & ucp[4])) {
+        if (sk_pr && ((bp = sg_scsi_sense_desc_find(sensep, sb_len, 2))) &&
+            (0x6 == bp[1]) && (0x80 & bp[4])) {
             if (progress_outp)
-                *progress_outp = sg_get_unaligned_be16(ucp + 5);
+                *progress_outp = sg_get_unaligned_be16(bp + 5);
             return 1;
-        } else if (((ucp = sg_scsi_sense_desc_find(sensep, sb_len, 0xa))) &&
-                   ((0x6 == ucp[1]))) {
+        } else if (((bp = sg_scsi_sense_desc_find(sensep, sb_len, 0xa))) &&
+                   ((0x6 == bp[1]))) {
             if (progress_outp)
-                *progress_outp = sg_get_unaligned_be16(ucp + 6);
+                *progress_outp = sg_get_unaligned_be16(bp + 6);
             return 1;
         } else
             return 0;
@@ -1914,23 +1914,23 @@ sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
 {
     bool fltr = ((m_assoc >= 0) || (m_desig_type >= 0) || (m_code_set >= 0));
     int k = *off;
-    const unsigned char * ucp = initial_desig_desc;
+    const unsigned char * bp = initial_desig_desc;
 
     while ((k + 3) < page_len) {
-        k = (k < 0) ? 0 : (k + ucp[k + 3] + 4);
+        k = (k < 0) ? 0 : (k + bp[k + 3] + 4);
         if ((k + 4) > page_len)
             break;
         if (fltr) {
             if (m_code_set >= 0) {
-                if ((ucp[k] & 0xf) != m_code_set)
+                if ((bp[k] & 0xf) != m_code_set)
                     continue;
             }
             if (m_assoc >= 0) {
-                if (((ucp[k + 1] >> 4) & 0x3) != m_assoc)
+                if (((bp[k + 1] >> 4) & 0x3) != m_assoc)
                     continue;
             }
             if (m_desig_type >= 0) {
-                if ((ucp[k + 1] & 0xf) != m_desig_type)
+                if ((bp[k + 1] & 0xf) != m_desig_type)
                     continue;
             }
         }

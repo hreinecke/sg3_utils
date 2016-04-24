@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2016 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -137,7 +137,7 @@ int main(int argc, char * argv[])
 {
     int sg_fd, k, j, off, res, c, report_len, tgt_port_count;
     unsigned char reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
-    unsigned char * ucp;
+    unsigned char * bp;
     int decode = 0;
     int hex = 0;
     int raw = 0;
@@ -246,53 +246,53 @@ int main(int argc, char * argv[])
             goto err_out;
         }
         printf("Report target port groups:\n");
-        ucp = reportTgtGrpBuff + 4;
+        bp = reportTgtGrpBuff + 4;
         if (extended) {
-             if (0x10 != (ucp[0] & 0x70)) {
+             if (0x10 != (bp[0] & 0x70)) {
                   pr2serr("   <<invalid extended header format\n");
                   goto err_out;
              }
-             printf("  Implicit transition time: %d\n", ucp[1]);
-             ucp += 4;
+             printf("  Implicit transition time: %d\n", bp[1]);
+             bp += 4;
         }
-        for (k = ucp - reportTgtGrpBuff; k < report_len;
-             k += off, ucp += off) {
+        for (k = bp - reportTgtGrpBuff; k < report_len;
+             k += off, bp += off) {
 
             printf("  target port group id : 0x%x , Pref=%d, Rtpg_fmt=%d\n",
-                   sg_get_unaligned_be16(ucp + 2), !!(ucp[0] & 0x80),
-                   (ucp[0] >> 4) & 0x07);
+                   sg_get_unaligned_be16(bp + 2), !!(bp[0] & 0x80),
+                   (bp[0] >> 4) & 0x07);
             printf("    target port group asymmetric access state : ");
-            printf("0x%02x", ucp[0] & 0x0f);
+            printf("0x%02x", bp[0] & 0x0f);
             if (decode)
-                decode_tpgs_state(ucp[0] & 0x0f);
+                decode_tpgs_state(bp[0] & 0x0f);
             printf("\n");
 
-            printf("    T_SUP : %d, ", !!(ucp[1] & 0x80));
-            printf("O_SUP : %d, ", !!(ucp[1] & 0x40));
-            printf("LBD_SUP : %d, ", !!(ucp[1] & 0x10));
-            printf("U_SUP : %d, ", !!(ucp[1] & 0x08));
-            printf("S_SUP : %d, ", !!(ucp[1] & 0x04));
-            printf("AN_SUP : %d, ", !!(ucp[1] & 0x02));
-            printf("AO_SUP : %d\n", !!(ucp[1] & 0x01));
+            printf("    T_SUP : %d, ", !!(bp[1] & 0x80));
+            printf("O_SUP : %d, ", !!(bp[1] & 0x40));
+            printf("LBD_SUP : %d, ", !!(bp[1] & 0x10));
+            printf("U_SUP : %d, ", !!(bp[1] & 0x08));
+            printf("S_SUP : %d, ", !!(bp[1] & 0x04));
+            printf("AN_SUP : %d, ", !!(bp[1] & 0x02));
+            printf("AO_SUP : %d\n", !!(bp[1] & 0x01));
 
             printf("    status code : ");
-            printf("0x%02x", ucp[5]);
+            printf("0x%02x", bp[5]);
             if (decode)
-                decode_status(ucp[5]);
+                decode_status(bp[5]);
             printf("\n");
 
             printf("    vendor unique status : ");
-            printf("0x%02x\n", ucp[6]);
+            printf("0x%02x\n", bp[6]);
 
             printf("    target port count : ");
-            tgt_port_count = ucp[7];
+            tgt_port_count = bp[7];
             printf("%02x\n", tgt_port_count);
 
             for (j = 0; j < tgt_port_count * 4; j += 4) {
                 if (0 == j)
                     printf("    Relative target port ids:\n");
                 printf("      0x%02x\n",
-                       sg_get_unaligned_be16(ucp + 8 + j + 2));
+                       sg_get_unaligned_be16(bp + 8 + j + 2));
             }
             off = 8 + j;
         }
