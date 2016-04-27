@@ -286,7 +286,7 @@ testonline ()
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
     return 1
   fi
-  TMPSTR=`echo "$SCSISTR" | sed -n 's/.*Type: *\(.*\) *ANSI.*/\1/p'`
+  TMPSTR=`echo "$SCSISTR" | sed -n 's/.*Type: *\([^ ]*\) *ANSI.*/\1/p'`
   if [ "$TMPSTR" != "$TYPE" ] ; then
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${TMPSTR} \nto: $TYPE ${norm} \n\n\n"
     return 1
