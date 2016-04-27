@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.20 20160423";  /* spc5r08, sbc4r10 */
+const char * sg_lib_version_str = "2.21 20160426";  /* spc5r09, sbc4r10 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -358,6 +358,7 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
 
 /* Service action out(16) [0x9f] service actions */
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
+    {0x0d, 0, "Set affiliation"},
     {0x11, 0, "Write long(16)"},
     {0x14, PDT_ZBC, "Reset write pointer"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
@@ -691,6 +692,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x20,"Logical unit not ready, logical unit reset required"},
     {0x04,0x21,"Logical unit not ready, hard reset required"},
     {0x04,0x22,"Logical unit not ready, power cycle required"},
+    {0x04,0x23,"Logical unit not ready, affiliation required"},
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},

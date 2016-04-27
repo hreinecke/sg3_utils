@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.17 20160421";  /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.18 20160426";  /* spc5r09 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -145,8 +145,6 @@ unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                           int len, int m_assoc, int m_desig_type,
                           int m_code_set, const struct opts_t * op);
-static void decode_transport_id(const char * leadin, unsigned char * bp,
-                                int len);
 
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
@@ -949,8 +947,12 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, const struct opts_t * op)
             if (op->do_hex > 1) {
                 printf("    Initiator port transport id:\n");
                 dStrHex((const char *)(bp + 8), ip_tid_len, 1);
-            } else
-                decode_transport_id("    ", bp + 8, ip_tid_len);
+            } else {
+                char b[1024];
+
+                printf("%s", sg_decode_transportid_str("    ", bp + 8,
+                                         ip_tid_len, true, sizeof(b), b));
+            }
         }
         tpd_len = sg_get_unaligned_be16(bp + bump + 2);
         if ((k + bump + tpd_len + 4) > len) {
@@ -1541,129 +1543,6 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
         return SG_LIB_CAT_MALFORMED;
     }
     return 0;
-}
-
-/* Transport IDs are initiator port identifiers, typically other than the
-   initiator port issuing a SCSI command. */
-static void
-decode_transport_id(const char * leadin, unsigned char * bp, int len)
-{
-    int format_code, proto_id, num, k;
-    uint64_t ull;
-    int bump;
-
-    for (k = 0, bump= 24; k < len; k += bump, bp += bump) {
-        if ((len < 24) || (0 != (len % 4)))
-            printf("%sTransport Id short or not multiple of 4 "
-                   "[length=%d]:\n", leadin, len);
-        else
-            printf("%sTransport Id of initiator:\n", leadin);
-        format_code = ((bp[0] >> 6) & 0x3);
-        proto_id = (bp[0] & 0xf);
-        switch (proto_id) {
-        case TPROTO_FCP: /* Fibre channel */
-            printf("%s  FCP-2 World Wide Name:\n", leadin);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            dStrHex((const char *)&bp[8], 8, -1);
-            bump = 24;
-            break;
-        case TPROTO_SPI:        /* Scsi Parallel Interface */
-            printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
-                   leadin, sg_get_unaligned_be16(bp + 2));
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin, sg_get_unaligned_be16(bp + 6));
-            bump = 24;
-            break;
-        case TPROTO_SSA:
-            printf("%s  SSA (transport id not defined):\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
-            break;
-        case TPROTO_1394: /* IEEE 1394 */
-            printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            dStrHex((const char *)&bp[8], 8, -1);
-            bump = 24;
-            break;
-        case TPROTO_SRP:
-            printf("%s  RDMA initiator port identifier:\n", leadin);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            dStrHex((const char *)&bp[8], 16, -1);
-            bump = 24;
-            break;
-        case TPROTO_ISCSI:
-            printf("%s  iSCSI ", leadin);
-            num = sg_get_unaligned_be16(bp + 2);
-            if (0 == format_code)
-                printf("name: %.*s\n", num, &bp[4]);
-            else if (1 == format_code)
-                printf("world wide unique port id: %.*s\n", num, &bp[4]);
-            else {
-                pr2serr("  [Unexpected format code: %d]\n", format_code);
-                dStrHexErr((const char *)bp, num + 4, 0);
-            }
-            bump = (((num + 4) < 24) ? 24 : num + 4);
-            break;
-        case TPROTO_SAS:
-            ull = sg_get_unaligned_be64(bp + 4);
-            printf("%s  SAS address: 0x%" PRIx64 "\n", leadin, ull);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            bump = 24;
-            break;
-        case TPROTO_ADT:
-            printf("%s  ADT:\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
-            break;
-        case TPROTO_ATA: /* ATA/ATAPI */
-            printf("%s  ATAPI:\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
-            break;
-        case TPROTO_UAS:
-            printf("%s  UAS:\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
-            break;
-        case TPROTO_SOP:
-            printf("%s  SOP ", leadin);
-            num = sg_get_unaligned_be16(bp + 2);
-            if (0 == format_code)
-                printf("Routing ID: 0x%x\n", num);
-            else {
-                pr2serr("  [Unexpected format code: %d]\n", format_code);
-                dStrHexErr((const char *)bp, 24, 0);
-            }
-            bump = 24;
-            break;
-        case TPROTO_NONE:
-            pr2serr("%s  No specified protocol\n", leadin);
-            /* dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), 0); */
-            bump = 24;
-            break;
-        default:
-            pr2serr("%s  unknown protocol id=0x%x  format_code=%d\n", leadin,
-                    proto_id, format_code);
-            dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), 0);
-            bump = 24;
-            break;
-        }
-    }
 }
 
 /* VPD_EXT_INQ    Extended Inquiry VPD */
