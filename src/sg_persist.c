@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.53 20160423";
+static const char * version_str = "0.54 20160426";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -236,120 +236,6 @@ usage(int help)
     }
 }
 
-/* If num_tids==0 then only one TransportID is assumed with len bytes in
- * it. If num_tids>0 then that many TransportIDs is assumed, each in an
- * element that is MX_TID_LEN bytes long (and the 'len' argument is
- * ignored). */
-static void
-decode_transport_id(const char * leadin, unsigned char * bp, int len,
-                    int num_tids)
-{
-    int format_code, proto_id, num, k;
-    int bump;
-
-    if (num_tids > 0)
-        len = num_tids * MX_TID_LEN;
-    for (k = 0, bump = MX_TID_LEN; k < len; k += bump, bp += bump) {
-        if ((len < 24) || (0 != (len % 4)))
-            printf("%sTransport Id short or not multiple of 4 "
-                   "[length=%d]:\n", leadin, len);
-        else
-            printf("%sTransport Id of initiator:\n", leadin);
-        format_code = ((bp[0] >> 6) & 0x3);
-        proto_id = (bp[0] & 0xf);
-        switch (proto_id) {
-        case TPROTO_FCP: /* Fibre channel */
-            printf("%s  FCP-2 World Wide Name:\n", leadin);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            dStrHex((const char *)&bp[8], 8, -1);
-            break;
-        case TPROTO_SPI: /* Parallel SCSI */
-            printf("%s  Parallel SCSI initiator SCSI address: 0x%x\n",
-                   leadin, sg_get_unaligned_be16(bp + 2));
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            printf("%s  relative port number (of corresponding target): "
-                   "0x%x\n", leadin,  sg_get_unaligned_be16(bp + 6));
-            break;
-        case TPROTO_SSA:
-            printf("%s  SSA (transport id not defined):\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
-            break;
-        case TPROTO_1394: /* IEEE 1394 */
-            printf("%s  IEEE 1394 EUI-64 name:\n", leadin);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            dStrHex((const char *)&bp[8], 8, -1);
-            break;
-        case TPROTO_SRP:
-            printf("%s  RDMA initiator port identifier:\n", leadin);
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            dStrHex((const char *)&bp[8], 16, -1);
-            break;
-        case TPROTO_ISCSI:
-            printf("%s  iSCSI ", leadin);
-            num =  sg_get_unaligned_be16(bp + 2);
-            if (0 == format_code)
-                printf("name: %.*s\n", num, &bp[4]);
-            else if (1 == format_code)
-                printf("name and session id: %.*s\n", num, &bp[4]);
-            else {
-                printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)bp, num + 4, -1);
-            }
-            break;
-        case TPROTO_SAS:
-            printf("%s  SAS address: 0x%016" PRIx64 "\n", leadin,
-                   sg_get_unaligned_be64(bp + 4));
-            if (0 != format_code)
-                printf("%s  [Unexpected format code: %d]\n", leadin,
-                       format_code);
-            break;
-        case TPROTO_ADT:
-            printf("%s  ADT:\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
-            break;
-        case TPROTO_ATA:
-            printf("%s  ATAPI:\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
-            break;
-        case TPROTO_UAS:
-            printf("%s  UAS:\n", leadin);
-            printf("%s  format code: %d\n", leadin, format_code);
-            dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
-            break;
-        case TPROTO_SOP:
-            printf("%s  SOP ", leadin);
-            num =  sg_get_unaligned_be16(bp + 2);
-            if (0 == format_code)
-                printf("Routing ID: 0x%x\n", num);
-            else {
-                printf("  [Unexpected format code: %d]\n", format_code);
-                dStrHex((const char *)bp, ((len > 24) ? 24 : len), -1);
-            }
-            break;
-        case TPROTO_NONE:
-            pr2serr("%s  No specified protocol\n", leadin);
-            /* dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), -1); */
-            break;
-        default:
-            pr2serr("%s  unknown protocol id=0x%x  format_code=%d\n",
-                    leadin, proto_id, format_code);
-            dStrHexErr((const char *)bp, ((len > 24) ? 24 : len), -1);
-            break;
-        }
-    }
-}
-
 static int
 prin_work(int sg_fd, const struct opts_t * op)
 {
@@ -501,8 +387,12 @@ prin_work(int sg_fd, const struct opts_t * op)
                     printf(" type: %s\n", pr_type_strs[j]);
                 } else
                     printf("      not reservation holder\n");
-                if (add_desc_len > 0)
-                    decode_transport_id("      ", &bp[24], add_desc_len, 0);
+                if (add_desc_len > 0) {
+                    char b[1024];
+
+                    printf("%s", sg_decode_transportid_str("      ", bp + 24,
+                                        add_desc_len, true, sizeof(b), b));
+                }
             }
         }
     }
@@ -979,7 +869,7 @@ my_cont_b:
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, res;
+    int sg_fd, c, k, res;
     const char * device_name = NULL;
     char buff[48];
     int help =0;
@@ -1235,11 +1125,17 @@ main(int argc, char * argv[])
         pr2serr("warning>>> --prout-type probably needs to be given\n");
     }
     if ((op->verbose > 2) && op->num_transportids) {
+        char b[1024];
+        unsigned char * bp;
+
         pr2serr("number of tranport-ids decoded from command line (or "
                 "stdin): %d\n", op->num_transportids);
         pr2serr("  Decode given transport-ids:\n");
-        decode_transport_id("      ", op->transportid_arr,
-                            0, op->num_transportids);
+        for (k = 0; k < op->num_transportids; ++k) {
+            bp = op->transportid_arr + (MX_TID_LEN * k);
+            printf("%s", sg_decode_transportid_str("      ", bp, MX_TID_LEN,
+                                                   true, sizeof(b), b));
+        }
     }
 
     if (op->inquiry) {

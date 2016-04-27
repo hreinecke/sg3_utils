@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,7 +99,7 @@ extern "C" {
 #define TPROTO_SPI 1
 #define TPROTO_SSA 2
 #define TPROTO_1394 3
-#define TPROTO_SRP 4
+#define TPROTO_SRP 4            /* SCSI over RDMA */
 #define TPROTO_ISCSI 5
 #define TPROTO_SAS 6
 #define TPROTO_ADT 7
@@ -243,6 +244,13 @@ int sg_lib_pdt_decay(int pdt);
 /* Yield string associated with transport protocol identifier (tpi). Returns
  *    'buff'. If 'tpi' out of range yields "bad tpi" string. */
 char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
+
+/* Decode TransportID pointed to by 'bp' of length 'bplen'. Place decoded
+ * string output in 'buff' which is also the return value. Each new line
+ * is prefixed by 'leadin'. If leadin NULL treat as "". */
+char * sg_decode_transportid_str(const char * leadin, unsigned char * bp,
+                                 int bplen, bool only_one, int buff_len,
+                                 char * buff);
 
 /* Returns a designator's type string given 'val' (0 to 15 inclusive),
  * otherwise returns NULL. */
