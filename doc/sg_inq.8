@@ -1,20 +1,21 @@
-.TH SG_INQ "8" "January 2016" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_INQ "8" "April 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
 .B sg_inq
 [\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR] [\fI\-\-inhex=FN\fR]
-[\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
+[\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
+[\fI\-\-inhex=FN\fR] [\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
-[\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR] [\fI\-c\fR]
-[\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR]
-[\fI\-I=FN\fR] [\fI\-l=LEN\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR]
-[\fI\-p=VPD_PG\fR] [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
+[\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
+[\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR]
+[\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-l=LEN\fR]
+[\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR] [\fI\-p=VPD_PG\fR]
+[\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -93,6 +94,16 @@ if any.
 .TP
 \fB\-e\fR
 see entry below for \fI\-\-vpd\fR.
+.TP
+\fB\-f\fR, \fB\-\-force\fR
+As a sanity check, the normal action when fetching VPD pages other than
+page 0x0 (the "Supported VPD pages" VPD page), is to first fetch page 0x0
+and only if the requested page is one of the supported pages, to go ahead
+and fetch the requested page.
+.br
+When this option is given, skip checking of VPD page 0x0 before accessing
+the requested VPD page. The prior check of VPD page 0x0 is known to
+crash certain USB devices, so use with care.
 .TP
 \fB\-u\fR, \fB\-\-export\fR
 prints out information obtained from the device. The output can be
@@ -317,6 +328,9 @@ enable (i.e. sets) the Vital Product Data (EVPD) bit (defaults to clear(0)).
 Used in conjunction with the \fI\-p=VPD_PG\fR option to specify the VPD page
 to fetch. If \fI\-p=VPD_PG\fR is not given then VPD page 0 (list supported
 VPD pages) is assumed.
+.TP
+\fB\-f\fR
+Equivalent to \fI\-\-force\fR in the OPTIONS section.
 .TP
 \fB\-h\fR
 outputs INQUIRY response in hex rather than trying to decode it.

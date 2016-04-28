@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160428] [svn: r695]
+Changelog for sg3_utils-1.43 [20160428] [svn: r696]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
@@ -19,6 +19,8 @@ Changelog for sg3_utils-1.43 [20160428] [svn: r695]
     - update version descriptor list to 20160420
   - sg_inq+sg_vpd: update Extended inquiry data vpd
     page (spc5r09)
+    - add --force option to bypass checking supported
+      vpd pages page and fetch requested page directly
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility

@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.60 20160428";    /* SPC-5 rev 09 */
+static const char * version_str = "1.61 20160428";    /* SPC-5 rev 09 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -190,6 +190,7 @@ static struct option long_options[] = {
         {"descriptors", no_argument, 0, 'd'},
         {"export", no_argument, 0, 'u'},
         {"extended", no_argument, 0, 'x'},
+        {"force", no_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"id", no_argument, 0, 'i'},
@@ -215,6 +216,7 @@ struct opts_t {
     int do_cmddt;
     int do_descriptors;
     int do_export;
+    int do_force;
     int do_help;
     int do_hex;
     int do_raw;
@@ -277,6 +279,7 @@ usage()
             "                    only supported for VPD pages 0x80 and 0x83\n"
             "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
+            "    --force|-f      skip VPD page 0 checking\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
             "    --id|-i         decode device identification VPD page "
@@ -398,10 +401,10 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
 
 #ifdef SG_LIB_LINUX
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "aB:cdeEhHiI:l:m:NOp:rsuvVx",
+        c = getopt_long(argc, argv, "aB:cdeEfhHiI:l:m:NOp:rsuvVx",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEhHiI:l:m:p:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:m:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
@@ -449,6 +452,9 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
             ++op->do_decode;
             ++op->do_vpd;
             op->page_num = VPD_EXT_INQ;
+            break;
+        case 'f':
+            ++op->do_force;
             break;
         case 'h':
             ++op->do_help;
@@ -581,6 +587,9 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'e':
                     ++op->do_vpd;
+                    break;
+                case 'f':
+                    ++op->do_force;
                     break;
                 case 'h':
                 case 'H':
@@ -1231,6 +1240,32 @@ decode_supported_vpd(unsigned char * buff, int len, int do_hex)
         else
             printf("     0x%x\n", vpd);
     }
+}
+
+static bool
+vpd_page_is_supported(unsigned char * buff, int len, int pg)
+{
+    int vpd, k, rlen;
+    bool supported = false;
+
+    if (len < 4)
+        return false;
+
+    rlen = buff[3] + 4;
+    if (rlen > len)
+        pr2serr("Supported VPD pages VPD page truncated, indicates %d, got "
+                "%d\n", rlen, len);
+    else
+        len = rlen;
+
+    for (k = 0; k < len - 4; ++k) {
+        vpd = buff[4 + k];
+        if(vpd == pg) {
+            supported = true;
+            break;
+        }
+    }
+    return supported;
 }
 
 /* ASCII Information VPD pages (page numbers: 0x1 to 0x7f) */
@@ -3347,6 +3382,16 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         mxlen = op->resp_len;
     else
         mxlen = inhex_len;
+    if (sg_fd != -1 && !op->do_force && pn != VPD_SUPPORTED_VPDS) {
+        res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_SUPPORTED_VPDS, mxlen,
+                                      vb, &len);
+        if (res)
+            goto out;
+        if (!vpd_page_is_supported(rp, len, pn)) {
+            res = SG_LIB_CAT_ILLEGAL_REQ;
+            goto out;
+        }
+    }
     switch (pn) {
     case VPD_SUPPORTED_VPDS:
         if (!op->do_raw && (op->do_hex < 2))
@@ -3640,6 +3685,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             return vpd_mainly_hex(sg_fd, op, inhex_len);
         }
     }
+out:
     if (res) {
         char b[80];
 

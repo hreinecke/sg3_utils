@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.19 20160428";  /* spc5r09 + sbc4r10 */
+static const char * version_str = "1.20 20160428";  /* spc5r09 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -45,6 +45,7 @@ static const char * version_str = "1.19 20160428";  /* spc5r09 + sbc4r10 */
 struct opts_t {
     int do_all;
     int do_enum;
+    int do_force;
     int do_hex;
     int num_vpd;
     int do_ident;
@@ -149,6 +150,7 @@ static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
         {"enumerate", no_argument, 0, 'e'},
+        {"force", no_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"ident", no_argument, 0, 'i'},
@@ -229,7 +231,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
 static void
 usage()
 {
-    pr2serr("Usage: sg_vpd  [--all] [--enumerate] [--help] [--hex] "
+    pr2serr("Usage: sg_vpd  [--all] [--enumerate] [--force] [--help] [--hex] "
             "[--ident]\n"
             "               [--inhex=FN] [--long] [--maxlen=LEN] "
             "[--page=PG] [--quiet]\n"
@@ -242,6 +244,7 @@ usage()
             "    --enumerate|-e    enumerate known VPD pages names (ignore "
             "DEVICE),\n"
             "                      can be used with --page=num to search\n"
+            "    --force|-f      skip VPD page 0 checking\n"
             "    --help|-h       output this usage message then exit\n"
             "    --hex|-H        output page in ASCII hexadecimal\n"
             "    --ident|-i      output device identification VPD page, "
@@ -2909,7 +2912,7 @@ static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
     int len, pdt, num, k, resid, alloc_len, pn, vb, allow_name, long_notquiet;
-    int res = 0;
+    int res = 0, vpd_supported = 0;
     char b[48];
     const struct svpd_values_name_t * vnp;
     char obuff[DEF_ALLOC_LEN];
@@ -2924,6 +2927,26 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     else
         allow_name = 1;
     rp = rsp_buff + off;
+    if (sg_fd != -1 && !op->do_force &&
+        pn != VPD_NO_RATHER_STD_INQ &&
+        pn != VPD_SUPPORTED_VPDS) {
+        res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_SUPPORTED_VPDS,
+                                      op->maxlen, vb, &len);
+        if (res)
+            return res;
+
+        num = rp[3];
+        if (num > (len - 4))
+            num = (len - 4);
+        for (k = 0; k < num; ++k) {
+            if (pn == rp[4 + k]) {
+                vpd_supported = 1;
+                break;
+            }
+        }
+        if (!vpd_supported)
+            return SG_LIB_CAT_ILLEGAL_REQ;
+    }
     switch(pn) {
     case VPD_NO_RATHER_STD_INQ:    /* -2 (want standard inquiry response) */
         if (sg_fd >= 0) {
@@ -3646,7 +3669,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aehHiI:lm:M:p:qrvV", long_options,
+        c = getopt_long(argc, argv, "aefhHiI:lm:M:p:qrvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -3657,6 +3680,9 @@ main(int argc, char * argv[])
             break;
         case 'e':
             ++op->do_enum;
+            break;
+        case 'f':
+            ++op->do_force;
             break;
         case 'h':
         case '?':
