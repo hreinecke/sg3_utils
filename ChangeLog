@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160426] [svn: r694]
+Changelog for sg3_utils-1.43 [20160428] [svn: r695]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
@@ -13,10 +13,12 @@ Changelog for sg3_utils-1.43 [20160426] [svn: r694]
   - sg_logs: fix volume statistics lpage when subpage
     is zero (ssc5r02a); decode mount history log parameter
     - decode Requested recovery, TapeAlert response, and
-      Service buffer information lpages
+      Service buffer information lpages for tape
     - add '--pdt=DT' option
   - sg_inq: fix potential unbounded loop in --export
     - update version descriptor list to 20160420
+  - sg_inq+sg_vpd: update Extended inquiry data vpd
+    page (spc5r09)
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility

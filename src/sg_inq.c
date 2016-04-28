@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.59 20160426";    /* SPC-5 rev 09 */
+static const char * version_str = "1.60 20160428";    /* SPC-5 rev 09 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2144,8 +2144,12 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  WU_SUP=%d [CRD_SUP=%d] NV_SUP=%d V_SUP=%d\n",
            !!(buff[6] & 0x8), !!(buff[6] & 0x4), !!(buff[6] & 0x2),
            !!(buff[6] & 0x1));
-    printf("  P_I_I_SUP=%d LUICLR=%d R_SUP=%d CBCS=%d\n",
-           !!(buff[7] & 0x10), !!(buff[7] & 0x1), !!(buff[8] & 0x10),
+    /* NO_PI_CHK and HSSRELEF added in spc5r02 */
+    printf("  NO_PI_CHK=%d P_I_I_SUP=%d LUICLR=%d\n", !!(buff[7] & 0x20),
+           !!(buff[7] & 0x10), !!(buff[7] & 0x1));
+    /* LU_COLL_TYPE in spc5r09, CBCS obsolete in spc5r01 */
+    printf("LU_COLL_TYPE=%d R_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
+           (buff[8] >> 5) & 0x7, !!(buff[8] & 0x10), !!(buff[8] & 0x2),
            !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
@@ -2154,6 +2158,10 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20));
     printf("  Maximum supported sense data length=%d\n",
            buff[13]); /* spc4r34 */
+    /* All byte 14 bits added in spc5r09 */
+    printf("  IBS=%d IAS=%d SAC=%d NRD1=%d NRD0=%d\n",
+           !!(buff[14] & 0x80), !!(buff[14] & 0x40), !!(buff[14] & 0x4),
+           !!(buff[14] & 0x2), !!(buff[14] & 0x1));
 }
 
 /* VPD_SOFTW_INF_ID */
