@@ -3,7 +3,7 @@
  *
  * Retrieve / set RDAC options.
  *
- * Copyright (C) 2006-2015 Hannes Reinecke <hare@suse.de>
+ * Copyright (C) 2006-2016 Hannes Reinecke <hare@suse.de>
  *
  * Based on sg_modes.c and sg_emc_trespass.c; credits from there apply.
  *
@@ -27,7 +27,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.10 20151219";
+static const char * version_str = "1.11 20160429";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -178,9 +178,16 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
         int res;
         char b[80];
 
-        if (use_6_byte && lun > 32) {
-                pr2serr("must use 10 byte cdb to fail luns over 32\n");
-                return -1;
+        if (use_6_byte) {
+                if (lun > 31) {
+                        pr2serr("must use 10 byte cdb to fail luns over 31\n");
+                        return -1;
+                }
+        } else {        /* 10 byte cdb case */
+                if (lun > 255) {
+                        pr2serr("lun cannot exceed 255\n");
+                        return -1;
+                }
         }
 
         memset(fail_paths_pg, 0, 308);
