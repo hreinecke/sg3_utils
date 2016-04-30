@@ -1,4 +1,4 @@
-.TH SG_RDAC "8" "April 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_RDAC "8" "April 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_rdac \- display or modify SCSI RDAC Redundant Controller mode page
 .SH SYNOPSIS
@@ -24,6 +24,8 @@ Transfer all (visible) devices
 \fB\-f\fR=\fILUN\fR
 Transfer the device identified by \fILUN\fR. This command will only work
 if the controller supports 'Dual Active Mode' (aka active/active mode).
+\fILUN\fR is a decimal number which cannot exceed 31 when the \fI\-6\fR
+option is given, otherwise is cannot exceed 255.
 .TP
 \fB\-v\fR
 be verbose
@@ -38,7 +40,7 @@ Written by Hannes Reinecke <hare at suse dot com>, based on sg_emc_trespass.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2015 Hannes Reinecke, Douglas Gilbert.
+Copyright \(co 2006\-2016 Hannes Reinecke, Douglas Gilbert.
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
