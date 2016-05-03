@@ -25,7 +25,7 @@
  *
  */
 
-static char * version_str = "1.03 20160128";
+static char * version_str = "1.04 20160503";
 
 
 #define MAX_LINE_LEN 1024
@@ -188,7 +188,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     int ret = 0;
     char b[2048];
-    char bb[128];
+    char bb[256];
 
     while (1) {
         int option_index = 0;
@@ -369,10 +369,12 @@ main(int argc, char * argv[])
         for (k = 0; k < 18; ++k) {
             printf("k=%d:\n", k);
             dStrHex(b, k, 0);
-            dStrHex(b, k, 1);
-            dStrHex(b, k, -1);
-            dStrHexStr(b, k, "dStrHexStr:^", 0, sizeof(bb), bb);
+            dStrHexStr(b, k, "dSHS_0: ", 0, sizeof(bb), bb);
             printf("%s", bb);
+            dStrHex(b, k, 1);
+            dStrHexStr(b, k, "dSHS_1: ", 1, sizeof(bb), bb);
+            printf("%s", bb);
+            dStrHex(b, k, -1);
             printf("\n");
         }
     }

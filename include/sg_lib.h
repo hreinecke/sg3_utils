@@ -383,20 +383,21 @@ char * safe_strerror(int errnum);
  *     = 0     in addition, the bytes are listed in ASCII to the right
  *     < 0     only the ASCII-hex bytes are listed (i.e. without address)
 */
-void dStrHex(const char* str, int len, int no_ascii);
+void dStrHex(const char * str, int len, int no_ascii);
 
 /* Print (to sg_warnings_strm (stderr)) 'str' of bytes in hex, 16 bytes per
  * line optionally followed at right by its ASCII interpretation. Same
  * logic as dStrHex() with different output stream (i.e. stderr). */
-void dStrHexErr(const char* str, int len, int no_ascii);
+void dStrHexErr(const char * str, int len, int no_ascii);
 
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
  * per line with an extra space between the 8th and 9th bytes. 'format'
- * is unused, set to 0 . Returns number of bytes written to 'b' excluding
- * the trailing '\0'.*/
-int dStrHexStr(const char* str, int len, const char * leadin, int format,
+ * is 0 for repeat in printable ASCII ('.' for non printable chars) to
+ * right of each line; 1 don't (so just output ASCII hex). Returns
+ * number of bytes written to 'b' excluding the trailing '\0'. */
+int dStrHexStr(const char * str, int len, const char * leadin, int format,
                int b_len, char * b);
 
 /* Returns 1 when executed on big endian machine; else returns 0.
@@ -425,7 +426,7 @@ int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
  * If 'swapb' non-zero then bytes in each word swapped. Needs to be set
  * for ATA IDENTIFY DEVICE response on big-endian machines.
 */
-void dWordHex(const unsigned short* words, int num, int no_ascii, int swapb);
+void dWordHex(const unsigned short * words, int num, int no_ascii, int swapb);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
  * then -1 is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')

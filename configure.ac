@@ -1,7 +1,7 @@
 AC_INIT(sg3_utils, 1.43, dgilbert@interlog.com)
 
-AM_INIT_AUTOMAKE
-AM_MAINTAINER_MODE([-Wall -Werror foreign])
+AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+AM_MAINTAINER_MODE
 AM_CONFIG_HEADER(config.h)
 
 AC_PROG_CC

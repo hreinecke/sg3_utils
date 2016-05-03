@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.12 20160413";    /* ses3r13 */
+static const char * version_str = "2.13 20160502";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1725,15 +1725,12 @@ configuration_sdg(const uint8_t * resp, int resp_len)
         printf("\n      enclosure vendor: %.8s  product: %.16s  rev: %.4s\n",
                bp + 12, bp + 20, bp + 36);
         if (el > 40) {
+            char bb[1024];
+
             printf("      vendor-specific data:\n");
-            /* dStrHex((const char *)(bp + 40), el - 40, 0); */
-            printf("        ");
-            for (j = 0; j < (el - 40); ++j) {
-                if ((j > 0) && (0 == (j % 16)))
-                    printf("\n        ");
-                printf("%02x ", *(bp + 40 + j));
-            }
-            printf("\n");
+            dStrHexStr((const char *)(bp + 40), el - 40, "        ", 0,
+                       sizeof(bb), bb);
+            printf("%s\n", bb);
         }
     }
     /* printf("\n"); */
@@ -3216,7 +3213,7 @@ truncated:
 static void
 subenc_string_sdg(const uint8_t * resp, int resp_len)
 {
-    int k, j, el, num_subs;
+    int k, el, num_subs;
     uint32_t gen_code;
     const uint8_t * bp;
     const uint8_t * last_bp;
@@ -3236,14 +3233,11 @@ subenc_string_sdg(const uint8_t * resp, int resp_len)
         el = sg_get_unaligned_be16(bp + 2) + 4;
         printf("   subenclosure identifier: %d\n", bp[1]);
         if (el > 4) {
-            /* dStrHex((const char *)(bp + 4), el - 4, 0); */
-            printf("    ");
-            for (j = 0; j < (el - 4); ++j) {
-                if ((j > 0) && (0 == (j % 16)))
-                    printf("\n    ");
-                printf("%02x ", *(bp + 4 + j));
-            }
-            printf("\n");
+            char bb[1024];
+
+            dStrHexStr((const char *)(bp + 40), el - 40, "    ", 0,
+                       sizeof(bb), bb);
+            printf("%s\n", bb);
         } else
             printf("    <empty>\n");
     }

@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.20 20160428";  /* spc5r09 + sbc4r10 */
+static const char * version_str = "1.21 20160503";  /* spc5r09 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -2046,7 +2046,8 @@ get_cscd_desc_id_name(uint16_t cscd_desc_id)
 
 /* VPD_3PARTY_COPY [3PC, third party copy] */
 static void
-decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
+decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
+                       int verbose)
 {
     int j, k, m, bump, desc_type, desc_len, sa_len;
     unsigned int u;
@@ -2084,6 +2085,8 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         else if (do_hex > 2)
             dStrHex((const char *)bp, bump, 1);
         else {
+            int csll;
+
             switch (desc_type) {
             case 0x0000:    /* Required if POPULATE TOKEN (or friend) used */
                 printf(" Block Device ROD Token Limits:\n");
@@ -2101,14 +2104,27 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int verbose)
             case 0x0001:    /* Mandatory (SPC-4) */
                 printf(" Supported Commands:\n");
                 j = 0;
-                while (j < bp[4]) {
+                csll = bp[4];
+                if (csll >= desc_len) {
+                    pr2serr("Command supported list length (%d) >= "
+                            "descriptor length (%d), wrong so trim\n",
+                            csll, desc_len);
+                    csll = desc_len - 1;
+                }
+                while (j < csll) {
                     sa_len = bp[6 + j];
-                    for (m = 0; m < sa_len; ++m) {
+                    for (m = 0; (m < sa_len) && ((j + m) < csll); ++m) {
                         sg_get_opcode_sa_name(bp[5 + j], bp[7 + j + m],
-                                              0, sizeof(b), b);
+                                              pdt, sizeof(b), b);
                         printf("  %s\n", b);
                     }
-                    j += sa_len + 2;
+                    if (0 == sa_len) {
+                        sg_get_opcode_name(bp[5 + j], pdt, sizeof(b), b);
+                        printf("  %s\n",  b);
+                    } else if (m < sa_len)
+                        pr2serr("Supported service actions list length (%d) "
+                                "is too large\n", sa_len);
+                    j += m + 2;
                 }
                 break;
             case 0x0004:
@@ -2483,16 +2499,28 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     }
 }
 
+static const char * prov_type_arr[8] = {
+    "not known or fully provisioned",
+    "resource provisioned",
+    "thin provisioned",
+    "reserved [0x3]",
+    "reserved [0x4]",
+    "reserved [0x5]",
+    "reserved [0x6]",
+    "reserved [0x7]",
+};
+
 /* VPD_LB_PROVISIONING 0xb2 */
 static int
 decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
 {
-    int dp;
+    int dp, pt;
 
     if (len < 4) {
         pr2serr("Logical block provisioning page too short=%d\n", len);
         return SG_LIB_CAT_MALFORMED;
     }
+    pt = b[6] & 0x7;
     printf("  Unmap command supported (LBPU): %d\n", !!(0x80 & b[5]));
     printf("  Write same (16) with unmap bit supported (LBWS): %d\n",
            !!(0x40 & b[5]));
@@ -2505,7 +2533,7 @@ decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
     printf("  Threshold exponent: %d\n", b[4]);
     printf("  Descriptor present (DP): %d\n", dp);
     printf("  Minimum percentage: %d\n", 0x1f & (b[6] >> 3));
-    printf("  Provisioning type: %d\n", b[6] & 0x7);
+    printf("  Provisioning type: %d (%s)\n", pt, prov_type_arr[pt]);
     printf("  Threshold percentage: %d\n", b[7]);
     if (dp) {
         const unsigned char * bp;
@@ -3251,7 +3279,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_3party_copy_vpd(rp, len, op->do_hex, vb);
+                decode_3party_copy_vpd(rp, len, op->do_hex, pdt, vb);
             }
             return 0;
         }

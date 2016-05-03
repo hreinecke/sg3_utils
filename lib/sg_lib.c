@@ -98,6 +98,13 @@ scnpr(char * cp, int cp_max_len, const char * fmt, ...)
     return (n < cp_max_len) ? n : (cp_max_len - 1);
 }
 
+/* Simple ASCII printable (does not use locale), includes space and excludes
+ * DEL (0x7f). */
+static inline int my_isprint(int ch)
+{
+    return ((ch >= ' ') && (ch < 0x7f));
+}
+
 /* Searches 'arr' for match on 'value' then 'peri_type'. If matches
    'value' but not 'peri_type' then yields first 'value' match entry.
    Last element of 'arr' has NULL 'name'. If no match returns NULL. */
@@ -508,7 +515,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             if (0 != tpid_format)
                 n += scnpr(b + n, blen - n, "%s  [Unexpected TPID format: "
                            "%d]\n", lip, tpid_format);
-            n += dStrHexStr((const char *)bp +8, 8, lip, -1, blen - n,
+            n += dStrHexStr((const char *)bp +8, 8, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -528,7 +535,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
                        "defined):\n", lip);
             n += scnpr(b + n, blen - n, "%s  TPID format: %d\n", lip,
                        tpid_format);
-            n += dStrHexStr((const char *)bp, normal_len, lip, 0, blen - n,
+            n += dStrHexStr((const char *)bp, normal_len, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -537,7 +544,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             if (0 != tpid_format)
                 n += scnpr(b + n, blen - n, "%s  [Unexpected TPID format: "
                            "%d]\n", lip, tpid_format);
-            n += dStrHexStr((const char *)&bp[8], 8, lip, -1, blen - n,
+            n += dStrHexStr((const char *)&bp[8], 8, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -547,7 +554,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             if (0 != tpid_format)
                 n += scnpr(b + n, blen - n, "%s  [Unexpected TPID format: "
                            "%d]\n", lip, tpid_format);
-            n += dStrHexStr((const char *)&bp[8], 16, lip, -1, blen - n,
+            n += dStrHexStr((const char *)&bp[8], 16, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -581,7 +588,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             n += scnpr(b + n, blen - n, "%s  ADT:\n", lip);
             n += scnpr(b + n, blen - n, "%s  TPID format: %d\n", lip,
                        tpid_format);
-            n += dStrHexStr((const char *)bp, normal_len, lip, 0, blen - n,
+            n += dStrHexStr((const char *)bp, normal_len, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -589,7 +596,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             n += scnpr(b + n, blen - n, "%s  ATAPI:\n", lip);
             n += scnpr(b + n, blen - n, "%s  TPID format: %d\n", lip,
                        tpid_format);
-            n += dStrHexStr((const char *)bp, normal_len, lip, 0, blen - n,
+            n += dStrHexStr((const char *)bp, normal_len, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -597,7 +604,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             n += scnpr(b + n, blen - n, "%s  UAS:\n", lip);
             n += scnpr(b + n, blen - n, "%s  TPID format: %d\n", lip,
                        tpid_format);
-            n += dStrHexStr((const char *)bp, normal_len, lip, 0, blen - n,
+            n += dStrHexStr((const char *)bp, normal_len, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -609,7 +616,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             else {
                 n += scnpr(b + n, blen - n, "  [Unexpected TPID format: "
                            "%d]\n", tpid_format);
-                n += dStrHexStr((const char *)bp, normal_len, lip, 0,
+                n += dStrHexStr((const char *)bp, normal_len, lip, 1,
                                 blen - n, b + n);
             }
             bump = TRANSPORT_ID_MIN_LEN;
@@ -618,7 +625,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
             n += scnpr(b + n, blen - n, "%s  PCIE:\n", lip);
             n += scnpr(b + n, blen - n, "%s  TPID format: %d\n", lip,
                        tpid_format);
-            n += dStrHexStr((const char *)bp, normal_len, lip, 0, blen - n,
+            n += dStrHexStr((const char *)bp, normal_len, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -631,7 +638,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
         default:
             n += scnpr(b + n, blen - n, "%s  unknown protocol id=0x%x  "
                        "TPID format=%d\n", lip, proto_id, tpid_format);
-            n += dStrHexStr((const char *)bp, normal_len, lip, 0, blen - n,
+            n += dStrHexStr((const char *)bp, normal_len, lip, 1, blen - n,
                             b + n);
             bump = TRANSPORT_ID_MIN_LEN;
             break;
@@ -756,7 +763,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
     case 0: /* vendor specific */
         k = 0;
         if ((1 == c_set) || (2 == c_set)) { /* ASCII or UTF-8 */
-            for (k = 0; (k < dlen) && isprint(ip[k]); ++k)
+            for (k = 0; (k < dlen) && my_isprint(ip[k]); ++k)
                 ;
             if (k >= dlen)
                 k = 1;
@@ -789,7 +796,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             if ((8 != dlen) && (12 != dlen) && (16 != dlen)) {
                 n += scnpr(b + n, blen - n, "%s      << expect 8, 12 and 16 "
                            "byte EUI, got %d >>\n", lip, dlen);
-                 n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                 n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n,
                                  b + n);
                 break;
             }
@@ -804,7 +811,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
         if (1 != c_set) {
             n += scnpr(b + n, blen - n, "%s      << expected binary code_set "
                        "(1) >>\n", lip);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
         ci_off = 0;
@@ -816,7 +823,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
         } else if ((8 != dlen) && (12 != dlen)) {
             n += scnpr(b + n, blen - n, "%s      << can only decode 8, 12 "
                        "and 16 byte ids >>\n", lip);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
         c_id = sg_get_unaligned_be24(ip + ci_off);
@@ -840,7 +847,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
         if (1 != c_set) {
             n += scnpr(b + n, blen - n, "%s      << unexpected code set %d "
                        "for NAA >>\n", lip, c_set);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
         naa = (ip[0] >> 4) & 0xff;
@@ -849,7 +856,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             if (8 != dlen) {
                 n += scnpr(b + n, blen - n, "%s      << unexpected NAA 2 "
                            "identifier length: 0x%x >>\n", lip, dlen);
-                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n,
                                 b + n);
                 break;
             }
@@ -877,7 +884,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             if (8 != dlen) {
                 n += scnpr(b + n, blen - n, "%s      << unexpected NAA 3 "
                            "identifier length: 0x%x >>\n", lip, dlen);
-                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n,
                                 b + n);
                 break;
             }
@@ -893,7 +900,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             if (8 != dlen) {
                 n += scnpr(b + n, blen - n, "%s      << unexpected NAA 5 "
                            "identifier length: 0x%x >>\n", lip, dlen);
-                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n,
                                 b + n);
                 break;
             }
@@ -924,7 +931,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             if (16 != dlen) {
                 n += scnpr(b + n, blen - n, "%s      << unexpected NAA 6 "
                            "identifier length: 0x%x >>\n", lip, dlen);
-                n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n,
+                n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n,
                                 b + n);
                 break;
             }
@@ -958,7 +965,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
         default:
             n += scnpr(b + n, blen - n, "%s      << unexpected NAA [0x%x] "
                        ">>\n", lip, naa);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
         break;
@@ -967,7 +974,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             n += scnpr(b + n, blen - n, "%s      << expected binary "
                        "code_set, target port association, length 4 >>\n",
                        lip);
-            n += dStrHexStr((const char *)ip, dlen, "", 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, "", 1, blen - n, b + n);
             break;
         }
         d_id = sg_get_unaligned_be16(ip + 2);
@@ -979,7 +986,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             n += scnpr(b + n, blen - n, "%s      << expected binary "
                        "code_set, target port association, length 4 >>\n",
                        lip);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
         d_id = sg_get_unaligned_be16(ip + 2);
@@ -991,7 +998,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
             n += scnpr(b + n, blen - n, "%s      << expected binary "
                        "code_set, logical unit association, length 4 >>\n",
                        lip);
-            n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
         d_id = sg_get_unaligned_be16(ip + 2);
@@ -1002,12 +1009,12 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
         if ((1 != c_set) || (0 != assoc)) {
             n += scnpr(b + n, blen - n, "%s      << expected binary "
                        "code_set, logical unit association >>\n", lip);
-            n += dStrHexStr((const char *)ip, dlen, "", 0, blen - n, b + n);
+            n += dStrHexStr((const char *)ip, dlen, "", 1, blen - n, b + n);
             break;
         }
         n += scnpr(b + n, blen - n, "%s      MD5 logical unit identifier:\n",
                    lip);
-        n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+        n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
         break;
     case 8: /* SCSI name string */
         if (3 != c_set) {       /* accept ASCII as subset of UTF-8 */
@@ -1088,7 +1095,7 @@ sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
     default: /* reserved */
         n += scnpr(b + n, blen - n, "%s      reserved designator=0x%x\n", lip,
                    desig_type);
-        n += dStrHexStr((const char *)ip, dlen, lip, 0, blen - n, b + n);
+        n += dStrHexStr((const char *)ip, dlen, lip, 1, blen - n, b + n);
         break;
     }
     return n;
@@ -1765,8 +1772,8 @@ sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
         if (n >= (buff_len - 1))
             return n;
         scnpr(z, sizeof(z), "%.50s        ", lip);
-        n += dStrHexStr((const char *)sbp, len, z,  0,
-                        buff_len - n, buff + n);
+        n += dStrHexStr((const char *)sbp, len, z,  1, buff_len - n,
+                        buff + n);
     }
     return n;
 }
@@ -2332,7 +2339,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
         if (no_ascii)
             buff[cpos++] = ' ';
         else {
-            if ((c < ' ') || (c >= 0x7f))
+            if (! my_isprint(c))
                 c = '.';
             buff[cpos++] = c;
         }
@@ -2369,56 +2376,74 @@ dStrHexErr(const char* str, int len, int no_ascii)
               (sg_warnings_strm ? sg_warnings_strm : stderr));
 }
 
+#define DSHS_LINE_BLEN 160
+#define DSHS_BPL 16
+
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
  * per line with an extra space between the 8th and 9th bytes. 'format'
- * is unused (currently), set to 0 . Returns number of bytes written
- * to 'b' excluding the trailing '\0'. */
+ * is 0 for repeat in printable ASCII ('.' for non printable) to
+ * right of each line; 1 don't (so just output ASCII hex). Returns
+ * number of bytes written to 'b' excluding the trailing '\0'. */
 int
-dStrHexStr(const char* str, int len, const char * leadin, int format,
+dStrHexStr(const char * str, int len, const char * leadin, int format,
            int b_len, char * b)
 {
-    const char * p = str;
     unsigned char c;
-    char buff[122];
-    int bpstart, bpos, k, n;
+    int bpstart, bpos, k, n, prior_ascii_len;
+    bool want_ascii;
+    char buff[DSHS_LINE_BLEN + 2];
+    char a[DSHS_BPL + 1];
+    const char * p = str;
 
     if (len <= 0) {
         if (b_len > 0)
             b[0] = '\0';
         return 0;
     }
-    if (0 != format) {
-        ;       /* do nothing different for now */
+    if (b_len <= 0)
+        return 0;
+    want_ascii = !format;
+    if (want_ascii) {
+        memset(a, ' ', DSHS_BPL);
+        a[DSHS_BPL] = '\0';
     }
     if (leadin) {
         bpstart = strlen(leadin);
-        /* Cap leadin at 60 characters */
-        if (bpstart > 60)
-            bpstart = 60;
+        /* Cap leadin at (DSHS_LINE_BLEN - 70) characters */
+        if (bpstart > (DSHS_LINE_BLEN - 70))
+            bpstart = DSHS_LINE_BLEN - 70;
     } else
         bpstart = 0;
     bpos = bpstart;
+    prior_ascii_len = bpstart + (DSHS_BPL * 3) + 1;
     n = 0;
-    memset(buff, ' ', 120);
-    buff[120] = '\0';
+    memset(buff, ' ', DSHS_LINE_BLEN);
+    buff[DSHS_LINE_BLEN] = '\0';
     if (bpstart > 0)
         memcpy(buff, leadin, bpstart);
     for (k = 0; k < len; k++) {
         c = *p++;
-        if (bpos == (bpstart + (8 * 3)))
-            bpos++;
+        if (bpos == (bpstart + ((DSHS_BPL / 2) * 3)))
+            bpos++;     /* for extra space in middle of each line's hex */
         scnpr(buff + bpos, (int)sizeof(buff) - bpos, "%.2x",
               (int)(unsigned char)c);
         buff[bpos + 2] = ' ';
-        if ((k > 0) && (0 == ((k + 1) % 16))) {
+        if (want_ascii)
+            a[k % DSHS_BPL] = my_isprint(c) ? c : '.';
+        if ((k > 0) && (0 == ((k + 1) % DSHS_BPL))) {
             trimTrailingSpaces(buff);
-            n += scnpr(b + n, b_len - n, "%s\n", buff);
+            if (want_ascii) {
+                n += scnpr(b + n, b_len - n, "%-*s   %s\n", prior_ascii_len,
+                           buff, a);
+                memset(a, ' ', DSHS_BPL);
+            } else
+                n += scnpr(b + n, b_len - n, "%s\n", buff);
             if (n >= (b_len - 1))
                 return n;
+            memset(buff, ' ', DSHS_LINE_BLEN);
             bpos = bpstart;
-            memset(buff, ' ', 120);
             if (bpstart > 0)
                 memcpy(buff, leadin, bpstart);
         } else
@@ -2426,7 +2451,11 @@ dStrHexStr(const char* str, int len, const char * leadin, int format,
     }
     if (bpos > bpstart) {
         trimTrailingSpaces(buff);
-        n += scnpr(b + n, b_len - n, "%s\n", buff);
+        if (want_ascii)
+            n += scnpr(b + n, b_len - n, "%-*s   %s\n", prior_ascii_len,
+                       buff, a);
+        else
+            n += scnpr(b + n, b_len - n, "%s\n", buff);
     }
     return n;
 }
@@ -2529,10 +2558,10 @@ dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
         } else {
             upp = (c >> 8) & 0xff;
             low = c & 0xff;
-            if ((upp < 0x20) || (upp >= 0x7f))
+            if (! my_isprint(upp))
                 upp = '.';
             buff[cpos++] = upp;
-            if ((low < 0x20) || (low >= 0x7f))
+            if (! my_isprint(low))
                 low = '.';
             buff[cpos++] = low;
             buff[cpos++] = ' ';

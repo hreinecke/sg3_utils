@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160429] [svn: r698]
+Changelog for sg3_utils-1.43 [20160503] [svn: r699]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
@@ -21,6 +21,7 @@ Changelog for sg3_utils-1.43 [20160429] [svn: r698]
     page (spc5r09)
     - add --force option to bypass checking supported
       vpd pages page and fetch requested page directly
+  - sg_vpd: 3 party copy VPD page improvements
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_rdac: add sanity checks for -f=lun value
   - sg_turs+sg_requests: make both accept '--num=NUM'
@@ -31,6 +32,7 @@ Changelog for sg3_utils-1.43 [20160429] [svn: r698]
   - sg_lib: add SSC maintenance in/out sa names
     - add read buffer(16) command mode names
     - add sg_decode_transportid_str()
+    - implement 'format' argument in dStrHexStr()
   - sg_lib_data: sync asc/ascq codes with T10 20160425
   - rescan-scsi-bus.sh: harden code
   - clang --analyze static checker clean ups
