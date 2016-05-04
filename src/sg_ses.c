@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.13 20160502";    /* ses3r13 */
+static const char * version_str = "2.14 20160504";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -712,6 +712,7 @@ static struct option long_options[] = {
     {"status", no_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
+    {"warn", no_argument, 0, 'w'},
     {0, 0, 0, 0},
 };
 
@@ -2803,7 +2804,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
             printf("%sSAS address: 0x", pad);
             for (m = 0; m < 8; ++m)
                 printf("%02x", ae_bp[6 + eip_offset + m]);
-            printf("\n%sAttached connector;other_element pairs:\n", pad);
+            printf("\n%sAttached connector; other_element pairs:\n", pad);
             aep = ae_bp + 14 + eip_offset;
             for (j = 0; j < phys; ++j, aep += 2) {
                 printf("%s  [%d] ", pad, j);
@@ -3550,6 +3551,7 @@ process_status_page(int sg_fd, struct opts_t * op)
     const char * cp;
     struct enclosure_info primary_info;
     struct th_es_t tes;
+    struct th_es_t * tesp;
 
     resp = (uint8_t *)calloc(op->maxlen, 1);
     if (NULL == resp) {
@@ -3558,6 +3560,8 @@ process_status_page(int sg_fd, struct opts_t * op)
         ret = -1;
         goto fini;
     }
+    tesp = &tes;
+    memset(tesp, 0, sizeof(tes));
     cp = find_in_diag_page_desc(op->page_code);
     ret = do_rec_diag(sg_fd, op->page_code, resp, op->maxlen, op, &resp_len);
     if (ret)
@@ -3604,12 +3608,9 @@ process_status_page(int sg_fd, struct opts_t * op)
                     printf("%02x", primary_info.enc_log_id[j]);
                 printf("\n");
             }
-            tes.th_base = type_desc_hdr_arr;
-            tes.num_ths = num_ths;
-            tes.j_base = NULL;
-            tes.num_j_rows = 0;
-            tes.num_j_eoe = 0;
-            enc_status_dp(&tes, ref_gen_code, resp, resp_len, op);
+            tesp->th_base = type_desc_hdr_arr;
+            tesp->num_ths = num_ths;
+            enc_status_dp(tesp, ref_gen_code, resp, resp_len, op);
             break;
         case HELP_TEXT_DPC:
             printf("Help text diagnostic page (for primary "
@@ -3641,9 +3642,9 @@ process_status_page(int sg_fd, struct opts_t * op)
                     printf("%02x", primary_info.enc_log_id[j]);
                 printf("\n");
             }
-            tes.th_base = type_desc_hdr_arr;
-            tes.num_ths = num_ths;
-            threshold_sdg(&tes, ref_gen_code, resp, resp_len, op);
+            tesp->th_base = type_desc_hdr_arr;
+            tesp->num_ths = num_ths;
+            threshold_sdg(tesp, ref_gen_code, resp, resp_len, op);
             break;
         case ELEM_DESC_DPC:
             num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
@@ -3659,9 +3660,9 @@ process_status_page(int sg_fd, struct opts_t * op)
                     printf("%02x", primary_info.enc_log_id[j]);
                 printf("\n");
             }
-            tes.th_base = type_desc_hdr_arr;
-            tes.num_ths = num_ths;
-            element_desc_sdg(&tes, ref_gen_code, resp, resp_len, op);
+            tesp->th_base = type_desc_hdr_arr;
+            tesp->num_ths = num_ths;
+            element_desc_sdg(tesp, ref_gen_code, resp, resp_len, op);
             break;
         case SHORT_ENC_STATUS_DPC:
             printf("Short enclosure status diagnostic page, "
@@ -3686,9 +3687,9 @@ process_status_page(int sg_fd, struct opts_t * op)
                     printf("%02x", primary_info.enc_log_id[j]);
                 printf("\n");
             }
-            tes.th_base = type_desc_hdr_arr;
-            tes.num_ths = num_ths;
-            additional_elem_sdg(&tes, ref_gen_code, resp, resp_len, op);
+            tesp->th_base = type_desc_hdr_arr;
+            tesp->num_ths = num_ths;
+            additional_elem_sdg(tesp, ref_gen_code, resp, resp_len, op);
             break;
         case SUBENC_HELP_TEXT_DPC:
             subenc_help_sdg(resp, resp_len);
@@ -3777,7 +3778,7 @@ join_aes_helper(const uint8_t * ae_bp, const uint8_t * ae_last_bp,
     blen = sizeof(b);
     hex = op->do_hex;
     broken_ei = false;
-    /* loop over all type descritor headers in the Configuration dpge */
+    /* loop over all type descriptor headers in the Configuration dpge */
     for (k = 0, aes_i = 0; k < tesp->num_ths; ++k, ++tdhp) {
         if (is_et_used_by_aes(tdhp->etype)) {
             /* only consider element types that AES element are permiited
@@ -3972,6 +3973,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     const struct type_desc_hdr_t * tdhp;
     struct enclosure_info primary_info;
     struct th_es_t tes;
+    struct th_es_t * tesp;
     char b[64];
 
     eip_count = 0;
@@ -3984,11 +3986,10 @@ join_work(int sg_fd, struct opts_t * op, bool display)
                                          &primary_info, op);
     if (num_ths < 0)
         return num_ths;
-    tes.th_base = type_desc_hdr_arr;
-    tes.num_ths = num_ths;
-    tes.j_base = NULL;
-    tes.num_j_rows = 0;
-    tes.num_j_eoe = 0;
+    tesp = &tes;
+    memset(tesp, 0, sizeof(tes));
+    tesp->th_base = type_desc_hdr_arr;
+    tesp->num_ths = num_ths;
     if (display && primary_info.have_info) {
         printf("  Primary enclosure logical identifier (hex): ");
         for (j = 0; j < 8; ++j)
@@ -4109,9 +4110,9 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         t_bp = NULL;
     }
 
-    tes.j_base = join_arr;
-    jrp = tes.j_base;
-    tdhp = tes.th_base;
+    tesp->j_base = join_arr;
+    jrp = tesp->j_base;
+    tdhp = tesp->th_base;
     for (k = 0, eoe = 0, ei4aess = 0; k < num_ths; ++k, ++tdhp) {
         jrp->th_i = k;
         jrp->indiv_i = -1;
@@ -4156,24 +4157,24 @@ join_work(int sg_fd, struct opts_t * op, bool display)
             if (t_bp)
                 t_bp += 4;
             jrp->ae_statp = NULL;
-            ++tes.num_j_eoe;
+            ++tesp->num_j_eoe;
         }
         if (jrp >= join_arr_lastp) {
             ++k;
             break;      /* leave last row all zeros */
         }
     }
-    tes.num_j_rows = jrp - tes.j_base;
+    tesp->num_j_rows = jrp - tesp->j_base;
 
     broken_ei = false;
     if (ae_bp)
-        broken_ei = join_aes_helper(ae_bp, ae_last_bp, &tes, op);
+        broken_ei = join_aes_helper(ae_bp, ae_last_bp, tesp, op);
 
     if (op->verbose > 3) {
         pr2serr("Dump of join array, each line is a row. Lines start with\n");
         pr2serr("[<element_type>: <type_hdr_index>,<elem_ind_within>]\n");
         pr2serr("'-1' indicates overall element or not applicable.\n");
-        jrp = tes.j_base;
+        jrp = tesp->j_base;
         for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
             pr2serr("[0x%x: %d,%d] ", jrp->etype, jrp->th_i, jrp->indiv_i);
             if (jrp->se_id > 0)
@@ -4225,7 +4226,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
 
     /* Display contents of join_arr */
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
-    for (k = 0, jrp = tes.j_base, got1 = false;
+    for (k = 0, jrp = tesp->j_base, got1 = false;
          ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
         if (op->ind_given) {
             if (op->ind_th != jrp->th_i)
@@ -4281,7 +4282,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
             ae_bp = jrp->ae_statp;
             desc_len = ae_bp[1] + 2;
             additional_elem_helper("    ",  ae_bp, desc_len, jrp->etype,
-                                   &tes, op);
+                                   tesp, op);
         }
         if (jrp->thresh_inp) {
             t_bp = jrp->thresh_inp;
