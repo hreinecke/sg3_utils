@@ -783,35 +783,37 @@ static void
 decode_id_vpd(unsigned char * buff, int len, int subvalue,
               const struct opts_t * op)
 {
-    int m_a, m_d, m_cs;
+    int m_a, m_d, m_cs, blen;
+    unsigned char * b;
 
     if (len < 4) {
         pr2serr("Device identification VPD page length too short=%d\n", len);
         return;
     }
+    blen = len - 4;
+    b = buff + 4;
     m_a = -1;
     m_d = -1;
     m_cs = -1;
     if (0 == subvalue) {
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), buff + 4,
-                       len - 4, VPD_ASSOC_LU, m_d, m_cs, op);
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), buff + 4,
-                       len - 4, VPD_ASSOC_TPORT, m_d, m_cs, op);
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), buff + 4,
-                       len - 4, VPD_ASSOC_TDEVICE, m_d, m_cs, op);
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), b, blen,
+                       VPD_ASSOC_LU, m_d, m_cs, op);
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), b, blen,
+                       VPD_ASSOC_TPORT, m_d, m_cs, op);
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), b, blen,
+                       VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     } else if (VPD_DI_SEL_AS_IS == subvalue)
-        decode_dev_ids(NULL, buff + 4, len - 4, m_a, m_d, m_cs, op);
+        decode_dev_ids(NULL, b, blen, m_a, m_d, m_cs, op);
     else {
         if (VPD_DI_SEL_LU & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), buff + 4,
-                           len - 4, VPD_ASSOC_LU, m_d, m_cs, op);
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), b, blen,
+                           VPD_ASSOC_LU, m_d, m_cs, op);
         if (VPD_DI_SEL_TPORT & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), buff + 4,
-                           len - 4, VPD_ASSOC_TPORT, m_d, m_cs, op);
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), b, blen,
+                           VPD_ASSOC_TPORT, m_d, m_cs, op);
         if (VPD_DI_SEL_TARGET & subvalue)
             decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE),
-                           buff + 4, len - 4, VPD_ASSOC_TDEVICE, m_d, m_cs,
-                           op);
+                           b, blen, VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     }
 }
 
@@ -1175,349 +1177,30 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
     return 0;
 }
 
-static void
-decode_designation_descriptor(const unsigned char * ip, int i_len,
-                              int p_id, int c_set, int piv, int assoc,
-                              int desig_type, int print_assoc,
-                              const struct opts_t * op)
-{
-    int m, ci_off, c_id, d_id, naa;
-    int vsi, k;
-    uint64_t vsei;
-    uint64_t id_ext;
-    char b[64];
-
-    if (print_assoc)
-        printf("  %s:\n", sg_get_desig_assoc_str(assoc & 3));
-    printf("    designator type: %s,  code set: %s\n",
-           sg_get_desig_type_str(desig_type & 0xf),
-           sg_get_desig_code_set_str(c_set & 0xf));
-    if (piv && ((1 == assoc) || (2 == assoc)))
-        printf("     transport: %s\n",
-               sg_get_trans_proto_str(p_id, sizeof(b), b));
-/* printf("    associated with the %s\n", sg_get_desig_assoc_str(assoc)); */
-    switch (desig_type) {
-    case 0: /* vendor specific */
-        k = 0;
-        if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
-            for (k = 0; (k < i_len) && isprint(ip[k]); ++k)
-                ;
-            if (k >= i_len)
-                k = 1;
-        }
-        if (k)
-            printf("      vendor specific: %.*s\n", i_len, ip);
-        else {
-            pr2serr("      vendor specific:\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-        }
-        break;
-    case 1: /* T10 vendor identification */
-        printf("      vendor id: %.8s\n", ip);
-        if (i_len > 8) {
-            if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
-                printf("      vendor specific: %.*s\n", i_len - 8, ip + 8);
-            } else {
-                printf("      vendor specific: 0x");
-                for (m = 8; m < i_len; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("\n");
-            }
-        }
-        break;
-    case 2: /* EUI-64 based */
-        if (! op->do_long) {
-            if ((8 != i_len) && (12 != i_len) && (16 != i_len)) {
-                pr2serr("      << expect 8, 12 and 16 byte EUI, got %d>>\n",
-                        i_len);
-                dStrHexErr((const char *)ip, i_len, 0);
-                break;
-            }
-            printf("      0x");
-            for (m = 0; m < i_len; ++m)
-                printf("%02x", (unsigned int)ip[m]);
-            printf("\n");
-            break;
-        }
-        printf("      EUI-64 based %d byte identifier\n", i_len);
-        if (1 != c_set) {
-            pr2serr("      << expected binary code_set (1)>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        ci_off = 0;
-        if (16 == i_len) {
-            ci_off = 8;
-            id_ext = sg_get_unaligned_be64(ip);
-            printf("      Identifier extension: 0x%" PRIx64 "\n", id_ext);
-        } else if ((8 != i_len) && (12 != i_len)) {
-            pr2serr("      << can only decode 8, 12 and 16 byte ids>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        c_id = sg_get_unaligned_be24(ip + ci_off);
-        printf("      IEEE Company_id: 0x%x\n", c_id);
-        vsei = ((uint64_t)sg_get_unaligned_be32(ip + ci_off + 3) << 8) +
-               ip[ci_off + 3 + 4];      /* 5 byte integer */
-        printf("      Vendor Specific Extension Identifier: 0x%" PRIx64
-               "\n", vsei);
-        if (12 == i_len) {
-            d_id = sg_get_unaligned_be32(ip + 8);
-            printf("      Directory ID: 0x%x\n", d_id);
-        }
-        break;
-    case 3: /* NAA <n> */
-        if (1 != c_set) {
-            pr2serr("      << unexpected code set %d for NAA>>\n", c_set);
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        naa = (ip[0] >> 4) & 0xff;
-        switch (naa) {
-        case 2:         /* NAA 2: IEEE Extended */
-            if (8 != i_len) {
-                pr2serr("      << unexpected NAA 2 identifier length: "
-                        "0x%x>>\n", i_len);
-                dStrHexErr((const char *)ip, i_len, 0);
-                break;
-            }
-            d_id = sg_get_unaligned_be16(ip) & 0xfff;
-            c_id = sg_get_unaligned_be24(ip + 2);
-            vsi = sg_get_unaligned_be24(ip + 5);
-            if (op->do_long) {
-                printf("      NAA 2, vendor specific identifier A: "
-                       "0x%x\n", d_id);
-                printf("      IEEE Company_id: 0x%x\n", c_id);
-                printf("      vendor specific identifier B: 0x%x\n", vsi);
-                printf("      [0x");
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("]\n");
-            }
-            printf("      0x");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", (unsigned int)ip[m]);
-            printf("\n");
-            break;
-        case 3:         /* NAA 3: Locally assigned */
-            if (8 != i_len) {
-                pr2serr("      << unexpected NAA 3 identifier length: "
-                        "0x%x>>\n", i_len);
-                dStrHexErr((const char *)ip, i_len, 0);
-                break;
-            }
-            if (op->do_long)
-                printf("      NAA 3, Locally assigned value:\n");
-            printf("      0x");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", (unsigned int)ip[m]);
-            printf("\n");
-            break;
-        case 5:         /* NAA 5: IEEE Registered */
-            if (8 != i_len) {
-                pr2serr("      << unexpected NAA 5 identifier length: "
-                        "0x%x>>\n", i_len);
-                dStrHexErr((const char *)ip, i_len, 0);
-                break;
-            }
-            if (op->do_long) {
-                c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
-                        (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
-                vsei = ip[3] & 0xf;
-                for (m = 1; m < 5; ++m) {
-                    vsei <<= 8;
-                    vsei |= ip[3 + m];
-                }
-                printf("      NAA 5, IEEE Company_id: 0x%x\n", c_id);
-                printf("      Vendor Specific Identifier: 0x%" PRIx64
-                       "\n", vsei);
-                printf("      [0x");
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("]\n");
-            } else {
-                printf("      0x");
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("\n");
-            }
-            break;
-        case 6:         /* NAA 6: IEEE Registered extended */
-            if (16 != i_len) {
-                pr2serr("      << unexpected NAA 6 identifier length: "
-                        "0x%x>>\n", i_len);
-                dStrHexErr((const char *)ip, i_len, 0);
-                break;
-            }
-            c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
-                    (ip[2] << 4) | ((ip[3] & 0xf0) >> 4));
-            vsei = ip[3] & 0xf;
-            for (m = 1; m < 5; ++m) {
-                vsei <<= 8;
-                vsei |= ip[3 + m];
-            }
-            if (op->do_long) {
-                printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
-                printf("      Vendor Specific Identifier: 0x%" PRIx64
-                       "\n", vsei);
-                vsei = sg_get_unaligned_be64(ip + 8);
-                printf("      Vendor Specific Identifier Extension: "
-                       "0x%" PRIx64 "\n", vsei);
-                printf("      [0x");
-                for (m = 0; m < 16; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("]\n");
-            } else {
-                printf("      0x");
-                for (m = 0; m < 16; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("\n");
-            }
-            break;
-        default:
-            pr2serr("      << unexpected NAA [0x%x]>>\n", naa);
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        break;
-    case 4: /* Relative target port */
-        if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-            pr2serr("      << expected binary code_set, target port "
-                    "association, length 4>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        d_id = sg_get_unaligned_be16(ip + 2);
-        printf("      Relative target port: 0x%x\n", d_id);
-        break;
-    case 5: /* (primary) Target port group */
-        if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
-            pr2serr("      << expected binary code_set, target port "
-                    "association, length 4>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        d_id = sg_get_unaligned_be16(ip + 2);
-        printf("      Target port group: 0x%x\n", d_id);
-        break;
-    case 6: /* Logical unit group */
-        if ((1 != c_set) || (0 != assoc) || (4 != i_len)) {
-            pr2serr("      << expected binary code_set, logical unit "
-                    "association, length 4>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        d_id = sg_get_unaligned_be16(ip + 2);
-        printf("      Logical unit group: 0x%x\n", d_id);
-        break;
-    case 7: /* MD5 logical unit identifier */
-        if ((1 != c_set) || (0 != assoc)) {
-            pr2serr("      << expected binary code_set, logical unit "
-                    "association>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        printf("      MD5 logical unit identifier:\n");
-        dStrHex((const char *)ip, i_len, 0);
-        break;
-    case 8: /* SCSI name string */
-        if (3 != c_set) {
-            pr2serr("      << expected UTF-8 code_set>>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        if (! (strncmp((const char *)ip, "eui.", 4) ||
-               strncmp((const char *)ip, "EUI.", 4) ||
-               strncmp((const char *)ip, "naa.", 4) ||
-               strncmp((const char *)ip, "NAA.", 4) ||
-               strncmp((const char *)ip, "iqn.", 4))) {
-            pr2serr("      << expected name string prefix>>\n");
-            dStrHexErr((const char *)ip, i_len, -1);
-            break;
-        }
-        printf("      SCSI name string:\n");
-        /* does %s print out UTF-8 ok??
-         * Seems to depend on the locale. Looks ok here with my
-         * locale setting: en_AU.UTF-8
-         */
-        printf("      %.*s\n", i_len, (const char *)ip);
-        break;
-    case 9: /* Protocol specific port identifier */
-        /* added in spc4r36, PIV must be set, proto_id indicates */
-        /* whether UAS (USB) or SOP (PCIe) or ... */
-        if (! piv)
-            printf("      >>>> Protocol specific port identifier "
-                   "expects protocol\n"
-                   "           identifier to be valid and it is not\n");
-        if (TPROTO_UAS == p_id) {
-            printf("      USB device address: 0x%x\n", 0x7f & ip[0]);
-            printf("      USB interface number: 0x%x\n", ip[2]);
-        } else if (TPROTO_SOP == p_id) {
-            printf("      PCIe routing ID, bus number: 0x%x\n", ip[0]);
-            printf("          function number: 0x%x\n", ip[1]);
-            printf("          [or device number: 0x%x, function number: "
-                   "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
-        } else
-            pr2serr("      >>>> unexpected protocol indentifier: %s\n"
-                    "           with Protocol specific port "
-                    "identifier\n",
-                    sg_get_trans_proto_str(p_id, sizeof(b), b));
-        break;
-    case 0xa: /* UUID identifier */
-        if (1 != c_set) {
-            pr2serr("      << expected binary code_set >>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != i_len)) {
-            pr2serr("      << expected locally assigned UUID, 16 bytes long "
-                    ">>\n");
-            dStrHexErr((const char *)ip, i_len, 0);
-            break;
-        }
-        printf("      Locally assigned UUID: ");
-        for (m = 0; m < 16; ++m) {
-            if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
-                printf("-");    /* RFC 4122 format */
-            printf("%02x", (unsigned int)ip[2 + m]);
-        }
-        printf("\n");
-        if (op->do_long) {
-            printf("      [0x");
-            for (m = 0; m < 16; ++m)
-                printf("%02x", (unsigned int)ip[2 + m]);
-            printf("]\n");
-        }
-        break;
-    default: /* reserved */
-        pr2serr("      reserved designator=0x%x\n", desig_type);
-        dStrHexErr((const char *)ip, i_len, 0);
-        break;
-    }
-}
-
-/* Prints outs device identification designators selected by association,
+/* Prints outs designation descriptors (dd_s)selected by association,
    designator type and/or code set. */
 static int
 decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
                int m_assoc, int m_desig_type, int m_code_set,
                const struct opts_t * op)
 {
-    int assoc, i_len, c_set, piv, p_id, desig_type;
-    int printed, off, u;
+    int assoc, off, u, i_len;
+    bool printed;
     const unsigned char * bp;
+    char b[1024];
 
     if (op->do_quiet)
         return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
                                     m_code_set);
-    if ( buff[2] != 0 ) {
-        if (m_assoc == VPD_ASSOC_LU)
-            decode_designation_descriptor(buff, 16, 0, 1, 0, m_assoc, 3, 0,
-                                          op);
+    if (buff[2] != 0) { /* all valid dd_s should have 0 in this byte */
+        if (op->verbose)
+            pr2serr("%s: designation descriptors byte 2 should be 0\n"
+                    "perhaps this is a standard inquiry response, ignore\n",
+                    __func__);
         return 0;
     }
     off = -1;
-    printed = 0;
+    printed = false;
     while ((u = sg_vpd_dev_id_iter(buff, len, &off, m_assoc, m_desig_type,
                                    m_code_set)) == 0) {
         bp = buff + off;
@@ -1528,18 +1211,15 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
             return SG_LIB_CAT_MALFORMED;
         }
         assoc = ((bp[1] >> 4) & 0x3);
-        if (print_if_found && (0 == printed)) {
-            printed = 1;
+        if (print_if_found && (! printed)) {
+            printed = true;
             printf("  %s:\n", print_if_found);
         }
         if (NULL == print_if_found)
             printf("  %s:\n", sg_get_desig_assoc_str(assoc));
-        p_id = ((bp[0] >> 4) & 0xf);
-        c_set = (bp[0] & 0xf);
-        piv = ((bp[1] & 0x80) ? 1 : 0);
-        desig_type = (bp[1] & 0xf);
-        decode_designation_descriptor(bp + 4, i_len, p_id, c_set, piv, assoc,
-                                      desig_type, 0, op);
+        sg_get_designation_descriptor_str("", bp, i_len + 4, 0, op->do_long,
+                                          sizeof(b), b);
+        printf("%s", b);
     }
     if (-2 == u) {
         pr2serr("VPD page error: short designator around offset %d\n", off);
@@ -2535,25 +2215,22 @@ decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
     printf("  Minimum percentage: %d\n", 0x1f & (b[6] >> 3));
     printf("  Provisioning type: %d (%s)\n", pt, prov_type_arr[pt]);
     printf("  Threshold percentage: %d\n", b[7]);
-    if (dp) {
+    if (dp && (len > 11)) {
+        int i_len;
         const unsigned char * bp;
-        int i_len, p_id, c_set, piv, assoc, desig_type;
+        char bb[1024];
 
         bp = b + 8;
         i_len = bp[3];
         if (0 == i_len) {
-            pr2serr("Logical block provisioning page provisioning group "
-                    "descriptor too short=%d\n", i_len);
+            pr2serr("LB provisioning page provisioning group descriptor too "
+                    "short=%d\n", i_len);
             return 0;
         }
-        printf("  Provisioning group descriptor\n");
-        p_id = ((bp[0] >> 4) & 0xf);
-        c_set = (bp[0] & 0xf);
-        piv = ((bp[1] & 0x80) ? 1 : 0);
-        assoc = ((bp[1] >> 4) & 0x3);
-        desig_type = (bp[1] & 0xf);
-        decode_designation_descriptor(bp, i_len, p_id, c_set, piv, assoc,
-                                      desig_type, 1, op);
+        printf("  Provisioning group descriptor:\n");
+        sg_get_designation_descriptor_str("    ", bp, i_len + 4, 0,
+                                          op->do_long, sizeof(bb), bb);
+        printf("%s", bb);
     }
     return 0;
 }
@@ -2939,7 +2616,8 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
 static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
-    int len, pdt, num, k, resid, alloc_len, pn, vb, allow_name, long_notquiet;
+    int len, pdt, num, k, resid, alloc_len, pn, vb;
+    bool allow_name, long_notquiet;
     int res = 0, vpd_supported = 0;
     char b[48];
     const struct svpd_values_name_t * vnp;
@@ -2951,9 +2629,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     long_notquiet = op->do_long && (! op->do_quiet);
     if (op->do_raw || (op->do_quiet && (! op->do_long) && (! op->do_all)) ||
         (op->do_hex >= 3))
-        allow_name = 0;
+        allow_name = false;
     else
-        allow_name = 1;
+        allow_name = true;
     rp = rsp_buff + off;
     if (sg_fd != -1 && !op->do_force &&
         pn != VPD_NO_RATHER_STD_INQ &&
