@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -30,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.31 20160419";
+static const char * version_str = "1.32 20160510";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -44,6 +45,7 @@ static struct option long_options[] = {
         {"linux", no_argument, 0, 'l'},
 #endif
         {"lu_cong", no_argument, 0, 'L'},
+        {"lu-cong", no_argument, 0, 'L'},
         {"maxlen", required_argument, 0, 'm'},
         {"quiet", no_argument, 0, 'q'},
         {"raw", no_argument, 0, 'r'},
@@ -74,7 +76,8 @@ usage()
             "                  [--verbose] [--version] DEVICE\n");
 #endif
     pr2serr("     or\n"
-            "       sg_luns    --test=ALUN [--hex] [--lu_cong] [--verbose]\n"
+            "       sg_luns    --test=ALUN [--decode] [--hex] [--lu_cong] "
+            "[--verbose]\n"
             "  where:\n"
             "    --decode|-d        decode all luns into component parts\n"
             "    --help|-h          print out usage message\n"
@@ -122,29 +125,27 @@ usage()
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
-decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
+decode_lun(const char * leadin, const unsigned char * lunp, bool lu_cong,
            int do_hex, int verbose)
 {
-    int k, j, x, a_method, bus_id, target, lun, len_fld, e_a_method;
-    int next_level, lu_cong_admin;
-    unsigned char not_spec[8] = {0xff, 0xff, 0xff, 0xff,
-                                 0xff, 0xff, 0xff, 0xff};
+    int k, x, a_method, bus_id, target, lun, len_fld, e_a_method;
+    bool next_level, admin_lu_cong;
     char l_leadin[128];
     char b[256];
     uint64_t ull;
 
-    if (0 == memcmp(lunp, not_spec, sizeof(not_spec))) {
-        printf("%sLogical unit not specified\n", leadin);
+    if (0xff == lunp[0]) {
+        printf("%sLogical unit _not_ specified\n", leadin);
         return;
     }
-    lu_cong_admin = lu_cong;
+    admin_lu_cong = lu_cong;
     memset(l_leadin, 0, sizeof(l_leadin));
     for (k = 0; k < 4; ++k, lunp += 2) {
-        next_level = 0;
+        next_level = false;
         strncpy(l_leadin, leadin, sizeof(l_leadin) - 3);
         if (k > 0) {
             if (lu_cong) {
-                lu_cong_admin = 0;
+                admin_lu_cong = false;
                 if ((0 == lunp[0]) && (0 == lunp[1])) {
                     printf("%s>>>> Administrative LU\n", l_leadin);
                     if (do_hex || verbose)
@@ -172,8 +173,8 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                     printf("%s0x%04x\n", b, x);
                 else
                     printf("%s%d\n", b, x);
-                if (lu_cong_admin)
-                    next_level = 1;
+                if (admin_lu_cong)
+                    next_level = true;
             } else {
                 bus_id = lunp[0] & 0x3f;
                 snprintf(b, sizeof(b), "%sPeripheral device addressing: ",
@@ -192,7 +193,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                                (bus_id ? "target" : "lun"), lunp[1]);
                 }
                 if (bus_id)
-                    next_level = 1;
+                    next_level = true;
             }
             break;
         case 1:         /* flat space addressing method */
@@ -264,12 +265,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                     printf("%sExtended flat space addressing: lun=%d\n",
                            l_leadin, x);
             } else if ((2 == len_fld) && (2 == e_a_method)) {
-                ull = 0;
-                for (j = 0; j < 5; ++j) {
-                    if (j > 0)
-                        ull <<= 8;
-                    ull |= lunp[1 + j];
-                }
+                ull = sg_get_unaligned_be(5, lunp + 1);
                 if (do_hex)
                     printf("%sLong extended flat space addressing: "
                            "lun=0x%010" PRIx64 "\n", l_leadin, ull);
@@ -292,13 +288,8 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
                                "length=%d, e.a. method=%d, value=%d\n",
                                l_leadin, len_fld, e_a_method, x);
                 } else {
-                    ull = 0;
-                    x = (2 == len_fld) ? 5 : 7;
-                    for (j = 0; j < x; ++j) {
-                        if (j > 0)
-                            ull <<= 8;
-                        ull |= lunp[1 + j];
-                    }
+                    ull = sg_get_unaligned_be(((2 == len_fld) ? 5 : 7),
+                                              lunp + 1);
                     if (do_hex) {
                         printf("%sExtended logical unit addressing: "
                                "length=%d, e. a. method=%d, ", l_leadin,
@@ -315,7 +306,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, int lu_cong,
             }
             break;
         default:
-            printf("%s<<decode_lun: faulty logic>>\n", l_leadin);
+            printf("%s<<%s: faulty logic>>\n", l_leadin, __func__);
             break;
         }
         if (next_level)
@@ -349,22 +340,6 @@ t10_2linux_lun(const unsigned char t10_lun[])
         res = (res << 16) + sg_get_unaligned_be16(cp);
     return res;
 }
-
-/* Copy of t10_lun --> Linux unsigned int (i.e. 32 bit ) present in Linux
- * kernel, up to least lk 3.8.0, extended to 64 bits.
- * BEWARE: for sizeof(int==4) this function is BROKEN and is left here as
- * as example and may soon be removed. */
-static uint64_t
-t10_2linux_lun64bitBR(const unsigned char t10_lun[])
-{
-    int i;
-    uint64_t lun;
-
-    lun = 0;
-    for (i = 0; i < (int)sizeof(lun); i += 2)
-        lun = lun | (((t10_lun[i] << 8) | t10_lun[i + 1]) << (i * 8));
-    return lun;
-}
 #endif  /* SG_LIB_LINUX */
 
 
@@ -381,13 +356,13 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, k, m, off, res, c, list_len, len_cap, luns, trunc;
-    int decode = 0;
+    int decode_arg = 0;
     int do_hex = 0;
 #ifdef SG_LIB_LINUX
     int do_linux = 0;
 #endif
-    int lu_cong = 0;
-    int lu_cong_given = 0;
+    int lu_cong_arg = 0;
+    bool lu_cong_arg_given = false;
     int maxlen = 0;
     int do_quiet = 0;
     int do_raw = 0;
@@ -396,8 +371,7 @@ main(int argc, char * argv[])
     int verbose = 0;
 #ifdef SG_LIB_LINUX
     int test_linux_in = 0;
-    int test_linux_out = 0;
-    int test_linux_out2 = 0;
+    bool test_linux_out = false;
 #endif
     unsigned int h;
     const char * test_arg = NULL;
@@ -423,7 +397,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'd':
-            decode = 1;
+            ++decode_arg;
             break;
         case 'h':
         case '?':
@@ -438,8 +412,8 @@ main(int argc, char * argv[])
             break;
 #endif
         case 'L':
-            ++lu_cong;
-            ++lu_cong_given;
+            ++lu_cong_arg;
+            lu_cong_arg_given = true;
             break;
         case 'm':
             maxlen = sg_get_num(optarg);
@@ -501,7 +475,11 @@ main(int argc, char * argv[])
         if ('L' == toupper(cp[0])) {
             uint64_t ull;
 
-            if (1 != sscanf(cp + 1, " %" SCNu64, &ull)) {
+            if (('0' == cp[1]) && ('X' == toupper(cp[2])))
+                k = sscanf(cp + 3, " %" SCNx64, &ull);
+            else
+                k = sscanf(cp + 1, " %" SCNu64, &ull);
+            if (1 != k) {
                 pr2serr("Unable to read Linux style LUN integer given to "
                         "--test=\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -511,19 +489,22 @@ main(int argc, char * argv[])
         } else
 #endif
         {
-            /* Check if trailing 'L' or 'W' */
-            m = strlen(cp);    /* must be at least 1 char in test_arg */
+            /* Check if trailing 'L' */
 #ifdef SG_LIB_LINUX
+            m = strlen(cp);    /* must be at least 1 char in test_arg */
             if ('L' == toupper(cp[m - 1]))
-                test_linux_out = 1;
-            else if ('W' == toupper(cp[m - 1]))
-                test_linux_out2 = 1;
+                test_linux_out = true;
 #endif
             if (('0' == cp[0]) && ('X' == toupper(cp[1])))
                 cp += 2;
-            if (strchr(cp, ' ') || strchr(cp, '\t')) {
-                for (k = 0; k < 8; ++k, cp += m) {
-                    if (1 != sscanf(cp, " %2x%n", &h, &m))
+            if (strchr(cp, ' ') || strchr(cp, '\t') || strchr(cp, '-')) {
+                for (k = 0; k < 8; ++k, cp += 2) {
+                    c = *cp;
+                    if ('\0' == c)
+                        break;
+                    else if (! isxdigit(c))
+                        ++cp;
+                    if (1 != sscanf(cp, "%2x", &h))
                         break;
                     lun_arr[k] = h & 0xff;
                 }
@@ -541,14 +522,21 @@ main(int argc, char * argv[])
             }
         }
 #ifdef SG_LIB_LINUX
-        if (verbose || test_linux_in || test_linux_out2)
+        if (verbose || test_linux_in || decode_arg)
 #else
-        if (verbose)
+        if (verbose || decode_arg)
 #endif
         {
-            printf("64 bit LUN in T10 preferred (hex) format: ");
-            for (k = 0; k < 8; ++k)
-                printf(" %02x", lun_arr[k]);
+            if (decode_arg > 1) {
+                printf("64 bit LUN in T10 (hex, dashed) format: ");
+                for (k = 0; k < 8; k += 2)
+                    printf("%c%02x%02x", (k ? '-' : ' '), lun_arr[k],
+                           lun_arr[k + 1]);
+            } else {
+                printf("64 bit LUN in T10 preferred (hex) format: ");
+                for (k = 0; k < 8; ++k)
+                    printf(" %02x", lun_arr[k]);
+            }
             printf("\n");
         }
 #ifdef SG_LIB_LINUX
@@ -562,20 +550,10 @@ main(int argc, char * argv[])
             else
                 printf("Linux 'word flipped' integer LUN representation: %"
                        PRIu64 "\n", t10_2linux_lun(lun_arr));
-        } else if (test_linux_out2) {
-            if (do_hex > 1)
-                printf("Linux internal 64 bit LUN representation: 0x%016"
-                       PRIx64 "\n", t10_2linux_lun64bitBR(lun_arr));
-            else if (do_hex)
-                printf("Linux internal 64 bit LUN representation: 0x%"
-                       PRIx64 "\n", t10_2linux_lun64bitBR(lun_arr));
-            else
-                printf("Linux internal 64 bit LUN representation: %"
-                       PRIu64 "\n", t10_2linux_lun64bitBR(lun_arr));
         }
 #endif
         printf("Decoded LUN:\n");
-        decode_lun("  ", lun_arr, (lu_cong % 2), do_hex, verbose);
+        decode_lun("  ", lun_arr, (lu_cong_arg % 2), do_hex, verbose);
         return 0;
     }
     if (NULL == device_name) {
@@ -596,7 +574,10 @@ main(int argc, char * argv[])
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (decode && (! lu_cong_given)) {
+    if (decode_arg && (! lu_cong_arg_given)) {
+        if (verbose > 1)
+            pr2serr("in order to decode LUN and since --lu_cong not given, "
+                    "do standard\nINQUIRY to find LU_CONG bit\n");
         /* check if LU_CONG set in standard INQUIRY response */
         res = sg_simple_inquiry(sg_fd, &sir, 0, verbose);
         ret = res;
@@ -604,8 +585,8 @@ main(int argc, char * argv[])
             pr2serr("fetching standard INQUIRY response failed\n");
             goto the_end;
         }
-        lu_cong = !!(0x40 & sir.byte_1);
-        if (verbose && lu_cong)
+        lu_cong_arg = !!(0x40 & sir.byte_1);
+        if (verbose && lu_cong_arg)
             pr2serr("LU_CONG bit set in standard INQUIRY response\n");
     }
 
@@ -669,9 +650,9 @@ main(int argc, char * argv[])
             }
 #endif
             printf("\n");
-            if (decode)
-                decode_lun("      ", reportLunsBuff + off, (lu_cong % 2),
-                           do_hex, verbose);
+            if (decode_arg)
+                decode_lun("      ", reportLunsBuff + off,
+                           (bool)(lu_cong_arg % 2), do_hex, verbose);
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         pr2serr("Report Luns command not supported (support mandatory in "

@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.61 20160428";    /* SPC-5 rev 09 */
+static const char * version_str = "1.62 20160510";    /* SPC-5 rev 10 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
