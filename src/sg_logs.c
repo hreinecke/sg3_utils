@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.42 20160329";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.43 20160407";    /* spc5r08 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2548,18 +2548,20 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         switch (pc) {
         case 0:
             if ((extra > 5) && (k > 5)) {
-                if (bp[5] < 0xff)
-                    printf("  Current temperature = %d C", bp[5]);
+                if (0 == bp[5])
+                    printf("  Current temperature = 0 C (or less)\n");
+                else if (bp[5] < 0xff)
+                    printf("  Current temperature = %d C\n", bp[5]);
                 else
-                    printf("  Current temperature = <not available>");
+                    printf("  Current temperature = <not available>\n");
             }
             break;
         case 1:
             if ((extra > 5) && (k > 5)) {
                 if (bp[5] < 0xff)
-                    printf("  Reference temperature = %d C", bp[5]);
+                    printf("  Reference temperature = %d C\n", bp[5]);
                 else
-                    printf("  Reference temperature = <not available>");
+                    printf("  Reference temperature = <not available>\n");
             }
             break;
         default:
@@ -2573,9 +2575,8 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+            printf("        <%s>\n", pcb_str);
+        }
         if (op->filter_given)
             break;
     }

@@ -48,8 +48,8 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-5 revision 09 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20160402 */
+/* table from SPC-5 revision 10 [sorted numerically (from Annex E.9)] */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20160510 */
 
 
 #ifdef SG_SCSI_STRINGS
@@ -514,6 +514,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20e6, "SPL-3 T10/BSR INCITS 492 revision 7"},
     {0x20e8, "SPL-3 ANSI INCITS 492-2015"},
     {0x2100, "SPL-4 (no version claimed)"},
+    {0x2102, "SPL-4 T10/BSR INCITS 538 revision 08a"},
     {0x21e0, "SOP (no version claimed)"},
     {0x21e4, "SOP T10/BSR INCITS 489 revision 4"},
     {0x21e6, "SOP T10/BSR INCITS 489 revision 5"},

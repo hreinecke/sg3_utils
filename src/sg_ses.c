@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.14 20160504";    /* ses3r13 */
+static const char * version_str = "2.15 20160506";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1763,8 +1763,8 @@ truncated:
  * Returns total number of type descriptor headers written to 'tdhp' or -1
  * if there is a problem */
 static int
-build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp,
-                        int max_elems, uint32_t * generationp,
+build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
+                        uint32_t * generationp,
                         struct enclosure_info * primary_ip,
                         struct opts_t * op)
 {
@@ -2821,7 +2821,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                             jrp = find_join_row_cnst(tesp, m, FJ_EOE);
                         if ((NULL == jrp) || (NULL == jrp->enc_statp) ||
                             (SAS_CONNECTOR_ETC != jrp->etype))
-                            printf("broken");
+                            printf("broken [conn_idx=%d]", m);
                         else {
                             enc_status_helper("", jrp->enc_statp, jrp->etype,
                                               true, op);
@@ -2842,7 +2842,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                         else
                             jrp = find_join_row_cnst(tesp, m, FJ_EOE);
                         if (NULL == jrp)
-                            printf("broken");
+                            printf("broken [oth_elem_idx=%d]", m);
                         else if (jrp->elem_descp) {
                             cp = etype_str(jrp->etype, b, sizeof(b));
                             ed_bp = jrp->elem_descp;
@@ -2886,7 +2886,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                             jrp = find_join_row_cnst(tesp, m, FJ_EOE);
                         if ((NULL == jrp) || (NULL == jrp->enc_statp) ||
                             (SAS_CONNECTOR_ETC != jrp->etype))
-                            printf("broken");
+                            printf("broken [conn_idx=%d]", m);
                         else {
                             enc_status_helper("", jrp->enc_statp, jrp->etype,
                                               true, op);
@@ -2906,7 +2906,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                         else
                             jrp = find_join_row_cnst(tesp, m, FJ_EOE);
                         if (NULL == jrp)
-                            printf("broken");
+                            printf("broken [oth_elem_idx=%d]", m);
                         else if (jrp->elem_descp) {
                             cp = etype_str(jrp->etype, b, sizeof(b));
                             ed_bp = jrp->elem_descp;
@@ -3596,8 +3596,8 @@ process_status_page(int sg_fd, struct opts_t * op)
             break;
         case ENC_STATUS_DPC:
             num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 MX_ELEM_HDR, &ref_gen_code,
-                                                 &primary_info, op);
+                                              MX_ELEM_HDR, &ref_gen_code,
+                                              &primary_info, op);
             if (num_ths < 0) {
                 ret = num_ths;
                 goto fini;
@@ -3630,8 +3630,8 @@ process_status_page(int sg_fd, struct opts_t * op)
             break;
         case THRESHOLD_DPC:
             num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 MX_ELEM_HDR, &ref_gen_code,
-                                                 &primary_info, op);
+                                              MX_ELEM_HDR, &ref_gen_code,
+                                              &primary_info, op);
             if (num_ths < 0) {
                 ret = num_ths;
                 goto fini;
@@ -3648,8 +3648,8 @@ process_status_page(int sg_fd, struct opts_t * op)
             break;
         case ELEM_DESC_DPC:
             num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 MX_ELEM_HDR, &ref_gen_code,
-                                                 &primary_info, op);
+                                              MX_ELEM_HDR, &ref_gen_code,
+                                              &primary_info, op);
             if (num_ths < 0) {
                 ret = num_ths;
                 goto fini;
@@ -3675,8 +3675,8 @@ process_status_page(int sg_fd, struct opts_t * op)
             break;
         case ADD_ELEM_STATUS_DPC:
             num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                                 MX_ELEM_HDR, &ref_gen_code,
-                                                 &primary_info, op);
+                                              MX_ELEM_HDR, &ref_gen_code,
+                                              &primary_info, op);
             if (num_ths < 0) {
                 ret = num_ths;
                 goto fini;
@@ -3981,9 +3981,8 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     memset(&primary_info, 0, sizeof(primary_info));
     hex = op->do_hex;
     blen = sizeof(b);
-    num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                         MX_ELEM_HDR, &ref_gen_code,
-                                         &primary_info, op);
+    num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr, MX_ELEM_HDR,
+                                      &ref_gen_code, &primary_info, op);
     if (num_ths < 0)
         return num_ths;
     tesp = &tes;

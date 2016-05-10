@@ -1,4 +1,4 @@
-.TH SG_LUNS "8" "June" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_LUNS "8" "May" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
@@ -9,7 +9,8 @@ sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_luns
-\fI\-\-test=ALUN\fR [\fI\-\-hex\fR] [\fI\-\-lu_cong\fR] [\fI\-\-verbose\fR]
+\fI\-\-test=ALUN\fR [\fI\-\-decode\fR] [\fI\-\-hex\fR] [\fI\-\-lu_cong\fR]
+[\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -17,12 +18,14 @@ In the first form shown in the SYNOPSIS this utility sends the SCSI REPORT
 LUNS command to the \fIDEVICE\fR and outputs the response. The response
 should be a list of LUNs ("a LUN inventory") for the I_T nexus associated
 with the \fIDEVICE\fR. Roughly speaking that is all LUNs that share the
-target device that the REPORT LUNS command is sent through. In the SPC\-3
-and SPC\-4 SCSI standards support for the REPORT LUNS command is mandatory.
+target device that the REPORT LUNS command is sent through. This command
+is defined in the SPC\-3 and SPC\-4 SCSI standards and its support is
+mandatory. The most recent draft if SPC\5 revision 9.
 .PP
 When the \fI\-\-test=ALUN\fR option is given (the second form in the
-SYNOPSIS), then the \fIALUN\fR value is decoded as outlined in SAM\-3,
-SAM\-4 and SAM\-5 (revision 13, section 4.7) .
+SYNOPSIS), then the \fIALUN\fR value is decoded as outlined in various
+SCSI Architecture Model (SAM) standards and recent drafts (e.g. SAM\-6
+revision 2, section 4.7) .
 .PP
 Where required below the first form shown in the SYNOPSIS is called "device
 mode" and the second form is called "test mode".
@@ -32,6 +35,13 @@ Arguments to long options are mandatory for short options as well.
 \fB\-d\fR, \fB\-\-decode\fR
 decode LUNs into their component parts, as described in the LUN section
 of SAM\-3, SAM\-4 and SAM\-5.
+.br
+[test mode] \fIALUN\fR is decoded irrespective of whether this option is
+given or not. If this option is given once then the given \fIALUN\fR is
+output in T10 preferred format (which is 8 pairs of hex digits, each
+separated by a space). If given twice then the given \fIALUN\fR is output
+in an alternate T10 format made up of four quads of hex digits with each
+quad separated by a "-" (e.g. C101-0000-0000-0000).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -115,18 +125,22 @@ utility will accept any value between 0 and 255 (0xff) for \fISR\fR .
 letter 'L' followed by a decimal number (see below). The hexadecimal number
 can be up to 64 bits in size (i.e. 16 hexadecimal digits) and is padded to
 the right if less than 16 hexadecimal digits are given (e.g.
-\fI\-\-test=0122003a\fR represents T10 LUN 0122003a00000000). \fIALUN\fR
-may be prefixed by '0x' or '0X' (e.g. the previous example could have been
-\fI\-\-test=0x0122003a\fR). \fIALUN\fR may also be given with spaces or
-tabs between each byte (or other grouping) but then \fIALUN\fR would need
-to be surrounded by single or double quotes.
-In the decimal number case (i.e. following a 'L') that number is assumed
-to be a Linux "word flipped" LUN which is converted into a T10 LUN
-representation and printed. In both cases the number is interpreted as a
-LUN and decoded as if the \fI\-\-decode\fR option had been given.
-Also when \fIALUN\fR is a hexadecimal number it can have a trailing 'L'
-in which case the corresponding Linux "word flipped" LUN value is output.
-The LUN is decoded in all cases.
+\fI\-\-test=0122003a\fR represents T10 LUN: 01 22 00 3a 00 00 00 00).
+\fIALUN\fR may be prefixed by '0x' or '0X' (e.g. the previous example could
+have been \fI\-\-test=0x0122003a\fR). \fIALUN\fR may also be given with
+spaces, tabs, or a '-' between each byte (or other grouping (e.g.
+c101-0000-0000-0000)). However in the case of space or tab separators the
+\fIALUN\fR would need to be surrounded by single or double quotes.
+.br
+In the leading 'L' case the, following decimal number (hex if preceded
+by '0x') is assumed to be a Linux "word flipped" LUN which is converted
+into a T10 LUN representation and printed. In both cases the number is
+interpreted as a LUN and decoded as if the \fI\-\-decode\fR option had been
+given. Also when \fIALUN\fR is a hexadecimal number it can have a
+trailing 'L' in which case the corresponding Linux "word flipped" LUN value
+is output. The LUN is decoded in all cases.
+.br
+The action when used with \fI\-\-decode\fR is explained under that option.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -136,7 +150,8 @@ print the version string and then exit.
 .SH NOTES
 The SCSI REPORT LUNS command is important for Logical Unit (LU) discovery.
 After a target device is discovered (usually via some transport specific
-mechanism), a REPORT LUNS command should either be sent to LUN 0 (which
+mechanism) and after sending an INQUIRY command (to determine the LU_CONG
+setting), a REPORT LUNS command should either be sent to LUN 0 (which
 is Peripheral device addressing method with bus_id=0 and target/lun=0)
 or to the REPORT LUNS well known LUN (i.e. 0xc101000000000000). SAM\-5
 requires that one of these responds with an inventory of LUNS that are
@@ -296,7 +311,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2014 Douglas Gilbert
+Copyright \(co 2004\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
