@@ -4,7 +4,7 @@
 # (c) 2006--2015 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20160228"
+VERSION="20160511"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -360,37 +360,37 @@ chanlist ()
 # Returns the list of existing targets per host
 idlist ()
 {
-  local hcil
-  local target
   local tmpid
   local newid
+  local oldid
 
-  idsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
-  echo "${channel} - -" > /sys/class/scsi_host/host${host}/scan
-  # Rescan to check if we found new targets
-  newsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
-  for id in $newsearch ; do
-    newid=$id
-    for tmpid in $idsearch ; do
-      if test $id -eq $tmpid ; then
-        newid=
+  oldlist=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*:[0-9]*\)/\1/p" | uniq)
+  # Rescan LUN 0 to check if we found new targets
+  echo "${channel} - 0" > /sys/class/scsi_host/host${host}/scan
+  newlist=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*:[0-9]*\)/\1/p" | uniq)
+  for newid in $newlist ; do
+    oldid=$newid
+    for tmpid in $oldlist ; do
+      if test $newid = $tmpid ; then
+        oldid=
         break
       fi
     done
-    if test -n "$newid" ; then
-      id=$newid
-      for dev in /sys/class/scsi_device/${host}:${channel}:${newid}:* ; do
-        [ -d $dev ] || continue;
-        hcil=${dev##*/}
-        lun=${hcil##*:}
+    if test -n "$oldid" ; then
+      id=${oldid%%:*}
+      lun=${oldid##*:}
+      dev=/sys/class/scsi_device/${host}:${channel}:${id}:${lun}
+      if [ -d $dev ] ; then
+	hcil=${dev##*/}
         printf "\r${green}NEW: $norm"
         testexist
         if test "$SCSISTR" ; then
           incrfound "$hcil"
         fi
-      done
+      fi
     fi
   done
+  idsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
 }
 
 # Returns the list of existing LUNs from device $host $channel $id $lun
@@ -642,7 +642,11 @@ dosearch ()
   fi
   for channel in $channelsearch; do
     if test -z "$idsearch" ; then
-      idlist
+      if test -z "$lunsearch" ; then
+	idlist
+      else
+	idsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
+      fi
     fi
     for id in $idsearch; do
       if test -z "$lunsearch" ; then
