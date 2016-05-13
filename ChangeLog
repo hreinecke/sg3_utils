@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160511] [svn: r703]
+Changelog for sg3_utils-1.43 [20160513] [svn: r704]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
@@ -18,6 +18,8 @@ Changelog for sg3_utils-1.43 [20160511] [svn: r703]
     - decode Requested recovery, TapeAlert response, and
       Service buffer information lpages for tape
     - add '--pdt=DT' option
+    - add min+max 'mounted' temperature and rel. humidity
+      fields to Environmental reporting lpage (spc5r10)
   - sg_inq: fix potential unbounded loop in --export
     - update version descriptor list to 20160510
   - sg_inq+sg_vpd: update Extended inquiry data vpd
@@ -36,6 +38,7 @@ Changelog for sg3_utils-1.43 [20160511] [svn: r703]
     - add read buffer(16) command mode names
     - add sg_decode_transportid_str()
     - implement 'format' argument in dStrHexStr()
+    - add Microcode activation sense descriptor spc5r10
   - sg_lib_data: sync asc/ascq codes with T10 20160425
   - rescan-scsi-bus.sh: harden code
     - fixes from Suse; bump version to: 20160511

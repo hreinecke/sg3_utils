@@ -1495,7 +1495,7 @@ sg_get_sense_descriptors_str(const char * lip, const unsigned char * sbp,
                 n += scnpr(b + n, blen - n, "%02x", descp[16 + j]);
             n += scnpr(b + n, blen - n, "\n");
             break;
-        case 0xe:       /* Added in SPC-5 rev 6 (for bind/unbind) */
+        case 0xe:       /* Added in SPC-5 rev 6 (for Bind/Unbind) */
             n += scnpr(b + n, blen - n, "Device designation\n");
             j = (int)(sizeof(dd_usage_reason_str_arr) /
                       sizeof(dd_usage_reason_str_arr[0]));
@@ -1507,6 +1507,20 @@ sg_get_sense_descriptors_str(const char * lip, const unsigned char * sbp,
                            "reserved[%d]\n", lip, descp[3]);
             n += sg_get_designation_descriptor_str(z, descp + 4, descp[1] - 2,
                                                    1, 0, blen - n, b + n);
+            break;
+        case 0xf:       /* Added in SPC-5 rev 10 (for Write buffer) */
+            n += scnpr(b + n, blen - n, "Microcode activation ");
+            if (add_d_len < 6) {
+                n += scnpr(b + n, blen - n, "%s\n", dtsp);
+                processed = false;
+                break;
+            }
+            progress = sg_get_unaligned_be16(descp + 6);
+            n += scnpr(b + n, blen - n, "time: ");
+            if (0 == progress)
+                n += scnpr(b + n, blen - n, "unknown\n");
+            else
+                n += scnpr(b + n, blen - n, "%d seconds\n", progress);
             break;
         default:
             if (descp[0] >= 0x80)

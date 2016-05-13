@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.43 20160407";    /* spc5r08 + sbc4r10 */
+static const char * version_str = "1.44 20160512";    /* spc5r10 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1880,6 +1880,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
     int num, pl, pc, pcb, blen;
+    bool mounted_valid;
     const uint8_t * bp;
     char pcb_str[PCB_STR_LEN];
     char b[32];
@@ -1904,33 +1905,55 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                 break;
             }
         }
+        mounted_valid = !!(bp[4] & 1);
         if (pc < 0x100) {
             if (pl < 12)  {
                 printf("  <<expect parameter 0x%x to be at least 12 bytes "
                        "long, got %d, skip>>\n", pc, pl);
                 goto skip;
             }
-            printf("  Temperature: %s\n",
+            printf("  parameter code=0x%x\n", pc);
+            printf("    MTV=%d\n", (int)mounted_valid);
+            printf("    Temperature: %s\n",
                    temperature_str(bp[5], true, b, blen));
-            printf("  Lifetime maximum temperature: %s\n",
+            printf("    Lifetime maximum temperature: %s\n",
                    temperature_str(bp[6], true, b, blen));
-            printf("  Lifetime minimum temperature: %s\n",
+            printf("    Lifetime minimum temperature: %s\n",
                    temperature_str(bp[7], true, b, blen));
-            printf("  Maximum temperature since power on: %s\n",
+            printf("    Maximum temperature since power on: %s\n",
                    temperature_str(bp[8], true, b, blen));
-            printf("  Minimum temperature since power on: %s\n",
+            printf("    Minimum temperature since power on: %s\n",
                    temperature_str(bp[9], true, b, blen));
+            if (mounted_valid) {
+                printf("    Maximum mounted temperature: %s\n",
+                       temperature_str(bp[10], true, b, blen));
+                printf("    Minimum mounted temperature: %s\n",
+                       temperature_str(bp[11], true, b, blen));
+            }
         } else if (pc < 0x200) {
-            printf("  Relative humidity: %s\n",
+            if (pl < 12)  {
+                printf("  <<expect parameter 0x%x to be at least 12 bytes "
+                       "long, got %d, skip>>\n", pc, pl);
+                goto skip;
+            }
+            printf("  parameter code=0x%x\n", pc);
+            printf("    MRHV=%d\n", (int)mounted_valid);
+            printf("    Relative humidity: %s\n",
                    humidity_str(bp[5], true, b, blen));
-            printf("  Lifetime maximum relative humidity: %s\n",
+            printf("    Lifetime maximum relative humidity: %s\n",
                    humidity_str(bp[6], true, b, blen));
-            printf("  Lifetime minimum relative humidity: %s\n",
+            printf("    Lifetime minimum relative humidity: %s\n",
                    humidity_str(bp[7], true, b, blen));
-            printf("  Maximum relative humidity since power on: %s\n",
+            printf("    Maximum relative humidity since power on: %s\n",
                    humidity_str(bp[8], true, b, blen));
-            printf("  Minimum relative humidity since power on: %s\n",
+            printf("    Minimum relative humidity since power on: %s\n",
                    humidity_str(bp[9], true, b, blen));
+            if (mounted_valid) {
+                printf("    Maximum mounted relative humidity: %s\n",
+                       temperature_str(bp[10], true, b, blen));
+                printf("    Minimum mounted relative humidity: %s\n",
+                       temperature_str(bp[11], true, b, blen));
+            }
         } else
             printf("  <<unexpect parameter code 0x%x\n", pc);
         if (op->do_pcb) {
