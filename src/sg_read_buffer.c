@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.15 20160131";
+static const char * version_str = "1.16 20160512";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -85,9 +85,9 @@ usage()
             "acronym (def: 0)\n"
             "    --offset=OFF|-o OFF    buffer offset (unit: bytes, def: 0)\n"
             "    --raw|-r            output response to stdout\n"
+            "    --readonly|-R       open DEVICE read-only (def: read-write)\n"
             "    --specific=MS|-S MS    mode specific value; 3 bit field (0 "
             "to 7)\n"
-            "    --readonly|-R       open DEVICE read-only (def: read-write)\n"
             "    --verbose|-v        increase verbosity\n"
             "    --version|-V        print version string and exit\n\n"
             "Performs a SCSI READ BUFFER (10 or 16) command. Use '-m xxx' to "
