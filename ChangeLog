@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160513] [svn: r704]
+Changelog for sg3_utils-1.43 [20160517] [svn: r705]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
@@ -40,6 +40,9 @@ Changelog for sg3_utils-1.43 [20160513] [svn: r704]
     - implement 'format' argument in dStrHexStr()
     - add Microcode activation sense descriptor spc5r10
   - sg_lib_data: sync asc/ascq codes with T10 20160425
+  - sg_cmds_extra: expand sg_ll_ata_pt() to send new
+    Ata pass-through(32) command (sat4r05)
+  - sg_sat_identify: expand to take --len=32
   - rescan-scsi-bus.sh: harden code
     - fixes from Suse; bump version to: 20160511
   - 55-scsi-sg3_id.rules: fixes from Suse

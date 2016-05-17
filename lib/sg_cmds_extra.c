@@ -43,6 +43,8 @@
 #define ATA_PT_12_CMDLEN 12
 #define ATA_PT_16_CMD 0x85
 #define ATA_PT_16_CMDLEN 16
+#define ATA_PT_32_SA 0x1ff0
+#define ATA_PT_32_CMDLEN 32
 #define FORMAT_UNIT_CMD 0x4
 #define FORMAT_UNIT_CMDLEN 6
 #define PERSISTENT_RESERVE_IN_CMD 0x5e
@@ -1531,23 +1533,24 @@ sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
     return ret;
 }
 
-/* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len
- * is 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16
- * then a ATA PASS-THROUGH (16) command is called. If cdb_len is any other
- * value -1 is returned. After copying from cdbp to an internal buffer,
- * the first byte (i.e. offset 0) is set to 0xa1 if cdb_len is 12; or is
- * set to 0x85 if cdb_len is 16. The last byte (offset 11 or offset 15) is
- * set to 0x0 in the internal buffer. If timeout_secs <= 0 then the timeout
- * is set to 60 seconds. For data in or out transfers set dinp or doutp,
- * and dlen to the number of bytes to transfer. If dlen is zero then no data
- * transfer is assumed. If sense buffer obtained then it is written to
- * sensep, else sensep[0] is set to 0x0. If ATA return descriptor is obtained
- * then written to ata_return_dp, else ata_return_dp[0] is set to 0x0. Either
- * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
- * status value (>= 0) or -1 if other error. Users are expected to check the
- * sense buffer themselves. If available the data in resid is written to
- * residp. Note in SAT-2 and later, fixed format sense data may be placed in
- * *sensep in which case sensep[0]==0x70 .
+/* Invokes a ATA PASS-THROUGH (12, 16 or 32) SCSI command (SAT). This is
+ * selected by the cdb_len argument that can take values of 12, 16 or 32
+ * only (else -1 is returned). The byte at offset 0 (and bytes 0 to 9
+ * inclusive for ATA PT(32)) pointed to be cdbp are ignored and apart from
+ * the control byte, the rest is copied into an internal cdb which is then
+ * sent to the device. The control byte is byte 11 for ATA PT(12), byte 15
+ * for ATA PT(16) and byte 1 for ATA PT(32). If timeout_secs <= 0 then the
+ * timeout is set to 60 seconds. For data in or out transfers set dinp or
+ * doutp, and dlen to the number of bytes to transfer. If dlen is zero then
+ * no data transfer is assumed. If sense buffer obtained then it is written
+ * to sensep, else sensep[0] is set to 0x0. If ATA return descriptor is
+ * obtained then written to ata_return_dp, else ata_return_dp[0] is set to
+ * 0x0. Either sensep or ata_return_dp (or both) may be NULL pointers.
+ * Returns SCSI status value (>= 0) or -1 if other error. Users are
+ * expected to check the sense buffer themselves. If available the data in
+ * resid is written to residp. Note in SAT-2 and later, fixed format sense
+ * data may be placed in *sensep in which case sensep[0]==0x70, prior to
+ * SAT-2 descriptor sense format was required (i.e. sensep[0]==0x72).
  */
 int
 sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
@@ -1557,8 +1560,7 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
              int * residp, int verbose)
 {
     int k, res, slen, duration;
-    unsigned char aptCmdBlk[ATA_PT_16_CMDLEN] =
-                {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char aptCmdBlk[ATA_PT_32_CMDLEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * sp;
     const unsigned char * bp;
@@ -1567,19 +1569,38 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
     char b[256];
     int ret = -1;
 
+    memset(aptCmdBlk, 0, sizeof(aptCmdBlk));
     b[0] = '\0';
-    cnamep = (12 == cdb_len) ?
-             "ATA pass through (12)" : "ATA pass through (16)";
-    if ((NULL == cdbp) || ((12 != cdb_len) && (16 != cdb_len))) {
-        if (verbose) {
-            if (NULL == cdbp)
-                pr2ws("%s NULL cdb pointer\n", cnamep);
-            else
-                pr2ws("cdb_len must be 12 or 16\n");
-        }
+    switch (cdb_len) {
+    case 12:
+        cnamep = "ATA pass-through(12)";
+        aptCmdBlk[0] = ATA_PT_12_CMD;
+        memcpy(aptCmdBlk + 1, cdbp + 1,  10);
+        /* control byte at cdb[11] left at zero */
+        break;
+    case 16:
+        cnamep = "ATA pass-through(16)";
+        aptCmdBlk[0] = ATA_PT_16_CMD;
+        memcpy(aptCmdBlk + 1, cdbp + 1,  14);
+        /* control byte at cdb[15] left at zero */
+        break;
+    case 32:
+        cnamep = "ATA pass-through(32)";
+        aptCmdBlk[0] = SG_VARIABLE_LENGTH_CMD;
+        /* control byte at cdb[1] left at zero */
+        aptCmdBlk[7] = 0x18;    /* length starting at next byte */
+        sg_put_unaligned_be16(ATA_PT_32_SA, aptCmdBlk + 8);
+        memcpy(aptCmdBlk + 10, cdbp + 10,  32 - 10);
+        break;
+    default:
+        pr2ws("cdb_len must be 12, 16 or 32\n");
         return -1;
     }
-    aptCmdBlk[0] = (12 == cdb_len) ? ATA_PT_12_CMD : ATA_PT_16_CMD;
+    if (NULL == cdbp) {
+        if (verbose)
+            pr2ws("%s NULL cdb pointer\n", cnamep);
+        return -1;
+    }
     if (sensep && (max_sense_len >= (int)sizeof(sense_b))) {
         sp = sensep;
         slen = max_sense_len;
@@ -1587,15 +1608,16 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
         sp = sense_b;
         slen = sizeof(sense_b);
     }
-    if (12 == cdb_len)
-        memcpy(aptCmdBlk + 1, cdbp + 1, ((cdb_len > 11) ? 10 : (cdb_len - 1)));
-    else
-        memcpy(aptCmdBlk + 1, cdbp + 1, ((cdb_len > 15) ? 14 : (cdb_len - 1)));
     if (verbose) {
         pr2ws("    %s cdb: ", cnamep);
-        for (k = 0; k < cdb_len; ++k)
-            pr2ws("%02x ", aptCmdBlk[k]);
-        pr2ws("\n");
+        if (cdb_len < 32) {
+            for (k = 0; k < cdb_len; ++k)
+                pr2ws("%02x ", aptCmdBlk[k]);
+            pr2ws("\n");
+        } else {
+            pr2ws("\n");
+            dStrHexErr((const char *)aptCmdBlk, cdb_len, -1);
+        }
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {

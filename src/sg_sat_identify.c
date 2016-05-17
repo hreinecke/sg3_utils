@@ -21,16 +21,19 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
+#include "sg_unaligned.h"
 
 /* This program uses a ATA PASS-THROUGH SCSI command to package an
  * ATA IDENTIFY (PACKAGE) DEVICE command. It is based on the SCSI to
  * ATA Translation (SAT) drafts and standards. See http://www.t10.org
  * for drafts. SAT is a standard: SAT ANSI INCITS 431-2007 (draft prior
  * to that is sat-r09.pdf). SAT-2 is also a standard: SAT-2 ANSI INCITS
- * 465-2010 and the draft prior to that is sat2r09.pdf . The SAT-3
- * project has started and the most recent draft is sat3r01.pdf .
+ * 465-2010 and the draft prior to that is sat2r09.pdf . The SAT-3 is
+ * now a standard: SAT-3 ANSI INCITS 517-2015. The most current draft of
+ * SAT-4 is revision 5c (sat4r05c.pdf).
  */
 
+#define SAT_ATA_PASS_THROUGH32_LEN 32
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
 #define SAT_ATA_PASS_THROUGH12 0xa1     /* clashes with MMC BLANK comand */
@@ -46,7 +49,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.12 20160126";
+static const char * version_str = "1.13 20160517";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -67,7 +70,7 @@ static void usage()
 {
     pr2serr("Usage: sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
             "[--ident]\n"
-            "                       [--len=16|12] [--packet] [--raw] "
+            "                       [--len=CLEN] [--packet] [--raw] "
             "[--readonly]\n"
             "                       [--verbose] [--version] DEVICE\n"
             "  where:\n"
@@ -78,16 +81,20 @@ static void usage()
             "    --ident|-i       output WWN prefixed by 0x, if not "
             "available output\n"
             "                     0x0000000000000000\n"
-            "    --len=16|12 | -l 16|12    cdb length: 16 or 12 bytes "
-            "(default: 16)\n"
+            "    --len=CLEN| -l CLEN    CLEN is cdb length: 12, 16 or 32 "
+            "bytes\n"
+            "                           (default: 16)\n"
             "    --packet|-p      do IDENTIFY PACKET DEVICE (def: IDENTIFY "
-            "DEVICE) command\n"
+            "DEVICE)\n"
+            "                     command\n"
             "    --raw|-r         output response in binary to stdout\n"
             "    --readonly|-R    open DEVICE read-only (def: read-write)\n"
             "    --verbose|-v     increase verbosity\n"
             "    --version|-V     print version string and exit\n\n"
             "Performs a ATA IDENTIFY (PACKET) DEVICE command via a SAT "
-            "layer\n");
+            "layer using\na SCSI ATA PASS-THROUGH(12), (16) or (32) command. "
+            "Only SAT layers\ncompliant with SAT-4 revision 5 or later will "
+            "support the SCSI ATA\nPASS-THROUGH(32) command.\n");
 }
 
 static void dStrRaw(const char* str, int len)
@@ -124,15 +131,32 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     unsigned char apt12CmdBlk[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
+    unsigned char apt32CmdBlk[SAT_ATA_PASS_THROUGH32_LEN];
     const unsigned short * usp;
     uint64_t ull;
 
     sb_sz = sizeof(sense_buffer);
     memset(sense_buffer, 0, sb_sz);
+    memset(apt32CmdBlk, 0, sizeof(apt32CmdBlk));
     memset(ata_return_desc, 0, sizeof(ata_return_desc));
     ok = 0;
-    if (SAT_ATA_PASS_THROUGH16_LEN == cdb_len) {
-        /* Prepare ATA PASS-THROUGH COMMAND (16) command */
+    switch (cdb_len) {
+    case SAT_ATA_PASS_THROUGH32_LEN:    /* SAT-4 revision 5 or later */
+        /* Prepare SCSI ATA PASS-THROUGH COMMAND(32) command */
+        sg_put_unaligned_be16(1, apt32CmdBlk + 22);     /* count=1 */
+        apt32CmdBlk[25] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
+                                       ATA_IDENTIFY_DEVICE);
+        apt32CmdBlk[10] = (multiple_count << 5) | (protocol << 1) | extend;
+        apt32CmdBlk[11] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+                          (byte_block << 2) | t_length;
+        /* following call takes care of all bytes below offset 10 in cdb */
+        res = sg_ll_ata_pt(sg_fd, apt32CmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
+                           NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
+                           sb_sz, ata_return_desc,
+                           sizeof(ata_return_desc), &resid, verbose);
+        break;
+    case SAT_ATA_PASS_THROUGH16_LEN:
+        /* Prepare SCSI ATA PASS-THROUGH COMMAND(16) command */
         aptCmdBlk[6] = 1;   /* sector count */
         aptCmdBlk[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                      ATA_IDENTIFY_DEVICE);
@@ -143,8 +167,9 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
-    } else {
-        /* Prepare ATA PASS-THROUGH COMMAND (12) command */
+        break;
+    case SAT_ATA_PASS_THROUGH12_LEN:
+        /* Prepare SCSI ATA PASS-THROUGH COMMAND(12) command */
         apt12CmdBlk[4] = 1;   /* sector count */
         apt12CmdBlk[9] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                       ATA_IDENTIFY_DEVICE);
@@ -155,6 +180,10 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
+        break;
+    default:
+        pr2serr("%s: bad cdb_len=%d\n", __func__, cdb_len);
+        return -1;
     }
     if (0 == res) {
         ok = 1;
@@ -162,7 +191,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
             pr2serr("command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
         if (verbose > 1) {
-            pr2serr("ATA pass through:\n");
+            pr2serr("ATA pass-through:\n");
             sg_print_sense(NULL, sense_buffer, sb_sz,
                            ((verbose > 2) ? 1 : 0));
         }
@@ -264,7 +293,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
             return SG_LIB_CAT_MALFORMED;
         }
     } else {
-        pr2serr("ATA pass through (%d) failed\n", cdb_len);
+        pr2serr("ATA pass-through (%d) failed\n", cdb_len);
         if (verbose < 2)
             pr2serr("    try adding '-v' for more information\n");
         return -1;
@@ -367,8 +396,13 @@ int main(int argc, char * argv[])
             break;
         case 'l':
             cdb_len = sg_get_num(optarg);
-            if (! ((cdb_len == 12) || (cdb_len == 16))) {
-                pr2serr("argument to '--len' should be 12 or 16\n");
+            switch (cdb_len) {
+            case 12:
+            case 16:
+            case 32:
+                break;
+            default:
+                pr2serr("argument to '--len' should be 12, 16 or 32\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

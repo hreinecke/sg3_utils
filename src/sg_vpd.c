@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.21 20160503";  /* spc5r09 + sbc4r10 */
+static const char * version_str = "1.22 20160515";  /* spc5r10 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -1371,7 +1371,7 @@ static void
 decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
 {
     char b[80];
-    int num, is_be;
+    int num, is_be, cc;
     const char * cp;
     const char * ata_transp;
 
@@ -1400,11 +1400,19 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         dStrHex((const char *)buff + 36, 20, 0);
     } else
         printf("  Device signature indicates %s transport\n", ata_transp);
+    cc = buff[56];      /* 0xec for IDENTIFY DEVICE and 0xa1 for IDENTIFY
+                         * PACKET DEVICE (obsolete) */
+    printf("  Command code: 0x%x\n", cc);
     if (len < 60)
         return;
+    if (0xec == cc)
+        cp = "";
+    else if (0xa1 == cc)
+        cp = "PACKET ";
+    else
+        cp = NULL;
     is_be = sg_is_big_endian();
-    if ((0xec == buff[56]) || (0xa1 == buff[56])) {
-        cp = (0xa1 == buff[56]) ? "PACKET " : "";
+    if (cp) {
         printf("  ATA command IDENTIFY %sDEVICE response summary:\n", cp);
         num = sg_ata_get_chars((const unsigned short *)(buff + 60), 27, 20,
                                is_be, b);
@@ -1422,7 +1430,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
             printf("  ATA command IDENTIFY %sDEVICE response in hex:\n", cp);
     } else if (do_long)
         printf("  ATA command 0x%x got following response:\n",
-               (unsigned int)buff[56]);
+               (unsigned int)cc);
     if (len < 572)
         return;
     if (2 == do_hex)
