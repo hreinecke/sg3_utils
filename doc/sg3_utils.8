@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "April 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG3_UTILS "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -30,23 +30,26 @@ SCSI draft standards can be found at http://www.t10.org . The standards
 themselves can be purchased from ANSI and other standards organizations.
 A good overview of various SCSI standards can be seen in
 http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
-of the diagram. SCSI commands in common with all device types can be found
-in SPC of which SPC\-4 is the latest major version. Block device specific
-commands (e.g. as used by disks) are in SBC, those for tape drives in SSC
-and those for CD/DVD/BD drives in MMC.
+of the diagram. The highest level (i.e. most abstract) document is the SCSI
+Architecture Model (SAM) with SAM\-5 being the most recent standard (ANSI
+INCITS 447-2008) although SAM\-5 should be released soon. SCSI commands in
+common with all device types can be found in SPC of which SPC\-5 is the
+latest major version. Block device specific commands (e.g. as used by disks)
+are in SBC, those for tape drives in SSC and those for CD/DVD/BD drives in
+MMC.
 .PP
 It is becoming more common to control ATA disks with the SCSI command set.
-This involves the translation of SCSI commands to their corresponding
-ATA equivalents (and that is an imperfect mapping in some cases). The
-relevant standard is called SCSI to ATA Translation (SAT and SAT\-2
-are now standards at INCITS(ANSI) and ISO while SAT\-3 is at the draft
-stage). The logic to perform the command translation is often called
-a SAT Layer or SATL and may be within an operating system, in host bus
-adapter firmware or in an external device (e.g. associated with a SAS
-expander). See http://www.t10.org for more information.
+This involves the translation of SCSI commands to their corresponding ATA
+equivalents (and that is an imperfect mapping in some cases). The relevant
+standard is called SCSI to ATA Translation (SAT, SAT\-2 and SAT\-3) are
+now standards at INCITS(ANSI) and ISO while SAT\-4 is at the draft stage.
+The logic to perform the command translation is often called a SAT Layer or
+SATL and may be within an operating system, in host bus adapter firmware or
+in an external device (e.g. associated with a SAS expander). See
+http://www.t10.org for more information.
 .PP
 There is some support for SCSI tape devices but not for their basic
-commands. The reader is referred to the "mt" utility.
+operation. The reader is referred to the "mt" utility.
 .PP
 There are two generations of command line option usage. The newer
 utilities (written since July 2004) use the getopt_long() function to parse
@@ -281,9 +284,9 @@ the \fIDEVICE\fR reports a SCSI status of "condition met". Currently only
 the PRE\-FETCH command (see SBC\-4) yields this status.
 .TP
 .B 26
-the \fIDEVICE\fR reports a SCSI status of "busy". SAM\-5 defines this
-status as the logical unit is temporarily unable to process a command.
-It is recommended to re-issue the command.
+the \fIDEVICE\fR reports a SCSI status of "busy". SAM\-6 defines this status
+as the logical unit is temporarily unable to process a command. It is
+recommended to re\-issue the command.
 .TP
 .B 27
 the \fIDEVICE\fR reports a SCSI status of "task set full".

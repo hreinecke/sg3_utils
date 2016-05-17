@@ -23,22 +23,24 @@ extern "C" {
  * a lot longer than the default timeout. */
 
 
-/* Invokes a ATA PASS-THROUGH (12 or 16) SCSI command (SAT). If cdb_len is
- * 12 then a ATA PASS-THROUGH (12) command is called. If cdb_len is 16 then
- * a ATA PASS-THROUGH (16) command is called. If cdb_len is any other value
- * -1 is returned. After copying from cdbp to an internal buffer, the first
- * byte (i.e. offset 0) is set to 0xa1 if cdb_len is 12; or is set to 0x85
- * if cdb_len is 16. The last byte (offset 11 or offset 15) is set to 0x0 in
- * the internal buffer. For data in or out transfers set dinp or doutp, and
- * dlen to the number of bytes to transfer. If dlen is zero then no data
- * transfer is assumed. If sense buffer obtained then it is written to
- * sensep, else sensep[0] is set to 0x0. If ATA return descriptor is obtained
- * then written to ata_return_dp, else ata_return_dp[0] is set to 0x0. Either
- * sensep or ata_return_dp (or both) may be NULL pointers. Returns SCSI
- * status value (>= 0) or -1 if other error. Users are expected to check the
- * sense buffer themselves. If available the data in resid is written to
- * residp. Note in SAT-2 and later, fixed format sense data may be placed in
- * *sensep in which case sensep[0]==0x70 .
+/* Invokes a ATA PASS-THROUGH (12, 16 or 32) SCSI command (SAT). This is
+ * selected by the cdb_len argument that can take values of 12, 16 or 32
+ * only (else -1 is returned). The byte at offset 0 (and bytes 0 to 9
+ * inclusive for ATA PT(32)) pointed to be cdbp are ignored and apart from
+ * the control byte, the rest is copied into an internal cdb which is then
+ * sent to the device. The control byte is byte 11 for ATA PT(12), byte 15
+ * for ATA PT(16) and byte 1 for ATA PT(32). If timeout_secs <= 0 then the
+ * timeout is set to 60 seconds. For data in or out transfers set dinp or
+ * doutp, and dlen to the number of bytes to transfer. If dlen is zero then
+ * no data transfer is assumed. If sense buffer obtained then it is written
+ * to sensep, else sensep[0] is set to 0x0. If ATA return descriptor is
+ * obtained then written to ata_return_dp, else ata_return_dp[0] is set to
+ * 0x0. Either sensep or ata_return_dp (or both) may be NULL pointers.
+ * Returns SCSI status value (>= 0) or -1 if other error. Users are
+ * expected to check the sense buffer themselves. If available the data in
+ * resid is written to residp. Note in SAT-2 and later, fixed format sense
+ * data may be placed in *sensep in which case sensep[0]==0x70, prior to
+ * SAT-2 descriptor sense format was required (i.e. sensep[0]==0x72).
  */
 int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
                  int timeout_secs,  void * dinp, void * doutp, int dlen,
