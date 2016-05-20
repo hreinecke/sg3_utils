@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.15 20160506";    /* ses3r13 */
+static const char * version_str = "2.16 20160518";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2993,7 +2993,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             break;
         additional_elem_sas(pad, ae_bp, etype, tesp, op);
         break;
-    case TPROTO_PCIE: /* added in ses3r08 */
+    case TPROTO_PCIE: /* added in ses3r08; contains little endian fields */
         printf("%sTransport protocol: PCIe\n", pad);
         if (0 == eip_offset) {
             printf("%sfor this protocol EIP must be set (it isn't)\n", pad);
@@ -3017,7 +3017,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         printf(", device slot number: %d\n", ae_bp[7]);
 
         pcie_vid = sg_get_unaligned_le16(ae_bp + 10);
-        printf("%svendor id: 0x%" PRIx16 "%s\n", pad, pcie_vid,
+        printf("%sPCIe vendor id: 0x%" PRIx16 "%s\n", pad, pcie_vid,
                (0xffff == pcie_vid) ? " (not reported)" : "");
         printf("%sserial number: %.20s\n", pad, ae_bp + 12);
         printf("%smodel number: %.40s\n", pad, ae_bp + 32);
