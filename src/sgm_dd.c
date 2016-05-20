@@ -64,7 +64,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.45 20160218";
+static const char * version_str = "1.46 20160518";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -83,14 +83,6 @@ static const char * version_str = "1.45 20160218";
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
-
-#ifndef SERVICE_ACTION_IN
-#define SERVICE_ACTION_IN     0x9e
-#endif
-#ifndef SAI_READ_CAPACITY_16
-#define SAI_READ_CAPACITY_16  0x10
-#endif
-
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 

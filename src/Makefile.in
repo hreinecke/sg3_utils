@@ -88,12 +88,13 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = sg_compare_and_write$(EXEEXT) sg_decode_sense$(EXEEXT) \
-	sg_format$(EXEEXT) sg_get_config$(EXEEXT) \
-	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) sg_inq$(EXEEXT) \
-	sg_logs$(EXEEXT) sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
-	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) sg_prevent$(EXEEXT) \
-	sg_raw$(EXEEXT) sg_rdac$(EXEEXT) sg_read_attr$(EXEEXT) \
+bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
+	sg_decode_sense$(EXEEXT) sg_format$(EXEEXT) \
+	sg_get_config$(EXEEXT) sg_get_lba_status$(EXEEXT) \
+	sg_ident$(EXEEXT) sg_inq$(EXEEXT) sg_logs$(EXEEXT) \
+	sg_luns$(EXEEXT) sg_modes$(EXEEXT) sg_opcodes$(EXEEXT) \
+	sg_persist$(EXEEXT) sg_prevent$(EXEEXT) sg_raw$(EXEEXT) \
+	sg_rdac$(EXEEXT) sg_read_attr$(EXEEXT) \
 	sg_read_block_limits$(EXEEXT) sg_read_buffer$(EXEEXT) \
 	sg_read_long$(EXEEXT) sg_readcap$(EXEEXT) sg_reassign$(EXEEXT) \
 	sg_referrals$(EXEEXT) sg_rep_zones$(EXEEXT) \
@@ -139,13 +140,16 @@ CONFIG_CLEAN_VPATH_FILES =
 @OS_WIN32_CYGWIN_TRUE@am__EXEEXT_3 = sg_scan$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-sg_compare_and_write_SOURCES = sg_compare_and_write.c
-sg_compare_and_write_OBJECTS = sg_compare_and_write.$(OBJEXT)
-sg_compare_and_write_DEPENDENCIES = ../lib/libsgutils2.la
+sg_bg_ctl_SOURCES = sg_bg_ctl.c
+sg_bg_ctl_OBJECTS = sg_bg_ctl.$(OBJEXT)
+sg_bg_ctl_DEPENDENCIES = ../lib/libsgutils2.la
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+sg_compare_and_write_SOURCES = sg_compare_and_write.c
+sg_compare_and_write_OBJECTS = sg_compare_and_write.$(OBJEXT)
+sg_compare_and_write_DEPENDENCIES = ../lib/libsgutils2.la
 sg_copy_results_SOURCES = sg_copy_results.c
 sg_copy_results_OBJECTS = sg_copy_results.$(OBJEXT)
 sg_copy_results_DEPENDENCIES = ../lib/libsgutils2.la
@@ -374,7 +378,7 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
+SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_decode_sense.c sg_emc_trespass.c sg_format.c \
 	sg_get_config.c sg_get_lba_status.c sg_ident.c \
 	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
@@ -390,8 +394,8 @@ SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_xcopy.c \
 	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
-DIST_SOURCES = sg_compare_and_write.c sg_copy_results.c sg_dd.c \
-	sg_decode_sense.c sg_emc_trespass.c sg_format.c \
+DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
+	sg_dd.c sg_decode_sense.c sg_emc_trespass.c sg_format.c \
 	sg_get_config.c sg_get_lba_status.c sg_ident.c \
 	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
 	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
@@ -564,6 +568,7 @@ AM_CFLAGS = -Wall -W @os_cflags@
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11 --analyze
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c++14
+sg_bg_ctl_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_dd_LDADD = ../lib/libsgutils2.la @os_libs@
@@ -714,6 +719,10 @@ clean-binPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
+
+sg_bg_ctl$(EXEEXT): $(sg_bg_ctl_OBJECTS) $(sg_bg_ctl_DEPENDENCIES) $(EXTRA_sg_bg_ctl_DEPENDENCIES) 
+	@rm -f sg_bg_ctl$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_bg_ctl_OBJECTS) $(sg_bg_ctl_LDADD) $(LIBS)
 
 sg_compare_and_write$(EXEEXT): $(sg_compare_and_write_OBJECTS) $(sg_compare_and_write_DEPENDENCIES) $(EXTRA_sg_compare_and_write_DEPENDENCIES) 
 	@rm -f sg_compare_and_write$(EXEEXT)
@@ -977,6 +986,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_bg_ctl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_compare_and_write.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_copy_results.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_dd.Po@am__quote@

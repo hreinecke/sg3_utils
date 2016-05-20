@@ -6,12 +6,14 @@ of them on the right. The second table lists supported ATA commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
+ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
 ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
                     sg_sat_phy_event, sg_sat_read_gplog ++
                     [sg_sat_chk_power, sg__sat_identify,
                      sg__sat_set_features, sg_sat_smart_rd_data
                      (previous four in the examples directory)]
-ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
+ATA COMMAND PASS-THROUGH(32)  sg_sat_identify, ++
+BACKGROUND CONTROL  sg_bg_ctl
 CLOSE ZONE          sg_zone
 COMPARE AND WRITE   sg_compare_and_write
 COPY OPERATION ABORT    ddptctl, ++
@@ -133,4 +135,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-8th February 2016
+19th May 2016

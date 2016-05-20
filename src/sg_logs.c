@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.44 20160512";    /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.45 20160519";    /* spc5r10 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -3675,7 +3675,7 @@ static bool
 show_format_status_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int k, j, num, pl, pc, pcb, all_ff, counter;
+    int k, num, pl, pc, pcb, counter;
     const uint8_t * bp;
     const uint8_t * xp;
     uint64_t ull;
@@ -3706,13 +3706,7 @@ show_format_status_page(const uint8_t * resp, int len,
             if (pl < 5)
                 printf("  Format data out: <empty>\n");
             else {
-                for (all_ff = 1, j = 4; j < pl; ++j) {
-                    if (0xff != bp[j]) {
-                        all_ff = 0;
-                        break;
-                    }
-                }
-                if (all_ff)
+                if (all_bits_set(bp + 4, pl - 4))
                     printf("  Format data out: <not available>\n");
                 else {
                     printf("  Format data out:\n");
@@ -3734,7 +3728,7 @@ show_format_status_page(const uint8_t * resp, int len,
             printf("  Power on minutes since format");
             break;
         default:
-            printf("  Unknown Format status code = 0x%x\n", pc);
+            printf("  Unknown Format parameter code = 0x%x\n", pc);
             counter = 0;
             dStrHex((const char *)bp, pl, 0);
             break;
@@ -3742,24 +3736,16 @@ show_format_status_page(const uint8_t * resp, int len,
         if (counter) {
             k = pl - 4;
             xp = bp + 4;
-            if (k > (int)sizeof(ull)) {
-                xp += (k - sizeof(ull));
-                k = sizeof(ull);
-            }
-            ull = 0;
-            for (all_ff = 0, j = 0; j < k; ++j) {
-                if (j > 0)
-                    ull <<= 8;
-                else
-                    all_ff = 1;
-                ull |= xp[j];
-                if (0xff != xp[j])
-                    all_ff = 0;
-            }
-            if (all_ff)
+            if (all_bits_set(xp, k))
                 printf(" <not available>");
-            else
+            else {
+                if (k > (int)sizeof(ull)) {
+                    xp += (k - sizeof(ull));
+                    k = sizeof(ull);
+                }
+                ull = sg_get_unaligned_be(k, xp);
                 printf(" = %" PRIu64 "", ull);
+            }
             if (op->do_pcb) {
                 get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
                 printf("\n        <%s>\n", pcb_str);
@@ -3852,7 +3838,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
                 printf("<unexpected parameter length=%d>\n", bp[4]);
             break;
         default:
-            printf("  Unknown Format status code = 0x%x\n", pc);
+            printf("  Unknown parameter code = 0x%x\n", pc);
             dStrHex((const char *)bp, pl, 0);
             break;
         }
@@ -3933,10 +3919,9 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             }
             if (0x3 == pc)
                 printf("  %s: %u %%\n", cp, sg_get_unaligned_be16(bp + 4));
-            else {
-                printf("  %s resource count:", cp);
-                printf(" %u\n", sg_get_unaligned_be32(bp + 4));
-            }
+            else
+                printf("  %s resource count: %u\n", cp,
+                       sg_get_unaligned_be32(bp + 4));
             if (pl > 8) {
                 switch (bp[8] & 0x3) {
                 case 0: cp = "not reported"; break;
@@ -5572,9 +5557,8 @@ skip:
 static void
 volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
 {
-    int dl, pn, k;
+    int dl, pn;
     bool all_ffs, ffs_last_fe;
-    uint8_t uc;
     uint64_t ull;
 
     while (len > 3) {
@@ -5582,20 +5566,21 @@ volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
         if (dl < 3)
             return;
         pn = sg_get_unaligned_be16(xp + 2);
-        for (k = 0, all_ffs = false, ffs_last_fe = false; k < (dl - 4); ++k) {
-            uc = xp[4 + k];
-            if (uc < 0xfe)
+        ffs_last_fe = false;
+        all_ffs = false;
+        if (all_bits_set(xp + 4, dl - 3)) {
+            switch (xp[4 + dl - 3]) {
+            case 0xff:
+                all_ffs = true;
                 break;
-            if ((k < (dl - 5)) && (0xfe == uc))
+            case 0xfe:
+                ffs_last_fe = true;
                 break;
-            if (k == (dl - 5)) {
-                if (0xff == uc)
-                    all_ffs = true;
-                else if (0xfe == uc)
-                    ffs_last_fe = true;
+            default:
+                break;
             }
         }
-        if ((! all_ffs) && (! ffs_last_fe)) {
+        if (! (all_ffs || ffs_last_fe)) {
             ull = sg_get_unaligned_be(dl - 4, xp + 4);
             if (in_hex)
                 printf("    partition number: %d, partition record data "
@@ -5606,7 +5591,7 @@ volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
         } else if (all_ffs)
             printf("    partition number: %d, partition record data "
                    "counter is all 0xFFs\n", pn);
-        else
+        else    /* ffs_last_fe is true */
             printf("    partition number: %d, partition record data "
                    "counter is all 0xFFs apart\n    from a trailing "
                    "0xFE\n", pn);

@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -28,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.12 20160226";
+static const char * version_str = "1.13 20160519";
 
 
 #define ME "sg_write_same: "
@@ -116,7 +117,7 @@ usage()
             "                         LBA+NUM > 32 bits, or NUM > 65535; "
             "then def 16)\n"
             "    --32|-T              do WRITE SAME(32) (def: 10 or 16)\n"
-            "    --anchor|-a          set anchor field in cdb\n"
+            "    --anchor|-a          set ANCHOR field in cdb\n"
             "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
             "    --help|-h            print out usage message\n"
             "    --in=IF|-i IF        IF is file to fetch one block of data "
@@ -126,11 +127,12 @@ usage()
             "    --lba=LBA|-l LBA     LBA is the logical block address to "
             "start (def: 0)\n"
             "    --lbdata|-L          set LBDATA bit (obsolete)\n"
-            "    --ndob|-N            set 'no data-out buffer' bit\n"
+            "    --ndob|-N            set NDOB (no data-out buffer) bit in "
+            "cdb\n"
             "    --num=NUM|-n NUM     NUM is number of logical blocks to "
             "write (def: 1)\n"
-            "                         [Beware NUM==0 may mean rest of "
-            "device]\n"
+            "                         [Beware NUM==0 may mean: 'rest of "
+            "device']\n"
             "    --pbdata|-P          set PBDATA bit (obsolete)\n"
             "    --timeout=TO|-t TO    command timeout (unit: seconds) (def: "
             "60)\n"
@@ -142,7 +144,12 @@ usage()
             "    --xferlen=LEN|-x LEN    LEN is number of bytes from IF to "
             "send to\n"
             "                            DEVICE (def: IF file length)\n\n"
-            "Performs a SCSI WRITE SAME (10, 16 or 32) command\n"
+            "Performs a SCSI WRITE SAME (10, 16 or 32) command. NDOB bit is "
+            "only\nsupported by the 16 and 32 byte variants. When set the "
+            "specified blocks\nwill be filled with zeros or the "
+            "'provisioning initialization pattern'\nas indicated by the "
+            "LBPRZ field. As a precaution one of the '--in=',\n'--lba=' or "
+            "'--num=' options is required.\n"
             );
 }
 
@@ -298,10 +305,10 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, res, c, infd, prot_en, act_cdb_len, vb;
-    int num_given = 0;
-    int lba_given = 0;
-    int if_given = 0;
-    int got_stdin = 0;
+    bool num_given = false;
+    bool lba_given = false;
+    bool if_given = false;
+    bool got_stdin = false;
     int64_t ll;
     uint32_t block_size;
     const char * device_name = NULL;
@@ -344,7 +351,7 @@ main(int argc, char * argv[])
             return 0;
         case 'i':
             strncpy(op->ifilename, optarg, sizeof(op->ifilename));
-            if_given = 1;
+            if_given = true;
             break;
         case 'l':
             ll = sg_get_llnum(optarg);
@@ -353,7 +360,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->lba = (uint64_t)ll;
-            lba_given = 1;
+            lba_given = true;
             break;
         case 'L':
             ++op->lbdata;
@@ -364,7 +371,7 @@ main(int argc, char * argv[])
                 pr2serr("bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            num_given = 1;
+            num_given = true;
             break;
         case 'N':
             ++op->ndob;
@@ -465,7 +472,7 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     } else if (op->ifilename[0]) {
-        got_stdin = (0 == strcmp(op->ifilename, "-")) ? 1 : 0;
+        got_stdin = (0 == strcmp(op->ifilename, "-"));
         if (! got_stdin) {
             memset(&a_stat, 0, sizeof(a_stat));
             if (stat(op->ifilename, &a_stat) < 0) {
