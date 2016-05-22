@@ -90,8 +90,9 @@
 struct opts_t {
     int do_all;
     int do_enum;
+    int do_force;
     int do_hex;
-    int num_vpd;
+    int vpd_pn;
     int do_ident;
     int do_long;
     int maxlen;
@@ -189,6 +190,21 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {0, 0, 0, NULL, NULL},
 };
 
+
+void
+dup_sanity_chk(int sz_opts_t, int sz_values_name_t)
+{
+    const size_t my_sz_opts_t = sizeof(struct opts_t);
+    const size_t my_sz_values_name_t = sizeof(struct svpd_values_name_t);
+
+    if (sz_opts_t != (int)my_sz_opts_t)
+        pr2serr(">>> struct opts_t differs in size from sg_vpd.c [%d != "
+                "%d]\n", (int)my_sz_opts_t, sz_opts_t);
+    if (sz_values_name_t != (int)my_sz_values_name_t)
+        pr2serr(">>> struct svpd_values_name_t differs in size from "
+                "sg_vpd.c [%d != %d]\n", (int)my_sz_values_name_t,
+                sz_values_name_t);
+}
 
 static int
 is_like_pdt(int actual_pdt, const struct svpd_values_name_t * vnp)
@@ -321,13 +337,13 @@ svpd_enumerate_vendor(int vend_prod_num)
 }
 
 int
-svpd_count_vendor_vpds(int num_vpd, int vend_prod_num)
+svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num)
 {
     const struct svpd_values_name_t * vnp;
     int matches;
 
     for (vnp = vendor_vpd_pg, matches = 0; vnp->acron; ++vnp) {
-        if ((num_vpd == vnp->value) && vnp->name) {
+        if ((vpd_pn == vnp->value) && vnp->name) {
             if ((vend_prod_num < 0) || (vend_prod_num == vnp->subvalue)) {
                 if (0 == matches)
                     printf("Matching vendor specific VPD pages:\n");
@@ -1296,15 +1312,15 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
         if (0 == alloc_len)
             alloc_len = DEF_ALLOC_LEN;
     }
-    res = vpd_fetch_page_from_dev(sg_fd, rp, op->num_vpd, alloc_len,
+    res = vpd_fetch_page_from_dev(sg_fd, rp, op->vpd_pn, alloc_len,
                                   op->verbose, &len);
     if (0 == res) {
-        vnp = svpd_get_v_detail(op->num_vpd, op->vend_prod_num, 0xf & rp[0]);
+        vnp = svpd_get_v_detail(op->vpd_pn, op->vend_prod_num, 0xf & rp[0]);
         if (vnp && vnp->name)
             strcpy(name, vnp->name);
         else
             snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x",
-                     op->num_vpd);
+                     op->vpd_pn);
         if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 2))
             printf("%s VPD Page:\n", name);
         if (op->do_raw)
@@ -1313,7 +1329,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
             dStrHex((const char *)rp, len,
                     ((1 == op->do_hex) ? 0 : -1));
         else {
-            switch(op->num_vpd) {
+            switch(op->vpd_pn) {
                 case 0xc0:
                     if (VPD_VP_SEAGATE == op->vend_prod_num)
                         decode_firm_vpd_c0_sea(rp, len);
@@ -1328,7 +1344,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_IBM_LTO == op->vend_prod_num)
                         decode_ibm_lto_dcrl(rp, len);
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
+                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1340,7 +1356,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_IBM_LTO == op->vend_prod_num)
                         decode_ibm_lto_dsn(rp, len);
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
+                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1348,7 +1364,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c2(rp, len);
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
+                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1358,7 +1374,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c3(rp, len);
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
+                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1366,13 +1382,13 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c4(rp, len);
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
+                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
                 case 0xc5:
                     if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->num_vpd);
+                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
                         dStrHex((const char *)rp, len, 0);
                     break;
@@ -1406,6 +1422,6 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
             return 0;
         }
     } else
-        pr2serr("Vendor VPD page=0x%x  failed to fetch", op->num_vpd);
+        pr2serr("Vendor VPD page=0x%x  failed to fetch", op->vpd_pn);
     return res;
 }

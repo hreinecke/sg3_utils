@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "February 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_WRITE_SAME "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -55,11 +55,11 @@ to the Block Limits VPD page [0xB0]. If set the WRITE SAME commands will not
 accept a \fINUM\fR of zero. The same SBC\-3 revision added the "Maximum
 Write Same Length" field to the Block Limits VPD page.
 .PP
-The Logical Block Provisioning VPD page [0xB2] contains the LBWS and
-LBW10 bits. If LBWS is set then WRITE SAME (16) supports the UNMAP bit.
-If LBWS10 is set then WRITE SAME (10) supports the UNMAP bit. If either
-LBWS or LBWS10 is set and the WRITE SAME (32) is supported then WRITE
-SAME (32) supports the UNMAP bit. This is as of SBC\-3 revision 26.
+The Logical Block Provisioning VPD page [0xB2] contains the LBPWS and
+LBPWS10 bits. If LBPWS is set then WRITE SAME (16) supports the UNMAP bit.
+If LBPWS10 is set then WRITE SAME (10) supports the UNMAP bit. If either
+LBPWS or LBPWS10 is set and the WRITE SAME (32) is supported then WRITE
+SAME (32) supports the UNMAP bit.
 .PP
 As a precaution against an accidental 'sg_write_same /dev/sda' (for example)
 overwriting LBA 0 on /dev/sda with zeros, at least one of the
@@ -112,9 +112,10 @@ sets the LBDATA bit in the WRITE SAME cdb. This bit was made obsolete in
 sbc3r32 in September 2012.
 .TP
 \fB\-N\fR, \fB\-\-ndob\fR
-sets the NDOB bit in the WRITE SAME (16 and 32 byte) commands. Default is to
-clear this bit. When this option is given then \fI\-\-in=IF\fR is not allowed
-and \fI\-\-xferlen=LEN\fR can only be given if \fILEN\fR is 0 .
+sets the NDOB bit in the WRITE SAME (16 and 32 byte) commands. NDOB stands
+for No Data\-Out Buffer. Default is to clear this bit. When this option
+is given then \fI\-\-in=IF\fR is not allowed and \fI\-\-xferlen=LEN\fR can
+only be given if \fILEN\fR is 0 .
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the
@@ -313,7 +314,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2015 Douglas Gilbert
+Copyright \(co 2009\-2016 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
