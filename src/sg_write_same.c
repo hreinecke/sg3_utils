@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20160519";
+static const char * version_str = "1.14 20160521";
 
 
 #define ME "sg_write_same: "
@@ -110,13 +110,13 @@ usage()
             "[xferlen=LEN]\n"
             "                     DEVICE\n"
             "  where:\n"
-            "    --10|-R              do WRITE SAME(10) (even if '--unmap' "
+            "    --10|-R              send WRITE SAME(10) (even if '--unmap' "
             "is given)\n"
-            "    --16|-S              do WRITE SAME(16) (def: 10 unless "
+            "    --16|-S              send WRITE SAME(16) (def: 10 unless "
             "'--unmap' given,\n"
             "                         LBA+NUM > 32 bits, or NUM > 65535; "
             "then def 16)\n"
-            "    --32|-T              do WRITE SAME(32) (def: 10 or 16)\n"
+            "    --32|-T              send WRITE SAME(32) (def: 10 or 16)\n"
             "    --anchor|-a          set ANCHOR field in cdb\n"
             "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
             "    --help|-h            print out usage message\n"

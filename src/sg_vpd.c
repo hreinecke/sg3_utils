@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.22 20160515";  /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.23 20160521";  /* spc5r10 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -47,7 +47,7 @@ struct opts_t {
     int do_enum;
     int do_force;
     int do_hex;
-    int num_vpd;
+    int vpd_pn;
     int do_ident;
     int do_long;
     int maxlen;
@@ -72,7 +72,7 @@ struct svpd_values_name_t {
 
 
 void svpd_enumerate_vendor(int vend_prod_num);
-int svpd_count_vendor_vpds(int num_vpd, int vend_prod_num);
+int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
 int svpd_decode_vendor(int sg_fd, struct opts_t * op, int off);
 const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 int svpd_find_vp_num_by_acron(const char * vp_ap);
@@ -80,6 +80,7 @@ const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
                                                           int vend_prod_num);
 int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
                             int mxlen, int vb, int * rlenp);
+void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 
 
 /* standard VPD pages, in ascending page number order */
@@ -262,7 +263,9 @@ usage()
             "    --page=PG|-p PG    fetch VPD page where PG is an "
             "acronym, or a decimal\n"
             "                       number unless hex indicator "
-            "is given (e.g. '0x83')\n"
+            "is given (e.g. '0x83');\n"
+            "                       can also take PG,VP as an "
+            "operand\n"
             "    --quiet|-q      suppress some output when decoding\n"
             "    --raw|-r        output page in binary; if --inhex=FN is "
             "also\n"
@@ -675,13 +678,13 @@ enumerate_vpds(int standard, int vendor)
 }
 
 static int
-count_standard_vpds(int num_vpd)
+count_standard_vpds(int vpd_pn)
 {
     const struct svpd_values_name_t * vnp;
     int matches;
 
     for (vnp = standard_vpd_pg, matches = 0; vnp->acron; ++vnp) {
-        if ((num_vpd == vnp->value) && vnp->name) {
+        if ((vpd_pn == vnp->value) && vnp->name) {
             if (0 == matches)
                 printf("Matching standard VPD pages:\n");
             ++matches;
@@ -2210,9 +2213,9 @@ decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
     }
     pt = b[6] & 0x7;
     printf("  Unmap command supported (LBPU): %d\n", !!(0x80 & b[5]));
-    printf("  Write same (16) with unmap bit supported (LBWS): %d\n",
+    printf("  Write same (16) with unmap bit supported (LBPWS): %d\n",
            !!(0x40 & b[5]));
-    printf("  Write same (10) with unmap bit supported (LBWS10): %d\n",
+    printf("  Write same (10) with unmap bit supported (LBPWS10): %d\n",
            !!(0x20 & b[5]));
     printf("  Logical block provisioning read zeros (LBPRZ): %d\n",
            (0x7 & (b[5] >> 2)));  /* expanded from 1 to 3 bits in sbc4r07 */
@@ -2585,19 +2588,19 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
         printf("Only hex output supported\n");
     if ((!op->do_raw) && (op->do_hex < 2)) {
         if (subvalue)
-            printf("VPD page code=0x%.2x, subvalue=0x%.2x:\n", op->num_vpd,
+            printf("VPD page code=0x%.2x, subvalue=0x%.2x:\n", op->vpd_pn,
                    subvalue);
-        else if (op->num_vpd >= 0)
-            printf("VPD page code=0x%.2x:\n", op->num_vpd);
+        else if (op->vpd_pn >= 0)
+            printf("VPD page code=0x%.2x:\n", op->vpd_pn);
         else
-            printf("VPD page code=%d:\n", op->num_vpd);
+            printf("VPD page code=%d:\n", op->vpd_pn);
     }
     if (sg_fd >= 0) {
         if (0 == alloc_len)
             alloc_len = DEF_ALLOC_LEN;
     }
 
-    res = vpd_fetch_page_from_dev(sg_fd, rp, op->num_vpd, alloc_len,
+    res = vpd_fetch_page_from_dev(sg_fd, rp, op->vpd_pn, alloc_len,
                                   op->verbose, &len);
     if (0 == res) {
         if (op->do_raw)
@@ -2605,22 +2608,23 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
         else {
             if (op->do_hex > 1)
                 dStrHex((const char *)rp, len, -1);
-            else if (VPD_ASCII_OP_DEF == op->num_vpd)
+            else if (VPD_ASCII_OP_DEF == op->vpd_pn)
                 dStrHex((const char *)rp, len, 0);
             else
                 dStrHex((const char *)rp, len, (op->do_long ? 0 : 1));
         }
         return 0;
     } else {
-        if (op->num_vpd >= 0)
-            pr2serr("fetching VPD page code=0x%.2x: failed\n", op->num_vpd);
+        if (op->vpd_pn >= 0)
+            pr2serr("fetching VPD page code=0x%.2x: failed\n", op->vpd_pn);
         else
-            pr2serr("fetching VPD page code=%d: failed\n", op->num_vpd);
+            pr2serr("fetching VPD page code=%d: failed\n", op->vpd_pn);
         return res;
     }
 }
 
-/* Returns 0 if successful, else see sg_ll_inquiry() */
+/* Returns 0 if successful. If don't know how to decode, returns
+ * SG_LIB_SYNTAX_ERROR else see sg_ll_inquiry(). */
 static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
@@ -2632,7 +2636,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     char obuff[DEF_ALLOC_LEN];
     unsigned char * rp;
 
-    pn = op->num_vpd;
+    pn = op->vpd_pn;
     vb = op->verbose;
     long_notquiet = op->do_long && (! op->do_quiet);
     if (op->do_raw || (op->do_quiet && (! op->do_long) && (! op->do_all)) ||
@@ -3273,8 +3277,8 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
     unsigned char vpd0_buff[512];
     unsigned char * rp = vpd0_buff;
 
-    if (op->num_vpd > 0)
-        max_pn = op->num_vpd;
+    if (op->vpd_pn > 0)
+        max_pn = op->vpd_pn;
     if (sg_fd >= 0) {
         res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_SUPPORTED_VPDS,
                                       op->maxlen, op->verbose, &rlen);
@@ -3300,7 +3304,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             pn = rp[4 + k];
             if (pn > max_pn)
                 continue;
-            op->num_vpd = pn;
+            op->vpd_pn = pn;
             if (op->do_long)
                 printf("[0x%x] ", pn);
 
@@ -3343,7 +3347,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
                 break;
             }
             prev_pn = pn;
-            op->num_vpd = pn;
+            op->vpd_pn = pn;
             if (pn > max_pn) {
                 if (op->verbose > 2)
                     pr2serr("%s: skipping as this pn=0x%x exceeds "
@@ -3379,6 +3383,7 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(&opts, 0, sizeof(opts));
+    dup_sanity_chk((int)sizeof(opts), (int)sizeof(*vnp));
     op->vend_prod_num = -1;
     while (1) {
         int option_index = 0;
@@ -3499,10 +3504,10 @@ main(int argc, char * argv[])
         if (op->page_str) {
             if ((0 == strcmp("-1", op->page_str)) ||
                 (0 == strcmp("-2", op->page_str)))
-                op->num_vpd = VPD_NO_RATHER_STD_INQ;
+                op->vpd_pn = VPD_NO_RATHER_STD_INQ;
             else if (isdigit(op->page_str[0])) {
-                op->num_vpd = sg_get_num_nomult(op->page_str);
-                if ((op->num_vpd < 0) || (op->num_vpd > 255)) {
+                op->vpd_pn = sg_get_num_nomult(op->page_str);
+                if ((op->vpd_pn < 0) || (op->vpd_pn > 255)) {
                     pr2serr("Bad page code value after '-p' option\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -3511,13 +3516,13 @@ main(int argc, char * argv[])
                         "numbers\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            matches = count_standard_vpds(op->num_vpd);
+            matches = count_standard_vpds(op->vpd_pn);
             if (0 == matches)
-                matches = svpd_count_vendor_vpds(op->num_vpd,
+                matches = svpd_count_vendor_vpds(op->vpd_pn,
                                                  op->vend_prod_num);
             if (0 == matches)
                 printf("No matches found for VPD page number 0x%x\n",
-                       op->num_vpd);
+                       op->vpd_pn);
         } else {        /* enumerate standard then vendor VPD pages */
             printf("Standard VPD pages:\n");
             enumerate_vpds(1, 1);
@@ -3527,7 +3532,7 @@ main(int argc, char * argv[])
     if (op->page_str) {
         if ((0 == strcmp("-1", op->page_str)) ||
             (0 == strcmp("-2", op->page_str)))
-            op->num_vpd = VPD_NO_RATHER_STD_INQ;
+            op->vpd_pn = VPD_NO_RATHER_STD_INQ;
         else if (isalpha(op->page_str[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_str);
             if (NULL == vnp) {
@@ -3539,7 +3544,7 @@ main(int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
-            op->num_vpd = vnp->value;
+            op->vpd_pn = vnp->value;
             subvalue = vnp->subvalue;
             op->vend_prod_num = subvalue;
         } else {
@@ -3549,8 +3554,8 @@ main(int argc, char * argv[])
                         "choose one or the other\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->num_vpd = sg_get_num_nomult(op->page_str);
-            if ((op->num_vpd < 0) || (op->num_vpd > 255)) {
+            op->vpd_pn = sg_get_num_nomult(op->page_str);
+            if ((op->vpd_pn < 0) || (op->vpd_pn > 255)) {
                 pr2serr("Bad page code value after '-p' option\n");
                 printf("Available standard VPD pages:\n");
                 enumerate_vpds(1, 1);
@@ -3620,15 +3625,15 @@ main(int argc, char * argv[])
                 if (op->verbose)
                     pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
                             rsp_buff[1]);
-                op->num_vpd = rsp_buff[1];
+                op->vpd_pn = rsp_buff[1];
             } else {
-                if (op->num_vpd > 0x80) {
-                    op->num_vpd = rsp_buff[1];
+                if (op->vpd_pn > 0x80) {
+                    op->vpd_pn = rsp_buff[1];
                     if (op->verbose)
                         pr2serr("Guessing from --inhex this is VPD page "
                                 "0x%x\n", rsp_buff[1]);
                 } else {
-                    op->num_vpd = VPD_NO_RATHER_STD_INQ;
+                    op->vpd_pn = VPD_NO_RATHER_STD_INQ;
                     if (op->verbose)
                         pr2serr("page number unclear from --inhex, hope "
                                 "it's a standard INQUIRY response\n");
@@ -3647,7 +3652,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_ident) {
-        op->num_vpd = VPD_DEVICE_ID;
+        op->vpd_pn = VPD_DEVICE_ID;
         if (op->do_ident > 1) {
             if (0 == op->do_long)
                 ++op->do_quiet;
