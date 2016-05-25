@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.35 [20140403]";
+static const char * version_str = "2.36 [20160525]";
 
 #include <stdio.h>
 #include <string.h>
@@ -899,10 +899,11 @@ get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
             fprintf(stdout, ">>> Unable to read %s mode page 0x%x, subpage "
                     "0x%x [mode_sense_10]\n", get_page_name(mpi), mpi->page,
                     mpi->subpage);
-        else
+        else {
             fprintf(stdout, ">>> Unable to read %s mode page (0x%x) "
                     "[mode_sense_10]\n", get_page_name(mpi), mpi->page);
             return status;
+        }
     }
     mpi->resp_len = (resp[0] << 8) + resp[1] + 2;
     if (sngl_fetch) {

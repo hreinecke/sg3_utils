@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.16 20160518";    /* ses3r13 */
+static const char * version_str = "2.17 20160525";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2145,12 +2145,13 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
     case POWER_SUPPLY_ETC:
-        if (nofilter || ((0xc0 & statp[1]) || (0xe & statp[2])))
+        if (nofilter || ((0xc0 & statp[1]) || (0xe & statp[2]))) {
             printf("%sIdent=%d, Do not remove=%d, DC overvoltage=%d, "
                    "DC undervoltage=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[2] & 0x8),
                    !!(statp[2] & 0x4));
             printf("%s DC overcurrent=%d\n", pad, !!(statp[2] & 0x2));
+        }
         if (nofilter || (0xf8 & statp[3]))
             printf("%sHot swap=%d, Fail=%d, Requested on=%d, Off=%d, "
                    "Overtmp fail=%d\n", pad, !!(statp[3] & 0x80),
