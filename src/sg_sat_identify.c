@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -49,7 +50,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.13 20160517";
+static const char * version_str = "1.14 20160525";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -118,8 +119,8 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks (if t_type=0) */
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
-    int got_ard = 0;    /* got ATA result descriptor */
-    int got_fixsense = 0;    /* got ATA result in fixed format sense */
+    bool got_ard = false;         /* got ATA result descriptor */
+    bool got_fixsense = false;    /* got ATA result in fixed format sense */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
     unsigned char inBuff[ID_RESPONSE_LEN];
@@ -221,17 +222,17 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                                         "Descriptor\n");
                             return SG_LIB_CAT_RECOVERED;
                         }
-                        got_ard = 1;
+                        got_ard = true;
                         break;
                     } else if (0x70 == ssh.response_code) {
-                        got_fixsense = 1;
+                        got_fixsense = true;
                         break;
                     } else {
                         if (verbose < 2)
                             pr2serr("ATA PASS-THROUGH (%d), unexpected  "
                                     "response_code=0x%x\n", ssh.response_code,
                                     cdb_len);
-                            return SG_LIB_CAT_RECOVERED;
+                        return SG_LIB_CAT_RECOVERED;
                     }
                 } else if (SPC_SK_RECOVERED_ERROR == ssh.sense_key)
                     return SG_LIB_CAT_RECOVERED;
@@ -299,7 +300,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         return -1;
     }
 
-    if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (0 == got_ard))
+    if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (! got_ard))
         pr2serr("Seem to have got ATA Result Descriptor but it was not "
                 "indicated\n");
     if (got_ard) {
