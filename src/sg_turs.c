@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 
@@ -31,7 +32,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.32 20160226";
+static const char * version_str = "3.33 20160525";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -61,12 +62,12 @@ static struct option long_options[] = {
 struct opts_t {
     int do_help;
     int do_number;
-    int do_progress;
-    int do_time;
+    bool do_progress;
+    bool do_time;
     int do_verbose;
-    int do_version;
+    bool do_version;
     const char * device_name;
-    int opt_new;
+    bool opts_new;
 };
 
 
@@ -107,7 +108,7 @@ static void usage_old()
 
 static void usage_for(const struct opts_t * op)
 {
-    if (op->opt_new)
+    if (op->opts_new)
         usage();
     else
         usage_old();
@@ -142,19 +143,19 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opts_new = false;
             return 0;
         case 'p':
-            ++op->do_progress;
+            op->do_progress = true;
             break;
         case 't':
-            ++op->do_time;
+            op->do_time = true;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -193,21 +194,21 @@ static int process_cl_old(struct opts_t * op, int argc, char * argv[])
             for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'N':
-                    op->opt_new = 1;
+                    op->opts_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'p':
-                    ++op->do_progress;
+                    op->do_progress = true;
                     break;
                 case 't':
-                    ++op->do_time;
+                    op->do_time = true;
                     break;
                 case 'v':
                     ++op->do_verbose;
                     break;
                 case 'V':
-                    ++op->do_verbose;
+                    op->do_version = true;
                     break;
                 case '?':
                     usage_old();
@@ -254,14 +255,14 @@ static int process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opts_new = false;
         res = process_cl_old(op, argc, argv);
-        if ((0 == res) && op->opt_new)
+        if ((0 == res) && op->opts_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opts_new = true;
         res = process_cl_new(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (0 == op->opts_new))
             res = process_cl_old(op, argc, argv);
     }
     return res;
@@ -271,7 +272,7 @@ int main(int argc, char * argv[])
 {
     int sg_fd, k, res, progress, pr, rem;
     int num_errs = 0;
-    int reported = 0;
+    bool reported = false;
     int ret = 0;
 #ifndef SG_LIB_MINGW
     struct timeval start_tm, end_tm;
@@ -326,7 +327,7 @@ int main(int argc, char * argv[])
         if (op->do_number > 1)
             printf("Completed %d Test Unit Ready commands\n",
                    ((k < op->do_number) ? k + 1 : k));
-    } else {
+    } else {            /* --progress not given */
 #ifndef SG_LIB_MINGW
         if (op->do_time) {
             start_tm.tv_sec = 0;
@@ -348,7 +349,7 @@ int main(int argc, char * argv[])
                                                   op->do_verbose);
                         printf("%s\n", b);
                     }
-                    reported = 1;
+                    reported = true;
                     break;
                 }
             }

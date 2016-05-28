@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20160521";
+static const char * version_str = "1.14 20160528";
 
 
 #define ME "sg_write_same: "
@@ -159,7 +159,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 {
     int k, ret, res, sense_cat, cdb_len;
     uint64_t llba;
-    unsigned char wsCmdBlk[WRITE_SAME32_LEN];
+    unsigned char ws_cdb[WRITE_SAME32_LEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
@@ -184,62 +184,62 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
     if (act_cdb_lenp)
         *act_cdb_lenp = cdb_len;
-    memset(wsCmdBlk, 0, sizeof(wsCmdBlk));
+    memset(ws_cdb, 0, sizeof(ws_cdb));
     switch (cdb_len) {
     case WRITE_SAME10_LEN:
-        wsCmdBlk[0] = WRITE_SAME10_OP;
-        wsCmdBlk[1] = ((op->wrprotect & 0x7) << 5);
+        ws_cdb[0] = WRITE_SAME10_OP;
+        ws_cdb[1] = ((op->wrprotect & 0x7) << 5);
         /* ANCHOR + UNMAP not allowed for WRITE_SAME10 in sbc3r24+r25 but
          * a proposal has been made to allow it. Anticipate approval. */
         if (op->anchor)
-            wsCmdBlk[1] |= 0x10;
+            ws_cdb[1] |= 0x10;
         if (op->unmap)
-            wsCmdBlk[1] |= 0x8;
+            ws_cdb[1] |= 0x8;
         if (op->pbdata)
-            wsCmdBlk[1] |= 0x4;
+            ws_cdb[1] |= 0x4;
         if (op->lbdata)
-            wsCmdBlk[1] |= 0x2;
-        sg_put_unaligned_be32((uint32_t)op->lba, wsCmdBlk + 2);
-        wsCmdBlk[6] = (op->grpnum & 0x1f);
-        sg_put_unaligned_be16((uint16_t)op->numblocks, wsCmdBlk + 7);
+            ws_cdb[1] |= 0x2;
+        sg_put_unaligned_be32((uint32_t)op->lba, ws_cdb + 2);
+        ws_cdb[6] = (op->grpnum & 0x1f);
+        sg_put_unaligned_be16((uint16_t)op->numblocks, ws_cdb + 7);
         break;
     case WRITE_SAME16_LEN:
-        wsCmdBlk[0] = WRITE_SAME16_OP;
-        wsCmdBlk[1] = ((op->wrprotect & 0x7) << 5);
+        ws_cdb[0] = WRITE_SAME16_OP;
+        ws_cdb[1] = ((op->wrprotect & 0x7) << 5);
         if (op->anchor)
-            wsCmdBlk[1] |= 0x10;
+            ws_cdb[1] |= 0x10;
         if (op->unmap)
-            wsCmdBlk[1] |= 0x8;
+            ws_cdb[1] |= 0x8;
         if (op->pbdata)
-            wsCmdBlk[1] |= 0x4;
+            ws_cdb[1] |= 0x4;
         if (op->lbdata)
-            wsCmdBlk[1] |= 0x2;
+            ws_cdb[1] |= 0x2;
         if (op->ndob)
-            wsCmdBlk[1] |= 0x1;
-        sg_put_unaligned_be64(op->lba, wsCmdBlk + 2);
-        sg_put_unaligned_be32((uint32_t)op->numblocks, wsCmdBlk + 10);
-        wsCmdBlk[14] = (op->grpnum & 0x1f);
+            ws_cdb[1] |= 0x1;
+        sg_put_unaligned_be64(op->lba, ws_cdb + 2);
+        sg_put_unaligned_be32((uint32_t)op->numblocks, ws_cdb + 10);
+        ws_cdb[14] = (op->grpnum & 0x1f);
         break;
     case WRITE_SAME32_LEN:
         /* Note: In Linux at this time the sg driver does not support
          * cdb_s > 16 bytes long, but the bsg driver does. */
-        wsCmdBlk[0] = VARIABLE_LEN_OP;
-        wsCmdBlk[6] = (op->grpnum & 0x1f);
-        wsCmdBlk[7] = WRITE_SAME32_ADD;
-        sg_put_unaligned_be16((uint16_t)WRITE_SAME32_SA, wsCmdBlk + 8);
-        wsCmdBlk[10] = ((op->wrprotect & 0x7) << 5);
+        ws_cdb[0] = VARIABLE_LEN_OP;
+        ws_cdb[6] = (op->grpnum & 0x1f);
+        ws_cdb[7] = WRITE_SAME32_ADD;
+        sg_put_unaligned_be16((uint16_t)WRITE_SAME32_SA, ws_cdb + 8);
+        ws_cdb[10] = ((op->wrprotect & 0x7) << 5);
         if (op->anchor)
-            wsCmdBlk[10] |= 0x10;
+            ws_cdb[10] |= 0x10;
         if (op->unmap)
-            wsCmdBlk[10] |= 0x8;
+            ws_cdb[10] |= 0x8;
         if (op->pbdata)
-            wsCmdBlk[10] |= 0x4;
+            ws_cdb[10] |= 0x4;
         if (op->lbdata)
-            wsCmdBlk[10] |= 0x2;
+            ws_cdb[10] |= 0x2;
         if (op->ndob)
-            wsCmdBlk[10] |= 0x1;
-        sg_put_unaligned_be64(op->lba, wsCmdBlk + 12);
-        sg_put_unaligned_be32((uint32_t)op->numblocks, wsCmdBlk + 28);
+            ws_cdb[10] |= 0x1;
+        sg_put_unaligned_be64(op->lba, ws_cdb + 12);
+        sg_put_unaligned_be32((uint32_t)op->numblocks, ws_cdb + 28);
         break;
     default:
         pr2serr("do_write_same: bad cdb length %d\n", cdb_len);
@@ -249,7 +249,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     if (op->verbose > 1) {
         pr2serr("    Write same(%d) cmd: ", cdb_len);
         for (k = 0; k < cdb_len; ++k)
-            pr2serr("%02x ", wsCmdBlk[k]);
+            pr2serr("%02x ", ws_cdb[k]);
         pr2serr("\n    Data-out buffer length=%d\n",
                 op->xfer_len);
     }
@@ -262,7 +262,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
         pr2serr("Write same(%d): out of memory\n", cdb_len);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, wsCmdBlk, cdb_len);
+    set_scsi_pt_cdb(ptvp, ws_cdb, cdb_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);

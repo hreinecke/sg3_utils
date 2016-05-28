@@ -36,7 +36,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.36 20160423";
+static const char * version_str = "1.37 20160528";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -223,23 +223,23 @@ sg_ll_format_medium(int sg_fd, int verify, int immed, int format,
                     int verbose)
 {
         int k, ret, res, sense_cat;
-        unsigned char fmCmdBlk[SG_FORMAT_MEDIUM_CMDLEN] =
+        unsigned char fm_cdb[SG_FORMAT_MEDIUM_CMDLEN] =
                                   {SG_FORMAT_MEDIUM_CMD, 0, 0, 0, 0, 0};
         unsigned char sense_b[SENSE_BUFF_LEN];
         struct sg_pt_base * ptvp;
 
         if (verify)
-                fmCmdBlk[1] |= 0x2;
+                fm_cdb[1] |= 0x2;
         if (immed)
-                fmCmdBlk[1] |= 0x1;
+                fm_cdb[1] |= 0x1;
         if (format)
-                fmCmdBlk[2] |= (0xf & format);
+                fm_cdb[2] |= (0xf & format);
         if (transfer_len > 0)
-                sg_put_unaligned_be16(transfer_len, fmCmdBlk + 3);
+                sg_put_unaligned_be16(transfer_len, fm_cdb + 3);
         if (verbose) {
                 pr2serr("    Format medium cdb: ");
                 for (k = 0; k < SG_FORMAT_MEDIUM_CMDLEN; ++k)
-                        pr2serr("%02x ", fmCmdBlk[k]);
+                        pr2serr("%02x ", fm_cdb[k]);
                 pr2serr("\n");
         }
 
@@ -248,7 +248,7 @@ sg_ll_format_medium(int sg_fd, int verify, int immed, int format,
                 pr2serr("%s: out of memory\n", __func__);
                 return -1;
         }
-        set_scsi_pt_cdb(ptvp, fmCmdBlk, sizeof(fmCmdBlk));
+        set_scsi_pt_cdb(ptvp, fm_cdb, sizeof(fm_cdb));
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
         set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, transfer_len);
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);

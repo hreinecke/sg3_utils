@@ -52,9 +52,9 @@
 int main(int argc, char * argv[])
 {
     int bsg_fd, k, ok;
-    unsigned char inqCmdBlk[INQ_CMD_LEN] =
+    unsigned char inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char sdiagCmdBlk[SDIAG_CMD_LEN] =
+    unsigned char sdiag_cdb[SDIAG_CMD_LEN] =
                                 {0x1d, 0, 0, 0, 0, 0};
     unsigned char inqBuff[16][INQ_REPLY_LEN];
     struct sg_io_v4 io_hdr[16];
@@ -100,11 +100,11 @@ int main(int argc, char * argv[])
         io_hdr[k].guard = 'Q';
         /* io_hdr[k].iovec_count = 0; */  /* memset takes care of this */
         if (0 == (k % 3)) {
-            io_hdr[k].request_len = sizeof(sdiagCmdBlk);
-            io_hdr[k].request = (uint64_t)(long)sdiagCmdBlk;
+            io_hdr[k].request_len = sizeof(sdiag_cdb);
+            io_hdr[k].request = (uint64_t)(long)sdiag_cdb;
         } else {
-            io_hdr[k].request_len = sizeof(inqCmdBlk);
-            io_hdr[k].request = (uint64_t)(long)inqCmdBlk;
+            io_hdr[k].request_len = sizeof(inq_cdb);
+            io_hdr[k].request = (uint64_t)(long)inq_cdb;
             io_hdr[k].din_xfer_len = INQ_REPLY_LEN;
             io_hdr[k].din_xferp = (uint64_t)(long)inqBuff[k];
         }

@@ -51,7 +51,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.12 20160121";
+static const char * version_str = "4.12 20160528";
 
 #define ME "sg_scan: "
 
@@ -90,7 +90,7 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra);
 int scsi_inq(int sg_fd, unsigned char * inqBuff);
 int try_ata_identity(const char * file_namep, int ata_fd, int do_inq);
 
-static unsigned char inqCmdBlk[INQ_CMD_LEN] =
+static unsigned char inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
 
 
@@ -399,12 +399,12 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
     memset(inqBuff, 0, INQ_REPLY_LEN);
     inqBuff[0] = 0x7f;
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(inqCmdBlk);
+    io_hdr.cmd_len = sizeof(inq_cdb);
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = INQ_REPLY_LEN;
     io_hdr.dxferp = inqBuff;
-    io_hdr.cmdp = inqCmdBlk;
+    io_hdr.cmdp = inq_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
 
@@ -466,7 +466,7 @@ int scsi_inq(int sg_fd, unsigned char * inqBuff)
     memset(buff, 0, sizeof(buff));
     sicp->inlen = 0;
     sicp->outlen = INQ_REPLY_LEN;
-    memcpy(sicp->data, inqCmdBlk, INQ_CMD_LEN);
+    memcpy(sicp->data, inq_cdb, INQ_CMD_LEN);
     res = ioctl(sg_fd, SCSI_IOCTL_SEND_COMMAND, sicp);
     if (0 == res)
         memcpy(inqBuff, sicp->data, INQ_REPLY_LEN);

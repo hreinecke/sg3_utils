@@ -26,7 +26,7 @@
    Invocation: sg_queue_tst [-t] <sg_device>
         -t      queue at tail
 
-   Version 0.90 (20100324)
+   Version 0.91 (20160528)
 
 */
 
@@ -49,9 +49,9 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
-    unsigned char inqCmdBlk[INQ_CMD_LEN] =
+    unsigned char inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char sdiagCmdBlk[SDIAG_CMD_LEN] =
+    unsigned char sdiag_cdb[SDIAG_CMD_LEN] =
                                 {0x1d, 0, 0, 0, 0, 0};
     unsigned char inqBuff[16][INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr[16];
@@ -98,12 +98,12 @@ int main(int argc, char * argv[])
         /* io_hdr[k].iovec_count = 0; */  /* memset takes care of this */
         io_hdr[k].mx_sb_len = (unsigned char)sizeof(sense_buffer);
         if (0 == (k % 3)) {
-            io_hdr[k].cmd_len = sizeof(sdiagCmdBlk);
-            io_hdr[k].cmdp = sdiagCmdBlk;
+            io_hdr[k].cmd_len = sizeof(sdiag_cdb);
+            io_hdr[k].cmdp = sdiag_cdb;
             io_hdr[k].dxfer_direction = SG_DXFER_NONE;
         } else {
-            io_hdr[k].cmd_len = sizeof(inqCmdBlk);
-            io_hdr[k].cmdp = inqCmdBlk;
+            io_hdr[k].cmd_len = sizeof(inq_cdb);
+            io_hdr[k].cmdp = inq_cdb;
             io_hdr[k].dxfer_direction = SG_DXFER_FROM_DEV;
             io_hdr[k].dxfer_len = INQ_REPLY_LEN;
             io_hdr[k].dxferp = inqBuff[k];

@@ -19,7 +19,7 @@
 
    Invocation: sg_simple5 [-x] <scsi_device>
 
-   Version 1.01 (20070331)
+   Version 1.02 (20160528)
 
 */
 
@@ -33,9 +33,9 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok, dsize, res, duration, resid, cat, got, slen;
-    unsigned char inqCmdBlk [INQ_CMD_LEN] =
+    unsigned char inq_cdb [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char turCmdBlk [TUR_CMD_LEN] =
+    unsigned char tur_cdb [TUR_CMD_LEN] =
                                 {0x00, 0, 0, 0, 0, 0};
     unsigned char inqBuff[INQ_REPLY_LEN];
     char * file_name = 0;
@@ -85,7 +85,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "sg_simple5: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
+    set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, inqBuff, dsize);
     res = do_scsi_pt(ptvp, sg_fd, CMD_TIMEOUT_SECS, verbose);
@@ -168,7 +168,7 @@ finish_inq:
         fprintf(stderr, "sg_simple5: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, turCmdBlk, sizeof(turCmdBlk));
+    set_scsi_pt_cdb(ptvp, tur_cdb, sizeof(tur_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     /* no data in or out */
     res = do_scsi_pt(ptvp, sg_fd, CMD_TIMEOUT_SECS, verbose);

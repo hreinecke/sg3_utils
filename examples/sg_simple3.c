@@ -17,7 +17,7 @@
    the sg_io_hdr interface to break an INQUIRY response into its
    component parts.
 
-*  Copyright (C) 1999 D. Gilbert
+*  Copyright (C) 1999-2016 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -25,7 +25,7 @@
 
    Invocation: sg_simple3 [-x] <sg_device>
 
-   Version 03.58 (20020226)
+   Version 03.59 (20160528)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -48,10 +48,10 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
-    unsigned char inqCmdBlk [INQ_CMD_LEN] = {0x12, 0, 0, 0,
+    unsigned char inq_cdb[INQ_CMD_LEN] = {0x12, 0, 0, 0,
                     INQ_REPLY_BASE_LEN + INQ_REPLY_VID_LEN +
                     INQ_REPLY_PID_LEN + INQ_REPLY_PREV_LEN, 0};
-    unsigned char turCmdBlk [TUR_CMD_LEN] = {0x00, 0, 0, 0, 0, 0};
+    unsigned char tur_cdb[TUR_CMD_LEN] = {0x00, 0, 0, 0, 0, 0};
     sg_iovec_t iovec[INQ_REPLY_IOVEC_COUNT];
     unsigned char inqBaseBuff[INQ_REPLY_BASE_LEN];
     char inqVidBuff[INQ_REPLY_VID_LEN];
@@ -102,7 +102,7 @@ int main(int argc, char * argv[])
     /* Prepare INQUIRY command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(inqCmdBlk);
+    io_hdr.cmd_len = sizeof(inq_cdb);
     io_hdr.iovec_count = INQ_REPLY_IOVEC_COUNT;
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
@@ -117,7 +117,7 @@ int main(int argc, char * argv[])
     iovec[3].iov_base = inqPRevBuff;
     iovec[3].iov_len = INQ_REPLY_PREV_LEN;
     io_hdr.dxferp = iovec;
-    io_hdr.cmdp = inqCmdBlk;
+    io_hdr.cmdp = inq_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
     /* io_hdr.flags = 0; */     /* take defaults: indirect IO, etc */
@@ -162,10 +162,10 @@ int main(int argc, char * argv[])
     /* Prepare TEST UNIT READY command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(turCmdBlk);
+    io_hdr.cmd_len = sizeof(tur_cdb);
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_NONE;
-    io_hdr.cmdp = turCmdBlk;
+    io_hdr.cmdp = tur_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
 

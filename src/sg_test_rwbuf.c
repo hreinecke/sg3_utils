@@ -1,7 +1,7 @@
 /*
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2015 Douglas Gilbert
+ * (c) 1999-2016 Douglas Gilbert
  *
  * Program to test the SCSI host adapter by issueing
  * write and read operations on a device's buffer
@@ -41,7 +41,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.09 20151220";
+static const char * version_str = "1.09 20160528";
 
 #define BPI (signed)(sizeof(int))
 
@@ -84,29 +84,29 @@ static struct option long_options[] = {
 
 int find_out_about_buffer (int sg_fd)
 {
-        unsigned char rbCmdBlk[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        unsigned char rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         unsigned char rbBuff[RB_DESC_LEN];
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
         int k, res;
 
-        rbCmdBlk[1] = RB_MODE_DESC;
-        rbCmdBlk[8] = RB_DESC_LEN;
+        rb_cdb[1] = RB_MODE_DESC;
+        rb_cdb[8] = RB_DESC_LEN;
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(rbCmdBlk);
+        io_hdr.cmd_len = sizeof(rb_cdb);
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = RB_DESC_LEN;
         io_hdr.dxferp = rbBuff;
-        io_hdr.cmdp = rbCmdBlk;
+        io_hdr.cmdp = rb_cdb;
         io_hdr.sbp = sense_buffer;
         io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
 
         if (verbose) {
                 pr2serr("    read buffer [mode desc] cdb: ");
-                for (k = 0; k < (int)sizeof(rbCmdBlk); ++k)
-                        pr2serr("%02x ", rbCmdBlk[k]);
+                for (k = 0; k < (int)sizeof(rb_cdb); ++k)
+                        pr2serr("%02x ", rb_cdb[k]);
                 pr2serr("\n");
         }
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
@@ -215,7 +215,7 @@ void do_fill_buffer (int *buf, int len)
 int read_buffer (int sg_fd, unsigned size)
 {
         int res, k;
-        unsigned char rbCmdBlk[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        unsigned char rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = size + addread;
         unsigned char * rbBuff = (unsigned char *)malloc(bufSize);
         unsigned char sense_buffer[32];
@@ -223,23 +223,23 @@ int read_buffer (int sg_fd, unsigned size)
 
         if (NULL == rbBuff)
                 return -1;
-        rbCmdBlk[1] = RWB_MODE_DATA;
-        sg_put_unaligned_be24((uint32_t)bufSize, rbCmdBlk + 6);
+        rb_cdb[1] = RWB_MODE_DATA;
+        sg_put_unaligned_be24((uint32_t)bufSize, rb_cdb + 6);
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(rbCmdBlk);
+        io_hdr.cmd_len = sizeof(rb_cdb);
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = bufSize;
         io_hdr.dxferp = rbBuff;
-        io_hdr.cmdp = rbCmdBlk;
+        io_hdr.cmdp = rb_cdb;
         io_hdr.sbp = sense_buffer;
         io_hdr.pack_id = 2;
         io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
         if (verbose) {
                 pr2serr("    read buffer [mode data] cdb: ");
-                for (k = 0; k < (int)sizeof(rbCmdBlk); ++k)
-                        pr2serr("%02x ", rbCmdBlk[k]);
+                for (k = 0; k < (int)sizeof(rb_cdb); ++k)
+                        pr2serr("%02x ", rb_cdb[k]);
                 pr2serr("\n");
         }
 
@@ -269,7 +269,7 @@ int read_buffer (int sg_fd, unsigned size)
 
 int write_buffer (int sg_fd, unsigned size)
 {
-        unsigned char wbCmdBlk[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        unsigned char wb_cdb[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = size + addwrite;
         unsigned char * wbBuff = (unsigned char *)malloc(bufSize);
         unsigned char sense_buffer[32];
@@ -280,23 +280,23 @@ int write_buffer (int sg_fd, unsigned size)
                 return -1;
         memset(wbBuff, 0, bufSize);
         do_fill_buffer ((int*)wbBuff, size);
-        wbCmdBlk[1] = RWB_MODE_DATA;
-        sg_put_unaligned_be24((uint32_t)bufSize, wbCmdBlk + 6);
+        wb_cdb[1] = RWB_MODE_DATA;
+        sg_put_unaligned_be24((uint32_t)bufSize, wb_cdb + 6);
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(wbCmdBlk);
+        io_hdr.cmd_len = sizeof(wb_cdb);
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
         io_hdr.dxfer_len = bufSize;
         io_hdr.dxferp = wbBuff;
-        io_hdr.cmdp = wbCmdBlk;
+        io_hdr.cmdp = wb_cdb;
         io_hdr.sbp = sense_buffer;
         io_hdr.pack_id = 1;
         io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
         if (verbose) {
                 pr2serr("    write buffer [mode data] cdb: ");
-                for (k = 0; k < (int)sizeof(wbCmdBlk); ++k)
-                        pr2serr("%02x ", wbCmdBlk[k]);
+                for (k = 0; k < (int)sizeof(wb_cdb); ++k)
+                        pr2serr("%02x ", wb_cdb[k]);
                 pr2serr("\n");
         }
 

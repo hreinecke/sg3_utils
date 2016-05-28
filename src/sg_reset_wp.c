@@ -32,7 +32,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.05 20160519";
+static const char * version_str = "1.05 20160528";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -79,19 +79,19 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, int noisy,
                           int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rwpCmdBlk[SG_ZONING_OUT_CMDLEN] =
+    unsigned char rwp_cdb[SG_ZONING_OUT_CMDLEN] =
           {SG_ZONING_OUT, RESET_WRITE_POINTER_SA, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0,  0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    sg_put_unaligned_be64(zid, rwpCmdBlk + 2);
+    sg_put_unaligned_be64(zid, rwp_cdb + 2);
     if (all)
-        rwpCmdBlk[14] = 0x1;
+        rwp_cdb[14] = 0x1;
     if (verbose) {
         pr2serr("    Reset write pointer cdb: ");
         for (k = 0; k < SG_ZONING_OUT_CMDLEN; ++k)
-            pr2serr("%02x ", rwpCmdBlk[k]);
+            pr2serr("%02x ", rwp_cdb[k]);
         pr2serr("\n");
     }
 
@@ -100,7 +100,7 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, int noisy,
         pr2serr("Reset write pointer: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, rwpCmdBlk, sizeof(rwpCmdBlk));
+    set_scsi_pt_cdb(ptvp, rwp_cdb, sizeof(rwp_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "reset write pointer", res, 0, sense_b,

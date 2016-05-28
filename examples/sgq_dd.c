@@ -48,7 +48,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.58 20151209";
+static char * version_str = "0.59 20160528";
 /* resurrected from "0.55 20020509" */
 
 #define DEF_BLOCK_SIZE 512
@@ -285,19 +285,19 @@ static int
 read_capacity(int sg_fd, int * num_sect, int * sect_sz)
 {
     int res;
-    unsigned char rcCmdBlk [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    unsigned char rc_cdb [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char rcBuff[64];
     unsigned char sense_b[64];
     sg_io_hdr_t io_hdr;
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rcCmdBlk);
+    io_hdr.cmd_len = sizeof(rc_cdb);
     io_hdr.mx_sb_len = sizeof(sense_b);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = sizeof(rcBuff);
     io_hdr.dxferp = rcBuff;
-    io_hdr.cmdp = rcCmdBlk;
+    io_hdr.cmdp = rc_cdb;
     io_hdr.sbp = sense_b;
     io_hdr.timeout = DEF_TIMEOUT;
 

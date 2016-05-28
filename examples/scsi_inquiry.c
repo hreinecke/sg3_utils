@@ -26,7 +26,7 @@
    this is a good idea on a disk while it is mounted is debatable.
    No detrimental effects when this was tested ...]
 
-Version 0.14 20011218
+Version 0.15 20160528
 */
 
 
@@ -51,10 +51,10 @@ typedef struct my_scsi_ioctl_command {
 int main(int argc, char * argv[])
 {
     int s_fd, res, k, to;
-    unsigned char inqCmdBlk [INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0,
+    unsigned char inq_cdb [INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0,
                                                 INQUIRY_REPLY_LEN, 0};
     unsigned char * inqBuff = (unsigned char *)
-                                malloc(OFF + sizeof(inqCmdBlk) + 512);
+                                malloc(OFF + sizeof(inq_cdb) + 512);
     unsigned char * buffp = inqBuff + OFF;
     My_Scsi_Ioctl_Command * ishp = (My_Scsi_Ioctl_Command *)inqBuff;
     char * file_name = 0;
@@ -107,7 +107,7 @@ int main(int argc, char * argv[])
 
     ishp->inlen = 0;
     ishp->outlen = INQUIRY_REPLY_LEN;
-    memcpy(buffp, inqCmdBlk, INQUIRY_CMDLEN);
+    memcpy(buffp, inq_cdb, INQUIRY_CMDLEN);
     res = ioctl(s_fd, SCSI_IOCTL_SEND_COMMAND, inqBuff);
     if (0 == res) {
         to = (int)*(buffp + 7);

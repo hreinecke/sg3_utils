@@ -21,7 +21,7 @@
 
    Invocation: sg_simple16 <scsi_device>
 
-   Version 1.02 (20020206)
+   Version 1.03 (20160528)
 
 */
 
@@ -33,7 +33,7 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
-    unsigned char r16CmdBlk [READ16_CMD_LEN] =
+    unsigned char r16_cdb [READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
@@ -77,13 +77,13 @@ int main(int argc, char * argv[])
     /* Prepare READ_16 command */
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(r16CmdBlk);
+    io_hdr.cmd_len = sizeof(r16_cdb);
     /* io_hdr.iovec_count = 0; */  /* memset takes care of this */
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = READ16_REPLY_LEN;
     io_hdr.dxferp = inBuff;
-    io_hdr.cmdp = r16CmdBlk;
+    io_hdr.cmdp = r16_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
     /* io_hdr.flags = 0; */     /* take defaults: indirect IO, etc */

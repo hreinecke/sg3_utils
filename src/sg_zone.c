@@ -32,7 +32,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.03 20160324";
+static const char * version_str = "1.03 20160528";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -94,21 +94,21 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, int noisy,
                int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char zoCmdBlk[SG_ZONING_OUT_CMDLEN] =
+    unsigned char zo_cdb[SG_ZONING_OUT_CMDLEN] =
           {SG_ZONING_OUT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     char b[64];
 
-    zoCmdBlk[1] = 0x1f & sa;
-    sg_put_unaligned_be64(zid, zoCmdBlk + 2);
+    zo_cdb[1] = 0x1f & sa;
+    sg_put_unaligned_be64(zid, zo_cdb + 2);
     if (all)
-        zoCmdBlk[14] = 0x1;
-    sg_get_opcode_sa_name(zoCmdBlk[0], sa, -1, sizeof(b), b);
+        zo_cdb[14] = 0x1;
+    sg_get_opcode_sa_name(zo_cdb[0], sa, -1, sizeof(b), b);
     if (verbose) {
         pr2serr("    %s cdb: ", b);
         for (k = 0; k < SG_ZONING_OUT_CMDLEN; ++k)
-            pr2serr("%02x ", zoCmdBlk[k]);
+            pr2serr("%02x ", zo_cdb[k]);
         pr2serr("\n");
     }
 
@@ -117,7 +117,7 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, int noisy,
         pr2serr("%s: out of memory\n", b);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, zoCmdBlk, sizeof(zoCmdBlk));
+    set_scsi_pt_cdb(ptvp, zo_cdb, sizeof(zo_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "reset write pointer", res, 0, sense_b,

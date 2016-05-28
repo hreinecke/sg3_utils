@@ -49,7 +49,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.13 20160126";
+static const char * version_str = "1.13 20160528";
 
 struct opts_t {
     int cdb_len;
@@ -134,10 +134,10 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
     struct sg_scsi_sense_hdr ssh;
     unsigned char sense_buffer[64];
     unsigned char ata_return_desc[16];
-    unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
+    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12CmdBlk[SAT_ATA_PASS_THROUGH12_LEN] =
+    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
     char cmd_name[32];
@@ -159,29 +159,29 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
                 op->pn);
     if (op->cdb_len == 16) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-        aptCmdBlk[14] = ata_cmd;
-        sg_put_unaligned_be16((uint16_t)op->count, aptCmdBlk + 5);
-        aptCmdBlk[8] = op->la;
-        sg_put_unaligned_be16((uint16_t)op->pn, aptCmdBlk + 9);
-        aptCmdBlk[1] = (protocol << 1) | extend;
-        aptCmdBlk[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt_cdb[14] = ata_cmd;
+        sg_put_unaligned_be16((uint16_t)op->count, apt_cdb + 5);
+        apt_cdb[8] = op->la;
+        sg_put_unaligned_be16((uint16_t)op->pn, apt_cdb + 9);
+        apt_cdb[1] = (protocol << 1) | extend;
+        apt_cdb[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, op->cdb_len, DEF_TIMEOUT, inbuff,
+        res = sg_ll_ata_pt(sg_fd, apt_cdb, op->cdb_len, DEF_TIMEOUT, inbuff,
                            NULL, op->count * 512, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, op->verbose);
     } else {
         /* Prepare ATA PASS-THROUGH COMMAND (12) command */
         /* Cannot map upper 8 bits of the pn since no LBA (39:32) field */
-        apt12CmdBlk[9] = ata_cmd;
-        apt12CmdBlk[4] = op->count;
-        apt12CmdBlk[5] = op->la;
-        apt12CmdBlk[6] = op->pn & 0xff;
-        /* apt12CmdBlk[7] = (op->pn >> 8) & 0xff; */
-        apt12CmdBlk[1] = (protocol << 1);
-        apt12CmdBlk[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt12_cdb[9] = ata_cmd;
+        apt12_cdb[4] = op->count;
+        apt12_cdb[5] = op->la;
+        apt12_cdb[6] = op->pn & 0xff;
+        /* apt12_cdb[7] = (op->pn >> 8) & 0xff; */
+        apt12_cdb[1] = (protocol << 1);
+        apt12_cdb[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, op->cdb_len, DEF_TIMEOUT,
+        res = sg_ll_ata_pt(sg_fd, apt12_cdb, op->cdb_len, DEF_TIMEOUT,
                            inbuff, NULL, op->count * 512, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, op->verbose);

@@ -50,7 +50,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.14 20160525";
+static const char * version_str = "1.14 20160528";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -126,58 +126,58 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
     unsigned char inBuff[ID_RESPONSE_LEN];
     unsigned char sense_buffer[64];
     unsigned char ata_return_desc[16];
-    unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
+    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12CmdBlk[SAT_ATA_PASS_THROUGH12_LEN] =
+    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
-    unsigned char apt32CmdBlk[SAT_ATA_PASS_THROUGH32_LEN];
+    unsigned char apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN];
     const unsigned short * usp;
     uint64_t ull;
 
     sb_sz = sizeof(sense_buffer);
     memset(sense_buffer, 0, sb_sz);
-    memset(apt32CmdBlk, 0, sizeof(apt32CmdBlk));
+    memset(apt32_cdb, 0, sizeof(apt32_cdb));
     memset(ata_return_desc, 0, sizeof(ata_return_desc));
     ok = 0;
     switch (cdb_len) {
     case SAT_ATA_PASS_THROUGH32_LEN:    /* SAT-4 revision 5 or later */
         /* Prepare SCSI ATA PASS-THROUGH COMMAND(32) command */
-        sg_put_unaligned_be16(1, apt32CmdBlk + 22);     /* count=1 */
-        apt32CmdBlk[25] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
+        sg_put_unaligned_be16(1, apt32_cdb + 22);     /* count=1 */
+        apt32_cdb[25] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                        ATA_IDENTIFY_DEVICE);
-        apt32CmdBlk[10] = (multiple_count << 5) | (protocol << 1) | extend;
-        apt32CmdBlk[11] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt32_cdb[10] = (multiple_count << 5) | (protocol << 1) | extend;
+        apt32_cdb[11] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                           (byte_block << 2) | t_length;
         /* following call takes care of all bytes below offset 10 in cdb */
-        res = sg_ll_ata_pt(sg_fd, apt32CmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
+        res = sg_ll_ata_pt(sg_fd, apt32_cdb, cdb_len, DEF_TIMEOUT, inBuff,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
         break;
     case SAT_ATA_PASS_THROUGH16_LEN:
         /* Prepare SCSI ATA PASS-THROUGH COMMAND(16) command */
-        aptCmdBlk[6] = 1;   /* sector count */
-        aptCmdBlk[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
+        apt_cdb[6] = 1;   /* sector count */
+        apt_cdb[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                      ATA_IDENTIFY_DEVICE);
-        aptCmdBlk[1] = (multiple_count << 5) | (protocol << 1) | extend;
-        aptCmdBlk[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt_cdb[1] = (multiple_count << 5) | (protocol << 1) | extend;
+        apt_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
+        res = sg_ll_ata_pt(sg_fd, apt_cdb, cdb_len, DEF_TIMEOUT, inBuff,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
         break;
     case SAT_ATA_PASS_THROUGH12_LEN:
         /* Prepare SCSI ATA PASS-THROUGH COMMAND(12) command */
-        apt12CmdBlk[4] = 1;   /* sector count */
-        apt12CmdBlk[9] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
+        apt12_cdb[4] = 1;   /* sector count */
+        apt12_cdb[9] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                       ATA_IDENTIFY_DEVICE);
-        apt12CmdBlk[1] = (multiple_count << 5) | (protocol << 1);
-        apt12CmdBlk[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt12_cdb[1] = (multiple_count << 5) | (protocol << 1);
+        apt12_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, inBuff,
+        res = sg_ll_ata_pt(sg_fd, apt12_cdb, cdb_len, DEF_TIMEOUT, inBuff,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);

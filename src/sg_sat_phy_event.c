@@ -22,7 +22,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.07 20160126";
+static const char * version_str = "1.07 20160528";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -166,10 +166,10 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
     struct sg_scsi_sense_hdr ssh;
     unsigned char sense_buffer[64];
     unsigned char ata_return_desc[16];
-    unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
+    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12CmdBlk[SAT_ATA_PASS_THROUGH12_LEN] =
+    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
 
@@ -179,33 +179,33 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
     ok = 0;
     if (SAT_ATA_PASS_THROUGH16_LEN == cdb_len) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-        aptCmdBlk[3] = (feature >> 8) & 0xff;   /* feature(15:8) */
-        aptCmdBlk[4] = feature & 0xff;          /* feature(7:0) */
-        aptCmdBlk[5] = (blk_count >> 8) & 0xff; /* sector_count(15:8) */
-        aptCmdBlk[6] = blk_count & 0xff;        /* sector_count(7:0) */
-        aptCmdBlk[8] = log_addr & 0xff;  /* lba_low(7:0) == LBA(7:0) */
-        aptCmdBlk[9] = (page_in_log >> 8) & 0xff;
+        apt_cdb[3] = (feature >> 8) & 0xff;   /* feature(15:8) */
+        apt_cdb[4] = feature & 0xff;          /* feature(7:0) */
+        apt_cdb[5] = (blk_count >> 8) & 0xff; /* sector_count(15:8) */
+        apt_cdb[6] = blk_count & 0xff;        /* sector_count(7:0) */
+        apt_cdb[8] = log_addr & 0xff;  /* lba_low(7:0) == LBA(7:0) */
+        apt_cdb[9] = (page_in_log >> 8) & 0xff;
                 /* lba_mid(15:8) == LBA(39:32) */
-        aptCmdBlk[10] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
-        aptCmdBlk[14] = ATA_READ_LOG_EXT;
-        aptCmdBlk[1] = (multiple_count << 5) | (protocol << 1) | extend;
-        aptCmdBlk[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt_cdb[10] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
+        apt_cdb[14] = ATA_READ_LOG_EXT;
+        apt_cdb[1] = (multiple_count << 5) | (protocol << 1) | extend;
+        apt_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                        (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, resp,
+        res = sg_ll_ata_pt(sg_fd, apt_cdb, cdb_len, DEF_TIMEOUT, resp,
                            NULL /* doutp */, mx_resp_len, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     } else {
         /* Prepare ATA PASS-THROUGH COMMAND (12) command */
-        apt12CmdBlk[3] = feature & 0xff;        /* feature(7:0) */
-        apt12CmdBlk[4] = blk_count & 0xff;        /* sector_count(7:0) */
-        apt12CmdBlk[5] = log_addr & 0xff;  /* lba_low(7:0) == LBA(7:0) */
-        apt12CmdBlk[6] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
-        apt12CmdBlk[9] = ATA_READ_LOG_EXT;
-        apt12CmdBlk[1] = (multiple_count << 5) | (protocol << 1);
-        apt12CmdBlk[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt12_cdb[3] = feature & 0xff;        /* feature(7:0) */
+        apt12_cdb[4] = blk_count & 0xff;        /* sector_count(7:0) */
+        apt12_cdb[5] = log_addr & 0xff;  /* lba_low(7:0) == LBA(7:0) */
+        apt12_cdb[6] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
+        apt12_cdb[9] = ATA_READ_LOG_EXT;
+        apt12_cdb[1] = (multiple_count << 5) | (protocol << 1);
+        apt12_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, resp,
+        res = sg_ll_ata_pt(sg_fd, apt12_cdb, cdb_len, DEF_TIMEOUT, resp,
                            NULL /* doutp */, mx_resp_len, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);

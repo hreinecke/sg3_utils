@@ -926,20 +926,20 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
            int * residp, int noisy, int verbose)
 {
     int res, ret, k, sense_cat, resid;
-    unsigned char inqCmdBlk[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
+    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     unsigned char * up;
     struct sg_pt_base * ptvp;
 
     if (evpd)
-        inqCmdBlk[1] |= 1;
-    inqCmdBlk[2] = (unsigned char)pg_op;
+        inq_cdb[1] |= 1;
+    inq_cdb[2] = (unsigned char)pg_op;
     /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
-    sg_put_unaligned_be16((uint16_t)mx_resp_len, inqCmdBlk + 3);
+    sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
         pr2serr("    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            pr2serr("%02x ", inqCmdBlk[k]);
+            pr2serr("%02x ", inq_cdb[k]);
         pr2serr("\n");
     }
     if (resp && (mx_resp_len > 0)) {
@@ -953,7 +953,7 @@ pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
         pr2serr("inquiry: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, inqCmdBlk, sizeof(inqCmdBlk));
+    set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);

@@ -27,7 +27,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.15 20160227";
+static const char * version_str = "1.15 20160528";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -88,24 +88,24 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
                  int noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char scCmdBlk[SYNCHRONIZE_CACHE16_CMDLEN] =
+    unsigned char sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
                 {SYNCHRONIZE_CACHE16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (sync_nv)
-        scCmdBlk[1] |= 4;       /* obsolete in sbc3r35d */
+        sc_cdb[1] |= 4;       /* obsolete in sbc3r35d */
     if (immed)
-        scCmdBlk[1] |= 2;
-    sg_put_unaligned_be64(lba, scCmdBlk + 2);
-    scCmdBlk[14] = group & 0x1f;
-    sg_put_unaligned_be32((uint32_t)num_lb, scCmdBlk + 10);
+        sc_cdb[1] |= 2;
+    sg_put_unaligned_be64(lba, sc_cdb + 2);
+    sc_cdb[14] = group & 0x1f;
+    sg_put_unaligned_be32((uint32_t)num_lb, sc_cdb + 10);
 
     if (verbose) {
         pr2serr("    synchronize cache(16) cdb: ");
         for (k = 0; k < SYNCHRONIZE_CACHE16_CMDLEN; ++k)
-            pr2serr("%02x ", scCmdBlk[k]);
+            pr2serr("%02x ", sc_cdb[k]);
         pr2serr("\n");
     }
     ptvp = construct_scsi_pt_obj();
@@ -113,7 +113,7 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
         pr2serr("synchronize cache(16): out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, scCmdBlk, sizeof(scCmdBlk));
+    set_scsi_pt_cdb(ptvp, sc_cdb, sizeof(sc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, to_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, "synchronize cache(16)", res, 0,
