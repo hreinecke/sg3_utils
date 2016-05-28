@@ -56,7 +56,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.05 20160423";
+static const char * version_str = "1.05 20160528";
 
 
 #if 0
@@ -98,7 +98,7 @@ sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
 int main(int argc, char * argv[])
 {
     int sg_fd, k;
-    unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
+    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     sg_io_hdr_t io_hdr;
@@ -150,26 +150,26 @@ int main(int argc, char * argv[])
     }
 
     /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-    aptCmdBlk[14] = ATA_CHECK_POWER_MODE;
-    aptCmdBlk[1] = (protocol << 1) | extend;
-    aptCmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |
+    apt_cdb[14] = ATA_CHECK_POWER_MODE;
+    apt_cdb[1] = (protocol << 1) | extend;
+    apt_cdb[2] = (chk_cond << 5) | (t_dir << 3) |
                    (byte_block << 2) | t_length;
     if (verbose) {
         fprintf(stderr, "    ata pass through(16) cdb: ");
         for (k = 0; k < SAT_ATA_PASS_THROUGH16_LEN; ++k)
-            fprintf(stderr, "%02x ", aptCmdBlk[k]);
+            fprintf(stderr, "%02x ", apt_cdb[k]);
         fprintf(stderr, "\n");
     }
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(aptCmdBlk);
+    io_hdr.cmd_len = sizeof(apt_cdb);
     /* io_hdr.iovec_count = 0; */  /* memset takes care of this */
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_NONE;
     io_hdr.dxfer_len = 0;
     io_hdr.dxferp = NULL;
-    io_hdr.cmdp = aptCmdBlk;
+    io_hdr.cmdp = apt_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
     /* io_hdr.flags = 0; */     /* take defaults: indirect IO, etc */

@@ -34,7 +34,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.02 20160423";
+static const char * version_str = "1.02 20160528";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -239,28 +239,28 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp,
 {
     int k, ret, res, sense_cat;
     int noisy = 1;
-    unsigned char raCmdBlk[SG_READ_ATTRIBUTE_CMDLEN] =
+    unsigned char ra_cdb[SG_READ_ATTRIBUTE_CMDLEN] =
           {SG_READ_ATTRIBUTE_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    raCmdBlk[1] = 0x1f & op->sa;
+    ra_cdb[1] = 0x1f & op->sa;
     if (op->ea)
-        sg_put_unaligned_be16(op->ea, raCmdBlk + 2);
+        sg_put_unaligned_be16(op->ea, ra_cdb + 2);
     if (op->lvn)
-        raCmdBlk[5] = 0xff & op->lvn;
+        ra_cdb[5] = 0xff & op->lvn;
     if (op->pn)
-        raCmdBlk[7] = 0xff & op->pn;
+        ra_cdb[7] = 0xff & op->pn;
     if (op->fai)
-        sg_put_unaligned_be16(op->fai, raCmdBlk + 8);
-    sg_put_unaligned_be32((uint32_t)op->maxlen, raCmdBlk + 10);
+        sg_put_unaligned_be16(op->fai, ra_cdb + 8);
+    sg_put_unaligned_be32((uint32_t)op->maxlen, ra_cdb + 10);
     if (op->cache)
-        raCmdBlk[14] |= 0x1;
+        ra_cdb[14] |= 0x1;
     if (op->verbose) {
         pr2serr("    Read attribute cdb: ");
         for (k = 0; k < SG_READ_ATTRIBUTE_CMDLEN; ++k)
-            pr2serr("%02x ", raCmdBlk[k]);
+            pr2serr("%02x ", ra_cdb[k]);
         pr2serr("\n");
     }
 
@@ -269,7 +269,7 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp,
         pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, raCmdBlk, sizeof(raCmdBlk));
+    set_scsi_pt_cdb(ptvp, ra_cdb, sizeof(ra_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, op->maxlen);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, op->verbose);

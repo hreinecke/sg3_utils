@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.02 20160423";
+static const char * version_str = "1.02 20160528";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -169,7 +169,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             int param_lst_len)
 {
     int k, ret, res, sense_cat, immed, timeout;
-    unsigned char sanCmdBlk[SANITIZE_OP_LEN];
+    unsigned char san_cdb[SANITIZE_OP_LEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
@@ -181,30 +181,30 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     /* only use command line timeout if it exceeds previous defaults */
     if (op->timeout > timeout)
         timeout = op->timeout;
-    memset(sanCmdBlk, 0, sizeof(sanCmdBlk));
-    sanCmdBlk[0] = SANITIZE_OP;
+    memset(san_cdb, 0, sizeof(san_cdb));
+    san_cdb[0] = SANITIZE_OP;
     if (op->overwrite)
-        sanCmdBlk[1] = SANITIZE_SA_OVERWRITE;
+        san_cdb[1] = SANITIZE_SA_OVERWRITE;
     else if (op->block)
-        sanCmdBlk[1] = SANITIZE_SA_BLOCK_ERASE;
+        san_cdb[1] = SANITIZE_SA_BLOCK_ERASE;
     else if (op->crypto)
-        sanCmdBlk[1] = SANITIZE_SA_CRYPTO_ERASE;
+        san_cdb[1] = SANITIZE_SA_CRYPTO_ERASE;
     else if (op->fail)
-        sanCmdBlk[1] = SANITIZE_SA_EXIT_FAIL_MODE;
+        san_cdb[1] = SANITIZE_SA_EXIT_FAIL_MODE;
     else
         return SG_LIB_SYNTAX_ERROR;
     if (immed)
-        sanCmdBlk[1] |= 0x80;
+        san_cdb[1] |= 0x80;
     if (op->znr)        /* added sbc4r07 */
-        sanCmdBlk[1] |= 0x40;
+        san_cdb[1] |= 0x40;
     if (op->ause)
-        sanCmdBlk[1] |= 0x20;
-    sg_put_unaligned_be16((uint16_t)param_lst_len, sanCmdBlk + 7);
+        san_cdb[1] |= 0x20;
+    sg_put_unaligned_be16((uint16_t)param_lst_len, san_cdb + 7);
 
     if (op->verbose > 1) {
         pr2serr("    Sanitize cmd: ");
         for (k = 0; k < SANITIZE_OP_LEN; ++k)
-            pr2serr("%02x ", sanCmdBlk[k]);
+            pr2serr("%02x ", san_cdb[k]);
         pr2serr("\n");
         if (op->verbose > 2) {
             if (param_lst_len > 0) {
@@ -219,7 +219,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         pr2serr("Sanitize: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, sanCmdBlk, sizeof(sanCmdBlk));
+    set_scsi_pt_cdb(ptvp, san_cdb, sizeof(san_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)param_lstp, param_lst_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout, op->verbose);

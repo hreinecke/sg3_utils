@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.02 20160126";
+static const char * version_str = "1.02 20160528";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -124,16 +124,16 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
                     int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rtCmdBlk[REP_TIMESTAMP_CMDLEN] =
+    unsigned char rt_cdb[REP_TIMESTAMP_CMDLEN] =
           {SG_MAINTENANCE_IN, REP_TIMESTAMP_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    sg_put_unaligned_be32((uint32_t)mx_resp_len, rtCmdBlk + 6);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rt_cdb + 6);
     if (verbose) {
         pr2serr("    Report timestamp cdb: ");
         for (k = 0; k < REP_TIMESTAMP_CMDLEN; ++k)
-            pr2serr("%02x ", rtCmdBlk[k]);
+            pr2serr("%02x ", rt_cdb[k]);
         pr2serr("\n");
     }
 
@@ -142,7 +142,7 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
         pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, rtCmdBlk, sizeof(rtCmdBlk));
+    set_scsi_pt_cdb(ptvp, rt_cdb, sizeof(rt_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
@@ -182,17 +182,17 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, int noisy,
                     int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char stCmdBlk[SET_TIMESTAMP_CMDLEN] =
+    unsigned char st_cdb[SET_TIMESTAMP_CMDLEN] =
           {SG_MAINTENANCE_OUT, SET_TIMESTAMP_SA, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    sg_put_unaligned_be32(param_len, stCmdBlk + 6);
+    sg_put_unaligned_be32(param_len, st_cdb + 6);
     if (verbose) {
         pr2serr("    Set timestamp cdb: ");
         for (k = 0; k < SET_TIMESTAMP_CMDLEN; ++k)
-            pr2serr("%02x ", stCmdBlk[k]);
+            pr2serr("%02x ", st_cdb[k]);
         pr2serr("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2serr("    set timestamp parameter list:\n");
@@ -205,7 +205,7 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, int noisy,
         pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, stCmdBlk, sizeof(stCmdBlk));
+    set_scsi_pt_cdb(ptvp, st_cdb, sizeof(st_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);

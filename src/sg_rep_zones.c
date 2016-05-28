@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.09 20160423";
+static const char * version_str = "1.09 20160528";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -96,21 +96,21 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int partial, int report_opts,
                    int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rzCmdBlk[SG_ZONING_IN_CMDLEN] =
+    unsigned char rz_cdb[SG_ZONING_IN_CMDLEN] =
           {SG_ZONING_IN, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    sg_put_unaligned_be64(zs_lba, rzCmdBlk + 2);
-    sg_put_unaligned_be32((uint32_t)mx_resp_len, rzCmdBlk + 10);
-    rzCmdBlk[14] = report_opts & 0x3f;
+    sg_put_unaligned_be64(zs_lba, rz_cdb + 2);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rz_cdb + 10);
+    rz_cdb[14] = report_opts & 0x3f;
     if (partial)
-        rzCmdBlk[14] |= 0x80;
+        rz_cdb[14] |= 0x80;
     if (verbose) {
         pr2serr("    Report zones cdb: ");
         for (k = 0; k < SG_ZONING_IN_CMDLEN; ++k)
-            pr2serr("%02x ", rzCmdBlk[k]);
+            pr2serr("%02x ", rz_cdb[k]);
         pr2serr("\n");
     }
 
@@ -119,7 +119,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int partial, int report_opts,
         pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, rzCmdBlk, sizeof(rzCmdBlk));
+    set_scsi_pt_cdb(ptvp, rz_cdb, sizeof(rz_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);

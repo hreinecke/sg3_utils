@@ -29,7 +29,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.47 20160423";    /* spc5r08 */
+static const char * version_str = "0.48 20160528";    /* spc5r10 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -983,25 +983,25 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
         void * resp, int mx_resp_len, int noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rsocCmdBlk[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
+    unsigned char rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (rctd)
-        rsocCmdBlk[2] |= 0x80;
+        rsoc_cdb[2] |= 0x80;
     if (rep_opts)
-        rsocCmdBlk[2] |= (rep_opts & 0x7);
+        rsoc_cdb[2] |= (rep_opts & 0x7);
     if (rq_opcode > 0)
-        rsocCmdBlk[3] = (rq_opcode & 0xff);
+        rsoc_cdb[3] = (rq_opcode & 0xff);
     if (rq_servact > 0)
-        sg_put_unaligned_be16((uint16_t)rq_servact, rsocCmdBlk + 4);
-    sg_put_unaligned_be32((uint32_t)mx_resp_len, rsocCmdBlk + 6);
+        sg_put_unaligned_be16((uint16_t)rq_servact, rsoc_cdb + 4);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rsoc_cdb + 6);
 
     if (verbose) {
         pr2serr("    Report Supported Operation Codes cmd: ");
         for (k = 0; k < RSOC_CMD_LEN; ++k)
-            pr2serr("%02x ", rsocCmdBlk[k]);
+            pr2serr("%02x ", rsoc_cdb[k]);
         pr2serr("\n");
     }
     ptvp = construct_scsi_pt_obj();
@@ -1009,7 +1009,7 @@ do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
         pr2serr("Report Supported Operation Codes: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, rsocCmdBlk, sizeof(rsocCmdBlk));
+    set_scsi_pt_cdb(ptvp, rsoc_cdb, sizeof(rsoc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
@@ -1040,19 +1040,19 @@ do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
          int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rstmfCmdBlk[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
+    unsigned char rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (repd)
-        rstmfCmdBlk[2] = 0x80;
-    sg_put_unaligned_be32((uint32_t)mx_resp_len, rstmfCmdBlk + 6);
+        rstmf_cdb[2] = 0x80;
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rstmf_cdb + 6);
 
     if (verbose) {
         pr2serr("    Report Supported Task Management Functions cmd: ");
         for (k = 0; k < RSTMF_CMD_LEN; ++k)
-            pr2serr("%02x ", rstmfCmdBlk[k]);
+            pr2serr("%02x ", rstmf_cdb[k]);
         pr2serr("\n");
     }
     ptvp = construct_scsi_pt_obj();
@@ -1060,7 +1060,7 @@ do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
         pr2serr("Report Supported Task Management Functions: out of memory\n");
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, rstmfCmdBlk, sizeof(rstmfCmdBlk));
+    set_scsi_pt_cdb(ptvp, rstmf_cdb, sizeof(rstmf_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);

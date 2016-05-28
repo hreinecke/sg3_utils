@@ -55,7 +55,7 @@
 #endif
 
 
-static const char * version_str = "4.96 20160222";
+static const char * version_str = "4.97 20160528";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -349,7 +349,7 @@ main(int argc, char * argv[])
 {
     int sg_fd, res, j;
     unsigned int k, num;
-    unsigned char rbCmdBlk [RB_CMD_LEN];
+    unsigned char rb_cdb [RB_CMD_LEN];
     unsigned char * rbBuff = NULL;
     void * rawp = NULL;
     unsigned char sense_buffer[32];
@@ -411,25 +411,25 @@ main(int argc, char * argv[])
     }
     rbBuff = (unsigned char *)rawp;
 
-    memset(rbCmdBlk, 0, RB_CMD_LEN);
-    rbCmdBlk[0] = RB_OPCODE;
-    rbCmdBlk[1] = op->do_echo ? RB_MODE_ECHO_DESC : RB_MODE_DESC;
-    rbCmdBlk[8] = RB_DESC_LEN;
+    memset(rb_cdb, 0, RB_CMD_LEN);
+    rb_cdb[0] = RB_OPCODE;
+    rb_cdb[1] = op->do_echo ? RB_MODE_ECHO_DESC : RB_MODE_DESC;
+    rb_cdb[8] = RB_DESC_LEN;
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(rbCmdBlk);
+    io_hdr.cmd_len = sizeof(rb_cdb);
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = RB_DESC_LEN;
     io_hdr.dxferp = rbBuff;
-    io_hdr.cmdp = rbCmdBlk;
+    io_hdr.cmdp = rb_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
     if (op->do_verbose) {
         pr2serr("    Read buffer (%sdescriptor) cdb: ",
                 (op->do_echo ? "echo " : ""));
         for (k = 0; k < RB_CMD_LEN; ++k)
-            pr2serr("%02x ", rbCmdBlk[k]);
+            pr2serr("%02x ", rb_cdb[k]);
         pr2serr("\n");
     }
 
@@ -530,23 +530,23 @@ main(int argc, char * argv[])
     }
     /* main data reading loop */
     for (k = 0; k < num; ++k) {
-        memset(rbCmdBlk, 0, RB_CMD_LEN);
-        rbCmdBlk[0] = RB_OPCODE;
-        rbCmdBlk[1] = op->do_echo ? RB_MODE_ECHO_DATA : RB_MODE_DATA;
-        sg_put_unaligned_be24((uint32_t)buf_size, rbCmdBlk + 6);
+        memset(rb_cdb, 0, RB_CMD_LEN);
+        rb_cdb[0] = RB_OPCODE;
+        rb_cdb[1] = op->do_echo ? RB_MODE_ECHO_DATA : RB_MODE_DATA;
+        sg_put_unaligned_be24((uint32_t)buf_size, rb_cdb + 6);
 #ifdef SG_DEBUG
         memset(rbBuff, 0, buf_size);
 #endif
 
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
         io_hdr.interface_id = 'S';
-        io_hdr.cmd_len = sizeof(rbCmdBlk);
+        io_hdr.cmd_len = sizeof(rb_cdb);
         io_hdr.mx_sb_len = sizeof(sense_buffer);
         io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
         io_hdr.dxfer_len = buf_size;
         if (! op->do_mmap)
             io_hdr.dxferp = rbBuff;
-        io_hdr.cmdp = rbCmdBlk;
+        io_hdr.cmdp = rb_cdb;
         io_hdr.sbp = sense_buffer;
         io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
         io_hdr.pack_id = k;
@@ -560,7 +560,7 @@ main(int argc, char * argv[])
             pr2serr("    Read buffer (%sdata) cdb: ",
                     (op->do_echo ? "echo " : ""));
             for (j = 0; j < RB_CMD_LEN; ++j)
-                pr2serr("%02x ", rbCmdBlk[j]);
+                pr2serr("%02x ", rb_cdb[j]);
             pr2serr("\n");
         }
 

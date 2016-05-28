@@ -88,6 +88,15 @@ pr2ws(const char * fmt, ...)
     return n;
 }
 
+static struct sg_pt_base *
+create_pt_obj(const char * cname)
+{
+    struct sg_pt_base * ptvp = construct_scsi_pt_obj();
+    if (NULL == ptvp)
+        pr2ws("%s: out of memory\n", cname);
+    return ptvp;
+}
+
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
@@ -95,40 +104,38 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
                     unsigned int lba, unsigned int count, int noisy,
                     int verbose)
 {
+    static const char * const cdb_name_s = "synchronize cache(10)";
     int res, ret, k, sense_cat;
-    unsigned char scCmdBlk[SYNCHRONIZE_CACHE_CMDLEN] =
+    unsigned char sc_cdb[SYNCHRONIZE_CACHE_CMDLEN] =
                 {SYNCHRONIZE_CACHE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (sync_nv)
-        scCmdBlk[1] |= 4;
+        sc_cdb[1] |= 4;
     if (immed)
-        scCmdBlk[1] |= 2;
-    sg_put_unaligned_be32((uint32_t)lba, scCmdBlk + 2);
-    scCmdBlk[6] = group & 0x1f;
+        sc_cdb[1] |= 2;
+    sg_put_unaligned_be32((uint32_t)lba, sc_cdb + 2);
+    sc_cdb[6] = group & 0x1f;
     if (count > 0xffff) {
         pr2ws("count too big\n");
         return -1;
     }
-    sg_put_unaligned_be16((int16_t)count, scCmdBlk + 7);
+    sg_put_unaligned_be16((int16_t)count, sc_cdb + 7);
 
     if (verbose) {
-        pr2ws("    synchronize cache(10) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < SYNCHRONIZE_CACHE_CMDLEN; ++k)
-            pr2ws("%02x ", scCmdBlk[k]);
+            pr2ws("%02x ", sc_cdb[k]);
         pr2ws("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("synchronize cache(10): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, scCmdBlk, sizeof(scCmdBlk));
+    set_scsi_pt_cdb(ptvp, sc_cdb, sizeof(sc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "synchronize cache(10)", res, 0,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -154,36 +161,34 @@ int
 sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "read capacity(16)";
     int k, ret, res, sense_cat;
-    unsigned char rcCmdBlk[SERVICE_ACTION_IN_16_CMDLEN] =
+    unsigned char rc_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                         {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (pmi) { /* lbs only valid when pmi set */
-        rcCmdBlk[14] |= 1;
-        sg_put_unaligned_be64(llba, rcCmdBlk + 2);
+        rc_cdb[14] |= 1;
+        sg_put_unaligned_be64(llba, rc_cdb + 2);
     }
     /* Allocation length, no guidance in SBC-2 rev 15b */
-    sg_put_unaligned_be32((uint32_t)mx_resp_len, rcCmdBlk + 10);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rc_cdb + 10);
     if (verbose) {
-        pr2ws("    read capacity (16) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            pr2ws("%02x ", rcCmdBlk[k]);
+            pr2ws("%02x ", rc_cdb[k]);
         pr2ws("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("read capacity (16): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
+    set_scsi_pt_cdb(ptvp, rc_cdb, sizeof(rc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "read capacity (16)", res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -209,33 +214,31 @@ int
 sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
                  int mx_resp_len, int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "read capacity(10)";
     int k, ret, res, sense_cat;
-    unsigned char rcCmdBlk[READ_CAPACITY_10_CMDLEN] =
+    unsigned char rc_cdb[READ_CAPACITY_10_CMDLEN] =
                          {READ_CAPACITY_10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (pmi) { /* lbs only valid when pmi set */
-        rcCmdBlk[8] |= 1;
-        sg_put_unaligned_be32((uint32_t)lba, rcCmdBlk + 2);
+        rc_cdb[8] |= 1;
+        sg_put_unaligned_be32((uint32_t)lba, rc_cdb + 2);
     }
     if (verbose) {
-        pr2ws("    read capacity (10) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < READ_CAPACITY_10_CMDLEN; ++k)
-            pr2ws("%02x ", rcCmdBlk[k]);
+            pr2ws("%02x ", rc_cdb[k]);
         pr2ws("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("read capacity (10): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, rcCmdBlk, sizeof(rcCmdBlk));
+    set_scsi_pt_cdb(ptvp, rc_cdb, sizeof(rc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "read capacity (10)", res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -261,37 +264,35 @@ int
 sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "mode sense(6)";
     int res, ret, k, sense_cat, resid;
-    unsigned char modesCmdBlk[MODE_SENSE6_CMDLEN] =
+    unsigned char modes_cdb[MODE_SENSE6_CMDLEN] =
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    modesCmdBlk[1] = (unsigned char)(dbd ? 0x8 : 0);
-    modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
-    modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
-    modesCmdBlk[4] = (unsigned char)(mx_resp_len & 0xff);
+    modes_cdb[1] = (unsigned char)(dbd ? 0x8 : 0);
+    modes_cdb[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
+    modes_cdb[3] = (unsigned char)(sub_pg_code & 0xff);
+    modes_cdb[4] = (unsigned char)(mx_resp_len & 0xff);
     if (mx_resp_len > 0xff) {
         pr2ws("mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        pr2ws("    mode sense (6) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < MODE_SENSE6_CMDLEN; ++k)
-            pr2ws("%02x ", modesCmdBlk[k]);
+            pr2ws("%02x ", modes_cdb[k]);
         pr2ws("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("mode sense (6): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_cdb(ptvp, modes_cdb, sizeof(modes_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "mode sense (6)", res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
+                               noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
@@ -308,7 +309,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    mode sense (6): response");
+            pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
                 dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
@@ -322,8 +323,8 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            pr2ws("mode sense(6): resid (%d) should never exceed requested "
-                  "len=%d\n", resid, mx_resp_len);
+            pr2ws("%s: resid (%d) should never exceed requested len=%d\n",
+                  cdb_name_s, resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -339,37 +340,35 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                    int sub_pg_code, void * resp, int mx_resp_len,
                    int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "mode sense(10)";
     int res, ret, k, sense_cat, resid;
-    unsigned char modesCmdBlk[MODE_SENSE10_CMDLEN] =
+    unsigned char modes_cdb[MODE_SENSE10_CMDLEN] =
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    modesCmdBlk[1] = (unsigned char)((dbd ? 0x8 : 0) | (llbaa ? 0x10 : 0));
-    modesCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
-    modesCmdBlk[3] = (unsigned char)(sub_pg_code & 0xff);
-    sg_put_unaligned_be16((int16_t)mx_resp_len, modesCmdBlk + 7);
+    modes_cdb[1] = (unsigned char)((dbd ? 0x8 : 0) | (llbaa ? 0x10 : 0));
+    modes_cdb[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
+    modes_cdb[3] = (unsigned char)(sub_pg_code & 0xff);
+    sg_put_unaligned_be16((int16_t)mx_resp_len, modes_cdb + 7);
     if (mx_resp_len > 0xffff) {
         pr2ws("mx_resp_len too big\n");
         return -1;
     }
     if (verbose) {
-        pr2ws("    mode sense (10) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < MODE_SENSE10_CMDLEN; ++k)
-            pr2ws("%02x ", modesCmdBlk[k]);
+            pr2ws("%02x ", modes_cdb[k]);
         pr2ws("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("mode sense (10): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_cdb(ptvp, modes_cdb, sizeof(modes_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "mode sense (10)", res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
+                               noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
@@ -386,7 +385,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
         }
     } else {
         if ((verbose > 2) && (ret > 0)) {
-            pr2ws("    mode sense (10): response");
+            pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
                 dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
@@ -400,8 +399,8 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            pr2ws("mode sense(10): resid (%d) should never exceed requested "
-                  "len=%d\n", resid, mx_resp_len);
+            pr2ws("%s: resid (%d) should never exceed requested len=%d\n",
+                  cdb_name_s, resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -416,40 +415,38 @@ int
 sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
                    int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "mode select(6)";
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SELECT6_CMDLEN] =
+    unsigned char modes_cdb[MODE_SELECT6_CMDLEN] =
         {MODE_SELECT6_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
-    modesCmdBlk[4] = (unsigned char)(param_len & 0xff);
+    modes_cdb[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
+    modes_cdb[4] = (unsigned char)(param_len & 0xff);
     if (param_len > 0xff) {
-        pr2ws("mode select (6): param_len too big\n");
+        pr2ws("%s: param_len too big\n", cdb_name_s);
         return -1;
     }
     if (verbose) {
-        pr2ws("    mode select (6) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < MODE_SELECT6_CMDLEN; ++k)
-            pr2ws("%02x ", modesCmdBlk[k]);
+            pr2ws("%02x ", modes_cdb[k]);
         pr2ws("\n");
     }
     if (verbose > 1) {
-        pr2ws("    mode select (6) parameter list\n");
+        pr2ws("    %s parameter list\n", cdb_name_s);
         dStrHexErr((const char *)paramp, param_len, -1);
     }
 
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("mode select (6): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_cdb(ptvp, modes_cdb, sizeof(modes_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "mode select (6)", res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -475,40 +472,38 @@ int
 sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
                     int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "mode select(10)";
     int res, ret, k, sense_cat;
-    unsigned char modesCmdBlk[MODE_SELECT10_CMDLEN] =
+    unsigned char modes_cdb[MODE_SELECT10_CMDLEN] =
         {MODE_SELECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    modesCmdBlk[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
-    sg_put_unaligned_be16((int16_t)param_len, modesCmdBlk + 7);
+    modes_cdb[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
+    sg_put_unaligned_be16((int16_t)param_len, modes_cdb + 7);
     if (param_len > 0xffff) {
-        pr2ws("mode select (10): param_len too big\n");
+        pr2ws("%s: param_len too big\n", cdb_name_s);
         return -1;
     }
     if (verbose) {
-        pr2ws("    mode select (10) cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < MODE_SELECT10_CMDLEN; ++k)
-            pr2ws("%02x ", modesCmdBlk[k]);
+            pr2ws("%02x ", modes_cdb[k]);
         pr2ws("\n");
     }
     if (verbose > 1) {
-        pr2ws("    mode select (10) parameter list\n");
+        pr2ws("    %s parameter list\n", cdb_name_s);
         dStrHexErr((const char *)paramp, param_len, -1);
     }
 
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("mode select (10): out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, modesCmdBlk, sizeof(modesCmdBlk));
+    set_scsi_pt_cdb(ptvp, modes_cdb, sizeof(modes_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "mode select (10)", res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -651,7 +646,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
                                  ebuff, EBUFF_SZ);
     if (offset < 0) {
         if (('\0' != ebuff[0]) && (verbose > 0))
-            pr2ws("sg_get_mode_page_controls: %s\n", ebuff);
+            pr2ws("%s: %s\n", __func__, ebuff);
         return SG_LIB_CAT_MALFORMED;
     }
     xfer_len = calc_len - offset;
@@ -693,8 +688,9 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
                 int mx_resp_len, int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "log sense";
     int res, ret, k, sense_cat, resid;
-    unsigned char logsCmdBlk[LOG_SENSE_CMDLEN] =
+    unsigned char logs_cdb[LOG_SENSE_CMDLEN] =
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -703,28 +699,25 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
         pr2ws("mx_resp_len too big\n");
         return -1;
     }
-    logsCmdBlk[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
-    logsCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
-    logsCmdBlk[3] = (unsigned char)(subpg_code & 0xff);
-    sg_put_unaligned_be16((int16_t)paramp, logsCmdBlk + 5);
-    sg_put_unaligned_be16((int16_t)mx_resp_len, logsCmdBlk + 7);
+    logs_cdb[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
+    logs_cdb[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
+    logs_cdb[3] = (unsigned char)(subpg_code & 0xff);
+    sg_put_unaligned_be16((int16_t)paramp, logs_cdb + 5);
+    sg_put_unaligned_be16((int16_t)mx_resp_len, logs_cdb + 7);
     if (verbose) {
-        pr2ws("    log sense cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
-            pr2ws("%02x ", logsCmdBlk[k]);
+            pr2ws("%02x ", logs_cdb[k]);
         pr2ws("\n");
     }
 
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("log sense: out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, logsCmdBlk, sizeof(logsCmdBlk));
+    set_scsi_pt_cdb(ptvp, logs_cdb, sizeof(logs_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "log sense", res, mx_resp_len,
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
     destruct_scsi_pt_obj(ptvp);
@@ -751,8 +744,8 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            pr2ws("log sense: resid (%d) should never exceed requested "
-                  "len=%d\n", resid, mx_resp_len);
+            pr2ws("%s: resid (%d) should never exceed requested len=%d\n",
+                  cdb_name_s, resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
@@ -768,42 +761,40 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
                  int subpg_code, unsigned char * paramp, int param_len,
                  int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "log select";
     int res, ret, k, sense_cat;
-    unsigned char logsCmdBlk[LOG_SELECT_CMDLEN] =
+    unsigned char logs_cdb[LOG_SELECT_CMDLEN] =
         {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (param_len > 0xffff) {
-        pr2ws("log select: param_len too big\n");
+        pr2ws("%s: param_len too big\n", cdb_name_s);
         return -1;
     }
-    logsCmdBlk[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
-    logsCmdBlk[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
-    logsCmdBlk[3] = (unsigned char)(subpg_code & 0xff);
-    sg_put_unaligned_be16((int16_t)param_len, logsCmdBlk + 7);
+    logs_cdb[1] = (unsigned char)((pcr ? 2 : 0) | (sp ? 1 : 0));
+    logs_cdb[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
+    logs_cdb[3] = (unsigned char)(subpg_code & 0xff);
+    sg_put_unaligned_be16((int16_t)param_len, logs_cdb + 7);
     if (verbose) {
-        pr2ws("    log select cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
-            pr2ws("%02x ", logsCmdBlk[k]);
+            pr2ws("%02x ", logs_cdb[k]);
         pr2ws("\n");
     }
     if ((verbose > 1) && (param_len > 0)) {
-        pr2ws("    log select parameter list\n");
+        pr2ws("    %s parameter list\n", cdb_name_s);
         dStrHexErr((const char *)paramp, param_len, -1);
     }
 
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("log select: out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, logsCmdBlk, sizeof(logsCmdBlk));
+    set_scsi_pt_cdb(ptvp, logs_cdb, sizeof(logs_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "log select", res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -836,6 +827,7 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
                       int power_cond, int noflush__fl, int loej, int start,
                       int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "start stop unit";
     int k, res, ret, sense_cat;
     struct sg_pt_base * ptvp;
     unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
@@ -846,22 +838,19 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
     ssuBlk[4] = ((power_cond & 0xf) << 4) | (noflush__fl ? 0x4 : 0) |
                  (loej ? 0x2 : 0) | (start ? 0x1 : 0);
     if (verbose) {
-        pr2ws("    Start stop unit command:");
+        pr2ws("    %s command:", cdb_name_s);
         for (k = 0; k < (int)sizeof(ssuBlk); ++k)
                 pr2ws(" %02x", ssuBlk[k]);
         pr2ws("\n");
     }
 
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("start stop unit: out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
     set_scsi_pt_cdb(ptvp, ssuBlk, sizeof(ssuBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, START_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "start stop unit", res, 0,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -888,8 +877,9 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
 int
 sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
 {
+    static const char * const cdb_name_s = "prevent allow medium removal";
     int k, res, ret, sense_cat;
-    unsigned char pCmdBlk[PREVENT_ALLOW_CMDLEN] =
+    unsigned char p_cdb[PREVENT_ALLOW_CMDLEN] =
                 {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -898,24 +888,21 @@ sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
         pr2ws("prevent argument should be 0, 1, 2 or 3\n");
         return -1;
     }
-    pCmdBlk[4] |= (prevent & 0x3);
+    p_cdb[4] |= (prevent & 0x3);
     if (verbose) {
-        pr2ws("    Prevent allow medium removal cdb: ");
+        pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < PREVENT_ALLOW_CMDLEN; ++k)
-            pr2ws("%02x ", pCmdBlk[k]);
+            pr2ws("%02x ", p_cdb[k]);
         pr2ws("\n");
     }
 
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2ws("prevent allow medium removal: out of memory\n");
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
-    }
-    set_scsi_pt_cdb(ptvp, pCmdBlk, sizeof(pCmdBlk));
+    set_scsi_pt_cdb(ptvp, p_cdb, sizeof(p_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "prevent allow medium removal", res, 0,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {

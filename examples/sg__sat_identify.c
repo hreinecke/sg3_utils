@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Douglas Gilbert.
+ * Copyright (c) 2006-2016 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -64,7 +64,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.02 20070130";
+static char * version_str = "1.03 20160528";
 
 static void usage()
 {
@@ -81,7 +81,7 @@ static void usage()
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
-    unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
+    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     sg_io_hdr_t io_hdr;
@@ -138,28 +138,28 @@ int main(int argc, char * argv[])
     }
 
     /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-    aptCmdBlk[6] = 1;   /* sector count */
-    aptCmdBlk[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
+    apt_cdb[6] = 1;   /* sector count */
+    apt_cdb[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                  ATA_IDENTIFY_DEVICE);
-    aptCmdBlk[1] = (protocol << 1) | extend;
-    aptCmdBlk[2] = (chk_cond << 5) | (t_dir << 3) |
-                   (byte_block << 2) | t_length;
+    apt_cdb[1] = (protocol << 1) | extend;
+    apt_cdb[2] = (chk_cond << 5) | (t_dir << 3) |
+                 (byte_block << 2) | t_length;
     if (verbose) {
         fprintf(stderr, "    ata pass through(16) cdb: ");
         for (k = 0; k < SAT_ATA_PASS_THROUGH16_LEN; ++k)
-            fprintf(stderr, "%02x ", aptCmdBlk[k]);
+            fprintf(stderr, "%02x ", apt_cdb[k]);
         fprintf(stderr, "\n");
     }
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
     io_hdr.interface_id = 'S';
-    io_hdr.cmd_len = sizeof(aptCmdBlk);
+    io_hdr.cmd_len = sizeof(apt_cdb);
     /* io_hdr.iovec_count = 0; */  /* memset takes care of this */
     io_hdr.mx_sb_len = sizeof(sense_buffer);
     io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     io_hdr.dxfer_len = ID_RESPONSE_LEN;
     io_hdr.dxferp = inBuff;
-    io_hdr.cmdp = aptCmdBlk;
+    io_hdr.cmdp = apt_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
     /* io_hdr.flags = 0; */     /* take defaults: indirect IO, etc */

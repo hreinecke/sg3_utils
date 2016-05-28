@@ -47,7 +47,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.12 20160126";
+static const char * version_str = "1.12 20160528";
 
 static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
@@ -119,10 +119,10 @@ do_set_features(int sg_fd, int feature, int count, uint64_t lba,
     struct sg_scsi_sense_hdr ssh;
     unsigned char sense_buffer[64];
     unsigned char ata_return_desc[16];
-    unsigned char aptCmdBlk[SAT_ATA_PASS_THROUGH16_LEN] =
+    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12CmdBlk[SAT_ATA_PASS_THROUGH12_LEN] =
+    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
 
@@ -131,34 +131,34 @@ do_set_features(int sg_fd, int feature, int count, uint64_t lba,
     memset(ata_return_desc, 0, sizeof(ata_return_desc));
     if (16 == cdb_len) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
-        aptCmdBlk[14] = ATA_SET_FEATURES;
-        aptCmdBlk[4] = feature;
-        aptCmdBlk[6] = count;
-        aptCmdBlk[8] = lba & 0xff;
-        aptCmdBlk[10] = (lba >> 8) & 0xff;
-        aptCmdBlk[12] = (lba >> 16) & 0xff;
-        aptCmdBlk[7] = (lba >> 24) & 0xff;
-        aptCmdBlk[9] = (lba >> 32) & 0xff;
-        aptCmdBlk[11] = (lba >> 40) & 0xff;
-        aptCmdBlk[1] = (multiple_count << 5) | (protocol << 1) | extend;
-        aptCmdBlk[2] = (ck_cond << 5) | (t_type << 4)| (t_dir << 3) |
+        apt_cdb[14] = ATA_SET_FEATURES;
+        apt_cdb[4] = feature;
+        apt_cdb[6] = count;
+        apt_cdb[8] = lba & 0xff;
+        apt_cdb[10] = (lba >> 8) & 0xff;
+        apt_cdb[12] = (lba >> 16) & 0xff;
+        apt_cdb[7] = (lba >> 24) & 0xff;
+        apt_cdb[9] = (lba >> 32) & 0xff;
+        apt_cdb[11] = (lba >> 40) & 0xff;
+        apt_cdb[1] = (multiple_count << 5) | (protocol << 1) | extend;
+        apt_cdb[2] = (ck_cond << 5) | (t_type << 4)| (t_dir << 3) |
                        (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, aptCmdBlk, cdb_len, DEF_TIMEOUT, NULL,
+        res = sg_ll_ata_pt(sg_fd, apt_cdb, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     } else {
         /* Prepare ATA PASS-THROUGH COMMAND (12) command */
-        apt12CmdBlk[9] = ATA_SET_FEATURES;
-        apt12CmdBlk[3] = feature;
-        apt12CmdBlk[4] = count;
-        apt12CmdBlk[5] = lba & 0xff;
-        apt12CmdBlk[6] = (lba >> 8) & 0xff;
-        apt12CmdBlk[7] = (lba >> 16) & 0xff;
-        apt12CmdBlk[1] = (multiple_count << 5) | (protocol << 1);
-        apt12CmdBlk[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
+        apt12_cdb[9] = ATA_SET_FEATURES;
+        apt12_cdb[3] = feature;
+        apt12_cdb[4] = count;
+        apt12_cdb[5] = lba & 0xff;
+        apt12_cdb[6] = (lba >> 8) & 0xff;
+        apt12_cdb[7] = (lba >> 16) & 0xff;
+        apt12_cdb[1] = (multiple_count << 5) | (protocol << 1);
+        apt12_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
                          (byte_block << 2) | t_length;
-        res = sg_ll_ata_pt(sg_fd, apt12CmdBlk, cdb_len, DEF_TIMEOUT, NULL,
+        res = sg_ll_ata_pt(sg_fd, apt12_cdb, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
