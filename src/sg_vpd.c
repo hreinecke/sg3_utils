@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.23 20160528";  /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.24 20160531";  /* spc5r10 + sbc4r10 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -291,8 +291,8 @@ static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
           unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line, fd;
-    bool has_stdin;
+    int fn_len, in_len, k, j, m, fd;
+    bool has_stdin, split_line;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -370,9 +370,9 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-                split_line = 0;
+                split_line = false;
             } else
-                split_line = 1;
+                split_line = true;
         }
         if (in_len < 1) {
             carry_over[0] = 0;
@@ -2580,7 +2580,6 @@ static int
 svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
     int len, res;
-    int alloc_len = op->maxlen;
     unsigned char * rp;
 
     rp = rsp_buff + off;
@@ -2595,12 +2594,8 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
         else
             printf("VPD page code=%d:\n", op->vpd_pn);
     }
-    if (sg_fd >= 0) {
-        if (0 == alloc_len)
-            alloc_len = DEF_ALLOC_LEN;
-    }
 
-    res = vpd_fetch_page_from_dev(sg_fd, rp, op->vpd_pn, alloc_len,
+    res = vpd_fetch_page_from_dev(sg_fd, rp, op->vpd_pn, op->maxlen,
                                   op->verbose, &len);
     if (0 == res) {
         if (op->do_raw)

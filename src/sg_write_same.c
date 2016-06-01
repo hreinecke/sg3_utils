@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20160528";
+static const char * version_str = "1.14 20160531";
 
 
 #define ME "sg_write_same: "
@@ -247,7 +247,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
 
     if (op->verbose > 1) {
-        pr2serr("    Write same(%d) cmd: ", cdb_len);
+        pr2serr("    Write same(%d) cdb: ", cdb_len);
         for (k = 0; k < cdb_len; ++k)
             pr2serr("%02x ", ws_cdb[k]);
         pr2serr("\n    Data-out buffer length=%d\n",

@@ -1307,6 +1307,21 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
     int alloc_len = op->maxlen;
     unsigned char * rp;
 
+    switch (op->vpd_pn) {
+    case 0xc0:
+    case 0xc1:
+    case 0xc2:
+    case 0xc3:
+    case 0xc4:
+    case 0xc5:
+    case 0xc8:
+    case 0xc9:
+    case 0xca:
+    case 0xd0:
+        break;
+    default:    /* not known so return prior to fetching page */
+        return SG_LIB_SYNTAX_ERROR;
+    }
     rp = rsp_buff + off;
     if (sg_fd >= 0) {
         if (0 == alloc_len)
@@ -1417,6 +1432,8 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                         dStrHex((const char *)rp, len, 0);
                     break;
                 default:
+                    pr2serr("%s: logic error, should know can't decode "
+                            "pn=0x%x\n", __func__, op->vpd_pn);
                     return SG_LIB_SYNTAX_ERROR;
             }
             return 0;

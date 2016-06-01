@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.16 20160512";
+static const char * version_str = "1.17 20160531";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -351,7 +351,7 @@ main(int argc, char * argv[])
                         break;
                     }
                 }
-                if (NULL == mp) {
+                if (NULL == mp->mode_string) {
                     print_modes();
                     return SG_LIB_SYNTAX_ERROR;
                 }

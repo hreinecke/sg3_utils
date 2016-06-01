@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.02 20160528";
+static const char * version_str = "1.02 20160531";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -202,7 +202,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     sg_put_unaligned_be16((uint16_t)param_lst_len, san_cdb + 7);
 
     if (op->verbose > 1) {
-        pr2serr("    Sanitize cmd: ");
+        pr2serr("    Sanitize cdb: ");
         for (k = 0; k < SANITIZE_OP_LEN; ++k)
             pr2serr("%02x ", san_cdb[k]);
         pr2serr("\n");
