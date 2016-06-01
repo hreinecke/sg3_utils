@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 Douglas Gilbert
+ * Copyright (c) 2014-2016 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.08 20151220";
+static const char * version_str = "1.09 20160531";
 
 
 #define ME "sg_write_verify: "
@@ -129,7 +129,7 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
 
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);
     if (verbose) {
-       pr2serr("    %s cmd: ", b);
+       pr2serr("    %s cdb: ", b);
        for (k = 0; k < cdb_len; ++k)
            pr2serr("%02x ", cdbp[k]);
        pr2serr("\n");

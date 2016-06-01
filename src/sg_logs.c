@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.45 20160519";    /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.46 20160531";    /* spc5r10 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -71,8 +71,30 @@ static const char * version_str = "1.45 20160519";    /* spc5r10 + sbc4r10 */
 #define ENV_LIMITS_SUBPG 0x2
 #define LPS_MISALIGNMENT_SUBPG 0x3
 
-#define VENDOR_M 0x1000
-#define LTO5_M 0x2000
+/* Vendor product identifiers followed by associated mask values */
+#define VP_SEAG   0
+#define VP_HITA   1
+#define VP_WDC    2
+#define VP_TOSH   3
+#define VP_SMSTR  4
+#define VP_LTO5   5
+#define VP_LTO6   6
+#define VP_ALL    99
+
+#define MVP_OFFSET 8
+/* shared is T10 defined lpage with vendor specific parameter codes */
+#define MVP_SHARED (1 << (MVP_OFFSET - 1))
+#define MVP_SEAG   (1 << (VP_SEAG + MVP_OFFSET))
+#define MVP_HITA   (1 << (VP_HITA + MVP_OFFSET))
+#define MVP_WDC    (1 << (VP_WDC + MVP_OFFSET))
+#define MVP_TOSH   (1 << (VP_TOSH + MVP_OFFSET))
+#define MVP_SMSTR  (1 << (VP_SMSTR + MVP_OFFSET))
+#define MVP_LTO5   (1 << (VP_LTO5 + MVP_OFFSET))
+#define MVP_LTO6   (1 << (VP_LTO6 + MVP_OFFSET))
+
+#define OVP_LTO    (MVP_LTO5 | MVP_LTO6)
+#define OVP_ALL    (~0)
+
 
 #define PCB_STR_LEN 128
 
@@ -86,7 +108,6 @@ static struct option long_options[] = {
         {"brief", no_argument, 0, 'b'},
         {"control", required_argument, 0, 'c'},
         {"enumerate", no_argument, 0, 'e'},
-        {"enum_vendor", no_argument, 0, 'E'},
         {"filter", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
@@ -109,6 +130,7 @@ static struct option long_options[] = {
         {"select", no_argument, 0, 'S'},
         {"temperature", no_argument, 0, 't'},
         {"transport", no_argument, 0, 'T'},
+        {"vendor", required_argument, 0, 'M'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -118,7 +140,6 @@ struct opts_t {
     int do_all;
     int do_brief;
     int do_enumerate;
-    int do_enum_vendor;
     int do_help;
     int do_hex;
     int do_list;
@@ -132,6 +153,8 @@ struct opts_t {
     int do_sp;
     int do_temperature;
     int do_transport;
+    int vend_prod_num;
+    int deduced_vpn;
     int verbose;
     int do_version;
     int filter;
@@ -147,6 +170,7 @@ struct opts_t {
     const char * device_name;
     const char * in_fn;
     const char * pg_arg;
+    const char * vend_prod;
     const struct log_elem * lep;
 };
 
@@ -156,12 +180,20 @@ struct log_elem {
     int subpg_code;     /* only unless subpg_high>0 then this is only */
     int subpg_high;     /* when >0 this is high end of subpage range */
     int pdt;            /* -1 for all */
-    int flags;          /* bit mask; only VENDOR_M to start with */
+    int flags;          /* bit mask; or-ed MVP_* constants */
     const char * name;
     const char * acron;
     bool (*show_pagep)(const uint8_t * resp, int len,
                        const struct opts_t * op);
                         /* Returns true if done */
+};
+
+struct vp_name_t {
+    int vend_prod_num;       /* vendor/product identifier */
+    const char * acron;
+    const char * name;
+    const char * t10_vendorp;
+    const char * t10_productp;
 };
 
 static bool show_supported_pgs_page(const uint8_t * resp, int len,
@@ -349,50 +381,67 @@ static struct log_elem log_arr[] = {
      NULL},                             /* 0x2d, 0  SSC */
     {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, 0, "Tape alert", "ta",
      show_tape_alert_ssc_page},         /* 0x2e, 0  SSC */
-    {IE_LPAGE, 0, 0, -1, 0, "Informational exceptions", "ie",
-     show_ie_page},                     /* 0x2f, 0  */
+    {IE_LPAGE, 0, 0, -1, (MVP_SHARED | MVP_SMSTR), "Informational exceptions",
+     "ie", show_ie_page},               /* 0x2f, 0  */
 /* vendor specific */
-    {0x30, 0, 0, PDT_DISK, VENDOR_M, "Performance counters (Hitachi)",
+    {0x30, 0, 0, PDT_DISK, MVP_HITA, "Performance counters (Hitachi)",
      "pc_hi", NULL},                             /* 0x30, 0  SBC */
-    {0x30, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape usage (lto-5, 6)", "tu_",
+    {0x30, 0, 0, PDT_TAPE, OVP_LTO, "Tape usage (lto-5, 6)", "tu_",
      show_tape_usage_page},             /* 0x30, 0  SSC */
-    {0x31, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Tape capacity (lto-5, 6)",
+    {0x31, 0, 0, PDT_TAPE, OVP_LTO, "Tape capacity (lto-5, 6)",
      "tc_", show_tape_capacity_page},   /* 0x31, 0  SSC */
-    {0x32, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Data compression (lto-5)",
+    {0x32, 0, 0, PDT_TAPE, MVP_LTO5, "Data compression (lto-5)",
      "dc_", show_data_compression_page}, /* 0x32, 0  SSC; redirect to 0x1b */
-    {0x33, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Write errors (lto-5)", "we_",
+    {0x33, 0, 0, PDT_TAPE, MVP_LTO5, "Write errors (lto-5)", "we_",
      NULL},                             /* 0x33, 0  SSC */
-    {0x34, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Read forward errors (lto-5)",
+    {0x34, 0, 0, PDT_TAPE, MVP_LTO5, "Read forward errors (lto-5)",
      "rfe_", NULL},                             /* 0x34, 0  SSC */
-    {0x35, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "DT Device Error (lto-5, 6)",
+    {0x35, 0, 0, PDT_TAPE, OVP_LTO, "DT Device Error (lto-5, 6)",
      "dtde_", NULL},                             /* 0x35, 0  SSC */
-    {0x37, 0, 0, PDT_DISK, VENDOR_M, "Cache (seagate)", "c_se",
+    {0x37, 0, 0, PDT_DISK, MVP_SEAG, "Cache (seagate)", "c_se",
      show_seagate_cache_page},          /* 0x37, 0  SBC */
-    {0x37, 0, 0, PDT_DISK, VENDOR_M, "Miscellaneous (hitachi)", "mi_hi",
+    {0x37, 0, 0, PDT_DISK, MVP_HITA, "Miscellaneous (hitachi)", "mi_hi",
      NULL},                             /* 0x37, 0  SBC */
-    {0x37, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Performance characteristics "
+    {0x37, 0, 0, PDT_TAPE, MVP_LTO5, "Performance characteristics "
      "(lto-5)", "pc_", NULL},                             /* 0x37, 0  SSC */
-    {0x38, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Blocks/bytes transferred "
+    {0x38, 0, 0, PDT_TAPE, MVP_LTO5, "Blocks/bytes transferred "
      "(lto-5)", "bbt_", NULL},                             /* 0x38, 0  SSC */
-    {0x39, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Host port 0 interface errors "
+    {0x39, 0, 0, PDT_TAPE, MVP_LTO5, "Host port 0 interface errors "
      "(lto-5)", "hp0_", NULL},                             /* 0x39, 0  SSC */
-    {0x3a, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Drive control verification "
+    {0x3a, 0, 0, PDT_TAPE, MVP_LTO5, "Drive control verification "
      "(lto-5)", "dcv_", NULL},                             /* 0x3a, 0  SSC */
-    {0x3b, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Host port 1 interface errors "
+    {0x3b, 0, 0, PDT_TAPE, MVP_LTO5, "Host port 1 interface errors "
      "(lto-5)", "hp1_", NULL},                             /* 0x3b, 0  SSC */
-    {0x3c, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Drive usage information "
+    {0x3c, 0, 0, PDT_TAPE, MVP_LTO5, "Drive usage information "
      "(lto-5)", "dui_", NULL},                             /* 0x3c, 0  SSC */
-    {0x3d, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Subsystem statistics (lto-5)",
+    {0x3d, 0, 0, PDT_TAPE, MVP_LTO5, "Subsystem statistics (lto-5)",
      "ss_", NULL},                             /* 0x3d, 0  SSC */
-    {0x3e, 0, 0, PDT_DISK, VENDOR_M, "Factory (seagate)", "f_se",
+    {0x3e, 0, 0, PDT_DISK, MVP_SEAG, "Factory (seagate)", "f_se",
      show_seagate_factory_page},        /* 0x3e, 0  SBC */
-    {0x3e, 0, 0, PDT_DISK, VENDOR_M, "Factory (hitachi)", "f_hi",
+    {0x3e, 0, 0, PDT_DISK, MVP_HITA, "Factory (hitachi)", "f_hi",
      NULL},                             /* 0x3e, 0  SBC */
-    {0x3e, 0, 0, PDT_TAPE, VENDOR_M | LTO5_M, "Device Status (lto-5, 6)",
+    {0x3e, 0, 0, PDT_TAPE, OVP_LTO, "Device Status (lto-5, 6)",
      "ds_", NULL},                             /* 0x3e, 0  SSC */
 
     {-1, -1, -1, -1, -1, NULL, "zzzzz", NULL},           /* end sentinel */
 };
+
+/* Supported vendor product codes */
+/* Arrange in alphabetical order by acronym */
+static struct vp_name_t vp_arr[] = {
+    {VP_SEAG, "sea", "Seagate", "SEAGATE", NULL},
+    {VP_HITA, "hit", "Hitachi", "HGST", NULL},
+    {VP_WDC, "wdc", "WDC", "WDC", NULL},
+    {VP_TOSH, "tos", "Toshiba", "TOSHIBA", NULL},
+    {VP_SMSTR, "smstr", "SmrtStor (Sandisk)", "SmrtStor", NULL},
+    {VP_LTO5, "lto5", "LTO-5 (tape drive consortium)", NULL, NULL},
+    {VP_LTO6, "lto6", "LTO-6 (tape drive consortium)", NULL, NULL},
+    {VP_ALL, "all", "enumerate all vendor specific", NULL, NULL},
+    {0, NULL, NULL, NULL, NULL},
+};
+
+static char t10_vendor_str[10];
+static char t10_product_str[18];
 
 #ifdef SG_LIB_WIN32
 static int win32_spt_init_state = 0;
@@ -407,15 +456,16 @@ usage(int hval)
         pr2serr(
            "Usage: sg_logs [-All] [--all] [--brief] [--control=PC] "
            "[--enumerate]\n"
-           "               [--enum_vendor] [--filter=FL] [--help] [--hex] "
-           "[--in=FN]\n"
-           "               [--list] [--no_inq] [--maxlen=LEN] [--name] "
-           "[--page=PG]\n"
+           "               [--filter=FL] [--help] [--hex] [--in=FN] "
+           "[--list]\n"
+           "               [--no_inq] [--maxlen=LEN] [--name] [--page=PG]\n"
            "               [--paramp=PP] [--pcb] [--ppc] [--pdt=DT] "
            "[--raw]\n"
            "               [--readonly] [--reset] [--select] [--sp] "
            "[--temperature]\n"
-           "               [--transport] [--verbose] [--version] DEVICE\n"
+           "               [--transport] [--vendor=VP] [--verbose] "
+           "[--version]\n"
+           "               DEVICE\n"
            "  where the main options are:\n"
            "    --All|-A        fetch and decode all log pages and "
            "subpages\n"
@@ -430,8 +480,6 @@ usage(int hval)
            "by acronym;\n"
            "                      '-eee': all numerically; '-eeee': "
            "non-v numerically\n"
-           "    --enum_vendor|-E    enumerate known specific vendor pages "
-           "only\n"
            "    --filter=FL|-f FL    FL is parameter code to display (def: "
            "all);\n"
            "                         with '-e' then FL>=0 enumerate that "
@@ -456,6 +504,8 @@ usage(int hval)
            "0x2f)\n"
            "    --transport|-T    decode transport (protocol specific port "
            "0x18) page\n"
+           "    --vendor=VP|-M VP    vendor/product abbreviation [or "
+           "number]\n"
            "    --verbose|-v    increase verbosity\n\n"
            "Performs a SCSI LOG SENSE (or LOG SELECT) command and decodes "
            "the response.\nIf only DEVICE is given then '-p sp' (supported "
@@ -511,13 +561,13 @@ usage(int hval)
 static void
 usage_old()
 {
-    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-D=DT] [-e] [-E] [-f=FL] "
+    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-D=DT] [-e] [-f=FL] "
            "[-h]\n"
-           "               [-H] [-i=FN] [-l] [-L] [-m=LEN] [-n] [-p=PG] "
-           "[-paramp=PP]\n"
-           "               [-pcb] [-ppc] [-r] [-select] [-sp] [-t] [-T] "
-           "[-v] [-V]\n"
-           "               [-x] [-X] [-?] DEVICE\n"
+           "               [-H] [-i=FN] [-l] [-L] [-m=LEN] [-M=VP] [-n] "
+           "[-p=PG]\n"
+           "               [-paramp=PP] [-pcb] [-ppc] [-r] [-select] [-sp] "
+           "[-t] [-T]\n"
+           "               [-v] [-V] [-x] [-X] [-?] DEVICE\n"
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
@@ -526,7 +576,6 @@ usage_old()
            "                  0: current threshhold, 1: current cumulative\n"
            "                  2: default threshhold, 3: default cumulative\n"
            "    -e     enumerate known log pages\n"
-           "    -E     enumerate known vendor specific log pages only\n"
            "    -f=FL    filter match parameter code or pdt\n"
            "    -h     output in hex (default: decode if known)\n"
            "    -H     output in hex (same as '-h')\n"
@@ -539,6 +588,7 @@ usage_old()
            "           '-p=0,ff')\n"
            "    -m=LEN   max response length (decimal) (def: 0 "
            "-> everything)\n"
+           "    -M=VP    vendor/product abbreviation [or number]\n"
            "    -n       decode some pages into multiple name=value "
            "lines\n"
            "    -p=PG    PG is an acronym (def: 'sp')\n"
@@ -568,6 +618,37 @@ usage_old()
 }
 
 static int
+get_vp_mask(int vpn)
+{
+    if (vpn < 0)
+        return 0;
+    else
+        return (vpn > (32 - MVP_OFFSET)) ?  OVP_ALL :
+                                            (1 << (vpn + MVP_OFFSET));
+}
+
+static int
+mask_to_vendor(int vp_mask)
+{
+    if (MVP_SEAG & vp_mask)
+        return VP_SEAG;
+    else if (MVP_HITA & vp_mask)
+        return VP_HITA;
+    else if (MVP_WDC & vp_mask)
+        return VP_WDC;
+    else if (MVP_TOSH & vp_mask)
+        return VP_TOSH;
+    else if (MVP_SMSTR & vp_mask)
+        return VP_SMSTR;
+    else if (MVP_LTO5 & vp_mask)
+        return VP_LTO5;
+    else if (MVP_LTO6 & vp_mask)
+        return VP_LTO6;
+    else
+        return -1;
+}
+
+static int
 asort_comp(const void * lp, const void * rp)
 {
     const struct log_elem * const * lepp =
@@ -585,6 +666,8 @@ enumerate_helper(const struct log_elem * lep, int pos,
     char b[80];
     char bb[80];
     const char * cp;
+    bool mvp = !! lep->flags;
+    bool shared_vp = !!(MVP_SHARED & lep->flags);
 
     if (0 == pos) {
         if (1 == op->verbose) {
@@ -595,9 +678,7 @@ enumerate_helper(const struct log_elem * lep, int pos,
             printf("===================================================\n");
         }
     }
-    if ((op->do_enum_vendor > 0) && !(VENDOR_M & lep->flags))
-        return;
-    if ((0 == (op->do_enumerate % 2)) && (VENDOR_M & lep->flags))
+    if ((0 == (op->do_enumerate % 2)) && mvp && ! shared_vp)
         return;     /* if do_enumerate is even then skip vendor pages */
     else if ((! op->filter_given) || (-1 == op->filter))
         ;           /* otherwise enumerate all lpages if no --filter= */
@@ -613,6 +694,10 @@ enumerate_helper(const struct log_elem * lep, int pos,
     } else if ((op->filter >= 0) && (op->filter <= 0x1f)) {
         if ((lep->pdt >= 0) && (lep->pdt != op->filter) &&
             (lep->pdt != sg_lib_pdt_decay(op->filter)))
+            return;
+    }
+    if (op->vend_prod_num >= 0) {
+        if (! (lep->flags & get_vp_mask(op->vend_prod_num)))
             return;
     }
     if (lep->subpg_high > 0)
@@ -679,16 +764,51 @@ acron_search(const char * acron)
     return NULL;
 }
 
+static int
+find_vp_num_by_acron(const char * vp_ap)
+{
+    size_t len;
+    const struct vp_name_t * vpp;
+
+    for (vpp = vp_arr; vpp->acron; ++vpp) {
+        len = strlen(vpp->acron);
+        if (0 == strncmp(vpp->acron, vp_ap, len))
+            return vpp->vend_prod_num;
+    }
+    return -1;
+}
+
+static void
+enumerate_vp(void)
+{
+    const struct vp_name_t * vpp;
+    bool seen = false;
+
+    for (vpp = vp_arr; vpp->acron; ++vpp) {
+        if (vpp->name) {
+            if (! seen) {
+                printf("\nVendor/product identifiers:\n");
+                seen = true;
+            }
+            printf("  %-10s %d      %s\n", vpp->acron,
+                   vpp->vend_prod_num, vpp->name);
+        }
+    }
+}
+
 static const struct log_elem *
-pg_subpg_pdt_search(int pg_code, int subpg_code, int pdt)
+pg_subpg_pdt_search(int pg_code, int subpg_code, int pdt, int vpn)
 {
     const struct log_elem * lep;
     int d_pdt;
+    int vp_mask = get_vp_mask(vpn);
 
     d_pdt = sg_lib_pdt_decay(pdt);
     for (lep = log_arr; lep->pg_code >=0; ++lep) {
         if (pg_code == lep->pg_code) {
             if (subpg_code == lep->subpg_code) {
+                if (vp_mask && ! (vp_mask & lep->flags))
+                    continue;
                 if ((lep->pdt < 0) || (pdt == lep->pdt) || (pdt < 0))
                     return lep;
                 else if (d_pdt == lep->pdt)
@@ -723,8 +843,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:D:eEf:hHi:lLm:nNOp:P:qQrRsStTvVxX",
-                        long_options, &option_index);
+        c = getopt_long(argc, argv, "aAbc:D:ef:hHi:lLm:M:nNOp:P:qQrRsStTvV"
+                        "xX", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -757,9 +877,6 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             break;
         case 'e':
             ++op->do_enumerate;
-            break;
-        case 'E':
-            ++op->do_enum_vendor;
             break;
         case 'f':
             if ('-' == optarg[0]) {
@@ -805,6 +922,14 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->maxlen = n;
+            break;
+        case 'M':
+            if (op->vend_prod) {
+                pr2serr("only one '--vendor=' option permitted\n");
+                usage(2);
+                return SG_LIB_SYNTAX_ERROR;
+            } else
+                op->vend_prod = optarg;
             break;
         case 'n':
             ++op->do_name;
@@ -915,9 +1040,6 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 case 'e':
                     ++op->do_enumerate;
                     break;
-                case 'E':
-                    ++op->do_enum_vendor;
-                    break;
                 case 'h':
                 case 'H':
                     ++op->do_hex;
@@ -1010,6 +1132,13 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->maxlen = n;
+            } else if (0 == strncmp("M=", cp, 2)) {
+                if (op->vend_prod) {
+                    pr2serr("only one '-M=' option permitted\n");
+                    usage(2);
+                    return SG_LIB_SYNTAX_ERROR;
+                } else
+                    op->vend_prod = cp + 2;
             } else if (0 == strncmp("p=", cp, 2)) {
                 const char * ccp = cp + 2;
                 char * xp;
@@ -1045,6 +1174,8 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                         op->subpg_code = n;
                     } else
                         op->subpg_code = lep->subpg_code;
+                    if (lep->flags)
+                        op->deduced_vpn = mask_to_vendor(lep->flags);
                 } else {
                     /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
                     if (NULL == strchr(cp + 2, ',')) {
@@ -1475,7 +1606,7 @@ show_supported_pgs_page(const uint8_t * resp, int len,
     for (k = 0; k < num; ++k) {
         pg_code = bp[k];
         snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
-        lep = pg_subpg_pdt_search(pg_code, 0, op->dev_pdt);
+        lep = pg_subpg_pdt_search(pg_code, 0, op->dev_pdt, -1);
         if (lep) {
             if (op->do_brief > 1)
                 printf("    %s\n", lep->name);
@@ -1516,7 +1647,7 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
         else
             snprintf(b, sizeof(b) - 1, "    0x%02x,0x%02x   ", pg_code,
                      subpg_code);
-        lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt);
+        lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt, -1);
         if (lep) {
             if (op->do_brief > 1)
                 printf("    %s\n", lep->name);
@@ -2774,14 +2905,19 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* IE_LPAGE [0x2f]  introduced: SPC-3 */
+/* IE_LPAGE [0x2f] "Informational Exceptions"  introduced: SPC-3 */
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb, full;
+    int k, num, extra, pc, pcb;
     const uint8_t * bp;
+    const char * cp;
     char pcb_str[PCB_STR_LEN];
     char b[256];
+    char bb[32];
+    bool full, decoded, has_header;
+    bool is_smstr = op->lep ? (MVP_SMSTR & op->lep->flags) :
+                              (VP_SMSTR == op->vend_prod_num);
 
     full = ! op->do_temperature;
     num = len - 4;
@@ -2794,7 +2930,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (full)
             printf("Informational Exceptions page  [0x2f]\n");
     }
-    for (k = num; k > 0; k -= extra, bp += extra) {
+    for (k = num, has_header = false; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
             printf("short Informational Exceptions page\n");
             return false;
@@ -2814,8 +2950,10 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
                 break;
             }
         }
+        decoded = true;
+        cp = NULL;
         switch (pc) {
-        case 0:
+        case 0x0:
             if (extra > 5) {
                 if (full) {
                     printf("  IE asc = 0x%x, ascq = 0x%x", bp[4], bp[5]);
@@ -2825,26 +2963,101 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
                 }
                 if (extra > 6) {
                     if (bp[6] < 0xff)
-                        printf("\n  Current temperature = %d C", bp[6]);
+                        printf("\n    Current temperature = %d C", bp[6]);
                     else
-                        printf("\n  Current temperature = <not available>");
+                        printf("\n    Current temperature = <not available>");
                     if (extra > 7) {
                         if (bp[7] < 0xff)
-                            printf("\n  Threshold temperature = %d C  [IBM "
-                                   "extension]", bp[7]);
+                            printf("\n    Threshold temperature = %d C  "
+                                   "[common extension]", bp[7]);
                         else
-                            printf("\n  Threshold temperature = <not "
+                            printf("\n    Threshold temperature = <not "
                                    "available>");
                      }
                 }
+                decoded = true;
             }
             break;
         default:
-            if (full) {
-                printf("  parameter code = 0x%x, contents in hex:\n", pc);
-                dStrHex((const char *)bp, extra, 1);
+            if (! is_smstr) {
+                decoded = false;
+                break;
+            }
+            switch (pc) {
+            case 0x1:
+                cp = "Read error rate";
+                break;
+            case 0x2:
+                cp = "Flash rom check";
+                break;
+            case 0x5:
+                cp = "Realloc block count";
+                break;
+            case 0x9:
+                cp = "Power on hours";
+                break;
+            case 0xc:
+                cp = "Power cycles";
+                break;
+            case 0xd:
+                cp = "Ecc rate";
+                break;
+            case 0x20:
+                cp = "Write amp";
+                break;
+            case 0xb1:      /* 177 */
+                cp = "Percent life remaining";
+                break;
+            case 0xb4:      /* 180 */
+                cp = "Unused reserved block count";
+                break;
+            case 0xb5:      /* 181 */
+                cp = "Program fail count";
+                break;
+            case 0xb6:      /* 182 */
+                cp = "Erase fail count";
+                break;
+            case 0xbe:      /* 190 */
+                cp = "Drive temperature warn";
+                break;
+            case 0xc2:      /* 194 */
+                cp = "Drive temperature";
+                break;
+            case 0xc3:      /* 195 */
+                cp = "Uncorrected error count";
+                break;
+            case 0xc6:      /* 198 */
+                cp = "Offline scan uncorrected sector count";
+                break;
+            case 0xe9:      /* 233 */
+                cp = "Number of writes";
+                break;
+            default:
+                snprintf(bb, sizeof(bb), "parameter_code=0x%x (%d)",
+                         pc, pc);
+                cp = bb;
+                break;
             }
             break;
+        }
+        if (cp && (extra >= 24)) {
+            if (! has_header) {
+                has_header = true;
+                printf("  Has|Ever  %% to  worst %%   Current      "
+                       "Worst  Threshold  Attribute\n");
+                printf("   tripped  fail  to fail     "
+                       "value      value\n");
+            }
+            printf("   %2d %2d  %4d     %4d  %10u %10u %10u  %s",
+                   !!(0x80 & bp[4]), !!(0x40 & bp[4]), bp[5], bp[6],
+                   sg_get_unaligned_be32(bp + 8),
+                   sg_get_unaligned_be32(bp + 12),
+                   sg_get_unaligned_be32(bp + 16),
+                   cp);
+            decoded = true;
+        } else if ((! decoded) && full) {
+            printf("  parameter code = 0x%x, contents in hex:\n", pc);
+            dStrHex((const char *)bp, extra, 1);
         }
         if (op->do_pcb) {
             get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
@@ -6088,9 +6301,9 @@ skip:
 }
 
 static void
-show_ascii_page(const uint8_t * resp, int len, const struct opts_t * op)
+decode_page_contents(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int pg_code, subpg_code, spf;
+    int pg_code, subpg_code, spf, vpn;
     bool done = false;
     const struct log_elem * lep;
 
@@ -6106,7 +6319,8 @@ show_ascii_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (done)
             return;
     }
-    lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt);
+    vpn = (op->vend_prod_num >= 0) ? op->vend_prod_num : op->deduced_vpn;
+    lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt, vpn);
     if (lep && lep->show_pagep)
         done = (*lep->show_pagep)(resp, len, op);
 
@@ -6202,6 +6416,8 @@ decode_pg_arg(struct opts_t * op)
             op->subpg_code = nn;
         } else
             op->subpg_code = lep->subpg_code;
+        if (lep->flags)
+            op->deduced_vpn = mask_to_vendor(lep->flags);
     } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
         cp = (char *)strchr(op->pg_arg, ',');
         n = sg_get_num_nomult(op->pg_arg);
@@ -6243,6 +6459,8 @@ main(int argc, char * argv[])
     /* N.B. some disks only give data for current cumulative */
     op->page_control = 1;
     op->dev_pdt = -1;
+    op->vend_prod_num = -1;
+    op->deduced_vpn = -1;
     res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -6254,12 +6472,25 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
-    if ((op->do_enumerate > 0) || (op->do_enum_vendor > 0)) {
+    if (op->vend_prod) {
+        if (isdigit(op->vend_prod[0]))
+            k = sg_get_num_nomult(op->vend_prod);
+        else
+            k = find_vp_num_by_acron(op->vend_prod);
+        op->vend_prod_num = k;
+        if (VP_ALL == k)
+            ;
+        else if ((k < 0) || (k > (32 - MVP_OFFSET))) {
+            pr2serr("Bad vendor/product acronym after '--vendor=' "
+                    " ('-M ') option\n");
+            enumerate_vp();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
+    if (op->do_enumerate > 0) {
         if (op->device_name && op->verbose)
             pr2serr("Warning: device: %s is being ignored\n",
                     op->device_name);
-        if ((op->do_enum_vendor > 0) && (0 == op->do_enumerate))
-            op->do_enumerate = 1;
         enumerate_pages(op);
         return 0;
     }
@@ -6296,7 +6527,8 @@ main(int argc, char * argv[])
                     n = in_len - k;
                 }
                 pdt = op->dev_pdt;
-                lep = pg_subpg_pdt_search(pg_code, subpg_code, pdt);
+                lep = pg_subpg_pdt_search(pg_code, subpg_code, pdt,
+                                          op->vend_prod_num);
                 if (lep) {
                     if (lep->show_pagep)
                         (*lep->show_pagep)(bp, n, op);
@@ -6417,6 +6649,8 @@ main(int argc, char * argv[])
             (0 == op->no_inq) && (0 == op->do_brief))
             printf("    %.8s  %.16s  %.4s\n", inq_out.vendor,
                    inq_out.product, inq_out.revision);
+        memcpy(t10_vendor_str, inq_out.vendor, 8);
+        memcpy(t10_product_str, inq_out.product, 16);
     } else
         memset(&inq_out, 0, sizeof(inq_out));
 
@@ -6471,7 +6705,7 @@ main(int argc, char * argv[])
                 dStrHex((const char *)rsp_buff, pg_len + 4,
                         (op->do_hex < 4));
             else
-                show_ascii_page(rsp_buff, pg_len + 4, op);
+                decode_page_contents(rsp_buff, pg_len + 4, op);
         } else if (op->do_raw)
             dStrRaw((const char *)rsp_buff, pg_len + 4);
         else if (op->do_hex > 1)
@@ -6489,7 +6723,7 @@ main(int argc, char * argv[])
                 dStrHex((const char *)rsp_buff, pg_len + 4, 1);
             }
             else
-                show_ascii_page(rsp_buff, pg_len + 4, op);
+                decode_page_contents(rsp_buff, pg_len + 4, op);
         }
     }
     ret = res;
@@ -6540,7 +6774,7 @@ main(int argc, char * argv[])
                     dStrHex((const char *)rsp_buff, pg_len + 4, 1);
                 }
                 else
-                    show_ascii_page(rsp_buff, pg_len + 4, op);
+                    decode_page_contents(rsp_buff, pg_len + 4, op);
             } else if (SG_LIB_CAT_INVALID_OP == res)
                 pr2serr("log_sense: page=0x%x,0x%x not supported\n",
                         op->pg_code, op->subpg_code);

@@ -1,21 +1,32 @@
-.TH SG_LOGS "8" "March 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_LOGS "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
-[\fI\-\-All\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-control=PC\fR]
-[\fI\-\-enumerate\fR] [\fI\-\-enum_vendor\fR] [\fI\-\-filter=FL\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR] [\fI\-\-list\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-reset\fR] [\fI\-\-select\fR]
+[\fI\-\-All\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-filter=FL\fR]
+[\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
+[\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
+[\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
 [\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR] \fIDEVICE\fR
+.PP
+.B sg_logs 
+[\fI\-\-brief\fR] [\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] \fI\-\-in=FN\fR
+[\fI\-\-name\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
+.PP
+.B sg_logs
+[\fI\-\-control=PC\fR] [\fI\-\-in=FN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
+[\fI\-\-reset\fR] \fI\-\-select\fR [\fI\-\-sp\fR] [\fI\-\-verbose\fR]
+\fIDEVICE\fR
+.PP
+.B sg_logs
+[\fI\-\-enumerate\fR] [\fI\-\-filter=FL\fR] [\fI\-\-help\fR]
+[\fI\-\-vendor=VP\fR] [\fI\-\-version\fR]
 .PP
 .B sg_logs
 [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-D=DT\fR] [\fI\-c=PC\fR] [\fI\-e\fR]
-[\fI\-E\fR] [\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR]
-[\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
+[\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
+[\fI\-m=LEN\fR] [\fI\-M=VP\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
 [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
 [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
 [\fI\-x\fR] \fIDEVICE\fR
@@ -24,17 +35,22 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 .PP
 This utility sends a SCSI LOG SENSE command to the \fIDEVICE\fR and then
 outputs the response. The LOG SENSE command is used to fetch log pages. Known
-log pages can be decoded. When the \fI\-\-reset\fR and/or \fI\-\-select\fR
-option is given then a SCSI LOG SELECT command is issued.
+log pages can be decoded. Alternatively when the \fI\-\-reset\fR and/or
+\fI\-\-select\fR option is given then a SCSI LOG SELECT command is issued.
 .PP
 In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
 LOG SELECT command. At the same time a page code field was introduced to the
 to the LOG SELECT command. The log subpage code can range from 0 to 255 (0xff)
 inclusive. The subpage code value 255 can be thought of as a wildcard.
 .PP
-This utility supports two command line syntaxes, the preferred one is shown
-first in the synopsis and explained in this section. A later section on the
-old command line syntax outlines the second group of options.
+The SYNOPSIS section above is divided into five forms. The first form
+shows the options that can be used to send a LOG SENSE command to the
+\fIDEVICE\fR and decode its response. The second form fetches data from a
+file (named \fIFN\fR) and decodes it as if it were a response from a LOG
+SENSE command. The third form shows the options that can be used to send a
+LOG SELECT command. The fourth form groups various management options.
+The last form shows the older, deprecated command line interface which is
+maintaimed for backward compatibility.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -83,20 +99,16 @@ the numeric order.
 The \fI\-\-filter=FL\fR and \fI\-\-verbose\fR options modify the output
 of the enumeration.
 .TP
-\fB\-E\fR, \fB\-\-enum_vendor\fR
-this option is used to output information held in internal tables about
-known vendor specific log pages including their names and acronyms.
-.TP
 \fB\-f\fR, \fB\-\-filter\fR=\fIFL\fR
 \fIFL\fR is either a parameter code when \fIDEVICE\fR is given, or a
 peripheral device type (pdt) (or other) if \fI\-\-enumerate\fR is given.
 .br
 In the parameter code case \fIFL\fR is a value between 0 and 65535 (0xffff)
-and only the parameter section matching that code is output.
-The \fB\-\-hex\fR option outputs log parameter in hexadecimal rather than
-decoding it. If the \fB\-\-hex\fR option is used twice then the leading
-address on each line of hex is removed. If the \fB\-\-raw\fR option is
-given then the log parameter is output in binary.
+and only the parameter section matching that code is output. If the
+\fB\-\-hex\fR option is given the log parameter is output in hexadecimal
+rather than decoding it. If the \fB\-\-hex\fR option is used twice then the
+leading address on each line of hex is removed. If the \fB\-\-raw\fR option
+is given then the log parameter is output in binary.
 Most log pages contain one or more log parameters. Examples of those that
 don't are those pages that list supported log pages.
 .br
@@ -259,6 +271,21 @@ may also have the current temperature (especially on older disks).
 outputs the transport ('Protocol specific port') log page. Equivalent to
 setting '\-\-page=18h'.
 .TP
+\fB\-M\fR, \fB\-\-vendor\fR=\fIVP\fR
+where \fIVP\fR is a vendor (e.g. "sea" for Seagate) or product (group)
+acronym (e.g. "lto5" for the 5th generation LTO (tape) consortium). Either
+the whole log page is vendor specific (e.g. page numbers 0x30 to 0x3f) or
+part of a T10 defined log page is vendor specific. For example SPC\-5
+defines parameter code 0x0 of page 0x2f (the Informational Exceptions log
+page) and states that the remaining parameter codes (i.e. 0x1 to 0xffff)
+are vendor specific. Using a \fIVP\fR of "xxx" will list the available
+acronyms.
+.br
+If this option is used with \fI\-\-page=PG\fR and \fIPG\fR is an acronym
+then this option is ignored. If \fIPG\fR is a number (e.g. 0xc0) then
+\fIVP\fR is used to choose the which vendor specific page (e.g. sharing
+page number 0xc0) to decode.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level of verbosity. When used with \fI\-\-enumerate\fR, in the
 list of known log page names, those that have no associated decode logic
@@ -344,10 +371,6 @@ Equivalent to \fI\-\-control=PC\fR in the main description.
 enumerate internal tables to show information about known log pages.
 Equivalent to \fI\-\-enumerate\fR in the main description.
 .TP
-\fB\-E\fR
-enumerate internal tables to show information about known vendor specific
-log pages. Equivalent to \fI\-\-enum_vendor\fR in the main description.
-.TP
 \fB\-h\fR
 suppresses decoding of known log sense pages and prints out the
 response in hex instead.
@@ -374,6 +397,9 @@ request only \fILEN\fR bytes of response data. Default is 0 which is
 interpreted as all that is available. \fILEN\fR is decimal unless it has
 a leading '0x' or trailing 'h'.  Equivalent to \fI\-\-maxlen=LEN\fR in
 the main description.
+.TP
+\fB\-M\fR=\fIVP\fR
+Equivalent to \fI\-\-vendor=VP\fR in the main description.
 .TP
 \fB\-n\fR
 Equivalent to \fI\-\-name\fR in the main description.

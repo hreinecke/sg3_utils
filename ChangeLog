@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160528] [svn: r708]
+Changelog for sg3_utils-1.43 [20160531] [svn: r710]
   - sg_bg_ctl: new Background control command (spc4r08)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
@@ -16,9 +16,9 @@ Changelog for sg3_utils-1.43 [20160528] [svn: r708]
     - accept and output on request "quad dashed" format
   - sg_logs: fix volume statistics lpage when subpage
     is zero (ssc5r02a); decode mount history log parameter
+    - add --vendor=VP and '--pdt=DT' options
     - decode Requested recovery, TapeAlert response, and
       Service buffer information lpages for tape
-    - add '--pdt=DT' option
     - add min+max 'mounted' temperature and rel. humidity
       fields to Environmental reporting lpage (spc5r10)
   - sg_inq: fix potential unbounded loop in --export
@@ -28,6 +28,7 @@ Changelog for sg3_utils-1.43 [20160528] [svn: r708]
     - add --force option to bypass checking supported
       vpd pages page and fetch requested page directly
   - sg_vpd: 3 party copy VPD page improvements
+    - improve handling of unknown pages
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_rdac: add sanity checks for -f=lun value
   - sg_turs+sg_requests: make both accept '--num=NUM'

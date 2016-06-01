@@ -29,7 +29,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.21 20160528";    /* spc5r10 */
+static const char * version_str = "1.21 20160531";    /* spc5r10 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -200,7 +200,7 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
     sg_put_unaligned_be24(buffer_offset, wbuf_cdb + 3);
     sg_put_unaligned_be24(param_len, wbuf_cdb + 6);
     if (verbose) {
-        pr2serr("    Write buffer cmd: ");
+        pr2serr("    Write buffer cdb: ");
         for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
             pr2serr("%02x ", wbuf_cdb[k]);
         pr2serr("\n");

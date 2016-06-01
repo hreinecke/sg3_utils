@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.62 20160510";    /* SPC-5 rev 10 */
+static const char * version_str = "1.63 20160531";    /* SPC-5 rev 10 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -3087,7 +3087,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
 static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
-    int len, k, res;
+    int len, k, res, c;
     unsigned char b[DEF_ALLOC_LEN];
 
     memset(b, 0xff, 4); /* guard against empty response */
@@ -3097,10 +3097,15 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
         len -= 4;
         len = (len < (obuff_len - 1)) ? len : (obuff_len - 1);
         if (len > 0) {
-            /* replace non-printable ASCII characters with space */
-            for (k = 0; k < len; ++k)
-                obuff[k] = isprint(b[4 + k]) ? b[4 + k] : ' ';
-            obuff[len] = '\0';
+            /* replace non-printable characters (except NULL) with space */
+            for (k = 0; k < len; ++k) {
+                c = b[4 + k];
+                if (c)
+                    obuff[k] = isprint(c) ? c : ' ';
+                else
+                    break;
+            }
+            obuff[k] = '\0';
             return 0;
         } else {
             if (verbose > 2)
