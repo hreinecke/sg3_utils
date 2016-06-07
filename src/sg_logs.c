@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.46 20160531";    /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.47 20160605";    /* spc5r10 + sbc4r10 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -72,6 +72,7 @@ static const char * version_str = "1.46 20160531";    /* spc5r10 + sbc4r10 */
 #define LPS_MISALIGNMENT_SUBPG 0x3
 
 /* Vendor product identifiers followed by associated mask values */
+#define VP_NONE   (-1)
 #define VP_SEAG   0
 #define VP_HITA   1
 #define VP_WDC    2
@@ -153,8 +154,8 @@ struct opts_t {
     int do_sp;
     int do_temperature;
     int do_transport;
-    int vend_prod_num;
-    int deduced_vpn;
+    int vend_prod_num;  /* one of the VP_* constants or -1 (def) */
+    int deduced_vpn;    /* deduced vendor_prod_num; from INQUIRY, etc */
     int verbose;
     int do_version;
     int filter;
@@ -528,7 +529,7 @@ usage(int hval)
            "                           when > 1 will request LEN bytes\n"
            "    --name|-n       decode some pages into multiple name=value "
            "lines\n"
-           "    --no_inq|-x     no initial INQUIRY output (twice: no "
+           "    --no_inq|-x     no initial INQUIRY output (twice: and no "
            "INQUIRY call)\n"
            "    --old|-O        use old interface (use as first option)\n"
            "    --paramp=PP|-P PP    parameter pointer (decimal) (def: 0)\n"
@@ -627,6 +628,7 @@ get_vp_mask(int vpn)
                                             (1 << (vpn + MVP_OFFSET));
 }
 
+#if 0
 static int
 mask_to_vendor(int vp_mask)
 {
@@ -645,8 +647,9 @@ mask_to_vendor(int vp_mask)
     else if (MVP_LTO6 & vp_mask)
         return VP_LTO6;
     else
-        return -1;
+        return VP_NONE;
 }
+#endif
 
 static int
 asort_comp(const void * lp, const void * rp)
@@ -698,6 +701,10 @@ enumerate_helper(const struct log_elem * lep, int pos,
     }
     if (op->vend_prod_num >= 0) {
         if (! (lep->flags & get_vp_mask(op->vend_prod_num)))
+            return;
+    }
+    if (op->deduced_vpn >= 0) {
+        if (! (lep->flags & get_vp_mask(op->deduced_vpn)))
             return;
     }
     if (lep->subpg_high > 0)
@@ -765,17 +772,55 @@ acron_search(const char * acron)
 }
 
 static int
-find_vp_num_by_acron(const char * vp_ap)
+find_vpn_by_acron(const char * vp_ap)
 {
-    size_t len;
+    size_t len, k;
     const struct vp_name_t * vpp;
 
     for (vpp = vp_arr; vpp->acron; ++vpp) {
         len = strlen(vpp->acron);
-        if (0 == strncmp(vpp->acron, vp_ap, len))
+        for (k = 0; k < len; ++k) {
+            if (tolower(vp_ap[k]) != vpp->acron[k])
+                break;
+        }
+        if (k < len)
+            continue;
+        return vpp->vend_prod_num;
+    }
+    return VP_NONE;
+}
+
+static int
+find_vpn_by_inquiry(void)
+{
+    size_t len;
+    size_t t10_v_len = strlen(t10_vendor_str);
+    size_t t10_p_len = strlen(t10_product_str);
+    bool matched;
+    const struct vp_name_t * vpp;
+
+    if ((0 == t10_v_len) && (0 == t10_p_len))
+        return VP_NONE;
+    for (vpp = vp_arr; vpp->acron; ++vpp) {
+        matched = false;
+        if (vpp->t10_vendorp && (t10_v_len > 0)) {
+            len = strlen(vpp->t10_vendorp);
+            len = (len > t10_v_len) ? t10_v_len : len;
+            if (strncmp(vpp->t10_vendorp, t10_vendor_str, len))
+                continue;
+            matched = true;
+        }
+        if (vpp->t10_productp && (t10_p_len > 0)) {
+            len = strlen(vpp->t10_productp);
+            len = (len > t10_p_len) ? t10_p_len : len;
+            if (strncmp(vpp->t10_productp, t10_product_str, len))
+                continue;
+            matched = true;
+        }
+        if (matched)
             return vpp->vend_prod_num;
     }
-    return -1;
+    return VP_NONE;
 }
 
 static void
@@ -1174,8 +1219,6 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                         op->subpg_code = n;
                     } else
                         op->subpg_code = lep->subpg_code;
-                    if (lep->flags)
-                        op->deduced_vpn = mask_to_vendor(lep->flags);
                 } else {
                     /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
                     if (NULL == strchr(cp + 2, ',')) {
@@ -2916,8 +2959,8 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
     char b[256];
     char bb[32];
     bool full, decoded, has_header;
-    bool is_smstr = op->lep ? (MVP_SMSTR & op->lep->flags) :
-                              (VP_SMSTR == op->vend_prod_num);
+    bool is_smstr = (VP_SMSTR == op->vend_prod_num) ||
+                    (VP_SMSTR == op->deduced_vpn);
 
     full = ! op->do_temperature;
     num = len - 4;
@@ -6416,8 +6459,6 @@ decode_pg_arg(struct opts_t * op)
             op->subpg_code = nn;
         } else
             op->subpg_code = lep->subpg_code;
-        if (lep->flags)
-            op->deduced_vpn = mask_to_vendor(lep->flags);
     } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
         cp = (char *)strchr(op->pg_arg, ',');
         n = sg_get_num_nomult(op->pg_arg);
@@ -6459,8 +6500,8 @@ main(int argc, char * argv[])
     /* N.B. some disks only give data for current cumulative */
     op->page_control = 1;
     op->dev_pdt = -1;
-    op->vend_prod_num = -1;
-    op->deduced_vpn = -1;
+    op->vend_prod_num = VP_NONE;
+    op->deduced_vpn = VP_NONE;
     res = process_cl(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -6476,7 +6517,7 @@ main(int argc, char * argv[])
         if (isdigit(op->vend_prod[0]))
             k = sg_get_num_nomult(op->vend_prod);
         else
-            k = find_vp_num_by_acron(op->vend_prod);
+            k = find_vpn_by_acron(op->vend_prod);
         op->vend_prod_num = k;
         if (VP_ALL == k)
             ;
@@ -6637,7 +6678,8 @@ main(int argc, char * argv[])
     }
     pg_len = 0;
 
-    if (op->no_inq < 2)  {
+    memset(&inq_out, 0, sizeof(inq_out));
+    if (op->no_inq < 2) {
         if (sg_simple_inquiry(sg_fd, &inq_out, 1, op->verbose)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                     op->device_name);
@@ -6651,8 +6693,9 @@ main(int argc, char * argv[])
                    inq_out.product, inq_out.revision);
         memcpy(t10_vendor_str, inq_out.vendor, 8);
         memcpy(t10_product_str, inq_out.product, 16);
-    } else
-        memset(&inq_out, 0, sizeof(inq_out));
+        if (VP_NONE == op->vend_prod_num)
+            op->deduced_vpn = find_vpn_by_inquiry();
+    }
 
     if (1 == op->do_temperature)
         return fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op);

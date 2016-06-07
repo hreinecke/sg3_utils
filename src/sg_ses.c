@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.17 20160525";    /* ses3r13 */
+static const char * version_str = "2.18 20160607";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -103,6 +103,17 @@ struct element_type_t {
     const char * desc;
 };
 
+#define CGS_CL_ARR_MAX_SZ 8
+#define CGS_STR_MAX_SZ 80
+
+enum cgs_select_t {CLEAR_OPT, GET_OPT, SET_OPT};
+
+struct cgs_cl_t {
+    enum cgs_select_t cgs_sel;
+    bool last_cs;       /* true only for last --clear= or --set= */
+    char cgs_str[CGS_STR_MAX_SZ];
+};
+
 struct opts_t {
     int byte1;
     bool byte1_given;
@@ -118,6 +129,7 @@ struct opts_t {
     bool ind_given;
     int ind_th;    /* type header index, set by build_type_desc_hdr_arr() */
     int ind_indiv;      /* individual element index; -1 for overall */
+    int ind_indiv_last; /* if > ind_indiv then [ind_indiv..ind_indiv_last] */
     int ind_et_inst;    /* ETs can have multiple type header instances */
     int inner_hex;
     int do_join;
@@ -138,14 +150,12 @@ struct opts_t {
     int arr_len;
     uint8_t sas_addr[8];
     uint8_t data_arr[MX_DATA_IN + 16];
-    const char * clear_str;
     const char * desc_name;
-    const char * get_str;
-    const char * set_str;
     const char * dev_name;
     const char * index_str;
     const char * nickname_str;
     const struct element_type_t * ind_etp;
+    struct cgs_cl_t cgs_cl_arr[CGS_CL_ARR_MAX_SZ];
 };
 
 struct diag_page_code {
@@ -213,10 +223,12 @@ struct th_es_t {
 };
 
 /* Representation of <acronym>[=<value>] or
- * <start_byte>:<start_bit>[:<num_bits>][=<value>]. */
+ * <start_byte>:<start_bit>[:<num_bits>][=<value>]. Associated with
+ * --clear=, --get= or --set= option. */
 struct tuple_acronym_val {
     const char * acron;
     const char * val_str;
+    enum cgs_select_t cgs_sel;  /* indicates --clear=, --get= or --set= */
     int start_byte;     /* -1 indicates no start_byte */
     int start_bit;
     int num_bits;
@@ -224,7 +236,7 @@ struct tuple_acronym_val {
 };
 
 /* Mapping from <acronym> to <start_byte>:<start_bit>:<num_bits> for a
- * given element type. */
+ * given element type. Table of known acronyms made from these elements. */
 struct acronym2tuple {
     const char * acron; /* element name or acronym, NULL for past end */
     int etype;          /* -1 for all element types */
@@ -293,6 +305,7 @@ static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
  */
 static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
+static bool join_done = false;
 
 #ifdef SG_LIB_FREEBSD
 
@@ -797,7 +810,10 @@ usage(int help_num)
             "additional\n"
             "    --index=IIA|-I IIA    individual index ('-1' for overall) "
             "or element\n"
-            "                          type abbreviation (e.g. 'arr')\n"
+            "                          type abbreviation (e.g. 'arr'). A "
+            "range may be\n"
+            "                          given for the individual index "
+            "(e.g. '2-5')\n"
             "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
             "type header\n"
             "                                index or element type "
@@ -822,8 +838,9 @@ usage(int help_num)
             "action)\n\n"
             "First usage above is for fetching pages or fields from a SCSI "
             "enclosure.\nThe second usage is for changing a page or field in "
-            "an enclosure. Use\n'-hh' for more help, including the options "
-            "not explained above.\n");
+            "an enclosure. The\n'--clear=', '--get=' and '--set=' options "
+            "can appear multiple times.\nUse '-hh' for more help, including "
+            "the options not explained above.\n");
     } else {    /* for '-hh' or '--help --help' */
         pr2serr(
             "  where the remaining sg_ses options are:\n"
@@ -888,15 +905,18 @@ usage(int help_num)
 static int
 parse_index(struct opts_t *op)
 {
-    int n;
+    int n, n2;
     const char * cp;
     char * mallcp;
     char * c2p;
+    const char * cc3p;
     const struct element_type_t * etp;
     char b[64];
 
     op->ind_given = true;
+    n2 = 0;
     if ((cp = strchr(op->index_str, ','))) {
+        /* decode number following comma */
         if (0 == strcmp("-1", cp + 1))
             n = -1;
         else {
@@ -906,15 +926,25 @@ parse_index(struct opts_t *op)
                         "number from -1 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if ((cc3p = strchr(cp + 1, '-'))) {
+                n2 = sg_get_num(cc3p + 1);
+                if ((n2 < n) || (n2 > 255)) {
+                    pr2serr("bad argument to '--index', after '-' expect "
+                            "number from -%d to 255\n", n);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
         }
         op->ind_indiv = n;
+        if (n2 > 0)
+            op->ind_indiv_last = n2;
         n = cp - op->index_str;
         if (n >= (int)sizeof(b)) {
             pr2serr("bad argument to '--index', string prior to comma too "
                     "long\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-    } else {
+    } else {    /* no comma found in index_str */
         n = strlen(op->index_str);
         if (n >= (int)sizeof(b)) {
             pr2serr("bad argument to '--index', string too long\n");
@@ -938,15 +968,24 @@ parse_index(struct opts_t *op)
                     "to 255\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (cp)
+        if (cp)         /* argument to left of comma */
             op->ind_th = n;
-        else {
+        else {          /* no comma found, so 'n' is ind_indiv */
             op->ind_th = 0;
             op->ind_indiv = n;
+            if ((c2p = strchr(b, '-'))) {
+                n2 = sg_get_num(c2p + 1);
+                if ((n2 < n) || (n2 > 255)) {
+                    pr2serr("bad argument to '--index', after '-' expect "
+                            "number from -%d to 255\n", n);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
+            op->ind_indiv_last = n2;
         }
-    } else if ('_' == b[0]) {
+    } else if ('_' == b[0]) {   /* leading "_" prefixes element type code */
         if ((c2p = strchr(b + 1, '_')))
-            *c2p = '\0';
+            *c2p = '\0';        /* subsequent "_" prefixes e.t. index */
         n = sg_get_num(b + 1);
         if ((n < 0) || (n > 255)) {
             pr2serr("bad element type code for '--index', expect value from "
@@ -1013,14 +1052,14 @@ parse_index(struct opts_t *op)
 static int
 cl_process(struct opts_t *op, int argc, char *argv[])
 {
-    int c, j, ret, ff;
+    int c, j, ret;
     const char * data_arg = NULL;
     uint64_t saddr;
     const char * cp;
 
-    op->dev_slot_num = -1;
     while (1) {
         int option_index = 0;
+        bool ff;
 
         c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:rRs"
                         "S:vVwx:", long_options, &option_index);
@@ -1036,9 +1075,9 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                 pr2serr("bad argument to '--sas-addr'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            for (j = 7, ff = 1; j >= 0; --j) {
-                if (ff & (0xff != (saddr & 0xff)))
-                    ff = 0;
+            for (j = 7, ff = true; j >= 0; --j) {
+                if (ff && (0xff != (saddr & 0xff)))
+                    ff = false;
                 op->sas_addr[j] = (saddr & 0xff);
                 saddr >>= 8;
             }
@@ -1059,8 +1098,20 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->do_control;
             break;
         case 'C':
-            op->clear_str = optarg;
-            ++op->num_cgs;
+            if (strlen(optarg) >= CGS_STR_MAX_SZ) {
+                pr2serr("--clear= option too long (max %d characters)\n",
+                        CGS_STR_MAX_SZ);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (op->num_cgs < CGS_CL_ARR_MAX_SZ) {
+                op->cgs_cl_arr[op->num_cgs].cgs_sel = CLEAR_OPT;
+                strcpy(op->cgs_cl_arr[op->num_cgs].cgs_str, optarg);
+                ++op->num_cgs;
+            } else {
+                pr2serr("Too many --clear=, --get= and --set= options "
+                        "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'd':
             data_arg = optarg;
@@ -1087,8 +1138,20 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->do_filter;
             break;
         case 'G':
-            op->get_str = optarg;
-            ++op->num_cgs;
+            if (strlen(optarg) >= CGS_STR_MAX_SZ) {
+                pr2serr("--get= option too long (max %d characters)\n",
+                        CGS_STR_MAX_SZ);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (op->num_cgs < CGS_CL_ARR_MAX_SZ) {
+                op->cgs_cl_arr[op->num_cgs].cgs_sel = GET_OPT;
+                strcpy(op->cgs_cl_arr[op->num_cgs].cgs_str, optarg);
+                ++op->num_cgs;
+            } else {
+                pr2serr("Too many --clear=, --get= and --set= options "
+                        "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'h':
         case '?':
@@ -1167,8 +1230,20 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->do_status;
             break;
         case 'S':
-            op->set_str = optarg;
-            ++op->num_cgs;
+            if (strlen(optarg) >= CGS_STR_MAX_SZ) {
+                pr2serr("--set= option too long (max %d characters)\n",
+                        CGS_STR_MAX_SZ);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (op->num_cgs < CGS_CL_ARR_MAX_SZ) {
+                op->cgs_cl_arr[op->num_cgs].cgs_sel = SET_OPT;
+                strcpy(op->cgs_cl_arr[op->num_cgs].cgs_str, optarg);
+                ++op->num_cgs;
+            } else {
+                pr2serr("Too many --clear=, --get= and --set= options "
+                        "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'v':
             ++op->verbose;
@@ -1334,8 +1409,8 @@ get_llnum(const char * buf)
     return (1 == res) ? num : -1;
 }
 
-/* Parse clear/get/set string. Uses 'buff' for scratch area. Returns 0
- * on success, else -1. */
+/* Parse clear/get/set string, writes output to '*tavp'. Uses 'buff' for
+ * scratch area. Returns 0 on success, else -1. */
 static int
 parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
 {
@@ -1423,6 +1498,28 @@ find_out_diag_page_desc(int page_num)
     }
     return NULL;
 }
+
+static bool
+match_ind_indiv(int index, const struct opts_t * op)
+{
+    if (index == op->ind_indiv)
+        return true;
+    if (op->ind_indiv_last > op->ind_indiv) {
+        if ((index > op->ind_indiv) && (index <= op->ind_indiv_last))
+            return true;
+    }
+    return false;
+}
+
+#if 0
+static bool
+match_last_ind_indiv(int index, const struct opts_t * op)
+{
+    if (op->ind_indiv_last >= op->ind_indiv)
+        return (index == op->ind_indiv_last);
+    return (index == op->ind_indiv);
+}
+#endif
 
 /* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
  * failures */
@@ -2103,8 +2200,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
                   bool abridged, const struct opts_t * op)
 {
     int res, a, b, ct, bblen;
+    bool nofilter = ! op->do_filter;
     char bb[128];
-    int nofilter = ! op->do_filter;
 
 
     if (op->inner_hex) {
@@ -2475,7 +2572,7 @@ enc_status_dp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (j != op->ind_indiv))
+                    (! match_ind_indiv(j, op)))
                     continue;
             }
             printf("      Element %d descriptor:\n", j);
@@ -2483,9 +2580,14 @@ enc_status_dp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             got1 = true;
         }
     }
-    if (op->ind_given && (! got1))
-        printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+    if (op->ind_given && (! got1)) {
+        printf("      >>> no match on --index=%d,%d", op->ind_th,
                op->ind_indiv);
+        if (op->ind_indiv_last > op->ind_indiv)
+            printf("-%d\n", op->ind_indiv_last);
+        else
+            printf("\n");
+    }
     return;
 truncated:
     pr2serr("    <<<enc: response too short>>>\n");
@@ -2623,7 +2725,7 @@ threshold_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (j != op->ind_indiv))
+                    (! match_ind_indiv(j, op)))
                     continue;
             }
             snprintf(b, sizeof(b), "      Element %d descriptor:\n", j);
@@ -2631,9 +2733,14 @@ threshold_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
             got1 = true;
         }
     }
-    if (op->ind_given && (! got1))
-        printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+    if (op->ind_given && (! got1)) {
+        printf("      >>> no match on --index=%d,%d", op->ind_th,
                op->ind_indiv);
+        if (op->ind_indiv_last > op->ind_indiv)
+            printf("-%d\n", op->ind_indiv_last);
+        else
+            printf("\n");
+    }
     return;
 truncated:
     pr2serr("    <<<thresh: response too short>>>\n");
@@ -2691,7 +2798,7 @@ element_desc_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
             desc_len = sg_get_unaligned_be16(bp + 2) + 4;
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (j != op->ind_indiv))
+                    (! match_ind_indiv(j, op)))
                     continue;
             }
             if (desc_len > 4)
@@ -2702,9 +2809,14 @@ element_desc_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
             got1 = true;
         }
     }
-    if (op->ind_given && (! got1))
-        printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+    if (op->ind_given && (! got1)) {
+        printf("      >>> no match on --index=%d,%d", op->ind_th,
                op->ind_indiv);
+        if (op->ind_indiv_last > op->ind_indiv)
+            printf("-%d\n", op->ind_indiv_last);
+        else
+            printf("\n");
+    }
     return;
 truncated:
     pr2serr("    <<<element: response too short>>>\n");
@@ -2735,16 +2847,16 @@ static void
 additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                     const struct th_es_t * tesp, const struct opts_t * op)
 {
-    int phys, j, m, n, desc_type, eip, eiioe, eip_offset;
-    int nofilter = ! op->do_filter;
-    bool print_sas_addr, saddr_nz;
+    int phys, j, m, n, desc_type, eiioe, eip_offset;
+    bool nofilter = ! op->do_filter;
+    bool eip, print_sas_addr, saddr_nz;
     const struct join_row_t * jrp;
     const uint8_t * aep;
     const uint8_t * ed_bp;
     const char * cp;
     char b[64];
 
-    eip = (0x10 & ae_bp[0]);
+    eip = !!(0x10 & ae_bp[0]);
     eiioe = eip ? (0x3 & ae_bp[2]) : 0;
     eip_offset = eip ? 2 : 0;
     desc_type = (ae_bp[3 + eip_offset] >> 6) & 0x3;
@@ -2945,8 +3057,8 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                        int len, int etype, const struct th_es_t * tesp,
                        const struct opts_t * op)
 {
-    int ports, phys, j, m, eip, eip_offset, pcie_pt, psn_valid, bdf_valid;
-    int cid_valid;
+    int ports, phys, j, m, eip_offset, pcie_pt;
+    bool cid_valid, psn_valid, bdf_valid, eip;
     uint16_t pcie_vid;
     const uint8_t * aep;
     char b[64];
@@ -2960,7 +3072,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         printf("\n");
         return;
     }
-    eip = (0x10 & ae_bp[0]);
+    eip = !!(0x10 & ae_bp[0]);
     eip_offset = eip ? 2 : 0;
     switch (0xf & ae_bp[0]) {     /* switch on protocol identifier */
     case TPROTO_FCP:
@@ -3029,7 +3141,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             bdf_valid = !!(0x2 & aep[0]);
             cid_valid = !!(0x1 & aep[0]);
             printf("%s  PSN_VALID=%d, BDF_VALID=%d, CID_VALID=%d\n", pad,
-                   psn_valid, bdf_valid, cid_valid);
+                   (int)psn_valid, (int)bdf_valid, (int)cid_valid);
             if (cid_valid)
                 printf("%s  controller id: 0x%" PRIx16 "\n", pad,
                        sg_get_unaligned_le16(aep + 1));
@@ -3059,10 +3171,10 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     const uint8_t * resp, int resp_len,
                     const struct opts_t * op)
 {
-    int j, k, desc_len, etype, el_num, eip, ind;
-    int elem_count, ei, eiioe, num_elems, fake_ei;
+    int j, k, desc_len, etype, el_num, ind, elem_count, ei, eiioe, num_elems;
+    int fake_ei;
     uint32_t gen_code;
-    bool invalid, match_ind_th, my_eiioe_force, skip;
+    bool eip, invalid, match_ind_th, my_eiioe_force, skip;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const struct type_desc_hdr_t * tp = tesp->th_base;
@@ -3092,8 +3204,8 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
         if ((bp + 1) > last_bp)
             goto truncated;
 
-        /* if eip is 1, do bounds check on the element index */
-        if (bp[0] & 0x10) {    /* eip=1 */
+        eip = !! (bp[0] & 0x10);
+        if (eip) { /* do bounds check on the element index */
             ei = bp[3];
             skip = false;
             if ((0 == k) && op->eiioe_auto && (1 == ei)) {
@@ -3145,7 +3257,7 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
         for (j = 0; j < num_elems; ++j, bp += desc_len, ++el_num) {
             invalid = !!(bp[0] & 0x80);
             desc_len = bp[1] + 2;
-            eip = bp[0] & 0x10;
+            eip = !!(bp[0] & 0x10);
             eiioe = eip ? (0x3 & bp[2]) : 0;
             if (fake_ei >= 0)
                 ind = fake_ei;
@@ -3153,7 +3265,7 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 ind = eip ? bp[3] : el_num;
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (el_num != op->ind_indiv))
+                    (! match_ind_indiv(el_num, op)))
                     continue;
             }
             if (eip)
@@ -3394,7 +3506,8 @@ truncated:
 static int
 read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
 {
-    int in_len, k, j, m, off, split_line;
+    int in_len, k, j, m, off;
+    bool split_line;
     unsigned int h;
     const char * lcp;
     char * cp;
@@ -3429,9 +3542,9 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
                 if ('\n' == line[in_len - 1]) {
                     --in_len;
                     line[in_len] = '\0';
-                    split_line = 0;
+                    split_line = false;
                 } else
-                    split_line = 1;
+                    split_line = true;
             }
             if (in_len < 1) {
                 carry_over[0] = 0;
@@ -4221,6 +4334,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         pr2serr("broken_ei=%d\n", (int)broken_ei);
     }
 
+    join_done = true;
     if (! display)      /* probably wanted join_arr[] built only */
         return 0;
 
@@ -4231,7 +4345,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         if (op->ind_given) {
             if (op->ind_th != jrp->th_i)
                 continue;
-            if (op->ind_indiv != jrp->indiv_i)
+            if (! match_ind_indiv(jrp->indiv_i, op))
                 continue;
         }
         ed_bp = jrp->elem_descp;
@@ -4291,10 +4405,14 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         }
     }
     if (! got1) {
-        if (op->ind_given)
-            printf("      >>> no match on --index=%d,%d\n", op->ind_th,
+        if (op->ind_given) {
+            printf("      >>> no match on --index=%d,%d", op->ind_th,
                    op->ind_indiv);
-        else if (op->desc_name)
+            if (op->ind_indiv_last > op->ind_indiv)
+                printf("-%d\n", op->ind_indiv_last);
+            else
+                printf("\n");
+        } else if (op->desc_name)
             printf("      >>> no match on --descriptor=%s\n", op->desc_name);
         else if (op->dev_slot_num >= 0)
             printf("      >>> no match on --dev-slot-name=%d\n",
@@ -4376,7 +4494,7 @@ strcase_eq(const char * s1p, const char * s2p)
     return 1;
 }
 
-static int
+static bool
 is_acronym_in_status_ctl(const struct tuple_acronym_val * tavp)
 {
     const struct acronym2tuple * ap;
@@ -4385,10 +4503,10 @@ is_acronym_in_status_ctl(const struct tuple_acronym_val * tavp)
         if (strcase_eq(tavp->acron, ap->acron))
             break;
     }
-    return (ap->acron ? 1 : 0);
+    return ap->acron;
 }
 
-static int
+static bool
 is_acronym_in_threshold(const struct tuple_acronym_val * tavp)
 {
     const struct acronym2tuple * ap;
@@ -4397,10 +4515,10 @@ is_acronym_in_threshold(const struct tuple_acronym_val * tavp)
         if (strcase_eq(tavp->acron, ap->acron))
             break;
     }
-    return (ap->acron ? 1 : 0);
+    return ap->acron;
 }
 
-static int
+static bool
 is_acronym_in_additional(const struct tuple_acronym_val * tavp)
 {
     const struct acronym2tuple * ap;
@@ -4409,7 +4527,7 @@ is_acronym_in_additional(const struct tuple_acronym_val * tavp)
         if (strcase_eq(tavp->acron, ap->acron))
             break;
     }
-    return (ap->acron ? 1 : 0);
+    return ap->acron;
 }
 
 /* ENC_STATUS_DPC  ENC_CONTROL_DPC
@@ -4418,7 +4536,7 @@ is_acronym_in_additional(const struct tuple_acronym_val * tavp)
 static int
 cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
                  const struct tuple_acronym_val * tavp,
-                 const struct opts_t * op)
+                 const struct opts_t * op, bool last)
 {
     int ret, len, s_byte, s_bit, n_bits, k;
     uint64_t ui;
@@ -4454,7 +4572,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
     }
     if (op->verbose > 1)
         pr2serr("  s_byte=%d, s_bit=%d, n_bits=%d\n", s_byte, s_bit, n_bits);
-    if (op->get_str) {
+    if (GET_OPT == tavp->cgs_sel) {
         ui = get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
@@ -4476,10 +4594,12 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
         if (op->byte1_given)
             enc_stat_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(enc_stat_rsp + 2) + 4;
-        ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
-        if (ret) {
-            pr2serr("couldn't send Enclosure Control page\n");
-            return -1;
+        if (last) {
+            ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
+            if (ret) {
+                pr2serr("couldn't send Enclosure Control page\n");
+                return -1;
+            }
         }
     }
     return 0;
@@ -4491,7 +4611,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
 static int
 cgs_threshold(int sg_fd, const struct join_row_t * jrp,
               const struct tuple_acronym_val * tavp,
-              const struct opts_t * op)
+              const struct opts_t * op, bool last)
 {
     int ret, len, s_byte, s_bit, n_bits;
     uint64_t ui;
@@ -4519,7 +4639,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
         } else
             return -2;
     }
-    if (op->get_str) {
+    if (GET_OPT == tavp->cgs_sel) {
         ui = get_big_endian(jrp->thresh_inp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
@@ -4531,10 +4651,12 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
         if (op->byte1_given)
             threshold_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
-        ret = do_senddiag(sg_fd, 1, threshold_rsp, len, 1, op->verbose);
-        if (ret) {
-            pr2serr("couldn't send Threshold Out page\n");
-            return -1;
+        if (last) {
+            ret = do_senddiag(sg_fd, 1, threshold_rsp, len, 1, op->verbose);
+            if (ret) {
+                pr2serr("couldn't send Threshold Out page\n");
+                return -1;
+            }
         }
     }
     return 0;
@@ -4574,7 +4696,7 @@ cgs_additional_el(const struct join_row_t * jrp,
         } else
             return -2;
     }
-    if (op->get_str) {
+    if (GET_OPT == tavp->cgs_sel) {
         ui = get_big_endian(jrp->ae_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
@@ -4592,42 +4714,57 @@ cgs_additional_el(const struct join_row_t * jrp,
  * Returns 0 for success, any other return value is an error. */
 static int
 ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
-        struct opts_t * op)
+        struct opts_t * op, bool last)
 {
-    int ret, k, j, desc_len, dn_len, found;
+    int ret, k, j, desc_len, dn_len;
+    bool found;
     struct join_row_t * jrp;
     const uint8_t * ed_bp;
     char b[64];
 
-    found = 0;
+    found = false;
     if (NULL == tavp->acron) {
         if (! op->page_code_given)
             op->page_code = ENC_CONTROL_DPC;
-        ++found;
+        found = true;
     } else if (is_acronym_in_status_ctl(tavp)) {
-        op->page_code = ENC_CONTROL_DPC;
-        ++found;
+        if (op->page_code > 0) {
+            if (ENC_CONTROL_DPC != op->page_code)
+                goto inconsistent;
+        } else
+            op->page_code = ENC_CONTROL_DPC;
+        found = true;
     } else if (is_acronym_in_threshold(tavp)) {
-        op->page_code = THRESHOLD_DPC;
-        ++found;
+        if (op->page_code > 0) {
+            if (THRESHOLD_DPC != op->page_code)
+                goto inconsistent;
+        } else
+            op->page_code = THRESHOLD_DPC;
+        found = true;
     } else if (is_acronym_in_additional(tavp)) {
-        op->page_code = ADD_ELEM_STATUS_DPC;
-        ++found;
+        if (op->page_code > 0) {
+            if (ADD_ELEM_STATUS_DPC != op->page_code)
+                goto inconsistent;
+        } else
+            op->page_code = ADD_ELEM_STATUS_DPC;
+        found = true;
     }
     if (! found) {
         pr2serr("acroynm %s not found (try '-ee' option)\n", tavp->acron);
         return -1;
     }
-    ret = join_work(sg_fd, op, false);
-    if (ret)
-        return ret;
+    if (false == join_done) {
+        ret = join_work(sg_fd, op, false);
+        if (ret)
+            return ret;
+    }
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
     for (k = 0, jrp = join_arr; ((k < MX_JOIN_ROWS) && jrp->enc_statp);
          ++k, ++jrp) {
         if (op->ind_given) {
             if (op->ind_th != jrp->th_i)
                 continue;
-            if (op->ind_indiv != jrp->indiv_i)
+            if (! match_ind_indiv(jrp->indiv_i, op))
                 continue;
         } else if (op->desc_name) {
             ed_bp = jrp->elem_descp;
@@ -4655,9 +4792,9 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
                 continue;
         }
         if (ENC_CONTROL_DPC == op->page_code)
-            ret = cgs_enc_ctl_stat(sg_fd, jrp, tavp, op);
+            ret = cgs_enc_ctl_stat(sg_fd, jrp, tavp, op, last);
         else if (THRESHOLD_DPC == op->page_code)
-            ret = cgs_threshold(sg_fd, jrp, tavp, op);
+            ret = cgs_threshold(sg_fd, jrp, tavp, op, last);
         else if (ADD_ELEM_STATUS_DPC == op->page_code)
             ret = cgs_additional_el(jrp, tavp, op);
         else {
@@ -4667,8 +4804,9 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         }
         if (ret)
             return ret;
-        break;
-    }
+        if (op->ind_indiv_last <= op->ind_indiv)
+            break;
+    }   /* end of loop over join array */
     if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
         if (op->desc_name)
             pr2serr("descriptor name: %s not found (check the 'ed' page "
@@ -4677,11 +4815,21 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
             pr2serr("device slot number: %d not found\n", op->dev_slot_num);
         else if (saddr_non_zero(op->sas_addr))
             pr2serr("SAS address not found\n");
-        else
-            pr2serr("index: %d,%d not found\n", op->ind_th, op->ind_indiv);
+        else {
+            pr2serr("index: %d,%d", op->ind_th, op->ind_indiv);
+            if (op->ind_indiv_last > op->ind_indiv)
+                printf("-%d not found\n", op->ind_indiv_last);
+            else
+                printf(" not found\n");
+        }
         return -1;
     }
     return 0;
+
+inconsistent:
+    pr2serr("acroynm %s inconsistent with page_code=0x%x\n", tavp->acron,
+            op->page_code);
+    return -1;
 }
 
 /* Called when '--nickname=SEN' given. First calls status page to fetch
@@ -4728,9 +4876,9 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
 static void
 enumerate_diag_pages(void)
 {
+    bool got1;
     const struct diag_page_code * pcdp;
     const struct diag_page_abbrev * ap;
-    bool got1;
 
     printf("Diagnostic pages, followed by abbreviation(s) then page code:\n");
     for (pcdp = dpc_arr; pcdp->desc; ++pcdp) {
@@ -4813,20 +4961,24 @@ enumerate_work(const struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res;
-    char buff[128];
-    char b[80];
+    int sg_fd, k, res;
     int pd_type = 0;
-    int have_cgs = 0;
+    bool have_cgs = false;
     int ret = 0;
     struct sg_simple_inquiry_resp inq_resp;
+    char buff[128];
+    char b[80];
+    struct tuple_acronym_val tav_arr[CGS_CL_ARR_MAX_SZ];
     const char * cp;
     struct opts_t opts;
     struct opts_t * op;
-    struct tuple_acronym_val tav;
+    struct tuple_acronym_val * tavp;
+    struct cgs_cl_t * cgs_clp;
 
     op = &opts;
     memset(op, 0, sizeof(*op));
+    op->dev_slot_num = -1;
+    op->ind_indiv_last = -1;
     res = cl_process(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -4843,38 +4995,47 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->num_cgs) {
-        have_cgs = 1;
-        cp = op->clear_str ? op->clear_str :
-             (op->get_str ? op->get_str : op->set_str);
-        strncpy(buff, cp, sizeof(buff) - 1);
-        buff[sizeof(buff) - 1] = '\0';
-        if (parse_cgs_str(buff, &tav)) {
-            pr2serr("unable to decode STR argument to --clear, --get or "
-                    "--set\n");
+        have_cgs = true;
+        if (op->page_code_given &&
+            ! ((ENC_STATUS_DPC == op->page_code) ||
+               (THRESHOLD_DPC == op->page_code) ||
+               (ADD_ELEM_STATUS_DPC == op->page_code))) {
+            pr2serr("--clear, --get or --set options only supported for the "
+                    "Enclosure\nControl/Status, Threshold In/Out and "
+                    "Additional Element Status pages\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (op->get_str && tav.val_str)
-            pr2serr("--get option ignoring =<val> at the end of STR "
-                    "argument\n");
         if (! (op->ind_given || op->desc_name || (op->dev_slot_num >= 0) ||
                saddr_non_zero(op->sas_addr))) {
             pr2serr("with --clear, --get or --set option need either\n   "
                     "--index, --descriptor, --dev-slot-num or --sas-addr\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (NULL == tav.val_str) {
-            if (op->clear_str)
-                tav.val = 0;
-            if (op->set_str)
-                tav.val = 1;
+        for (k = 0, cgs_clp = op->cgs_cl_arr, tavp = tav_arr; k < op->num_cgs;
+             ++k, ++cgs_clp, ++tavp) {
+            if (parse_cgs_str(cgs_clp->cgs_str, tavp)) {
+                pr2serr("unable to decode STR argument to: %s\n",
+                        cgs_clp->cgs_str);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if ((GET_OPT == cgs_clp->cgs_sel) && tavp->val_str)
+                pr2serr("--get option ignoring =<val> at the end of STR "
+                        "argument\n");
+            if (NULL == tavp->val_str) {
+                if (CLEAR_OPT == cgs_clp->cgs_sel)
+                    tavp->val = 0;
+                if (SET_OPT == cgs_clp->cgs_sel)
+                    tavp->val = 1;
+            }
+            tavp->cgs_sel = cgs_clp->cgs_sel;
         }
-        if (op->page_code_given && (ENC_STATUS_DPC != op->page_code) &&
-            (THRESHOLD_DPC != op->page_code) &&
-            (ADD_ELEM_STATUS_DPC != op->page_code)) {
-            pr2serr("--clear, --get or --set options only supported for the "
-                    "Enclosure\nControl/Status, Threshold In/Out and "
-                    "Additional Element Status pages\n");
-            return SG_LIB_SYNTAX_ERROR;
+        /* keep this descending for loop directly after ascending for loop */
+        for (--k, --cgs_clp; k >= 0; --k, --cgs_clp) {
+            if ((CLEAR_OPT == cgs_clp->cgs_sel) ||
+                (SET_OPT == cgs_clp->cgs_sel)) {
+                cgs_clp->last_cs = true;
+                break;
+            }
         }
     }
 
@@ -4915,9 +5076,14 @@ main(int argc, char * argv[])
 
     if (op->nickname_str)
         ret = ses_set_nickname(sg_fd, op);
-    else if (have_cgs)
-        ret = ses_cgs(sg_fd, &tav, op);
-    else if (op->do_join)
+    else if (have_cgs) {
+        for (k = 0, tavp = tav_arr, cgs_clp = op->cgs_cl_arr;
+             k < op->num_cgs; ++k, ++tavp, ++cgs_clp) {
+            ret = ses_cgs(sg_fd, tavp, op,  cgs_clp->last_cs);
+            if (ret)
+                break;
+        }
+    } else if (op->do_join)
         ret = join_work(sg_fd, op, true);
     else if (op->do_status)
         ret = process_status_page(sg_fd, op);
