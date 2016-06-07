@@ -1,4 +1,4 @@
-.TH SG_SES "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SES "8" "June 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -82,7 +82,8 @@ trailing 'h' or 'H').
 Used to clear an element field in the Enclosure Control or Threshold Out
 page. Must be used together with an indexing option to specify which element
 is to be changed. The Enclosure Control page is assumed if the
-\fI\-\-page=PG\fR option is not given. See the STR FORMAT section below.
+\fI\-\-page=PG\fR option is not given. See the STR FORMAT and the CLEAR, GET,
+SET sections below.
 .TP
 \fB\-c\fR, \fB\-\-control\fR
 will send control information to the \fIDEVICE\fR via a SCSI SEND
@@ -165,7 +166,8 @@ indexing option to specify which element is to be read. By default the
 Enclosure Status page is read, the only other pages that can be read are the
 Threshold In and Additional Element Status pages. If a value is found it is
 output in decimal to stdout (by default) or in hexadecimal preceded by "0x"
-if the \fI\-\-hex\fR option is also given. See the STR FORMAT section below.
+if the \fI\-\-hex\fR option is also given. See the STR FORMAT and the CLEAR,
+GET, SET sections below.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit. Since there is a lot of information,
@@ -290,7 +292,7 @@ See the DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
 Used to set an element field in the Enclosure Control or Threshold Out page.
 Must be used together with an indexing option to specify which element is to
 be changed. The Enclosure Control page is assumed if the \fI\-\-page=PG\fR
-option is not given. See the STR FORMAT section below.
+option is not given. See the STR FORMAT and CLEAR, GET, SET sections below.
 .TP
 \fB\-s\fR, \fB\-\-status\fR
 will fetch page from the \fIDEVICE\fR via a SCSI RECEIVE DIAGNOSTIC RESULTS
@@ -361,6 +363,10 @@ individual index then the option is equivalent to \fI\-\-index=0,II\fR. When
 \fIIIA\fR is an Element type abbreviation then the option is equivalent to
 \fI\-\-index=A,\-1\fR.
 .PP
+Wherever an individual index is applicable, it can be replaced by an
+individual index range. It has the form: <first_ii>-<last_ii>. For
+example: '3-5' will select individial indexes 3, 4 and 5 .
+.PP
 To cope with vendor specific Element types (which should be in the range 128
 to 255) the Element type can be given as a number with a leading underscore.
 For example these are equivalent: \fI\-\-index=arr\fR and
@@ -425,6 +431,16 @@ values can be given in the normal fashion.
 .PP
 The supported list of <acronym>s can be viewed by using the
 \fI\-\-enumerate\fR option twice (or "\-ee").
+.SH CLEAR, GET, SET
+The \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options can
+be used up to 8 times in the same invocation. Any <acronym>s used in the
+\fISTR\fR operands must refer to the same diagnostic page.
+.PP
+When multiple of these options are used, they are applied in the order in
+which they appear on the command line. So if options contradict each other,
+the last one appearing on the command line will be enforced. When there
+are multiple \fI\-\-clear=STR\fR and \fI\-\-set=STR\fR options, then the
+diagnostic page they refer to is only written after the last one.
 .SH CHANGING STATE
 This utility has various techniques for changing the state of a SES device.
 As noted above this is typically a read\-modify\-write type operation.

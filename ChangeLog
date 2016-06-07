@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160531] [svn: r710]
+Changelog for sg3_utils-1.43 [20160607] [svn: r711]
   - sg_bg_ctl: new Background control command (spc4r08)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
@@ -11,6 +11,8 @@ Changelog for sg3_utils-1.43 [20160531] [svn: r710]
   - sg_ses: handle 2 bit EIIOE field in aes dpage
     - expand join handling of SAS connectors and others
     - expand join debug code
+    - allow multiple --clear=, --get= and --set= options
+    - allow individual index ranges (e.g. --index=3,5)
   - sg_luns: resync with drafts (sam6r02+spc5r10)
     - remove undocumented test "W" format
     - accept and output on request "quad dashed" format
