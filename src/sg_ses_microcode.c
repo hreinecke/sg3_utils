@@ -36,7 +36,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.04 20160423";    /* ses3r07 */
+static const char * version_str = "1.05 20160610";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -439,7 +439,7 @@ main(int argc, char * argv[])
             ++do_help;
             break;
         case 'i':
-            op->mc_id = sg_get_num(optarg);
+            op->mc_id = sg_get_num_nomult(optarg);
             if ((op->mc_id < 0) || (op->mc_id > 255)) {
                 pr2serr("argument to '--id' should be in the range 0 to "
                         "255\n");
@@ -459,7 +459,7 @@ main(int argc, char * argv[])
              break;
         case 'm':
             if (isdigit(*optarg)) {
-                op->mc_mode = sg_get_num(optarg);
+                op->mc_mode = sg_get_num_nomult(optarg);
                 if ((op->mc_mode < 0) || (op->mc_mode > 255)) {
                     pr2serr("argument to '--mode' should be in the range 0 "
                             "to 255\n");
@@ -501,7 +501,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'S':
-           op->mc_subenc = sg_get_num(optarg);
+           op->mc_subenc = sg_get_num_nomult(optarg);
            if ((op->mc_subenc < 0) || (op->mc_subenc > 255)) {
                 pr2serr("expected argument to '--subenc' to be 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;

@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.18 20160607";    /* ses3r13 */
+static const char * version_str = "2.19 20160610";    /* ses3r13 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -96,6 +96,9 @@ static const char * version_str = "2.18 20160607";    /* ses3r13 */
 
 #define NUM_ETC (LAST_ETC + 1)
 
+#define DEF_CLEAR_VAL 0
+#define DEF_SET_VAL 1
+
 
 struct element_type_t {
     int elem_type_code;
@@ -146,7 +149,7 @@ struct opts_t {
     int verbose;
     int do_version;
     int warn;
-    int num_cgs;
+    int num_cgs;        /* number of --clear-, --get= and --set= options */
     int arr_len;
     uint8_t sas_addr[8];
     uint8_t data_arr[MX_DATA_IN + 16];
@@ -920,14 +923,14 @@ parse_index(struct opts_t *op)
         if (0 == strcmp("-1", cp + 1))
             n = -1;
         else {
-            n = sg_get_num(cp + 1);
+            n = sg_get_num_nomult(cp + 1);
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad argument to '--index', after comma expect "
                         "number from -1 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             if ((cc3p = strchr(cp + 1, '-'))) {
-                n2 = sg_get_num(cc3p + 1);
+                n2 = sg_get_num_nomult(cc3p + 1);
                 if ((n2 < n) || (n2 > 255)) {
                     pr2serr("bad argument to '--index', after '-' expect "
                             "number from -%d to 255\n", n);
@@ -962,7 +965,7 @@ parse_index(struct opts_t *op)
         op->ind_th = 0;
         op->ind_indiv = -1;
     } else if (isdigit(b[0])) {
-        n = sg_get_num(b);
+        n = sg_get_num_nomult(b);
         if ((n < 0) || (n > 255)) {
             pr2serr("bad numeric argument to '--index', expect number from 0 "
                     "to 255\n");
@@ -974,7 +977,7 @@ parse_index(struct opts_t *op)
             op->ind_th = 0;
             op->ind_indiv = n;
             if ((c2p = strchr(b, '-'))) {
-                n2 = sg_get_num(c2p + 1);
+                n2 = sg_get_num_nomult(c2p + 1);
                 if ((n2 < n) || (n2 > 255)) {
                     pr2serr("bad argument to '--index', after '-' expect "
                             "number from -%d to 255\n", n);
@@ -986,7 +989,7 @@ parse_index(struct opts_t *op)
     } else if ('_' == b[0]) {   /* leading "_" prefixes element type code */
         if ((c2p = strchr(b + 1, '_')))
             *c2p = '\0';        /* subsequent "_" prefixes e.t. index */
-        n = sg_get_num(b + 1);
+        n = sg_get_num_nomult(b + 1);
         if ((n < 0) || (n > 255)) {
             pr2serr("bad element type code for '--index', expect value from "
                     "0 to 255\n");
@@ -998,7 +1001,7 @@ parse_index(struct opts_t *op)
         snprintf(mallcp + 1, 6, "%d", n);
         element_type_by_code.abbrev = mallcp;
         if (c2p) {
-            n = sg_get_num(c2p + 1);
+            n = sg_get_num_nomult(c2p + 1);
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad element type code <num> for '--index', expect "
                         "<num> from 0 to 255\n");
@@ -1023,7 +1026,7 @@ parse_index(struct opts_t *op)
             return SG_LIB_SYNTAX_ERROR;
         }
         if ((int)strlen(b) > n) {
-            n = sg_get_num(b + n);
+            n = sg_get_num_nomult(b + n);
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad element type abbreviation <num> for '--index', "
                         "expect <num> from 0 to 255\n");
@@ -1087,7 +1090,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             }
             break;
         case 'b':
-            op->byte1 = sg_get_num(optarg);
+            op->byte1 = sg_get_num_nomult(optarg);
             if ((op->byte1 < 0) || (op->byte1 > 255)) {
                 pr2serr("bad argument to '--byte1' (0 to 255 inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1176,7 +1179,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             op->nickname_str = optarg;
             break;
         case 'N':
-            op->seid = sg_get_num(optarg);
+            op->seid = sg_get_num_nomult(optarg);
             if ((op->seid < 0) || (op->seid > 255)) {
                 pr2serr("bad argument to '--nick_id' (0 to 255 inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1196,7 +1199,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             break;
         case 'p':
             if (isdigit(optarg[0])) {
-                op->page_code = sg_get_num(optarg);
+                op->page_code = sg_get_num_nomult(optarg);
                 if ((op->page_code < 0) || (op->page_code > 255)) {
                     pr2serr("bad argument to '--page' (0 to 255 "
                             "inclusive)\n");
@@ -1255,7 +1258,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->warn;
             break;
         case 'x':
-            op->dev_slot_num = sg_get_num(optarg);
+            op->dev_slot_num = sg_get_num_nomult(optarg);
             if ((op->dev_slot_num < 0) || (op->dev_slot_num > 255)) {
                 pr2serr("bad argument to '--dev-slot-num' (0 to 255 "
                         "inclusive)\n");
@@ -1293,10 +1296,6 @@ cl_process(struct opts_t *op, int argc, char *argv[])
         pr2serr("cannot have '--join' and '--control'\n");
         goto err_help;
     }
-    if (op->num_cgs > 1) {
-        pr2serr("can only be one of '--clear', '--get' and '--set'\n");
-        goto err_help;
-    }
     if (op->index_str) {
         ret = parse_index(op);
         if (ret) {
@@ -1321,14 +1320,14 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             (0 == op->num_cgs) && (! op->page_code_given)) {
             ++op->do_join;      /* implicit --join */
             if (op->verbose)
-                pr2serr("assume --join option is set\n");
+                pr2serr("process as if --join option is set\n");
         }
     }
     if (op->ind_given) {
         if ((0 == op->do_join) && (0 == op->do_control) &&
             (0 == op->num_cgs) && (! op->page_code_given)) {
             op->page_code_given = true;
-            op->page_code = 2;  /* implicit status page */
+            op->page_code = ENC_STATUS_DPC;  /* implicit status page */
             if (op->verbose)
                 pr2serr("assume --page=2 (es) option is set\n");
         }
@@ -1385,30 +1384,6 @@ err_help:
     return SG_LIB_SYNTAX_ERROR;
 }
 
-/* Returns 64 bit signed integer given in either decimal or in hex. The
- * hex number is either preceded by "0x" or followed by "h". Returns -1
- * on error (so check for "-1" string before using this function). */
-static int64_t
-get_llnum(const char * buf)
-{
-    int res, len;
-    int64_t num;
-    uint64_t unum;
-
-    if ((NULL == buf) || ('\0' == buf[0]))
-        return -1;
-    len = strlen(buf);
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
-        num = unum;
-    } else if ('H' == toupper(buf[len - 1])) {
-        res = sscanf(buf, "%" SCNx64 "", &unum);
-        num = unum;
-    } else
-        res = sscanf(buf, "%" SCNd64 "", &num);
-    return (1 == res) ? num : -1;
-}
-
 /* Parse clear/get/set string, writes output to '*tavp'. Uses 'buff' for
  * scratch area. Returns 0 on success, else -1. */
 static int
@@ -1429,7 +1404,7 @@ parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
         if (0 == strcmp("-1", esp + 1))
             tavp->val = -1;
         else {
-            tavp->val = get_llnum(esp + 1);
+            tavp->val = sg_get_llnum_nomult(esp + 1);
             if (-1 == tavp->val) {
                 pr2serr("unable to decode: %s value\n", esp + 1);
                 pr2serr("    expected: <acronym>[=<val>]\n");
@@ -1534,9 +1509,10 @@ do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
         page_num = ((const char *)outgoing_pg)[0];
         cp = find_out_diag_page_desc(page_num);
         if (cp)
-            pr2serr("    Send diagnostic cmd name: %s\n", cp);
+            pr2serr("    Send diagnostic command page name: %s\n", cp);
         else
-            pr2serr("    Send diagnostic cmd number: 0x%x\n", page_num);
+            pr2serr("    Send diagnostic command page number: 0x%x\n",
+                    page_num);
     }
     return sg_ll_send_diag(sg_fd, 0 /* sf_code */, pf_bit, 0 /* sf_bit */,
                            0 /* devofl_bit */, 0 /* unitofl_bit */,
@@ -1725,9 +1701,10 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
     cp = find_in_diag_page_desc(page_code);
     if (op->verbose > 1) {
         if (cp)
-            pr2serr("    Receive diagnostic results cmd for %s page\n", cp);
+            pr2serr("    Receive diagnostic results command for %s page\n",
+                    cp);
         else
-            pr2serr("    Receive diagnostic results cmd for page 0x%x\n",
+            pr2serr("    Receive diagnostic results command for page 0x%x\n",
                     page_code);
     }
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
@@ -3142,14 +3119,14 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             cid_valid = !!(0x1 & aep[0]);
             printf("%s  PSN_VALID=%d, BDF_VALID=%d, CID_VALID=%d\n", pad,
                    (int)psn_valid, (int)bdf_valid, (int)cid_valid);
-            if (cid_valid)
+            if (cid_valid)      /* N.B. little endian */
                 printf("%s  controller id: 0x%" PRIx16 "\n", pad,
                        sg_get_unaligned_le16(aep + 1));
             if (bdf_valid)
                 printf("%s  bus number: 0x%x, device number: 0x%x, "
                        "function number: 0x%x\n", pad, aep[4],
                        (aep[5] >> 3) & 0x1f, 0x7 & aep[5]);
-            if (psn_valid)
+            if (psn_valid)      /* little endian, top 3 bits assumed zero */
                 printf("%s  physical slot number: 0x%" PRIx16 "\n", pad,
                        0x1fff & sg_get_unaligned_le16(aep + 6));
         }
@@ -3654,7 +3631,8 @@ err_with_fp:
     return 1;
 }
 
-/* Display "status" page (op->page_code). Return 0 for success. */
+/* Display "status" page (op->page_code). data-in from SES device.
+ * Return 0 for success. */
 static int
 process_status_page(int sg_fd, struct opts_t * op)
 {
@@ -5023,9 +5001,9 @@ main(int argc, char * argv[])
                         "argument\n");
             if (NULL == tavp->val_str) {
                 if (CLEAR_OPT == cgs_clp->cgs_sel)
-                    tavp->val = 0;
+                    tavp->val = DEF_CLEAR_VAL;
                 if (SET_OPT == cgs_clp->cgs_sel)
-                    tavp->val = 1;
+                    tavp->val = DEF_SET_VAL;
             }
             tavp->cgs_sel = cgs_clp->cgs_sel;
         }
@@ -5048,6 +5026,21 @@ main(int argc, char * argv[])
         scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
 #endif
 #endif
+
+#if 0
+    pr2serr("Debug dump of input parameters:\n");
+    pr2serr("  index option given: %d, ind_th=%d, ind_indiv=%d, "
+            "ind_indiv_last=%d\n", op->ind_given, op->ind_th,
+            op->ind_indiv, op->ind_indiv_last);
+    pr2serr("  num_cgs=%d, contents:\n", op->num_cgs);
+    for (k = 0, tavp = tav_arr, cgs_clp = op->cgs_cl_arr;
+         k < op->num_cgs; ++k, ++tavp, ++cgs_clp) {
+        pr2serr("  k=%d, cgs_sel=%d, last_cs=%d, tavp=%p str: %s\n",
+                k, (int)cgs_clp->cgs_sel, (int)cgs_clp->last_cs, tavp,
+                cgs_clp->cgs_str);
+    }
+#endif
+
     sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,
