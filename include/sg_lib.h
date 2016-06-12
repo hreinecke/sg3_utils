@@ -439,8 +439,9 @@ int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
  * hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
- * assumed. Does not accept multipliers. Accept a comma (","), a whitespace
- * or newline as terminator.  */
+ * assumed. Does not accept multipliers. Accept a comma (","), hyphen ("-"),
+ * a whitespace or newline as terminator. Only decimal numbers can represent
+ * negative numbers and '-1' must be treated separately. */
 int sg_get_num_nomult(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
@@ -451,6 +452,13 @@ int sg_get_num_nomult(const char * buf);
  * Ignore leading spaces and tabs; accept comma, space, tab and hash as
  * terminator. */
 int64_t sg_get_llnum(const char * buf);
+
+/* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
+ * hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
+ * assumed. Does not accept multipliers. Accept a comma (","), hyphen ("-"),
+ * a whitespace or newline as terminator. Only decimal numbers can represent
+ * negative numbers and '-1' must be treated separately. */
+int64_t sg_get_llnum_nomult(const char * buf);
 
 
 /* <<< Architectural support functions [is there a better place?] >>> */

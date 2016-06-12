@@ -2699,8 +2699,8 @@ sg_get_num(const char * buf)
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
  * hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
- * assumed. Does not accept multipliers. Accept a comma (","), a whitespace
- * or newline as terminator. */
+ * assumed. Does not accept multipliers. Accept a comma (","), hyphen ("-"),
+ * a whitespace or newline as terminator. */
 int
 sg_get_num_nomult(const char * buf)
 {
@@ -2847,6 +2847,32 @@ sg_get_llnum(const char * buf)
             return -1LL;
         }
     }
+}
+
+/* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
+ * hex prefix (0x or 0X) or a 'h' (or 'H') suffix; otherwise decimal is
+ * assumed. Does not accept multipliers. Accept a comma (","), hyphen ("-"),
+ * a whitespace or newline as terminator. Only decimal numbers can represent
+ * negative numbers and '-1' must be treated separately. */
+int64_t
+sg_get_llnum_nomult(const char * buf)
+{
+    int res, len;
+    int64_t num;
+    uint64_t unum;
+
+    if ((NULL == buf) || ('\0' == buf[0]))
+        return -1;
+    len = strlen(buf);
+    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
+        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
+        num = unum;
+    } else if ('H' == toupper(buf[len - 1])) {
+        res = sscanf(buf, "%" SCNx64 "", &unum);
+        num = unum;
+    } else
+        res = sscanf(buf, "%" SCNd64 "", &num);
+    return (1 == res) ? num : -1;
 }
 
 /* Extract character sequence from ATA words as in the model string

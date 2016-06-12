@@ -34,7 +34,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.18 20160226";
+static const char * version_str = "1.19 20160612";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -97,34 +97,6 @@ usage()
             "Perform a SCSI REASSIGN BLOCKS command (or READ DEFECT LIST)\n");
 }
 
-/* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
- * only confuse things here, so use this local trimmed version */
-static int64_t
-get_llnum(const char * buf)
-{
-    int res, len;
-    int64_t num;
-    uint64_t unum;
-
-    if ((NULL == buf) || ('\0' == buf[0]))
-        return -1LL;
-    len = strspn(buf, "0123456789aAbBcCdDeEfFhHxX");
-    if (0 == len)
-        return -1LL;
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
-        num = unum;
-    } else if ('H' == toupper(buf[len - 1])) {
-        res = sscanf(buf, "%" SCNx64 "", &unum);
-        num = unum;
-    } else
-        res = sscanf(buf, "%" SCNd64 "", &num);
-    if (1 == res)
-        return num;
-    else
-        return -1LL;
-}
-
 /* Read numbers (up to 64 bits in size) from command line (comma (or
  * (single) space) separated list) or from stdin (one per line, comma
  * separated list or space separated list). Assumed decimal unless prefixed
@@ -179,7 +151,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                 return 1;
             }
             for (k = 0; k < 1024; ++k) {
-                ll = get_llnum(lcp);
+                ll = sg_get_llnum_nomult(lcp);
                 if (-1 != ll) {
                     if ((off + k) >= max_arr_len) {
                         pr2serr("build_lba_arr: array length exceeded\n");
@@ -212,7 +184,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
             return 1;
         }
         for (k = 0; k < max_arr_len; ++k) {
-            ll = get_llnum(lcp);
+            ll = sg_get_llnum_nomult(lcp);
             if (-1 != ll) {
                 lba_arr[k] = (uint64_t)ll;
                 cp = (char *)strchr(lcp, ',');

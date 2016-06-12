@@ -91,36 +91,6 @@ usage()
           );
 }
 
-#if 0
-/* Trying to decode multipliers as sg_get_llnum() [in sg_libs] does would
- * only confuse things here, so use this local trimmed version */
-static int64_t
-get_llnum(const char * buf)
-{
-    int res, len;
-    int64_t num;
-    uint64_t unum;
-
-    if ((NULL == buf) || ('\0' == buf[0]))
-        return -1LL;
-    len = strspn(buf, "0123456789aAbBcCdDeEfFhHxX");
-    if (0 == len)
-        return -1LL;
-    if (('0' == buf[0]) && (('x' == buf[1]) || ('X' == buf[1]))) {
-        res = sscanf(buf + 2, "%" SCNx64 "", &unum);
-        num = unum;
-    } else if ('H' == toupper(buf[len - 1])) {
-        res = sscanf(buf, "%" SCNx64 "", &unum);
-        num = unum;
-    } else
-        res = sscanf(buf, "%" SCNd64 "", &num);
-    if (1 == res)
-        return num;
-    else
-        return -1LL;
-}
-#endif
-
 /* Read numbers (up to 64 bits in size) from command line (comma (or
  * (single) space) separated list). Assumed decimal unless prefixed
  * by '0x', '0X' or contains trailing 'h' or 'H' (which indicate hex).
