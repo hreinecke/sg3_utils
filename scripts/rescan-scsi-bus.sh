@@ -499,6 +499,7 @@ dolunscan()
         fi
         echo 1 > /sys/class/scsi_device/${host}:${channel}:${id}:${lun}/device/delete
         sleep 0.02
+        echo "scsi add-single-device $devnr" > /proc/scsi/scsi
       else
         echo "scsi remove-single-device $devnr" > /proc/scsi/scsi
         if test $RC -eq 1 -o $lun -eq 0 ; then
