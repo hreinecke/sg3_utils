@@ -715,7 +715,16 @@ searchexisting()
     else
       match=1
     fi
-    test $match -eq 1 && doreportlun
+
+    test $match -eq 0 && continue
+
+    if [ -z "$lunsearch" ] ; then
+      doreportlun
+    else
+      for lun in $lunsearch ; do
+        dolunscan
+      done
+    fi
   done
 }
 
