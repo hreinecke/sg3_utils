@@ -4,7 +4,7 @@
 # (c) 2006--2015 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20160511"
+VERSION="20160831"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -715,7 +715,16 @@ searchexisting()
     else
       match=1
     fi
-    test $match -eq 1 && doreportlun
+
+    test $match -eq 0 && continue
+
+    if [ -z "$lunsearch" ] ; then
+      doreportlun
+    else
+      for lun in $lunsearch ; do
+        dolunscan
+      done
+    fi
   done
 }
 
