@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.24 20160528";/* spc5r10, sbc4r10 */
+const char * sg_lib_version_str = "2.25 20160630";/* spc5r10, sbc4r11 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -362,6 +362,7 @@ struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
     {0x0e, 0, "Bind"},
     {0x0f, 0, "Unbind"},
     {0x11, 0, "Write long(16)"},
+    {0x12, 0, "Write scattered(16)"},   /* added sbc4r11 */
     {0x14, PDT_ZBC, "Reset write pointer"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
     {0xffff, 0, NULL},
@@ -440,6 +441,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
     {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
     {0x10, 0, "Write stream(32)"},   /* added sbc4r07 */
+    {0x11, 0, "Write scattered(32)"},     /* added sbc4r11 */
     {0x1800, 0, "Receive credential"},
     {0x1ff0, 0, "ATA pass-through(32)"},  /* added sat4r05 */
     {0x8801, 0, "Format OSD (osd)"},

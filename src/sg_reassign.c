@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -34,7 +35,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.19 20160612";
+static const char * version_str = "1.20 20160701";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -217,7 +218,7 @@ main(int argc, char * argv[])
 {
     int sg_fd, res, c, num, k, j;
     int dummy = 0;
-    int got_addr = 0;
+    bool got_addr = false;
     int eight = -1;
     int addr_arr_len = 0;
     int grown = 0;
@@ -248,7 +249,7 @@ main(int argc, char * argv[])
                 pr2serr("bad argument to '--address'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            got_addr = 1;
+            got_addr = true;
             break;
         case 'd':
             dummy = 1;
@@ -319,7 +320,7 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
-    } else if ((0 == got_addr) || (addr_arr_len < 1)) {
+    } else if ((! got_addr) || (addr_arr_len < 1)) {
         pr2serr("need at least one address (see '--address=')\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
@@ -385,7 +386,8 @@ main(int argc, char * argv[])
     } else /* if (grown || primary) */ {
         int dl_format = DEF_DEFECT_LIST_FORMAT;
         int div = 0;
-        int dl_len, got_grown, got_primary;
+        int dl_len;
+        bool got_grown, got_primary;
         const char * lstp;
 
         param_len = 4;
@@ -418,9 +420,15 @@ main(int argc, char * argv[])
             pr2serr("asked for defect list format %d, got %d\n", dl_format,
                     (param_arr[1] & 0x7));
         dl_format = (param_arr[1] & 0x7);
-        switch (dl_format) {
+        switch (dl_format) {    /* Defect list formats: */
             case 0:     /* short block */
                 div = 4;
+                break;
+            case 1:     /* extended bytes from index */
+                div = 8;
+                break;
+            case 2:     /* extended physical sector */
+                div = 8;
                 break;
             case 3:     /* long block */
             case 4:     /* bytes from index */

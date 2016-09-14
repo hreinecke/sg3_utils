@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.24 20160531";  /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.25 20160701";  /* spc5r10 + sbc4r11 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -2269,10 +2269,10 @@ decode_sup_block_lens_vpd(unsigned char * buff, int len)
         printf("    GRD_CHK: %d\n", !!(bp[4] & 0x4));
         printf("    APP_CHK: %d\n", !!(bp[4] & 0x2));
         printf("    REF_CHK: %d\n", !!(bp[4] & 0x1));
-        printf("    T3PS_SUP: %d\n", !!(bp[5] & 0x8));
-        printf("    T2PS_SUP: %d\n", !!(bp[5] & 0x4));
-        printf("    T1PS_SUP: %d\n", !!(bp[5] & 0x2));
-        printf("    T0PS_SUP: %d\n", !!(bp[5] & 0x1));
+        printf("    T3PS: %d\n", !!(bp[5] & 0x8));
+        printf("    T2PS: %d\n", !!(bp[5] & 0x4));
+        printf("    T1PS: %d\n", !!(bp[5] & 0x2));
+        printf("    T0PS: %d\n", !!(bp[5] & 0x1));
     }
 }
 
@@ -2544,7 +2544,7 @@ decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
         printf("%" PRIu32 "\n", u);
 }
 
-/* VPD_BLOCK_LIMITS_EXT sbc */
+/* VPD_BLOCK_LIMITS_EXT [0xb7] sbc */
 static void
 decode_b7_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -2567,6 +2567,14 @@ decode_b7_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         printf("  Optimal stream write size: %u logical blocks\n", u);
         u = sg_get_unaligned_be32(buff + 10);
         printf("  Stream granularity size: %u\n", u);
+        if (len > 27) {
+            u = sg_get_unaligned_be32(buff + 16);
+            printf("  Maximum scattered LBA range transfer length: %u\n", u);
+            u = sg_get_unaligned_be16(buff + 22);
+            printf("  Maximum scattered LBA range descriptor count: %u\n", u);
+            u = sg_get_unaligned_be32(buff + 24);
+            printf("  Maximum scattered transfer length: %u\n", u);
+        }
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);

@@ -1,13 +1,13 @@
-.TH SG_FORMAT "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "June 2016" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
-[\fI\-\-early\fR] [\fI\-\-ffmy=FFMT\fR] [\fI\-\-fmtpinfo=FPI\fR]
+[\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR] [\fI\-\-fmtpinfo=FPI\fR]
 [\fI\-\-format\fR] [\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR]
 [\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR]
-[\fI\-\-poll=PT\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
+[\fI\-\-poll=PT\fR] [\fI\-\-quick\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
 [\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR] [\fI\-\-tape=FM\fR]
 [\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-verify\fR]
 [\fI\-\-version\fR] [\fI\-\-wait\fR]
@@ -42,10 +42,11 @@ The reason for this double check is to detect a "format corrupt" state (see
 the NOTES section). This usage will not modify the disk.
 .PP
 When this utility is used with the "\-\-format" (or "\-F") option it will
-attempt to format the given DEVICE. There is a 15 second pause during which
-time the user is invited thrice (5 seconds apart) to abort sg_format. This
-occurs just prior the SCSI FORMAT UNIT command being issued. See the NOTES
-section for more information.
+attempt to format the given DEVICE. In the absence of the \fI\-\-quick\fR
+option there is a 15 second pause during which time the user is invited
+thrice (5 seconds apart) to abort sg_format. This occurs just prior the
+SCSI FORMAT UNIT command being issued. See the NOTES section for more
+information.
 .PP
 Protection information is optional and is made up of one or more protection
 intervals, each made up of 8 bytes associated with each logical block. Four
@@ -53,9 +54,9 @@ protection types are defined with protection type 0 being no protection
 intervals. See the PROTECTION INFORMATION section below for more information.
 .PP
 When the \fI\-\-tape=FM\fR option is given then the SCSI FORMAT MEDIUM
-command is sent to the \fIDEVICE\fR. FORMAT MEDIUM is defined in SSC and
-prepares a volume for use which may include partitioning the medium. See
-the section below on TAPE for more information.
+command is sent to the \fIDEVICE\fR. FORMAT MEDIUM is defined in SSC
+document and prepares a volume for use which may include partitioning the
+medium. See the section below on TAPE for more information.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -153,10 +154,10 @@ below for more information.
 \fB\-F\fR, \fB\-\-format\fR
 issue a SCSI FORMAT UNIT command.
 .B This will destroy all the data held on the media.
-This option is required to change the block size of a disk. The user is given
-a 15 second count down to ponder the wisdom of doing this, during which time
-control\-C (amongst other Unix commands) can be used to kill this process
-before it does any damage.
+This option is required to change the block size of a disk. In the absence
+of the \fI\-\-quick\fR option, the user is given a 15 second count down to
+ponder the wisdom of doing this, during which time control\-C (amongst other
+Unix commands) can be used to kill this process before it does any damage.
 .br
 When used three times (or more) the preliminary MODE SENSE and SELECT
 commands are bypassed, leaving only the initial INQUIRY and FORMAT UNIT
@@ -222,6 +223,12 @@ READY command is used, otherwise a REQUEST SENSE command is used. The
 default is currently 0 but this will change to 1 in the near future. See
 the NOTES sections below.
 .TP
+\fB\-Q\fR, \fB\-\-quick\fR
+the default action (i.e. when the option is not given) is to give the user
+15 seconds to reconsider doing a format operation on the \fIDEVICE\fR.
+When this option is given that step (i.e. the 15 second warning period)
+is skipped.
+.TP
 \fB\-r\fR, \fB\-\-resize\fR
 rather than format the disk, it can be resized. This means changing the
 number of blocks on the device reported by the READ CAPACITY command.
@@ -262,7 +269,7 @@ an "Invalid field in parameter list" message will appear in sense
 data (requires the use of '\-v' to decode sense data).
 .TP
 \fB\-T\fR, \fB\-\-tape\fR=\fIFM\fR
-will send a FORMAT MEDIUM command to the \fIDEVICE\fR with the FORMAT field
+will send a FORMAT MEDIUM command to the \fIDEVICE\fR with its FORMAT field
 set to \fIFM\fR. This option is used to prepare a tape (i.e. the "medium")
 in a tape drive for use. Values for \fIFM\fR include 0 to do the "default"
 format; 1 to partition a volume and 2 to do a default format then partition.

@@ -2,11 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160612] [svn: r712]
+Changelog for sg3_utils-1.43 [20160914] [svn: r713]
   - sg_bg_ctl: new Background control command (spc4r08)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
+    - add --quick option to skip reconsideration time
   - sg_decode sense: add --cdb option
   - sg_ses: handle 2 bit EIIOE field in aes dpage
     - expand join handling of SAS connectors and others
@@ -45,6 +46,7 @@ Changelog for sg3_utils-1.43 [20160612] [svn: r712]
     - implement 'format' argument in dStrHexStr()
     - add Microcode activation sense descriptor spc5r10
   - sg_lib_data: sync asc/ascq codes with T10 20160425
+    - add write scattered (16+32) cdb names sbc4r11
   - sg_cmds_extra: expand sg_ll_ata_pt() to send new
     Ata pass-through(32) command (sat4r05)
   - sg_sat_identify: expand to take --len=32
