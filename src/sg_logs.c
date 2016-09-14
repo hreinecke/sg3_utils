@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.47 20160605";    /* spc5r10 + sbc4r10 */
+static const char * version_str = "1.47 20160704";    /* spc5r10 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1329,12 +1329,15 @@ all_bits_set(const uint8_t * xp, int num_bytes)
         if (0xff != *xp)
             return false;
     }
-    return true;
+    return true;  /* also in degenerate case when original (num_bytes <= 0) */
 }
 
+/* Returns 'xp' with "unknown" if all bits set; otherwise decoded (big endian)
+ * number in 'xp'. Number rendered in decimal if in_hex=false otherwise in
+ * hex with leading '0x' prepended. */
 static char *
-num_or_unknown(const uint8_t * xp, int num_bytes, bool in_hex, char * b,
-               int blen)
+num_or_unknown(const uint8_t * xp, int num_bytes /* max is 8 */, bool in_hex,
+               char * b, int blen)
 {
     if (all_bits_set(xp, num_bytes))
         snprintf(b, blen, "unknown");
@@ -1606,7 +1609,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
 }
 
 /* DS made obsolete in spc4r03; TMC and ETC made obsolete in spc5r03. */
-static void
+static char *
 get_pcb_str(int pcb, char * outp, int maxoutlen)
 {
     char buff[PCB_STR_LEN];
@@ -1630,6 +1633,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
         outp[n] = '\0';
     } else if (outp && (maxoutlen > 0))
         outp[0] = '\0';
+    return outp;
 }
 
 /* SUPP_PAGES_LPAGE [0x0,0x0] */
@@ -1709,11 +1713,11 @@ static bool
 show_buffer_over_under_run_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
 {
-    int num, pl, pcb, pc;
+    int num, pl, pc;
     uint64_t count;
     const uint8_t * bp;
     const char * cp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Buffer over-run/under-run page  [0x1]\n");
@@ -1816,12 +1820,9 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
         if (cp)
             printf("  %s = %" PRIu64 "", cp, count);
 
-        if (op->do_pcb) {
-            pcb = bp[2];
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -1837,9 +1838,9 @@ static bool
 show_error_counter_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int num, pl, pc, pcb, pg_code;
+    int num, pl, pc, pg_code;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     pg_code = resp[0] & 0x3f;
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
@@ -1867,7 +1868,6 @@ show_error_counter_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -1893,11 +1893,9 @@ show_error_counter_page(const uint8_t * resp, int len,
         default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
         printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -1912,9 +1910,9 @@ static bool
 show_non_medium_error_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Non-medium error page  [0x6]\n");
@@ -1922,7 +1920,6 @@ show_non_medium_error_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -1947,11 +1944,9 @@ show_non_medium_error_page(const uint8_t * resp, int len,
             break;
         }
         printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -1966,9 +1961,9 @@ static bool
 show_power_condition_transitions_page(const uint8_t * resp, int len,
                                       const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Power condition transitions page  [0x1a]\n");
@@ -1976,7 +1971,6 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2006,11 +2000,9 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             printf("  Reserved [0x%x]", pc);
         }
         printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -2053,10 +2045,10 @@ static bool
 show_environmental_reporting_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
-    int num, pl, pc, pcb, blen;
+    int num, pl, pc, blen;
     bool mounted_valid;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
     char b[32];
 
     blen = sizeof(b);
@@ -2066,7 +2058,6 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2130,11 +2121,9 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
             }
         } else
             printf("  <<unexpect parameter code 0x%x\n", pc);
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -2149,9 +2138,9 @@ static bool
 show_environmental_limits_page(const uint8_t * resp, int len,
                                const struct opts_t * op)
 {
-    int num, pl, pc, pcb, blen;
+    int num, pl, pc, blen;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
     char b[32];
 
     blen = sizeof(b);
@@ -2161,7 +2150,6 @@ show_environmental_limits_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2215,11 +2203,9 @@ show_environmental_limits_page(const uint8_t * resp, int len,
                    humidity_str(bp[11], false, b, blen));
         } else
             printf("  <<unexpect parameter code 0x%x\n", pc);
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -2233,11 +2219,11 @@ skip:
 static bool
 show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb;
+    int k, num, extra, pc;
     unsigned int n;
     uint64_t ull;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2249,7 +2235,6 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
         printf("Tape usage page  (LTO-5 and LTO-6 specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         extra = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2326,11 +2311,9 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
             dStrHex((const char *)bp, extra, 1);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2342,10 +2325,10 @@ static bool
 show_tape_capacity_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb;
+    int k, num, extra, pc;
     unsigned int n;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2357,7 +2340,6 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         printf("Tape capacity page  (LTO-5 and LTO-6 specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         extra = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2393,11 +2375,9 @@ show_tape_capacity_page(const uint8_t * resp, int len,
             dStrHex((const char *)bp, extra, 1);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2410,10 +2390,10 @@ static bool
 show_data_compression_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
-    int k, j, pl, num, extra, pc, pcb, pg_code;
+    int k, j, pl, num, extra, pc, pg_code;
     uint64_t n;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     pg_code = resp[0] & 0x3f;
     num = len - 4;
@@ -2431,7 +2411,6 @@ show_data_compression_page(const uint8_t * resp, int len,
     }
     for (k = num; k > 0; k -= extra, bp += extra) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3];
         extra = pl + 4;
         if (op->filter_given) {
@@ -2499,11 +2478,9 @@ show_data_compression_page(const uint8_t * resp, int len,
             break;
         }
 skip_para:
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2515,9 +2492,9 @@ static bool
 show_last_n_error_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
-    int k, num, pl, pc, pcb;
+    int k, num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2534,7 +2511,6 @@ show_last_n_error_page(const uint8_t * resp, int len,
         }
         pl = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -2548,20 +2524,18 @@ show_last_n_error_page(const uint8_t * resp, int len,
         }
         printf("  Error event %d:\n", pc);
         if (pl > 4) {
-            if ((pcb & 0x1) && (pcb & 0x2)) {
+            if ((bp[2] & 0x1) && (bp[2] & 0x2)) {
                 printf("    [binary]:\n");
                 dStrHex((const char *)bp + 4, pl - 4, 1);
-            } else if (pcb & 0x1)
+            } else if (bp[2] & 0x1)
                 printf("    %.*s\n", pl - 4, (const char *)(bp + 4));
             else {
                 printf("    [data counter?? (LP bit should be set)]:\n");
                 dStrHex((const char *)bp + 4, pl - 4, 1);
             }
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2573,9 +2547,9 @@ static bool
 show_last_n_deferred_error_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
 {
-    int k, num, pl, pc, pcb;
+    int k, num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2592,7 +2566,6 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
         }
         pl = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -2606,10 +2579,8 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
         }
         printf("  Deferred error %d:\n", pc);
         dStrHex((const char *)bp + 4, pl - 4, 1);
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2638,11 +2609,11 @@ static const char * self_test_result[] = {
 static bool
 show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, n, res, pc, pl, pcb;
+    int k, num, n, res, pc, pl;
     unsigned int v;
     const uint8_t * bp;
     uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
     char b[80];
 
     num = len - 4;
@@ -2654,7 +2625,6 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Self-test results page  [0x10]\n");
     for (k = 0, bp = resp + 4; k < 20; ++k, bp += 20 ) {
-        pcb = bp[2];
         pl = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
         if (op->filter_given) {
@@ -2693,11 +2663,9 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
                 printf("      [%s]\n", sg_get_asc_ascq_str(bp[17], bp[18],
                        sizeof(b), b));
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2708,9 +2676,9 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb;
+    int k, num, extra, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2729,7 +2697,6 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         extra = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -2770,10 +2737,8 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
                 continue;
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2784,9 +2749,9 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb;
+    int k, num, extra, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2803,7 +2768,6 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         extra = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -2881,11 +2845,9 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             dStrHex((const char *)bp, extra, 1);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -2896,9 +2858,9 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb;
+    int k, num, extra, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2926,7 +2888,6 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         extra = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter != pc)
             continue;
         if (op->do_raw)
@@ -2937,12 +2898,9 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
             dStrHex((const char *)bp, extra, 1);
         else
             dStrHex((const char *)bp, extra, -1);
-
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         break;
     }
     return true;
@@ -2952,10 +2910,10 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc, pcb;
+    int k, num, extra, pc;
     const uint8_t * bp;
     const char * cp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
     char b[256];
     char bb[32];
     bool full, decoded, has_header;
@@ -2980,7 +2938,6 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         extra = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -3102,11 +3059,9 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)bp, extra, 1);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -3292,15 +3247,14 @@ static void
 show_sas_port_param(const uint8_t * bp, int param_len,
                     const struct opts_t * op)
 {
-    int j, m, nphys, pcb, t, sz, spld_len;
+    int j, m, nphys, t, sz, spld_len;
     const uint8_t * vcp;
     uint64_t ull;
     unsigned int ui;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
     char s[64];
 
     sz = sizeof(s);
-    pcb = bp[2];
     t = sg_get_unaligned_be16(bp + 0);
     if (op->do_name)
         printf("rel_target_port=%d\n", t);
@@ -3314,12 +3268,9 @@ show_sas_port_param(const uint8_t * bp, int param_len,
     if (op->do_name)
         printf("  num_phys=%d\n", nphys);
     else {
-        printf("  number of phys = %d", nphys);
-        if ((op->do_pcb) && (0 == op->do_name)) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("  number of phys = %d\n", nphys);
+        if ((op->do_pcb) && (0 == op->do_name))
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
     }
 
     for (j = 0, vcp = bp + 8; j < (param_len - 8);
@@ -3502,13 +3453,13 @@ static bool
 show_stats_perform_pages(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
-    int k, num, param_len, param_code, spf, subpg_code, extra;
-    int pcb, nam;
+    int k, num, param_len, param_code, subpg_code, extra, nam;
+    bool spf;
     unsigned int ui;
     const uint8_t * bp;
     const char * ccp;
     uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     nam = op->do_name;
     num = len - 4;
@@ -3539,7 +3490,6 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             param_len = bp[3];
             extra = param_len + 4;
             param_code = sg_get_unaligned_be16(bp + 0);
-            pcb = bp[2];
             if (op->filter_given) {
                 if (param_code != op->filter)
                     continue;
@@ -3670,10 +3620,8 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     dStrHexErr((const char *)bp, extra, 1);
                 break;
             }
-            if ((op->do_pcb) && (0 == op->do_name)) {
-                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-                printf("    <%s>\n", pcb_str);
-            }
+            if ((op->do_pcb) && (0 == op->do_name))
+                printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
             if (op->filter_given)
                 break;
         }
@@ -3686,7 +3634,6 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             param_len = bp[3];
             extra = param_len + 4;
             param_code = sg_get_unaligned_be16(bp + 0);
-            pcb = bp[2];
             if (op->filter_given) {
                 if (param_code != op->filter)
                     continue;
@@ -3779,10 +3726,8 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     dStrHexErr((const char *)bp, extra, 1);
                 break;
             }
-            if ((op->do_pcb) && (0 == op->do_name)) {
-                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-                printf("    <%s>\n", pcb_str);
-            }
+            if ((op->do_pcb) && (0 == op->do_name))
+                printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
             if (op->filter_given)
                 break;
         }
@@ -3795,13 +3740,13 @@ show_stats_perform_pages(const uint8_t * resp, int len,
 static bool
 show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, pc, spf, subpg_code, extra;
-    int pcb, nam;
+    int k, num, pc, subpg_code, extra, nam;
+    bool spf;
     unsigned int ui;
     const uint8_t * bp;
     const char * ccp;
     uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     nam = op->do_name;
     num = len - 4;
@@ -3833,7 +3778,6 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         extra = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -3916,10 +3860,8 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrHexErr((const char *)bp, extra, 1);
             break;
         }
-        if ((op->do_pcb) && (0 == op->do_name)) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("    <%s>\n", pcb_str);
-        }
+        if ((op->do_pcb) && (0 == op->do_name))
+            printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
     }
@@ -3931,11 +3873,12 @@ static bool
 show_format_status_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int k, num, pl, pc, pcb, counter;
+    int k, num, pl, pc;
+    bool is_count;
     const uint8_t * bp;
     const uint8_t * xp;
     uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Format status page  [0x8]\n");
@@ -3943,7 +3886,6 @@ show_format_status_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -3956,7 +3898,7 @@ show_format_status_page(const uint8_t * resp, int len,
                 break;
             }
         }
-        counter = 1;
+        is_count = true;
         switch (pc) {
         case 0:
             if (pl < 5)
@@ -3969,7 +3911,7 @@ show_format_status_page(const uint8_t * resp, int len,
                     dStrHex((const char *)bp + 4, pl - 4, 0);
                 }
             }
-            counter = 0;
+            is_count = false;
             break;
         case 1:
             printf("  Grown defects during certification");
@@ -3985,34 +3927,26 @@ show_format_status_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Unknown Format parameter code = 0x%x\n", pc);
-            counter = 0;
+            is_count = false;
             dStrHex((const char *)bp, pl, 0);
             break;
         }
-        if (counter) {
+        if (is_count) {
             k = pl - 4;
             xp = bp + 4;
             if (all_bits_set(xp, k))
-                printf(" <not available>");
+                printf(" <not available>\n");
             else {
                 if (k > (int)sizeof(ull)) {
                     xp += (k - sizeof(ull));
                     k = sizeof(ull);
                 }
                 ull = sg_get_unaligned_be(k, xp);
-                printf(" = %" PRIu64 "", ull);
-            }
-            if (op->do_pcb) {
-                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-                printf("\n        <%s>\n", pcb_str);
-            } else
-                printf("\n");
-        } else {
-            if (op->do_pcb) {
-                get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-                printf("\n        <%s>\n", pcb_str);
+                printf(" = %" PRIu64 "\n", ull);
             }
         }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4027,9 +3961,9 @@ static bool
 show_non_volatile_cache_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
-    int j, num, pl, pc, pcb;
+    int j, num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Non-volatile cache page  [0x17]\n");
@@ -4037,7 +3971,6 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4098,10 +4031,8 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             dStrHex((const char *)bp, pl, 0);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4116,7 +4047,7 @@ static bool
 show_lb_provisioning_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     const char * cp;
     char str[PCB_STR_LEN];
@@ -4127,7 +4058,6 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4173,19 +4103,20 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            if (0x3 == pc)
+            if (0x3 == pc)      /* resource percentage log parameter */
                 printf("  %s: %u %%\n", cp, sg_get_unaligned_be16(bp + 4));
-            else
+            else {              /* resource count log parameters */
                 printf("  %s resource count: %u\n", cp,
                        sg_get_unaligned_be32(bp + 4));
-            if (pl > 8) {
-                switch (bp[8] & 0x3) {
-                case 0: cp = "not reported"; break;
-                case 1: cp = "dedicated to lu"; break;
-                case 2: cp = "not dedicated to lu"; break;
-                case 3: cp = "reserved"; break;
+                if (pl > 8) {
+                    switch (bp[8] & 0x3) {      /* SCOPE field */
+                    case 0: cp = "not reported"; break;
+                    case 1: cp = "dedicated to lu"; break;
+                    case 2: cp = "not dedicated to lu"; break;
+                    case 3: cp = "reserved"; break;
+                    }
+                    printf("    Scope: %s\n", cp);
                 }
-                printf("    Scope: %s\n", cp);
             }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
             printf("  Vendor specific [0x%x]:", pc);
@@ -4194,10 +4125,8 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4211,7 +4140,7 @@ skip:
 static bool
 show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int num, pl, pc, pcb, k;
+    int num, pl, pc, k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4221,7 +4150,6 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4267,10 +4195,8 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
             dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4285,7 +4211,7 @@ static bool
 show_solid_state_media_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4295,7 +4221,6 @@ show_solid_state_media_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4327,10 +4252,8 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4365,7 +4288,7 @@ static bool
 show_dt_device_status_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
-    int num, pl, pc, pcb, j;
+    int num, pl, pc, j;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
     char b[64];
@@ -4376,7 +4299,6 @@ show_dt_device_status_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4490,10 +4412,8 @@ show_dt_device_status_page(const uint8_t * resp, int len,
             }
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4508,7 +4428,7 @@ static bool
 show_tapealert_response_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
-    int num, pl, pc, pcb, k, mod, div;
+    int num, pl, pc, k, mod, div;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4518,7 +4438,6 @@ show_tapealert_response_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4559,10 +4478,8 @@ show_tapealert_response_page(const uint8_t * resp, int len,
             }
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4600,7 +4517,7 @@ static bool
 show_requested_recovery_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
-    int num, pl, pc, pcb, j, k;
+    int num, pl, pc, j, k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4610,7 +4527,6 @@ show_requested_recovery_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4646,10 +4562,8 @@ show_requested_recovery_page(const uint8_t * resp, int len,
             }
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4664,7 +4578,7 @@ static bool
 show_ata_pt_results_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     const uint8_t * dp;
     char str[PCB_STR_LEN];
@@ -4675,7 +4589,6 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4712,10 +4625,8 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
                    pl, pc);
             dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4757,7 +4668,7 @@ static bool
 show_background_scan_results_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
-    int j, m, num, pl, pc, pcb;
+    int j, m, num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4767,7 +4678,6 @@ show_background_scan_results_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4867,10 +4777,8 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             printf("\n");
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4885,7 +4793,7 @@ static bool
 show_pending_defects_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4895,7 +4803,6 @@ show_pending_defects_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4938,10 +4845,8 @@ show_pending_defects_page(const uint8_t * resp, int len,
                    sg_get_unaligned_be32(bp + 4));
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -4956,7 +4861,7 @@ static bool
 show_background_op_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -4966,7 +4871,6 @@ show_background_op_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -4998,10 +4902,8 @@ show_background_op_page(const uint8_t * resp, int len,
             dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5016,9 +4918,9 @@ static bool
 show_lps_misalignment_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("LPS misalignment page  [0x15,0x3]\n");
@@ -5026,7 +4928,6 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5063,10 +4964,8 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
             }
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5081,7 +4980,7 @@ static bool
 show_service_buffer_info_page(const uint8_t * resp, int len,
                               const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -5091,7 +4990,6 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5121,10 +5019,8 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
                    "hex:\n", pc);
             dStrHex((const char *)bp + 4, pl - 4, 0);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5139,11 +5035,11 @@ static bool
 show_sequential_access_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     uint64_t ull, gbytes;
     bool all_set;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Sequential access device page (ssc-3)\n");
@@ -5151,7 +5047,6 @@ show_sequential_access_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5238,10 +5133,8 @@ show_sequential_access_page(const uint8_t * resp, int len,
                        pc, ull);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5256,10 +5149,9 @@ static bool
 show_device_stats_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
-    uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Device statistics page (ssc-3 and adc)\n");
@@ -5267,7 +5159,6 @@ show_device_stats_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5281,117 +5172,123 @@ show_device_stats_page(const uint8_t * resp, int len,
             }
         }
         if (pc < 0x1000) {
-            ull = sg_get_unaligned_be(pl - 4, bp + 4);
+            bool vl_num = true;
+
             switch (pc) {
             case 0:
-                printf("  Lifetime media loads: %" PRIu64 "\n", ull);
+                printf("  Lifetime media loads:");
                 break;
             case 1:
-                printf("  Lifetime cleaning operations: %" PRIu64 "\n", ull);
+                printf("  Lifetime cleaning operations:");
                 break;
             case 2:
-                printf("  Lifetime power on hours: %" PRIu64 "\n", ull);
+                printf("  Lifetime power on hours:");
                 break;
             case 3:
-                printf("  Lifetime media motion (head) hours: %" PRIu64 "\n",
-                       ull);
+                printf("  Lifetime media motion (head) hours:");
                 break;
             case 4:
-                printf("  Lifetime metres of tape processed: %" PRIu64 "\n",
-                       ull);
+                printf("  Lifetime metres of tape processed:");
                 break;
             case 5:
                 printf("  Lifetime media motion (head) hours when "
-                       "incompatible media last loaded: %" PRIu64 "\n", ull);
+                       "incompatible media last loaded:");
                 break;
             case 6:
                 printf("  Lifetime power on hours when last temperature "
-                       "condition occurred: %" PRIu64 "\n", ull);
+                       "condition occurred:");
                 break;
             case 7:
                 printf("  Lifetime power on hours when last power "
-                       "consumption condition occurred: %" PRIu64 "\n", ull);
+                       "consumption condition occurred:");
                 break;
             case 8:
                 printf("  Media motion (head) hours since last successful "
-                       "cleaning operation: %" PRIu64 "\n", ull);
+                       "cleaning operation:");
                 break;
             case 9:
                 printf("  Media motion (head) hours since 2nd to last "
-                       "successful cleaning: %" PRIu64 "\n", ull);
+                       "successful cleaning:");
                 break;
             case 0xa:
                 printf("  Media motion (head) hours since 3rd to last "
-                       "successful cleaning: %" PRIu64 "\n", ull);
+                       "successful cleaning:");
                 break;
             case 0xb:
                 printf("  Lifetime power on hours when last operator "
                        "initiated forced reset\n    and/or emergency "
-                       "eject occurred: %" PRIu64 "\n", ull);
+                       "eject occurred:");
                 break;
             case 0xc:
-                printf("  Lifetime power cycles: %" PRIu64 "\n", ull);
+                printf("  Lifetime power cycles:");
                 break;
             case 0xd:
-                printf("  Volume loads since last parameter reset: %" PRIu64
-                       "\n", ull);
+                printf("  Volume loads since last parameter reset:");
                 break;
             case 0xe:
-                printf("  Hard write errors: %" PRIu64 "\n", ull);
+                printf("  Hard write errors:");
                 break;
             case 0xf:
-                printf("  Hard read errors: %" PRIu64 "\n", ull);
+                printf("  Hard read errors:");
                 break;
             case 0x10:
-                printf("  Duty cycle sample time: %" PRIu64 " ms\n", ull);
+                printf("  Duty cycle sample time (ms):");
                 break;
             case 0x11:
-                printf("  Read duty cycle: %" PRIu64 "\n", ull);
+                printf("  Read duty cycle:");
                 break;
             case 0x12:
-                printf("  Write duty cycle: %" PRIu64 "\n", ull);
+                printf("  Write duty cycle:");
                 break;
             case 0x13:
-                printf("  Activity duty cycle: %" PRIu64 "\n", ull);
+                printf("  Activity duty cycle:");
                 break;
             case 0x14:
-                printf("  Volume not present duty cycle: %" PRIu64 "\n", ull);
+                printf("  Volume not present duty cycle:");
                 break;
             case 0x15:
-                printf("  Ready duty cycle: %" PRIu64 "\n", ull);
+                printf("  Ready duty cycle:");
                 break;
             case 0x16:
                 printf("  MBs transferred from app client in duty cycle "
-                       "sample time: %" PRIu64 "\n", ull);
+                       "sample time:");
                 break;
             case 0x17:
                 printf("  MBs transferred to app client in duty cycle "
-                       "sample time: %" PRIu64 "\n", ull);
+                       "sample time:");
                 break;
             case 0x40:
-                printf("  Drive manufacturer's serial number: %" PRIu64 "\n",
-                       ull);
+                printf("  Drive manufacturer's serial number:");
                 break;
             case 0x41:
-                printf("  Drive serial number: %" PRIu64 "\n", ull);
+                printf("  Drive serial number:");
+                break;
+            case 0x42:          /* added ssc5r02b */
+                vl_num = false;
+                printf("  Manufacturing date (yyyymmdd): %.*s\n", pl - 4,
+                       bp + 4);
+                break;
+            case 0x43:          /* added ssc5r02b */
+                vl_num = false;
+                printf("  Manufacturing date (yyyyww): %.*s\n", pl - 4,
+                       bp + 4);
                 break;
             case 0x80:
-                printf("  Medium removal prevented: %" PRIu64 "\n", ull);
+                printf("  Medium removal prevented:");
                 break;
             case 0x81:
                 printf("  Maximum recommended mechanism temperature "
-                       "exceeded: %" PRIu64 "\n", ull);
-                break;
-            case 0x1000:
-                printf("  Medium motion hours for each medium type: %" PRIu64
-                       "\n", ull);
+                       "exceeded:");
                 break;
             default:
-                printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n", pc,
-                       ull);
+                vl_num = false;
+                printf("  Reserved parameter code [0x%x] data in hex:\n", pc);
+                dStrHex((const char *)bp + 4, pl - 4, 0);
                 break;
             }
-        } else {
+            if (vl_num)
+                printf(" %" PRIu64 "\n", sg_get_unaligned_be(pl - 4, bp + 4));
+        } else {        /* parameter_code >= 0x1000 */
             int k;
             const uint8_t * p = bp + 4;
 
@@ -5411,14 +5308,12 @@ show_device_stats_page(const uint8_t * resp, int len,
                            "hex:\n", pc);
                 else
                     printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
-                dStrHex((const char *)bp, pl, 0);
+                dStrHex((const char *)bp + 4, pl - 4, 0);
                 break;
             }
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5432,10 +5327,10 @@ skip:
 static bool
 show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
     uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Media statistics page (smc-3)\n");
@@ -5443,7 +5338,6 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5553,10 +5447,8 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                    pc, ull);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5571,7 +5463,7 @@ static bool
 show_element_stats_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     unsigned int v;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -5582,7 +5474,6 @@ show_element_stats_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5608,10 +5499,8 @@ show_element_stats_page(const uint8_t * resp, int len,
         printf("    Number of determined volume identifiers: %u\n", v);
         v = sg_get_unaligned_be32(bp + 24);
         printf("    Number of unreadable volume identifiers: %u\n", v);
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5626,7 +5515,7 @@ static bool
 show_tape_diag_data_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
-    int k, num, pl, pc, pcb;
+    int k, num, pl, pc;
     unsigned int v;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -5638,7 +5527,6 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5701,10 +5589,8 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
             printf("    Vendor specific:\n");
             dStrHex((const char *)(bp + 72), pl - 72, 0);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5719,7 +5605,7 @@ static bool
 show_mchanger_diag_data_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     unsigned int v;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -5731,7 +5617,6 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -5796,10 +5681,8 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
             printf("    Timestamp:\n");
             dStrHex((const char *)(bp + 94), 6, 1);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -5884,9 +5767,10 @@ static bool
 show_volume_stats_pages(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
-    int num, pl, pc, pcb, spf, subpg_code;
+    int num, pl, pc, subpg_code;
+    bool spf;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
     char b[64];
 
     spf = !!(resp[0] & 0x40);
@@ -5905,7 +5789,6 @@ show_volume_stats_pages(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -6095,10 +5978,8 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             dStrHex((const char *)(bp + 4), pl - 4, 0);
             break;
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("        <%s>\n", pcb_str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -6177,7 +6058,7 @@ static bool
 show_tape_alert_ssc_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
-    int num, pl, pc, pcb, flag;
+    int num, pl, pc, flag;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -6188,7 +6069,6 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -6212,10 +6092,8 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
                 printf("  Reserved parameter code 0x%x, flag: %d\n", pc,
                        flag);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, str, sizeof(str));
-            printf("        <%s>\n", str);
-        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -6230,9 +6108,9 @@ static bool
 show_seagate_cache_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int num, pl, pc, pcb;
+    int num, pl, pc;
     const uint8_t * bp;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Seagate cache page [0x37]\n");
@@ -6240,7 +6118,6 @@ show_seagate_cache_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -6269,11 +6146,9 @@ show_seagate_cache_page(const uint8_t * resp, int len,
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
         printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -6288,10 +6163,10 @@ static bool
 show_seagate_factory_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
-    int num, pl, pc, pcb, valid;
+    int num, pl, pc, valid;
     const uint8_t * bp;
     uint64_t ull;
-    char pcb_str[PCB_STR_LEN];
+    char str[PCB_STR_LEN];
 
     if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
         printf("Seagate/Hitachi factory page [0x3e]\n");
@@ -6299,7 +6174,6 @@ show_seagate_factory_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pcb = bp[2];
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -6329,11 +6203,9 @@ show_seagate_factory_page(const uint8_t * resp, int len,
             else
                 printf(" = %" PRIu64 "", ull);
         }
-        if (op->do_pcb) {
-            get_pcb_str(pcb, pcb_str, sizeof(pcb_str));
-            printf("\n        <%s>\n", pcb_str);
-        } else
-            printf("\n");
+        printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
 skip:
@@ -6346,7 +6218,8 @@ skip:
 static void
 decode_page_contents(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int pg_code, subpg_code, spf, vpn;
+    int pg_code, subpg_code, vpn;
+    bool spf;
     bool done = false;
     const struct log_elem * lep;
 
@@ -6773,7 +6646,7 @@ main(int argc, char * argv[])
 
     if (op->do_all && (pg_len > 1)) {
         int my_len = pg_len;
-        int spf;
+        bool spf;
         uint8_t parr[1024];
 
         spf = !!(rsp_buff[0] & 0x40);

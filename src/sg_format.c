@@ -36,7 +36,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.37 20160528";
+static const char * version_str = "1.38 20160629";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -83,6 +83,7 @@ struct opts_t {
         bool pinfo;             /* -p, deprecated, prefer fmtpinfo */
         int pollt;              /* -x value */
         bool pollt_given;
+        bool quick;             /* -Q */
         bool do_rcap16;         /* -l */
         bool resize;            /* -r */
         bool rto_req;           /* -R, deprecated, prefer fmtpinfo */
@@ -114,6 +115,7 @@ static struct option long_options[] = {
         {"pfu", required_argument, 0, 'P'},
         {"pie", required_argument, 0, 'q'},
         {"poll", required_argument, 0, 'x'},
+        {"quick", no_argument, 0, 'Q'},
         {"resize", no_argument, 0, 'r'},
         {"rto_req", no_argument, 0, 'R'},
         {"security", no_argument, 0, 'S'},
@@ -134,15 +136,17 @@ usage()
 {
         printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
                "[--early]\n"
-               "                 [--ffmt] [--fmtpinfo=FPI] [--format] "
-               "[--help] [--ip_def]\n"
-               "                 [--long] [--mode=MP] [--pfu=PFU] "
-               "[--pie=PIE] [--pinfo]\n"
-               "                 [--poll=PT] [--resize] [--rto_req] "
-               "[--security] [--six]\n"
-               "                 [--size=SIZE] [--tape=FM] [--timeout=SEC] "
-               "[--verbose]\n"
-               "                 [--verify] [--version] [--wait] DEVICE\n"
+               "                 [--ffmt=FFMT] [--fmtpinfo=FPI] [--format] "
+               "[--help]\n"
+               "                 [--ip_def] [--long] [--mode=MP] [--pfu=PFU] "
+               "[--pie=PIE]\n"
+               "                 [--pinfo] [--poll=PT] [--quick] [--resize] "
+               "[--rto_req]\n"
+               "                 [--security] [--six] [--size=SIZE] "
+               "[--tape=FM]\n"
+               "                 [--timeout=SEC] [--verbose] [--verify] "
+               "[--version] [--wait]\n"
+               "                 DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -165,7 +169,7 @@ usage()
                "                    use thrice for FORMAT UNIT command "
                "only\n"
                "    --help|-h       prints out this usage message\n"
-               "    --ip_def|-I     initialization pattern: default\n"
+               "    --ip_def|-I     use default initialization pattern\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
                "32 bit lbas)\n"
                "    --mode=MP|-M MP     mode page (def: 1 -> RW error "
@@ -179,7 +183,10 @@ usage()
                "ready\n"
                "                       1 for request sense (def: 0 (1 "
                "for tape))\n");
-        printf("    --resize|-r     resize (rather than format) to COUNT "
+        printf("    --quick|-Q      start format without pause for user "
+               "intervention\n"
+               "                    (i.e. no time to reconsider)\n"
+               "    --resize|-r     resize (rather than format) to COUNT "
                "value\n"
                "    --rto_req|-R    set lower bit of FMTPINFO field\n"
                "                    (deprecated use '--fmtpinfo=FPI' "
@@ -761,7 +768,7 @@ main(int argc, char **argv)
                 int c;
 
                 c = getopt_long(argc, argv,
-                                "c:C:Def:FhIlm:M:pP:q:rRs:St:T:vVwx:y6",
+                                "c:C:Def:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -847,6 +854,9 @@ main(int argc, char **argv)
                                         "to 15 inclusive\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
+                        break;
+                case 'Q':
+                        op->quick = true;
                         break;
                 case 'r':
                         op->resize = true;
@@ -1202,6 +1212,8 @@ again_with_long_lba:
         if (op->format) {
 format_only:
 #if 1
+                if (op->quick)
+                        goto skip_f_unit_reconsider;
                 printf("\nA FORMAT UNIT will commence in 15 seconds\n");
                 printf("    ALL data on %s will be DESTROYED\n",
                        op->device_name);
@@ -1217,6 +1229,7 @@ format_only:
                        op->device_name);
                 printf("        Press control-C to abort\n");
                 sleep_for(5);
+skip_f_unit_reconsider:
                 res = scsi_format_unit(fd, op);
                 ret = res;
                 if (res) {
@@ -1234,6 +1247,8 @@ format_only:
 format_med:
         if (! op->pollt_given)
                 op->pollt = 1;  /* SSC-5 specifies REQUEST SENSE polling */
+        if (op->quick)
+                goto skip_f_med_reconsider;
         printf("\nA FORMAT MEDIUM will commence in 15 seconds\n");
         printf("    ALL data on %s will be DESTROYED\n",
                op->device_name);
@@ -1249,6 +1264,7 @@ format_med:
                op->device_name);
         printf("        Press control-C to abort\n");
         sleep_for(5);
+skip_f_med_reconsider:
         res = scsi_format_medium(fd, op);
         ret = res;
         if (res) {
