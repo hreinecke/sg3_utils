@@ -1,7 +1,7 @@
 #
 # spec file for package sg3_utils
 #
-# Copyright (c) 2013 SUSE LINUX Products GmbH, Nuernberg, Germany.
+# Copyright (c) 2016 SUSE LINUX GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -14,25 +14,22 @@
 
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
-#
-# No patches, this is the maintainer's version for Suse targets.
-# Patch lines would appear after the "Source:" line and look like:
-#   Patch1:         sg3_utils-1.38r546.patch
-# then under the "%setup -q" line there would be one or more lines:
-#   %patch1 -p1
 
 
 Name:           sg3_utils
 %define lname	libsgutils2-2
-Version:        1.41
+Version:        1.43
 Release:        0
 Summary:        A collection of tools that send SCSI commands to devices
 License:        GPL-2.0+ and BSD-3-Clause
 Group:          Hardware/Other
 Url:            http://sg.danny.cz/sg/sg3_utils.html
 
-Source:         http://sg.danny.cz/sg/p/%name-%{version}.tar.xz
+Source:         %name-%version.tar.xz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
+BuildRequires:  libtool
+BuildRequires:  systemd-rpm-macros
+BuildRequires:  udev
 BuildRequires:  xz
 Requires(pre):  %insserv_prereq
 Provides:       scsi
@@ -87,18 +84,35 @@ applications that want to make use of libsgutils.
 %setup -q
 
 %build
+autoreconf -fi
 %configure --disable-static --with-pic
 make %{?_smp_mflags}
 
 %install
-make install DESTDIR="%buildroot"
+%make_install
 install -m 755 scripts/scsi_logging_level $RPM_BUILD_ROOT%{_bindir}
 install -m 755 scripts/rescan-scsi-bus.sh $RPM_BUILD_ROOT%{_bindir}
-%{__rm} -f %{buildroot}%{_libdir}/*.la
+install -m 644 doc/rescan-scsi-bus.sh.8 $RPM_BUILD_ROOT%{_mandir}/man8
+mkdir -p $RPM_BUILD_ROOT%{_udevrulesdir}
+install -m 644 scripts/55-scsi-sg3_id.rules $RPM_BUILD_ROOT%{_udevrulesdir}
+install -m 644 scripts/58-scsi-sg3_symlink.rules $RPM_BUILD_ROOT%{_udevrulesdir}
+mkdir -p $RPM_BUILD_ROOT%{_unitdir}
+install -m 644 scripts/lunmask.service $RPM_BUILD_ROOT%{_unitdir}
+mkdir -p $RPM_BUILD_ROOT%{_unitdir}/../scripts
+install -m 755 scripts/scsi-enable-target-scan.sh $RPM_BUILD_ROOT%{_unitdir}/../scripts
+rm -f %{buildroot}%{_libdir}/*.la
 
-%post   -p /sbin/ldconfig -n %lname
+%post -n %lname
+/sbin/ldconfig
 
-%postun -p /sbin/ldconfig -n %lname
+%preun
+%service_del_preun lunmask.service
+
+%postun
+%service_del_postun lunmask.service
+
+%postun -n %lname
+/sbin/ldconfig
 
 %files
 %defattr(-,root,root)
@@ -112,6 +126,11 @@ install -m 755 scripts/rescan-scsi-bus.sh $RPM_BUILD_ROOT%{_bindir}
 %_bindir/scsi_logging_level
 %_bindir/rescan-scsi-bus.sh
 %_mandir/man8/*.8*
+%{_udevrulesdir}/55-scsi-sg3_id.rules
+%{_udevrulesdir}/58-scsi-sg3_symlink.rules
+%dir %{_unitdir}/../scripts
+%{_unitdir}/../scripts/scsi-enable-target-scan.sh
+%{_unitdir}/lunmask.service
 
 %files -n %lname
 %defattr(-,root,root)
