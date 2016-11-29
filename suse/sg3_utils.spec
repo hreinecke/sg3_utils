@@ -96,6 +96,8 @@ install -m 644 doc/rescan-scsi-bus.sh.8 $RPM_BUILD_ROOT%{_mandir}/man8
 mkdir -p $RPM_BUILD_ROOT%{_udevrulesdir}
 install -m 644 scripts/55-scsi-sg3_id.rules $RPM_BUILD_ROOT%{_udevrulesdir}
 install -m 644 scripts/58-scsi-sg3_symlink.rules $RPM_BUILD_ROOT%{_udevrulesdir}
+install -m 644 scripts/65-cciss-compat.rules $RPM_BUILD_ROOT%{_udevrulesdir}
+install -m 755 scripts/cciss_id $RPM_BUILD_ROOT%{_udevrulesdir}/..
 mkdir -p $RPM_BUILD_ROOT%{_unitdir}
 install -m 644 scripts/lunmask.service $RPM_BUILD_ROOT%{_unitdir}
 mkdir -p $RPM_BUILD_ROOT%{_unitdir}/../scripts
@@ -128,6 +130,9 @@ rm -f %{buildroot}%{_libdir}/*.la
 %_mandir/man8/*.8*
 %{_udevrulesdir}/55-scsi-sg3_id.rules
 %{_udevrulesdir}/58-scsi-sg3_symlink.rules
+%{_udevrulesdir}/65-cciss-compat.rules
+%dir %{_udevrulesdir}/..
+%{_udevrulesdir}/../cciss_id
 %dir %{_unitdir}/../scripts
 %{_unitdir}/../scripts/scsi-enable-target-scan.sh
 %{_unitdir}/lunmask.service
