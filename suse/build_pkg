@@ -1,0 +1,138 @@
+#! /bin/bash
+
+set -e
+trap 'trap - ERR; echo error in $BASH_COMMAND on $LINENO >&2' ERR
+CLEANUP=:
+trap 'trap - 0; eval "$CLEANUP"' 0
+
+: ${API:=https://api.suse.de}
+: ${PKG:=sg3_utils}
+: ${OSCUSER:=}
+# Set LOCALDIR or use -d to check out to a known location
+: ${LOCALDIR:=}
+
+usage() {
+    echo usage: "$0 [ -d DIR ] PROJECT [ COMMIT_ID ]" >&2
+    exit 129
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+	-d|--dir) shift; LOCALDIR=$1;;
+	-*) usage;;
+	*) break;
+    esac
+    shift
+done
+
+PROJECT=$1
+COMM=$2
+[[ -n "$PROJECT" ]] || usage
+[[ -n "$COMM" ]] || COMM=HEAD
+
+if [[ -n "$LOCALDIR" ]]; then
+    [[ -d "$LOCALDIR" ]] || mkdir -p "$LOCALDIR"
+else
+    LOCALDIR=$(mktemp -d /tmp/ibs-XXXXXX)
+    CLEANUP='rm -rf "$LOCALDIR;"'"$CLEANUP"
+fi
+
+if [[ -z "$OSCUSER" ]]; then
+    OSCUSER=$(osc config "$API" user | sed -n "s/^.*is set to '\\([^']*\\)'/\1/p")
+    [[ -n "$OSCUSER" ]] || { echo "Failed to determine OSC user name" >&2; false; }
+fi
+OSCBRANCH="home:$OSCUSER:branches:$PROJECT"
+
+DIR=$LOCALDIR
+
+if [[ -d "$DIR/.osc" ]]; then
+    if [[ x"$(cat "$DIR"/.osc/_project)" != x"$OSCBRANCH" || \
+		x"$(cat "$DIR"/.osc/_package)" != x"$PKG" ]]; then
+	echo "osc project in $DIR doesnt match $OSCBRANCH/$PKG" >&2
+	false
+    fi
+    (cd "$DIR" && osc update)
+else
+    # If branch fails, assume it failed because already branched
+    osc branch "$PROJECT" "$PKG" || true
+    osc co -o "$LOCALDIR" "OSCBRANCH" "$PKG"
+fi
+
+DESC=$(git describe $COMM)
+TAG=${DESC%%-*}
+EXT=${DESC#*-}
+[[ x$EXT != x$TAG ]] || EXT=
+case $TAG in
+    V*) ;;
+    *) echo "Please create an annotated tag starting with 'V'" >&2; false;;
+esac
+
+TAG=${TAG#V}
+DATE=$(date "+%Y%m%d")
+
+if [[ -n "$EXT" ]]; then
+    TAIL=${EXT//-g/.suse.}
+    EXT="+$DATE.$TAIL"
+fi
+VERSION="$TAG$EXT"
+NAME="$PKG-$VERSION"
+FILE="$NAME".tar.xz
+OUT="$DIR/$FILE"
+
+NEWTAG=$(echo "$PROJECT" | tr A-Z: a-z-)
+
+git tag "$(date +"${NEWTAG}_%Y-%m-%d_%H-%M")"
+git archive --format=tar --prefix=${NAME}/ $COMM | \
+    xz -c > "$OUT"
+
+echo created "$OUT" >&2
+
+SPEC="$DIR/$PKG.spec"
+CHANGES="$DIR/$PKG.changes"
+[[ -f suse/$PKG.spec ]] && cp suse/$PKG.spec "$SPEC"
+
+last=$(sed -n '/^- /{s/^- //;s/ *(b[sn]c#[^)]*)//;p;q;}' "$CHANGES")
+last_hash=$(git log -n 1 --pretty=format:%h --grep "$last" | head -n 1)
+if [[ -n "$last_hash" ]]; then
+    git_sel="$last_hash"..
+else
+    echo "cannot determine previous commit" >&2
+    last=$(sed -n '2{s/\(20[0-9][0-9]\) - .*$/\1/p;q;}' "$CHANGES")
+    if [[ -n "$last" ]]; then
+	git_sel="--since='$last'"
+	echo "$git_sel"
+    else
+	git_sel="--since='last month'"
+    fi
+fi
+
+last_cmt=$(git log --pretty=format:%h -1)
+if [[ x"$last_hash" != x"$last_cmt" ]]; then
+    DD=$(mktemp -d /tmp/bmp-XXXXXX)
+    CLEANUP='rm -rf "$DD";'"$CLEANUP"
+    {
+	echo "- version $VERSION:"
+	git log --pretty=format:"- %s" "$git_sel"
+	echo; echo
+	cat $CHANGES
+    } >"$DD"/changes
+    cp -f "$DD"/changes "$CHANGES"
+fi
+
+if [[ -f "$SPEC" ]]; then
+    sed -i '
+s/^\(%define version_unconverted \)\(.*\)$/\1'"$VERSION"'/
+s/^\(Version:[ \t]*\)\(.*\)$/\1'"$VERSION"'/
+' "$SPEC"
+    echo modified $SPEC >&2
+    cd "$DIR"
+    mv "$FILE" "$FILE.BAK"
+    for x in "$PKG"-*.xz; do
+	osc rm --force "$x" || true
+    done
+    mv "$FILE.BAK" "$FILE"
+    osc add "$FILE" || true
+    osc status
+    osc vc
+    osc commit
+fi
