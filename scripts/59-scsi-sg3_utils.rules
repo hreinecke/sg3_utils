@@ -1,0 +1,18 @@
+# cciss compat rules
+
+ACTION!="add|change", GOTO="cciss_compat_end"
+KERNEL!="sd*", GOTO="cciss_compat_end"
+ENV{ID_VENDOR}!="HP", ENV{ID_VENDOR}!="COMPAQ", GOTO="cciss_compat_end"
+ENV{ID_MODEL}!="LOGICAL_VOLUME", GOTO="cciss_compat_end"
+
+ENV{DEVTYPE}=="disk", DRIVERS=="hpsa", IMPORT{program}="cciss_id %p"
+ENV{DEVTYPE}=="partition", IMPORT{parent}="ID_*"
+ENV{ID_CCISS}!="?*", GOTO="cciss_compat_end"
+
+ENV{DEVTYPE}=="disk", SYMLINK+="cciss/$env{ID_CCISS}"
+ENV{DEVTYPE}=="disk", ENV{ID_SERIAL}=="?*", SYMLINK+="disk/by-id/cciss-$env{ID_SERIAL}"
+
+ENV{DEVTYPE}=="partition", SYMLINK+="cciss/$env{ID_CCISS}p%n"
+ENV{DEVTYPE}=="partition", ENV{ID_SERIAL}=="?*", SYMLINK+="disk/by-id/cciss-$env{ID_SERIAL}-part%n"
+
+LABEL="cciss_compat_end"
