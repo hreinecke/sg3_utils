@@ -1002,7 +1002,7 @@ flushmpaths()
 # Find resized luns
 findresized()
 {
-  local devs=`ls /sys/class/scsi_device/`
+  local devs=
   local size=
   local new_size=
   local sysfs_path=
@@ -1011,6 +1011,14 @@ findresized()
   local m=
   local mpathsize=
   declare -a mpathsizes
+
+  if [ -z "$lunsearch" ] ; then
+    devs=`ls /sys/class/scsi_device/`
+  else
+    for lun in $lunsearch ; do
+      devs="$devs `(cd /sys/class/scsi_device/ && ls -d *:${lun})`"
+    done
+  fi
 
   for hctl in $devs ; do
     sysfs_path="/sys/class/scsi_device/$hctl/device"
