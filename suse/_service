@@ -1,0 +1,15 @@
+<services>
+  <service name="tar_scm">
+    <param name="scm">git</param>
+    <param name="url">https://github.com/hreinecke/sg3_utils.git</param>
+    <param name="subdir"></param>
+    <param name="filename">sg3_utils</param>
+    <param name="versionformat">1.43+%cd.@TAG_OFFSET@.suse.%h</param>
+    <param name="revision">sles12-sp2</param>
+  </service>
+  <service name="recompress">
+    <param name="file">*sg3_utils*.tar</param>
+    <param name="compression">xz</param>
+  </service>
+  <service name="set_version"/>
+</services>
