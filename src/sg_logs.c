@@ -1947,13 +1947,13 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             }
         }
         switch (pc) {
-        case 0:
-            printf("  Accumulated transitions to active"); break;
         case 1:
-            printf("  Accumulated transitions to idle_a"); break;
+            printf("  Accumulated transitions to active"); break;
         case 2:
-            printf("  Accumulated transitions to idle_b"); break;
+            printf("  Accumulated transitions to idle_a"); break;
         case 3:
+            printf("  Accumulated transitions to idle_b"); break;
+        case 4:
             printf("  Accumulated transitions to idle_c"); break;
         case 8:
             printf("  Accumulated transitions to standby_z"); break;
