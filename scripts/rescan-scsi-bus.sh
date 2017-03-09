@@ -16,7 +16,7 @@ setcolor ()
   norm="\e[0;0m"
 }
 
-unsetcolor () 
+unsetcolor ()
 {
   red=""; green=""
   yellow=""; norm=""
@@ -55,9 +55,9 @@ white_out ()
 # Return hosts. sysfs must be mounted
 findhosts_26 ()
 {
-  hosts=`find /sys/class/scsi_host/host* -maxdepth 4 -type d -o -type l 2> /dev/null | awk -F'/' '{print $5}' | sed -e 's~host~~' | sort -nu` 
-  scsi_host_data=`echo "$hosts" | sed -e 's~^~/sys/class/scsi_host/host~'` 
-  for hostdir in $scsi_host_data; do 
+  hosts=`find /sys/class/scsi_host/host* -maxdepth 4 -type d -o -type l 2> /dev/null | awk -F'/' '{print $5}' | sed -e 's~host~~' | sort -nu`
+  scsi_host_data=`echo "$hosts" | sed -e 's~^~/sys/class/scsi_host/host~'`
+  for hostdir in $scsi_host_data; do
     hostno=${hostdir#/sys/class/scsi_host/host}
     if [ -f $hostdir/isp_name ] ; then
       hostname="qla2xxx"
@@ -68,7 +68,7 @@ findhosts_26 ()
     fi
     #hosts="$hosts $hostno"
     echo_debug "Host adapter $hostno ($hostname) found."
-  done  
+  done
   if [ -z "$hosts" ] ; then
     echo "No SCSI host adapters found in sysfs"
     exit 1;
@@ -125,7 +125,7 @@ printtype ()
 
 print02i()
 {
-    if [ "$1" = "*" ] ; then 
+    if [ "$1" = "*" ] ; then
         echo "00"
     else
         printf "%02i" "$1"
@@ -133,10 +133,10 @@ print02i()
 }
 
 # Get /proc/scsi/scsi info for device $host:$channel:$id:$lun
-# Optional parameter: Number of lines after first (default = 2), 
+# Optional parameter: Number of lines after first (default = 2),
 # result in SCSISTR, return code 1 means empty.
 procscsiscsi ()
-{  
+{
   if test -z "$1"; then LN=2; else LN=$1; fi
   CHANNEL=`print02i "$channel"`
   ID=`print02i "$id"`
@@ -187,7 +187,7 @@ sgdevice26 ()
       fi
     done
     SGDEV=""
-  fi  
+  fi
 }
 
 # Find sg device with 2.4 report-devs extensions
@@ -205,7 +205,7 @@ sgdevice ()
   SGDEV=
   if test -d /sys/class/scsi_device; then
     sgdevice26
-  else  
+  else
     DRV=`grep 'Attached drivers:' /proc/scsi/scsi 2>/dev/null`
     repdevstat=$((1-$?))
     if [ $repdevstat = 0 ]; then
@@ -407,7 +407,7 @@ getluns()
       # Swap LUN number
       l0=0x$lun
       l1=$(( ($l0 >> 48) & 0xffff ))
-      l2=$(( ($l0 >> 32) & 0xffff )) 
+      l2=$(( ($l0 >> 32) & 0xffff ))
       l3=$(( ($l0 >> 16) & 0xffff ))
       l4=$(( $l0 & 0xffff ))
       l0=$(( ( ( ($l4 * 0xffff) + $l3 ) * 0xffff + $l2 ) * 0xffff + $l1 ))
@@ -420,7 +420,7 @@ getluns()
 udevadm_settle()
 {
   local tmo=60
-  if test -x /sbin/udevadm; then 
+  if test -x /sbin/udevadm; then
     print_and_scroll_back " Calling udevadm settle (can take a while) "
     # Loop for up to 60 seconds if sd devices still are settling..
     # This allows us to continue if udev events are stuck on multipaths in recovery mode
@@ -535,10 +535,10 @@ dolunscan()
       # Device not present
       printf "\r\e[A";
       # Optimization: if lun==0, stop here (only if in non-remove mode)
-      if test $lun = 0 -a -z "$remove" -a $optscan = 1; then 
+      if test $lun = 0 -a -z "$remove" -a $optscan = 1; then
         break;
       fi
-    else 
+    else
       if test "$remappedlun0" != "2" ; then
         incrfound "$host:$channel:$id:$lun"
       fi
@@ -590,7 +590,7 @@ doreportlun()
   # OK -- if we don't have a LUN to send a REPORT_LUNS to, we could
   # fall back to wildcard scanning. Same thing if the device does not
   # support REPORT_LUNS
-  # TODO: We might be better off to ALWAYS use wildcard scanning if 
+  # TODO: We might be better off to ALWAYS use wildcard scanning if
   # it works
   if test "$REPLUNSTAT" = "1"; then
     if test -e /sys/class/scsi_host/host${host}/scan; then
@@ -619,7 +619,7 @@ doreportlun()
         newsearch="$newsearch $tmplun"
       fi
     done
-    # OK, we have now done a lunscan on $lun and 
+    # OK, we have now done a lunscan on $lun and
     # $newsearch is the old $targetluns without $lun
     if [ -z "$inlist" ]; then
       # Stale lun
@@ -659,14 +659,14 @@ dosearch ()
     done
   done
 }
- 
+
 expandlist ()
 {
   list=$1
   result=""
   first=${list%%,*}
   rest=${list#*,}
-  while test ! -z "$first"; do 
+  while test ! -z "$first"; do
     beg=${first%%-*};
     if test "$beg" = "$first"; then
       result="$result $beg";
@@ -853,11 +853,11 @@ incrrmvd()
 findsddev()
 {
   local hctl="$1"
-  local sddev=  
+  local sddev=
 
   if test ! -e /sys/class/scsi_device/$hctl/device/block ; then
     return 1
-  fi 
+  fi
 
   sddev=`ls /sys/class/scsi_device/$hctl/device/block`
   echo $sddev
@@ -1095,7 +1095,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--issue-lip:     same as -i"
     echo "--issue-lip-wait=SECS:     same as -I"
     echo "--largelun:      Tell kernel to support LUNs > 7 even on SCSI2 devs"
-    echo "--luns=LIST:     Scan only lun(s) in LIST"  
+    echo "--luns=LIST:     Scan only lun(s) in LIST"
     echo "--multipath:     same as -m"
     echo "--nooptscan:     don't stop looking for LUNs is 0 is not found"
     echo "--remove:        same as -r"
@@ -1143,8 +1143,8 @@ if test -x /usr/bin/sg_inq; then
   fi
 else
   echo "WARN: /usr/bin/sg_inq not present -- please install sg3_utils"
-  echo " or rescan-scsi-bus.sh might not fully work."     
-fi    
+  echo " or rescan-scsi-bus.sh might not fully work."
+fi
 
 # defaults
 unsetcolor
@@ -1189,9 +1189,9 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     -forcerescan) remove=1; forcerescan=1 ;;
     -forceremove) remove=1; forceremove=1 ;;
     -hosts=*)     arg=${opt#-hosts=};   hosts=`expandlist $arg` ;;
-    -channels=*)  arg=${opt#-channels=};opt_channelsearch=`expandlist $arg` ;; 
+    -channels=*)  arg=${opt#-channels=};opt_channelsearch=`expandlist $arg` ;;
     -ids=*)   arg=${opt#-ids=};         opt_idsearch=`expandlist $arg` ; filter_ids=1;;
-    -luns=*)  arg=${opt#-luns=};        lunsearch=`expandlist $arg` ;; 
+    -luns=*)  arg=${opt#-luns=};        lunsearch=`expandlist $arg` ;;
     -color) setcolor ;;
     -nooptscan) optscan=0 ;;
     -issue-lip) lipreset=0 ;;
@@ -1210,20 +1210,20 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   esac
   shift
   opt="$1"
-done    
+done
 
 if [ -z "$hosts" ] ; then
-  if test -d /sys/class/scsi_host; then 
+  if test -d /sys/class/scsi_host; then
     findhosts_26
-  else  
+  else
     findhosts
-  fi  
+  fi
 fi
 
 if [ -d /sys/class/scsi_host -a ! -w /sys/class/scsi_host ]; then
   echo "You need to run scsi-rescan-bus.sh as root"
   exit 2
-fi  
+fi
 if test "$sync" = 1 -a "$remove" = 1; then sync=2; fi
 if test "$sync" = 2; then echo "Syncing file systems"; sync; fi
 if test -w /sys/module/scsi_mod/parameters/default_dev_flags -a $scan_flags != 0; then
@@ -1236,7 +1236,7 @@ if test -w /sys/module/scsi_mod/parameters/default_dev_flags -a $scan_flags != 0
   else
     unset OLD_SCANFLAGS
   fi
-fi  
+fi
 DMSETUP=$(which dmsetup)
 [ -z "$DMSETUP" ] && flush= && mp_enable=
 MULTIPATH=$(which multipath)
@@ -1324,7 +1324,7 @@ if test -n "$mp_enable" -a $rmvd_found -gt 0 ; then
       echo "Trying to discover new multipath mappings for newly discovered devices... "
       $MULTIPATH | grep "create:" 2> /dev/null
     fi
-  fi 
+  fi
 fi
 
 echo "$found new or changed device(s) found.          "
