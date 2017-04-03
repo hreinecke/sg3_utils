@@ -127,7 +127,8 @@ message. There is an associated kernel message (viewable with dmesg) that an
 attempt has been made to map <n> bytes which is greater than
 DFLTPHYS(65536). Still a problem in FreeBSD 8.1 . Due to CAM overhead the
 largest power of 2 that can fit through with one command is 32768 bytes (32
-KB).
+KB). This issue can be resolved by forcing a maximum response length if the
+command has one: `sg_ses --maxlen=32768 /dev/ses0`
 
 FreeBSD 9.0 is the most recent version of FreeBSD tested with these
 utilities.
