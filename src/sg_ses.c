@@ -1298,7 +1298,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
         pr2serr("\n");
     }
 
-    if (NULL == op->dev_name) {
+    if (NULL == op->dev_name && !op->data_arr) {
         pr2serr("missing DEVICE name!\n");
         goto err_help;
     }
@@ -1624,6 +1624,23 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
     memset(rsp_buff, 0, rsp_buff_size);
     if (rsp_lenp)
         *rsp_lenp = 0;
+    if (op->data_arr) {
+        memcpy(rsp_buff, op->data_arr + 4, op->arr_len);
+        cp = (char *)&op->data_arr[4];
+        res = 0;
+        if (op->verbose > 2) {
+            pr2serr("    receive diagnostic results: response");
+            if (3 == op->verbose) {
+                pr2serr("%s:\n", (op->arr_len > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)rsp_buff,
+                           (op->arr_len > 256 ? 256 : op->arr_len), -1);
+            } else {
+                pr2serr(":\n");
+                dStrHexErr((const char *)rsp_buff, op->arr_len, 0);
+            }
+        }
+        goto decode;
+    }
     cp = find_in_diag_page_desc(page_code);
     if (op->verbose > 1) {
         if (cp)
@@ -1634,6 +1651,7 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
     }
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
                              rsp_buff_size, 1, op->verbose);
+decode:
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {
@@ -4818,7 +4836,7 @@ enumerate_work(const struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res;
+    int sg_fd = -1, res;
     char buff[128];
     char b[80];
     int pd_type = 0;
@@ -4892,13 +4910,15 @@ main(int argc, char * argv[])
         scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT pt interface */);
 #endif
 #endif
-    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
-    if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", op->dev_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+    if (op->dev_name) {
+        sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
+        if (sg_fd < 0) {
+            pr2serr("open error: %s: %s\n", op->dev_name,
+                    safe_strerror(-sg_fd));
+            return SG_LIB_FILE_ERROR;
+        }
     }
-    if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
+    if (sg_fd >= 0 && ! (op->do_raw || have_cgs || (op->do_hex > 2))) {
         if (sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->dev_name);
             ret = SG_LIB_CAT_OTHER;
@@ -5021,7 +5041,8 @@ err_out:
     if (ret && (0 == op->verbose))
         pr2serr("Problem detected, try again with --verbose option for more "
                 "information\n");
-    res = sg_cmds_close_device(sg_fd);
+    if (sg_fd >= 0)
+        res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
