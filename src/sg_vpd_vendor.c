@@ -90,6 +90,7 @@
 struct opts_t {
     int do_all;
     int do_enum;
+    int do_force;
     int do_hex;
     int num_vpd;
     int do_ident;
