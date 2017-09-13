@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "April 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_INQ "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -207,7 +207,8 @@ print out version string then exit.
 set the Enable Vital Product Data (EVPD) bit (defaults to clear(0)). Used in
 conjunction with the \fI\-\-page=PG\fR option where \fIPG\fR specifies the
 VPD page number to query. If the \fI\-\-page=PG\fR is not given then \fIPG\fR
-defaults to zero which is the "Supported VPD pages" VPD page.
+defaults to zero which is the "Supported VPD pages" VPD page. A more up to
+date decoding of VPD pages can be found in the sg_vpd(8) utility.
 .SH NOTES
 Some devices with weak SCSI command set implementations lock up when
 they receive commands they don't understand (or even response lengths
@@ -447,4 +448,5 @@ Copyright \(co 2001\-2016 Douglas Gilbert
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_opcodes(8), sg_vpd(8), sdparm(8), hdparm(8), sgdiag(scsirastools)
+.B sg_opcodes(8), sg_vpd(8), sg_logs(8), sg_modes(8), sdparm(8), hdparm(8),
+.B sgdiag(scsirastools)

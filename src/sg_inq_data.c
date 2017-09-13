@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2016 D. Gilbert
+*  Copyright (C) 2000-2017 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -48,8 +48,8 @@ struct sg_version_descriptor {
     const char * name;
 };
 
-/* table from SPC-5 revision 10 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20160510 */
+/* table from SPC-5 revision 16 [sorted numerically (from Annex E.9)] */
+/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20170114 */
 
 
 #ifdef SG_SCSI_STRINGS
@@ -76,6 +76,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa0, "SAM-5 (no version claimed)"},
     {0xa2, "SAM-5 T10/2104-D revision 4"},
     {0xa4, "SAM-5 T10/2104-D revision 20"},
+    {0xa8, "SAM-5 ANSI INCITS 515-2016"},
     {0xa6, "SAM-5 T10/2104-D revision 21"},
     {0xc0, "SAM-6 (no version claimed)"},
     {0x120, "SPC (no version claimed)"},
@@ -226,17 +227,20 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x560, "OSD-3 (no version claimed)"},
     {0x580, "SES-3 (no version claimed)"},
     {0x582, "SES-3 T10/BSR INCITS 518 revision 13"},
+    {0x584, "SES-3 T10/BSR INCITS 518 revision 14"},
     {0x5a0, "SSC-5 (no version claimed)"},
     {0x5c0, "SPC-5 (no version claimed)"},
     {0x5e0, "SFSC (no version claimed)"},
     {0x5e3, "SFSC BSR INCITS 501 revision 01"},
     {0x5e5, "SFSC BSR INCITS 501 revision 02"},
+    {0x5e8, "SFSC ANSI INCITS 501-2016"},
     {0x600, "SBC-4 (no version claimed)"},
     {0x620, "ZBC (no version claimed)"},
     {0x622, "ZBC BSR INCITS 536 revision 02"},
     {0x624, "ZBC BSR INCITS 536 revision 05"},
     {0x640, "ADC-4 (no version claimed)"},
     {0x660, "ZBC-2 (no version claimed)"},
+    {0x680, "SES-4 (no version claimed)"},
     {0x820, "SSA-TL2 (no version claimed)"},
     {0x83b, "SSA-TL2 T10/1147-D revision 05b"},
     {0x83c, "SSA-TL2 ANSI INCITS 308-1998"},
@@ -362,6 +366,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc65, "SAS-3 T10/BSR INCITS 519 revision 06"},
     {0xc68, "SAS-3 ANSI INCITS 519-2014"},
     {0xc80, "SAS-4 (no version claimed)"},
+    {0xc82, "T10/BSR INCITS 534 revision 08a"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "
@@ -499,6 +504,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1ee8, "SAT-3 ANSI INCITS 517-2015"},
     {0x1f00, "SAT-4 (no version claimed)"},
     {0x1f02, "SAT-4 T10/BSR INCITS 491 revision 5"},
+    {0x1f04, "SAT-4 T10/BSR INCITS 491 revision 6"},
     {0x20a0, "SPL (no version claimed)"},
     {0x20a3, "SPL T10/2124-D revision 6a"},
     {0x20a5, "SPL T10/2124-D revision 7"},
@@ -515,6 +521,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x20e8, "SPL-3 ANSI INCITS 492-2015"},
     {0x2100, "SPL-4 (no version claimed)"},
     {0x2102, "SPL-4 T10/BSR INCITS 538 revision 08a"},
+    {0x2104, "SPL-4 T10/BSR INCITS 538 revision 10"},
+    {0x2105, "SPL-4 T10/BSR INCITS 538 revision 11"},
+    {0x2120, "SPL-5 (no version claimed)"},
     {0x21e0, "SOP (no version claimed)"},
     {0x21e4, "SOP T10/BSR INCITS 489 revision 4"},
     {0x21e6, "SOP T10/BSR INCITS 489 revision 5"},
@@ -525,6 +534,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x2208, "PQI ANSI INCITS 490-2014"},
     {0x2220, "SOP-2 (no draft published)"},
     {0x2240, "PQI-2 (no version claimed)"},
+    {0x2244, "PQI-2 PQI-2 ANSI INCITS 507-2016"},
     {0x2242, "PQI-2 T10/BSR INCITS 507 revision 01"},
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},

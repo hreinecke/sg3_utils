@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20160914] [svn: r713]
+Changelog for sg3_utils-1.43 [20170912] [svn: r713]
   - sg_bg_ctl: new Background control command (spc4r08)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
@@ -14,6 +14,11 @@ Changelog for sg3_utils-1.43 [20160914] [svn: r713]
     - expand join debug code
     - allow multiple --clear=, --get= and --set= options
     - allow individual index ranges (e.g. --index=3,5)
+    - allow --index=IIA with -ee to enumerate only fields
+      belonging to element type IIA
+    - add 'offset_temp' and 'rqst_override' to temperature
+      sensor element type
+    - sync to ses4r01
   - sg_luns: resync with drafts (sam6r02+spc5r10)
     - remove undocumented test "W" format
     - accept and output on request "quad dashed" format
@@ -24,8 +29,10 @@ Changelog for sg3_utils-1.43 [20160914] [svn: r713]
       Service buffer information lpages for tape
     - add min+max 'mounted' temperature and rel. humidity
       fields to Environmental reporting lpage (spc5r10)
+    - add zoned block device statistics lpage (zbc2r?,
+      16-264r4)
   - sg_inq: fix potential unbounded loop in --export
-    - update version descriptor list to 20160510
+    - update version descriptor list to 20170114
   - sg_inq+sg_vpd: update Extended inquiry data vpd
     page (spc5r09)
     - add --force option to bypass checking supported
@@ -39,13 +46,23 @@ Changelog for sg3_utils-1.43 [20160914] [svn: r713]
   - sg_zone: fix debug cdb naming
   - sg_opcode: add '--enumerate' and '--pdt=' options
   - sg_raw: add '--enumerate' option
+  - sg_get_lba_status: add --report-type= option (sbc4r12)
+    - add support for 32 byte cdb variant (sbc4r14)
+    - add support for --element-id= and --scan-len=
+      options (sbc4r14)
+    - decode response's RTP and two more provisioning
+      statuses and the additional status (sbc4r12)
+    - decode completion condition (sbc4r14)
   - sg_lib: add SSC maintenance in/out sa names
     - add read buffer(16) command mode names
     - add sg_decode_transportid_str()
     - add sg_get_llnum_nomult()
+    - add sg_ll_get_lba_status16()
+    - add sg_ll_get_lba_status32()
     - implement 'format' argument in dStrHexStr()
     - add Microcode activation sense descriptor spc5r10
-  - sg_lib_data: sync asc/ascq codes with T10 20160425
+    - add sg_get_sfs_name() for spc5r11 (Feature sets)
+  - sg_lib_data: sync asc/ascq codes with T10 20170114
     - add write scattered (16+32) cdb names sbc4r11
   - sg_cmds_extra: expand sg_ll_ata_pt() to send new
     Ata pass-through(32) command (sat4r05)

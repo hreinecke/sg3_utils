@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2016 Douglas Gilbert.
+ * Copyright (c) 1999-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,6 +39,7 @@
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -2088,7 +2089,7 @@ sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
 
 static const char * bad_sense_cat = "Bad sense category";
 
-/* Yield string associated with sense++ category. Returns 'buff' (or pointer
+/* Yield string associated with sense category. Returns 'buff' (or pointer
  * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
  * yield "Sense category: <sense_cat>" string. */
 const char *
@@ -2243,6 +2244,97 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
                      "information");
         break;
     }
+    return buff;
+}
+
+static const char * sg_sfs_spc_reserved = "SPC reserved";
+static const char * sg_sfs_sbc_reserved = "SBC reserved";
+static const char * sg_sfs_ssc_reserved = "SSC reserved";
+static const char * sg_sfs_zbc_reserved = "ZBC reserved";
+static const char * sg_sfs_reserved = "Reserved";
+
+/* Yield SCSI Feature Set (sfs) string. When 'peri_type' is < -1 (or > 31)
+ * returns pointer to string (same as 'buff') associated with 'sfs_code'.
+ * When 'peri_type' is between -1 (for SPC) and 31 (inclusive) then a match
+ * on both 'sfs_code' and 'peri_type' is required. If a match is found and
+ * 'foundp' is not NULL then the bool it points to is set to true; else if
+ * 'foundp' is not NULL then the bool it points to is set to false.
+ * Example:
+ *    char b[64];
+ *    ...
+ *    printf("%s\n", sg_get_sfs_str(sfs_code, -2, sizeof(b), b, NULL, 0));
+ */
+const char *
+sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len, char * buff,
+               bool * foundp, int verbose)
+{
+    const struct sg_lib_value_name_t * vnp = NULL;
+    int n = 0;
+    int my_pdt;
+
+    if ((NULL == buff) || (buff_len < 1)) {
+        if (foundp)
+            *foundp = false;
+        return NULL;
+    } else if (1 == buff_len) {
+        buff[0] = '\0';
+        if (foundp)
+            *foundp = false;
+        return NULL;
+    }
+    my_pdt = ((peri_type < -1) || (peri_type > 0x1f)) ? -2 : peri_type;
+    vnp = get_value_name(sg_lib_scsi_feature_sets, sfs_code, my_pdt);
+    if (vnp && (-2 != my_pdt)) {
+        if (peri_type != vnp->peri_dev_type)
+            vnp = NULL;         /* shouldn't really happen */
+    }
+    if (foundp)
+        *foundp = vnp ? true : false;
+    if (sfs_code < 0x100) {             /* SPC Feature Sets */
+        if (vnp) {
+            if (verbose)
+                n += scnpr(buff, buff_len, "SPC %s", vnp->name);
+            else
+                n += scnpr(buff, buff_len, "%s", vnp->name);
+        } else
+            n += scnpr(buff, buff_len, "%s", sg_sfs_spc_reserved);
+    } else if (sfs_code < 0x200) {      /* SBC Feature Sets */
+        if (vnp) {
+            if (verbose)
+                n += scnpr(buff, buff_len, "SBC %s", vnp->name);
+            else
+                n += scnpr(buff, buff_len, "%s", vnp->name);
+        } else
+            n += scnpr(buff, buff_len, "%s", sg_sfs_sbc_reserved);
+    } else if (sfs_code < 0x300) {      /* SSC Feature Sets */
+        if (vnp) {
+            if (verbose)
+                n += scnpr(buff, buff_len, "SSC %s", vnp->name);
+            else
+                n += scnpr(buff, buff_len, "%s", vnp->name);
+        } else
+            n += scnpr(buff, buff_len, "%s", sg_sfs_ssc_reserved);
+    } else if (sfs_code < 0x400) {      /* ZBC Feature Sets */
+        if (vnp) {
+            if (verbose)
+                n += scnpr(buff, buff_len, "ZBC %s", vnp->name);
+            else
+                n += scnpr(buff, buff_len, "%s", vnp->name);
+        } else
+            n += scnpr(buff, buff_len, "%s", sg_sfs_zbc_reserved);
+    } else {                            /* Other SCSI Feature Sets */
+        if (vnp) {
+            if (verbose)
+                n += scnpr(buff, buff_len, "[unrecognized PDT] %s",
+                           vnp->name);
+            else
+                n += scnpr(buff, buff_len, "%s", vnp->name);
+        } else
+            n += scnpr(buff, buff_len, "%s", sg_sfs_reserved);
+
+    }
+    if (verbose > 4)
+        pr2serr("%s: length of returned string (n) %d\n", __func__, n);
     return buff;
 }
 

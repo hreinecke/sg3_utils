@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -109,8 +109,15 @@ extern "C" {
 #define TPROTO_PCIE 0xb         /* includes NVMe */
 #define TPROTO_NONE 0xf
 
+/* SCSI Feature Sets (sfs) */
+#define SCSI_FS_SPC_DISCOVERY_2016 0x1
+#define SCSI_FS_SBC_BASE_2010 0x102
+#define SCSI_FS_SBC_BASE_2016 0x101
+#define SCSI_FS_SBC_BASIC_PROV_2016 0x103
+#define SCSI_FS_SBC_DRIVE_MAINT_2016 0x104
 
-/* The format of the version string is like this: "1.87 20130731" */
+
+/* The format of the version string is like this: "2.26 20170906" */
 const char * sg_lib_version();
 
 /* Returns length of SCSI command given the opcode (first byte).
@@ -263,6 +270,20 @@ const char * sg_get_desig_code_set_str(int val);
 /* Returns a designator's association string given 'val' (0 to 3 inclusive),
  * otherwise returns NULL. */
 const char * sg_get_desig_assoc_str(int val);
+
+/* Yield SCSI Feature Set (sfs) string. When 'peri_type' is < -1 (or > 31)
+ * returns pointer to string (same as 'buff') associated with 'sfs_code'.
+ * When 'peri_type' is between -1 (for SPC) and 31 (inclusive) then a match
+ * on both 'sfs_code' and 'peri_type' is required. If a match is found and
+ * 'foundp' is not NULL then the bool it points to is set to true; else if
+ * 'foundp' is not NULL then the bool it points to is set to false.
+ * Example:
+ *    char b[64];
+ *    ...
+ *    printf("%s\n", sg_get_sfs_str(sfs_code, -2, sizeof(b), b, NULL, 0));
+ */
+const char * sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len,
+                            char * buff, bool * foundp, int verbose);
 
 extern FILE * sg_warnings_strm;
 

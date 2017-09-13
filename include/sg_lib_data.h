@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2016 Douglas Gilbert.
+ * Copyright (c) 2007-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -92,6 +92,7 @@ extern struct sg_lib_value_name_t sg_lib_read_attr_arr[];
 extern struct sg_lib_value_name_t sg_lib_read_pos_arr[];
 extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
 extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
+extern struct sg_lib_value_name_t sg_lib_scsi_feature_sets[];
 extern const char * sg_lib_sense_key_desc[];
 extern const char * sg_lib_pdt_strs[];
 extern const char * sg_lib_transport_proto_strs[];

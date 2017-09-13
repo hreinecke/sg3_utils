@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.25 20160701";  /* spc5r10 + sbc4r11 */
+static const char * version_str = "1.26 20170911";  /* spc5r16 + sbc4r14 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -86,8 +86,8 @@ void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
 #define VPD_UNIT_SERIAL_NUM 0x80
-#define VPD_IMP_OP_DEF 0x81     /* obsolete in SPC-2 */
-#define VPD_ASCII_OP_DEF 0x82   /* obsolete in SPC-2 */
+#define VPD_IMP_OP_DEF 0x81             /* obsolete in SPC-2 */
+#define VPD_ASCII_OP_DEF 0x82           /* obsolete in SPC-2 */
 #define VPD_DEVICE_ID 0x83
 #define VPD_SOFTW_INF_ID 0x84
 #define VPD_MAN_NET_ADDR 0x85
@@ -99,26 +99,27 @@ void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 #define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_CFA_PROFILE_INFO 0x8c
 #define VPD_POWER_CONSUMPTION  0x8d
-#define VPD_3PARTY_COPY 0x8f    /* 3PC, XCOPY, SPC-4, SBC-3 */
+#define VPD_3PARTY_COPY 0x8f            /* 3PC, XCOPY, SPC-4, SBC-3 */
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
-#define VPD_BLOCK_LIMITS 0xb0   /* SBC-3 */
-#define VPD_SA_DEV_CAP 0xb0     /* SSC-3 */
-#define VPD_OSD_INFO 0xb0       /* OSD */
-#define VPD_BLOCK_DEV_CHARS 0xb1 /* SBC-3 */
-#define VPD_MAN_ASS_SN 0xb1     /* SSC-3, ADC-2 */
-#define VPD_SECURITY_TOKEN 0xb1 /* OSD */
-#define VPD_TA_SUPPORTED 0xb2   /* SSC-3 */
-#define VPD_LB_PROVISIONING 0xb2   /* SBC-3 */
-#define VPD_REFERRALS 0xb3   /* SBC-3 */
-#define VPD_AUTOMATION_DEV_SN 0xb3   /* SSC-3 */
-#define VPD_SUP_BLOCK_LENS 0xb4 /* SBC-4 */
-#define VPD_DTDE_ADDRESS 0xb4   /* SSC-4 */
-#define VPD_BLOCK_DEV_C_EXTENS 0xb5 /* SBC-4 */
-#define VPD_LB_PROTECTION 0xb5  /* SSC-5 */
-#define VPD_ZBC_DEV_CHARS 0xb6  /* ZBC */
-#define VPD_BLOCK_LIMITS_EXT 0xb7   /* SBC-4 */
-#define VPD_NO_RATHER_STD_INQ -2      /* request for standard inquiry */
+#define VPD_SCSI_FEATURE_SETS 0x92      /* spc5r11 */
+#define VPD_BLOCK_LIMITS 0xb0           /* SBC-3 */
+#define VPD_SA_DEV_CAP 0xb0             /* SSC-3 */
+#define VPD_OSD_INFO 0xb0               /* OSD */
+#define VPD_BLOCK_DEV_CHARS 0xb1        /* SBC-3 */
+#define VPD_MAN_ASS_SN 0xb1             /* SSC-3, ADC-2 */
+#define VPD_SECURITY_TOKEN 0xb1         /* OSD */
+#define VPD_TA_SUPPORTED 0xb2           /* SSC-3 */
+#define VPD_LB_PROVISIONING 0xb2        /* SBC-3 */
+#define VPD_REFERRALS 0xb3              /* SBC-3 */
+#define VPD_AUTOMATION_DEV_SN 0xb3      /* SSC-3 */
+#define VPD_SUP_BLOCK_LENS 0xb4         /* sbc4r01 */
+#define VPD_DTDE_ADDRESS 0xb4           /* SSC-4 */
+#define VPD_BLOCK_DEV_C_EXTENS 0xb5     /* sbc4r02 */
+#define VPD_LB_PROTECTION 0xb5          /* SSC-5 */
+#define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
+#define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
+#define VPD_NO_RATHER_STD_INQ -2        /* request for standard inquiry */
 
 /* Device identification VPD page associations */
 #define VPD_ASSOC_LU 0
@@ -213,13 +214,14 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_REFERRALS, 0, 0, "ref", "Referrals (SBC)"},
     {VPD_SA_DEV_CAP, 0, 1, "sad",
      "Sequential access device capabilities (SSC)"},
+    {VPD_SUP_BLOCK_LENS, 0, 0, "sbl", "Supported block lengths and "
+     "protection types (SBC)"},
+    {VPD_SCSI_FEATURE_SETS, 0, -1, "sfs", "SCSI feature sets"},
     {VPD_SOFTW_INF_ID, 0, -1, "sii", "Software interface identification"},
     {VPD_NO_RATHER_STD_INQ, 0, -1, "sinq", "Standard inquiry response"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, "sp", "SCSI ports"},
     {VPD_SECURITY_TOKEN, 0, 0x11, "st", "Security token (OSD)"},
-    {VPD_SUP_BLOCK_LENS, 0, 0, "sbl", "Supported block lengths and "
-     "protection types (SBC)"},
     {VPD_SUPPORTED_VPDS, 0, -1, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, "tas", "TapeAlert supported flags (SSC)"},
     {VPD_3PARTY_COPY, 0, -1, "tpc", "Third party copy"},
@@ -1309,6 +1311,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         printf("  LUICLR=%d\n", !!(b[7] & 0x1));
         printf("  LU_COLL_TYPE=%d\n", (b[8] >> 5) & 0x7); /* spc5r09 */
         printf("  R_SUP=%d\n", !!(b[8] & 0x10));
+        printf("  RTD_SUP=%d\n", !!(b[8] & 0x8));       /* spc5r11 */
         printf("  HSSRELEF=%d\n", !!(b[8] & 0x2));      /* spc5r02 */
         printf("  CBCS=%d\n", !!(b[8] & 0x1));  /* obsolete in spc5r01 */
         printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
@@ -2020,6 +2023,54 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
     }
 }
 
+/* VPD_SCSI_FEATURE_SETS [0x92] (sfs) */
+static void
+decode_feature_sets_vpd(unsigned char * buff, int len,
+                        const struct opts_t * op)
+{
+    int k, bump;
+    uint16_t sf_code;
+    bool found;
+    unsigned char * bp;
+    char b[64];
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 1 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("SCSI Feature sets VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 8;
+    bp = buff + 8;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        sf_code = sg_get_unaligned_be16(bp);
+        bump = 2;
+        if ((k + bump) > len) {
+            pr2serr("SCSI Feature sets, short descriptor length=%d, "
+                    "left=%d\n", bump, (len - k));
+            return;
+        }
+        if (2 == op->do_hex)
+            dStrHex((const char *)bp + 8, 2, 1);
+        else if (op->do_hex > 2)
+            dStrHex((const char *)bp, 2, 1);
+        else {
+            printf("    %s", sg_get_sfs_str(sf_code, -2, sizeof(b), b,
+                   &found, op->verbose));
+            if (op->verbose == 1)
+                printf(" [0x%x]\n", (unsigned int)sf_code);
+            else if (op->verbose > 1)
+                printf(" [0x%x] found=%s\n", (unsigned int)sf_code,
+                       found ? "true" : "false");
+            else
+                printf("\n");
+        }
+    }
+}
+
+
 /* VPD_BLOCK_LIMITS sbc */
 /* VPD_SA_DEV_CAP ssc */
 /* VPD_OSD_INFO osd */
@@ -2175,9 +2226,12 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             break;
         }
         printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);   /* sbc4r04 */
+        printf("  RBWZ=%d\n", !!(buff[8] & 0x8));       /* sbc4r12 */
         printf("  BOCS=%d\n", !!(buff[8] & 0x4));       /* sbc4r07 */
         printf("  FUAB=%d\n", !!(buff[8] & 0x2));
         printf("  VBULS=%d\n", !!(buff[8] & 0x1));
+        printf("  DEPOPULATION_TIME=%u (seconds)\n",
+               sg_get_unaligned_be32(buff + 12));       /* added sbc4r14 */
         break;
     case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
         printf("  Manufacturer-assigned serial number: %.*s\n",
@@ -2246,7 +2300,7 @@ decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
     return 0;
 }
 
-/* VPD_SUP_BLOCK_LENS  0xb4 */
+/* VPD_SUP_BLOCK_LENS  0xb4 (added sbc4r01) */
 static void
 decode_sup_block_lens_vpd(unsigned char * buff, int len)
 {
@@ -2276,7 +2330,7 @@ decode_sup_block_lens_vpd(unsigned char * buff, int len)
     }
 }
 
-/* VPD_BLOCK_DEV_C_EXTENS  0xb5 */
+/* VPD_BLOCK_DEV_C_EXTENS  0xb5 (added sbc4r02) */
 static void
 decode_block_dev_char_ext_vpd(unsigned char * b, int len)
 {
@@ -3009,6 +3063,24 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
                 decode_proto_port_vpd(rp, len, op->do_hex);
+            }
+            return 0;
+        }
+        break;
+    case VPD_SCSI_FEATURE_SETS:         /* 0x92 */
+        if (allow_name)
+            printf("SCSI Feature sets:\n");
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (0 == res) {
+            if (op->do_raw)
+                dStrRaw((const char *)rp, len);
+            else {
+                pdt = rp[0] & 0x1f;
+                if (vb || long_notquiet)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_feature_sets_vpd(rp, len, op);
             }
             return 0;
         }

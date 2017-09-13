@@ -1,12 +1,12 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2016 D. Gilbert
+*  Copyright (C) 2000-2017 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
    This program outputs information provided by a SCSI INQUIRY command.
-   It is mainly based on the SCSI SPC-4 document at http://www.t10.org .
+   It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
 
    Acknowledgment:
       - Martin Schwenke <martin at meltin dot net> added the raw switch and
@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.63 20160531";    /* SPC-5 rev 10 */
+static const char * version_str = "1.64 20170912";    /* SPC-5 rev 14 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -90,11 +90,18 @@ static const char * version_str = "1.63 20160531";    /* SPC-5 rev 10 */
 #define VPD_3PARTY_COPY  0x8f
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
+#define VPD_SCSI_FEATURE_SETS 0x92      /* spc5r11 */
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
 #define VPD_MAN_ASS_SN 0xb1
 #define VPD_LB_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
+#define VPD_SUP_BLOCK_LENS 0xb4         /* sbc4r01 */
+#define VPD_BLOCK_DEV_C_EXTENS 0xb5     /* sbc4r02 */
+#define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
+#define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
+
+/* Vendor specific VPD pages (typically >= 0xc0) */
 #define VPD_UPR_EMC 0xc0
 #define VPD_RDAC_VERS 0xc2
 #define VPD_RDAC_VAC 0xc9
@@ -146,7 +153,10 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc",
      "Block device characteristics (SBC)"},
+    {VPD_BLOCK_DEV_C_EXTENS, 0, 0, 0, "bdce", "Block device characteristics "
+     "extension (SBC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
+    {VPD_BLOCK_LIMITS_EXT, 0, 0, 0, "ble", "Block limits extension (SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
 #if 0
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
@@ -169,11 +179,16 @@ static struct svpd_values_name_t vpd_pg[] = {
      "information"},
     {VPD_PROTO_PORT, 0, 0x0, 0, "pspo", "Protocol-specific port information"},
     {VPD_REFERRALS, 0, 0, 0, "ref", "Referrals (SBC)"},
+    {VPD_SUP_BLOCK_LENS, 0, 0, 0, "sbl", "Supported block lengths and "
+     "protection types (SBC)"},
+    {VPD_SCSI_FEATURE_SETS, 0, -1, 0, "sfs", "SCSI Feature sets"},
     {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_3PARTY_COPY, 0, -1, 0, "tpc", "Third party copy"},
+    {VPD_ZBC_DEV_CHARS, 0, -1, 0, "zbdc", "Zoned block device "
+     "characteristics"},
     /* Following are vendor specific */
     {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (RDAC)"},
     {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (RDAC)"},
@@ -1155,6 +1170,9 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_CFA_PROFILE_INFO, 0, "CFA profile information"},       /* 0x8c */
     {VPD_POWER_CONSUMPTION, 0, "Power consumption"},            /* 0x8d */
     {VPD_3PARTY_COPY, 0, "Third party copy"},                   /* 0x8f */
+    {VPD_PROTO_LU, 0, "Protocol-specific logical unit information"}, /* 0x90 */
+    {VPD_PROTO_PORT, 0, "Protocol-specific port information"},  /* 0x91 */
+    {VPD_SCSI_FEATURE_SETS, 0, "SCSI Feature sets"},            /* 0x92 */
     /* 0xb0 to 0xbf are per peripheral device type */
     {VPD_BLOCK_LIMITS, 0, "Block limits (sbc2)"},               /* 0xb0 */
     {VPD_BLOCK_DEV_CHARS, 0, "Block device characteristics (sbc3)"},
@@ -2156,7 +2174,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 "around offset=%d\n", off);
 }
 
-/* VPD_EXT_INQ   Extended Inquiry */
+/* VPD_EXT_INQ   Extended Inquiry [0x86] */
 static void
 decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -2182,10 +2200,11 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     /* NO_PI_CHK and HSSRELEF added in spc5r02 */
     printf("  NO_PI_CHK=%d P_I_I_SUP=%d LUICLR=%d\n", !!(buff[7] & 0x20),
            !!(buff[7] & 0x10), !!(buff[7] & 0x1));
-    /* LU_COLL_TYPE in spc5r09, CBCS obsolete in spc5r01 */
-    printf("LU_COLL_TYPE=%d R_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
-           (buff[8] >> 5) & 0x7, !!(buff[8] & 0x10), !!(buff[8] & 0x2),
-           !!(buff[8] & 0x1));
+    /* LU_COLL_TYPE in spc5r09, CBCS obsolete in spc5r01, RTD_SUP added in
+     * spc5r11 */
+    printf("LU_COLL_TYPE=%d R_SUP=%d RTD_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
+           (buff[8] >> 5) & 0x7, !!(buff[8] & 0x10), !!(buff[8] & 0x8),
+           !!(buff[8] & 0x2), !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            sg_get_unaligned_be16(buff + 10));     /* spc4r27 */
@@ -2199,7 +2218,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
            !!(buff[14] & 0x2), !!(buff[14] & 0x1));
 }
 
-/* VPD_SOFTW_INF_ID */
+/* VPD_SOFTW_INF_ID [0x84] */
 static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
@@ -2215,7 +2234,7 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
                sg_get_unaligned_be24(buff + 3));
 }
 
-/* VPD_ATA_INFO */
+/* VPD_ATA_INFO [0x89] */
 static void
 decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -2274,7 +2293,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
                  sg_is_big_endian());
 }
 
-/* VPD_POWER_CONDITION */
+/* VPD_POWER_CONDITION [0x8a] */
 static void
 decode_power_condition(unsigned char * buff, int len, int do_hex)
 {
@@ -2301,6 +2320,53 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
            sg_get_unaligned_be16(buff + 14));
     printf("  Idle_c condition recovery time (ms) %d\n",
            sg_get_unaligned_be16(buff + 16));
+}
+
+/* VPD_SCSI_FEATURE_SETS [0x92] (sfs) */
+static void
+decode_feature_sets_vpd(unsigned char * buff, int len,
+                        const struct opts_t * op)
+{
+    int k, bump;
+    uint16_t sf_code;
+    bool found;
+    unsigned char * bp;
+    char b[64];
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 1 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("SCSI Feature sets VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 8;
+    bp = buff + 8;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        sf_code = sg_get_unaligned_be16(bp);
+        bump = 2;
+        if ((k + bump) > len) {
+            pr2serr("SCSI Feature sets, short descriptor length=%d, "
+                    "left=%d\n", bump, (len - k));
+            return;
+        }
+        if (2 == op->do_hex)
+            dStrHex((const char *)bp + 8, 2, 1);
+        else if (op->do_hex > 2)
+            dStrHex((const char *)bp, 2, 1);
+        else {
+            printf("    %s", sg_get_sfs_str(sf_code, -2, sizeof(b), b,
+                   &found, op->do_verbose));
+            if (op->do_verbose == 1)
+                printf(" [0x%x]\n", (unsigned int)sf_code);
+            else if (op->do_verbose > 1)
+                printf(" [0x%x] found=%s\n", (unsigned int)sf_code,
+                       found ? "true" : "false");
+            else
+                printf("\n");
+        }
+    }
 }
 
 /* VPD_BLOCK_LIMITS sbc */
@@ -2433,6 +2499,8 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
             printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);   /* sbc4r04 */
             printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
+            printf("  DEPOPULATION_TIME=%u (seconds)\n",
+                   sg_get_unaligned_be32(buff + 12));   /* added sbc4r14 */
             break;
         case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
             printf("  Manufacturer-assigned serial number: %.*s\n",
@@ -3539,6 +3607,17 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             dStrRaw((const char *)rp, len);
         else
             decode_power_condition(rp, len, op->do_hex);
+        break;
+    case VPD_SCSI_FEATURE_SETS:         /* 0x92 */
+        if (!op->do_raw && (op->do_hex < 2))
+            printf("VPD INQUIRY: SCSI Feature sets\n");
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else
+            decode_feature_sets_vpd(rp, len, op);
         break;
     case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);

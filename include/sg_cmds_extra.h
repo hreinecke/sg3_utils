@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -61,12 +61,21 @@ int sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                        int timeout_secs, void * paramp, int param_len,
                        int noisy, int verbose);
 
-/* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
- * SG_LIB_CAT_INVALID_OP -> GET LBA STATUS not supported,
+/* Invokes a SCSI GET LBA STATUS(16) or GET LBA STATUS(32) command (SBC).
+ * Returns 0 -> success,
+ * SG_LIB_CAT_INVALID_OP -> GET LBA STATUS(16 or 32) not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
+ * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure.
+ * sg_ll_get_lba_status() calls the 16 byte variant with rt=0 . */
 int sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
                          int alloc_len, int noisy, int verbose);
+int sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
+                           void * resp, int alloc_len, int noisy,
+			   int verbose);
+int sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
+			   uint32_t element_id, uint8_t rt,
+                           void * resp, int alloc_len, int noisy,
+			   int verbose);
 
 /* Invokes a SCSI PERSISTENT RESERVE IN command (SPC). Returns 0
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,

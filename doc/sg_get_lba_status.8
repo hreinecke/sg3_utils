@@ -1,39 +1,60 @@
-.TH SG_GET_LBA_STATUS "8" "May 2014" "sg3_utils\-1.39" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
-sg_get_lba_status \- send SCSI GET LBA STATUS command
+sg_get_lba_status \- send SCSI GET LBA STATUS(16 or 32) command
 .SH SYNOPSIS
 .B sg_get_lba_status
-[\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-brief\fR] [\fI\-\-element-id=EI\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-report\-type=RT\fR]
+[\fI\-\-scan-len=SL\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Send the SCSI GET LBA STATUS command to the \fIDEVICE\fR and outputs the
-response. This command was introduced in (draft) SBC\-3 revision 20 and
-devices that support logical block provisioning should support this command.
+Send the SCSI GET LBA STATUS(16) or GET LBA STATUS(32) command to the
+\fIDEVICE\fR and outputs the response. The 16 byte command variant was
+introduced in (draft) SBC\-3 revision 20 and devices that support logical
+block provisioning should support this command. The GET LBA STATUS(32)
+command was added in (draft) SBC\-4 revision 14.
 .PP
 The default action is to decode the response into one LBA status descriptor
 per line output to stdout. The descriptor LBA is output in hex (prefixed
 by '0x') and the number of blocks is output in decimal followed by the
-provisioning status in decimal. The provisioning status can be in the
-range 0 to 15 of which only 0 (mapped), 1 (unmapped) and 2 (anchored) are
-used currently. The amount of output can be reduced by the \fI\-\-brief\fR
-option.
+provisioning status and additional status in decimal. The provisioning status
+can be in the range 0 to 15 of which only 0 (mapped or unknown), 1 (unmapped),
+2 (anchored), 3 (mapped) and 4 (unknown) are used currently. The amount of
+output can be reduced by the \fI\-\-brief\fR option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-S\fR, \fB\-\-16\fR
+send SCSI GET LBA STATUS(16) command which is the 16 byte variant. In the
+absence of the \fI\-\-16\fR or the \fI\-\-32\fR options the SCSI GET LBA
+STATUS(16) command is sent. If both \fI\-\-16\fR and the \fI\-\-32\fR options
+are given then the GET LBA STATUS(16) command is sent.
+.TP
+\fB\-T\fR, \fB\-\-32\fR
+send SCSI GET LBA STATUS(32) command which is the 32 byte variant. When
+given together with the \fI\-\-16\fR option then this option is ignored (so
+the GET LBA STATUS(16) command is sent).
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
 when use once then one LBA status descriptor per line is output to stdout.
 Each line has this
-format: "0x<descriptor_LBA>  0x<blocks> <provisioning_status>". So the
-descriptor's starting LBA and number of blocks are output in hex and the
-provisioning status in decimal. When used twice (e.g. '\-bb' or '\-\-brief
-\-\-brief') then the provisioning status of the given \fILBA\fR (or LBA 0
-if the \fI\-\-lba\fR option is not given) is output to stdout. A check is
-made that the given \fILBA\fR lies in the range of the first returned LBA
-status descriptor (as it should according to SBC\-3 revision 20) and
-warnings are sent to stderr if it doesn't.
+format: "0x<descriptor_LBA>  0x<blocks> <provisioning_status>
+<additional_status>". So the descriptor's starting LBA and number of blocks
+are output in hex while the provisioning status and additional status are
+in decimal. When used twice (e.g. '\-bb' or '\-\-brief \-\-brief') then the
+provisioning status of the given \fILBA\fR (or LBA 0 if the \fI\-\-lba\fR
+option is not given) is output to stdout. A check is made that the given
+\fILBA\fR lies in the range of the first returned LBA status descriptor (as
+it should according to SBC\-3 revision 20) and warnings are sent to stderr
+if it doesn't.
+.TP
+\fB\-e\fR, \fB\-\-element\-id\fR=\fIEI\fR
+where \fIEI\fR is the element identifier of the physical element for which
+the LBAs shall be reported based on the value in the report type field (i.e.
+\fIRT\fR). This option is only active with the SCSI GET LBA STATUS(32)
+command (i.e. it is ignored if the GET LBA STATUS(16) command is sent).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -59,6 +80,20 @@ output response in binary (to stdout).
 open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
 The default is to open it read\-write.
 .TP
+\fB\-t\fR, \fB\-\-report\-type\fR=\fIRT\fR
+where \fIRT\fR is 0 for report all LBAs; 1 for report LBAs using non\-zero
+provisioning status; 2 for report LBAs that are mapped; 3 for report LBAs
+that are de-allocated; 4 for report LBAs that are anchored; 5 for report
+LBAs that may return an unrecovered error. The REPORT TYPE field was added
+to the GET LBA STATUS cdb in sbc4r12.
+.TP
+\fB\-s\fR, \fB\-\-scan\-len\fR=\fISL\fR
+where \fISL\fR is the scan length which is the maximum number of contiguous
+logical blocks to be scanned for logical blocks that meet the given report
+type (i.e. \fIRT\fR). This option is only active with the SCSI GET LBA
+STATUS(32) command (i.e. it is ignored if the GET LBA STATUS(16) command is
+sent).
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Additional output
 caused by this option is sent to stderr.
@@ -70,7 +105,7 @@ In SBC\-3 revision 25 the calculation associated with the Parameter Data
 Length field in the response was modified. Prior to that the byte offset
 was 8 and in revision 25 it was changed to 4.
 .PP
-For a discussion of logical block provisioning see section 4.7 of sbc3r29.pdf
+For a discussion of logical block provisioning see section 4.7 of sbc4r14.pdf
 at http://www.t10.org (or the corresponding section of a later draft).
 .SH EXIT STATUS
 The exit status of sg_get_lba_status is 0 when it is successful. Otherwise
@@ -80,7 +115,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2014 Douglas Gilbert
+Copyright \(co 2009\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
