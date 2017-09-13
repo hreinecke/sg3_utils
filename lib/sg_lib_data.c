@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2016 Douglas Gilbert.
+ * Copyright (c) 2007-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.25 20160630";/* spc5r10, sbc4r11 */
+const char * sg_lib_version_str = "2.26 20170910";/* spc5r16, sbc4r14 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -346,18 +346,23 @@ struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
 
 /* Service action in(16) [0x9e] service actions */
 struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
+    {0xf, 0, "Receive binding report"}, /* added spc5r11 */
     {0x10, 0, "Read capacity(16)"},
     {0x11, 0, "Read long(16)"},         /* obsolete in SBC-4 r7 */
-    {0x12, 0, "Get LBA status"},
+    {0x12, 0, "Get LBA status(16)"},    /* 32 byte variant added in sbc4r14 */
     {0x13, 0, "Report referrals"},
     {0x14, 0, "Stream control"},
     {0x15, 0, "Background control"},
     {0x16, 0, "Get stream status"},
+    {0x17, 0, "Get physical element status"},   /* added sbc4r13 */
+    {0x18, 0, "Remove element and truncate"},   /* added sbc4r13 */
     {0xffff, 0, NULL},
 };
 
 /* Service action out(16) [0x9f] service actions */
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
+    {0x0b, 0, "Test bind"},             /* added spc5r13 */
+    {0x0c, 0, "Prepare bind report"},   /* added spc5r11 */
     {0x0d, 0, "Set affiliation"},
     {0x0e, 0, "Bind"},
     {0x0f, 0, "Unbind"},
@@ -438,12 +443,13 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xb, 0, "Write(32)"},
     {0xc, 0, "Write and verify(32)"},
     {0xd, 0, "Write same(32)"},
-    {0xe, 0, "Orwrite(32)"},         /* added sbc3r25 */
-    {0xf, 0, "Atomic write(32)"},    /* added sbc4r02 */
-    {0x10, 0, "Write stream(32)"},   /* added sbc4r07 */
-    {0x11, 0, "Write scattered(32)"},     /* added sbc4r11 */
+    {0xe, 0, "Orwrite(32)"},            /* added sbc3r25 */
+    {0xf, 0, "Atomic write(32)"},       /* added sbc4r02 */
+    {0x10, 0, "Write stream(32)"},      /* added sbc4r07 */
+    {0x11, 0, "Write scattered(32)"},   /* added sbc4r11 */
+    {0x12, 0, "Get LBA status(32)"},    /* added sbc4r14 */
     {0x1800, 0, "Receive credential"},
-    {0x1ff0, 0, "ATA pass-through(32)"},  /* added sat4r05 */
+    {0x1ff0, 0, "ATA pass-through(32)"},/* added sat4r05 */
     {0x8801, 0, "Format OSD (osd)"},
     {0x8802, 0, "Create (osd)"},
     {0x8803, 0, "List (osd)"},
@@ -730,6 +736,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x0F,"Warning - low critical humidity limit exceeded"},
     {0x0B,0x10,"Warning - high operating humidity limit exceeded"},
     {0x0B,0x11,"Warning - low operating humidity limit exceeded"},
+    {0x0B,0x12,"Warning - microcode security at risk"},
+    {0x0B,0x13,"Warning - microcode digital signature validation failure"},
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -884,6 +892,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x24,0x06,"Nonce not unique"},
     {0x24,0x07,"Nonce timestamp out of range"},
     {0x24,0x08,"Invalid xcdb"},
+    {0x24,0x09,"Invalid fast format"},
     {0x25,0x00,"Logical unit not supported"},
     {0x26,0x00,"Invalid field in parameter list"},
     {0x26,0x01,"Parameter not supported"},
@@ -905,6 +914,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x26,0x11,"Incomplete key-associated data set"},
     {0x26,0x12,"Vendor specific key reference not found"},
     {0x26,0x13,"Application tag mode page is invalid"},
+    {0x26,0x14,"Tape stream mirroring prevented"},
+    {0x26,0x15,"Copy source or copy destination not authorized"},
     {0x27,0x00,"Write protected"},
     {0x27,0x01,"Hardware write protected"},
     {0x27,0x02,"Logical unit software write protected"},
@@ -1208,6 +1219,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x5D,0x1A,"Hardware impending failure seek time performance"},
     {0x5D,0x1B,"Hardware impending failure spin-up retry count"},
     {0x5D,0x1C,"Hardware impending failure drive calibration retry count"},
+    {0x5D,0x1D,"Hardware impending failure power loss protection circuit"},
     {0x5D,0x20,"Controller impending failure general hard drive failure"},
     {0x5D,0x21,"Controller impending failure drive error rate too high" },
     {0x5D,0x22,"Controller impending failure data error rate too high" },
@@ -1273,6 +1285,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x5D,0x6A,"Firmware impending failure seek time performance"},
     {0x5D,0x6B,"Firmware impending failure spin-up retry count"},
     {0x5D,0x6C,"Firmware impending failure drive calibration retry count"},
+    {0x5D,0x73,"Media impending failure endurance limit met"},
     {0x5D,0xFF,"Failure prediction threshold exceeded (false)"},
     {0x5E,0x00,"Low power condition on"},
     {0x5E,0x01,"Idle condition activated by timer"},
@@ -1480,4 +1493,15 @@ const char * sg_lib_transport_proto_strs[] =
     "PCIe",                             /* added in spc5r02 */
     "Oxc", "Oxd", "Oxe",
     "No specific protocol"
+};
+
+/* SCSI Feature Sets array. code->value, pdt->peri_dev_type (-1 for SPC) */
+struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
+{
+    {SCSI_FS_SPC_DISCOVERY_2016, -1, "Discovery 2016"},
+    {SCSI_FS_SBC_BASE_2010, PDT_DISK, "SBC Base 2010"},
+    {SCSI_FS_SBC_BASE_2016, PDT_DISK, "SBC Base 2016"},
+    {SCSI_FS_SBC_BASIC_PROV_2016, PDT_DISK, "Basic provisioning 2016"},
+    {SCSI_FS_SBC_DRIVE_MAINT_2016, PDT_DISK, "Drive maintenance 2016"},
+    {0x0, 0, NULL},     /* 0x0 is reserved sfs; trailing sentinel */
 };

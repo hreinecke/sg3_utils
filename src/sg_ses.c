@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.19 20160610";    /* ses3r13 */
+static const char * version_str = "2.20 20170904";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -215,11 +215,11 @@ struct join_row_t {
 
 enum fj_select_t {FJ_IOE, FJ_EOE, FJ_AESS, FJ_SAS_CON};
 
-/* In some cases a type_desc_hdr_t array potentially with the matching
- * join array if present. */
+/* Instance ('tes' in main() ) holds a type_desc_hdr_t array potentially with
+   the matching join array if present. */
 struct th_es_t {
     const struct type_desc_hdr_t * th_base;
-    int num_ths;
+    int num_ths;        /* items in array pointed to by th_base */
     struct join_row_t * j_base;
     int num_j_rows;
     int num_j_eoe;
@@ -596,6 +596,8 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"muted", AUD_ALARM_ETC, 3, 6, 1, "status only: alarm is muted"},
     {"off", POWER_SUPPLY_ETC, 3, 4, 1, "Not providing power"},
     {"off", COOLING_ETC, 3, 4, 1, "Not providing cooling"},
+    {"offset_temp", TEMPERATURE_ETC, 1, 5, 6, "Offset for reference "
+     "temperature"},
     {"ok", ARRAY_DEV_ETC, 1, 7, 1, NULL},
     {"on", COOLING_ETC, 3, 5, 1, NULL},
     {"on", POWER_SUPPLY_ETC, 3, 5, 1, "0: turn (remain) off; 1: turn on"},
@@ -609,6 +611,21 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"overvoltage", POWER_SUPPLY_ETC, 2, 3, 1, "DC overvoltage"},
     {"overvoltage", VOLT_SENSOR_ETC, 1, 1, 1, "overvoltage"},
     {"overvoltage_warn", POWER_SUPPLY_ETC, 1, 3, 1, "DC overvoltage warning"},
+    {"pow_cycle", ENCLOSURE_ETC, 2, 7, 2,
+     "0: no; 1: start in pow_c_delay minutes; 2: cancel"},
+    {"pow_c_delay", ENCLOSURE_ETC, 2, 5, 6,
+     "delay in minutes before starting power cycle (max: 60)"},
+    {"pow_c_duration", ENCLOSURE_ETC, 3, 7, 6,
+     "0: power off, restore within 1 minute; <=60: restore within that many "
+     "minutes; 63: power off, wait for manual power on"},
+     /* slightly different in Enclosure status element */
+    {"pow_c_time", ENCLOSURE_ETC, 2, 7, 6,
+     "time in minutes remaining until starting power cycle; 0: not "
+     "scheduled; <=60: scheduled in that many minutes; 63: in zero minutes"},
+    {"prdfail", -1, 0, 6, 1, "predict failure"},
+    {"rebuildremap", ARRAY_DEV_ETC, 1, 1, 1, NULL},
+    {"remove", DEVICE_ETC, 2, 2, 1, NULL},
+    {"remove", ARRAY_DEV_ETC, 2, 2, 1, NULL},
     {"remind", AUD_ALARM_ETC, 3, 4, 1, NULL},
     {"report", ENC_SCELECTR_ETC, 2, 0, 1, NULL},
     {"report", SCC_CELECTR_ETC, 2, 0, 1, NULL},
@@ -616,17 +633,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"report", SCSI_TPORT_ETC, 2, 0, 1, NULL},
     {"rqst_mute", AUD_ALARM_ETC, 3, 7, 1,
      "status only: alarm was manually muted"},
-    {"pow_cycle", ENCLOSURE_ETC, 2, 7, 2,
-     "0: no; 1: start in pow_c_delay minutes; 2: cancel"},
-    {"pow_c_delay", ENCLOSURE_ETC, 2, 5, 6,
-     "delay in minutes before starting power cycle"},
-    {"pow_c_duration", ENCLOSURE_ETC, 3, 7, 6, NULL},
-    {"pow_c_time", ENCLOSURE_ETC, 2, 7, 6,
-     "time in minutes remaining until starting power cycle"},
-    {"prdfail", -1, 0, 6, 1, "predict failure"},
-    {"rebuildremap", ARRAY_DEV_ETC, 1, 1, 1, NULL},
-    {"remove", DEVICE_ETC, 2, 2, 1, NULL},
-    {"remove", ARRAY_DEV_ETC, 2, 2, 1, NULL},
+    {"rqst_override", TEMPERATURE_ETC, 3, 7, 1, "Request(ed) override"},
     {"rrabort", ARRAY_DEV_ETC, 1, 0, 1, "rebuild/remap abort"},
     {"rsvddevice", ARRAY_DEV_ETC, 1, 6, 1, "reserved device"},
     {"select_element", ENC_SCELECTR_ETC, 2, 0, 1, NULL},
@@ -637,6 +644,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
      "0: leave; 1: lowest... 7: highest"},
     {"size_mult", NV_CACHE_ETC, 1, 1, 2, NULL},
     {"swap", -1, 0, 4, 1, NULL},               /* Reset swap */
+    {"temp", TEMPERATURE_ETC, 2, 7, 8, "(Requested) temperature"},
     {"unlock", DOOR_ETC, 3, 0, 1, NULL},
     {"undertemp_fail", TEMPERATURE_ETC, 3, 1, 1, "Undertemperature failure"},
     {"undertemp_warn", TEMPERATURE_ETC, 3, 0, 1, "Undertemperature warning"},
@@ -645,7 +653,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"undervoltage_warn", POWER_SUPPLY_ETC, 1, 2, 1,
      "DC undervoltage warning"},
     {"ups_fail", UI_POWER_SUPPLY_ETC, 2, 2, 1, NULL},
-    {"urgency", AUD_ALARM_ETC, 3, 3, 4, NULL},
+    {"urgency", AUD_ALARM_ETC, 3, 3, 4, NULL},  /* Tone urgency control bits */
     {"voltage", VOLT_SENSOR_ETC, 2, 7, 16, "voltage in centivolts"},
     {"warning", UI_POWER_SUPPLY_ETC, 2, 1, 1, NULL},
     {"warning", ENCLOSURE_ETC, 3, 0, 1, NULL},
@@ -795,7 +803,8 @@ usage(int help_num)
             "              [--page=PG] [--sas-addr=SA] [--set=STR] "
             "[--verbose]\n"
             "              DEVICE\n\n"
-            "       sg_ses [--enumerate] [--help] [--list] [--version]\n\n"
+            "       sg_ses [--enumerate] [--help] [--index=IIA] [--list] "
+            "[--version]\n\n"
             "  where the main options are:\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
             "    --control|-c        send control information (def: fetch "
@@ -1999,10 +2008,7 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
                      "[max 16 phys]");
         break;
     case 0xf:
-        if (abridged)
-            snprintf(buff, buff_len, "VS external connector");
-        else
-            snprintf(buff, buff_len, "Vendor specific external connector");
+        snprintf(buff, buff_len, "Vendor specific");
         break;
     case 0x10:
         if (abridged)
@@ -2029,6 +2035,41 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
             snprintf(buff, buff_len, "Mini SAS HD 8i");
         else
             snprintf(buff, buff_len, "Mini SAS HD 8i receptacle (SFF-8643) "
+                     "[max 8 phys]");
+        break;
+    case 0x14:
+        if (abridged)
+            snprintf(buff, buff_len, "Mini SAS HD 16i");
+        else
+            snprintf(buff, buff_len, "Mini SAS HD 16i receptacle (SFF-8643) "
+                     "[max 16 phys]");
+        break;
+    case 0x15:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS SlimLine 4i");
+        else
+            snprintf(buff, buff_len, "SAS SlimLine 4i (SFF-8654) "
+                     "[max 4 phys]");
+        break;
+    case 0x16:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS SlimLine 8i");
+        else
+            snprintf(buff, buff_len, "SAS SlimLine 8i (SFF-8654) "
+                     "[max 8 phys]");
+        break;
+    case 0x17:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS MiniLink 4i");
+        else
+            snprintf(buff, buff_len, "SAS MiniLink 4i (SFF-8612) "
+                     "[max 4 phys]");
+        break;
+    case 0x18:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS MiniLink 8i");
+        else
+            snprintf(buff, buff_len, "SAS MiniLink 8i (SFF-8612) "
                      "[max 8 phys]");
         break;
     case 0x20:
@@ -2111,6 +2152,28 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
             snprintf(buff, buff_len, "Multifunction 12 Gb/s 6x unshielded "
                      "plug (SFF-8639)");
         break;
+    case 0x2c:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS MultiLink Drive backplane "
+                     "receptacle");
+        else
+            snprintf(buff, buff_len, "SAS MultiLink Drive backplane "
+                     "receptacle (SFF-8630)");
+        break;
+    case 0x2d:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS MultiLink Drive backplane plug");
+        else
+            snprintf(buff, buff_len, "SAS MultiLink Drive backplane plug "
+                     "(SFF-8630)");
+        break;
+    case 0x2e:
+        if (abridged)
+            snprintf(buff, buff_len, "Reserved");
+        else
+            snprintf(buff, buff_len, "Reserved for internal connectors to "
+                     "end device");
+        break;
     case 0x2f:
         if (abridged)
             snprintf(buff, buff_len, "SAS virtual connector");
@@ -2122,6 +2185,22 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
             snprintf(buff, buff_len, "VS internal connector");
         else
             snprintf(buff, buff_len, "Vendor specific internal connector");
+        break;
+    case 0x40:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS high density drive backplane "
+                     "receptacle");
+        else
+            snprintf(buff, buff_len, "SAS high density drive backplane "
+                     "receptacle (SFF-8631) [max 8 phys]");
+        break;
+    case 0x41:
+        if (abridged)
+            snprintf(buff, buff_len, "SAS high density drive backplane "
+                     "plug");
+        else
+            snprintf(buff, buff_len, "SAS high density drive backplane "
+                     "plug (SFF-8631) [max 8 phys]");
         break;
     default:
         if (conn_type < 0x10)
@@ -3406,8 +3485,8 @@ supported_pages_sdg(const char * leadin, const uint8_t * resp,
 static struct diag_page_code mc_status_arr[] = {
     {0x0, "No download microcode operation in progress"},
     {0x1, "Download in progress, awaiting more"},
-    {0x2, "Download complete, updating storage"},
-    {0x3, "Updating storage with deferred microcode"},
+    {0x2, "Download complete, updating non-volatile storage"},
+    {0x3, "Updating non-volatile storage with deferred microcode"},
     {0x10, "Complete, no error, starting now"},
     {0x11, "Complete, no error, start after hard reset or power cycle"},
     {0x12, "Complete, no error, start after power cycle"},
@@ -4895,10 +4974,21 @@ enumerate_work(const struct opts_t * op)
             printf("    %s  [%s] [0x%x]\n", etp->desc, etp->abbrev,
                    etp->elem_type_code);
     } else {
+        char bb[64];
+        bool given_et = false;
+
         /* command line has multiple --enumerate and/or --list options */
         printf("--clear, --get, --set acronyms for Enclosure Status/Control "
-               "['es' or 'ec'] page:\n");
+               "['es' or 'ec'] page");
+        if (op->ind_given && op->ind_etp &&
+            (cp = etype_str(op->ind_etp->elem_type_code, bb, sizeof(bb)))) {
+            printf("\n(element type: %s)", bb);
+            given_et = true;
+        }
+        printf(":\n");
         for (ap = ecs_a2t_arr; ap->acron; ++ap) {
+            if (given_et && (op->ind_etp->elem_type_code != ap->etype))
+                continue;
             cp = (ap->etype < 0) ?  "*" : etype_str(ap->etype, b, sizeof(b));
             snprintf(a, sizeof(a), "  %s  [%s] [%d:%d:%d]", ap->acron,
                      (cp ? cp : "??"), ap->start_byte, ap->start_bit,
@@ -4908,6 +4998,8 @@ enumerate_work(const struct opts_t * op)
             else
                 printf("%s\n", a);
         }
+        if (given_et)
+            return;
         printf("\n--clear, --get, --set acronyms for Threshold In/Out "
                "['th'] page:\n");
         for (ap = th_a2t_arr; ap->acron; ++ap) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2016 Douglas Gilbert.
+ * Copyright (c) 1999-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -82,7 +82,8 @@
 #define WRITE_BUFFER_CMD 0x3b
 #define WRITE_BUFFER_CMDLEN 10
 
-#define GET_LBA_STATUS_SA 0x12
+#define GET_LBA_STATUS16_SA 0x12
+#define GET_LBA_STATUS32_SA 0x12
 #define READ_LONG_16_SA 0x11
 #define READ_MEDIA_SERIAL_NUM_SA 0x1
 #define REPORT_IDENTIFYING_INFORMATION_SA 0x5
@@ -123,13 +124,13 @@ create_pt_obj(const char * cname)
 }
 
 
-/* Invokes a SCSI GET LBA STATUS command (SBC). Returns 0 -> success,
+/* Invokes a SCSI GET LBA STATUS(16) command (SBC). Returns 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
-                     int alloc_len, int noisy, int verbose)
+sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
+                      void * resp, int alloc_len, int noisy, int verbose)
 {
-    static const char * const cdb_name_s = "get LBA status";
+    static const char * const cdb_name_s = "Get LBA status(16)";
     int k, res, sense_cat, ret;
     unsigned char getLbaStatCmd[SERVICE_ACTION_IN_16_CMDLEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
@@ -137,10 +138,11 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
 
     memset(getLbaStatCmd, 0, sizeof(getLbaStatCmd));
     getLbaStatCmd[0] = SERVICE_ACTION_IN_16_CMD;
-    getLbaStatCmd[1] = GET_LBA_STATUS_SA;
+    getLbaStatCmd[1] = GET_LBA_STATUS16_SA;
 
     sg_put_unaligned_be64(start_llba, getLbaStatCmd + 2);
     sg_put_unaligned_be32((uint32_t)alloc_len, getLbaStatCmd + 10);
+    getLbaStatCmd[14] = rt;
     if (verbose) {
         pr2ws("    %s cdb: ", cdb_name_s);
         for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
@@ -151,6 +153,81 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
         return -1;
     set_scsi_pt_cdb(ptvp, getLbaStatCmd, sizeof(getLbaStatCmd));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, alloc_len);
+    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, alloc_len, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (-1 == ret)
+        ;
+    else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = sense_cat;
+            break;
+        }
+    } else {
+        if ((verbose > 2) && (ret > 0)) {
+            pr2ws("    %s: response\n", cdb_name_s);
+            if (3 == verbose) {
+                pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
+                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            } else {
+                pr2ws(":\n");
+                dStrHexErr((const char *)resp, ret, 0);
+            }
+        }
+        ret = 0;
+    }
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+int
+sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
+                     int alloc_len, int noisy, int verbose)
+{
+    return sg_ll_get_lba_status16(sg_fd, start_llba, /* rt = */ 0x0, resp,
+                                  alloc_len, noisy, verbose);
+}
+
+#define GLS32_CMD_LEN 32
+
+int
+sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
+                       uint32_t element_id, uint8_t rt,
+                       void * resp, int alloc_len, int noisy,
+                       int verbose)
+{
+    static const char * const cdb_name_s = "Get LBA status(32)";
+    int k, res, sense_cat, ret;
+    unsigned char gls32_cmd[GLS32_CMD_LEN];
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    memset(gls32_cmd, 0, sizeof(gls32_cmd));
+    gls32_cmd[0] = SG_VARIABLE_LENGTH_CMD;
+    gls32_cmd[7] = GLS32_CMD_LEN - 8;
+    sg_put_unaligned_be16((uint16_t)GET_LBA_STATUS32_SA, gls32_cmd + 8);
+    gls32_cmd[10] = rt;
+    sg_put_unaligned_be64(start_llba, gls32_cmd + 12);
+    sg_put_unaligned_be32(scan_len, gls32_cmd + 20);
+    sg_put_unaligned_be32(element_id, gls32_cmd + 24);
+    sg_put_unaligned_be32((uint32_t)alloc_len, gls32_cmd + 28);
+    if (verbose) {
+        pr2ws("    %s cdb: ", cdb_name_s);
+        for (k = 0; k < GLS32_CMD_LEN; ++k)
+            pr2ws("%02x ", gls32_cmd[k]);
+        pr2ws("\n");
+    }
+
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
+        return -1;
+    set_scsi_pt_cdb(ptvp, gls32_cmd, sizeof(gls32_cmd));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, alloc_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);

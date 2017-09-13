@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2016 D. Gilbert
+ *  Copyright (C) 2000-2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.47 20160704";    /* spc5r10 + sbc4r11 */
+static const char * version_str = "1.48 20170912";    /* spc5r11 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -70,6 +70,7 @@ static const char * version_str = "1.47 20160704";    /* spc5r10 + sbc4r11 */
 #define UTILIZATION_SUBPG 0x1
 #define ENV_LIMITS_SUBPG 0x2
 #define LPS_MISALIGNMENT_SUBPG 0x3
+#define ZONED_BLOCK_DEV_STATS_SUBPG 0x1
 
 /* Vendor product identifiers followed by associated mask values */
 #define VP_NONE   (-1)
@@ -241,6 +242,8 @@ static bool show_requested_recovery_page(const uint8_t * resp, int len,
                                          const struct opts_t * op);
 static bool show_background_scan_results_page(const uint8_t * resp, int len,
                                               const struct opts_t * op);
+static bool show_zoned_block_dev_stats(const uint8_t * resp, int len,
+                                       const struct opts_t * op);
 static bool show_pending_defects_page(const uint8_t * resp, int len,
                                       const struct opts_t * op);
 static bool show_background_op_page(const uint8_t * resp, int len,
@@ -342,6 +345,8 @@ static struct log_elem log_arr[] = {
      show_device_stats_page},           /* 0x14, 0x0  SSC,ADC */
     {0x14, 0, 0, PDT_MCHANGER, 0, "Media changer statistics", "mcs",
      show_media_stats_page},            /* 0x14, 0x0  SMC */
+    {0x14, ZONED_BLOCK_DEV_STATS_SUBPG, 0, 0, 0,        /* 0x14,0x1 zbc2r01 */
+     "Zoned block device statistics", "zbds", show_zoned_block_dev_stats},
     {BACKGROUND_SCAN_LPAGE, 0, 0, 0, 0, "Background scan results", "bsr",
      show_background_scan_results_page}, /* 0x15, 0x0  SBC */
     {BACKGROUND_SCAN_LPAGE, BACKGROUND_OP_SUBPG, 0, 0, 0,
@@ -1747,10 +1752,10 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             cp = "over-run";
             break;
         case 0x2:
-            cp = "transport under-run";
+            cp = "service delivery subsystem busy, under-run";
             break;
         case 0x3:
-            cp = "transport over-run";
+            cp = "service delivery subsystem busy, over-run";
             break;
         case 0x4:
             cp = "transfer too slow, under-run";
@@ -1765,10 +1770,10 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             cp = "command, over-run";
             break;
         case 0x22:
-            cp = "command, transport under-run";
+            cp = "command, service delivery subsystem busy, under-run";
             break;
         case 0x23:
-            cp = "command, transport over-run";
+            cp = "command, service delivery subsystem busy, over-run";
             break;
         case 0x24:
             cp = "command, transfer too slow, under-run";
@@ -1783,10 +1788,10 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             cp = "I_T nexus, over-run";
             break;
         case 0x42:
-            cp = "I_T nexus, transport under-run";
+            cp = "I_T nexus, service delivery subsystem busy, under-run";
             break;
         case 0x43:
-            cp = "I_T nexus, transport over-run";
+            cp = "I_T nexus, service delivery subsystem busy, over-run";
             break;
         case 0x44:
             cp = "I_T nexus, transfer too slow, under-run";
@@ -1801,10 +1806,10 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             cp = "time, over-run";
             break;
         case 0x82:
-            cp = "time, transport under-run";
+            cp = "time, service delivery subsystem busy, under-run";
             break;
         case 0x83:
-            cp = "time, transport over-run";
+            cp = "time, service delivery subsystem busy, over-run";
             break;
         case 0x84:
             cp = "time, transfer too slow, under-run";
@@ -2040,13 +2045,14 @@ humidity_str(uint8_t h, bool reporting, char * b, int blen)
     return b;
 }
 
-/* ENV_REPORTING_SUBPG [0xd,0x1]  introduced: SPC-5 (rev 02) */
+/* ENV_REPORTING_SUBPG [0xd,0x1]  introduced: SPC-5 (rev 02). "mounted"
+ * changed to "other" in spc5r11 */
 static bool
 show_environmental_reporting_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
     int num, pl, pc, blen;
-    bool mounted_valid;
+    bool other_valid;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
     char b[32];
@@ -2070,7 +2076,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                 break;
             }
         }
-        mounted_valid = !!(bp[4] & 1);
+        other_valid = !!(bp[4] & 1);
         if (pc < 0x100) {
             if (pl < 12)  {
                 printf("  <<expect parameter 0x%x to be at least 12 bytes "
@@ -2078,7 +2084,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                 goto skip;
             }
             printf("  parameter code=0x%x\n", pc);
-            printf("    MTV=%d\n", (int)mounted_valid);
+            printf("    OTV=%d\n", (int)other_valid);
             printf("    Temperature: %s\n",
                    temperature_str(bp[5], true, b, blen));
             printf("    Lifetime maximum temperature: %s\n",
@@ -2089,10 +2095,10 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                    temperature_str(bp[8], true, b, blen));
             printf("    Minimum temperature since power on: %s\n",
                    temperature_str(bp[9], true, b, blen));
-            if (mounted_valid) {
-                printf("    Maximum mounted temperature: %s\n",
+            if (other_valid) {
+                printf("    Maximum other temperature: %s\n",
                        temperature_str(bp[10], true, b, blen));
-                printf("    Minimum mounted temperature: %s\n",
+                printf("    Minimum other temperature: %s\n",
                        temperature_str(bp[11], true, b, blen));
             }
         } else if (pc < 0x200) {
@@ -2102,7 +2108,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                 goto skip;
             }
             printf("  parameter code=0x%x\n", pc);
-            printf("    MRHV=%d\n", (int)mounted_valid);
+            printf("    ORHV=%d\n", (int)other_valid);
             printf("    Relative humidity: %s\n",
                    humidity_str(bp[5], true, b, blen));
             printf("    Lifetime maximum relative humidity: %s\n",
@@ -2113,10 +2119,10 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                    humidity_str(bp[8], true, b, blen));
             printf("    Minimum relative humidity since power on: %s\n",
                    humidity_str(bp[9], true, b, blen));
-            if (mounted_valid) {
-                printf("    Maximum mounted relative humidity: %s\n",
+            if (other_valid) {
+                printf("    Maximum other relative humidity: %s\n",
                        temperature_str(bp[10], true, b, blen));
-                printf("    Minimum mounted relative humidity: %s\n",
+                printf("    Minimum other relative humidity: %s\n",
                        temperature_str(bp[11], true, b, blen));
             }
         } else
@@ -3368,9 +3374,9 @@ show_sas_port_param(const uint8_t * bp, int param_len,
             ui = sg_get_unaligned_be32(vcp + 36);
             printf("    Running disparity error count = %u\n", ui);
             ui = sg_get_unaligned_be32(vcp + 40);
-            printf("    Loss of DWORD synchronization = %u\n", ui);
+            printf("    Loss of DWORD synchronization count = %u\n", ui);
             ui = sg_get_unaligned_be32(vcp + 44);
-            printf("    Phy reset problem = %u\n", ui);
+            printf("    Phy reset problem count = %u\n", ui);
         }
         if (spld_len > 51) {
             int num_ped, pes;
@@ -4775,6 +4781,193 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             for (m = 0; m < 8; ++m)
                 printf("%02x", bp[16 + m]);
             printf("\n");
+            break;
+        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        bp += pl;
+    }
+    return true;
+}
+
+/* ZONED_BLOCK_DEV_STATS_SUBPG [0x14,0x1]  introduced: zbc2r01 */
+static bool
+show_zoned_block_dev_stats(const uint8_t * resp, int len,
+                           const struct opts_t * op)
+{
+    int num, pl, pc;
+    const uint8_t * bp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+        printf("Zoned block device statistics page  [0x14,0x1]\n");
+    num = len - 4;
+    bp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pl = bp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw((const char *)bp, pl);
+                break;
+            } else if (op->do_hex) {
+                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x0:
+            printf("  Maximum open zones:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x1:
+            printf("  Maximum explicitly open zones:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x2:
+            printf("  Maximum implicitly open zones:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x3:
+            printf("  Minimum empty zones:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x4:
+            printf("  Maximum number of non-sequential zones:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x5:
+            printf("  Zones emptied:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x6:
+            printf("  Suboptimal write commands:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x7:
+            printf("  Commands exceeding optimal limit:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x8:
+            printf("  Failed explicit opens:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x9:
+            printf("  Read rule violations:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0xa:
+            printf("  Write rule violations:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            break;
+        default:
+            printf("  Reserved [parameter_code=0x%x]:\n", pc);
+            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb)
