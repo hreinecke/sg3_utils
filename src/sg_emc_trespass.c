@@ -2,7 +2,7 @@
  * LUN ownership from one Service-Processor to this one on an EMC
  * CLARiiON and potentially other devices.
  *
- * Copyright (C) 2004-2015 Lars Marowsky-Bree <lmb@suse.de>
+ * Copyright (C) 2004-2017 Lars Marowsky-Bree <lmb@suse.de>
  *
  * Based on sg_start.c; credits from there also apply.
  * Minor modifications for sg_lib, D. Gilbert 2004/10/19
@@ -29,7 +29,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.20 20141219";
+static const char * version_str = "0.21 20170917";
 
 static int debug = 0;
 
@@ -64,11 +64,11 @@ static int do_trespass(int fd, int hr, int short_cmd)
         if (short_cmd)
                 res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
                                  short_trespass_pg, sizeof(short_trespass_pg),
-                                 1, (debug ? 2 : 0));
+                                 true, (debug ? 2 : 0));
         else
                 res = sg_ll_mode_select10(fd, 1 /* pf */, 0 /* sp */,
                                  long_trespass_pg, sizeof(long_trespass_pg),
-                                 1, (debug ? 2 : 0));
+                                 true, (debug ? 2 : 0));
 
         switch (res) {
         case 0:

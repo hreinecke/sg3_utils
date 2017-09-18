@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2017 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.26 20151219";
+static const char * version_str = "0.27 20170917";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -84,7 +84,7 @@ read_safte_configuration(int sg_fd, unsigned char *rb_buff,
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=0 to fetch "
                 "configuration\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 0, 0,
-                            rb_buff, rb_len, 1, verbose);
+                            rb_buff, rb_len, true, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED)
         return res;
 
@@ -136,7 +136,7 @@ do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=1 to read "
                 "enclosure status\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 1, 0,
-                            rb_buff, rb_len, 0, verbose);
+                            rb_buff, rb_len, false, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED)
         return res;
 
@@ -277,7 +277,7 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=2 to read "
                 "usage statistics\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 2, 0,
-                            rb_buff, rb_len, 0, verbose);
+                            rb_buff, rb_len, false, verbose);
     if (res) {
         if (res == SG_LIB_CAT_ILLEGAL_REQ) {
             printf("Usage Statistics:\n\tNot implemented\n");
@@ -322,7 +322,7 @@ do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=3 to read "
                 "device insertions\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 3, 0,
-                            rb_buff, rb_len, 0, verbose);
+                            rb_buff, rb_len, false, verbose);
     if (res ) {
         if (res == SG_LIB_CAT_ILLEGAL_REQ) {
                 printf("Slot insertions:\n\tNot implemented\n");
@@ -366,7 +366,7 @@ do_safte_slot_status(int sg_fd, int do_hex, int do_raw, int verbose)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=4 to read "
                 "device slot status\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 4, 0,
-                            rb_buff, rb_len, 0, verbose);
+                            rb_buff, rb_len, false, verbose);
     if (res && res != SG_LIB_CAT_RECOVERED) {
         free(rb_buff);
         return res;
@@ -415,7 +415,7 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=5 to read "
                 "global flags\n");
     res = sg_ll_read_buffer(sg_fd, RWB_MODE_VENDOR, 5, 0,
-                            rb_buff, rb_len, 0, verbose);
+                            rb_buff, rb_len, false, verbose);
     if (res ) {
         if (res == SG_LIB_CAT_ILLEGAL_REQ) {
                 printf("Global Flags:\n\tNot implemented\n");

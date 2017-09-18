@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2015 Douglas Gilbert.
+ * Copyright (c) 2009-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.04 20151219";
+static const char * version_str = "1.05 20170917";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -142,8 +142,7 @@ main(int argc, char * argv[])
     }
 
     memset(readBlkLmtBuff, 0x0, 6);
-    res = sg_ll_read_block_limits(sg_fd, readBlkLmtBuff, 6, 1,
-                            verbose);
+    res = sg_ll_read_block_limits(sg_fd, readBlkLmtBuff, 6, true, verbose);
     ret = res;
     if (0 == res) {
       if (do_hex) {

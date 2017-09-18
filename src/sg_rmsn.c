@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2016 Douglas Gilbert.
+ * Copyright (c) 2005-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.12 20160423";
+static const char * version_str = "1.13 20170917";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -134,7 +134,7 @@ int main(int argc, char * argv[])
     memset(rmsn_buff, 0x0, sizeof(rmsn_buff));
 
     res = sg_ll_read_media_serial_num(sg_fd, rmsn_buff, sizeof(rmsn_buff),
-                                      1, verbose);
+                                      true, verbose);
     ret = res;
     if (0 == res) {
         sn_len = sg_get_unaligned_be32(rmsn_buff + 0);
@@ -155,7 +155,7 @@ int main(int argc, char * argv[])
             pr2serr("    Out of memory (ram)\n");
             goto err_out;
         }
-        res = sg_ll_read_media_serial_num(sg_fd, bp, sn_len, 1, verbose);
+        res = sg_ll_read_media_serial_num(sg_fd, bp, sn_len, true, verbose);
         if (0 == res) {
             sn_len = sg_get_unaligned_be32(bp + 0);
             if (raw) {

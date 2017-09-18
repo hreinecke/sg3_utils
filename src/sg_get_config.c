@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
 
 */
 
-static const char * version_str = "0.42 20160423";    /* mmc6r02 */
+static const char * version_str = "0.43 20170917";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -1080,7 +1080,7 @@ main(int argc, char * argv[])
     }
 
     res = sg_ll_get_config(sg_fd, rt, starting, resp_buffer,
-                              sizeof(resp_buffer), 1, verbose);
+                              sizeof(resp_buffer), true, verbose);
     ret = res;
     if (0 == res) {
         len = sg_get_unaligned_be32(resp_buffer + 0) + 4;

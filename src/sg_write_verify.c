@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Douglas Gilbert
+ * Copyright (c) 2014-2017 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.09 20160531";
+static const char * version_str = "1.10 20170917";
 
 
 #define ME "sg_write_verify: "
@@ -119,11 +119,11 @@ usage()
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
-                     unsigned char *dop, int do_len, int timeout, int verbose)
+                     unsigned char *dop, int do_len, int timeout,
+                     bool noisy, int verbose)
 {
     int res, k, sense_cat, ret;
     unsigned char sense_b[SENSE_BUFF_LEN];
-    int noisy = 1;
     struct sg_pt_base * ptvp;
     char b[32];
 
@@ -188,7 +188,8 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
 static int
 sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
                      unsigned int lba, int num_lb, int group,
-                     unsigned char *dop, int do_len, int timeout, int verbose)
+                     unsigned char *dop, int do_len, int timeout,
+                     bool noisy, int verbose)
 {
     int ret;
     unsigned char wv_cdb[WRITE_VERIFY10_CMDLEN];
@@ -205,7 +206,7 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
     wv_cdb[6] = group & 0x1f;
     sg_put_unaligned_be16((uint16_t)num_lb, wv_cdb + 7);
     ret = run_scsi_transaction(sg_fd, wv_cdb, sizeof(wv_cdb), dop, do_len,
-                               timeout, verbose);
+                               timeout, noisy, verbose);
     return ret;
 }
 
@@ -214,7 +215,7 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
 static int
 sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
                      uint64_t llba, int num_lb, int group, unsigned char *dop,
-                     int do_len, int timeout, int verbose)
+                     int do_len, int timeout, bool noisy, int verbose)
 {
     int ret;
     unsigned char wv_cdb[WRITE_VERIFY16_CMDLEN];
@@ -232,7 +233,7 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
     sg_put_unaligned_be32((uint32_t)num_lb, wv_cdb + 10);
     wv_cdb[14] = group & 0x1f;
     ret = run_scsi_transaction(sg_fd, wv_cdb, sizeof(wv_cdb), dop, do_len,
-                               timeout, verbose);
+                               timeout, noisy, verbose);
     return ret;
 }
 
@@ -553,11 +554,12 @@ main(int argc, char * argv[])
         if (do_16)
             res = sg_ll_write_verify16(sg_fd, wrprotect, dpo, bytchk, llba,
                                        snum_lb, group, wvb, ilen, timeout,
-                                       verbose);
+                                       verbose > 0, verbose);
         else
             res = sg_ll_write_verify10(sg_fd, wrprotect, dpo, bytchk,
                                        (unsigned int)llba, snum_lb, group,
-                                       wvb, ilen, timeout, verbose);
+                                       wvb, ilen, timeout, verbose > 0,
+                                       verbose);
         ret = res;
         if (repeat && (0 == ret))
             tnum_lb_wr += snum_lb;

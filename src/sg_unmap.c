@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2016 Douglas Gilbert.
+ * Copyright (c) 2009-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.10 20160201";
+static const char * version_str = "1.11 20170917";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -485,7 +485,7 @@ main(int argc, char * argv[])
     }
 
     res = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr, param_len,
-                         1, verbose);
+                         true, verbose);
     ret = res;
     if (SG_LIB_CAT_NOT_READY == res) {
         pr2serr("UNMAP failed, device not ready\n");

@@ -3,7 +3,7 @@
  * data transfer (and no REQUEST SENSE command iff the unit is ready)
  * then this can be used for timing per SCSI command overheads.
  *
- * Copyright (C) 2000-2016 D. Gilbert
+ * Copyright (C) 2000-2017 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -32,7 +32,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.33 20160525";
+static const char * version_str = "3.34 20170917";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -314,7 +314,7 @@ int main(int argc, char * argv[])
                 sleep_for(30);
             progress = -1;
             res = sg_ll_test_unit_ready_progress(sg_fd, k, &progress,
-                     ((1 == op->do_number) ? 1 : 0), op->do_verbose);
+                     (1 == op->do_number), op->do_verbose);
             if (progress < 0) {
                 ret = res;
                 break;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.16 20160208";
+static const char * version_str = "1.17 20170917";
 
 #define ME "sg_wr_mode: "
 
@@ -451,11 +451,12 @@ int main(int argc, char * argv[])
     alloc_len = mode_6 ? SHORT_ALLOC_LEN : MX_ALLOC_LEN;
     if (mode_6)
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /*current */, pg_code,
-                                sub_pg_code, ref_md, alloc_len, 1, verbose);
+                                sub_pg_code, ref_md, alloc_len, true,
+                                verbose);
      else
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd, 0 /* current */,
-                                 pg_code, sub_pg_code, ref_md, alloc_len, 1,
-                                 verbose);
+                                 pg_code, sub_pg_code, ref_md, alloc_len,
+                                 true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -540,10 +541,10 @@ int main(int argc, char * argv[])
         memcpy(ref_md + off, read_in, read_in_len);
         if (mode_6)
             res = sg_ll_mode_select6(sg_fd, 1 /* PF */, save, ref_md, md_len,
-                                     1, verbose);
+                                     true, verbose);
         else
             res = sg_ll_mode_select10(sg_fd, 1 /* PF */, save, ref_md,
-                                      md_len, 1, verbose);
+                                      md_len, true, verbose);
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);

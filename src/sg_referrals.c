@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2016 Hannes Reinecke.
+ * Copyright (c) 2010-2017 Hannes Reinecke.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.06 20160423";    /* sbc4r10 */
+static const char * version_str = "1.07 20170917";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -274,7 +274,7 @@ main(int argc, char * argv[])
     }
 
     res = sg_ll_report_referrals(sg_fd, lba, do_one_segment, referralBuffp,
-                                 maxlen, 1, verbose);
+                                 maxlen, true, verbose);
     ret = res;
     if (0 == res) {
         if (maxlen >= 4)

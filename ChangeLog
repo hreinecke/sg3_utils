@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20170912] [svn: r713]
+Changelog for sg3_utils-1.43 [20170917] [svn: r715]
   - sg_bg_ctl: new Background control command (spc4r08)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
@@ -31,6 +31,8 @@ Changelog for sg3_utils-1.43 [20170912] [svn: r713]
       fields to Environmental reporting lpage (spc5r10)
     - add zoned block device statistics lpage (zbc2r?,
       16-264r4)
+    - fixup enumeration in power condition transition
+      log page (from H. Reinecke, Suse)
   - sg_inq: fix potential unbounded loop in --export
     - update version descriptor list to 20170114
   - sg_inq+sg_vpd: update Extended inquiry data vpd
@@ -70,6 +72,8 @@ Changelog for sg3_utils-1.43 [20170912] [svn: r713]
   - rescan-scsi-bus.sh: harden code
     - fixes from Suse; bump version to: 20160511
   - 55-scsi-sg3_id.rules: fixes from Suse
+  - https://github.com/hreinecke/sg3_utils
+    branch sles15 synced 20170914
   - clang --analyze static checker clean ups
   - shellcheck cleanup on scripts
   - automake: add AM_PROG_AR to configure.ac
@@ -121,6 +125,7 @@ Changelog for sg3_utils-1.42 [20160217] [svn: r663]
   - sg_io_linux, sg_pt_linux: drop SUGGEST_* decoding
   - sg_unaligned.h: add 48 bit support and gets for
     variable length unsigned integers
+  - change sg_ll_*() function's 'int noisy' to bool
 
 Changelog for sg3_utils-1.41 [20150511] [svn: r644]
   - sg_zone: new utility for open, close and finish

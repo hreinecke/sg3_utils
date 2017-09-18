@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Douglas Gilbert.
+ * Copyright (c) 2016-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.02 20160528";
+static const char * version_str = "1.03 20170917";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -234,11 +234,10 @@ usage()
 /* Invokes a SCSI READ ATTRIBUTE command (SPC+SMC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_read_attr(int sg_fd, void * resp, int * residp,
+sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
                 const struct opts_t * op)
 {
     int k, ret, res, sense_cat;
-    int noisy = 1;
     unsigned char ra_cdb[SG_READ_ATTRIBUTE_CMDLEN] =
           {SG_READ_ATTRIBUTE_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
@@ -1094,7 +1093,7 @@ main(int argc, char * argv[])
         goto clean_up;
     }
 
-    res = sg_ll_read_attr(sg_fd, rabp, &resid, op);
+    res = sg_ll_read_attr(sg_fd, rabp, &resid, op->verbose > 0, op);
     ret = res;
     if (0 == res) {
         rlen = op->maxlen - resid;

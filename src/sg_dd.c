@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2016 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2017 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -60,7 +60,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.86 20151219";
+static const char * version_str = "5.88 20170917";
 
 
 #define ME "sg_dd: "
@@ -418,7 +418,8 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 1, verb);
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, true,
+                           verb);
     if (0 != res)
         return res;
 
@@ -426,7 +427,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         (0xff == rcBuff[3])) {
         int64_t ls;
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 1,
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, true,
                                verb);
         if (0 != res)
             return res;
@@ -685,7 +686,10 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 return SG_LIB_CAT_MEDIUM_HARD;
             }
         }
-        /* drop through */
+#if defined(__GNUC__) || defined(__clang__)
+        __attribute__((fallthrough));
+        /* FALL THROUGH */
+#endif
     default:
         ++unrecovered_errs;
         if (verbose > 0)
@@ -774,6 +778,10 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             goto err_out;
         case SG_LIB_CAT_MEDIUM_HARD:
             may_coe = 1;
+#if defined(__GNUC__) || defined(__clang__)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
         default:
             if (retries_tmp > 0) {
                 pr2serr(">>> retrying a sgio read, lba=0x%" PRIx64 "\n",
@@ -864,7 +872,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             }
             corrct = (ifp->coe > 2) ? 1 : 0;
             res = sg_ll_read_long10(sg_fd, /* pblock */0, corrct, lba, buffp,
-                                    bs + read_long_blk_inc, &offset, 1,
+                                    bs + read_long_blk_inc, &offset, true,
                                     verbose);
             ok = 0;
             switch (res) {
@@ -884,7 +892,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 if (verbose)
                     pr2serr("read_long(10): adjusted len=%d\n", nl);
                 r = sg_ll_read_long10(sg_fd, 0, corrct, lba, buffp, nl,
-                                      &offset, 1, verbose);
+                                      &offset, true, verbose);
                 if (0 == r) {
                     ok = 1;
                     ++read_longs;

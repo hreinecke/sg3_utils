@@ -31,7 +31,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.20 20170904";    /* ses4r01 */
+static const char * version_str = "2.21 20170917";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -120,8 +120,8 @@ struct cgs_cl_t {
 struct opts_t {
     int byte1;
     bool byte1_given;
-    int do_control;
-    int do_data;
+    bool do_control;
+    bool do_data;
     int dev_slot_num;
     int enumerate;
     bool eiioe_auto;
@@ -1107,7 +1107,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             op->byte1_given = true;
             break;
         case 'c':
-            ++op->do_control;
+            op->do_control = true;
             break;
         case 'C':
             if (strlen(optarg) >= CGS_STR_MAX_SZ) {
@@ -1127,7 +1127,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             break;
         case 'd':
             data_arg = optarg;
-            op->do_data = 1;
+            op->do_data = true;
             break;
         case 'D':
             op->desc_name = optarg;
@@ -1301,7 +1301,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     }
     if (op->maxlen <= 0)
         op->maxlen = MX_ALLOC_LEN;
-    if (op->do_join && (op->do_control)) {
+    if (op->do_join && op->do_control) {
         pr2serr("cannot have '--join' and '--control'\n");
         goto err_help;
     }
@@ -1325,7 +1325,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                     "--dev-slot-num and --sas-addr\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if ((0 == op->do_join) && (0 == op->do_control) &&
+        if ((0 == op->do_join) && (! op->do_control) &&
             (0 == op->num_cgs) && (! op->page_code_given)) {
             ++op->do_join;      /* implicit --join */
             if (op->verbose)
@@ -1333,7 +1333,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
         }
     }
     if (op->ind_given) {
-        if ((0 == op->do_join) && (0 == op->do_control) &&
+        if ((0 == op->do_join) && (! op->do_control) &&
             (0 == op->num_cgs) && (! op->page_code_given)) {
             op->page_code_given = true;
             op->page_code = ENC_STATUS_DPC;  /* implicit status page */
@@ -1509,7 +1509,7 @@ match_last_ind_indiv(int index, const struct opts_t * op)
  * failures */
 static int
 do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
-            int noisy, int verbose)
+            bool noisy, int verbose)
 {
     const char * cp;
     int page_num;
@@ -1717,7 +1717,7 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
                     page_code);
     }
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
-                             rsp_buff_size, 1, op->verbose);
+                             rsp_buff_size, true, op->verbose);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {

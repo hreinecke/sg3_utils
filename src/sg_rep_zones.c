@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Douglas Gilbert.
+ * Copyright (c) 2014-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.09 20160528";
+static const char * version_str = "1.10 20170917";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -92,7 +92,7 @@ usage()
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int partial, int report_opts,
-                   void * resp, int mx_resp_len, int * residp, int noisy,
+                   void * resp, int mx_resp_len, int * residp, bool noisy,
                    int verbose)
 {
     int k, ret, res, sense_cat;
@@ -286,7 +286,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'o':
-           reporting_opt = sg_get_num(optarg);
+           reporting_opt = sg_get_num_nomult(optarg);
            if ((reporting_opt < 0) || (reporting_opt > 63)) {
                 pr2serr("bad argument to '--report=OPT', expect 0 to "
                         "63\n");
@@ -364,7 +364,7 @@ main(int argc, char * argv[])
     }
 
     res = sg_ll_report_zones(sg_fd, st_lba, do_partial, reporting_opt,
-                             reportZonesBuff, maxlen, &resid, 1, verbose);
+                             reportZonesBuff, maxlen, &resid, true, verbose);
     ret = res;
     if (0 == res) {
         rlen = maxlen - resid;

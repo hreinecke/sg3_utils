@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2016 Douglas Gilbert.
+ * Copyright (c) 1999-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -101,7 +101,7 @@ create_pt_obj(const char * cname)
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
-                    unsigned int lba, unsigned int count, int noisy,
+                    unsigned int lba, unsigned int count, bool noisy,
                     int verbose)
 {
     static const char * const cdb_name_s = "synchronize cache(10)";
@@ -159,7 +159,7 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
-                 int mx_resp_len, int noisy, int verbose)
+                 int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read capacity(16)";
     int k, ret, res, sense_cat;
@@ -212,7 +212,7 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
-                 int mx_resp_len, int noisy, int verbose)
+                 int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read capacity(10)";
     int k, ret, res, sense_cat;
@@ -262,7 +262,7 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
-                  void * resp, int mx_resp_len, int noisy, int verbose)
+                  void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode sense(6)";
     int res, ret, k, sense_cat, resid;
@@ -338,7 +338,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
 int
 sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
                    int sub_pg_code, void * resp, int mx_resp_len,
-                   int noisy, int verbose)
+                   bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode sense(10)";
     int res, ret, k, sense_cat, resid;
@@ -413,7 +413,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
-                   int noisy, int verbose)
+                   bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode select(6)";
     int res, ret, k, sense_cat;
@@ -470,7 +470,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
-                    int noisy, int verbose)
+                    bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode select(10)";
     int res, ret, k, sense_cat;
@@ -605,12 +605,12 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
     memset(buff, 0, MODE10_RESP_HDR_LEN);
     if (mode6)  /* want first 8 bytes just in case */
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /* pc */, pg_code,
-                                sub_pg_code, buff, MODE10_RESP_HDR_LEN, 1,
+                                sub_pg_code, buff, MODE10_RESP_HDR_LEN, true,
                                 verbose);
     else
         res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd,
                                  0 /* pc */, pg_code, sub_pg_code, buff,
-                                 MODE10_RESP_HDR_LEN, 1, verbose);
+                                 MODE10_RESP_HDR_LEN, true, verbose);
     if (0 != res)
         return res;
     n = buff[0];
@@ -660,11 +660,11 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
         if (mode6)
             res = sg_ll_mode_sense6(sg_fd, dbd, k /* pc */,
                                     pg_code, sub_pg_code, buff,
-                                    calc_len, 1, verbose);
+                                    calc_len, true, verbose);
         else
             res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd,
                                      k /* pc */, pg_code, sub_pg_code,
-                                     buff, calc_len, 1, verbose);
+                                     buff, calc_len, true, verbose);
         if (0 != res) {
             if (0 == first_err)
                 first_err = res;
@@ -686,7 +686,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
 int
 sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
-                int mx_resp_len, int noisy, int verbose)
+                int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "log sense";
     int res, ret, k, sense_cat, resid;
@@ -759,7 +759,7 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
 int
 sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
                  int subpg_code, unsigned char * paramp, int param_len,
-                 int noisy, int verbose)
+                 bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "log select";
     int res, ret, k, sense_cat;
@@ -825,7 +825,7 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
 int
 sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
                       int power_cond, int noflush__fl, int loej, int start,
-                      int noisy, int verbose)
+                      bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "start stop unit";
     int k, res, ret, sense_cat;
@@ -875,7 +875,7 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
  * Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_prevent_allow(int sg_fd, int prevent, int noisy, int verbose)
+sg_ll_prevent_allow(int sg_fd, int prevent, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "prevent allow medium removal";
     int k, res, ret, sense_cat;

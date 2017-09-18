@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Douglas Gilbert.
+ * Copyright (c) 2016-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.00 20160518";
+static const char * version_str = "1.01 20170917";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -84,7 +84,7 @@ usage()
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
-                         int noisy, int verbose)
+                         bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char bcCDB[16] = {SG_SERVICE_ACTION_IN_16,
@@ -207,7 +207,7 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_background_control(sg_fd, ctl, time_tnth, 1, verbose);
+    res = sg_ll_background_control(sg_fd, ctl, time_tnth, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)

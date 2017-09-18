@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2017 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.20 20151219";
+static const char * version_str = "1.21 20170917";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -223,7 +223,7 @@ int main(int argc, char * argv[])
 
     res = sg_ll_report_tgt_prt_grp2(sg_fd, reportTgtGrpBuff,
                                     sizeof(reportTgtGrpBuff),
-                                    extended, 1, verbose);
+                                    extended, true, verbose);
     ret = res;
     if (0 == res) {
         report_len = sg_get_unaligned_be32(reportTgtGrpBuff + 0) + 4;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -26,7 +26,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.27 20160226";
+static const char * version_str = "1.28 20170917";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -223,7 +223,7 @@ main(int argc, char * argv[])
                 sleep_for(30);
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
             res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                      1, verbose);
+                                      true, verbose);
             if (res) {
                 ret = res;
                 if (SG_LIB_CAT_INVALID_OP == res)
@@ -275,7 +275,7 @@ main(int argc, char * argv[])
     for (k = 0; k < num_rs; ++k) {
         memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
         res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                  1, verbose);
+                                  true, verbose);
         ret = res;
         if (0 == res) {
             resp_len = requestSenseBuff[7] + 8;

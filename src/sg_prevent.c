@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.08 20151219";
+static const char * version_str = "1.09 20170917";
 
 #define ME "sg_prevent: "
 
@@ -136,7 +136,7 @@ int main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    res = sg_ll_prevent_allow(sg_fd, prevent, 1, verbose);
+    res = sg_ll_prevent_allow(sg_fd, prevent, true, verbose);
     ret = res;
     if (res) {
         char b[80];

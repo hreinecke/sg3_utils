@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2004-2016 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
+* Copyright (c) 2004-2017 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.12 20160423";
+static const char * version_str = "1.13 20170917";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -564,7 +564,7 @@ main(int argc, char * argv[])
 
     if (0 == port_arr_len) {
         res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
-                            DEF_VPD_DEVICE_ID_LEN, 1, verbose);
+                            DEF_VPD_DEVICE_ID_LEN, true, verbose);
         if (0 == res) {
             report_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
             if (VPD_DEVICE_ID != rsp_buff[1]) {
@@ -582,7 +582,7 @@ main(int argc, char * argv[])
                 return SG_LIB_CAT_MALFORMED;
             } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
                 if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
-                                  report_len, 1, verbose))
+                                  report_len, true, verbose))
                     return SG_LIB_CAT_OTHER;
             }
             decode_target_port(rsp_buff + 4, report_len - 4, &relport,
@@ -595,7 +595,7 @@ main(int argc, char * argv[])
         /* trunc = 0; */
 
         res = sg_ll_report_tgt_prt_grp2(sg_fd, reportTgtGrpBuff,
-                                        sizeof(reportTgtGrpBuff), 0, 1,
+                                        sizeof(reportTgtGrpBuff), 0, true,
                                         verbose);
         ret = res;
         if (0 == res) {
@@ -667,7 +667,8 @@ main(int argc, char * argv[])
         report_len = port_arr_len * 4 + 4;
     }
 
-    res = sg_ll_set_tgt_prt_grp(sg_fd, setTgtGrpBuff, report_len, 1, verbose);
+    res = sg_ll_set_tgt_prt_grp(sg_fd, setTgtGrpBuff, report_len, true,
+                                verbose);
 
     if (0 == res)
         goto err_out;

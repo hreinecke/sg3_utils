@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2016 D. Gilbert
+ *  Copyright (C) 2000-2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.48 20151219";
+static const char * version_str = "1.49 20170917";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -882,7 +882,7 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
     for (header = 0, k = 0; k < PG_CODE_MAX; ++k) {
         if (op->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
-                                    1, op->do_verbose);
+                                    true, op->do_verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again without the '-6' switch for a 10 "
                         "byte MODE SENSE command\n");
@@ -893,7 +893,7 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
             }
         } else {
             res = sg_ll_mode_sense10(sg_fd, 0, 0, 0, k, 0, rbuf, mresp_len,
-                                     1, op->do_verbose);
+                                     true, op->do_verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again with a '-6' switch for a 6 byte "
                         "MODE SENSE command\n");
@@ -1097,7 +1097,7 @@ main(int argc, char * argv[])
     if (op->do_six) {
         res = sg_ll_mode_sense6(sg_fd, op->do_dbd, op->page_control,
                                 op->pg_code, op->subpg_code, rsp_buff,
-                                rsp_buff_size, 1, op->do_verbose);
+                                rsp_buff_size, true, op->do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again without the '-6' switch for a 10 byte "
                     "MODE SENSE command\n");
@@ -1105,7 +1105,7 @@ main(int argc, char * argv[])
         res = sg_ll_mode_sense10(sg_fd, op->do_llbaa, op->do_dbd,
                                  op->page_control, op->pg_code,
                                  op->subpg_code, rsp_buff, rsp_buff_size,
-                                 1, op->do_verbose);
+                                 true, op->do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again with a '-6' switch for a 6 byte MODE "
                     "SENSE command\n");

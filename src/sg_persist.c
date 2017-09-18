@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2016 D. Gilbert
+ *  Copyright (C) 2004-2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.54 20160426";
+static const char * version_str = "0.55 20170917";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -246,7 +246,7 @@ prin_work(int sg_fd, const struct opts_t * op)
 
     memset(pr_buff, 0, sizeof(pr_buff));
     res = sg_ll_persistent_reserve_in(sg_fd, op->prin_sa, pr_buff,
-                                      op->alloc_len, 1, op->verbose);
+                                      op->alloc_len, true, op->verbose);
     if (res) {
         char b[64];
         char bb[80];
@@ -452,7 +452,7 @@ prout_work(int sg_fd, struct opts_t * op)
         sg_put_unaligned_be32((uint32_t)t_arr_len, pr_buff + 24);
     }
     res = sg_ll_persistent_reserve_out(sg_fd, op->prout_sa, 0,
-                                       op->prout_type, pr_buff, len, 1,
+                                       op->prout_type, pr_buff, len, true,
                                        op->verbose);
     if (res || op->verbose) {
         if (op->prout_sa < num_prout_sa_strs)
@@ -498,7 +498,7 @@ prout_reg_move_work(int sg_fd, struct opts_t * op)
         sg_put_unaligned_be32((uint32_t)t_arr_len, pr_buff + 20);
     }
     res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA, 0,
-                                       op->prout_type, pr_buff, len, 1,
+                                       op->prout_type, pr_buff, len, true,
                                        op->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)

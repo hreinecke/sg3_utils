@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2017 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.17 20160531";
+static const char * version_str = "1.18 20170917";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -143,7 +143,7 @@ print_modes(void)
 static int
 ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
                   uint32_t rb_offset, void * resp, int mx_resp_len,
-                  int * residp, int noisy, int verbose)
+                  int * residp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rb10_cb[SG_READ_BUFFER_10_CMDLEN] =
@@ -206,7 +206,7 @@ ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
 static int
 ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
                   uint64_t rb_offset, void * resp, int mx_resp_len,
-                  int * residp, int noisy, int verbose)
+                  int * residp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rb16_cb[SG_READ_BUFFER_16_CMDLEN] =
@@ -452,7 +452,7 @@ main(int argc, char * argv[])
 
     if (do_long)
         res = ll_read_buffer_16(sg_fd, rb_mode, rb_mode_sp, rb_id, rb_offset,
-                                resp, rb_len, &resid, 1, verbose);
+                                resp, rb_len, &resid, true, verbose);
     else if (rb_offset > 0xffffff) {
         pr2serr("--offset value is too large for READ BUFFER(10), try "
                 "--16\n");
@@ -460,8 +460,8 @@ main(int argc, char * argv[])
         goto fini;
     } else
         res = ll_read_buffer_10(sg_fd, rb_mode, rb_mode_sp, rb_id,
-                                (uint32_t)rb_offset, resp, rb_len, &resid, 1,
-                                verbose);
+                                (uint32_t)rb_offset, resp, rb_len, &resid,
+                                true, verbose);
     if (0 != res) {
         char b[80];
 

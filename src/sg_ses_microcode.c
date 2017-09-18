@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Douglas Gilbert.
+ * Copyright (c) 2014-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.05 20160610";    /* ses3r07 */
+static const char * version_str = "1.06 20170917";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -316,7 +316,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     res = sg_ll_send_diag(sg_fd, 0 /* sf_code */, 1 /* pf */, 0 /* sf */,
                           0 /* devofl */, 0 /* unitofl */,
                           1 /* long_duration */, wp->doutp, do_len,
-                          1 /* noisy */, verb);
+                          true /* noisy */, verb);
     if (op->mc_non) {
         /* If non-standard, only call RDR after failed SD */
         if (0 == res)
@@ -349,7 +349,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     }
 
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
-                             DEF_DI_LEN, 1, verb);
+                             DEF_DI_LEN, true, verb);
     if (res)
         return ret ? ret : res;
     rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
@@ -692,7 +692,7 @@ main(int argc, char * argv[])
     verb = (op->verbose > 1) ? op->verbose - 1 : 0;
     /* Fetch Download microcode status dpage for generation code ++ */
     res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
-                             DEF_DI_LEN, 1, verb);
+                             DEF_DI_LEN, true, verb);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
         if (rsp_len > DEF_DI_LEN) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2016 Douglas Gilbert.
+ * Copyright (c) 2009-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20160531";
+static const char * version_str = "1.15 20170917";
 
 
 #define ME "sg_write_same: "
@@ -267,7 +267,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
     ret = sg_cmds_process_resp(ptvp, "Write same", res, 0, sense_b,
-                               1 /*noisy */, op->verbose, &sense_cat);
+                               true /*noisy */, op->verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -496,11 +496,12 @@ main(int argc, char * argv[])
         prot_en = 0;
         if (0 == op->xfer_len) {
             res = sg_ll_readcap_16(sg_fd, 0 /* pmi */, 0 /* llba */, resp_buff,
-                                   RCAP16_RESP_LEN, 1, (vb ? (vb - 1): 0));
+                                   RCAP16_RESP_LEN, true, (vb ? (vb - 1): 0));
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 pr2serr("Read capacity(16) unit attention, try again\n");
                 res = sg_ll_readcap_16(sg_fd, 0, 0, resp_buff,
-                                       RCAP16_RESP_LEN, 1, (vb ? (vb - 1): 0));
+                                       RCAP16_RESP_LEN, true,
+                                       (vb ? (vb - 1): 0));
             }
             if (0 == res) {
                 if (vb > 3)
@@ -516,7 +517,7 @@ main(int argc, char * argv[])
                     pr2serr("Read capacity(16) not supported, try Read "
                             "capacity(10)\n");
                 res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */,
-                                       resp_buff, RCAP10_RESP_LEN, 1,
+                                       resp_buff, RCAP10_RESP_LEN, true,
                                        (vb ? (vb - 1): 0));
                 if (0 == res) {
                     if (vb > 3)

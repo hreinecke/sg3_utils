@@ -226,7 +226,7 @@ usage()
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_format_medium(int sg_fd, int verify, int immed, int format,
-                    void * paramp, int transfer_len, int timeout, int noisy,
+                    void * paramp, int transfer_len, int timeout, bool noisy,
                     int verbose)
 {
         int k, ret, res, sense_cat;

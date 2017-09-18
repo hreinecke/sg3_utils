@@ -715,7 +715,16 @@ searchexisting()
     else
       match=1
     fi
-    test $match -eq 1 && doreportlun
+
+    test $match -eq 0 && continue
+
+    if [ -z "$lunsearch" ] ; then
+      doreportlun
+    else
+      for lun in $lunsearch ; do
+        dolunscan
+      done
+    fi
   done
 }
 
@@ -993,7 +1002,7 @@ flushmpaths()
 # Find resized luns
 findresized()
 {
-  local devs=`ls /sys/class/scsi_device/`
+  local devs=
   local size=
   local new_size=
   local sysfs_path=
@@ -1002,6 +1011,14 @@ findresized()
   local m=
   local mpathsize=
   declare -a mpathsizes
+
+  if [ -z "$lunsearch" ] ; then
+    devs=`ls /sys/class/scsi_device/`
+  else
+    for lun in $lunsearch ; do
+      devs="$devs `(cd /sys/class/scsi_device/ && ls -d *:${lun})`"
+    done
+  fi
 
   for hctl in $devs ; do
     sysfs_path="/sys/class/scsi_device/$hctl/device"
@@ -1070,8 +1087,8 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--channels=LIST: Scan only channel(s) in LIST"
     echo "--color:         use coloured prefixes OLD/NEW/DEL"
     echo "--flush:         same as -f"
-    echo "--forceremove:   Remove and readd every device (DANGEROUS)"
-    echo "--forcerescan:   Rescan existing devices"
+    echo "--forceremove:   Remove stale devices (DANGEROUS)"
+    echo "--forcerescan:   Remove and readd existing devices (DANGEROUS)"
     echo "--help:          print this usage message then exit"
     echo "--hosts=LIST:    Scan only host(s) in LIST"
     echo "--ids=LIST:      Scan only target ID(s) in LIST"
