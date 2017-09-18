@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.32 20160510";
+static const char * version_str = "1.33 20170917";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -599,7 +599,7 @@ main(int argc, char * argv[])
     }
     trunc = 0;
 
-    res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen, 1,
+    res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen, true,
                             verbose);
     ret = res;
     if (0 == res) {

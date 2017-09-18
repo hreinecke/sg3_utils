@@ -128,7 +128,7 @@ create_pt_obj(const char * cname)
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
-                      void * resp, int alloc_len, int noisy, int verbose)
+                      void * resp, int alloc_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "Get LBA status(16)";
     int k, res, sense_cat, ret;
@@ -189,7 +189,7 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
 
 int
 sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
-                     int alloc_len, int noisy, int verbose)
+                     int alloc_len, bool noisy, int verbose)
 {
     return sg_ll_get_lba_status16(sg_fd, start_llba, /* rt = */ 0x0, resp,
                                   alloc_len, noisy, verbose);
@@ -200,7 +200,7 @@ sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
 int
 sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
                        uint32_t element_id, uint8_t rt,
-                       void * resp, int alloc_len, int noisy,
+                       void * resp, int alloc_len, bool noisy,
                        int verbose)
 {
     static const char * const cdb_name_s = "Get LBA status(32)";
@@ -264,7 +264,7 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
 
 int
 sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len,
-                         int noisy, int verbose)
+                         bool noisy, int verbose)
 {
     return sg_ll_report_tgt_prt_grp2(sg_fd, resp, mx_resp_len, 0, noisy,
                                      verbose);
@@ -274,7 +274,7 @@ sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
-                          int extended, int noisy, int verbose)
+                          int extended, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "report target port groups";
     int k, res, ret, sense_cat;
@@ -335,7 +335,7 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
 /* Invokes a SCSI SET TARGET PORT GROUPS command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
+sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
                       int verbose)
 {
     static const char * const cdb_name_s = "set target port groups";
@@ -388,7 +388,7 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
-                       void * resp, int mx_resp_len, int noisy,
+                       void * resp, int mx_resp_len, bool noisy,
                        int verbose)
 {
     static const char * const cdb_name_s = "report referrals";
@@ -454,7 +454,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
 int
 sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
                 int unitofl_bit, int long_duration, void * paramp,
-                int param_len, int noisy, int verbose)
+                int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "send diagnostic";
     int k, res, ret, sense_cat, tmout;
@@ -516,7 +516,7 @@ sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
-                   int mx_resp_len, int noisy, int verbose)
+                   int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "receive diagnostic results";
     int k, res, ret, sense_cat;
@@ -577,7 +577,7 @@ sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist, int dl_format,
-                    void * resp, int mx_resp_len, int noisy, int verbose)
+                    void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read defect(10)";
     int res, k, ret, sense_cat;
@@ -641,7 +641,7 @@ sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist, int dl_format,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
-                            int noisy, int verbose)
+                            bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read media serial number";
     int k, res, ret, sense_cat;
@@ -701,7 +701,7 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
-                     int noisy, int verbose)
+                     bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "report identifying information";
     int k, res, ret, sense_cat;
@@ -763,7 +763,7 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
-                  int noisy, int verbose)
+                  bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "set identifying information";
     int k, res, ret, sense_cat;
@@ -818,7 +818,7 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
 int
 sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                   int cmplst, int dlist_format, int timeout_secs,
-                  void * paramp, int param_len, int noisy, int verbose)
+                  void * paramp, int param_len, bool noisy, int verbose)
 {
     return sg_ll_format_unit2(sg_fd, fmtpinfo, longlist, fmtdata, cmplst,
                               dlist_format, 0, timeout_secs, paramp,
@@ -831,7 +831,7 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
 int
 sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                    int cmplst, int dlist_format, int ffmt, int timeout_secs,
-                   void * paramp, int param_len, int noisy, int verbose)
+                   void * paramp, int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "format unit";
     int k, res, ret, sense_cat, tmout;
@@ -898,7 +898,7 @@ sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
-                      int param_len, int noisy, int verbose)
+                      int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "reassign blocks";
     int res, k, ret, sense_cat;
@@ -952,7 +952,7 @@ sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
  * -1 -> other errors */
 int
 sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
-                            int mx_resp_len, int noisy, int verbose)
+                            int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "persistent reservation in";
     int res, k, ret, sense_cat;
@@ -1015,7 +1015,7 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
 int
 sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
                              unsigned int rq_type, void * paramp,
-                             int param_len, int noisy, int verbose)
+                             int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "persistent reservation out";
     int res, k, ret, sense_cat;
@@ -1090,7 +1090,7 @@ has_blk_ili(unsigned char * sensep, int sb_len)
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
-                  void * resp, int xfer_len, int * offsetp, int noisy,
+                  void * resp, int xfer_len, int * offsetp, bool noisy,
                   int verbose)
 {
     static const char * const cdb_name_s = "read long(10)";
@@ -1177,7 +1177,7 @@ sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
-                  void * resp, int xfer_len, int * offsetp, int noisy,
+                  void * resp, int xfer_len, int * offsetp, bool noisy,
                   int verbose)
 {
     static const char * const cdb_name_s = "read long(16)";
@@ -1266,7 +1266,7 @@ sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
 int
 sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                    unsigned int lba, void * data_out, int xfer_len,
-                   int * offsetp, int noisy, int verbose)
+                   int * offsetp, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "write long(10)";
     int k, res, sense_cat, ret;
@@ -1345,7 +1345,7 @@ sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
 int
 sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                    uint64_t llba, void * data_out, int xfer_len,
-                   int * offsetp, int noisy, int verbose)
+                   int * offsetp, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "write long(16)";
     int k, res, sense_cat, ret;
@@ -1426,7 +1426,7 @@ sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
 int
 sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
                unsigned int lba, int veri_len, void * data_out,
-               int data_out_len, unsigned int * infop, int noisy,
+               int data_out_len, unsigned int * infop, bool noisy,
                int verbose)
 {
     static const char * const cdb_name_s = "verify(10)";
@@ -1503,7 +1503,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytchk,
 int
 sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytchk, uint64_t llba,
                int veri_len, int group_num, void * data_out,
-               int data_out_len, uint64_t * infop, int noisy, int verbose)
+               int data_out_len, uint64_t * infop, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "verify(16)";
     int k, res, ret, sense_cat, slen;
@@ -1751,7 +1751,7 @@ out:
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
-                  void * resp, int mx_resp_len, int noisy, int verbose)
+                  void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read buffer(10)";
     int res, k, ret, sense_cat;
@@ -1812,7 +1812,7 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
-                   void * paramp, int param_len, int noisy, int verbose)
+                   void * paramp, int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "write buffer";
     int k, res, ret, sense_cat;
@@ -1874,7 +1874,7 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
-            int param_len, int noisy, int verbose)
+            int param_len, bool noisy, int verbose)
 {
     return sg_ll_unmap_v2(sg_fd, 0, group_num, timeout_secs, paramp,
                           param_len, noisy, verbose);
@@ -1884,7 +1884,7 @@ sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
  * (sbc3r22). Otherwise same as sg_ll_unmap() . */
 int
 sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
-               void * paramp, int param_len, int noisy, int verbose)
+               void * paramp, int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "unmap";
     int k, res, ret, sense_cat, tmout;
@@ -1939,7 +1939,7 @@ sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
-                        int noisy, int verbose)
+                        bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read block limits";
     int k, ret, res, sense_cat;
@@ -1997,7 +1997,7 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
-                           int mx_resp_len, int noisy, int verbose)
+                           int mx_resp_len, bool noisy, int verbose)
 {
     int k, res, ret, sense_cat;
     unsigned char rcvcopyres_cdb[THIRD_PARTY_COPY_IN_CMDLEN] =
@@ -2056,7 +2056,7 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
 /* Invokes a SCSI EXTENDED COPY (LID1) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
+sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
                     int verbose)
 {
     int k, res, ret, sense_cat;
@@ -2114,7 +2114,7 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
 int
 sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
                       int timeout_secs, void * paramp, int param_len,
-                      int noisy, int verbose)
+                      bool noisy, int verbose)
 {
     int k, res, ret, sense_cat, tmout;
     unsigned char xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =

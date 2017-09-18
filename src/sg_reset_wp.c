@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Douglas Gilbert.
+ * Copyright (c) 2014-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.05 20160528";
+static const char * version_str = "1.06 20170917";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -75,7 +75,7 @@ usage()
 /* Invokes a SCSI RESET WRITE POINTER command (ZBC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, int noisy,
+sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, bool noisy,
                           int verbose)
 {
     int k, ret, res, sense_cat;
@@ -206,7 +206,7 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_reset_write_pointer(sg_fd, zid, all, 1, verbose);
+    res = sg_ll_reset_write_pointer(sg_fd, zid, all, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)

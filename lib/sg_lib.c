@@ -2566,15 +2566,15 @@ dStrHexStr(const char * str, int len, const char * leadin, int format,
     return n;
 }
 
-/* Returns 1 when executed on big endian machine; else returns 0.
+/* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a
  * big endian machine). */
-int
+bool
 sg_is_big_endian()
 {
     union u_t {
-        unsigned short s;
-        unsigned char c[sizeof(unsigned short)];
+        uint16_t s;
+        unsigned char c[sizeof(uint16_t)];
     } u;
 
     u.s = 0x0102;
@@ -2582,10 +2582,10 @@ sg_is_big_endian()
                                     the most significant byte */
 }
 
-static unsigned short
-swapb_ushort(unsigned short u)
+static uint16_t
+swapb_uint16(uint16_t u)
 {
-    unsigned short r;
+    uint16_t r;
 
     r = (u >> 8) & 0xff;
     r |= ((u & 0xff) << 8);
@@ -2600,13 +2600,13 @@ swapb_ushort(unsigned short u)
  *     = -1    only the ASCII-hex words are listed (i.e. without address)
  *     = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
  *     < -2    same as -1
- * If 'swapb' non-zero then bytes in each word swapped. Needs to be set
+ * If 'swapb' is true then bytes in each word swapped. Needs to be set
  * for ATA IDENTIFY DEVICE response on big-endian machines. */
 void
-dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
+dWordHex(const uint16_t* words, int num, int no_ascii, bool swapb)
 {
-    const unsigned short * p = words;
-    unsigned short c;
+    const uint16_t * p = words;
+    uint16_t c;
     char buff[82];
     unsigned char upp, low;
     int a = 0;
@@ -2625,7 +2625,7 @@ dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
         for (k = 0; k < num; k++) {
             c = *p++;
             if (swapb)
-                c = swapb_ushort(c);
+                c = swapb_uint16(c);
             bpos += 5;
             scnpr(buff + bpos, blen - bpos, "%.4x", (unsigned int)c);
             buff[bpos + 4] = ' ';
@@ -2653,7 +2653,7 @@ dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
     for (i = 0; i < num; i++) {
         c = *p++;
         if (swapb)
-            c = swapb_ushort(c);
+            c = swapb_uint16(c);
         bpos += 5;
         scnpr(buff + bpos, blen - bpos, "%.4x", (unsigned int)c);
         buff[bpos + 4] = ' ';
@@ -2690,7 +2690,7 @@ dWordHex(const unsigned short* words, int num, int no_ascii, int swapb)
  * then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
  * multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
  * Main (SI) multipliers supported: K, M, G. Ignore leading spaces and
- * tabs; accept comma, space, tab and hash as terminator. */
+ * tabs; accept comma, hyphen, space, tab and hash as terminator. */
 int
 sg_get_num(const char * buf)
 {
@@ -2714,7 +2714,7 @@ sg_get_num(const char * buf)
         len -=n;
     }
     /* following hack to keep C++ happy */
-    cp = strpbrk((char *)buf, " \t,#");
+    cp = strpbrk((char *)buf, " \t,#-");
     if (cp) {
         len = cp - buf;
         n = (int)sizeof(lb) - 1;
@@ -2825,7 +2825,7 @@ sg_get_num_nomult(const char * buf)
  * then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
  * multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
  * Main (SI) multipliers supported: K, M, G, T, P. Ignore leading spaces
- * and tabs; accept comma, space, tab and hash as terminator. */
+ * and tabs; accept comma, hyphen, space, tab and hash as terminator. */
 int64_t
 sg_get_llnum(const char * buf)
 {
@@ -2850,7 +2850,7 @@ sg_get_llnum(const char * buf)
         len -= n;
     }
     /* following hack to keep C++ happy */
-    cp = strpbrk((char *)buf, " \t,#");
+    cp = strpbrk((char *)buf, " \t-,#");
     if (cp) {
         len = cp - buf;
         n = (int)sizeof(lb) - 1;
@@ -2972,11 +2972,11 @@ sg_get_llnum_nomult(const char * buf)
  * written to 'ochars' before 0 character is found or 'num' words
  * are processed. */
 int
-sg_ata_get_chars(const unsigned short * word_arr, int start_word,
-                 int num_words, int is_big_endian, char * ochars)
+sg_ata_get_chars(const uint16_t * word_arr, int start_word,
+                 int num_words, bool is_big_endian, char * ochars)
 {
     int k;
-    unsigned short s;
+    uint16_t s;
     char a, b;
     char * op = ochars;
 

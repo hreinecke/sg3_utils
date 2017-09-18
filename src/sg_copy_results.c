@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2017 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.13 20160227";
+static const char * version_str = "1.14 20170923";
 
 
 #define MAX_XFER_LEN 10000
@@ -421,7 +421,7 @@ main(int argc, char * argv[])
                 PRIu32 "\n", cp, device_name, xfer_len, xfer_len, list_id);
 
     res = sg_ll_receive_copy_results(sg_fd, sa, list_id, cpResultBuff,
-                                     xfer_len, 1, verbose);
+                                     xfer_len, true, verbose);
     ret = res;
     if (res) {
         char b[80];

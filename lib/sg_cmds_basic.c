@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2016 Douglas Gilbert.
+ * Copyright (c) 1999-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
 #endif
 
 
-static const char * const version_str = "1.74 20160528";
+static const char * const version_str = "1.75 20170917";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -116,11 +116,11 @@ static const char * const pass_through_s = "pass-through";
 
 static int
 sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
-                       const unsigned char * sbp, int slen, int noisy,
+                       const unsigned char * sbp, int slen, bool noisy,
                        int verbose, int * o_sense_cat)
 {
     int scat, got;
-    int n = 0;
+    bool n = false;
     bool check_data_in = false;
     char b[512];
 
@@ -135,12 +135,15 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     case SG_LIB_CAT_PROTECTION:
     case SG_LIB_CAT_NO_SENSE:
     case SG_LIB_CAT_MISCOMPARE:
-        n = 0;
+        n = false;
         break;
     case SG_LIB_CAT_RECOVERED:
     case SG_LIB_CAT_MEDIUM_HARD:
         check_data_in = true;
-        /* drop through */
+#if defined(__GNUC__) || defined(__clang__)
+        __attribute__((fallthrough));
+        /* FALL THROUGH */
+#endif
     case SG_LIB_CAT_UNIT_ATTENTION:
     case SG_LIB_CAT_SENSE:
     default:
@@ -179,7 +182,7 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
 int
 sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, int mx_di_len, const unsigned char * sbp,
-                     int noisy, int verbose, int * o_sense_cat)
+                     bool noisy, int verbose, int * o_sense_cat)
 {
     int got, cat, duration, slen, resid, resp_code, sstat;
     bool transport_sense;
@@ -325,7 +328,7 @@ static const char * const inquiry_s = "inquiry";
  * successful, various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
-              int mx_resp_len, int noisy, int verbose)
+              int mx_resp_len, bool noisy, int verbose)
 {
     int res, ret, k, sense_cat, resid;
     unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -398,7 +401,7 @@ sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
  * -1 -> other errors */
 int
 sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
-                  int noisy, int verbose)
+                  bool noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -472,7 +475,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
  * -1 -> other errors */
 int
 sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
-                               int noisy, int verbose)
+                               bool noisy, int verbose)
 {
     static const char * const tur_s = "test unit ready";
     int res, ret, k, sense_cat;
@@ -525,7 +528,7 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
  * Returns 0 when successful, various SG_LIB_CAT_* positive values or
  * -1 -> other errors */
 int
-sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
+sg_ll_test_unit_ready(int sg_fd, int pack_id, bool noisy, int verbose)
 {
     return sg_ll_test_unit_ready_progress(sg_fd, pack_id, NULL, noisy,
                                           verbose);
@@ -535,7 +538,7 @@ sg_ll_test_unit_ready(int sg_fd, int pack_id, int noisy, int verbose)
  * SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
-                    int noisy, int verbose)
+                    bool noisy, int verbose)
 {
     static const char * const rq_s = "request sense";
     int k, ret, res, sense_cat;
@@ -595,7 +598,7 @@ sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
 sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
-                  int noisy, int verbose)
+                  bool noisy, int verbose)
 {
     static const char * const report_luns_s = "report luns";
     int k, ret, res, sense_cat;

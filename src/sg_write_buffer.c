@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2017 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.21 20160531";    /* spc5r10 */
+static const char * version_str = "1.22 20170917";    /* spc5r10 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -178,7 +178,8 @@ print_modes(void)
 static int
 sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
                       uint32_t buffer_offset, void * paramp,
-                      uint32_t param_len, int to_secs, int noisy, int verbose)
+                      uint32_t param_len, int to_secs, bool noisy,
+                      int verbose)
 {
     int k, res, ret, sense_cat;
     uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
@@ -508,7 +509,7 @@ main(int argc, char * argv[])
                         wb_offset + k, n);
             res = sg_ll_write_buffer_v2(sg_fd, wb_mode, wb_mspec, wb_id,
                                         wb_offset + k, dop + k, n,
-                                        wb_timeout, 1, verbose);
+                                        wb_timeout, true, verbose);
             if (res)
                 break;
         }
@@ -516,7 +517,7 @@ main(int argc, char * argv[])
             if (verbose)
                 pr2serr("sending Activate deferred microcode [0xf]\n");
             res = sg_ll_write_buffer_v2(sg_fd, MODE_ACTIVATE_MC, 0, 0, 0,
-                                        NULL, 0, wb_timeout, 1, verbose);
+                                        NULL, 0, wb_timeout, true, verbose);
         }
     } else {
         if (verbose)
@@ -524,7 +525,7 @@ main(int argc, char * argv[])
                     "id=%d, offset=%d, len=%d\n", wb_mode, wb_mspec, wb_id,
                     wb_offset, wb_len);
         res = sg_ll_write_buffer_v2(sg_fd, wb_mode, wb_mspec, wb_id,
-                                    wb_offset, dop, wb_len, wb_timeout, 1,
+                                    wb_offset, dop, wb_len, wb_timeout, true,
                                     verbose);
     }
     if (0 != res) {

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 1999-2015 D. Gilbert
+ *  Copyright (C) 1999-2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -32,7 +32,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.60 20151219";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.61 20170917";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", 0, 0, 'e'},
@@ -535,15 +535,15 @@ main(int argc, char * argv[])
     if (op->do_fl >= 0)
         res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_fl, 0 /* pc */,
                                     1 /* fl */, 1 /* loej */,
-                                    1 /*start */, 1 /* noisy */,
+                                    1 /*start */, true /* noisy */,
                                     op->do_verbose);
     else if (op->do_pc > 0)
         res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_mod,
-                                    op->do_pc, op->do_noflush, 0, 0, 1,
+                                    op->do_pc, op->do_noflush, 0, 0, true,
                                     op->do_verbose);
     else
         res = sg_ll_start_stop_unit(fd, op->do_immed, 0, 0, op->do_noflush,
-                                    op->do_loej, op->do_start, 1,
+                                    op->do_loej, op->do_start, true,
                                     op->do_verbose);
     ret = res;
     if (res) {

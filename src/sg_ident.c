@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2016 Douglas Gilbert.
+ * Copyright (c) 2005-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,7 +29,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.15 20160423";
+static const char * version_str = "1.16 20170917";
 
 #define ME "sg_ident: "
 
@@ -221,10 +221,10 @@ int main(int argc, char * argv[])
                 goto err_out;
             }
             ii_len = res;
-            res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, ii_len, 1,
+            res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, ii_len, true,
                                     verbose);
         } else    /* do_clear */
-            res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, 0, 1, verbose);
+            res = sg_ll_set_id_info(sg_fd, itype, rdi_buff, 0, true, verbose);
         if (res) {
             ret = res;
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
@@ -233,7 +233,7 @@ int main(int argc, char * argv[])
                 pr2serr("    try '-v' for more information\n");
         }
     } else {    /* do report identifying information */
-        res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, 1, verbose);
+        res = sg_ll_report_id_info(sg_fd, itype, rdi_buff, 4, true, verbose);
         if (0 == res) {
             ii_len = sg_get_unaligned_be32(rdi_buff + 0);
             if ((! raw) && (verbose > 0))
@@ -252,7 +252,7 @@ int main(int argc, char * argv[])
                 goto err_out;
             }
             bp = rdi_buff;
-            res = sg_ll_report_id_info(sg_fd, itype, bp, ii_len + 4, 1,
+            res = sg_ll_report_id_info(sg_fd, itype, bp, ii_len + 4, true,
                                        verbose);
             if (0 == res) {
                 ii_len = sg_get_unaligned_be32(bp + 0);

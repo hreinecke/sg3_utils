@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2016 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2017 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -64,7 +64,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.46 20160518";
+static const char * version_str = "1.47 20170917";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -309,7 +309,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     int verb;
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, 0,
+    res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, false,
                            verb);
     if (0 != res)
         return res;
@@ -317,7 +317,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
 
-        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, 0,
+        res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, false,
                                verb);
         if (0 != res)
             return res;
@@ -1332,10 +1332,10 @@ main(int argc, char * argv[])
     if (do_sync) {
         if (FT_SG == out_type) {
             pr2serr(">> Synchronizing cache on %s\n", outf);
-            res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 0, 0);
+            res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, false, 0);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 pr2serr("Unit attention(out), continuing\n");
-                res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, 0, 0);
+                res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, false, 0);
             }
             if (0 != res) {
                 sg_get_category_sense_str(res, sizeof(b), b, verbose);

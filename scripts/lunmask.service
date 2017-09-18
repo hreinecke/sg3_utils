@@ -1,0 +1,11 @@
+[Unit]
+Description=Disable LUN masking and scan SCSI Hosts
+After=systemd-udev-trigger.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/systemd/scripts/scsi-enable-target-scan.sh
+
+[Install]
+WantedBy=multi-user.target

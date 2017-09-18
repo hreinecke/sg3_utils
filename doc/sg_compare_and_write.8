@@ -1,4 +1,4 @@
-.TH "COMPARE AND WRITE" "8" "March 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH "COMPARE AND WRITE" "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
@@ -19,7 +19,7 @@ is read from the file indicated by the \fI\-\-in=IF\fR while the write
 buffer is read from the file indicated by the \fI\-\-inw=WF\fR.
 .PP
 Those buffers are expected to each contain \fINUM\fR blocks of data. The
-compare starts at at logical block address \fILBA\fR on the \fIDEVICE\fR
+compare starts at logical block address \fILBA\fR on the \fIDEVICE\fR
 and if the comparison fails (i.e. the provided compare buffer does not
 equal at \fILBA\fR on the \fIDEVICE\fR) then the COMPARE AND WRITE command
 finishes with a sense key of MISCOMPARE. In this case this utility will
@@ -137,8 +137,7 @@ Eric Seppanen.
 .SH "REPORTING BUGS"
 Report bugs to shahar.salzman@kaminario.com or dgilbert@interlog.com
 .SH COPYRIGHT
-Copyright \(co 2012\-2014 Kaminario Technologies LTD
-
+Copyright \(co 2012\-2017 Kaminario Technologies LTD
 .br
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:

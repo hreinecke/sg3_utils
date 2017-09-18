@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.26 20170911";  /* spc5r16 + sbc4r14 */
+static const char * version_str = "1.26 20170917";  /* spc5r16 + sbc4r14 */
 
 
 /* These structures are duplicates of those of the same name in
@@ -480,7 +480,7 @@ bad:
  * passes back resid. Same return values as sg_ll_inquiry() (0 is good). */
 static int
 pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
-           int * residp, int noisy, int verbose)
+           int * residp, bool noisy, int verbose)
 {
     int res, ret, k, sense_cat, resid;
     unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};

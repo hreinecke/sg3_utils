@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# cciss_id
+#
+# Generates device node names according to the cciss naming rules
+#
+# Copyright (C) 2011 SUSE Linux Products GmbH
+# Author:
+#       Hannes Reinecke <hare@suse.de>
+#
+#
+#       This program is free software; you can redistribute it and/or modify it
+#       under the terms of the GNU General Public License as published by the
+#       Free Software Foundation version 2 of the License.
+#
+# This script generates a device node name which is compatible
+# with the 'cciss' device naming rules.
+# It is intended to provide backward-compatible names for the
+# 'hpsa' driver.
+#
+
+cciss_enumerate()
+{
+    local last_pci_dev=${1##0000:}
+    local cur_pci_dev
+    local cciss_num=0
+
+    for cur_pci_dev in $(lspci -n | tac | sed -n 's/\(..:..\..\) .* 103c:\(3220\|3230\|3238\|323a\|323b\) .*/\1/p') ; do
+	if [ "$cur_pci_dev" == "$last_pci_dev" ] ; then
+	    echo "$cciss_num"
+	    return;
+	fi
+	cciss_num=$(($cciss_num + 1))
+    done
+    echo "$cciss_num"
+}
+
+hpsa_lun_offset()
+{
+    local scsi_host=$1
+
+    scsi_id=$(lsscsi 2>/dev/null | sed -n "s/.\(${scsi_host}:[0-9]*:[0-9]*:[0-9]*\)..*disk .*/\1/p" | head -1)
+    echo ${scsi_id##*:}
+}
+
+DEVPATH=$1
+SCSIPATH=$(cd -P /sys$DEVPATH/device; echo $PWD)
+SCSIID=${SCSIPATH##*/}
+HOSTID=${SCSIID%%:*}
+LUNID=${SCSIID##*:}
+PCIPATH=${SCSIPATH%%/host*}
+PCIDEV=${PCIPATH##*/}
+HOSTPATH=${PCIPATH}/host${HOSTID}/scsi_host/host${HOSTID}
+read controller 2>/dev/null <${HOSTPATH}/ctlr_num || controller=$(cciss_enumerate $PCIDEV)
+
+# hpsa lies about the LUN ...
+disk_offset=$(hpsa_lun_offset $HOSTID)
+if [ "$disk_offset" ] ; then
+    disk=$(( $LUNID - $disk_offset ))
+else
+    disk=$LUNID
+fi
+
+if [ "$controller" ] && [ "$disk" ] ; then
+    echo "ID_CCISS=c${controller}d${disk}"
+fi

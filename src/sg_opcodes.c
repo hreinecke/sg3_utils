@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2016 D. Gilbert
+ *  Copyright (C) 2004-2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.48 20160531";    /* spc5r10 */
+static const char * version_str = "0.49 20170917";    /* spc5r10 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -178,7 +178,7 @@ static const char * const rsoc_s = "Report supported operation codes";
 
 static int
 do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
-        void * resp, int mx_resp_len, int noisy, int verbose)
+        void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
@@ -241,7 +241,7 @@ static const char * const rstmf_s = "Report supported task management "
                                     "functions";
 
 static int
-do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, int noisy,
+do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, bool noisy,
          int verbose)
 {
     int k, ret, res, sense_cat;

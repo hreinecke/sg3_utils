@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Douglas Gilbert.
+ * Copyright (c) 2014-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.03 20160528";
+static const char * version_str = "1.04 20170917";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -90,7 +90,7 @@ usage()
 /* Invokes the zone out command indicated by 'sa' (ZBC).  Return of 0
  * -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, int noisy,
+sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, bool noisy,
                int verbose)
 {
     int k, ret, res, sense_cat;
@@ -243,7 +243,7 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    res = sg_ll_zone_out(sg_fd, sa, zid, all, 1, verbose);
+    res = sg_ll_zone_out(sg_fd, sa, zid, all, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)

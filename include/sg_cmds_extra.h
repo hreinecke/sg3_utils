@@ -55,11 +55,11 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
  * -1 -> other failure */
 int sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                       int cmplist, int dlist_format, int timeout_secs,
-                      void * paramp, int param_len, int noisy, int verbose);
+                      void * paramp, int param_len, bool noisy, int verbose);
 int sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
                        int cmplist, int dlist_format, int ffmt,
                        int timeout_secs, void * paramp, int param_len,
-                       int noisy, int verbose);
+                       bool noisy, int verbose);
 
 /* Invokes a SCSI GET LBA STATUS(16) or GET LBA STATUS(32) command (SBC).
  * Returns 0 -> success,
@@ -68,21 +68,21 @@ int sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure.
  * sg_ll_get_lba_status() calls the 16 byte variant with rt=0 . */
 int sg_ll_get_lba_status(int sg_fd, uint64_t start_llba, void * resp,
-                         int alloc_len, int noisy, int verbose);
+                         int alloc_len, bool noisy, int verbose);
 int sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
-                           void * resp, int alloc_len, int noisy,
-			   int verbose);
+                           void * resp, int alloc_len, bool noisy,
+                           int verbose);
 int sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
-			   uint32_t element_id, uint8_t rt,
-                           void * resp, int alloc_len, int noisy,
-			   int verbose);
+                           uint32_t element_id, uint8_t rt,
+                           void * resp, int alloc_len, bool noisy,
+                           int verbose);
 
 /* Invokes a SCSI PERSISTENT RESERVE IN command (SPC). Returns 0
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
  * SG_LIB_CAT_ILLEGAL_REQ if field in cdb not supported,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
 int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
-                                int mx_resp_len, int noisy, int verbose);
+                                int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI PERSISTENT RESERVE OUT command (SPC). Returns 0
  * when successful, SG_LIB_CAT_INVALID_OP if command not supported,
@@ -90,14 +90,14 @@ int sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
 int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
                                  unsigned int rq_type, void * paramp,
-                                 int param_len, int noisy, int verbose);
+                                 int param_len, bool noisy, int verbose);
 
 /* Invokes a SCSI READ BLOCK LIMITS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> READ BLOCK LIMITS not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
 int sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
-                            int noisy, int verbose);
+                            bool noisy, int verbose);
 
 /* Invokes a SCSI READ BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
@@ -105,7 +105,7 @@ int sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
-                      void * resp, int mx_resp_len, int noisy, int verbose);
+                      void * resp, int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI READ DEFECT DATA (10) command (SBC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
@@ -114,7 +114,7 @@ int sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
  * -1 -> other failure */
 int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
                         int dl_format, void * resp, int mx_resp_len,
-                        int noisy, int verbose);
+                        bool noisy, int verbose);
 
 /* Invokes a SCSI READ LONG (10) command (SBC). Note that 'xfer_len'
  * is in bytes. Returns 0 -> success,
@@ -125,7 +125,7 @@ int sg_ll_read_defect10(int sg_fd, int req_plist, int req_glist,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
-                      void * resp, int xfer_len, int * offsetp, int noisy,
+                      void * resp, int xfer_len, int * offsetp, bool noisy,
                       int verbose);
 
 /* Invokes a SCSI READ LONG (16) command (SBC). Note that 'xfer_len'
@@ -137,7 +137,7 @@ int sg_ll_read_long10(int sg_fd, int pblock, int correct, unsigned int lba,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  *  -1 -> other failure */
 int sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
-                      void * resp, int xfer_len, int * offsetp, int noisy,
+                      void * resp, int xfer_len, int * offsetp, bool noisy,
                       int verbose);
 
 /* Invokes a SCSI READ MEDIA SERIAL NUMBER command. Return of 0 -> success,
@@ -146,14 +146,14 @@ int sg_ll_read_long16(int sg_fd, int pblock, int correct, uint64_t llba,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
-                                int noisy, int verbose);
+                                bool noisy, int verbose);
 
 /* Invokes a SCSI REASSIGN BLOCKS command.  Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
 int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
-                          int param_len, int noisy, int verbose);
+                          int param_len, bool noisy, int verbose);
 
 /* Invokes a SCSI RECEIVE DIAGNOSTIC RESULTS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Receive diagnostic results not supported,
@@ -161,7 +161,7 @@ int sg_ll_reassign_blocks(int sg_fd, int longlba, int longlist, void * paramp,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
-                       int mx_resp_len, int noisy, int verbose);
+                       int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI REPORT IDENTIFYING INFORMATION command. This command was
  * called REPORT DEVICE IDENTIFIER prior to spc4r07. Return of 0 -> success,
@@ -170,22 +170,22 @@ int sg_ll_receive_diag(int sg_fd, int pcv, int pg_code, void * resp,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
-                         int noisy, int verbose);
+                         bool noisy, int verbose);
 
 /* Invokes a SCSI REPORT TARGET PORT GROUPS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 int sg_ll_report_tgt_prt_grp(int sg_fd, void * resp, int mx_resp_len,
-                             int noisy, int verbose);
+                             bool noisy, int verbose);
 int sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
-                              int extended, int noisy, int verbose);
+                              int extended, bool noisy, int verbose);
 
 /* Invokes a SCSI SET TARGET PORT GROUPS command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report Target Port Groups not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
-int sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
+int sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
                           int verbose);
 
 /* Invokes a SCSI REPORT REFERRALS command. Return of 0 -> success,
@@ -193,7 +193,7 @@ int sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, int noisy,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 int sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
-                           void * resp, int mx_resp_len, int noisy,
+                           void * resp, int mx_resp_len, bool noisy,
                            int verbose);
 
 /* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
@@ -206,7 +206,7 @@ int sg_ll_report_referrals(int sg_fd, uint64_t start_llba, int one_seg,
  * -1 -> other failure */
 int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
                     int devofl_bit, int unitofl_bit, int long_duration,
-                    void * paramp, int param_len, int noisy, int verbose);
+                    void * paramp, int param_len, bool noisy, int verbose);
 
 /* Invokes a SCSI SET IDENTIFYING INFORMATION command. This command was
  * called SET DEVICE IDENTIFIER prior to spc4r07. Return of 0 -> success,
@@ -215,18 +215,18 @@ int sg_ll_send_diag(int sg_fd, int sf_code, int pf_bit, int sf_bit,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
-                      int noisy, int verbose);
+                      bool noisy, int verbose);
 
 /* Invokes a SCSI UNMAP (SBC-3) command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> command not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_UNIT_ATTENTION, -1 -> other failure */
 int sg_ll_unmap(int sg_fd, int group_num, int timeout_secs, void * paramp,
-                int param_len, int noisy, int verbose);
+                int param_len, bool noisy, int verbose);
 /* Invokes a SCSI UNMAP (SBC-3) command. Version 2 adds anchor field
  * (sbc3r22). Otherwise same as sg_ll_unmap() . */
 int sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
-                   void * paramp, int param_len, int noisy, int verbose);
+                   void * paramp, int param_len, bool noisy, int verbose);
 
 /* Invokes a SCSI VERIFY (10) command (SBC and MMC).
  * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.
@@ -239,7 +239,7 @@ int sg_ll_unmap_v2(int sg_fd, int anchor, int group_num, int timeout_secs,
  * SG_LIB_CAT_MISCOMPARE, -1 -> other failure */
 int sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
                    unsigned int lba, int veri_len, void * data_out,
-                   int data_out_len, unsigned int * infop, int noisy,
+                   int data_out_len, unsigned int * infop, bool noisy,
                    int verbose);
 
 /* Invokes a SCSI VERIFY (16) command (SBC).
@@ -254,7 +254,7 @@ int sg_ll_verify10(int sg_fd, int vrprotect, int dpo, int bytechk,
 int sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk,
                    uint64_t llba, int veri_len, int group_num,
                    void * data_out, int data_out_len, uint64_t * infop,
-                   int noisy, int verbose);
+                   bool noisy, int verbose);
 
 /* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
@@ -262,7 +262,7 @@ int sg_ll_verify16(int sg_fd, int vrprotect, int dpo, int bytechk,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
-                       void * paramp, int param_len, int noisy, int verbose);
+                       void * paramp, int param_len, bool noisy, int verbose);
 /* Need a sg_ll_write_buffer_v2() function because SPC-4 rev32 has added
  * a "mode specific" field. Wait for next rev change of this library */
 
@@ -276,7 +276,7 @@ int sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
  * -1 -> other failure */
 int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                        unsigned int lba, void * data_out, int xfer_len,
-                       int * offsetp, int noisy, int verbose);
+                       int * offsetp, bool noisy, int verbose);
 
 /* Invokes a SCSI WRITE LONG (16) command (SBC). Note that 'xfer_len'
  * is in bytes. Returns 0 -> success,
@@ -288,7 +288,7 @@ int sg_ll_write_long10(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * -1 -> other failure */
 int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
                        uint64_t llba, void * data_out, int xfer_len,
-                       int * offsetp, int noisy, int verbose);
+                       int * offsetp, bool noisy, int verbose);
 
 /* Invokes a SPC-3 SCSI RECEIVE COPY RESULTS command. In SPC-4 this function
  * supports all service action variants of the THIRD-PARTY COPY IN opcode.
@@ -297,7 +297,7 @@ int sg_ll_write_long16(int sg_fd, int cor_dis, int wr_uncor, int pblock,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
-                               int mx_resp_len, int noisy, int verbose);
+                               int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI EXTENDED COPY(LID1) command. For EXTENDED COPY(LID4)
  * including POPULATE TOKEN and WRITE USING TOKEN use
@@ -306,7 +306,7 @@ int sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
+int sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
                         int verbose);
 
 /* Handles various service actions associated with opcode 0x83 which is
@@ -318,7 +318,7 @@ int sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, int noisy,
  * -1 -> other failure */
 int sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id,
                           int group_num, int timeout_secs, void * paramp,
-                          int param_len, int noisy, int verbose);
+                          int param_len, bool noisy, int verbose);
 
 #ifdef __cplusplus
 }

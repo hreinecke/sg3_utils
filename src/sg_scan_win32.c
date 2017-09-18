@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,14 +38,14 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.15 (win32) 20140827";
+static const char * version_str = "1.16 (win32) 20170917";
 
-#define MAX_SCSI_ELEMS 1024
-#define MAX_ADAPTER_NUM 64
-#define MAX_PHYSICALDRIVE_NUM 512
+#define MAX_SCSI_ELEMS 2048
+#define MAX_ADAPTER_NUM 128
+#define MAX_PHYSICALDRIVE_NUM 1024
 #define MAX_CDROM_NUM 512
 #define MAX_TAPE_NUM 512
-#define MAX_HOLE_COUNT 8
+#define MAX_HOLE_COUNT 16
 
 // IOCTL_STORAGE_QUERY_PROPERTY
 

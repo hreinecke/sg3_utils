@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2016 Douglas Gilbert.
+ * Copyright (c) 2005-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.20 20160701";
+static const char * version_str = "1.21 20170917";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -376,7 +376,7 @@ main(int argc, char * argv[])
             return 0;
         }
         res = sg_ll_reassign_blocks(sg_fd, eight, longlist, param_arr,
-                                    param_len, 1, verbose);
+                                    param_len, true, verbose);
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
@@ -393,7 +393,7 @@ main(int argc, char * argv[])
         param_len = 4;
         memset(param_arr, 0, param_len);
         res = sg_ll_read_defect10(sg_fd, primary, grown, dl_format,
-                                  param_arr, param_len, 0, verbose);
+                                  param_arr, param_len, false, verbose);
         ret = res;
         if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);

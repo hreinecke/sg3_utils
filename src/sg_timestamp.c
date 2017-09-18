@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016 Douglas Gilbert.
+ * Copyright (c) 2015-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.02 20160528";
+static const char * version_str = "1.03 20170917";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -121,7 +121,7 @@ usage()
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
-                    int noisy, int verbose)
+                    bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rt_cdb[REP_TIMESTAMP_CMDLEN] =
@@ -178,7 +178,7 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
 /* Invokes the SET TIMESTAMP command.  Return of 0 -> success, various
  * SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, int noisy,
+sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
                     int verbose)
 {
     int k, ret, res, sense_cat;
@@ -350,10 +350,10 @@ main(int argc, char * argv[])
     if (do_set) {
         cmd_name = "Set timestamp";
         sg_put_unaligned_be48(secs_given ? (secs * 1000) : msecs, d_buff + 4);
-        res = sg_ll_set_timestamp(sg_fd, d_buff, 12, 1, verbose);
+        res = sg_ll_set_timestamp(sg_fd, d_buff, 12, true, verbose);
     } else {
         cmd_name = "Report timestamp";
-        res = sg_ll_rep_timestamp(sg_fd, d_buff, 12, NULL, 1, verbose);
+        res = sg_ll_rep_timestamp(sg_fd, d_buff, 12, NULL, true, verbose);
         if (0 == res) {
             if (do_raw)
                 dStrRaw((const char *)d_buff, 12);

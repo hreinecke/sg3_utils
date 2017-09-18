@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2016 D. Gilbert
+   *  Copyright (C) 2004-2017 D. Gilbert
    *  This program is free software; you can redistribute it and/or modify
    *  it under the terms of the GNU General Public License as published by
    *  the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.21 20160121";
+static const char * version_str = "1.22 20170917";
 
 #define MAX_XFER_LEN 10000
 
@@ -94,10 +94,10 @@ process_read_long(int sg_fd, int do_16, int pblock, int correct,
 
     if (do_16)
         res = sg_ll_read_long16(sg_fd, pblock, correct, llba, data_out,
-                                xfer_len, &offset, 1, verbose);
+                                xfer_len, &offset, true, verbose);
     else
         res = sg_ll_read_long10(sg_fd, pblock, correct, (unsigned int)llba,
-                                data_out, xfer_len, &offset, 1, verbose);
+                                data_out, xfer_len, &offset, true, verbose);
     ten_or = do_16 ? "16" : "10";
     switch (res) {
     case 0:

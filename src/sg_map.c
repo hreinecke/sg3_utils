@@ -1,5 +1,5 @@
 /* Utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2000-2007 D. Gilbert
+*  Copyright (C) 2000-2017 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -42,7 +42,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.09 20130507";
+static const char * version_str = "1.10 20170917";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -300,7 +300,7 @@ int main(int argc, char * argv[])
             char buff[INQUIRY_RESP_INITIAL_LEN];
 
             if (0 == sg_ll_inquiry(sg_fd, 0, 0, 0, buff, sizeof(buff),
-                                   1, 0)) {
+                                   true, 0)) {
                 memcpy(map_arr[k].vendor, &buff[8], 8);
                 memcpy(map_arr[k].product, &buff[16], 16);
                 memcpy(map_arr[k].revision, &buff[32], 4);

@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2016, Kaminario Technologies LTD
+*  Copyright (c) 2012-2017, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -332,7 +332,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
 static int
 sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                      int64_t lba, int xfer_len, struct caw_flags flags,
-                     int noisy, int verbose)
+                     bool noisy, int verbose)
 {
         int k, sense_cat, valid, slen, res, ret;
         unsigned char cawCmd[COMPARE_AND_WRITE_CDB_SIZE];

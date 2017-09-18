@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2016 D. Gilbert
+ *  Copyright (C) 2004-2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -32,7 +32,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.12 20160121";
+static const char * version_str = "1.13 20170917";
 
 
 #define MAX_XFER_LEN 10000
@@ -255,11 +255,12 @@ main(int argc, char * argv[])
     ten_or = do_16 ? "16" : "10";
     if (do_16)
         res = sg_ll_write_long16(sg_fd, cor_dis, wr_uncor, pblock, llba,
-                                 writeLongBuff, xfer_len, &offset, 1, verbose);
+                                 writeLongBuff, xfer_len, &offset, true,
+                                 verbose);
     else
         res = sg_ll_write_long10(sg_fd, cor_dis, wr_uncor, pblock,
                                  (unsigned int)llba, writeLongBuff, xfer_len,
-                                 &offset, 1, verbose);
+                                 &offset, true, verbose);
     ret = res;
     switch (res) {
     case 0:

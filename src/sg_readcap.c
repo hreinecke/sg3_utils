@@ -1,7 +1,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
    and outputs the result.
 
-*  Copyright (C) 1999 - 2015 D. Gilbert
+*  Copyright (C) 1999 - 2017 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.95 20151219";
+static const char * version_str = "3.96 20170917";
 
 #define ME "sg_readcap: "
 
@@ -451,7 +451,8 @@ main(int argc, char * argv[])
 
     if (! op->do_long) {
         res = sg_ll_readcap_10(sg_fd, op->do_pmi, (unsigned int)op->llba,
-                               resp_buff, RCAP_REPLY_LEN, 1, op->do_verbose);
+                               resp_buff, RCAP_REPLY_LEN, true,
+                               op->do_verbose);
         ret = res;
         if (0 == res) {
             if (op->do_hex || op->do_raw) {
@@ -524,7 +525,7 @@ main(int argc, char * argv[])
     }
     if (op->do_long) {
         res = sg_ll_readcap_16(sg_fd, op->do_pmi, op->llba, resp_buff,
-                               RCAP16_REPLY_LEN, 1, op->do_verbose);
+                               RCAP16_REPLY_LEN, true, op->do_verbose);
         ret = res;
         if (0 == res) {
             if (op->do_hex || op->do_raw) {

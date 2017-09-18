@@ -73,7 +73,7 @@ create_pt_obj(const char * cname)
  * -1 -> other failure */
 int
 sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
-                   int drv_write_speed, int noisy, int verbose)
+                   int drv_write_speed, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "set cd speed";
     int res, ret, k, sense_cat;
@@ -131,7 +131,7 @@ sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND, else -1 */
 int
 sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
-                 int mx_resp_len, int noisy, int verbose)
+                 int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "get configuration";
     int res, k, ret, sense_cat;
@@ -221,7 +221,7 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
 int
 sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
                       int max_num_desc, int ttype, void * resp,
-                      int mx_resp_len, int noisy, int verbose)
+                      int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "get performance";
     int res, k, ret, sense_cat;
@@ -312,7 +312,7 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
  * -1 -> other failure */
 int
 sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
-                    int noisy, int verbose)
+                    bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "set streaming";
     int k, res, ret, sense_cat;

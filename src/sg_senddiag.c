@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2016 D. Gilbert
+*  Copyright (C) 2003-2017 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.49 20160228";
+static const char * version_str = "0.50 20170917";
 
 #define ME "sg_senddiag: "
 
@@ -407,7 +407,7 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 static int
 do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
             int unitofl_bit, void * outgoing_pg, int outgoing_len, int tmout,
-            int noisy, int verbose)
+            bool noisy, int verbose)
 {
     int long_duration = 0;
 
@@ -425,7 +425,7 @@ do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
 
 /* Get expected extended self-test time from mode page 0xa (for '-e') */
 static int
-do_modes_0a(int sg_fd, void * resp, int mx_resp_len, int noisy, int mode6,
+do_modes_0a(int sg_fd, void * resp, int mx_resp_len, bool noisy, bool mode6,
             int verbose)
 {
     int res;
@@ -710,7 +710,7 @@ main(int argc, char * argv[])
                 usage_old();
             }
             ret = SG_LIB_SYNTAX_ERROR;
-	    goto fini;
+            goto fini;
         }
     }
 
@@ -723,7 +723,7 @@ main(int argc, char * argv[])
             usage_old();
         }
         ret = SG_LIB_SYNTAX_ERROR;
-	goto fini;
+        goto fini;
     }
     if ((op->do_selftest > 0) && op->do_deftest) {
         if (op->opt_new) {
@@ -734,7 +734,7 @@ main(int argc, char * argv[])
             usage_old();
         }
         ret = SG_LIB_SYNTAX_ERROR;
-	goto fini;
+        goto fini;
     }
     if (op->do_raw) {
         if ((op->do_selftest > 0) || op->do_deftest || op->do_extdur ||
@@ -749,7 +749,7 @@ main(int argc, char * argv[])
                 usage_old();
             }
             ret = SG_LIB_SYNTAX_ERROR;
-	    goto fini;
+            goto fini;
         }
         if (! op->do_pf) {
             if (op->opt_new)
@@ -775,16 +775,16 @@ main(int argc, char * argv[])
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
-	goto fini;
+        goto fini;
     }
     rsp_buff = (unsigned char *)calloc(op->maxlen, 1);
     if (NULL == rsp_buff) {
         pr2serr("unable to allocate %d bytes (2)\n", op->maxlen);
         ret = SG_LIB_CAT_OTHER;
-	goto close_fini;
+        goto close_fini;
     }
     if (op->do_extdur) {
-        res = do_modes_0a(sg_fd, rsp_buff, 32, 1, 0, op->do_verbose);
+        res = do_modes_0a(sg_fd, rsp_buff, 32, true, false, op->do_verbose);
         if (0 == res) {
             /* Assume mode sense(10) response without block descriptors */
             num = sg_get_unaligned_be16(rsp_buff) - 6;

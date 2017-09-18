@@ -3,7 +3,7 @@
  *
  * Retrieve / set RDAC options.
  *
- * Copyright (C) 2006-2016 Hannes Reinecke <hare@suse.de>
+ * Copyright (C) 2006-2017 Hannes Reinecke <hare@suse.de>
  *
  * Based on sg_modes.c and sg_emc_trespass.c; credits from there apply.
  *
@@ -27,7 +27,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.11 20160429";
+static const char * version_str = "1.12 20170917";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -148,11 +148,11 @@ static int fail_all_paths(int fd, int use_6_byte)
         if (use_6_byte) {
                 res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
                                         fail_paths_pg, 118,
-                                        1, (do_verbose ? 2 : 0));
+                                        true, (do_verbose ? 2 : 0));
         } else {
                 res = sg_ll_mode_select10(fd, 1 /* pf */, 0 /* sp */,
                                         fail_paths_pg, 308,
-                                        1, (do_verbose ? 2: 0));
+                                        true, (do_verbose ? 2: 0));
         }
 
         switch (res) {
@@ -220,11 +220,11 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
         if (use_6_byte) {
                 res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
                                         fail_paths_pg, 118,
-                                        1, (do_verbose ? 2 : 0));
+                                        true, (do_verbose ? 2 : 0));
         } else {
                 res = sg_ll_mode_select10(fd, 1 /* pf */, 0 /* sp */,
                                         fail_paths_pg, 308,
-                                        1, (do_verbose ? 2: 0));
+                                        true, (do_verbose ? 2: 0));
         }
 
         switch (res) {
@@ -448,13 +448,13 @@ int main(int argc, char * argv[])
                 if (use_6_byte)
                         res = sg_ll_mode_sense6(fd, /* DBD */ 0, /* PC */0,
                                                 0x2c, 0, rsp_buff, 252,
-                                                1, do_verbose);
+                                                true, do_verbose);
                 else
                         res = sg_ll_mode_sense10(fd, /* llbaa */ 0,
                                                  /* DBD */ 0,
                                                  /* page control */0,
                                                  0x2c, 0x1, rsp_buff, 308,
-                                                 1, do_verbose);
+                                                 true, do_verbose);
 
                 if (!res) {
                         if (do_verbose)

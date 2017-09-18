@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2016 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.15 20160528";
+static const char * version_str = "1.16 20170917";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -85,7 +85,7 @@ static void usage()
 static int
 ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
                  uint64_t lba, unsigned int num_lb, int to_secs,
-                 int noisy, int verbose)
+                 bool noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
@@ -243,10 +243,10 @@ int main(int argc, char * argv[])
 
     if (do_16)
         res = ll_sync_cache_16(sg_fd, sync_nv, immed, group, lba, num_lb,
-                               to_secs, 1, verbose);
+                               to_secs, true, verbose);
     else
         res = sg_ll_sync_cache_10(sg_fd, sync_nv, immed, group,
-                                  (unsigned int)lba, num_lb, 1, verbose);
+                                  (unsigned int)lba, num_lb, true, verbose);
     ret = res;
     if (res) {
         char b[80];

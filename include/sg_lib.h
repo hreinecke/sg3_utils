@@ -421,18 +421,18 @@ void dStrHexErr(const char * str, int len, int no_ascii);
 int dStrHexStr(const char * str, int len, const char * leadin, int format,
                int b_len, char * b);
 
-/* Returns 1 when executed on big endian machine; else returns 0.
+/* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a
  * big endian machine).
 */
-int sg_is_big_endian();
+bool sg_is_big_endian();
 
 /* Extract character sequence from ATA words as in the model string
  * in a IDENTIFY DEVICE response. Returns number of characters
  * written to 'ochars' before 0 character is found or 'num' words
  * are processed. */
-int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
-                     int num_words, int is_big_endian, char * ochars);
+int sg_ata_get_chars(const uint16_t * word_arr, int start_word,
+                     int num_words, bool is_big_endian, char * ochars);
 
 /* Print (to stdout) 16 bit 'words' in hex, 8 words per line optionally
  * followed at the right hand side of the line with an ASCII interpretation
@@ -444,10 +444,10 @@ int sg_ata_get_chars(const unsigned short * word_arr, int start_word,
  *     = -1    only the ASCII-hex words are listed (i.e. without address)
  *     = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
  *     < -2    same as -1
- * If 'swapb' non-zero then bytes in each word swapped. Needs to be set
+ * If 'swapb' is true then bytes in each word swapped. Needs to be set
  * for ATA IDENTIFY DEVICE response on big-endian machines.
 */
-void dWordHex(const unsigned short * words, int num, int no_ascii, int swapb);
+void dWordHex(const uint16_t * words, int num, int no_ascii, bool swapb);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
  * then -1 is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
@@ -455,7 +455,8 @@ void dWordHex(const unsigned short * words, int num, int no_ascii, int swapb);
  * multipliers: c C  *1;  w W  *2; b  B *512;  k K KiB  *1,024;
  * KB  *1,000;  m M MiB  *1,048,576; MB *1,000,000; g G GiB *1,073,741,824;
  * GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . Ignore leading
- * spaces and tabs; accept comma, space, tab and hash as terminator. */
+ * spaces and tabs; accept comma, hyphen, space, tab and hash as terminator.
+ */
 int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
@@ -470,8 +471,8 @@ int sg_get_num_nomult(const char * buf);
  * suffix. Otherwise a decimal multiplier suffix may be given. In addition
  * to supporting the multipliers of sg_get_num(), this function supports:
  * t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) .
- * Ignore leading spaces and tabs; accept comma, space, tab and hash as
- * terminator. */
+ * Ignore leading spaces and tabs; accept comma, hyphen, space, tab and hash
+ * as terminator. */
 int64_t sg_get_llnum(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a

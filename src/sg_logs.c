@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.48 20170912";    /* spc5r11 + sbc4r11 */
+static const char * version_str = "1.50 20170917";    /* spc5r11 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -182,7 +182,7 @@ struct log_elem {
     int subpg_code;     /* only unless subpg_high>0 then this is only */
     int subpg_high;     /* when >0 this is high end of subpage range */
     int pdt;            /* -1 for all */
-    int flags;          /* bit mask; or-ed MVP_* constants */
+    int flags;          /* bit mask; or-ed with MVP_* constants */
     const char * name;
     const char * acron;
     bool (*show_pagep)(const uint8_t * resp, int len,
@@ -623,6 +623,7 @@ usage_old()
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
 
+/* Return vendor product mask given vendor product number */
 static int
 get_vp_mask(int vpn)
 {
@@ -632,29 +633,6 @@ get_vp_mask(int vpn)
         return (vpn > (32 - MVP_OFFSET)) ?  OVP_ALL :
                                             (1 << (vpn + MVP_OFFSET));
 }
-
-#if 0
-static int
-mask_to_vendor(int vp_mask)
-{
-    if (MVP_SEAG & vp_mask)
-        return VP_SEAG;
-    else if (MVP_HITA & vp_mask)
-        return VP_HITA;
-    else if (MVP_WDC & vp_mask)
-        return VP_WDC;
-    else if (MVP_TOSH & vp_mask)
-        return VP_TOSH;
-    else if (MVP_SMSTR & vp_mask)
-        return VP_SMSTR;
-    else if (MVP_LTO5 & vp_mask)
-        return VP_LTO5;
-    else if (MVP_LTO6 & vp_mask)
-        return VP_LTO6;
-    else
-        return VP_NONE;
-}
-#endif
 
 static int
 asort_comp(const void * lp, const void * rp)
@@ -1334,7 +1312,7 @@ all_bits_set(const uint8_t * xp, int num_bytes)
         if (0xff != *xp)
             return false;
     }
-    return true;  /* also in degenerate case when original (num_bytes <= 0) */
+    return true;  /* also in degenerate case when 'num_bytes' <= 0 */
 }
 
 /* Returns 'xp' with "unknown" if all bits set; otherwise decoded (big endian)
@@ -1576,7 +1554,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
                                    op->page_control, op->pg_code,
                                    op->subpg_code, op->paramp,
                                    resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   1 /* noisy */, vb)))
+                                   true /* noisy */, vb)))
             return res;
         actual_len = sg_get_unaligned_be16(resp + 2) + 4;
         if ((0 == op->do_raw) && (vb > 1)) {
@@ -1604,7 +1582,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
     if ((res = sg_ll_log_sense(sg_fd, op->do_ppc, op->do_sp,
                                op->page_control, op->pg_code,
                                op->subpg_code, op->paramp,
-                               resp, actual_len, 1 /* noisy */, vb)))
+                               resp, actual_len, true /* noisy */, vb)))
         return res;
     if ((0 == op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense response:\n");
@@ -1989,13 +1967,13 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             }
         }
         switch (pc) {
-        case 0:
-            printf("  Accumulated transitions to active"); break;
         case 1:
-            printf("  Accumulated transitions to idle_a"); break;
+            printf("  Accumulated transitions to active"); break;
         case 2:
-            printf("  Accumulated transitions to idle_b"); break;
+            printf("  Accumulated transitions to idle_a"); break;
         case 3:
+            printf("  Accumulated transitions to idle_b"); break;
+        case 4:
             printf("  Accumulated transitions to idle_c"); break;
         case 8:
             printf("  Accumulated transitions to standby_z"); break;
@@ -2923,8 +2901,8 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
     char b[256];
     char bb[32];
     bool full, decoded, has_header;
-    bool is_smstr = (VP_SMSTR == op->vend_prod_num) ||
-                    (VP_SMSTR == op->deduced_vpn);
+    bool is_smstr = op->lep ? (MVP_SMSTR & op->lep->flags) :
+                              (VP_SMSTR == op->vend_prod_num);
 
     full = ! op->do_temperature;
     num = len - 4;
@@ -4111,18 +4089,17 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             }
             if (0x3 == pc)      /* resource percentage log parameter */
                 printf("  %s: %u %%\n", cp, sg_get_unaligned_be16(bp + 4));
-            else {              /* resource count log parameters */
+            else                /* resource count log parameters */
                 printf("  %s resource count: %u\n", cp,
                        sg_get_unaligned_be32(bp + 4));
-                if (pl > 8) {
-                    switch (bp[8] & 0x3) {      /* SCOPE field */
-                    case 0: cp = "not reported"; break;
-                    case 1: cp = "dedicated to lu"; break;
-                    case 2: cp = "not dedicated to lu"; break;
-                    case 3: cp = "reserved"; break;
-                    }
-                    printf("    Scope: %s\n", cp);
+            if (pl > 8) {
+                switch (bp[8] & 0x3) {      /* SCOPE field */
+                case 0: cp = "not reported"; break;
+                case 1: cp = "dedicated to lu"; break;
+                case 2: cp = "not dedicated to lu"; break;
+                case 3: cp = "reserved"; break;
                 }
+                printf("    Scope: %s\n", cp);
             }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
             printf("  Vendor specific [0x%x]:", pc);
@@ -5144,10 +5121,10 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
                 printf("<unexpected pc=0 parameter length=%d>\n", bp[4]);
             break;
         default:
-            if (pc <= 0xf000) {
+            if (pc <= 0xf000) {         /* parameter codes 0x1 to 0xf000 */
                 if (8 == bp[3])
                     printf("  LBA of misaligned block: 0x%" PRIx64 "\n",
-                           sg_get_unaligned_be64(bp + 8));
+                           sg_get_unaligned_be64(bp + 4));
                 else
                     printf("<unexpected pc=0x%x parameter length=%d>\n",
                            pc, bp[4]);
@@ -6770,7 +6747,7 @@ main(int argc, char * argv[])
         k = sg_ll_log_select(sg_fd, !!(op->do_pcreset), op->do_sp,
                              op->page_control, op->pg_code, op->subpg_code,
                              rsp_buff, ((in_len > 0) ? in_len : 0),
-                             1, op->verbose);
+                             true, op->verbose);
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
                 pr2serr("log_select: device not ready\n");

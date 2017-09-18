@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.64 20170912";    /* SPC-5 rev 14 */
+static const char * version_str = "1.66 20170917";    /* SPC-5 rev 14 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -938,7 +938,7 @@ bad:
  * passes back resid. Same return values as sg_ll_inquiry() (0 is good). */
 static int
 pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
-           int * residp, int noisy, int verbose)
+           int * residp, bool noisy, int verbose)
 {
     int res, ret, k, sense_cat, resid;
     unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -1831,7 +1831,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                 printf("%02x", (unsigned int)ip[2 + m]);
             }
             printf("\n");
-                break;
+            break;
         default: /* reserved */
             pr2serr("      reserved designator=0x%x\n", desig_type);
             dStrHexErr((const char *)ip, i_len, -1);
@@ -1850,6 +1850,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
     unsigned char * bp;
     unsigned char * ip;
     const char * assoc_str;
+    const char * suffix;
 
     if (buff[2] != 0) {
         /*
@@ -1979,61 +1980,25 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
              * So add a suffix to differentiate between them.
              */
             naa = (ip[0] >> 4) & 0xff;
-            if ((naa < 2) || (naa > 6) || (4 == naa)) {
-                if (verbose) {
-                    pr2serr("      << unexpected naa [0x%x]>>\n", naa);
-                    dStrHexErr((const char *)ip, i_len, 0);
-                }
-                break;
+            switch (naa) {
+                case 6:
+                    suffix="REGEXT";
+                    break;
+                case 5:
+                    suffix="REG";
+                    break;
+                case 2:
+                    suffix="EXT";
+                    break;
+                case 3:
+                default:
+                    suffix="LOCAL";
+                    break;
             }
-            if (6 != naa) {
-                const char *suffix;
-
-                if (8 != i_len) {
-                    if (verbose) {
-                        pr2serr("      << unexpected NAA %d identifier "
-                                "length: 0x%x>>\n", naa, i_len);
-                        dStrHexErr((const char *)ip, i_len, 0);
-                    }
-                    break;
-                }
-                if (naa != 2 && naa != 3 && naa != 5) {
-                    if (verbose) {
-                        pr2serr("      << unexpected NAA format %d>>\n", naa);
-                        dStrHexErr((const char *)ip, i_len, 0);
-                    }
-                    break;
-                }
-                switch (naa) {
-                    case 5:
-                        suffix="REG";
-                        break;
-                    case 2:
-                        suffix="EXT";
-                        break;
-                    case 3:
-                    default:
-                        suffix="LOCAL";
-                        break;
-                }
-                printf("SCSI_IDENT_%s_NAA_%s=", assoc_str, suffix);
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("\n");
-            } else {      /* NAA IEEE Registered extended */
-                if (16 != i_len) {
-                    if (verbose) {
-                        pr2serr("      << unexpected NAA 6 identifier "
-                                "length: 0x%x>>\n", i_len);
-                        dStrHexErr((const char *)ip, i_len, 0);
-                    }
-                    break;
-                }
-                printf("SCSI_IDENT_%s_NAA_REGEXT=", assoc_str);
-                for (m = 0; m < 16; ++m)
-                    printf("%02x", (unsigned int)ip[m]);
-                printf("\n");
-            }
+            printf("SCSI_IDENT_%s_NAA_%s=", assoc_str, suffix);
+            for (m = 0; m < i_len; ++m)
+                printf("%02x", (unsigned int)ip[m]);
+            printf("\n");
             break;
         case 4: /* Relative target port */
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
@@ -3276,7 +3241,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
         printf("Supported command list:\n");
         for (k = 0; k < 256; ++k) {
             res = sg_ll_inquiry(sg_fd, 1, 0, k, rsp_buff, DEF_ALLOC_LEN,
-                                1, op->do_verbose);
+                                true, op->do_verbose);
             if (0 == res) {
                 peri_type = rsp_buff[0] & 0x1f;
                 support_num = rsp_buff[1] & 7;
@@ -3309,7 +3274,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
     }
     else {
         res = sg_ll_inquiry(sg_fd, 1, 0, op->page_num, rsp_buff,
-                            DEF_ALLOC_LEN, 1, op->do_verbose);
+                            DEF_ALLOC_LEN, true, op->do_verbose);
         if (0 == res) {
             peri_type = rsp_buff[0] & 0x1f;
             if (! op->do_raw) {

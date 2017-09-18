@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2016 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2017 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -64,13 +64,13 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.54 20160423";
+static const char * version_str = "0.56 20170917";
 
 #define ME "sg_xcopy: "
 
 #define STR_SZ 1024
 #define INOUTF_SZ 512
-#define EBUFF_SZ 512
+#define EBUFF_SZ 1024
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -628,7 +628,7 @@ scsi_extended_copy(int sg_fd, unsigned char list_id,
     /* set noisy so if a UA happens it will be printed to stderr */
     res = sg_ll_3party_copy_out(sg_fd, SA_XCOPY_LID1, list_id,
                                 DEF_GROUP_NUM, DEF_3PC_OUT_TIMEOUT,
-                                xcopyBuff, desc_offset, 1, verb);
+                                xcopyBuff, desc_offset, true, verb);
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, verb);
         pr2serr("Xcopy(LID1): %s\n", b);
@@ -648,7 +648,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 
     verb = (verbose ? verbose - 1: 0);
     res = sg_ll_readcap_10(xfp->sg_fd, 0, 0, rcBuff,
-                           READ_CAP_REPLY_LEN, 1, verb);
+                           READ_CAP_REPLY_LEN, true, verb);
     if (0 != res) {
         sg_get_category_sense_str(res, sizeof(b), b, verb);
         pr2serr("Read capacity(10): %s\n", b);
@@ -660,7 +660,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
         uint64_t ls;
 
         res = sg_ll_readcap_16(xfp->sg_fd, 0, 0, rcBuff,
-                               RCAP16_REPLY_LEN, 1, verb);
+                               RCAP16_REPLY_LEN, true, verb);
         if (0 != res) {
             sg_get_category_sense_str(res, sizeof(b), b, verb);
             pr2serr("Read capacity(16): %s\n", b);
@@ -702,7 +702,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             ftype |= FT_ST;
     }
     res = sg_ll_receive_copy_results(xfp->sg_fd, SA_COPY_OP_PARAMS, 0, rcBuff,
-                                     rcBuffLen, 1, verb);
+                                     rcBuffLen, true, verb);
     if (0 != res) {
         sg_get_category_sense_str(res, sizeof(b), b, verb);
         pr2serr("Xcopy operating parameters: %s\n", b);
@@ -1013,7 +1013,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
 
     verb = (verbose ? verbose - 1: 0);
     memset(rcBuff, 0xff, len);
-    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, 4, 1, verb);
+    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, 4, true, verb);
     if (0 != res) {
         if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("Device identification VPD page not found\n");
@@ -1028,7 +1028,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         return SG_LIB_CAT_MALFORMED;
     }
     len = sg_get_unaligned_be16(rcBuff + 2) + 4;
-    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, len, 1, verb);
+    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, len, true, verb);
     if (0 != res) {
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
         pr2serr("VPD inquiry (Device ID): %s\n", b);
