@@ -825,7 +825,12 @@ sg_in_operation(Rq_coll * clp, Rq_elem * rep)
                 pr2serr(">> substituted zeros for in blk=%" PRId64 " for %d "
                         "bytes\n", rep->blk, rep->num_blks * rep->bs);
             }
-            /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
         case 0:
             if (rep->dio_incomplete || rep->resid) {
                 status = pthread_mutex_lock(&clp->aux_mutex);
@@ -894,7 +899,12 @@ sg_out_operation(Rq_coll * clp, Rq_elem * rep)
             } else
                 pr2serr(">> ignored error for out blk=%" PRId64 " for %d "
                         "bytes\n", rep->blk, rep->num_blks * rep->bs);
-            /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
         case 0:
             if (rep->dio_incomplete || rep->resid) {
                 status = pthread_mutex_lock(&clp->aux_mutex);

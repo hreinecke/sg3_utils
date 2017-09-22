@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999 - 2016 D. Gilbert
+ *  Copyright (C) 1999 - 2017 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.12 20160528";
+static const char * version_str = "4.13 20170921";
 
 #define ME "sg_scan: "
 
@@ -424,7 +424,12 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("Inquiry, continuing", &io_hdr, 1);
-            /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
         case SG_LIB_CAT_CLEAN:
             break;
         default: /* won't bother decoding other categories */

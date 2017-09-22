@@ -60,7 +60,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.88 20170917";
+static const char * version_str = "5.89 20170921";
 
 
 #define ME "sg_dd: "
@@ -686,9 +686,11 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 return SG_LIB_CAT_MEDIUM_HARD;
             }
         }
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
         __attribute__((fallthrough));
         /* FALL THROUGH */
+#endif
 #endif
     default:
         ++unrecovered_errs;
@@ -778,9 +780,11 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             goto err_out;
         case SG_LIB_CAT_MEDIUM_HARD:
             may_coe = 1;
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
             __attribute__((fallthrough));
             /* FALL THROUGH */
+#endif
 #endif
         default:
             if (retries_tmp > 0) {

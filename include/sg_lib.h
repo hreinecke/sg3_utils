@@ -116,6 +116,13 @@ extern "C" {
 #define SCSI_FS_SBC_BASIC_PROV_2016 0x103
 #define SCSI_FS_SBC_DRIVE_MAINT_2016 0x104
 
+/* Often SCSI responses use the highest integer that can fit in a field
+ * to indicate "unbounded" or limit does not apply. Sometimes represented
+ * in output as "-1" for brevity */
+#define SG_LIB_UNBOUNDED_16BIT 0xffff
+#define SG_LIB_UNBOUNDED_32BIT 0xffffffffU
+#define SG_LIB_UNBOUNDED_64BIT 0xffffffffffffffffULL
+
 
 /* The format of the version string is like this: "2.26 20170906" */
 const char * sg_lib_version();

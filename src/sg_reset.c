@@ -29,7 +29,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.62 20170915";
+static const char * version_str = "0.63 20170921";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -266,9 +266,11 @@ int main(int argc, char * argv[])
             break;
         case EINVAL:
             pr2serr(ME "SG_SCSI_RESET not supported (for value=0x%x)\n", k);
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
             __attribute__((fallthrough));
             /* FALL THROUGH */
+#endif
 #endif
         default:
             perror(ME "SG_SCSI_RESET failed");

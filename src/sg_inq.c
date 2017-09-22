@@ -2342,6 +2342,8 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
 {
     int pdt;
     unsigned int u;
+    uint64_t ull;
+    bool ugavalid;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
@@ -2354,43 +2356,113 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
                 pr2serr("Block limits VPD page length too short=%d\n", len);
                 return;
             }
-            printf("  Maximum compare and write length: %u blocks\n",
-                   buff[5]);
+            u = buff[5];
+            printf("  Maximum compare and write length: ");
+            if (0 == u)
+                printf("0 blocks [Command not implemented]\n");
+            else
+                printf("%u blocks\n", buff[5]);
             u = sg_get_unaligned_be16(buff + 6);
-            printf("  Optimal transfer length granularity: %u blocks\n", u);
+            printf("  Optimal transfer length granularity: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
             u = sg_get_unaligned_be32(buff + 8);
-             printf("  Maximum transfer length: %u blocks\n", u);
+            printf("  Maximum transfer length: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
             u = sg_get_unaligned_be32(buff + 12);
-            printf("  Optimal transfer length: %u blocks\n", u);
+            printf("  Optimal transfer length: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
             if (len > 19) {     /* added in sbc3r09 */
                 u = sg_get_unaligned_be32(buff + 16);
-                printf("  Maximum prefetch transfer length: %u blocks\n", u);
+                printf("  Maximum prefetch transfer length: ");
+                if (0 == u)
+                    printf("0 blocks [ignored]\n");
+                else
+                    printf("%u blocks\n", u);
             }
             if (len > 27) {     /* added in sbc3r18 */
                 u = sg_get_unaligned_be32(buff + 20);
-                printf("  Maximum unmap LBA count: %u\n", u);
+                printf("  Maximum unmap LBA count: ");
+                if (0 == u)
+                    printf("0 [Unmap command not implemented]\n");
+                else if (SG_LIB_UNBOUNDED_32BIT == u)
+                    printf("-1 [unbounded]\n");
+                else
+                    printf("%u\n", u);
                 u = sg_get_unaligned_be32(buff + 24);
-                printf("  Maximum unmap block descriptor count: %u\n", u);
+                printf("  Maximum unmap block descriptor count: ");
+                if (0 == u)
+                    printf("0 [Unmap command not implemented]\n");
+                else if (SG_LIB_UNBOUNDED_32BIT == u)
+                    printf("-1 [unbounded]\n");
+                else
+                    printf("%u\n", u);
             }
             if (len > 35) {     /* added in sbc3r19 */
                 u = sg_get_unaligned_be32(buff + 28);
-                printf("  Optimal unmap granularity: %u\n", u);
-                printf("  Unmap granularity alignment valid: %u\n",
-                       !!(buff[32] & 0x80));
+                printf("  Optimal unmap granularity: ");
+                if (0 == u)
+                    printf("0 blocks [not reported]\n");
+                else
+                    printf("%u blocks\n", u);
+
+                ugavalid = !!(buff[32] & 0x80);
+                printf("  Unmap granularity alignment valid: %s\n",
+                       ugavalid ? "true" : "false");
                 u = 0x7fffffff & sg_get_unaligned_be32(buff + 32);
-                printf("  Unmap granularity alignment: %u\n", u);
+                printf("  Unmap granularity alignment: %u%s\n", u,
+                       ugavalid ? "" : " [invalid]");
             }
             if (len > 43) {     /* added in sbc3r26 */
-                printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
-                       sg_get_unaligned_be64(buff + 36));
+                ull = sg_get_unaligned_be64(buff + 36);
+                printf("  Maximum write same length: \n");
+                if (0 == ull)
+                    printf("0 blocks [not reported]\n");
+                else
+                    printf("0x%" PRIx64 " blocks\n", ull);
             }
             if (len > 44) {     /* added in sbc4r02 */
                 u = sg_get_unaligned_be32(buff + 44);
-                printf("  Maximum atomic transfer length: %u\n", u);
+                printf("  Maximum atomic transfer length: ");
+                if (0 == u)
+                    printf("0 blocks [not reported]\n");
+                else
+                    printf("%u blocks\n", u);
                 u = sg_get_unaligned_be32(buff + 48);
-                printf("  Atomic alignment: %u\n", u);
+                printf("  Atomic alignment: ");
+                if (0 == u)
+                    printf("0 [unaligned atomic writes permitted]\n");
+                else
+                    printf("%u\n", u);
                 u = sg_get_unaligned_be32(buff + 52);
-                printf("  Atomic transfer length granularity: %u\n", u);
+                printf("  Atomic transfer length granularity: ");
+                if (0 == u)
+                    printf("0 [no granularity requirement\n");
+                else
+                    printf("%u\n", u);
+            }
+            if (len > 56) {
+                u = sg_get_unaligned_be32(buff + 56);
+                printf("  Maximum atomic transfer length with atomic "
+                       "boundary: ");
+                if (0 == u)
+                    printf("0 blocks [not reported]\n");
+                else
+                    printf("%u blocks\n", u);
+                u = sg_get_unaligned_be32(buff + 60);
+                printf("  Maximum atomic boundary size: ");
+                if (0 == u)
+                    printf("0 blocks [can only write atomic 1 block]\n");
+                else
+                    printf("%u blocks\n", u);
             }
             break;
         case PDT_TAPE: case PDT_MCHANGER:
