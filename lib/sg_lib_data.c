@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.28 20170917";/* spc5r16, sbc4r14 */
+const char * sg_lib_version_str = "2.29 20170920";/* spc5r17, sbc4r14 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -655,6 +655,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x1f,"Logical unit transitioning to another power condition"},
     {0x00,0x20,"Extended copy information available"},
     {0x00,0x21,"Atomic command aborted due to ACA"},
+    {0x00,0x22,"Deferred microcode is pending"},
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},

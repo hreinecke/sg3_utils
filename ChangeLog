@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20170917] [svn: r715]
+Changelog for sg3_utils-1.43 [20170921] [svn: r716]
   - sg_bg_ctl: new Background control command (spc4r08)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
@@ -37,6 +37,8 @@ Changelog for sg3_utils-1.43 [20170917] [svn: r715]
     - update version descriptor list to 20170114
   - sg_inq+sg_vpd: update Extended inquiry data vpd
     page (spc5r09)
+    - block limits and block limit extension VPD pages:
+      add extra info about corner cases
     - add --force option to bypass checking supported
       vpd pages page and fetch requested page directly
   - sg_vpd: 3 party copy VPD page improvements
@@ -64,6 +66,8 @@ Changelog for sg3_utils-1.43 [20170917] [svn: r715]
     - implement 'format' argument in dStrHexStr()
     - add Microcode activation sense descriptor spc5r10
     - add sg_get_sfs_name() for spc5r11 (Feature sets)
+    - add SG_LIB_UNBOUNDED_32BIT (_16BIT and _64BIT)
+      defines to help with decoding corner cases
   - sg_lib_data: sync asc/ascq codes with T10 20170114
     - add write scattered (16+32) cdb names sbc4r11
   - sg_cmds_extra: expand sg_ll_ata_pt() to send new

@@ -140,9 +140,11 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
     case SG_LIB_CAT_RECOVERED:
     case SG_LIB_CAT_MEDIUM_HARD:
         check_data_in = true;
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
         __attribute__((fallthrough));
         /* FALL THROUGH */
+#endif
 #endif
     case SG_LIB_CAT_UNIT_ATTENTION:
     case SG_LIB_CAT_SENSE:

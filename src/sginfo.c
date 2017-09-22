@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.36 [20160525]";
+static const char * version_str = "2.37 [20170921]";
 
 #include <stdio.h>
 #include <string.h>
@@ -428,7 +428,12 @@ do_scsi_io(struct scsi_cmnd_io * sio)
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("do_scsi_cmd, continuing", &io_hdr, 1);
-        /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+        __attribute__((fallthrough));
+        /* FALL THROUGH */
+#endif
+#endif
     case SG_LIB_CAT_CLEAN:
         return 0;
     default:

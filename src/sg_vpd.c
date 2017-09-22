@@ -37,51 +37,7 @@
 
 */
 
-static const char * version_str = "1.26 20170917";  /* spc5r16 + sbc4r14 */
-
-
-/* These structures are duplicates of those of the same name in
- * sg_vpd_vendor.c . Take care that both are the same. */
-struct opts_t {
-    int do_all;
-    int do_enum;
-    int do_force;
-    int do_hex;
-    int vpd_pn;
-    int do_ident;
-    int do_long;
-    int maxlen;
-    int do_quiet;
-    int do_raw;
-    int vend_prod_num;
-    int verbose;
-    const char * device_name;
-    const char * page_str;
-    const char * inhex_fn;
-    const char * vend_prod;
-};
-
-struct svpd_values_name_t {
-    int value;       /* VPD page number */
-    int subvalue;    /* to differentiate if value+pdt are not unique */
-    int pdt;         /* peripheral device type id, -1 is the default */
-                     /* (all or not applicable) value */
-    const char * acron;
-    const char * name;
-};
-
-
-void svpd_enumerate_vendor(int vend_prod_num);
-int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
-int svpd_decode_vendor(int sg_fd, struct opts_t * op, int off);
-const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
-int svpd_find_vp_num_by_acron(const char * vp_ap);
-const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
-                                                          int vend_prod_num);
-int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
-                            int mxlen, int vb, int * rlenp);
-void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
-
+static const char * version_str = "1.27 20170920";  /* spc5r16 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -143,11 +99,55 @@ void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
-unsigned char rsp_buff[MX_ALLOC_LEN + 2];
+/* These structures are duplicates of those of the same name in
+ * sg_vpd_vendor.c . Take care that both are the same. */
+struct opts_t {
+    int do_all;
+    int do_enum;
+    int do_force;
+    int do_hex;
+    int vpd_pn;
+    int do_ident;
+    int do_long;
+    int maxlen;
+    int do_quiet;
+    int do_raw;
+    int vend_prod_num;
+    int verbose;
+    const char * device_name;
+    const char * page_str;
+    const char * inhex_fn;
+    const char * vend_prod;
+};
+
+struct svpd_values_name_t {
+    int value;       /* VPD page number */
+    int subvalue;    /* to differentiate if value+pdt are not unique */
+    int pdt;         /* peripheral device type id, -1 is the default */
+                     /* (all or not applicable) value */
+    const char * acron;
+    const char * name;
+};
+
+
+/* Following functions also used by sg_vpd_vendor.c hence extern */
+void svpd_enumerate_vendor(int vend_prod_num);
+int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
+int svpd_decode_vendor(int sg_fd, struct opts_t * op, int off);
+const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
+int svpd_find_vp_num_by_acron(const char * vp_ap);
+const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
+                                                          int vend_prod_num);
+int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
+                            int mxlen, int vb, int * rlenp);
+void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
+
 
 static int decode_dev_ids(const char * print_if_found, unsigned char * buff,
                           int len, int m_assoc, int m_desig_type,
                           int m_code_set, const struct opts_t * op);
+
+unsigned char rsp_buff[MX_ALLOC_LEN + 2];
 
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
@@ -1784,19 +1784,41 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
             switch (desc_type) {
             case 0x0000:    /* Required if POPULATE TOKEN (or friend) used */
                 printf(" Block Device ROD Token Limits:\n");
-                printf("  Maximum Range Descriptors: %d\n",
-                       sg_get_unaligned_be16(bp + 10));
+                u = sg_get_unaligned_be16(bp + 10);
+                printf("  Maximum range descriptors: ");
+                if (0 == u)
+                    printf("0 [not reported]\n");
+                else
+                    printf("%u\n", u);
                 u = sg_get_unaligned_be32(bp + 12);
-                printf("  Maximum Inactivity Timeout: %u seconds\n", u);
+                printf("  Maximum inactivity timeout: ");
+                if (0 == u)
+                    printf("0 [not reported]\n");
+                else if (SG_LIB_UNBOUNDED_32BIT == u)
+                    printf("-1 [no maximum given]\n");
+                else
+                    printf("%u seconds\n", u);
                 u = sg_get_unaligned_be32(bp + 16);
-                printf("  Default Inactivity Timeout: %u seconds\n", u);
+                printf("  Default inactivity timeout: ");
+                if (0 == u)
+                    printf("0 [not reported]\n");
+                else
+                    printf("%u seconds\n", u);
                 ull = sg_get_unaligned_be64(bp + 20);
-                printf("  Maximum Token Transfer Size: %" PRIu64 "\n", ull);
+                printf("  Maximum token transfer size: ");
+                if (0 == ull)
+                    printf("0 [not reported]\n");
+                else
+                    printf("%" PRIu64 "\n", ull);
                 ull = sg_get_unaligned_be64(bp + 28);
-                printf("  Optimal Transfer Count: %" PRIu64 "\n", ull);
+                printf("  Optimal transfer count: ");
+                if (0 == ull)
+                    printf("0 [not reported]\n");
+                else
+                    printf("%" PRIu64 "\n", ull);
                 break;
             case 0x0001:    /* Mandatory (SPC-4) */
-                printf(" Supported Commands:\n");
+                printf(" Supported commands:\n");
                 j = 0;
                 csll = bp[4];
                 if (csll >= desc_len) {
@@ -1822,18 +1844,18 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
                 }
                 break;
             case 0x0004:
-                printf(" Parameter Data:\n");
-                printf("  Maximum CSCD Descriptor Count: %d\n",
+                printf(" Parameter data:\n");
+                printf("  Maximum CSCD descriptor count: %d\n",
                        sg_get_unaligned_be16(bp + 8));
-                printf("  Maximum Segment Descriptor Count: %d\n",
+                printf("  Maximum segment descriptor count: %d\n",
                        sg_get_unaligned_be16(bp + 10));
                 u = sg_get_unaligned_be32(bp + 12);
-                printf("  Maximum Descriptor List Length: %u\n", u);
+                printf("  Maximum descriptor list length: %u\n", u);
                 u = sg_get_unaligned_be32(bp + 16);
-                printf("  Maximum Inline Data Length: %u\n", u);
+                printf("  Maximum inline data length: %u\n", u);
                 break;
             case 0x0008:
-                printf(" Supported Descriptors:\n");
+                printf(" Supported descriptors:\n");
                 for (j = 0; j < bp[4]; j++) {
                     cp = get_tpc_desc_name(bp[5 + j]);
                     if (strlen(cp) > 0)
@@ -1854,60 +1876,60 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
                 }
                 break;
             case 0x0106:
-                printf(" ROD Token Features:\n");
-                printf("  Remote Tokens: %d\n", bp[4] & 0x0f);
+                printf(" ROD token features:\n");
+                printf("  Remote tokens: %d\n", bp[4] & 0x0f);
                 u = sg_get_unaligned_be32(bp + 16);
-                printf("  Minimum Token Lifetime: %u seconds\n", u);
+                printf("  Minimum token lifetime: %u seconds\n", u);
                 u = sg_get_unaligned_be32(bp + 20);
-                printf("  Maximum Token Lifetime: %u seconds\n", u);
+                printf("  Maximum token lifetime: %u seconds\n", u);
                 u = sg_get_unaligned_be32(bp + 24);
-                printf("  Maximum Token inactivity timeout: %u\n", u);
+                printf("  Maximum token inactivity timeout: %u\n", u);
                 decode_rod_descriptor(bp + 48,
                                       sg_get_unaligned_be16(bp + 46));
                 break;
             case 0x0108:
-                printf(" Supported ROD Token and ROD Types:\n");
+                printf(" Supported ROD token and ROD types:\n");
                 for (j = 0; j < sg_get_unaligned_be16(bp + 6); j+= 64) {
                     u = sg_get_unaligned_be32(bp + 8 + j);
                     cp = get_tpc_rod_name(u);
                     if (strlen(cp) > 0)
-                        printf("  ROD Type: %s [0x%x]\n", cp, u);
+                        printf("  ROD type: %s [0x%x]\n", cp, u);
                     else
-                        printf("  ROD Type: 0x%x\n", u);
+                        printf("  ROD type: 0x%x\n", u);
                     printf("    Internal: %s\n",
                            (bp[8 + j + 4] & 0x80) ? "yes" : "no");
-                    printf("    Token In: %s\n",
+                    printf("    Token in: %s\n",
                            (bp[8 + j + 4] & 0x02) ? "yes" : "no");
-                    printf("    Token Out: %s\n",
+                    printf("    Token out: %s\n",
                            (bp[8 + j + 4] & 0x01) ? "yes" : "no");
                     printf("    Preference: %d\n",
                            sg_get_unaligned_be16(bp + 8 + j + 6));
                 }
                 break;
             case 0x8001:    /* Mandatory (SPC-4) */
-                printf(" General Copy Operations:\n");
+                printf(" General copy operations:\n");
                 u = sg_get_unaligned_be32(bp + 4);
-                printf("  Total Concurrent Copies: %u\n", u);
+                printf("  Total concurrent copies: %u\n", u);
                 u = sg_get_unaligned_be32(bp + 8);
-                printf("  Maximum Identified Concurrent Copies: %u\n", u);
+                printf("  Maximum identified concurrent copies: %u\n", u);
                 u = sg_get_unaligned_be32(bp + 12);
-                printf("  Maximum Segment Length: %u\n", u);
+                printf("  Maximum segment length: %u\n", u);
                 ull = (1 << bp[16]); /* field is power of 2 */
-                printf("  Data Segment Granularity: %" PRIu64 "\n", ull);
+                printf("  Data segment granularity: %" PRIu64 "\n", ull);
                 ull = (1 << bp[17]);
-                printf("  Inline Data Granularity: %" PRIu64 "\n", ull);
+                printf("  Inline data granularity: %" PRIu64 "\n", ull);
                 break;
             case 0x9101:
-                printf(" Stream Copy Operations:\n");
+                printf(" Stream copy operations:\n");
                 u = sg_get_unaligned_be32(bp + 4);
-                printf("  Maximum Stream Device Transfer Size: %u\n", u);
+                printf("  Maximum stream device transfer size: %u\n", u);
                 break;
             case 0xC001:
-                printf(" Held Data:\n");
+                printf(" Held data:\n");
                 u = sg_get_unaligned_be32(bp + 4);
-                printf("  Held Data Limit: %u\n", u);
+                printf("  Held data limit: %u\n", u);
                 ull = (1 << bp[8]);
-                printf("  Held Data Granularity: %" PRIu64 "\n", ull);
+                printf("  Held data granularity: %" PRIu64 "\n", ull);
                 break;
             default:
                 pr2serr("Unexpected type=%d\n", desc_type);
@@ -2078,7 +2100,8 @@ static void
 decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
     unsigned int u;
-    unsigned char b[4];
+    uint64_t ull;
+    bool ugavalid;
 
     if (do_hex) {
         dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
@@ -2091,52 +2114,113 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             return;
         }
         printf("  Write same non-zero (WSNZ): %d\n", !!(buff[4] & 0x1));
-        printf("  Maximum compare and write length: %u blocks\n",
-               buff[5]);
+        u = buff[5];
+        printf("  Maximum compare and write length: ");
+        if (0 == u)
+            printf("0 blocks [Command not implemented]\n");
+        else
+            printf("%u blocks\n", buff[5]);
         u = sg_get_unaligned_be16(buff + 6);
-        printf("  Optimal transfer length granularity: %u blocks\n", u);
+        printf("  Optimal transfer length granularity: ");
+        if (0 == u)
+            printf("0 blocks [not reported]\n");
+        else
+            printf("%u blocks\n", u);
         u = sg_get_unaligned_be32(buff + 8);
-        printf("  Maximum transfer length: %u blocks\n", u);
+        printf("  Maximum transfer length: ");
+        if (0 == u)
+            printf("0 blocks [not reported]\n");
+        else
+            printf("%u blocks\n", u);
         u = sg_get_unaligned_be32(buff + 12);
-        printf("  Optimal transfer length: %u blocks\n", u);
+        printf("  Optimal transfer length: ");
+        if (0 == u)
+            printf("0 blocks [not reported]\n");
+        else
+            printf("%u blocks\n", u);
         if (len > 19) {     /* added in sbc3r09 */
             u = sg_get_unaligned_be32(buff + 16);
-            printf("  Maximum prefetch length: %u blocks\n", u);
-            /* was 'Maximum prefetch transfer length' prior to sbc3r33 */
+            printf("  Maximum prefetch transfer length: ");
+            if (0 == u)
+                printf("0 blocks [ignored]\n");
+            else
+                printf("%u blocks\n", u);
         }
         if (len > 27) {     /* added in sbc3r18 */
             u = sg_get_unaligned_be32(buff + 20);
-            printf("  Maximum unmap LBA count: %u\n", u);
+            printf("  Maximum unmap LBA count: ");
+            if (0 == u)
+                printf("0 [Unmap command not implemented]\n");
+            else if (SG_LIB_UNBOUNDED_32BIT == u)
+                printf("-1 [unbounded]\n");
+            else
+                printf("%u\n", u);
             u = sg_get_unaligned_be32(buff + 24);
-            printf("  Maximum unmap block descriptor count: %u\n", u);
+            printf("  Maximum unmap block descriptor count: ");
+            if (0 == u)
+                printf("0 [Unmap command not implemented]\n");
+            else if (SG_LIB_UNBOUNDED_32BIT == u)
+                printf("-1 [unbounded]\n");
+            else
+                printf("%u\n", u);
         }
         if (len > 35) {     /* added in sbc3r19 */
             u = sg_get_unaligned_be32(buff + 28);
-            printf("  Optimal unmap granularity: %u\n", u);
-            printf("  Unmap granularity alignment valid: %u\n",
-                   !!(buff[32] & 0x80));
-            memcpy(b, buff + 32, 4);
-            b[0] &= 0x7f;       /* mask off top bit */
-            u = sg_get_unaligned_be32(b);
-            printf("  Unmap granularity alignment: %u\n", u);
-            /* added in sbc3r26 */
-            printf("  Maximum write same length: 0x%" PRIx64 " blocks\n",
-                   sg_get_unaligned_be64(buff + 36));
+            printf("  Optimal unmap granularity: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
+
+            ugavalid = !!(buff[32] & 0x80);
+            printf("  Unmap granularity alignment valid: %s\n",
+                   ugavalid ? "true" : "false");
+            u = 0x7fffffff & sg_get_unaligned_be32(buff + 32);
+            printf("  Unmap granularity alignment: %u%s\n", u,
+                   ugavalid ? "" : " [invalid]");
+        }
+        if (len > 43) {     /* added in sbc3r26 */
+            ull = sg_get_unaligned_be64(buff + 36);
+            printf("  Maximum write same length: \n");
+            if (0 == ull)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("0x%" PRIx64 " blocks\n", ull);
         }
         if (len > 44) {     /* added in sbc4r02 */
             u = sg_get_unaligned_be32(buff + 44);
-            printf("  Maximum atomic transfer length: %u\n", u);
+            printf("  Maximum atomic transfer length: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
             u = sg_get_unaligned_be32(buff + 48);
-            printf("  Atomic alignment: %u\n", u);
+            printf("  Atomic alignment: ");
+            if (0 == u)
+                printf("0 [unaligned atomic writes permitted]\n");
+            else
+                printf("%u\n", u);
             u = sg_get_unaligned_be32(buff + 52);
-            printf("  Atomic transfer length granularity: %u\n", u);
+            printf("  Atomic transfer length granularity: ");
+            if (0 == u)
+                printf("0 [no granularity requirement\n");
+            else
+                printf("%u\n", u);
         }
-        if (len > 56) {     /* added in sbc4r04 */
+        if (len > 56) {
             u = sg_get_unaligned_be32(buff + 56);
-            printf("  Maximum atomic transfer length with atomic boundary: "
-                   "%u\n", u);
+            printf("  Maximum atomic transfer length with atomic "
+                   "boundary: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
             u = sg_get_unaligned_be32(buff + 60);
-            printf("  Maximum atomic boundary size: %u\n", u);
+            printf("  Maximum atomic boundary size: ");
+            if (0 == u)
+                printf("0 blocks [can only write atomic 1 block]\n");
+            else
+                printf("%u blocks\n", u);
         }
         break;
     case PDT_TAPE: case PDT_MCHANGER:
@@ -2260,6 +2344,7 @@ static int
 decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
 {
     int dp, pt;
+    unsigned int u;
 
     if (len < 4) {
         pr2serr("Logical block provisioning page too short=%d\n", len);
@@ -2275,11 +2360,25 @@ decode_block_lb_prov_vpd(unsigned char * b, int len, const struct opts_t * op)
            (0x7 & (b[5] >> 2)));  /* expanded from 1 to 3 bits in sbc4r07 */
     printf("  Anchored LBAs supported (ANC_SUP): %d\n", !!(0x2 & b[5]));
     dp = !!(b[5] & 0x1);
-    printf("  Threshold exponent: %d\n", b[4]);
+    u = b[4];
+    printf("  Threshold exponent: ");
+    if (0 == u)
+        printf("0 [threshold sets not supported]\n");
+    else
+        printf("%u\n", u);
     printf("  Descriptor present (DP): %d\n", dp);
-    printf("  Minimum percentage: %d\n", 0x1f & (b[6] >> 3));
+    printf("  Minimum percentage: ");
+    u = 0x1f & (b[6] >> 3);
+    if (0 == u)
+        printf("0 [not reported]\n");
+    else
+        printf("%d\n", u);
     printf("  Provisioning type: %d (%s)\n", pt, prov_type_arr[pt]);
-    printf("  Threshold percentage: %d\n", b[7]);
+    printf("  Threshold percentage: ");
+    if (0 == b[7])
+        printf("0 [percentages not supported]\n");
+    else
+        printf("%u\n", b[7]);
     if (dp && (len > 11)) {
         int i_len;
         const unsigned char * bp;
@@ -2492,7 +2591,11 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
             break;
         }
         u = sg_get_unaligned_be32(b + 8);
-        printf("  User data segment size: %u\n", u);
+        printf("  User data segment size: ");
+        if (0 == u)
+            printf("0 [per sense descriptor]\n");
+        else
+            printf("%u\n", u);
         u = sg_get_unaligned_be32(b + 12);
         printf("  User data segment multiplier: %u\n", u);
         break;
@@ -2579,20 +2682,20 @@ decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
     printf("  URSWRZ type: %d\n", !!(b[4] & 0x1));
     u = sg_get_unaligned_be32(b + 8);
     printf("  Optimal number of open sequential write preferred zones: ");
-    if (0xffffffff == u)
+    if (SG_LIB_UNBOUNDED_32BIT == u)
         printf("not reported\n");
     else
         printf("%" PRIu32 "\n", u);
     u = sg_get_unaligned_be32(b + 12);
     printf("  Optimal number of non-sequentially written sequential write "
            "preferred zones: ");
-    if (0xffffffff == u)
+    if (SG_LIB_UNBOUNDED_32BIT == u)
         printf("not reported\n");
     else
         printf("%" PRIu32 "\n", u);
     u = sg_get_unaligned_be32(b + 16);
     printf("  Maximum number of open sequential write required zones: ");
-    if (0xffffffff == u)
+    if (SG_LIB_UNBOUNDED_32BIT == u)
         printf("no limit\n");
     else
         printf("%" PRIu32 "\n", u);
@@ -2616,18 +2719,34 @@ decode_b7_vpd(unsigned char * buff, int len, int do_hex, int pdt)
             return;
         }
         u = sg_get_unaligned_be16(buff + 6);
-        printf("  Maximum number of streams: %u\n", u);
+        printf("  Maximum number of streams: ");
+        if (0 == u)
+            printf("0 [Stream control not supported]\n");
+        else
+            printf("%u\n", u);
         u = sg_get_unaligned_be16(buff + 8);
-        printf("  Optimal stream write size: %u logical blocks\n", u);
+        printf("  Optimal stream write size: %u blocks\n", u);
         u = sg_get_unaligned_be32(buff + 10);
         printf("  Stream granularity size: %u\n", u);
         if (len > 27) {
             u = sg_get_unaligned_be32(buff + 16);
-            printf("  Maximum scattered LBA range transfer length: %u\n", u);
+            printf("  Maximum scattered LBA range transfer length: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
             u = sg_get_unaligned_be16(buff + 22);
-            printf("  Maximum scattered LBA range descriptor count: %u\n", u);
+            printf("  Maximum scattered LBA range descriptor count: ");
+            if (0 == u)
+                printf("0 [not reported]\n");
+            else
+                printf("%u\n", u);
             u = sg_get_unaligned_be32(buff + 24);
-            printf("  Maximum scattered transfer length: %u\n", u);
+            printf("  Maximum scattered transfer length: ");
+            if (0 == u)
+                printf("0 blocks [not reported]\n");
+            else
+                printf("%u blocks\n", u);
         }
         break;
     default:

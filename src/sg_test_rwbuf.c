@@ -1,7 +1,7 @@
 /*
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2016 Douglas Gilbert
+ * (c) 1999-2017 Douglas Gilbert
  *
  * Program to test the SCSI host adapter by issueing
  * write and read operations on a device's buffer
@@ -41,7 +41,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.09 20160528";
+static const char * version_str = "1.10 20170921";
 
 #define BPI (signed)(sizeof(int))
 
@@ -119,7 +119,12 @@ int find_out_about_buffer (int sg_fd)
         case SG_LIB_CAT_RECOVERED:
                 sg_chk_n_print3("READ BUFFER descriptor, continuing",
                                 &io_hdr, 1);
-                /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+                __attribute__((fallthrough));
+                /* FALL THROUGH */
+#endif
+#endif
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
@@ -253,7 +258,12 @@ int read_buffer (int sg_fd, unsigned size)
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, 1);
-            /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
@@ -310,7 +320,12 @@ int write_buffer (int sg_fd, unsigned size)
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("WRITE BUFFER data, continuing", &io_hdr, 1);
-            /* fall through */
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
