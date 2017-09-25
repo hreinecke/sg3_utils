@@ -32,7 +32,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.11 20170917";
+static const char * version_str = "1.11 20170924";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -355,10 +355,10 @@ main(int argc, char * argv[])
             break;
         case 'g':
             num = sscanf(optarg, "%d", &res);
-            if ((1 == num) && (res >= 0) && (res <= 31))
+            if ((1 == num) && (res >= 0) && (res <= 63))
                 grpnum = res;
             else {
-                pr2serr("value for '--grpnum=' must be 0 to 31\n");
+                pr2serr("value for '--grpnum=' must be 0 to 63\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

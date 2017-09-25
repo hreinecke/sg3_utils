@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.21 20140516";    /* sbc4r01 */
+static const char * version_str = "1.22 20170924";    /* sbc4r01 */
 
 #define ME "sg_verify: "
 
@@ -185,7 +185,7 @@ main(int argc, char * argv[])
             break;
         case 'g':
             group = sg_get_num(optarg);
-            if ((group < 0) || (group > 31)) {
+            if ((group < 0) || (group > 63)) {
                 pr2serr("bad argument to '--group'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

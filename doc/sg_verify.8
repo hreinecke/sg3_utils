@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "August 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_VERIFY "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -87,8 +87,9 @@ than 0).
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
 where \fIGN\fR becomes the contents of the group number field in the SCSI
-VERIFY(16) command. The default value for \fIGN\fR is 0. Note that this
-option is ignored for the SCSI VERIFY(10) command.
+VERIFY(16) command. It can be from 0 to 63 inclusive. The default value for
+\fIGN\fR is 0. Note that this option is ignored for the SCSI VERIFY(10)
+command.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -197,7 +198,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2013 Douglas Gilbert
+Copyright \(co 2004\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

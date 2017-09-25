@@ -33,6 +33,7 @@ problems.
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_bg_ctl
     sg_compare_and_write
     sg_decode_sense
     sg_format
@@ -79,6 +80,7 @@ Here is a list of utilities that have been ported:
     sg_verify
     sg_vpd
     sg_wr_mode
+    sg_write_atomic
     sg_write_buffer
     sg_write_long
     sg_write_same
@@ -238,4 +240,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-18th February 2016
+21st September 2017

@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.10 20170917";
+static const char * version_str = "1.10 20170924";
 
 
 #define ME "sg_write_verify: "
@@ -312,8 +312,8 @@ main(int argc, char * argv[])
             break;
         case 'g':
             group = sg_get_num(optarg);
-            if ((group < 0) || (group > 31))  {
-                pr2serr("argument to '--group' expected to be 0 to 31\n");
+            if ((group < 0) || (group > 63))  {
+                pr2serr("argument to '--group' expected to be 0 to 63\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

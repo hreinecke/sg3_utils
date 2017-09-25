@@ -3038,7 +3038,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
                    sg_get_unaligned_be32(bp + 12),
                    sg_get_unaligned_be32(bp + 16),
                    cp);
-            decoded = true;
+            /* decoded = true; */
         } else if ((! decoded) && full) {
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
             dStrHex((const char *)bp, extra, 1);

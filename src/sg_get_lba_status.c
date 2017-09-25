@@ -30,7 +30,7 @@
  * device.
  */
 
-static const char * version_str = "1.10 20170917";
+static const char * version_str = "1.11 20170921";
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -303,10 +303,11 @@ main(int argc, char * argv[])
         goto free_buff;
     }
 
+    res = 0;
     if (do_16)
         res = sg_ll_get_lba_status16(sg_fd, lba, rt, glbasBuffp, maxlen, true,
                                      verbose);
-    else
+    else if (do_32)     /* keep analyser happy since do_32 must be true */
         res = sg_ll_get_lba_status32(sg_fd, lba, element_id, scan_len, rt,
                                      glbasBuffp, maxlen, true, verbose);
 

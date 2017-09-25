@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WRITE_SAME "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -68,6 +68,8 @@ given. Obviously this utility can destroy a lot of user data so check the
 options carefully.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
 .TP
 \fB\-R\fR, \fB\-\-10\fR
 send a SCSI WRITE SAME (10) command to \fIDEVICE\fR. The ability to
@@ -86,7 +88,7 @@ That draft requires the \fI\-\-unmap\fR option to also be specified.
 .TP
 \fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
 sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
-\fIGN\fR should be a value between 0 and 31.
+\fIGN\fR should be a value between 0 and 63.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -314,7 +316,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2016 Douglas Gilbert
+Copyright \(co 2009\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,4 +1,4 @@
-.TH SG_SYNC "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SYNC "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_sync \- send SCSI SYNCHRONIZE CACHE command
 .SH SYNOPSIS
@@ -34,7 +34,7 @@ where \fICOUNT\fR is the number of blocks to synchronize from and including
 including \fILBA\fR argument to the highest block address are synchronized.
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
-where \fIGN\fR is the group number which can be between 0 and 31 inclusive.
+where \fIGN\fR is the group number which can be between 0 and 63 inclusive.
 The default value is 0 . Group numbers are used to segregate data collected
 within the device. This is a new feature in SBC\-2 and can probably be
 ignored for the time being.
@@ -89,7 +89,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2016 Douglas Gilbert
+Copyright \(co 2004\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -53,7 +53,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.15 20160217";
+static const char * version_str = "1.16 20170924";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -203,9 +203,9 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                 case 'g':
                         op->flags.group = sg_get_num(optarg);
                         if ((op->flags.group < 0) ||
-                            (op->flags.group > 31))  {
+                            (op->flags.group > 63))  {
                                 pr2serr("argument to '--group' expected to "
-                                        "be 0 to 31\n");
+                                        "be 0 to 63\n");
                                 goto out_err_no_usage;
                         }
                         break;
