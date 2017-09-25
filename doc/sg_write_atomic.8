@@ -1,0 +1,242 @@
+PROPS-END
+.TH SG_WRITE_ATOMIC "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.SH NAME
+sg_write_atomic \- send SCSI WRITE ATOMIC command
+.SH SYNOPSIS
+.B sg_write_atomic
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app-tag=AT\fR] [\fI\-\-boundary=AB\fR]
+[\fI\-\-bs=BS\fR] [\fI\-\-dld=DLD\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR]
+[\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] \fI\-\-in=IF\fR [\fI\-\-lba=LBA\fR]
+[\fI\-\-non\-atomic\fR] [\fI\-\-num=NUM\fR] [\fI\-\-offset=OFF\fR]
+[\fI\-\-ref\-tag=RT\fR] [\fI\-\-strict\fR] [\fI\-\-tag\-mask=TM\fR]
+[\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+Send the SCSI WRITE ATOMIC (16 or 32 byte) command to \fIDEVICE\fR unless the
+\fI\-\-non\-atomic\fR option is given in which case the normal WRITE(16 or
+32) is sent. The data written to the \fIDEVICE\fR is fetched from the file
+named in the \fI\-\-in=IF\fR option which is a mandatory option except when
+either the \fI\-\-help\fR] or fI\-\-version\fR option is given.
+.PP
+The data is read from the file system in a single operation, then placed in
+a buffer big enough to hold it, then written by a single SCSI WRITE
+ATOMIC(16 or 32) (or a normal SCSI WRITE(16 or 32)) command. The data read
+from the file specified by \fIIF\fR starts from byte offset
+\fIOFF\fR (default 0). The writing to the \fIDEVICE\fR starts at logical
+block address \fILBA\fR (default 0) for \fINUM\fR blocks.
+.PP
+The block size in bytes is either given explicitly with the \fI\-\-bs=BS\fR
+option as long as \fIBS\fR is greater than zero. If the \fI\-\-bs=BS\fR option
+is not given or \fIBS\fR is zero then the SCSI READ CAPACITY command is used
+to find the block size. First the READ CAPACITY(16) command is tried and
+if successful the logical block size in the response is usually used as the
+block size for this utility. The exception is when PROT_EN is set in the
+response and the \fI\-\-wrprotect=WPR\fR option is given and non\-zero; in
+which case 8 is added to the logical block size to yield the block size
+used by this utility. If READ CAPACITY(16) fails then READ CAPACITY(10)
+is tried and if that works then the logical block size in the response is
+used as the block size.
+.PP
+The number of bytes this utility will attempt to read from the file named by
+\fIIF\fR is the product of the block size and the number of blocks \fINUM\fR.
+If less bytes are read from the file \fIIF\fR and the \fI\-\-strict\fR
+option is given then this utility exits at this point with an exit status
+of SG_LIB_FILE_ERROR. If less bytes are read from the file \fIIF\fR and the
+\fI\-\-strict\fR option is not given then zero bytes are substituted for
+the "missing" bytes and this utility continues.
+.PP
+Attempts to use WRITE ATOMIC(16 or 32) with multi megabyte data are likely
+to fail for one of several reasons. First the operating might object to
+allocating a buffer that large. Next the SCSI pass\-through usually limits
+data blocks to a few megabytes or less. Finally the storage device might
+have a limited amount of RAM to support an atomic write operation (as it may
+need to roll back). The storage device can inform the application client
+of its limitations via the block limits VPD page (0xb0), with the maximum
+atomic transfer length field amongst others.
+.PP
+WRITE ATOMIC(16) and WRITE ATOMIC(32) were added in SBC\-4 revision 2 draft.
+The atomic boundary field was added in revision 4. The ability to do normal
+WRITE(16) and WRITE(32) was added to this utility due to similarity of the
+fields in WRITE ATOMIC and normal WRITE commands and their similar
+functionalities.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+The options are arranged in alphabetical order based on the long
+option name.
+.TP
+\fB\-S\fR, \fB\-\-16\fR
+send a SCSI WRITE ATOMIC(16) or a normal WRITE(16) command to \fIDEVICE\fR.
+The normal WRITE(16) command is sent when the \fI\-\-non\-atomic\fR option
+is also given. If neither this option nor the \fI\-\-32\fR option is
+given then this option is assumed.
+.TP
+\fB\-T\fR, \fB\-\-32\fR
+send a SCSI WRITE ATOMIC(32) or a normal WRITE(32) command to \fIDEVICE\fR.
+The normal WRITE(32) command is sent when the \fI\-\-non\-atomic\fR option is
+also given. If both this option and the \fI\-\-16\fR option are given then
+this option takes precedence.
+.TP
+\fB\-a\fR, \fB\-\-app\-tag\fR=\fIAT\fR
+where \fIAT\fR is the expected logical block application tag field in the
+WRITE ATOMIC(32) and WRITE(32) cdbs. It is 16 bit field which means the
+maximum value is 0xffff. The default value is zero.
+.TP
+\fB\-B\fR, \fB\-\-boundary\fR=\fIAB\fR
+where \fIAB\fR is placed in the atomic boundary field of the SCSI WRITE
+ATOMIC(16 or 32) cdb. It is a 16 bit field so the maximum value is 0xffff,
+the default value is zero.
+.TP
+\fB\-b\fR, \fB\-\-bs\fR=\fIBS\fR
+where \fIBS\fR is the block size which is usually the same as the logical
+block size of the \fIDEVICE\fR. The exception is outlined in the DESCRIPTION
+section above. The default value is zero. If this option is not given or
+is given with a \fIBS\fR of zero then the SCSI READ CAPACITY(16) command
+is sent to \fIDEVICE\fR. If that fails then the READ CAPACITY(10) command
+is sent.
+.TP
+\fB\-D\fR, \fB\-\-dld\fR=\fIDLD\fR
+where \fIDLD\fR is the duration limits descriptor spread across 3 bits in
+the SCSI WRITE(16) cdb. \fIDLD\fR is between 0 to 7 inclusive with a default
+of zero. The DLD0 field in WRITE(16) is set if (0x1 & \fIDLD\fR) is non\-zero.
+The DLD1 field in WRITE(16) is (0x2 & \fIDLD\fR) is non\-zero. The DLD2 field
+in WRITE(16) is (0x4 & \fIDLD\fR) is non\-zero.
+.TP
+\fB\-d\fR, \fB\-\-dpo\fR
+if this option is given then the DPO (disable page out) bit field in the
+cdb is set. The default is to clear this bit field.
+.TP
+\fB\-f\fR, \fB\-\-fua\fR
+if this option is given then the FUA (force unit access) bit field in the
+cdb is set. The default is to clear this bit field.
+.TP
+\fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
+sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
+\fIGN\fR should be a value between 0 and 63.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
+read data (binary) from a file named \fIIF\fR in a single OS system
+call (read(2)). That data is placed in a continuous buffer and then used as
+the data out buffer for the SCSI WRITE ATOMIC(16 or 32) or the normal SCSI
+WRITE(16 or 32) command. The data read from \fIIF\fR starts from byte offset
+\fIOFF\fR which defaults to zero and that is the start of \fIIF\fR. The
+number of bytes read from \fIIF\fR is basically the product of \fINUM\fR and
+\fIBS\fR (i.e. the number_of_blocks multiplied by block_size). This option
+is mandatory. In Unix based OSes, any number of zeros can produced by
+using the /dev/zero device file.
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+where \fILBA\fR is the logical block address (lba) of the first block written
+by the SCSI WRITE ATOMIC(16 or 32) or SCSI WRITE(16 or 32) command. Defaults
+to lba 0 which is a dangerous block to overwrite on a disk that is in use.
+\fILBA\fR is assumed to be in decimal unless prefixed with '0x' or has a
+trailing 'h'.
+.TP
+\fB\-N\fR, \fB\-\-non\-atomic\fR
+when this option is given either a SCSI WRITE(16) or SCSI WRITE(32) command
+is sent. The default (i.e. in the absence of this option) is to send
+either SCSI WRITE ATOMIC(16) or SCSI WRITE ATOMIC(32) command.
+.TP
+\fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
+where \fINUM\fR is the number of blocks, to read from the file named \fIIF\fR.
+It is also the number of blocks written using a SCSI WRITE ATOMIC(16 or 32)
+or a SCSI WRITE(16 or 32). The default is 0 which is the degenerate case
+that will not modify the \fIDEVICE\fR but is still valid.
+.TP
+\fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
+where \fIOFF\fR is the byte offset within the file named \fIIF\fR to start
+reading from. The default value is zero which is the beginning \fIIF\fR.
+.TP
+\fB\-r\fR, \fB\-\-ref\-tag\fR=\fIRT\fR
+where \fIRT\fR is the expected logical block reference tag field in the
+WRITE ATOMIC(32) and WRITE(32) cdbs. It is 32 bit field which means the
+maximum value is 0xffffffff. The default value is zero.
+.TP
+\fB\-s\fR, \fB\-\-strict\fR
+when this option is present, if the read of the file named \fIIF\fR yields
+less bytes than requested then this utility will exit at this point
+with an exit status of SG_LIB_FILE_ERROR. The default is to fill the
+remaining part of the buffer with zeros and attempt to write the
+full buffer to the \fIDEVICE\fR.
+.TP
+\fB\-T\fR, \fB\-\-tag\-mask\fR=\fITM\fR
+where \fITM\fR is the logical block application tag mask field in the
+WRITE ATOMIC(32) and WRITE(32) cdbs. It is 16 bit field which means the
+maximum value is 0xffff. The default value is zero.
+.TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fITO\fR
+where \fITO\fR is the command timeout value in seconds. The default value is
+120 seconds. If \fINUM\fR is large a WRITE ATOMIC command may require
+considerably more time than 120 seconds to complete.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the degree of verbosity (debug messages). These messages are usually
+written to stderr.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+output version string then exit.
+.TP
+\fB\-w\fR, \fB\-\-wrprotect\fR=\fIWPR\fR
+sets the "Write protect" field in the WRITE SAME cdb to \fIWPR\fR. The
+default value is zero. \fIWPR\fR should be a value between 0 and 7.
+When \fIWPR\fR is 1 or greater, and the disk's protection type is 1 or
+greater, then 8 extra bytes of protection information are expected or
+generated (to place in the command's data out buffer).
+.SH NOTES
+Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
+suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
+in the sg3_utils(8) man page.
+.PP
+In Linux, prior to lk 3.17, the sg driver did not support cdb sizes greater
+than 16 bytes. Hence a device node like /dev/sg1 which is associated with
+the sg driver would fail with this utility if the \fI\-\-32\fR option was
+given (or implied by other options). The bsg driver with device nodes like
+/dev/bsg/6:0:0:1 does support cdb sizes greater than 16 bytes since its
+introduction in lk 2.6.28 .
+.SH EXIT STATUS
+The exit status of sg_write_atomic is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH EXAMPLES
+One simple usage is to write 4 blocks of zeros from (and including) a given
+LBA:
+.PP
+  sg_write_atomic \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4 /dev/sdc
+.PP
+Since \fI\-\-bs=BS\fR has not been given, then this utility will call the
+READ CAPACITY(16) command on /dev/sdc to determine the number of bytes in a
+logical block. If the READ CAPACITY(16) command fails then the READ
+CAPACITY(10) command is tried. Let us assume one of them works and that
+the number of bytes in each logical block is 512 bytes. So 4 blocks of
+zeros (each block containing 512 bytes) will be written from (and including)
+LBA 0x1234 . Now to bypass the need for the READ CAPACITY command(s) the
+\fI\-\-bs=BS\fR option can be used:
+.PP
+  sg_write_atomic \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4
+/dev/sdc
+.PP
+Both of the examples above issue a SCSI WRITE ATOMIC(16) command. To send the
+32 byte variant add \-\-32 as in:
+.PP
+  sg_write_atomic \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4
+/dev/sdc
+.PP
+To drop the WRITE ATOMIC(32) and replace it with a normal WRITE(32) add the
+\-\-non\-atomic option:
+.PP
+  sg_write_atomic \-\-non\-atomic \-\-32 \-\-bs=512 \-\-in=/dev/zero
+\-\-lba=0x1234 \-\-num=4 /dev/sdc
+.PP
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2017 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_readcap,sg_vpd,sg_write_same(sg3_utils)

@@ -13,6 +13,7 @@ for FreeBSD.
 Supported Utilities
 ===================
 Here is a list of utilities that have been ported:
+    sg_bg_ctl
     sg_compare_and_write
     sg_decode_sense
     sg_format
@@ -52,9 +53,11 @@ Here is a list of utilities that have been ported:
     sg_unmap
     sg_vpd
     sg_wr_mode
+    sg_write_atomic
     sg_write_buffer
     sg_write_long
     sg_write_same
+    sg_write_verify
 
 Most utility names are indicative of the main SCSI command
 that they execute.  Some utilities are slightly higher level, for
@@ -135,4 +138,4 @@ utilities.
 
 
 Douglas Gilbert
-14th January 2013
+21st September 2017

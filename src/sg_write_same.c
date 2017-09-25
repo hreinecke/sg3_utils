@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.15 20170917";
+static const char * version_str = "1.16 20170924";
 
 
 #define ME "sg_write_same: "
@@ -68,7 +68,7 @@ static struct option long_options[] = {
     {"ndob", no_argument, 0, 'N'},
     {"num", required_argument, 0, 'n'},
     {"pbdata", no_argument, 0, 'P'},
-    {"timeout", required_argument, 0, 'r'},
+    {"timeout", required_argument, 0, 't'},
     {"unmap", no_argument, 0, 'U'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
@@ -221,8 +221,6 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
         ws_cdb[14] = (op->grpnum & 0x1f);
         break;
     case WRITE_SAME32_LEN:
-        /* Note: In Linux at this time the sg driver does not support
-         * cdb_s > 16 bytes long, but the bsg driver does. */
         ws_cdb[0] = VARIABLE_LEN_OP;
         ws_cdb[6] = (op->grpnum & 0x1f);
         ws_cdb[7] = WRITE_SAME32_ADD;
@@ -340,7 +338,7 @@ main(int argc, char * argv[])
             break;
         case 'g':
             op->grpnum = sg_get_num(optarg);
-            if ((op->grpnum < 0) || (op->grpnum > 31))  {
+            if ((op->grpnum < 0) || (op->grpnum > 63))  {
                 pr2serr("bad argument to '--grpnum'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

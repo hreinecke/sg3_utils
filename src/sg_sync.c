@@ -27,7 +27,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.16 20170917";
+static const char * version_str = "1.16 20170924";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -172,7 +172,7 @@ int main(int argc, char * argv[])
             break;
         case 'g':
             group = sg_get_num(optarg);
-            if ((group < 0) || (group > 31)) {
+            if ((group < 0) || (group > 63)) {
                 pr2serr("bad argument to '--group'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

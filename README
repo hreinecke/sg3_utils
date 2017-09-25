@@ -238,9 +238,9 @@ subdirectory of the sg3_utils package:
     sg_rtpg, sg_safte, sg_sanitize, sg_sat_identify, sg_sat_phy_event,
     sg_sat_read_gplog, sg_sat_set_features, sg_scan, sg_senddiag, sg_ses,
     sg_ses_microcode, sg_start, sg_stpg, sg_sync, sg_test_rwbuff,
-    sg_timestamp, sg_turs, sg_unmap, sg_verify, sg_vpd, sg_write_buffer,
-    sg_write_long, sg_write_same, sg_write_verify sg_wr_mode, sg_xcopy,
-    sg_zone
+    sg_timestamp, sg_turs, sg_unmap, sg_verify, sg_vpd, sg_write_atomic,
+    sg_write_buffer, sg_write_long, sg_write_same, sg_write_verify,
+    sg_wr_mode, sg_xcopy, sg_zone
 
 Each of the above utilities depends on header files found in the 'include'
 subdirectory and library code found in the 'lib' subdirectory. Associated
@@ -389,8 +389,8 @@ The more recent utilities that use "getopt_long" only are:
     sg_rmsn, sg_rtpg, sg_safte, sg_sanitize, sg_sat_identify,
     sg_sat_phy_event, sg_sat_read_gplog, sg_sat_set_features, sg_scan(w),
     sg_ses, sg_ses_microcode, sg_stpg, sg_sync, sg_test_rwbuf, sg_timestamp,
-    sg_unmap, sg_verify, sg_vpd, sg_write_buffer, sg_write_long,
-    sg_write_same, sg_write_verify, sg_wr_mode, sg_zone
+    sg_unmap, sg_verify, sg_vpd, sg_write_atomic, sg_write_buffer,
+    sg_write_long, sg_write_same, sg_write_verify, sg_wr_mode, sg_zone
 
 
 Dangerous code
@@ -462,4 +462,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-19th May 2016
+21st September 2017

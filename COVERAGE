@@ -89,10 +89,12 @@ VERIFY(16)          sg_verify, ++
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
-WRITE(16)           sg_dd, sgm_dd, sgp_dd
+WRITE(16)           sg_dd, sgm_dd, sgp_dd, sg_write_atomic
+WRITE(32)           sg_write_atomic
 WRITE AND VERIFY(10)      sg_write_verify
 WRITE AND VERIFY(16)      sg_write_verify
-WRITE ATOMIC(16)    ddpt
+WRITE ATOMIC(16)    ddpt, sg_write_atomic
+WRITE ATOMIC(32)    sg_write_atomic
 WRITE BUFFER        sg_test_rwbuf, sg_write_buffer, ++
 WRITE LONG(10)      sg_write_long, ++
 WRITE LONG(16)      sg_write_long, ++
@@ -135,4 +137,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-19th May 2016
+21st September 2017

@@ -496,7 +496,7 @@ sg_decode_transportid_str(const char * lip, unsigned char * bp, int bplen,
     }
     if (NULL == lip)
         lip = "";
-    bump = TRANSPORT_ID_MIN_LEN;
+    bump = TRANSPORT_ID_MIN_LEN; /* should be overwritten in all loop paths */
     for (k = 0, n = 0; bplen > 0; ++k, bp += bump, bplen -= bump) {
         if ((k > 0) && only_one)
             break;

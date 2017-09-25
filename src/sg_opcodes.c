@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.49 20170917";    /* spc5r10 */
+static const char * version_str = "0.50 20170922";    /* spc5r10 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -49,24 +49,25 @@ static const char * version_str = "0.49 20170917";    /* spc5r10 */
 static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
 
 static struct option long_options[] = {
-        {"alpha", 0, 0, 'a'},
-        {"compact", 0, 0, 'c'},
-        {"enumerate", 0, 0, 'e'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"mask", 0, 0, 'm'},
-        {"no-inquiry", 0, 0, 'n'},
-        {"new", 0, 0, 'N'},
-        {"opcode", 1, 0, 'o'},
-        {"old", 0, 0, 'O'},
-        {"raw", 0, 0, 'r'},
-        {"rctd", 0, 0, 'R'},
+        {"alpha", no_argument, 0, 'a'},
+        {"compact", no_argument, 0, 'c'},
+        {"enumerate", no_argument, 0, 'e'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"mask", no_argument, 0, 'm'},
+        {"no-inquiry", no_argument, 0, 'n'},
+        {"new", no_argument, 0, 'N'},
+        {"opcode", required_argument, 0, 'o'},
+        {"old", no_argument, 0, 'O'},
+        {"pdt", required_argument, 0, 'p'},
+        {"raw", no_argument, 0, 'r'},
+        {"rctd", no_argument, 0, 'R'},
         {"repd", 0, 0, 'q'},
-        {"sa", 1, 0, 's'},
-        {"tmf", 0, 0, 't'},
-        {"unsorted", 0, 0, 'u'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"sa", required_argument, 0, 's'},
+        {"tmf", no_argument, 0, 't'},
+        {"unsorted", no_argument, 0, 'u'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -644,7 +645,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
 {
     int k, j, m, cd_len, serv_act, len, opcode, res;
     bool sa_v;
-    unsigned int to;
+    unsigned int timeout;
     unsigned char * bp;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
@@ -660,7 +661,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         printf("sg_opcodes: no commands to display\n");
         return;
     }
-    if (op->do_rctd) {
+    if (op->do_rctd) {  /* Return command timeout descriptor */
         if (op->do_compact) {
             printf("\nOpcode,sa  Nominal  Recommended  Name\n");
             printf(  "  (hex)    timeout  timeout(sec)     \n");
@@ -672,14 +673,14 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             printf("-------------------------------------------------------"
                    "---------\n");
         }
-    } else {
+    } else {            /* RCTD clear in cdb */
         if (op->do_compact) {
             printf("\nOpcode,sa  Name\n");
             printf(  "  (hex)        \n");
             printf("---------------------------------------\n");
         } else {
-            printf("\nOpcode  Service    CDB    Name\n");
-            printf(  "(hex)   action(h)  size       \n");
+            printf("\nOpcode  Service    CDB    CDLP   Name\n");
+            printf(  "(hex)   action(h)  size              \n");
             printf("-----------------------------------------------\n");
         }
     }
@@ -719,25 +720,26 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
-            if (bp[5] & 0x2) {
+            if (bp[5] & 0x2) {          /* CTDP set */
+                /* don't show CDLP because it makes line too long */
                 if (op->do_compact)
                     printf(" %.2x%c%.4s", opcode, (sa_v ? ',' : ' '),
                            sa_buff);
                 else
                     printf(" %.2x     %.4s       %3d", opcode, sa_buff,
                            sg_get_unaligned_be16(bp + 6));
-                to = sg_get_unaligned_be32(bp + 12);
-                if (0 == to)
+                timeout = sg_get_unaligned_be32(bp + 12);
+                if (0 == timeout)
                     printf("         -");
                 else
-                    printf("  %8u", to);
-                to = sg_get_unaligned_be32(bp + 16);
-                if (0 == to)
+                    printf("  %8u", timeout);
+                timeout = sg_get_unaligned_be32(bp + 16);
+                if (0 == timeout)
                     printf("          -");
                 else
-                    printf("   %8u", to);
+                    printf("   %8u", timeout);
                 printf("    %s\n", name_buff);
-            } else
+            } else                      /* CTDP clear */
                 if (op->do_compact)
                     printf(" %.2x%c%.4s                        %s\n", opcode,
                            (sa_v ? ',' : ' '), sa_buff, name_buff);
@@ -745,13 +747,15 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                     printf(" %.2x     %.4s       %3d                         "
                            "%s\n", opcode, sa_buff,
                            sg_get_unaligned_be16(bp + 6), name_buff);
-        } else
+        } else {                        /* RCTD clear in cdb */
             if (op->do_compact)
                 printf(" %.2x%c%.4s   %s\n", bp[0], (sa_v ? ',' : ' '),
                        sa_buff, name_buff);
             else
-                printf(" %.2x     %.4s       %3d    %s\n", bp[0], sa_buff,
-                       sg_get_unaligned_be16(bp + 6), name_buff);
+                printf(" %.2x     %.4s       %3d     %2d    %s\n", bp[0],
+                       sa_buff, sg_get_unaligned_be16(bp + 6),
+                       (*(bp + 5) >> 2) & 0x3, name_buff);
+        }
         if (op->do_mask) {
             int cdb_sz;
             unsigned char b[64];
@@ -778,10 +782,10 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
 }
 
 static void
-decode_cmd_to_descriptor(unsigned char * dp, int max_b_len, char * b)
+decode_cmd_timeout_desc(unsigned char * dp, int max_b_len, char * b)
 {
     int len;
-    unsigned int to;
+    unsigned int timeout;
 
     if ((max_b_len < 2) || (NULL == dp))
         return;
@@ -793,22 +797,23 @@ decode_cmd_to_descriptor(unsigned char * dp, int max_b_len, char * b)
                  "(expect 10)", len);
         return;
     }
-    to = sg_get_unaligned_be32(dp + 4);
-    if (0 == to)
+    timeout = sg_get_unaligned_be32(dp + 4);
+    if (0 == timeout)
         snprintf(b, max_b_len, "no nominal timeout, ");
     else
-        snprintf(b, max_b_len, "nominal timeout: %u secs, ", to);
+        snprintf(b, max_b_len, "nominal timeout: %u secs, ", timeout);
     len = strlen(b);
     max_b_len -= len;
     b += len;
-    to = sg_get_unaligned_be32(dp + 8);
-    if (0 == to)
+    timeout = sg_get_unaligned_be32(dp + 8);
+    if (0 == timeout)
         snprintf(b, max_b_len, "no recommended timeout");
     else
-        snprintf(b, max_b_len, "recommended timeout: %u secs", to);
+        snprintf(b, max_b_len, "recommended timeout: %u secs", timeout);
     return;
 }
 
+/* One command descriptor (includes cdb usage data) */
 static void
 list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
          struct opts_t * op)
@@ -817,6 +822,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
     char name_buff[NAME_BUFF_SZ];
     unsigned char * bp;
     const char * cp;
+    const char * dlp;
     int v = 0;
 
 
@@ -828,7 +834,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
                           ((op->servact > 0) ? op->servact : 0),
                           peri_dtype, NAME_BUFF_SZ, name_buff);
     printf("  Command_name: %s\n", name_buff);
-    switch((int)(rsoc_buff[1] & 7)) {
+    switch((int)(rsoc_buff[1] & 7)) {   /* SUPPORT field */
     case 0:
         cp = "not currently available";
         break;
@@ -849,7 +855,22 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
         cp = name_buff;
         break;
     }
-    printf("  Command %s\n", cp);
+    k = 0x3 & (rsoc_buff[1] >> 3);
+    switch (k) {        /* CDLP field */
+    case 0:
+        dlp = "no command duration limit mode page";
+        break;
+    case 1:
+        dlp = "command duration limit A mode page";
+        break;
+    case 2:
+        dlp = "command duration limit B mode page";
+        break;
+    default:
+        dlp = "reserved [CDLP=3]";
+        break;
+    }
+    printf("  Command %s, [%s]\n", cp, dlp);
     if (v) {
         printf("  Usage data: ");
         bp = rsoc_buff + 4;
@@ -859,7 +880,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
     }
     if (0x80 & rsoc_buff[1]) {      /* CTDP */
         bp = rsoc_buff + 4 + cd_len;
-        decode_cmd_to_descriptor(bp, NAME_BUFF_SZ, name_buff);
+        decode_cmd_timeout_desc(bp, NAME_BUFF_SZ, name_buff);
         printf("  %s\n", name_buff);
     }
 }

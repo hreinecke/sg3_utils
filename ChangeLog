@@ -2,8 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20170921] [svn: r716]
-  - sg_bg_ctl: new Background control command (spc4r08)
+Changelog for sg3_utils-1.43 [20170925] [svn: r717]
+  - sg_bg_ctl: new Background control command (sbc4r08)
+  - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
+    - also can issue plain WRITE(16 or 32)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
@@ -49,6 +51,7 @@ Changelog for sg3_utils-1.43 [20170921] [svn: r716]
     and '--number=NUM' for mutual compatibility
   - sg_zone: fix debug cdb naming
   - sg_opcode: add '--enumerate' and '--pdt=' options
+    - support CDLP (command duration limit page)
   - sg_raw: add '--enumerate' option
   - sg_get_lba_status: add --report-type= option (sbc4r12)
     - add support for 32 byte cdb variant (sbc4r14)
@@ -57,6 +60,8 @@ Changelog for sg3_utils-1.43 [20170921] [svn: r716]
     - decode response's RTP and two more provisioning
       statuses and the additional status (sbc4r12)
     - decode completion condition (sbc4r14)
+  - group_number: is 6 bit field allowing 0 to 63,
+    code in several utilities limited it to 31, fix
   - sg_lib: add SSC maintenance in/out sa names
     - add read buffer(16) command mode names
     - add sg_decode_transportid_str()

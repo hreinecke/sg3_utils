@@ -4,10 +4,10 @@ sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
 .B sg_compare_and_write
 [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-fua_nv\fR] [\fI\-\-help\fR]
-\fI\-\-in=IF\fR [\fI\-\-inw=WF\fR] \fI\-\-lba=LBA\fR [\fI\-\-num=NUM\fR]
-[\fI\-\-quiet\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR] [\fI\-\-xferlen=LEN\fR]
-\fIDEVICE\fR
+[\fI\-\-group=GN\fR] \fI\-\-in=IF\fR [\fI\-\-inw=WF\fR] \fI\-\-lba=LBA\fR
+[\fI\-\-num=NUM\fR] [\fI\-\-quiet\fR] [\fI\-\-timeout=TO\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR]
+[\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Send the SCSI COMPARE AND WRITE command to \fIDEVICE\fR. This utility
@@ -66,6 +66,10 @@ Set the FUA bit in the COMPARE AND WRITE CDB
 \fB\-F\fR, \fB\-\-fua_nv\fR
 Set the FUA_NV bit in the COMPARE AND WRITE CDB. This bit was removed in
 SBC\-3 revision 35d and its position marked as "reserved".
+.TP
+\fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
+where \fIGN\fR is the value to be placed in the group number field in the
+COMPARE AND WRITE CDB.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
