@@ -34,7 +34,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.03 20170917";
+static const char * version_str = "1.03 20170926";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -227,8 +227,9 @@ usage()
             "    --sa=SA|-s SA      SA is service action (def: 0)\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
-            "Performs a SCSI READ ATTRIBUTE command. It is typically used "
-            "on tape\nsystems.\n");
+            "Performs a SCSI READ ATTRIBUTE command. Even though it is "
+            "defined in\nSPC-3 and later it is typically used on tape "
+            "systems.\n");
 }
 
 /* Invokes a SCSI READ ATTRIBUTE command (SPC+SMC).  Return of 0 -> success,

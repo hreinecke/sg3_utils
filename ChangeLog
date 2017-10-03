@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20170925] [svn: r717]
+Changelog for sg3_utils-1.43 [20171001] [svn: r718]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)
@@ -31,6 +31,8 @@ Changelog for sg3_utils-1.43 [20170925] [svn: r717]
       Service buffer information lpages for tape
     - add min+max 'mounted' temperature and rel. humidity
       fields to Environmental reporting lpage (spc5r10)
+    - add last n Inquiry/Mode_page data changed log
+      pages (spc5r17)
     - add zoned block device statistics lpage (zbc2r?,
       16-264r4)
     - fixup enumeration in power condition transition
@@ -43,6 +45,8 @@ Changelog for sg3_utils-1.43 [20170925] [svn: r717]
       add extra info about corner cases
     - add --force option to bypass checking supported
       vpd pages page and fetch requested page directly
+    - add maximum inquiry|mode_page change logs fields
+      to extended inquiry vpd page (spc5r17)
   - sg_vpd: 3 party copy VPD page improvements
     - improve handling of unknown pages
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
@@ -80,6 +84,8 @@ Changelog for sg3_utils-1.43 [20170925] [svn: r717]
   - sg_sat_identify: expand to take --len=32
   - rescan-scsi-bus.sh: harden code
     - fixes from Suse; bump version to: 20160511
+    - add to install list in Makefile, hope it does
+      not clash with other package providing it
   - 55-scsi-sg3_id.rules: fixes from Suse
   - https://github.com/hreinecke/sg3_utils
     branch sles15 synced 20170914
