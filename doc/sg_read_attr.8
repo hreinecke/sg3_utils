@@ -1,4 +1,4 @@
-.TH SG_READ_ATTR "8" "February 2016" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_READ_ATTR "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_read_attr \- send SCSI READ ATTRIBUTE command
 .SH SYNOPSIS
@@ -12,8 +12,10 @@ sg_read_attr \- send SCSI READ ATTRIBUTE command
 .\" Add any additional description here
 .PP
 Sends a SCSI READ ATTRIBUTE command to \fIDEVICE\fR and outputs the data
-returned. This command is found in the SPC\-5 draft standard, revision
-8 (spc5r08.pdf).
+returned. This command was introduced in SPC\-3 revision 1 and thus is
+applicable to all SCSI devices. In practice it is used mainly for tape
+systems. This utility is based on the SPC\-5 draft standard, revision
+17 (spc5r17.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -204,7 +206,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2016 Douglas Gilbert
+Copyright \(co 2016\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

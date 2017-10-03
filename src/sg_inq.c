@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.66 20170917";    /* SPC-5 rev 14 */
+static const char * version_str = "1.67 20170926";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2181,6 +2181,10 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     printf("  IBS=%d IAS=%d SAC=%d NRD1=%d NRD0=%d\n",
            !!(buff[14] & 0x80), !!(buff[14] & 0x40), !!(buff[14] & 0x4),
            !!(buff[14] & 0x2), !!(buff[14] & 0x1));
+    printf("  Maximum inquiry change logs=%u\n",
+           sg_get_unaligned_be16(buff + 15));     /* spc5r17 */
+    printf("  Maximum mode page change logs=%u\n",
+           sg_get_unaligned_be16(buff + 17));     /* spc5r17 */
 }
 
 /* VPD_SOFTW_INF_ID [0x84] */

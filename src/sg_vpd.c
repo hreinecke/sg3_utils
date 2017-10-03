@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.27 20170920";  /* spc5r16 + sbc4r14 */
+static const char * version_str = "1.28 20170926";  /* spc5r16 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1327,6 +1327,10 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
         printf("  SAC=%d\n", !!(b[14] & 0x4));      /* spc5r09 */
         printf("  NRD1=%d\n", !!(b[14] & 0x2));     /* spc5r09 */
         printf("  NRD0=%d\n", !!(b[14] & 0x1));     /* spc5r09 */
+        printf("  Maximum inquiry change logs=%u\n",
+               sg_get_unaligned_be16(b + 15));      /* spc5r17 */
+        printf("  Maximum mode page change logs=%u\n",
+               sg_get_unaligned_be16(b + 17));      /* spc5r17 */
         return;
     }
     printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
@@ -1353,6 +1357,10 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
     printf("  IBS=%d IAS=%d SAC=%d NRD1=%d NRD0=%d\n", !!(b[14] & 0x80),
            !!(b[14] & 0x40), !!(b[14] & 0x4), !!(b[14] & 0x2),
            !!(b[14] & 0x1));  /* added in spc5r09 */
+    printf("  Maximum inquiry change logs=%u\n",
+           sg_get_unaligned_be16(b + 15));        /* spc5r17 */
+    printf("  Maximum mode page change logs=%u\n",
+           sg_get_unaligned_be16(b + 17));        /* spc5r17 */
 }
 
 /* VPD_SOFTW_INF_ID */

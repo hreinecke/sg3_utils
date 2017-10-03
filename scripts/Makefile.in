@@ -270,7 +270,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
-	      scsi_satl scsi_start scsi_stop scsi_temperature
+	      scsi_satl scsi_start scsi_stop scsi_temperature \
+	      rescan-scsi-bus.sh
 
 all: all-am
 
