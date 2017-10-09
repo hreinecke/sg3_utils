@@ -1,11 +1,11 @@
-.TH SG_WRITE_BUFFER "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_buffer \- send SCSI WRITE BUFFER commands
 .SH SYNOPSIS
 .B sg_write_buffer
 [\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
 [\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
-[\fI\-\-raw\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR]
+[\fI\-\-read\-stdin\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR]
 [\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -13,7 +13,7 @@ sg_write_buffer \- send SCSI WRITE BUFFER commands
 Sends one or more SCSI WRITE BUFFER commands to \fIDEVICE\fR, along with data
 provided by the user. In some cases no data is required, or data can be read
 from the file given in the \fI\-\-in=FILE\fR option, or data is read from
-stdin when either \fI\-\-raw\fR or \fI\-\-in=\-\fR is given.
+stdin when either \fI\-\-read\-stdin\fR or \fI\-\-in=\-\fR is given.
 .PP
 Some WRITE BUFFER command variants do not have associated data to send to the
 device. For example "activate_mc" activates deferred microcode that was sent
@@ -51,16 +51,16 @@ this option sets the buffer id field in the cdb. \fIID\fR is a value between
 \fB\-I\fR, \fB\-\-in\fR=\fIFILE\fR
 read data from file \fIFILE\fR that will be sent with the WRITE BUFFER
 command.  If \fIFILE\fR is '\-' then stdin is read until an EOF is
-detected (this is the same action as \fI\-\-raw\fR). Data is read from
-the beginning of \fIFILE\fR except in the case when it is a regular file
+detected (this is the same action as \fI\-\-read\-stdin\fR). Data is read
+from the beginning of \fIFILE\fR except in the case when it is a regular file
 and the \fI\-\-skip=SKIP\fR option is given.
 .TP
 \fB\-l\fR, \fB\-\-length\fR=\fILEN\fR
 where \fILEN\fR is the length, in bytes, of data to be written to the device.
 If not given (and the length cannot be deduced from \fI\-\-in=FILE\fR or
-\fI\-\-raw\fR) then defaults to zero. If the option is given and the length
-deduced from \fI\-\-in=FILE\fR or \fI\-\-raw\fR is less (or no data is
-provided), then bytes of 0xff are used as fill bytes.
+\fI\-\-read\-stdin\fR) then defaults to zero. If the option is given and the
+length deduced from \fI\-\-in=FILE\fR or \fI\-\-read\-stdin\fR is less (or no
+data is provided), then bytes of 0xff are used as fill bytes.
 .TP
 \fB\-m\fR, \fB\-\-mode\fR=\fIMO\fR
 this option sets the MODE field in the cdb. \fIMO\fR is a value between
@@ -72,10 +72,11 @@ run time give an invalid one (e.g. '\-\-mode=xxx') or use the '\-hh' option.
 this option sets the BUFFER OFFSET field in the cdb. \fIOFF\fR is a value
 between 0 (default) and 2**24\-1 . It is a byte offset.
 .TP
-\fB\-r\fR, \fB\-\-raw\fR
+\fB\-r\fR, \fB\-\-read\-stdin\fR
 read data from stdin until an EOF is detected. This data is sent with
 the WRITE BUFFER command to \fIDEVICE\fR. The action of this option is the
-same as using '\-\-in=\-'.
+same as using '\-\-in=\-'. Previousy this option's long name was
+\fI\-\-raw\fR and it may still be used for backward compatibility.
 .TP
 \fB\-s\fR, \fB\-\-skip\fR=\fISKIP\fR
 this option is only active when \fI\-\-in=FILE\fR is given and \fIFILE\fR is

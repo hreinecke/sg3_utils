@@ -8,6 +8,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
@@ -36,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.14 20170923";
+static const char * version_str = "1.15 20171005";
 
 
 #define MAX_XFER_LEN 10000
@@ -247,17 +249,17 @@ scsi_operating_parameters(unsigned char *rcBuff, unsigned int rcBuffLen)
 }
 
 static struct option long_options[] = {
-        {"failed", 0, 0, 'f'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"list_id", 1, 0, 'l'},
-        {"params", 0, 0, 'p'},
-        {"readonly", 0, 0, 'R'},
-        {"receive", 0, 0, 'r'},
-        {"status", 0, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"xfer_len", 1, 0, 'x'},
+        {"failed", no_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"list_id", required_argument, 0, 'l'},
+        {"params", no_argument, 0, 'p'},
+        {"readonly", no_argument, 0, 'R'},
+        {"receive", no_argument, 0, 'r'},
+        {"status", no_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"xfer_len", required_argument, 0, 'x'},
         {0, 0, 0, 0},
 };
 
@@ -307,7 +309,7 @@ main(int argc, char * argv[])
     int sa = 3;
     uint32_t list_id = 0;
     int do_hex = 0;
-    int o_readonly = 0;
+    bool o_readonly = false;
     int verbose = 0;
     const char * cp;
     const char * device_name = NULL;
@@ -349,7 +351,7 @@ main(int argc, char * argv[])
             sa = 1;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 's':
             sa = 0;

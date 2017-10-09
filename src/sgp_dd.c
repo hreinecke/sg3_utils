@@ -32,6 +32,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -58,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.54 20170917";
+static const char * version_str = "5.55 20171008";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -98,14 +100,14 @@ static const char * version_str = "5.54 20170917";
 #define EBUFF_SZ 512
 
 struct flags_t {
-    int append;
-    int coe;
-    int dio;
-    int direct;
-    int dpo;
-    int dsync;
-    int excl;
-    int fua;
+    bool append;
+    bool coe;
+    bool dio;
+    bool direct;
+    bool dpo;
+    bool dsync;
+    bool excl;
+    bool fua;
 };
 
 typedef struct request_collection
@@ -130,12 +132,12 @@ typedef struct request_collection
     int64_t out_count;              /*  | blocks remaining for next write */
     int64_t out_rem_count;          /*  | count of remaining out blocks */
     int out_partial;                  /*  | */
-    int out_stop;                     /*  | */
+    bool out_stop;                    /*  | */
     pthread_mutex_t out_mutex;        /*  | */
     pthread_cond_t out_sync_cv;       /* -/ hold writes until "in order" */
     int bs;
     int bpt;
-    int dio_incomplete;         /* -\ */
+    int dio_incomplete_count;   /* -\ */
     int sum_of_resids;          /*  | */
     pthread_mutex_t aux_mutex;  /* -/ (also serializes some printf()s */
     int debug;
@@ -143,9 +145,9 @@ typedef struct request_collection
 
 typedef struct request_element
 {       /* one instance per worker thread */
+    bool wr;
     int infd;
     int outfd;
-    int wr;
     int64_t blk;
     int num_blks;
     unsigned char * buffp;
@@ -154,7 +156,7 @@ typedef struct request_element
     unsigned char cmd[MAX_SCSI_CDBSZ];
     unsigned char sb[SENSE_BUFF_LEN];
     int bs;
-    int dio_incomplete;
+    int dio_incomplete_count;
     int resid;
     int cdbsz_in;
     int cdbsz_out;
@@ -170,21 +172,21 @@ static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static void sg_in_operation(Rq_coll * clp, Rq_elem * rep);
 static void sg_out_operation(Rq_coll * clp, Rq_elem * rep);
-static int normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
+static bool normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
 static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
 static int sg_start_io(Rq_elem * rep);
-static int sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
+static int sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
 
 #define STRERR_BUFF_LEN 128
 
 static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
-static int do_time = 0;
+static bool do_sync = false;
+static bool do_time = false;
 static Rq_coll rcoll;
 static struct timeval start_tm;
 static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
-static int do_sync = 0;
 static int exit_status = 0;
 
 
@@ -384,7 +386,7 @@ static void
 guarded_stop_out(Rq_coll * clp)
 {
     pthread_mutex_lock(&clp->out_mutex);
-    clp->out_stop = 1;
+    clp->out_stop = true;
     pthread_mutex_unlock(&clp->out_mutex);
 }
 
@@ -495,7 +497,7 @@ cleanup_out(void * v_clp)
     Rq_coll * clp = (Rq_coll *)v_clp;
 
     pr2serr("thread cancelled while out mutex held\n");
-    clp->out_stop = 1;
+    clp->out_stop = true;
     pthread_mutex_unlock(&clp->out_mutex);
     guarded_stop_in(clp);
     pthread_cond_broadcast(&clp->out_sync_cv);
@@ -509,7 +511,7 @@ read_write_thread(void * v_clp)
     Rq_elem * rep = &rel;
     size_t psz = 0;
     int sz;
-    volatile int stop_after_write = 0;
+    volatile bool stop_after_write = false;
     int64_t seek_skip;
     int blocks, status;
 
@@ -546,7 +548,7 @@ read_write_thread(void * v_clp)
             break;
         }
         blocks = (clp->in_count > clp->bpt) ? clp->bpt : clp->in_count;
-        rep->wr = 0;
+        rep->wr = false;
         rep->blk = clp->in_blk;
         rep->num_blks = blocks;
         clp->in_blk += blocks;
@@ -577,21 +579,21 @@ read_write_thread(void * v_clp)
 
         if (clp->out_stop || (clp->out_count <= 0)) {
             if (! clp->out_stop)
-                clp->out_stop = 1;
+                clp->out_stop = true;
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
             break;
         }
         if (stop_after_write)
-            clp->out_stop = 1;
-        rep->wr = 1;
+            clp->out_stop = true;
+        rep->wr = true;
         rep->blk = clp->out_blk;
         clp->out_blk += blocks;
         clp->out_count -= blocks;
 
         if (0 == rep->num_blks) {
-            clp->out_stop = 1;
-            stop_after_write = 1;
+            clp->out_stop = true;
+            stop_after_write = true;
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
             break;      /* read nothing so leave loop */
@@ -628,11 +630,11 @@ read_write_thread(void * v_clp)
     return stop_after_write ? NULL : clp;
 }
 
-static int
+static bool
 normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
+    bool stop_after_write = false;
     int res;
-    int stop_after_write = 0;
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding in_mutex */
@@ -658,7 +660,7 @@ normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     }
     if (res < blocks * clp->bs) {
         int o_blocks = blocks;
-        stop_after_write = 1;
+        stop_after_write = true;
         blocks = res / clp->bs;
         if ((res % clp->bs) > 0) {
             blocks++;
@@ -696,7 +698,7 @@ normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
             pr2serr("error normal write, %s\n",
                     tsafe_strerror(errno, strerr_buff));
             guarded_stop_in(clp);
-            clp->out_stop = 1;
+            clp->out_stop = true;
             return;
         }
     }
@@ -713,7 +715,7 @@ normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 
 static int
 sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
-                  int64_t start_block, int write_true, int fua, int dpo)
+                  int64_t start_block, bool write_true, bool fua, bool dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
@@ -832,10 +834,10 @@ sg_in_operation(Rq_coll * clp, Rq_elem * rep)
 #endif
 #endif
         case 0:
-            if (rep->dio_incomplete || rep->resid) {
+            if (rep->dio_incomplete_count || rep->resid) {
                 status = pthread_mutex_lock(&clp->aux_mutex);
                 if (0 != status) err_exit(status, "lock aux_mutex");
-                clp->dio_incomplete += rep->dio_incomplete;
+                clp->dio_incomplete_count += rep->dio_incomplete_count;
                 clp->sum_of_resids += rep->resid;
                 status = pthread_mutex_unlock(&clp->aux_mutex);
                 if (0 != status) err_exit(status, "unlock aux_mutex");
@@ -906,10 +908,10 @@ sg_out_operation(Rq_coll * clp, Rq_elem * rep)
 #endif
 #endif
         case 0:
-            if (rep->dio_incomplete || rep->resid) {
+            if (rep->dio_incomplete_count || rep->resid) {
                 status = pthread_mutex_lock(&clp->aux_mutex);
                 if (0 != status) err_exit(status, "lock aux_mutex");
-                clp->dio_incomplete += rep->dio_incomplete;
+                clp->dio_incomplete_count += rep->dio_incomplete_count;
                 clp->sum_of_resids += rep->resid;
                 status = pthread_mutex_unlock(&clp->aux_mutex);
                 if (0 != status) err_exit(status, "unlock aux_mutex");
@@ -934,9 +936,9 @@ static int
 sg_start_io(Rq_elem * rep)
 {
     struct sg_io_hdr * hp = &rep->io_hdr;
-    int fua = rep->wr ? rep->out_flags.fua : rep->in_flags.fua;
-    int dpo = rep->wr ? rep->out_flags.dpo : rep->in_flags.dpo;
-    int dio = rep->wr ? rep->out_flags.dio : rep->in_flags.dio;
+    bool fua = rep->wr ? rep->out_flags.fua : rep->in_flags.fua;
+    bool dpo = rep->wr ? rep->out_flags.dpo : rep->in_flags.dpo;
+    bool dio = rep->wr ? rep->out_flags.dio : rep->in_flags.dio;
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
@@ -983,7 +985,7 @@ sg_start_io(Rq_elem * rep)
    -> try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
    -1 other errors */
 static int
-sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
+sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 {
     int res, status;
     struct sg_io_hdr io_hdr;
@@ -1017,12 +1019,12 @@ sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
             break;
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3((wr ? "writing continuing":
-                                       "reading continuing"), hp, 0);
+                                       "reading continuing"), hp, false);
             break;
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
             if (rep->debug > 8)
-                sg_chk_n_print3((wr ? "writing": "reading"), hp, 0);
+                sg_chk_n_print3((wr ? "writing": "reading"), hp, false);
             return res;
         case SG_LIB_CAT_NOT_READY:
         default:
@@ -1033,7 +1035,7 @@ sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
                          wr ? "writing": "reading", rep->blk);
                 status = pthread_mutex_lock(a_mutp);
                 if (0 != status) err_exit(status, "lock aux_mutex");
-                sg_chk_n_print3(ebuff, hp, 0);
+                sg_chk_n_print3(ebuff, hp, false);
                 status = pthread_mutex_unlock(a_mutp);
                 if (0 != status) err_exit(status, "unlock aux_mutex");
                 return res;
@@ -1044,9 +1046,9 @@ sg_finish_io(int wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 #endif
     if ((wr ? rep->out_flags.dio : rep->in_flags.dio) &&
         ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
-        rep->dio_incomplete = 1; /* count dios done as indirect IO */
+        rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
-        rep->dio_incomplete = 0;
+        rep->dio_incomplete_count = 0;
     rep->resid = hp->resid;
     if (rep->debug > 8)
         pr2serr("sg_finish_io: completed %s\n", wr ? "WRITE" : "READ");
@@ -1093,19 +1095,19 @@ process_flags(const char * arg, struct flags_t * fp)
         if (np)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
-            fp->append = 1;
+            fp->append = true;
         else if (0 == strcmp(cp, "coe"))
-            fp->coe = 1;
+            fp->coe = true;
         else if (0 == strcmp(cp, "dio"))
-            fp->dio = 1;
+            fp->dio = true;
         else if (0 == strcmp(cp, "direct"))
-            fp->direct = 1;
+            fp->direct = true;
         else if (0 == strcmp(cp, "dpo"))
-            fp->dpo = 1;
+            fp->dpo = true;
         else if (0 == strcmp(cp, "dsync"))
-            fp->dsync = 1;
+            fp->dsync = true;
         else if (0 == strcmp(cp, "excl"))
-            fp->excl = 1;
+            fp->excl = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = 1;
         else if (0 == strcmp(cp, "null"))
@@ -1184,7 +1186,7 @@ main(int argc, char * argv[])
             rcoll.cdbsz_out = rcoll.cdbsz_in;
             cdbsz_given = 1;
         } else if (0 == strcmp(key,"coe")) {
-            rcoll.in_flags.coe = sg_get_num(buf);
+            rcoll.in_flags.coe = !! sg_get_num(buf);
             rcoll.out_flags.coe = rcoll.in_flags.coe;
         } else if (0 == strcmp(key,"count")) {
             if (0 != strcmp("-1", buf)) {
@@ -1198,14 +1200,14 @@ main(int argc, char * argv[])
                    (0 == strncmp(key,"verb", 4)))
             rcoll.debug = sg_get_num(buf);
         else if (0 == strcmp(key,"dio")) {
-            rcoll.in_flags.dio = sg_get_num(buf);
+            rcoll.in_flags.dio = !! sg_get_num(buf);
             rcoll.out_flags.dio = rcoll.in_flags.dio;
         } else if (0 == strcmp(key,"fua")) {
             n = sg_get_num(buf);
             if (n & 1)
-                rcoll.out_flags.fua = 1;
+                rcoll.out_flags.fua = true;
             if (n & 2)
-                rcoll.in_flags.fua = 1;
+                rcoll.in_flags.fua = true;
         } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
             if (-1 == ibs) {
@@ -1253,11 +1255,11 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"sync"))
-            do_sync = sg_get_num(buf);
+            do_sync = !! sg_get_num(buf);
         else if (0 == strcmp(key,"thr"))
             num_threads = sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
-            do_time = sg_get_num(buf);
+            do_time = !! sg_get_num(buf);
         else if ((0 == strncmp(key, "--help", 7)) ||
                  (0 == strncmp(key, "-h", 2)) ||
                  (0 == strcmp(key, "-?"))) {
@@ -1287,7 +1289,7 @@ main(int argc, char * argv[])
         pr2serr("skip and seek cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((rcoll.out_flags.append > 0) && (seek > 0)) {
+    if (rcoll.out_flags.append && (seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1610,7 +1612,7 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec))
+    if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
         calc_duration_throughput(0);
 
     if (do_sync) {
@@ -1641,12 +1643,12 @@ main(int argc, char * argv[])
             res = SG_LIB_CAT_OTHER;
     }
     print_stats("");
-    if (rcoll.dio_incomplete) {
+    if (rcoll.dio_incomplete_count) {
         int fd;
         char c;
 
         pr2serr(">> Direct IO requested but incomplete %d times\n",
-                rcoll.dio_incomplete);
+                rcoll.dio_incomplete_count);
         if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)

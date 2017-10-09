@@ -17,6 +17,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -35,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.10 20170924";
+static const char * version_str = "1.11 20171008";
 
 
 #define ME "sg_write_verify: "
@@ -123,8 +125,8 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
                      bool noisy, int verbose)
 {
     int res, k, sense_cat, ret;
-    unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
+    unsigned char sense_b[SENSE_BUFF_LEN];
     char b[32];
 
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);
@@ -147,8 +149,8 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, dop, do_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
-    ret = sg_cmds_process_resp(ptvp, b, res, 0, sense_b, noisy, verbose,
-                               &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, b, res, SG_NO_DATA_IN, sense_b, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -159,7 +161,8 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
             break;
         case SG_LIB_CAT_MEDIUM_HARD:    /* write or verify failed */
             {
-                int valid, slen;
+                bool valid;
+                int slen;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
@@ -186,7 +189,7 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
 /* Invokes a SCSI WRITE AND VERIFY (10) command (SBC). Returns 0 -> success,
 * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
+sg_ll_write_verify10(int sg_fd, int wrprotect, bool dpo, int bytchk,
                      unsigned int lba, int num_lb, int group,
                      unsigned char *dop, int do_len, int timeout,
                      bool noisy, int verbose)
@@ -213,7 +216,7 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, int dpo, int bytchk,
 /* Invokes a SCSI WRITE AND VERIFY (16) command (SBC). Returns 0 -> success,
 * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_write_verify16(int sg_fd, int wrprotect, int dpo, int bytchk,
+sg_ll_write_verify16(int sg_fd, int wrprotect, bool dpo, int bytchk,
                      uint64_t llba, int num_lb, int group, unsigned char *dop,
                      int do_len, int timeout, bool noisy, int verbose)
 {
@@ -261,31 +264,32 @@ open_if(const char * fn, int got_stdin)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, n, first_time;
-    unsigned char * wvb = NULL;
-    void * wrkBuff = NULL;
-    int dpo = 0;
+    bool do_16 = false;
+    bool dpo = false;
+    bool first_time;
+    bool given_do_16 = false;
+    bool has_filename = false;
+    bool lba_given = false;
+    bool repeat = false;
+    int sg_fd, res, c, n;
     int bytchk = 0;
     int group = 0;
-    int do_16 = 0;
-    int given_do_16 = 0;
-    uint64_t llba = 0;
-    int lba_given = 0;
-    uint32_t num_lb = 1;
-    uint32_t snum_lb = 1;
-    int repeat = 0;
-    int timeout = DEF_TIMEOUT_SECS;
-    int verbose = 0;
-    int64_t ll;
-    int wrprotect = 0;
-    const char * device_name = NULL;
-    const char * ifnp;
-    int has_filename = 0;
     int ilen = -1;
     int ifd = -1;
-    int ret = 1;
     int b_p_lb = 512;
+    int ret = 1;
+    int timeout = DEF_TIMEOUT_SECS;
     int tnum_lb_wr = 0;
+    int verbose = 0;
+    int wrprotect = 0;
+    uint32_t num_lb = 1;
+    uint32_t snum_lb = 1;
+    uint64_t llba = 0;
+    int64_t ll;
+    unsigned char * wvb = NULL;
+    void * wrkBuff = NULL;
+    const char * device_name = NULL;
+    const char * ifnp;
     char cmd_name[32];
 
     ifnp = "";          /* keep MinGW quiet */
@@ -323,7 +327,7 @@ main(int argc, char * argv[])
             return 0;
         case 'i':
             ifnp = optarg;
-            has_filename = 1;
+            has_filename = true;
             break;
         case 'I':
             ilen = sg_get_num(optarg);
@@ -343,7 +347,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             llba = (uint64_t)ll;
-            ++lba_given;
+            lba_given = true;
             break;
         case 'n':
             n = sg_get_num(optarg);
@@ -354,11 +358,11 @@ main(int argc, char * argv[])
             num_lb = (uint32_t)n;
             break;
         case 'R':
-            ++repeat;
+            repeat = true;
             break;
         case 'S':
-            do_16 = 1;
-            given_do_16 = 1;
+            do_16 = true;
+            given_do_16 = true;
             break;
         case 't':
             timeout = sg_get_num(optarg);
@@ -432,19 +436,19 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
-    if ((0 == do_16) && (llba > UINT_MAX))
-        do_16 = 1;
-    if ((0 == do_16) && (num_lb > 0xffff))
-        do_16 = 1;
+    if ((! do_16) && (llba > UINT_MAX))
+        do_16 = true;
+    if ((! do_16) && (num_lb > 0xffff))
+        do_16 = true;
     snprintf(cmd_name, sizeof(cmd_name), "Write and verify(%d)",
              (do_16 ? 16 : 10));
-    if (verbose && (0 == given_do_16) && do_16)
+    if (verbose && (! given_do_16) && do_16)
         pr2serr("Switching to %s because LBA or NUM too large\n", cmd_name);
     if (verbose) {
         pr2serr("Issue %s to device %s\n\tilen=%d", cmd_name, device_name,
@@ -453,10 +457,10 @@ main(int argc, char * argv[])
             pr2serr(" [0x%x]", ilen);
         pr2serr(", lba=%" PRIu64 " [0x%" PRIx64 "]\n\twrprotect=%d, dpo=%d, "
                 "bytchk=%d, group=%d, repeat=%d\n", llba, llba, wrprotect,
-                dpo, bytchk, group, repeat);
+                (int)dpo, bytchk, group, (int)repeat);
     }
 
-    first_time = 1;
+    first_time = true;
     do {
         if (first_time) {
             //If a file with data to write has been provided
@@ -507,8 +511,8 @@ main(int argc, char * argv[])
                     pr2serr("Read only %d bytes (expected %d) from %s\n", res,
                             ilen, ifnp);
                     if (repeat)
-                        pr2serr("Will scale subsequent pieces when repeat=1, "
-                                "but this is first\n");
+                        pr2serr("Will scale subsequent pieces when "
+                                "repeat=true, but this is first\n");
                     goto err_out;
                 }
             } else {
@@ -527,9 +531,9 @@ main(int argc, char * argv[])
                 /* Not sure about this: default contents to 0xff bytes */
                 memset(wrkBuff, 0xff, ilen);
             }
-            first_time = 0;
+            first_time = false;
             snum_lb = num_lb;
-        } else {        /* repeat=1, first_time=0, must be reading file */
+        } else {    /* repeat=true, first_time=false, must be reading file */
             llba += snum_lb;
             res = read(ifd, wvb, ilen);
             if (res < 0) {

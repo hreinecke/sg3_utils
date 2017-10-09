@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.16 20150511 */
+/* sg_pt_win32 version 1.17 20171005 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -139,7 +139,7 @@ scsi_pt_win32_spt_state(void)
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
-scsi_pt_open_device(const char * device_name, int read_only, int verbose)
+scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 

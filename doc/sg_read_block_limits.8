@@ -1,10 +1,10 @@
-.TH SG_READ_BLOCK_LIMITS "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_READ_BLOCK_LIMITS "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_read_block_limits \- send SCSI READ BLOCK LIMITS command
 .SH SYNOPSIS
 .B sg_read_block_limits
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR]  [\fI\-\-readonly\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -22,6 +22,10 @@ output response in hex (rather than decode it).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary to stdout.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open \fIDEVICE\fR in read\-only mode. The default is to open it in
+read\-write mode.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -48,7 +52,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2012 Douglas Gilbert
+Copyright \(co 2009\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

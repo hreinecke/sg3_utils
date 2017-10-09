@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -30,7 +32,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.13 20170917";
+static const char * version_str = "1.14 20171007";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -76,18 +78,18 @@ struct tgtgrp {
 };
 
 static struct option long_options[] = {
-        {"active", 0, 0, 'a'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"offline", 0, 0, 'l'},
-        {"optimized", 0, 0, 'o'},
-        {"raw", 0, 0, 'r'},
-        {"standby", 0, 0, 's'},
+        {"active", no_argument, 0, 'a'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"offline", no_argument, 0, 'l'},
+        {"optimized", no_argument, 0, 'o'},
+        {"raw", no_argument, 0, 'r'},
+        {"standby", no_argument, 0, 's'},
         {"state", required_argument, 0, 'S'},
         {"tp", required_argument, 0, 't'},
-        {"unavailable", 0, 0, 'u'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"unavailable", no_argument, 0, 'u'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -410,7 +412,11 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
 int
 main(int argc, char * argv[])
 {
+    bool raw = false;
     int sg_fd, k, off, res, c, report_len, tgt_port_count;
+    int hex = 0;
+    int port_arr_len = 0;
+    int verbose = 0;
     unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char setTgtGrpBuff[TGT_GRP_BUFF_LEN];
     unsigned char rsp_buff[MX_ALLOC_LEN + 2];
@@ -419,11 +425,7 @@ main(int argc, char * argv[])
     int state = -1;
     const char * state_arg = NULL;
     const char * tp_arg = NULL;
-    int hex = 0;
-    int raw = 0;
-    int verbose = 0;
     int port_arr[MAX_PORT_LIST_ARR_LEN];
-    int port_arr_len = 0;
     int state_arr[MAX_PORT_LIST_ARR_LEN];
     char b[80];
     int state_arr_len = 0;
@@ -460,7 +462,7 @@ main(int argc, char * argv[])
             state = TPGS_STATE_OPTIMIZED;
             break;
         case 'r':
-            raw = 1;
+            raw = true;
             break;
         case 's':
             state = TPGS_STATE_STANDBY;
@@ -556,15 +558,15 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
     if (0 == port_arr_len) {
-        res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
-                            DEF_VPD_DEVICE_ID_LEN, true, verbose);
+        res = sg_ll_inquiry(sg_fd, false, true /* EVPD */, VPD_DEVICE_ID,
+                            rsp_buff, DEF_VPD_DEVICE_ID_LEN, true, verbose);
         if (0 == res) {
             report_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
             if (VPD_DEVICE_ID != rsp_buff[1]) {
@@ -581,7 +583,7 @@ main(int argc, char * argv[])
                         MX_ALLOC_LEN);
                 return SG_LIB_CAT_MALFORMED;
             } else if (report_len > DEF_VPD_DEVICE_ID_LEN) {
-                if (sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rsp_buff,
+                if (sg_ll_inquiry(sg_fd, false, true, VPD_DEVICE_ID, rsp_buff,
                                   report_len, true, verbose))
                     return SG_LIB_CAT_OTHER;
             }
@@ -595,8 +597,8 @@ main(int argc, char * argv[])
         /* trunc = 0; */
 
         res = sg_ll_report_tgt_prt_grp2(sg_fd, reportTgtGrpBuff,
-                                        sizeof(reportTgtGrpBuff), 0, true,
-                                        verbose);
+                                        sizeof(reportTgtGrpBuff),
+                                        false /* extended */, true, verbose);
         ret = res;
         if (0 == res) {
             report_len = sg_get_unaligned_be32(reportTgtGrpBuff + 0) + 4;

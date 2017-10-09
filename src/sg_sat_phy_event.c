@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -22,7 +24,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.07 20160528";
+static const char * version_str = "1.08 20171007";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -146,22 +148,25 @@ dStrRaw(const char* str, int len)
 }
 
 /* ATA READ LOG EXT command [2Fh, PIO data-in] */
-/* N.B. "log_addr" is the log page number, "page_in_log" is usually zero */
+/* N.B. "log_addr" is the log page number, "page_in_log" is usually false */
 static int
-do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
+do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
                 int blk_count, void * resp, int mx_resp_len, int cdb_len,
-                int ck_cond, int extend, int do_hex, int do_raw, int verbose)
+                bool ck_cond, bool extend, int do_hex, bool do_raw,
+                int verbose)
 {
-    int ok, res, ret;
     /* Following for ATA READ/WRITE MULTIPLE (EXT) cmds, normally 0 */
+    bool t_type = false;/* false -> 512 byte LBs, true -> device's LB size */
+    bool t_dir = true;  /* false -> to device, 1 -> from device */
+    bool byte_block = true; /* false -> bytes, true -> 512 byte blocks (if
+                               t_type=false) */
+    bool got_ard = false;    /* got ATA result descriptor */
+    bool ok;
+    int res, ret;
     int multiple_count = 0;
     int protocol = 4;   /* PIO data-in */
-    int t_type = 0;     /* 0 -> 512 byte blocks, 1 -> device's LB size */
-    int t_dir = 1;      /* 0 -> to device, 1 -> from device */
-    int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks (if t_type=0) */
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
-    int got_ard = 0;    /* got ATA result descriptor */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
     unsigned char sense_buffer[64];
@@ -176,7 +181,7 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
     sb_sz = sizeof(sense_buffer);
     memset(sense_buffer, 0, sb_sz);
     memset(ata_return_desc, 0, sizeof(ata_return_desc));
-    ok = 0;
+    ok = false;
     if (SAT_ATA_PASS_THROUGH16_LEN == cdb_len) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */
         apt_cdb[3] = (feature >> 8) & 0xff;   /* feature(15:8) */
@@ -188,9 +193,18 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                 /* lba_mid(15:8) == LBA(39:32) */
         apt_cdb[10] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
         apt_cdb[14] = ATA_READ_LOG_EXT;
-        apt_cdb[1] = (multiple_count << 5) | (protocol << 1) | extend;
-        apt_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                       (byte_block << 2) | t_length;
+        apt_cdb[1] = (multiple_count << 5) | (protocol << 1);
+        if (extend)
+            apt_cdb[1] |= 0x1;
+        apt_cdb[2] = t_length;
+        if (ck_cond)
+            apt_cdb[2] |= 0x20;
+        if (t_type)
+            apt_cdb[2] |= 0x10;
+        if (t_dir)
+            apt_cdb[2] |= 0x8;
+        if (byte_block)
+            apt_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt_cdb, cdb_len, DEF_TIMEOUT, resp,
                            NULL /* doutp */, mx_resp_len, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -203,15 +217,22 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
         apt12_cdb[6] = page_in_log & 0xff; /* lba_mid(7:0) == LBA(15:8) */
         apt12_cdb[9] = ATA_READ_LOG_EXT;
         apt12_cdb[1] = (multiple_count << 5) | (protocol << 1);
-        apt12_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                         (byte_block << 2) | t_length;
+        apt12_cdb[2] = t_length;
+        if (ck_cond)
+            apt12_cdb[2] |= 0x20;
+        if (t_type)
+            apt12_cdb[2] |= 0x10;
+        if (t_dir)
+            apt12_cdb[2] |= 0x8;
+        if (byte_block)
+            apt12_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt12_cdb, cdb_len, DEF_TIMEOUT, resp,
                            NULL /* doutp */, mx_resp_len, sense_buffer,
                            sb_sz, ata_return_desc,
                            sizeof(ata_return_desc), &resid, verbose);
     }
     if (0 == res) {
-        ok = 1;
+        ok = true;
         if (verbose > 2)
             pr2serr("command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
@@ -320,7 +341,7 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                 pr2serr("error indication in returned FIS: aborted command\n");
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
-        ok = 1;
+        ok = true;
     }
 
     if (ok) { /* output result if ok and --hex or --raw given */
@@ -338,18 +359,18 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
 
 int main(int argc, char * argv[])
 {
+    bool extend = false;
+    bool ignore = false;
+    bool raw = false;
+    bool reset = false;
+    bool ck_cond = false;   /* set to true to read register(s) back */
     int sg_fd, c, k, j, res, id, len, vendor;
     char * device_name = 0;
     char ebuff[EBUFF_SZ];
     unsigned char inBuff[READ_LOG_EXT_RESPONSE_LEN];
     int cdb_len = 16;
     int hex = 0;
-    int ignore = 0;
-    int raw = 0;
-    int reset = 0;
     int verbose = 0;
-    int ck_cond = 0;   /* set to 1 to read register(s) back */
-    int extend = 0;
     int ret = 0;
     uint64_t ull;
     const char * cp;
@@ -365,10 +386,10 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'c':
-            ++ck_cond;
+            ck_cond = true;
             break;
         case 'e':
-            ++extend;
+            extend = true;
             break;
         case 'h':
         case '?':
@@ -378,7 +399,7 @@ int main(int argc, char * argv[])
             ++hex;
             break;
         case 'i':
-            ++ignore;
+            ignore = true;
             break;
         case 'l':
             cdb_len = sg_get_num(optarg);
@@ -388,10 +409,10 @@ int main(int argc, char * argv[])
             }
             break;
         case 'r':
-            ++raw;
+            raw = true;
             break;
         case 'R':
-            ++reset;
+            reset = true;
             break;
         case 'v':
             ++verbose;
@@ -435,13 +456,14 @@ int main(int argc, char * argv[])
         perror(ebuff);
         return SG_LIB_FILE_ERROR;
     }
-    ret = do_read_log_ext(sg_fd, SATA_PHY_EVENT_LPAGE, 0 /* page_in_log */,
+    ret = do_read_log_ext(sg_fd, SATA_PHY_EVENT_LPAGE,
+                          false /* page_in_log */,
                           (reset ? 1 : 0) /* feature */,
                           1 /* blk_count */, inBuff,
                           READ_LOG_EXT_RESPONSE_LEN, cdb_len, ck_cond,
                           extend, hex, raw, verbose);
 
-    if ((0 == ret) && (0 == hex) && (0 == raw)) {
+    if ((0 == ret) && (0 == hex) && (! raw)) {
         printf("SATA phy event counters:\n");
         for (k = 4; k < 512; k += (len + 2)) {
             id = (inBuff[k + 1] << 8) + inBuff[k];
@@ -457,7 +479,7 @@ int main(int argc, char * argv[])
                 ull |= inBuff[k + 2 + j];
             }
             cp = NULL;
-            if ((0 == vendor) && (0 == ignore))
+            if ((0 == vendor) && (! ignore))
                 cp = find_phy_desc(id);
             if (cp)
                 printf("  %s: %" PRIu64 "\n", cp, ull);

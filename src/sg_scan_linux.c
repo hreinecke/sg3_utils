@@ -51,11 +51,11 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.13 20170921";
+static const char * version_str = "4.14 20171009";
 
 #define ME "sg_scan: "
 
-#define NUMERIC_SCAN_DEF 1   /* change to 0 to make alpha scan default */
+#define NUMERIC_SCAN_DEF true /* change to false to make alpha scan default */
 
 #define INQ_REPLY_LEN 36
 #define INQ_CMD_LEN 6
@@ -86,9 +86,9 @@ typedef struct my_sg_scsi_id {
     int unused2;        /* ditto */
 } My_sg_scsi_id;
 
-int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra);
+int sg3_inq(int sg_fd, unsigned char * inqBuff, bool do_extra);
 int scsi_inq(int sg_fd, unsigned char * inqBuff);
-int try_ata_identity(const char * file_namep, int ata_fd, int do_inq);
+int try_ata_identity(const char * file_namep, int ata_fd, bool do_inq);
 
 static unsigned char inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
@@ -136,7 +136,7 @@ static int sysfs_sg_scan(const char * dir_name)
     return num;
 }
 
-void make_dev_name(char * fname, int k, int do_numeric)
+void make_dev_name(char * fname, int k, bool do_numeric)
 {
     char buff[FNAME_SZ];
     int  big,little;
@@ -170,28 +170,29 @@ void make_dev_name(char * fname, int k, int do_numeric)
 
 int main(int argc, char * argv[])
 {
-    int sg_fd, res, k, j, f, plen, jmp_out;
-    unsigned char inqBuff[INQ_REPLY_LEN];
-    int do_numeric = NUMERIC_SCAN_DEF;
-    int do_inquiry = 0;
-    int do_extra = 0;
-    int verbose = 0;
-    int writeable = 0;
+    bool do_extra = false;
+    bool do_inquiry = false;
+    bool do_numeric = NUMERIC_SCAN_DEF;
+    bool eacces_err = false;
+    bool has_file_args = false;
+    bool has_sysfs_sg = false;
+    bool jmp_out;
+    bool writeable = false;
+    int sg_fd, res, k, j, f, plen;
+    int emul = -1;
+    int flags;
+    int host_no;
+    const int max_file_args = PRESENT_ARRAY_SIZE;
     int num_errors = 0;
     int num_silent = 0;
     int sg_ver3 = -1;
-    int eacces_err = 0;
-    char fname[FNAME_SZ];
+    int verbose = 0;
     char * file_namep;
-    char ebuff[EBUFF_SZ];
-    My_scsi_idlun my_idlun;
-    int host_no;
-    int flags;
-    int emul = -1;
-    int has_file_args = 0;
-    int has_sysfs_sg = 0;
-    const int max_file_args = PRESENT_ARRAY_SIZE;
     const char * cp;
+    char fname[FNAME_SZ];
+    char ebuff[EBUFF_SZ];
+    unsigned char inqBuff[INQ_REPLY_LEN];
+    My_scsi_idlun my_idlun;
     struct stat a_stat;
 
     if (NULL == (gen_index_arr =
@@ -206,10 +207,10 @@ int main(int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'a':
-                    do_numeric = 0;
+                    do_numeric = false;
                     break;
                 case 'h':
                 case '?':
@@ -218,10 +219,10 @@ int main(int argc, char * argv[])
                     usage();
                     return 0;
                 case 'i':
-                    do_inquiry = 1;
+                    do_inquiry = true;
                     break;
                 case 'n':
-                    do_numeric = 1;
+                    do_numeric = true;
                     break;
                 case 'v':
                     ++verbose;
@@ -230,13 +231,13 @@ int main(int argc, char * argv[])
                     pr2serr("Version string: %s\n", version_str);
                     exit(0);
                 case 'w':
-                    writeable = 1;
+                    writeable = true;
                     break;
                 case 'x':
-                    do_extra = 1;
+                    do_extra = true;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -251,7 +252,7 @@ int main(int argc, char * argv[])
             }
         } else {
             if (j < max_file_args) {
-                has_file_args = 1;
+                has_file_args = true;
                 gen_index_arr[j++] = k;
             } else {
                 printf("Too many command line arguments\n");
@@ -262,7 +263,7 @@ int main(int argc, char * argv[])
 
     if ((! has_file_args) && (stat(sysfs_sg_dir, &a_stat) >= 0) &&
         (S_ISDIR(a_stat.st_mode)))
-        has_sysfs_sg = sysfs_sg_scan(sysfs_sg_dir);
+        has_sysfs_sg = !! sysfs_sg_scan(sysfs_sg_dir);
 
     flags = O_NONBLOCK | (writeable ? O_RDWR : O_RDONLY);
 
@@ -309,7 +310,7 @@ int main(int argc, char * argv[])
             }
             else {
                 if (EACCES == errno)
-                    eacces_err = 1;
+                    eacces_err = true;
                 snprintf(ebuff, EBUFF_SZ, ME "Error opening %s ", file_namep);
                 perror(ebuff);
                 ++num_errors;
@@ -389,11 +390,12 @@ int main(int argc, char * argv[])
     return 0;
 }
 
-int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
+int sg3_inq(int sg_fd, unsigned char * inqBuff, bool do_extra)
 {
-    struct sg_io_hdr io_hdr;
+    bool ok;
+    int err, sg_io;
     unsigned char sense_buffer[32];
-    int ok, err, sg_io;
+    struct sg_io_hdr io_hdr;
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     memset(inqBuff, 0, INQ_REPLY_LEN);
@@ -408,7 +410,7 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 20000;     /* 20000 millisecs == 20 seconds */
 
-    ok = 1;
+    ok = true;
     sg_io = 0;
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
         if ((err = scsi_inq(sg_fd, inqBuff)) < 0) {
@@ -423,7 +425,7 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
         /* now for the error processing */
         switch (sg_err_category3(&io_hdr)) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("Inquiry, continuing", &io_hdr, 1);
+            sg_chk_n_print3("Inquiry, continuing", &io_hdr, true);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -433,8 +435,8 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, int do_extra)
         case SG_LIB_CAT_CLEAN:
             break;
         default: /* won't bother decoding other categories */
-            ok = 0;
-            sg_chk_n_print3("INQUIRY command error", &io_hdr, 1);
+            ok = false;
+            sg_chk_n_print3("INQUIRY command error", &io_hdr, true);
             break;
         }
     }
@@ -600,7 +602,7 @@ int ata_command_interface(int device, char *data)
     return 0;
 }
 
-int try_ata_identity(const char * file_namep, int ata_fd, int do_inq)
+int try_ata_identity(const char * file_namep, int ata_fd, bool do_inq)
 {
     struct ata_identify_device ata_ident;
     char model[64];

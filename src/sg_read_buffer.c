@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
@@ -30,7 +32,7 @@
  * device.
  */
 
-static const char * version_str = "1.18 20170917";
+static const char * version_str = "1.19 20171005";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -277,22 +279,22 @@ dStrRaw(const char* str, int len)
 int
 main(int argc, char * argv[])
 {
+    bool do_long = false;
+    bool o_readonly = false;
+    bool do_raw = false;
     int res, c, len, k;
     int sg_fd = -1;
     int do_help = 0;
     int do_hex = 0;
-    int do_long = 0;
-    int o_readonly = 0;
     int rb_id = 0;
     int rb_len = 4;
     int rb_mode = 0;
     int rb_mode_sp = 0;
-    int64_t ll;
-    uint64_t rb_offset = 0;
-    int do_raw = 0;
     int resid = 0;
     int verbose = 0;
     int ret = 0;
+    int64_t ll;
+    uint64_t rb_offset = 0;
     const char * device_name = NULL;
     unsigned char * resp;
     const struct mode_s * mp;
@@ -333,7 +335,7 @@ main(int argc, char * argv[])
              }
              break;
         case 'L':
-            ++do_long;
+            do_long = true;
             break;
         case 'm':
             if (isdigit(*optarg)) {
@@ -366,10 +368,10 @@ main(int argc, char * argv[])
             rb_offset = ll;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 'S':
            rb_mode_sp = sg_get_num(optarg);

@@ -15,6 +15,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -27,7 +29,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.12 20170917";
+static const char * version_str = "1.13 20171008";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -112,12 +114,12 @@ static void dump_mode_page( unsigned char *page, int len )
 #define RDAC_FORCE_QUIESCENCE 0x2
 #define RDAC_QUIESCENCE_TIME 10
 
-static int fail_all_paths(int fd, int use_6_byte)
+static int fail_all_paths(int fd, bool use_6_byte)
 {
-        unsigned char fail_paths_pg[308];
         struct rdac_legacy_page *rdac_page;
         struct rdac_expanded_page *rdac_page_exp;
         struct rdac_page_common *rdac_common = NULL;
+        unsigned char fail_paths_pg[308];
 
         int res;
         char b[80];
@@ -169,13 +171,13 @@ static int fail_all_paths(int fd, int use_6_byte)
         return res;
 }
 
-static int fail_this_path(int fd, int lun, int use_6_byte)
+static int fail_this_path(int fd, int lun, bool use_6_byte)
 {
-        unsigned char fail_paths_pg[308];
+        int res;
         struct rdac_legacy_page *rdac_page;
         struct rdac_expanded_page *rdac_page_exp;
         struct rdac_page_common *rdac_common = NULL;
-        int res;
+        unsigned char fail_paths_pg[308];
         char b[80];
 
         if (use_6_byte) {
@@ -243,11 +245,11 @@ static int fail_this_path(int fd, int lun, int use_6_byte)
 
 static void print_rdac_mode( unsigned char *ptr, int subpg)
 {
+        int i, k, bd_len, lun_table_len;
+        unsigned char * lun_table = NULL;
         struct rdac_legacy_page *legacy;
         struct rdac_expanded_page *expanded;
         struct rdac_page_common *rdac_ptr = NULL;
-        unsigned char * lun_table = NULL;
-        int i, k, bd_len, lun_table_len;
 
         if (subpg == 1) {
                 bd_len = ptr[7];
@@ -383,14 +385,14 @@ static void usage()
 
 int main(int argc, char * argv[])
 {
-        unsigned char rsp_buff[MX_ALLOC_LEN];
+        bool fail_all = false;
+        bool fail_path = false;
+        bool use_6_byte = false;
+        int res, fd, k, lun = -1;
+        int ret = 0;
         char **argptr;
         char * file_name = 0;
-        int res, fd, k, lun = -1;
-        int fail_all = 0;
-        int fail_path = 0;
-        int ret = 0;
-        int use_6_byte = 0;
+        unsigned char rsp_buff[MX_ALLOC_LEN];
 
         if (argc < 2) {
                 usage ();
@@ -402,14 +404,14 @@ int main(int argc, char * argv[])
                 if (!strcmp (*argptr, "-v"))
                         ++do_verbose;
                 else if (!strncmp(*argptr, "-f=",3)) {
-                        ++fail_path;
+                        fail_path = true;
                         lun = strtoul(*argptr + 3, NULL, 0);
                 }
                 else if (!strcmp(*argptr, "-a")) {
-                        ++fail_all;
+                        fail_all = true;
                 }
                 else if (!strcmp(*argptr, "-6")) {
-                        use_6_byte = 1;
+                        use_6_byte = true;
                 }
                 else if (!strcmp(*argptr, "-V")) {
                         pr2serr("sg_rdac version: %s\n", version_str);
@@ -433,7 +435,7 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
         }
 
-        fd = sg_cmds_open_device(file_name, 0 /* rw */, do_verbose);
+        fd = sg_cmds_open_device(file_name, false /* rw */, do_verbose);
         if (fd < 0) {
                 pr2serr("open error: %s: %s\n", file_name, safe_strerror(-fd));
                 usage();
@@ -446,14 +448,18 @@ int main(int argc, char * argv[])
                 res = fail_this_path(fd, lun, use_6_byte);
         } else {
                 if (use_6_byte)
-                        res = sg_ll_mode_sense6(fd, /* DBD */ 0, /* PC */0,
-                                                0x2c, 0, rsp_buff, 252,
+                        res = sg_ll_mode_sense6(fd, /* DBD */ false,
+                                                /* PC */ 0,
+                                                0x2c /* page */,
+                                                0 /*subpage */,
+                                                rsp_buff, 252,
                                                 true, do_verbose);
                 else
-                        res = sg_ll_mode_sense10(fd, /* llbaa */ 0,
-                                                 /* DBD */ 0,
+                        res = sg_ll_mode_sense10(fd, /* llbaa */ false,
+                                                 /* DBD */ false,
                                                  /* page control */0,
-                                                 0x2c, 0x1, rsp_buff, 308,
+                                                 0x2c, 0x1 /* subpage */,
+                                                 rsp_buff, 308,
                                                  true, do_verbose);
 
                 if (!res) {

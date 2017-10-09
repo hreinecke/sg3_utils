@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -38,7 +40,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.16 (win32) 20170917";
+static const char * version_str = "1.17 (win32) 20171007";
 
 #define MAX_SCSI_ELEMS 2048
 #define MAX_ADAPTER_NUM 128
@@ -162,12 +164,12 @@ static int next_unused_elem = 0;
 static int verbose = 0;
 
 static struct option long_options[] = {
-        {"bus", 0, 0, 'b'},
-        {"help", 0, 0, 'h'},
-        {"letter", 1, 0, 'l'},
-        {"verbose", 0, 0, 'v'},
-        {"scsi", 0, 0, 's'},
-        {"version", 0, 0, 'V'},
+        {"bus", no_argument, 0, 'b'},
+        {"help", no_argument, 0, 'h'},
+        {"letter", required_argument, 0, 'l'},
+        {"verbose", no_argument, 0, 'v'},
+        {"scsi", no_argument, 0, 's'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -181,7 +183,11 @@ usage()
             "       --help|-h       output this usage message then exit\n"
             "       --letter=VL|-l VL    volume letter (e.g. 'F' for F:) "
             "to match\n"
-            "       --scsi|-s       show SCSI adapter (tuple) scan\n"
+            "       --scsi|-s       used once: show SCSI adapters (tuple) "
+            "scan after\n"
+            "                       device scan; default: show no "
+            "adapters;\n"
+            "                       used twice: show only adapaters\n"
             "       --verbose|-v    increase verbosity\n"
             "       --version|-V    print version string and exit\n\n"
             "Scan for storage and related device names\n");
@@ -630,7 +636,7 @@ enum_tapes(void)
 }
 
 static int
-sg_do_wscan(char letter, int show_bt, int scsi_scan)
+sg_do_wscan(char letter, bool show_bt, int scsi_scan)
 {
     int k, j, n;
     struct storage_elem * sp;
@@ -707,9 +713,9 @@ sg_do_wscan(char letter, int show_bt, int scsi_scan)
 int
 main(int argc, char * argv[])
 {
+    bool show_bt = false;
     int c, ret;
     int vol_letter = 0;
-    int show_bt = 0;
     int scsi_scan = 0;
 
     while (1) {
@@ -722,7 +728,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'b':
-            ++show_bt;
+            show_bt = true;
             break;
         case 'h':
         case '?':

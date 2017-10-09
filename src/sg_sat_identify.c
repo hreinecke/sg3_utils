@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
@@ -50,7 +51,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.14 20160528";
+static const char * version_str = "1.15 20171006";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -106,22 +107,25 @@ static void dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
-                           int ck_cond, int extend, int do_indent,
-                           int do_hex, int do_raw, int verbose)
+static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
+                           bool ck_cond, bool extend, bool do_ident,
+                           int do_hex, bool do_raw, int verbose)
 {
-    int ok, j, res, ret;
+    bool t_type = false;/* false -> 512 byte blocks,
+                           true -> device's LB size */
+    bool t_dir = true;  /* false -> to device, true -> from device */
+    bool byte_block = true; /* false -> bytes, true -> 512 byte blocks (if
+                               t_type=false) */
+    bool got_ard = false;         /* got ATA result descriptor */
+    bool got_fixsense = false;    /* got ATA result in fixed format sense */
+    bool ok;
+    int j, res, ret, sb_sz;
     /* Following for ATA READ/WRITE MULTIPLE (EXT) cmds, normally 0 */
     int multiple_count = 0;
     int protocol = 4;   /* PIO data-in */
-    int t_type = 0;     /* 0 -> 512 byte blocks, 1 -> device's LB size */
-    int t_dir = 1;      /* 0 -> to device, 1 -> from device */
-    int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks (if t_type=0) */
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
-    bool got_ard = false;         /* got ATA result descriptor */
-    bool got_fixsense = false;    /* got ATA result in fixed format sense */
-    int sb_sz;
+    uint64_t ull;
     struct sg_scsi_sense_hdr ssh;
     unsigned char inBuff[ID_RESPONSE_LEN];
     unsigned char sense_buffer[64];
@@ -134,22 +138,30 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                  0, 0, 0, 0};
     unsigned char apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN];
     const unsigned short * usp;
-    uint64_t ull;
 
     sb_sz = sizeof(sense_buffer);
     memset(sense_buffer, 0, sb_sz);
     memset(apt32_cdb, 0, sizeof(apt32_cdb));
     memset(ata_return_desc, 0, sizeof(ata_return_desc));
-    ok = 0;
+    ok = false;
     switch (cdb_len) {
     case SAT_ATA_PASS_THROUGH32_LEN:    /* SAT-4 revision 5 or later */
         /* Prepare SCSI ATA PASS-THROUGH COMMAND(32) command */
         sg_put_unaligned_be16(1, apt32_cdb + 22);     /* count=1 */
         apt32_cdb[25] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                        ATA_IDENTIFY_DEVICE);
-        apt32_cdb[10] = (multiple_count << 5) | (protocol << 1) | extend;
-        apt32_cdb[11] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                          (byte_block << 2) | t_length;
+        apt32_cdb[10] = (multiple_count << 5) | (protocol << 1);
+        if (extend)
+            apt32_cdb[10] |= 0x1;
+        apt32_cdb[11] = t_length;
+        if (ck_cond)
+            apt32_cdb[11] |= 0x20;
+        if (t_type)
+            apt32_cdb[11] |= 0x10;
+        if (t_dir)
+            apt32_cdb[11] |= 0x8;
+        if (byte_block)
+            apt32_cdb[11] |= 0x4;
         /* following call takes care of all bytes below offset 10 in cdb */
         res = sg_ll_ata_pt(sg_fd, apt32_cdb, cdb_len, DEF_TIMEOUT, inBuff,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
@@ -161,9 +173,18 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         apt_cdb[6] = 1;   /* sector count */
         apt_cdb[14] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                      ATA_IDENTIFY_DEVICE);
-        apt_cdb[1] = (multiple_count << 5) | (protocol << 1) | extend;
-        apt_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                       (byte_block << 2) | t_length;
+        apt_cdb[1] = (multiple_count << 5) | (protocol << 1);
+        if (extend)
+            apt_cdb[1] |= 0x1;
+        apt_cdb[2] = t_length;
+        if (ck_cond)
+            apt_cdb[2] |= 0x20;
+        if (t_type)
+            apt_cdb[2] |= 0x10;
+        if (t_dir)
+            apt_cdb[2] |= 0x8;
+        if (byte_block)
+            apt_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt_cdb, cdb_len, DEF_TIMEOUT, inBuff,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -175,8 +196,15 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         apt12_cdb[9] = (do_packet ? ATA_IDENTIFY_PACKET_DEVICE :
                                       ATA_IDENTIFY_DEVICE);
         apt12_cdb[1] = (multiple_count << 5) | (protocol << 1);
-        apt12_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                         (byte_block << 2) | t_length;
+        apt12_cdb[2] = t_length;
+        if (ck_cond)
+            apt12_cdb[2] |= 0x20;
+        if (t_type)
+            apt12_cdb[2] |= 0x10;
+        if (t_dir)
+            apt12_cdb[2] |= 0x8;
+        if (byte_block)
+            apt12_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt12_cdb, cdb_len, DEF_TIMEOUT, inBuff,
                            NULL /* doutp */, ID_RESPONSE_LEN, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -187,7 +215,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
         return -1;
     }
     if (0 == res) {
-        ok = 1;
+        ok = true;
         if (verbose > 2)
             pr2serr("command completed with SCSI GOOD status\n");
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
@@ -310,7 +338,7 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                         (do_packet ? "out" : ""));
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
-        ok = 1;
+        ok = true;
     }
     if (got_fixsense) {
         if (0x4 & sense_buffer[3]) { /* Error is MSB of Info field */
@@ -319,14 +347,14 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
                         (do_packet ? "out" : ""));
                 return SG_LIB_CAT_ABORTED_COMMAND;
         }
-        ok = 1;
+        ok = true;
     }
 
     if (ok) { /* output result if it is available */
         if (do_raw)
             dStrRaw((const char *)inBuff, 512);
         else if (0 == do_hex) {
-            if (do_indent) {
+            if (do_ident) {
                 usp = (const unsigned short *)inBuff;
                 ull = 0;
                 for (j = 0; j < 4; ++j) {
@@ -357,18 +385,18 @@ static int do_identify_dev(int sg_fd, int do_packet, int cdb_len,
 
 int main(int argc, char * argv[])
 {
+    bool do_packet = false;
+    bool do_ident = false;
+    bool do_raw = false;
+    bool o_readonly = false;
+    bool ck_cond = false;    /* set to true to read register(s) back */
+    bool extend = false;    /* set to true to send 48 bit LBA with command */
     int sg_fd, c, res;
-    const char * device_name = NULL;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
-    int do_packet = 0;
     int do_hex = 0;
-    int do_indent = 0;
-    int do_raw = 0;
-    int o_readonly = 0;
     int verbose = 0;
-    int ck_cond = 0;   /* set to 1 to read register(s) back */
-    int extend = 0;    /* set to 1 to send 48 bit LBA with command */
     int ret = 0;
+    const char * device_name = NULL;
 
     while (1) {
         int option_index = 0;
@@ -380,10 +408,10 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'c':
-            ++ck_cond;
+            ck_cond = true;
             break;
         case 'e':
-            ++extend;
+            extend = true;
             break;
         case 'h':
         case '?':
@@ -393,7 +421,7 @@ int main(int argc, char * argv[])
             ++do_hex;
             break;
         case 'i':
-            ++do_indent;
+            do_ident = true;
             break;
         case 'l':
             cdb_len = sg_get_num(optarg);
@@ -408,13 +436,13 @@ int main(int argc, char * argv[])
             }
             break;
         case 'p':
-            ++do_packet;
+            do_packet = true;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 'v':
             ++verbose;
@@ -460,7 +488,7 @@ int main(int argc, char * argv[])
     }
 
     ret = do_identify_dev(sg_fd, do_packet, cdb_len, ck_cond, extend,
-                          do_indent, do_hex, do_raw, verbose);
+                          do_ident, do_hex, do_raw, verbose);
 
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
@@ -36,7 +38,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.06 20170917";    /* ses3r07 */
+static const char * version_str = "1.07 20171007";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -47,13 +49,13 @@ static const char * version_str = "1.06 20170917";    /* ses3r07 */
 #define DPC_DOWNLOAD_MICROCODE 0xe
 
 struct opts_t {
+    bool mc_non;
+    bool bpw_then_activate;
+    bool mc_len_given;
     int bpw;
-    int bpw_then_activate;
     int mc_id;
     int mc_len;
-    int mc_len_given;
     int mc_mode;
-    int mc_non;
     int mc_offset;
     int mc_skip;
     int mc_subenc;
@@ -262,7 +264,7 @@ static int
 send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                   const unsigned char * dmp, int dmp_len,
                   struct dout_buff_t * wp, unsigned char * dip,
-                  int last, const struct opts_t * op)
+                  bool last, const struct opts_t * op)
 {
     int do_len, rem, res, rsp_len, k, num, mc_status, verb;
     int send_data = 0;
@@ -313,10 +315,10 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     if (send_data && (dmp_len > 0))
         memcpy(wp->doutp + 24, dmp, dmp_len);
     /* select long duration timeout (7200 seconds) */
-    res = sg_ll_send_diag(sg_fd, 0 /* sf_code */, 1 /* pf */, 0 /* sf */,
-                          0 /* devofl */, 0 /* unitofl */,
-                          1 /* long_duration */, wp->doutp, do_len,
-                          true /* noisy */, verb);
+    res = sg_ll_send_diag(sg_fd, 0 /* sf_code */, true /* pf */,
+                          false /* sf */, false /* devofl */,
+                          false /* unitofl */, 1 /* long_duration */,
+                          wp->doutp, do_len, true /* noisy */, verb);
     if (op->mc_non) {
         /* If non-standard, only call RDR after failed SD */
         if (0 == res)
@@ -348,8 +350,8 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
         }
     }
 
-    res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
-                             DEF_DI_LEN, true, verb);
+    res = sg_ll_receive_diag(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
+                             dip, DEF_DI_LEN, true, verb);
     if (res)
         return ret ? ret : res;
     rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
@@ -393,9 +395,12 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, len, k, n, got_stdin, is_reg, rsp_len, verb, last;
+    bool last, got_stdin, is_reg;
+    int sg_fd, res, c, len, k, n, rsp_len, verb;
     int infd = -1;
     int do_help = 0;
+    int ret = 0;
+    uint32_t gen_code = 0;
     const char * device_name = NULL;
     const char * file_name = NULL;
     unsigned char * dmp = NULL;
@@ -407,8 +412,6 @@ main(int argc, char * argv[])
     struct opts_t opts;
     struct opts_t * op;
     const struct mode_s * mp;
-    uint32_t gen_code = 0;
-    int ret = 0;
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -431,7 +434,7 @@ main(int argc, char * argv[])
             }
             if ((cp = strchr(optarg, ','))) {
                 if (0 == strncmp("act", cp + 1, 3))
-                    ++op->bpw_then_activate;
+                    op->bpw_then_activate = true;
             }
             break;
         case 'h':
@@ -455,7 +458,7 @@ main(int argc, char * argv[])
                 pr2serr("bad argument to '--length'\n");
                 return SG_LIB_SYNTAX_ERROR;
              }
-             op->mc_len_given = 1;
+             op->mc_len_given = true;
              break;
         case 'm':
             if (isdigit(*optarg)) {
@@ -480,7 +483,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'N':
-            ++op->mc_non;
+            op->mc_non = true;
             break;
         case 'o':
            op->mc_offset = sg_get_num(optarg);
@@ -568,7 +571,7 @@ main(int argc, char * argv[])
 #endif
 #endif
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, op->verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, op->verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -579,7 +582,7 @@ main(int argc, char * argv[])
                       (MODE_ACTIVATE_MC == op->mc_mode)))
         pr2serr("ignoring --in=FILE option\n");
     else if (file_name) {
-        got_stdin = (0 == strcmp(file_name, "-")) ? 1 : 0;
+        got_stdin = (0 == strcmp(file_name, "-"));
         if (got_stdin)
             infd = STDIN_FILENO;
         else {
@@ -593,7 +596,7 @@ main(int argc, char * argv[])
                 perror("sg_set_binary_mode");
         }
         if ((0 == fstat(infd, &a_stat)) && S_ISREG(a_stat.st_mode)) {
-            is_reg = 1;
+            is_reg = true;
             if (0 == op->mc_len) {
                 if (op->mc_skip >= a_stat.st_size) {
                     pr2serr("skip exceeds file size of %d bytes\n",
@@ -604,7 +607,7 @@ main(int argc, char * argv[])
                 op->mc_len = (int)(a_stat.st_size) - op->mc_skip;
             }
         } else {
-            is_reg = 0;
+            is_reg = false;
             if (0 == op->mc_len)
                 op->mc_len = DEF_XFER_LEN;
         }
@@ -691,8 +694,8 @@ main(int argc, char * argv[])
     memset(dip, 0, DEF_DI_LEN);
     verb = (op->verbose > 1) ? op->verbose - 1 : 0;
     /* Fetch Download microcode status dpage for generation code ++ */
-    res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, DPC_DOWNLOAD_MICROCODE, dip,
-                             DEF_DI_LEN, true, verb);
+    res = sg_ll_receive_diag(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
+                             dip, DEF_DI_LEN, true, verb);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
         if (rsp_len > DEF_DI_LEN) {
@@ -723,17 +726,17 @@ main(int argc, char * argv[])
 
     res = 0;
     if (op->bpw > 0) {
-        for (k = 0, last = 0; k < op->mc_len; k += n) {
+        for (k = 0, last = false; k < op->mc_len; k += n) {
             n = op->mc_len - k;
             if (n > op->bpw)
                 n = op->bpw;
             else
-                last = 1;
+                last = true;
             if (op->verbose)
                 pr2serr("bpw loop: mode=0x%x, id=%d, off_off=%d, len=%d, "
                         "last=%d\n", op->mc_mode, op->mc_id, k, n, last);
             res = send_then_receive(sg_fd, gen_code, k, dmp + k, n, &dout,
-                                    dip, last, op);
+                                    dip, (int)last, op);
             if (res)
                 break;
         }

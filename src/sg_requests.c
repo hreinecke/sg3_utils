@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #include <sys/time.h>
@@ -26,7 +28,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.28 20170917";
+static const char * version_str = "1.29 20171008";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -109,19 +111,19 @@ main(int argc, char * argv[])
 {
     int sg_fd, res, c, resp_len, k, progress;
     unsigned char requestSenseBuff[MAX_REQS_RESP_LEN + 1];
-    int desc = 0;
+    bool desc = false;
+    bool do_progress = false;
+    bool do_raw = false;
+    bool do_status = false;
     int num_rs = 1;
     int do_hex = 0;
     int maxlen = 0;
-    int do_progress = 0;
-    int do_raw = 0;
-    int do_status = 0;
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
     char b[80];
 #ifndef SG_LIB_MINGW
-    int do_time = 0;
+    bool do_time = false;
     struct timeval start_tm, end_tm;
 #endif
 
@@ -135,7 +137,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'd':
-            desc = 1;
+            desc = true;
             break;
         case 'h':
         case '?':
@@ -160,17 +162,17 @@ main(int argc, char * argv[])
             }
             break;
         case 'p':
-            ++do_progress;
+            do_progress = true;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 's':
-            do_status = 1;
+            do_status = true;
             break;
         case 't':
 #ifndef SG_LIB_MINGW
-            do_time = 1;
+            do_time = true;
 #endif
             break;
         case 'v':
@@ -212,7 +214,7 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 1 /* ro */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, true /* ro */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
@@ -317,7 +319,7 @@ main(int argc, char * argv[])
         }
     }
 #ifndef SG_LIB_MINGW
-    if ((do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+    if (do_time && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
         double a, b;
 

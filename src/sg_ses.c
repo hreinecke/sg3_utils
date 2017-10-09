@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -31,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.21 20170917";    /* ses4r01 */
+static const char * version_str = "2.22 20171007";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -118,37 +119,39 @@ struct cgs_cl_t {
 };
 
 struct opts_t {
-    int byte1;
     bool byte1_given;
     bool do_control;
     bool do_data;
-    int dev_slot_num;
-    int enumerate;
     bool eiioe_auto;
     bool eiioe_force;
+    bool ind_given;
+    bool inner_hex;
+    bool do_list;
+    bool mask_ign;      /* element read-mask-modify-write actions */
+    bool seid_given;
+    bool page_code_given;
+    bool o_readonly;
+    bool do_status;
+    bool do_version;
+    bool warn;
+    int byte1;
+    int dev_slot_num;
+    int enumerate;
     int do_filter;
     int do_help;
     int do_hex;
-    bool ind_given;
     int ind_th;    /* type header index, set by build_type_desc_hdr_arr() */
     int ind_indiv;      /* individual element index; -1 for overall */
     int ind_indiv_last; /* if > ind_indiv then [ind_indiv..ind_indiv_last] */
     int ind_et_inst;    /* ETs can have multiple type header instances */
-    int inner_hex;
-    int do_join;
-    int do_list;
-    int mask_ign;       /* element read-mask-modify-write actions */
+    int do_join;        /* relational join of Enclosure status, Element
+                           descriptor and Additional element status pages.
+                           Use twice to add Threshold in page to join. */
     int maxlen;
     int seid;
-    bool seid_given;
     int page_code;
-    bool page_code_given;
     int do_raw;
-    int o_readonly;
-    int do_status;
     int verbose;
-    int do_version;
-    int warn;
     int num_cgs;        /* number of --clear-, --get= and --set= options */
     int arr_len;
     uint8_t sas_addr[8];
@@ -1173,7 +1176,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->do_hex;
             break;
         case 'i':
-            ++op->inner_hex;
+            op->inner_hex = true;
             break;
         case 'I':
             op->index_str = optarg;
@@ -1182,7 +1185,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->do_join;
             break;
         case 'l':
-            ++op->do_list;
+            op->do_list = true;
             break;
         case 'n':
             op->nickname_str = optarg;
@@ -1204,7 +1207,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             }
             break;
         case 'M':
-            ++op->mask_ign;
+            op->mask_ign = true;
             break;
         case 'p':
             if (isdigit(optarg[0])) {
@@ -1236,10 +1239,10 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->do_raw;
             break;
         case 'R':
-            ++op->o_readonly;
+            op->o_readonly = true;
             break;
         case 's':
-            ++op->do_status;
+            op->do_status = true;
             break;
         case 'S':
             if (strlen(optarg) >= CGS_STR_MAX_SZ) {
@@ -1261,10 +1264,10 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             ++op->verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             return 0;
         case 'w':
-            ++op->warn;
+            op->warn = true;
             break;
         case 'x':
             op->dev_slot_num = sg_get_num_nomult(optarg);
@@ -1353,8 +1356,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             pr2serr("need to give '--data' in control mode\n");
             goto err_help;
         }
-    } else if (0 == op->do_status)
-        op->do_status = 1;  /* default to receiving status pages */
+    } else if (! op->do_status)
+        op->do_status = true;  /* default to receiving status pages */
 
     if (op->nickname_str) {
         if (! op->do_control) {
@@ -1716,7 +1719,7 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
             pr2serr("    Receive diagnostic results command for page 0x%x\n",
                     page_code);
     }
-    res = sg_ll_receive_diag(sg_fd, 1 /* pcv */, page_code, rsp_buff,
+    res = sg_ll_receive_diag(sg_fd, true /* pcv */, page_code, rsp_buff,
                              rsp_buff_size, true, op->verbose);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
@@ -3330,7 +3333,7 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
                         " but overridden" : ""));
             else
                 printf("      Element %d descriptor\n", ind);
-            if (invalid && (0 == op->inner_hex))
+            if (invalid && (! op->inner_hex))
                 printf("        flagged as invalid (no further "
                        "information)\n");
             else
@@ -4636,7 +4639,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {    /* --set or --clear */
-        if ((0 == op->mask_ign) && (jrp->etype < NUM_ETC)) {
+        if ((! op->mask_ign) && (jrp->etype < NUM_ETC)) {
             if (op->verbose > 2)
                 pr2serr("Applying mask to element status [etc=%d] prior to "
                         "modify then write\n", jrp->etype);
@@ -4965,7 +4968,7 @@ enumerate_work(const struct opts_t * op)
     if (op->dev_name)
         printf(">>> DEVICE %s ignored when --%s option given.\n",
                op->dev_name, (op->do_list ? "list" : "enumerate"));
-    num = op->enumerate + op->do_list;
+    num = op->enumerate + (int)op->do_list;
     if (num < 2) {
         enumerate_diag_pages();
         printf("\nSES element type names, followed by abbreviation and "
@@ -5260,7 +5263,7 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (0 == op->do_status) {
+    if (! op->do_status) {
         sg_get_category_sense_str(ret, sizeof(b), b, op->verbose);
         pr2serr("    %s\n", b);
     }

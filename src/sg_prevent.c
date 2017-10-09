@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 
@@ -25,17 +27,17 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.09 20170917";
+static const char * version_str = "1.10 20171006";
 
 #define ME "sg_prevent: "
 
 
 static struct option long_options[] = {
-        {"allow", 0, 0, 'a'},
-        {"help", 0, 0, 'h'},
-        {"prevent", 1, 0, 'p'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"allow", no_argument, 0, 'a'},
+        {"help", no_argument, 0, 'h'},
+        {"prevent", required_argument, 0, 'p'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -62,7 +64,7 @@ static void usage()
 int main(int argc, char * argv[])
 {
     int sg_fd, res, c;
-    int allow = 0;
+    bool allow = false;
     int prevent = -1;
     int verbose = 0;
     const char * device_name = NULL;
@@ -78,7 +80,7 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'a':
-            allow = 1;
+            allow = true;
             break;
         case 'h':
         case '?':
@@ -130,7 +132,7 @@ int main(int argc, char * argv[])
     else if (prevent < 0)
         prevent = 1;    /* default is to prevent, as utility name suggests */
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

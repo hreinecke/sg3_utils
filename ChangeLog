@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171001] [svn: r718]
+Changelog for sg3_utils-1.43 [20171009] [svn: r719]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)
@@ -66,15 +66,18 @@ Changelog for sg3_utils-1.43 [20171001] [svn: r718]
     - decode completion condition (sbc4r14)
   - group_number: is 6 bit field allowing 0 to 63,
     code in several utilities limited it to 31, fix
+  - convert many two valued 'int's to bool
   - sg_lib: add SSC maintenance in/out sa names
-    - add read buffer(16) command mode names
-    - add sg_decode_transportid_str()
+    - add sg_ll_inquiry_v2()
+    - add sg_ll_write_buffer_v2()
     - add sg_get_llnum_nomult()
     - add sg_ll_get_lba_status16()
     - add sg_ll_get_lba_status32()
-    - implement 'format' argument in dStrHexStr()
-    - add Microcode activation sense descriptor spc5r10
     - add sg_get_sfs_name() for spc5r11 (Feature sets)
+    - add sg_decode_transportid_str()
+    - implement 'format' argument in dStrHexStr()
+    - add read buffer(16) command mode names
+    - add Microcode activation sense descriptor spc5r10
     - add SG_LIB_UNBOUNDED_32BIT (_16BIT and _64BIT)
       defines to help with decoding corner cases
   - sg_lib_data: sync asc/ascq codes with T10 20170114

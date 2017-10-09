@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.50 20170922";    /* spc5r10 */
+static const char * version_str = "0.51 20171006";    /* spc5r10 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -72,24 +72,24 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int do_alpha;
-    int do_compact;
-    int do_enumerate;
+    bool do_alpha;
+    bool do_compact;
+    bool do_enumerate;
+    bool no_inquiry;
+    bool do_mask;
+    bool do_raw;
+    bool do_rctd;
+    bool do_version;
+    bool do_unsorted;
+    bool do_taskman;
+    bool opt_new;
     int do_help;
     int do_hex;
-    int no_inquiry;
-    int do_mask;
     int opcode;
-    int do_raw;
-    int do_rctd;
     int do_repd;
     int servact;
     int verbose;
-    int do_version;
-    int do_unsorted;
-    int do_taskman;
     const char * device_name;
-    int opt_new;
 };
 
 
@@ -178,7 +178,7 @@ usage_old()
 static const char * const rsoc_s = "Report supported operation codes";
 
 static int
-do_rsoc(int sg_fd, int rctd, int rep_opts, int rq_opcode, int rq_servact,
+do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
         void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
@@ -313,13 +313,13 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 
         switch (c) {
         case 'a':
-            ++op->do_alpha;
+            op->do_alpha = true;
             break;
         case 'c':
-            ++op->do_compact;
+            op->do_compact = true;
             break;
         case 'e':
-            ++op->do_enumerate;
+            op->do_enumerate = true;
             break;
         case 'h':
         case '?':
@@ -329,10 +329,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_hex;
             break;
         case 'm':
-            ++op->do_mask;
+            op->do_mask = true;
             break;
         case 'n':
-            ++op->no_inquiry;
+            op->no_inquiry = true;
             break;
         case 'N':
             break;      /* ignore */
@@ -369,7 +369,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             }
             break;
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
         case 'p':
             n = -2;
@@ -387,10 +387,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_repd;
             break;
         case 'r':
-            ++op->do_raw;
+            op->do_raw = true;
             break;
         case 'R':
-            ++op->do_rctd;
+            op->do_rctd = true;
             break;
         case 's':
             n = sg_get_num(optarg);
@@ -402,16 +402,16 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->servact = n;
             break;
         case 't':
-            ++op->do_taskman;
+            op->do_taskman = true;
             break;
         case 'u':
-            ++op->do_unsorted;
+            op->do_unsorted = true;
             break;
         case 'v':
             ++op->verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -439,7 +439,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, n, num;
+    bool jmp_out;
+    int k, plen, n, num;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
@@ -448,55 +449,58 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'a':
-                    ++op->do_alpha;
+                    op->do_alpha = true;
                     break;
                 case 'c':
-                    ++op->do_compact;
+                    op->do_compact = true;
                     break;
                 case 'e':
-                    ++op->do_enumerate;
+                    op->do_enumerate = true;
                     break;
                 case 'H':
                     ++op->do_hex;
                     break;
                 case 'm':
-                    ++op->do_mask;
+                    op->do_mask = true;
                     break;
                 case 'n':
-                    ++op->no_inquiry;
+                    op->no_inquiry = true;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'q':
                     ++op->do_repd;
                     break;
+                case 'r':
+                    op->do_raw = true;
+                    break;
                 case 'R':
-                    ++op->do_rctd;
+                    op->do_rctd = true;
                     break;
                 case 't':
-                    ++op->do_taskman;
+                    op->do_taskman = true;
                     break;
                 case 'u':
-                    ++op->do_unsorted;
+                    op->do_unsorted = true;
                     break;
                 case 'v':
                     ++op->verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case 'h':
                 case '?':
                     ++op->do_help;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -555,14 +559,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = process_cl_old(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = process_cl_new(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (! op->opt_new))
             res = process_cl_old(op, argc, argv);
     }
     return res;
@@ -761,7 +765,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
             unsigned char b[64];
 
             memset(b, 0, sizeof(b));
-            res = do_rsoc(sg_fd, 0, (sa_v ? 2 : 1), opcode, serv_act,
+            res = do_rsoc(sg_fd, false, (sa_v ? 2 : 1), opcode, serv_act,
                           b, sizeof(b), 1, op->verbose);
             if (0 == res) {
                 cdb_sz = sg_get_unaligned_be16(b + 2);
@@ -919,7 +923,7 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    if ((NULL == op->device_name) && (0 == op->do_enumerate)) {
+    if ((NULL == op->device_name) && (! op->do_enumerate)) {
         pr2serr("No DEVICE argument given\n");
         if (op->opt_new)
             usage();

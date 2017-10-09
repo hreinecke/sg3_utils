@@ -16,6 +16,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #include <errno.h>
@@ -30,7 +32,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.22 20170917";
+static const char * version_str = "1.23 20171006";
 
 #define MAX_XFER_LEN 10000
 
@@ -40,16 +42,16 @@ static const char * version_str = "1.22 20170917";
 
 
 static struct option long_options[] = {
-        {"16", 0, 0, 'S'},
-        {"correct", 0, 0, 'c'},
-        {"help", 0, 0, 'h'},
-        {"lba", 1, 0, 'l'},
-        {"out", 1, 0, 'o'},
-        {"pblock", 0, 0, 'p'},
-        {"readonly", 0, 0, 'r'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"xfer_len", 1, 0, 'x'},
+        {"16", no_argument, 0, 'S'},
+        {"correct", no_argument, 0, 'c'},
+        {"help", no_argument, 0, 'h'},
+        {"lba", required_argument, 0, 'l'},
+        {"out", required_argument, 0, 'o'},
+        {"pblock", no_argument, 0, 'p'},
+        {"readonly", no_argument, 0, 'r'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"xfer_len", required_argument, 0, 'x'},
         {0, 0, 0, 0},
 };
 
@@ -85,7 +87,7 @@ usage()
 
 /* Returns 0 if successful */
 static int
-process_read_long(int sg_fd, int do_16, int pblock, int correct,
+process_read_long(int sg_fd, bool do_16, bool pblock, bool correct,
                   uint64_t llba, void * data_out, int xfer_len, int verbose)
 {
     int offset, res;
@@ -118,22 +120,22 @@ process_read_long(int sg_fd, int do_16, int pblock, int correct,
 int
 main(int argc, char * argv[])
 {
+    bool correct = false;
+    bool do_16 = false;
+    bool pblock = false;
+    bool readonly = false;
+    bool got_stdout;
     int sg_fd, outfd, res, c;
+    int ret = 0;
+    int xfer_len = 520;
+    int verbose = 0;
+    uint64_t llba = 0;
+    int64_t ll;
     unsigned char * readLongBuff = NULL;
     void * rawp = NULL;
-    int correct = 0;
-    int xfer_len = 520;
-    int do_16 = 0;
-    int pblock = 0;
-    uint64_t llba = 0;
-    int readonly = 0;
-    int verbose = 0;
-    int64_t ll;
-    int got_stdout;
     const char * device_name = NULL;
     char out_fname[256];
     char ebuff[EBUFF_SZ];
-    int ret = 0;
 
     memset(out_fname, 0, sizeof out_fname);
     while (1) {
@@ -146,7 +148,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'c':
-            correct = 1;
+            correct = true;
             break;
         case 'h':
         case '?':
@@ -164,13 +166,13 @@ main(int argc, char * argv[])
             strncpy(out_fname, optarg, sizeof(out_fname) - 1);
             break;
         case 'p':
-            pblock = 1;
+            pblock = true;
             break;
         case 'r':
-            ++readonly;
+            readonly = true;
             break;
         case 'S':
-            do_16 = 1;
+            do_16 = true;
             break;
         case 'v':
             ++verbose;
@@ -232,7 +234,7 @@ main(int argc, char * argv[])
     pr2serr(ME "issue read long (%s) to device %s\n    xfer_len=%d (0x%x), "
             "lba=%" PRIu64 " (0x%" PRIx64 "), correct=%d\n",
             (do_16 ? "16" : "10"), device_name, xfer_len, xfer_len, llba,
-            llba, correct);
+            llba, (int)correct);
 
     if ((ret = process_read_long(sg_fd, do_16, pblock, correct, llba,
                                  readLongBuff, xfer_len, verbose)))
@@ -241,7 +243,7 @@ main(int argc, char * argv[])
     if ('\0' == out_fname[0])
         dStrHex((const char *)rawp, xfer_len, 0);
     else {
-        got_stdout = (0 == strcmp(out_fname, "-")) ? 1 : 0;
+        got_stdout = (0 == strcmp(out_fname, "-"));
         if (got_stdout)
             outfd = STDOUT_FILENO;
         else {

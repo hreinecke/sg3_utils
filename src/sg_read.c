@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2016 D. Gilbert
+*  Copyright (C) 2001 - 2017 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -27,6 +27,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -50,7 +52,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.26 20160218";
+static const char * version_str = "1.27 20171008";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -202,11 +204,11 @@ static void usage()
 
 static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
                              unsigned int blocks, int64_t start_block,
-                             int write_true, int fua, int dpo)
+                             bool write_true, bool fua, bool dpo)
 {
+    int sz_ind;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
-    int sz_ind;
 
     memset(cdbp, 0, cdb_sz);
     if (dpo)
@@ -275,15 +277,16 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
    3 -> try again (e.g. aborted command), -1 -> other unrecoverable error */
 static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
                     int64_t from_block, int bs, int cdbsz,
-                    int fua, int dpo, int * diop, int do_mmap,
-                    int no_dxfer)
+                    bool fua, bool dpo, bool * diop, bool do_mmap,
+                    bool no_dxfer)
 {
     int k;
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
-    if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, dpo)) {
+    if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,
+                          dpo)) {
         pr2serr(ME "bad cdb build, from_block=%" PRId64 ", blocks=%d\n",
                 from_block, blocks);
         return -1;
@@ -331,26 +334,26 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
         break;
     case SG_LIB_CAT_RECOVERED:
         if (verbose > 1)
-                sg_chk_n_print3("reading, continue", &io_hdr, 1);
+                sg_chk_n_print3("reading, continue", &io_hdr, true);
         break;
     case SG_LIB_CAT_UNIT_ATTENTION:
         if (verbose)
-            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+            sg_chk_n_print3("reading", &io_hdr, (verbose > 1));
         return 2;
     case SG_LIB_CAT_ABORTED_COMMAND:
         if (verbose)
-            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+            sg_chk_n_print3("reading", &io_hdr, (verbose > 1));
         return 3;
     case SG_LIB_CAT_NOT_READY:
         if (verbose)
-            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+            sg_chk_n_print3("reading", &io_hdr, (verbose > 1));
         return -2;
     case SG_LIB_CAT_MEDIUM_HARD:
         if (verbose)
-            sg_chk_n_print3("reading", &io_hdr, verbose - 1);
+            sg_chk_n_print3("reading", &io_hdr, (verbose > 1));
         return -3;
     default:
-        sg_chk_n_print3("reading", &io_hdr, verbose);
+        sg_chk_n_print3("reading", &io_hdr, !! verbose);
         return -1;
     }
     if (blocks > 0) {
@@ -369,35 +372,35 @@ static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
 
 int main(int argc, char * argv[])
 {
-    int64_t skip = 0;
+    bool count_given = false;
+    bool dio_tmp;
+    bool do_blk_sgio = false;
+    bool do_dio = false;
+    bool do_mmap = false;
+    bool do_odir = false;
+    bool dpo = false;
+    bool fua = false;
+    bool no_dxfer = false;
     int bs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
-    char str[STR_SZ];
+    int dio_incomplete = 0;
+    int do_time = 0;
+    int in_type = FT_OTHER;
+    int ret = 0;
+    int scsi_cdbsz = DEF_SCSI_CDBSZ;
+    int res, k, t, buf_sz, iters, infd, blocks, flags, blocks_per;
+    size_t psz;
+    int64_t skip = 0;
     char * key;
     char * buf;
-    char inf[INF_SZ];
-    char outf[INF_SZ];
-    int in_type = FT_OTHER;
-    int do_dio = 0;
-    int do_odir = 0;
-    int do_blk_sgio = 0;
-    int do_mmap = 0;
-    int no_dxfer = 0;
-    int do_time = 0;
-    int fua = 0;
-    int dpo = 0;
-    int scsi_cdbsz = DEF_SCSI_CDBSZ;
-    int dio_incomplete = 0;
-    int count_given = 0;
-    int res, k, t, buf_sz, dio_tmp, iters;
-    int infd, blocks, flags, blocks_per;
     unsigned char * wrkBuff = NULL;
     unsigned char * wrkPos = NULL;
+    char inf[INF_SZ];
+    char outf[INF_SZ];
+    char str[STR_SZ];
     char ebuff[EBUFF_SZ];
-    struct timeval start_tm, end_tm;
     const char * read_str;
-    int ret = 0;
-    size_t psz;
+    struct timeval start_tm, end_tm;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
@@ -417,7 +420,7 @@ int main(int argc, char * argv[])
         if (*buf)
             *buf++ = '\0';
         if (0 == strcmp(key,"blk_sgio"))
-            do_blk_sgio = sg_get_num(buf);
+            do_blk_sgio = !! sg_get_num(buf);
         else if (0 == strcmp(key,"bpt")) {
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
@@ -433,7 +436,7 @@ int main(int argc, char * argv[])
         } else if (0 == strcmp(key,"cdbsz"))
             scsi_cdbsz = sg_get_num(buf);
         else if (0 == strcmp(key,"count")) {
-            count_given = 1;
+            count_given = true;
             if ('-' == *buf) {
                 dd_count = sg_get_llnum(buf + 1);
                 if (-1 == dd_count) {
@@ -449,19 +452,19 @@ int main(int argc, char * argv[])
                 }
             }
         } else if (0 == strcmp(key,"dio"))
-            do_dio = sg_get_num(buf);
+            do_dio = !! sg_get_num(buf);
         else if (0 == strcmp(key,"dpo"))
-            dpo = sg_get_num(buf);
+            dpo = !! sg_get_num(buf);
         else if (0 == strcmp(key,"fua"))
-            fua = sg_get_num(buf);
+            fua = !! sg_get_num(buf);
         else if (strcmp(key,"if") == 0)
             strncpy(inf, buf, INF_SZ);
         else if (0 == strcmp(key,"mmap"))
-            do_mmap = sg_get_num(buf);
+            do_mmap = !! sg_get_num(buf);
         else if (0 == strcmp(key,"no_dxfer"))
-            no_dxfer = sg_get_num(buf);
+            no_dxfer = !! sg_get_num(buf);
         else if (0 == strcmp(key,"odir"))
-            do_odir = sg_get_num(buf);
+            do_odir = !! sg_get_num(buf);
         else if (strcmp(key,"of") == 0)
             strncpy(outf, buf, INF_SZ);
         else if (0 == strcmp(key,"skip")) {

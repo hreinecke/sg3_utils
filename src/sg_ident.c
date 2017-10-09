@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 
@@ -29,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.16 20170917";
+static const char * version_str = "1.17 20171008";
 
 #define ME "sg_ident: "
 
@@ -37,19 +39,20 @@ static const char * version_str = "1.16 20170917";
 
 
 static struct option long_options[] = {
-        {"ascii", 0, 0, 'A'},
-        {"clear", 0, 0, 'C'},
-        {"help", 0, 0, 'h'},
-        {"itype", 1, 0, 'i'},
-        {"raw", 0, 0, 'r'},
-        {"set", 0, 0, 'S'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"ascii", no_argument, 0, 'A'},
+        {"clear", no_argument, 0, 'C'},
+        {"help", no_argument, 0, 'h'},
+        {"itype", required_argument, 0, 'i'},
+        {"raw", no_argument, 0, 'r'},
+        {"set", no_argument, 0, 'S'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
-static void decode_ii(const unsigned char * iip, int ii_len, int itype,
-                      int ascii, int raw, int verbose)
+static void
+decode_ii(const unsigned char * iip, int ii_len, int itype, bool ascii,
+          bool raw, int verbose)
 {
     int k;
 
@@ -85,7 +88,8 @@ static void decode_ii(const unsigned char * iip, int ii_len, int itype,
     }
 }
 
-static void usage()
+static void
+usage(void)
 {
     pr2serr("Usage: sg_ident   [--ascii] [--clear] [--help] [--itype=IT] "
             "[--raw] [--set]\n"
@@ -108,18 +112,19 @@ static void usage()
             "command\n");
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     int sg_fd, res, c, ii_len;
     unsigned char rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
     char b[80];
     unsigned char * bp = NULL;
-    int ascii = 0;
-    int do_clear = 0;
     int itype = 0;
-    int raw = 0;
-    int do_set = 0;
     int verbose = 0;
+    bool ascii = false;
+    bool do_clear = false;
+    bool raw = false;
+    bool do_set = false;
     const char * device_name = NULL;
     int ret = 0;
 
@@ -133,10 +138,10 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'A':
-            ascii = 1;
+            ascii = true;
             break;
         case 'C':
-            do_clear = 1;
+            do_clear = true;
             break;
         case 'h':
         case '?':
@@ -150,10 +155,10 @@ int main(int argc, char * argv[])
             }
             break;
         case 'r':
-            raw = 1;
+            raw = true;
             break;
         case 'S':
-            do_set = 1;
+            do_set = true;
             break;
         case 'v':
             ++verbose;
@@ -200,7 +205,7 @@ int main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw=false */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;

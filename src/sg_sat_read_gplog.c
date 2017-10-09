@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016 Hannes Reinecke, SUSE Linux GmbH.
+ * Copyright (c) 2014-2017 Hannes Reinecke, SUSE Linux GmbH.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
@@ -49,16 +51,16 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.13 20160528";
+static const char * version_str = "1.14 20171007";
 
 struct opts_t {
+    bool ck_cond;
+    bool rdonly;
     int cdb_len;
-    int ck_cond;
     int count;
     int hex;
     int la;             /* log address */
     int pn;             /* page number within log address */
-    int rdonly;
     int verbose;
     const char * device_name;
 };
@@ -121,15 +123,16 @@ static int
 do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
               const struct opts_t * op)
 {
+    const bool extend = true;
+    const bool t_dir = true; /* false -> to device, true -> from device */
+    const bool byte_block = true;/* false -> bytes, true -> 512 byte blocks */
+    const bool t_type = false; /* false -> 512 byte blocks, true -> logical
+                                  sectors */
+    bool got_ard = false;      /* got ATA result descriptor */
     int res, ret;
-    int extend = 1;
     int protocol;
-    int t_dir = 1;      /* 0 -> to device, 1 -> from device */
-    int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
     int t_length = 2;   /* 0 -> no data transferred, 2 -> sector count */
-    int t_type = 0; /* 0 -> 512 byte blocks, 1 -> logical sectors */
     int resid = 0;
-    int got_ard = 0;    /* got ATA result descriptor */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
     unsigned char sense_buffer[64];
@@ -164,8 +167,17 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
         apt_cdb[8] = op->la;
         sg_put_unaligned_be16((uint16_t)op->pn, apt_cdb + 9);
         apt_cdb[1] = (protocol << 1) | extend;
-        apt_cdb[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                       (byte_block << 2) | t_length;
+        if (extend)
+            apt_cdb[1] |= 0x1;
+        apt_cdb[2] = t_length;
+        if (op->ck_cond)
+            apt_cdb[2] |= 0x20;
+        if (t_type)
+            apt_cdb[2] |= 0x10;
+        if (t_dir)
+            apt_cdb[2] |= 0x8;
+        if (byte_block)
+            apt_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt_cdb, op->cdb_len, DEF_TIMEOUT, inbuff,
                            NULL, op->count * 512, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -179,8 +191,15 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
         apt12_cdb[6] = op->pn & 0xff;
         /* apt12_cdb[7] = (op->pn >> 8) & 0xff; */
         apt12_cdb[1] = (protocol << 1);
-        apt12_cdb[2] = (op->ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                         (byte_block << 2) | t_length;
+        apt12_cdb[2] = t_length;
+        if (op->ck_cond)
+            apt12_cdb[2] |= 0x20;
+        if (t_type)
+            apt12_cdb[2] |= 0x10;
+        if (t_dir)
+            apt12_cdb[2] |= 0x8;
+        if (byte_block)
+            apt12_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt12_cdb, op->cdb_len, DEF_TIMEOUT,
                            inbuff, NULL, op->count * 512, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -335,7 +354,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'C':
-            op->ck_cond = 1;
+            op->ck_cond = true;
             break;
         case 'd':
             ata_cmd = ATA_READ_LOG_DMA_EXT;
@@ -369,7 +388,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'r':
-            ++op->rdonly;
+            op->rdonly = true;
             break;
         case 'v':
             ++op->verbose;

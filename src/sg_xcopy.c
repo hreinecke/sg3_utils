@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -64,7 +65,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.56 20170917";
+static const char * version_str = "0.57 20171008";
 
 #define ME "sg_xcopy: "
 
@@ -163,16 +164,16 @@ static int in_partial = 0;
 static int64_t out_full = 0;
 static int out_partial = 0;
 
-static int do_time = 0;
-static int verbose = 0;
-static int start_tm_valid = 0;
-static struct timeval start_tm;
+static bool do_time = false;
+static bool start_tm_valid = false;
+static bool xcopy_flag_cat = false;
+static bool xcopy_flag_dc = false;
 static int blk_sz = 0;
-static int priority = 1;
 static int list_id_usage = -1;
+static int priority = 1;
+static int verbose = 0;
+static struct timeval start_tm;
 
-static int xcopy_flag_cat = 0;
-static int xcopy_flag_dc = 0;
 
 struct xcopy_fp_t {
     char fname[INOUTF_SZ];
@@ -328,7 +329,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
     } else {
         snprintf(ebuff, EBUFF_SZ, "/dev/char/%d:%d", devmajor, devminor);
     }
-    fp->sg_fd = sg_cmds_open_device(ebuff, 0, verbose);
+    fp->sg_fd = sg_cmds_open_device(ebuff, false /* rw mode */, verbose);
     if (fp->sg_fd < 0) {
         snprintf(ebuff, EBUFF_SZ,
                  ME "could not open %s device %d:%d for sg",
@@ -583,7 +584,11 @@ scsi_encode_seg_desc(unsigned char *seg_desc, int seg_desc_type,
     int seg_desc_len = 0;
 
     seg_desc[0] = seg_desc_type;
-    seg_desc[1] = xcopy_flag_cat | (xcopy_flag_dc << 1);
+    seg_desc[1] = 0x0;
+    if (xcopy_flag_cat)
+        seg_desc[1] |= 0x1;
+    if (xcopy_flag_dc)
+        seg_desc[1] |= 0x2;
     if (seg_desc_type == 0x02) {
         seg_desc_len = 0x18;
         seg_desc[4] = 0;
@@ -647,7 +652,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
     char b[80];
 
     verb = (verbose ? verbose - 1: 0);
-    res = sg_ll_readcap_10(xfp->sg_fd, 0, 0, rcBuff,
+    res = sg_ll_readcap_10(xfp->sg_fd, false /* pmi */, 0, rcBuff,
                            READ_CAP_REPLY_LEN, true, verb);
     if (0 != res) {
         sg_get_category_sense_str(res, sizeof(b), b, verb);
@@ -659,7 +664,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
         (0xff == rcBuff[3])) {
         uint64_t ls;
 
-        res = sg_ll_readcap_16(xfp->sg_fd, 0, 0, rcBuff,
+        res = sg_ll_readcap_16(xfp->sg_fd, false /* pmi */, 0, rcBuff,
                                RCAP16_REPLY_LEN, true, verb);
         if (0 != res) {
             sg_get_category_sense_str(res, sizeof(b), b, verb);
@@ -685,12 +690,12 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 static int
 scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
 {
-    int res, ftype, snlid;
-    unsigned char rcBuff[256];
+    bool valid = false;
+    int res, ftype, snlid, verb;
     uint32_t rcBuffLen = 256, len, n, td_list = 0;
     uint32_t num, max_target_num, max_segment_num, max_segment_len;
     uint32_t max_desc_len, max_inline_data, held_data_limit;
-    int verb, valid = 0;
+    unsigned char rcBuff[256];
     char b[80];
 
     verb = (verbose ? verbose - 1: 0);
@@ -778,82 +783,82 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
         switch(rcBuff[44 + n]) {
         case 0x00: /* copy block to stream device */
             if (!is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy Block to Stream device\n");
             break;
         case 0x01: /* copy stream to block device */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy Stream to Block device\n");
             break;
         case 0x02: /* copy block to block device */
             if (!is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy Block to Block device\n");
             break;
         case 0x03: /* copy stream to stream device */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy Stream to Stream device\n");
             break;
         case 0x04: /* copy inline data to stream device */
             if (!is_target && (ftype & FT_OTHER))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy inline data to Stream device\n");
             break;
         case 0x05: /* copy embedded data to stream device */
             if (!is_target && (ftype & FT_OTHER))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy embedded data to Stream device\n");
             break;
         case 0x06: /* Read from stream device and discard */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_DEV_NULL))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Read from stream device and discard\n");
             break;
         case 0x07: /* Verify block or stream device operation */
             if (!is_target && (ftype & (FT_ST | FT_BLOCK)))
-                valid++;
+                valid = true;
             if (is_target && (ftype & (FT_ST | FT_BLOCK)))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Verify block or stream device operation\n");
             break;
         case 0x08: /* copy block device with offset to stream device */
             if (!is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy block device with offset to stream "
                        "device\n");
             break;
         case 0x09: /* copy stream device to block device with offset */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy stream device to block device with "
                        "offset\n");
@@ -861,54 +866,54 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
         case 0x0a: /* copy block device with offset to block device with
                     * offset */
             if (!is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy block device with offset to block "
                        "device with offset\n");
             break;
         case 0x0b: /* copy block device to stream device and hold data */
             if (!is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy block device to stream device and hold "
                        "data\n");
             break;
         case 0x0c: /* copy stream device to block device and hold data */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy stream device to block device and hold "
                        "data\n");
             break;
         case 0x0d: /* copy block device to block device and hold data */
             if (!is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_BLOCK))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy block device to block device and hold "
                        "data\n");
             break;
         case 0x0e: /* copy stream device to stream device and hold data */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Copy block device to block device and hold "
                        "data\n");
             break;
         case 0x0f: /* read from stream device and hold data */
             if (!is_target && (ftype & FT_ST))
-                valid++;
+                valid = true;
             if (is_target && (ftype & FT_DEV_NULL))
-                valid++;
+                valid = true;
             if (verbose)
                 pr2serr("        Read from stream device and hold data\n");
             break;
@@ -984,7 +989,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
             break;
         }
     }
-    if (!valid) {
+    if (! valid) {
         pr2serr(">> no matching target descriptor supported\n");
         td_list = 0;
     }
@@ -1013,7 +1018,8 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
 
     verb = (verbose ? verbose - 1: 0);
     memset(rcBuff, 0xff, len);
-    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, 4, true, verb);
+    res = sg_ll_inquiry(sg_fd, false, true /* evpd */, VPD_DEVICE_ID, rcBuff,
+                        4, true, verb);
     if (0 != res) {
         if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("Device identification VPD page not found\n");
@@ -1028,7 +1034,8 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
         return SG_LIB_CAT_MALFORMED;
     }
     len = sg_get_unaligned_be16(rcBuff + 2) + 4;
-    res = sg_ll_inquiry(sg_fd, 0, 1, VPD_DEVICE_ID, rcBuff, len, true, verb);
+    res = sg_ll_inquiry(sg_fd, false, true, VPD_DEVICE_ID, rcBuff, len, true,
+                        verb);
     if (0 != res) {
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
         pr2serr("VPD inquiry (Device ID): %s\n", b);
@@ -1283,30 +1290,29 @@ num_chs_in_str(const char * s, int slen, int ch)
 int
 main(int argc, char * argv[])
 {
-    int64_t skip = 0;
-    int64_t seek = 0;
-    int ibs = 0;
-    int obs = 0;
-    int bpt = DEF_BLOCKS_PER_TRANSFER;
-    int bpt_given = 0;
-    char str[STR_SZ];
-    char * key;
-    char * buf;
-    int blocks = 0;
-    int num_help = 0;
-    int num_xcopy = 0;
-    int res, k, n, keylen;
-    int infd, outfd, xcopy_fd;
-    int ret = 0;
-    unsigned char list_id = 1;
-    int list_id_given = 0;
-    unsigned char src_desc[256];
-    unsigned char dst_desc[256];
-    int src_desc_len;
-    int dst_desc_len;
-    int seg_desc_type;
+    bool bpt_given = false;
+    bool list_id_given = false;
     bool on_src = false;
     bool on_src_dst_given = false;
+    int res, k, n, keylen, infd, outfd, xcopy_fd;
+    int blocks = 0;
+    int bpt = DEF_BLOCKS_PER_TRANSFER;
+    int dst_desc_len;
+    int ibs = 0;
+    int num_help = 0;
+    int num_xcopy = 0;
+    int obs = 0;
+    int ret = 0;
+    int seg_desc_type;
+    int src_desc_len;
+    int64_t skip = 0;
+    int64_t seek = 0;
+    unsigned char list_id = 1;
+    char * key;
+    char * buf;
+    char str[STR_SZ];
+    unsigned char src_desc[256];
+    unsigned char dst_desc[256];
 
     ixcf.fname[0] = '\0';
     oxcf.fname[0] = '\0';
@@ -1339,7 +1345,7 @@ main(int argc, char * argv[])
                 pr2serr(ME "bad argument to 'bpt='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            bpt_given = 1;
+            bpt_given = true;
         } else if (0 == strcmp(key, "bs")) {
             blk_sz = sg_get_num(buf);
             if (-1 == blk_sz) {
@@ -1353,7 +1359,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             list_id = (ret & 0xff);
-            list_id_given = 1;
+            list_id_given = true;
         } else if (0 == strcmp(key, "id_usage")) {
             if (!strncmp(buf, "hold", 4))
                 list_id_usage = 0;
@@ -1378,17 +1384,19 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "prio")) {
             priority = sg_get_num(buf);
         } else if (0 == strcmp(key, "cat")) {
-            xcopy_flag_cat = sg_get_num(buf);
-            if (xcopy_flag_cat < 0 || xcopy_flag_cat > 1) {
+            n = sg_get_num(buf);
+            if (n < 0 || n > 1) {
                 pr2serr(ME "bad argument to 'cat='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            xcopy_flag_cat = !! n;
         } else if (0 == strcmp(key, "dc")) {
-            xcopy_flag_dc = sg_get_num(buf);
-            if (xcopy_flag_dc < 0 || xcopy_flag_dc > 1) {
+            n = sg_get_num(buf);
+            if (n < 0 || n > 1) {
                 pr2serr(ME "bad argument to 'dc='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            xcopy_flag_dc = !! n;
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
         } else if (strcmp(key, "if") == 0) {
@@ -1428,7 +1436,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "time"))
-            do_time = sg_get_num(buf);
+            do_time = !! sg_get_num(buf);
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
         /* look for long options that start with '--' */
@@ -1551,7 +1559,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (list_id_usage == 3) { /* list_id usage disabled */
-        if (!list_id_given)
+        if (! list_id_given)
             list_id = 0;
         if (list_id) {
             pr2serr("list_id disabled by id_usage flag\n");
@@ -1816,7 +1824,7 @@ main(int argc, char * argv[])
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
-        start_tm_valid = 1;
+        start_tm_valid = true;
     }
 
     if (verbose)

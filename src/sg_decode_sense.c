@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2016 Douglas Gilbert.
+ * Copyright (c) 2010-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.11 20160418";
+static const char * version_str = "1.12 20171005";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -47,17 +47,17 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int do_binary;
-    const char * fname;
+    bool do_binary;
     bool do_cdb;
+    bool no_space;
+    bool do_status;
+    bool do_version;
+    const char * fname;
     int do_file;
     int do_help;
     int do_hex;
-    bool no_space;
-    int do_status;
     int sstatus;
     int do_verbose;
-    int do_version;
     const char * wfname;
     unsigned char sense[MAX_SENSE_LEN + 4];
     const char * no_space_str;
@@ -130,7 +130,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                         "option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->do_binary;
+            op->do_binary = true;
             op->fname = optarg;
             break;
         case 'c':
@@ -164,15 +164,15 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                 pr2serr("'--status=SS' byte value exceeds FF\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->do_status;
+            op->do_status = true;
             op->sstatus = ui;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            op->do_version = 1;
-            return 0;
+            op->do_version = true;
+            break;
         case 'w':
             op->wfname = optarg;
             break;

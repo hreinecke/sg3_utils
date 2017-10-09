@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
@@ -32,7 +33,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.34 20170917";
+static const char * version_str = "3.35 20171007";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -60,18 +61,19 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int do_help;
-    int do_number;
     bool do_progress;
     bool do_time;
-    int do_verbose;
     bool do_version;
-    const char * device_name;
     bool opts_new;
+    int do_help;
+    int do_number;
+    int do_verbose;
+    const char * device_name;
 };
 
 
-static void usage()
+static void
+usage()
 {
     printf("Usage: sg_turs [--help] [--number=NUM] [--num=NUM] [--progress] "
            "[--time]\n"
@@ -90,7 +92,8 @@ static void usage()
            "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
 
-static void usage_old()
+static void
+usage_old()
 {
     printf("Usage: sg_turs [-n=NUM] [-p] [-t] [-v] [-V] "
            "DEVICE\n"
@@ -106,7 +109,8 @@ static void usage_old()
            "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
 
-static void usage_for(const struct opts_t * op)
+static void
+usage_for(const struct opts_t * op)
 {
     if (op->opts_new)
         usage();
@@ -114,7 +118,8 @@ static void usage_for(const struct opts_t * op)
         usage_old();
 }
 
-static int process_cl_new(struct opts_t * op, int argc, char * argv[])
+static int
+process_cl_new(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
 
@@ -180,7 +185,8 @@ static int process_cl_new(struct opts_t * op, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl_old(struct opts_t * op, int argc, char * argv[])
+static int
+process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     int k, jmp_out, plen;
     const char * cp;
@@ -248,7 +254,8 @@ static int process_cl_old(struct opts_t * op, int argc, char * argv[])
     return 0;
 }
 
-static int process_cl(struct opts_t * op, int argc, char * argv[])
+static int
+process_cl(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -268,11 +275,13 @@ static int process_cl(struct opts_t * op, int argc, char * argv[])
     return res;
 }
 
-int main(int argc, char * argv[])
+
+int
+main(int argc, char * argv[])
 {
+    bool reported = false;
     int sg_fd, k, res, progress, pr, rem;
     int num_errs = 0;
-    bool reported = false;
     int ret = 0;
 #ifndef SG_LIB_MINGW
     struct timeval start_tm, end_tm;
@@ -302,7 +311,7 @@ int main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+    if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                      op->do_verbose)) < 0) {
         pr2serr("sg_turs: error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));

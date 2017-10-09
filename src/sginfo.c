@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.37 [20170921]";
+static const char * version_str = "2.38 [20171009]";
 
 #include <stdio.h>
 #include <string.h>
@@ -427,7 +427,7 @@ do_scsi_io(struct scsi_cmnd_io * sio)
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
-        sg_chk_n_print3("do_scsi_cmd, continuing", &io_hdr, 1);
+        sg_chk_n_print3("do_scsi_cmd, continuing", &io_hdr, true);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
         __attribute__((fallthrough));
@@ -441,7 +441,7 @@ do_scsi_io(struct scsi_cmnd_io * sio)
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "do_scsi_io: opcode=0x%x", sio->cmnd[0]);
-            sg_chk_n_print3(ebuff, &io_hdr, 1);
+            sg_chk_n_print3(ebuff, &io_hdr, true);
         }
         if (sg_normalize_sense(&io_hdr, &ssh)) {
             if (ILLEGAL_REQUEST == ssh.sense_key) {

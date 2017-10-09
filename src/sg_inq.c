@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.67 20170926";    /* SPC-5 rev 17 */
+static const char * version_str = "1.68 20171008";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -226,31 +226,31 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int do_ata;
+    bool do_ata;
+    bool do_descriptors;
+    bool do_export;
+    bool do_force;
+    bool do_version;
+    bool do_decode;
+    bool do_vpd;
+    bool p_given;
     int do_block;
     int do_cmddt;
-    int do_descriptors;
-    int do_export;
-    int do_force;
     int do_help;
     int do_hex;
     int do_raw;
     int do_vendor;
     int do_verbose;
-    int do_version;
-    int do_decode;
-    int do_vpd;
     int resp_len;
     int page_num;
     int page_pdt;
     int num_pages;
     int num_opcodes;
-    int p_given;
     const char * page_arg;
     const char * device_name;
     const char * inhex_fn;
 #ifdef SG_SCSI_STRINGS
-    int opt_new;
+    bool opt_new;
 #endif
 };
 
@@ -437,7 +437,7 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
         switch (c) {
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         case 'a':
-            ++op->do_ata;
+            op->do_ata = true;
             break;
 #endif
         case 'B':
@@ -457,19 +457,19 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
             ++op->do_cmddt;
             break;
         case 'd':
-            ++op->do_descriptors;
+            op->do_descriptors = true;
             break;
         case 'e':
-            ++op->do_vpd;
+            op->do_vpd = true;
             break;
         case 'E':
         case 'x':
-            ++op->do_decode;
-            ++op->do_vpd;
+            op->do_decode = true;
+            op->do_vpd = true;
             op->page_num = VPD_EXT_INQ;
             break;
         case 'f':
-            ++op->do_force;
+            op->do_force = true;
             break;
         case 'h':
             ++op->do_help;
@@ -482,8 +482,8 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
             ++op->do_hex;
             break;
         case 'i':
-            ++op->do_decode;
-            ++op->do_vpd;
+            op->do_decode = true;
+            op->do_vpd = true;
             op->page_num = VPD_DEVICE_ID;
             break;
         case 'I':
@@ -503,12 +503,12 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
 #endif
         case 'p':
             op->page_arg = optarg;
-            ++op->p_given;
+            op->p_given = true;
             break;
         case 'r':
             ++op->do_raw;
@@ -517,13 +517,13 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
             ++op->do_vendor;
             break;
         case 'u':
-            ++op->do_export;
+            op->do_export = true;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -554,7 +554,8 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
 static int
 cl_old_process(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num, n;
+    bool jmp_out;
+    int k, plen, num, n;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
@@ -563,7 +564,7 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case '3':
                     if ('6' == *(cp + 1)) {
@@ -571,21 +572,21 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                         --plen;
                         ++cp;
                     } else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 'a':
                     op->page_num = VPD_ATA_INFO;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
 #ifdef SG_LIB_LINUX
                 case 'A':
-                    ++op->do_ata;
+                    op->do_ata = true;
                     break;
 #endif
                 case 'b':
                     op->page_num = VPD_BLOCK_LIMITS;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case 'c':
@@ -597,14 +598,14 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                     }
                     break;
                 case 'd':
-                    ++op->do_descriptors;
-                    ++op->do_decode;
+                    op->do_descriptors = true;
+                    op->do_decode = true;
                     break;
                 case 'e':
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     break;
                 case 'f':
-                    ++op->do_force;
+                    op->do_force = true;
                     break;
                 case 'h':
                 case 'H':
@@ -612,27 +613,27 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'i':
                     op->page_num = VPD_DEVICE_ID;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case 'm':
                     op->page_num = VPD_MAN_NET_ADDR;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case 'M':
                     op->page_num = VPD_MODE_PG_POLICY;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'P':
                     op->page_num = VPD_UPR_EMC;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case 'r':
@@ -640,21 +641,21 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 's':
                     op->page_num = VPD_SCSI_PORTS;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case 'u':
-                    ++op->do_export;
+                    op->do_export = true;
                     break;
                 case 'v':
                     ++op->do_verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case 'x':
                     op->page_num = VPD_EXT_INQ;
-                    ++op->do_vpd;
+                    op->do_vpd = true;
                     ++op->num_pages;
                     break;
                 case '?':
@@ -662,7 +663,7 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                         ++op->do_help;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -696,7 +697,7 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
                 ++op->num_opcodes;
             } else if (0 == strncmp("p=", cp, 2)) {
                 op->page_arg = cp + 2;
-                ++op->p_given;
+                op->p_given = true;
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
@@ -730,14 +731,14 @@ cl_process(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = cl_old_process(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = cl_new_process(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = cl_new_process(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (! op->opt_new))
             res = cl_old_process(op, argc, argv);
     }
     return res;
@@ -931,82 +932,6 @@ bad:
     if (stdin != fp)
         fclose(fp);
     return 1;
-}
-
-
-/* Local version of sg_ll_inquiry() [found in libsgutils] that additionally
- * passes back resid. Same return values as sg_ll_inquiry() (0 is good). */
-static int
-pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
-           int * residp, bool noisy, int verbose)
-{
-    int res, ret, k, sense_cat, resid;
-    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char * up;
-    struct sg_pt_base * ptvp;
-
-    if (evpd)
-        inq_cdb[1] |= 1;
-    inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
-    sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
-    if (verbose) {
-        pr2serr("    inquiry cdb: ");
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            pr2serr("%02x ", inq_cdb[k]);
-        pr2serr("\n");
-    }
-    if (resp && (mx_resp_len > 0)) {
-        up = (unsigned char *)resp;
-        up[0] = 0x7f;   /* defensive prefill */
-        if (mx_resp_len > 4)
-            up[4] = 0;
-    }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2serr("inquiry: out of memory\n");
-        return -1;
-    }
-    set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
-    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
-                               noisy, verbose, &sense_cat);
-    resid = get_scsi_pt_resid(ptvp);
-    if (residp)
-        *residp = resid;
-    destruct_scsi_pt_obj(ptvp);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
-        switch (sense_cat) {
-        case SG_LIB_CAT_RECOVERED:
-        case SG_LIB_CAT_NO_SENSE:
-            ret = 0;
-            break;
-        default:
-            ret = sense_cat;
-            break;
-        }
-    } else if (ret < 4) {
-        if (verbose)
-            pr2serr("inquiry: got too few bytes (%d)\n", ret);
-        ret = SG_LIB_CAT_MALFORMED;
-    } else
-        ret = 0;
-
-    if (resid > 0) {
-        if (resid > mx_resp_len) {
-            pr2serr("INQUIRY resid (%d) should never exceed requested "
-                    "len=%d\n", resid, mx_resp_len);
-            return ret ? ret : SG_LIB_CAT_MALFORMED;
-        }
-        /* zero unfilled section of response buffer */
-        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
-    }
-    return ret;
 }
 
 static const struct svpd_values_name_t *
@@ -3054,7 +2979,7 @@ std_inq_response(const struct opts_t * op, int act_len)
                 printf(" Product identification: %s\n", xtra_buff);
         }
         if (act_len <= 32) {
-            if (!op->do_export)
+            if (! op->do_export)
                 printf(" Product revision level: <none>\n");
         } else {
             memcpy(xtra_buff, &rp[32], 4);
@@ -3141,7 +3066,8 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         return SG_LIB_SYNTAX_ERROR;
     }
     n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
-    res = pt_inquiry(sg_fd, 1, page, rp, n, &resid, 1, vb);
+    res = sg_ll_inquiry_v2(sg_fd, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
+                           true, vb);
     if (res)
         return res;
     rlen = n - resid;
@@ -3180,7 +3106,8 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     } else {
         /* First response indicated that not enough bytes of response were
          * requested, so try again, this time requesting more. */
-        res = pt_inquiry(sg_fd, 1, page, rp, len, &resid, 1, vb);
+        res = sg_ll_inquiry_v2(sg_fd, true, page, rp, len, DEF_PT_TIMEOUT,
+                               &resid, true, vb);
         if (res)
             return res;
         rlen = len - resid;
@@ -3242,14 +3169,16 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
         return std_inq_response(op, inhex_len);
     rlen = (op->resp_len > 0) ? op->resp_len : SAFE_STD_INQ_RESP_LEN;
     verb = op->do_verbose;
-    res = pt_inquiry(sg_fd, 0, 0, rsp_buff, rlen, &resid, 0, verb);
+    res = sg_ll_inquiry_v2(sg_fd, false, 0, rsp_buff, rlen, DEF_PT_TIMEOUT,
+                           &resid, false, verb);
     if (0 == res) {
         len = rsp_buff[4] + 5;
         if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
             (0 == op->resp_len)) {
             rlen = len;
             memset(rsp_buff, 0, rlen);
-            if (pt_inquiry(sg_fd, 0, 0, rsp_buff, rlen, &resid, 1, verb)) {
+            if (sg_ll_inquiry_v2(sg_fd, false, 0, rsp_buff, rlen,
+                                 DEF_PT_TIMEOUT, &resid, true, verb)) {
                 pr2serr("second INQUIRY (%d byte) failed\n", len);
                 return SG_LIB_CAT_OTHER;
             }
@@ -3316,8 +3245,8 @@ cmddt_process(int sg_fd, const struct opts_t * op)
     if (op->do_cmddt > 1) {
         printf("Supported command list:\n");
         for (k = 0; k < 256; ++k) {
-            res = sg_ll_inquiry(sg_fd, 1, 0, k, rsp_buff, DEF_ALLOC_LEN,
-                                true, op->do_verbose);
+            res = sg_ll_inquiry(sg_fd, true /* cmddt */, false, k, rsp_buff,
+                                DEF_ALLOC_LEN, true, op->do_verbose);
             if (0 == res) {
                 peri_type = rsp_buff[0] & 0x1f;
                 support_num = rsp_buff[1] & 7;
@@ -3349,8 +3278,8 @@ cmddt_process(int sg_fd, const struct opts_t * op)
         }
     }
     else {
-        res = sg_ll_inquiry(sg_fd, 1, 0, op->page_num, rsp_buff,
-                            DEF_ALLOC_LEN, true, op->do_verbose);
+        res = sg_ll_inquiry(sg_fd, true /* cmddt */, false, op->page_num,
+                            rsp_buff, DEF_ALLOC_LEN, true, op->do_verbose);
         if (0 == res) {
             peri_type = rsp_buff[0] & 0x1f;
             if (! op->do_raw) {
@@ -3881,7 +3810,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             if ((1 != op->do_hex) && (0 == op->do_raw))
-                ++op->do_decode;
+                op->do_decode = true;
             op->page_num = vnp->value;
             op->page_pdt = vnp->pdt;
         } else if ('-' == op->page_arg[0]) {
@@ -3897,7 +3826,7 @@ main(int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 if ((1 != op->do_hex) && (0 == op->do_raw))
-                    ++op->do_decode;
+                    op->do_decode = true;
             } else {
                 int num;
                 unsigned int u;
@@ -3920,7 +3849,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             if ((1 != op->do_hex) && (0 == op->do_raw))
-                ++op->do_decode;
+                op->do_decode = true;
 #endif /* SG_SCSI_STRINGS */
             op->page_num = n;
         }
@@ -3950,9 +3879,9 @@ main(int argc, char * argv[])
                     pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
                             rsp_buff[1]);
                 op->page_num = rsp_buff[1];
-                ++op->do_vpd;
+                op->do_vpd = true;
                 if ((1 != op->do_hex) && (0 == op->do_raw))
-                    ++op->do_decode;
+                    op->do_decode = true;
             } else {
                 if (op->do_verbose)
                     pr2serr("page number unclear from --inhex, hope it's a "
@@ -3976,13 +3905,13 @@ main(int argc, char * argv[])
                 usage_for(op);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->do_decode;
-            ++op->do_vpd;
+            op->do_decode = true;
+            op->do_vpd = true;
         }
     }
 
     if ((0 == op->do_cmddt) && (op->page_num >= 0) && op->p_given)
-        ++op->do_vpd;
+        op->do_vpd = true;
 
     if (op->do_raw && op->do_hex) {
         pr2serr("Can't do hex and raw at the same time\n");
@@ -4051,7 +3980,7 @@ main(int argc, char * argv[])
         }
 
     } else {
-        if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+        if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                          op->do_verbose)) < 0) {
             pr2serr("sg_inq: error opening file: %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
@@ -4059,7 +3988,7 @@ main(int argc, char * argv[])
         }
     }
 #else
-    if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+    if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                      op->do_verbose)) < 0) {
         pr2serr("sg_inq: error opening file: %s: %s\n",
                 op->device_name, safe_strerror(-sg_fd));

@@ -20,6 +20,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
@@ -55,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "4.98 20170921";
+static const char * version_str = "4.99 20171007";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -74,18 +76,18 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
+    bool do_dio;
+    bool do_echo;
+    bool do_mmap;
+    bool do_quick;
+    bool do_time;
+    bool do_version;
+    bool opt_new;
     int do_buffer;
-    int do_dio;
-    int do_echo;
     int do_help;
-    int do_mmap;
-    int do_quick;
-    int64_t do_size;
-    int do_time;
     int do_verbose;
-    int do_version;
+    int64_t do_size;
     const char * device_name;
-    int opt_new;
 };
 
 
@@ -170,25 +172,25 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             optsp->do_buffer = n;
             break;
         case 'd':
-            ++optsp->do_dio;
+            optsp->do_dio = true;
             break;
         case 'e':
-            ++optsp->do_echo;
+            optsp->do_echo = true;
             break;
         case 'h':
         case '?':
             ++optsp->do_help;
             break;
         case 'm':
-            ++optsp->do_mmap;
+            optsp->do_mmap = true;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = 0;
+            optsp->opt_new = false;
             return 0;
         case 'q':
-            ++optsp->do_quick;
+            optsp->do_quick = true;
             break;
         case 's':
            nn = sg_get_llnum(optarg);
@@ -200,13 +202,13 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
             optsp->do_size = nn;
             break;
         case 't':
-            ++optsp->do_time;
+            optsp->do_time = true;
             break;
         case 'v':
             ++optsp->do_verbose;
             break;
         case 'V':
-            ++optsp->do_version;
+            optsp->do_version = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -234,7 +236,8 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num;
+    bool jmp_out;
+    int k, plen, num;
     int64_t nn;
     const char * cp;
 
@@ -244,40 +247,40 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'd':
-                    ++optsp->do_dio;
+                    optsp->do_dio = true;
                     break;
                 case 'e':
-                    ++optsp->do_echo;
+                    optsp->do_echo = true;
                     break;
                 case 'h':
                 case '?':
                     ++optsp->do_help;
                     break;
                 case 'm':
-                    ++optsp->do_mmap;
+                    optsp->do_mmap = true;
                     break;
                 case 'N':
-                    optsp->opt_new = 1;
+                    optsp->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'q':
-                    ++optsp->do_quick;
+                    optsp->do_quick = true;
                     break;
                 case 't':
-                    ++optsp->do_time;
+                    optsp->do_time = true;
                     break;
                 case 'v':
                     ++optsp->do_verbose;
                     break;
                 case 'V':
-                    ++optsp->do_version;
+                    optsp->do_version = true;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -330,14 +333,14 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = 0;
+        optsp->opt_new = false;
         res = process_cl_old(optsp, argc, argv);
         if ((0 == res) && optsp->opt_new)
             res = process_cl_new(optsp, argc, argv);
     } else {
-        optsp->opt_new = 1;
+        optsp->opt_new = true;
         res = process_cl_new(optsp, argc, argv);
-        if ((0 == res) && (0 == optsp->opt_new))
+        if ((0 == res) && (! optsp->opt_new))
             res = process_cl_old(optsp, argc, argv);
     }
     return res;
@@ -402,8 +405,8 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
     if (op->do_mmap) {
-        op->do_dio = 0;
-        op->do_quick = 0;
+        op->do_dio = false;
+        op->do_quick = false;
     }
     if (NULL == (rawp = malloc(512))) {
         printf("out of memory (query)\n");
@@ -616,7 +619,7 @@ main(int argc, char * argv[])
         }
 #endif
     }
-    if ((op->do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+    if (op->do_time && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
         double a, b;
 

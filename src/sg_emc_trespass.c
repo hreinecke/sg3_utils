@@ -16,6 +16,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -29,13 +32,14 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.21 20170917";
+static const char * version_str = "0.22 20171005";
 
 static int debug = 0;
 
 #define TRESPASS_PAGE           0x22
 
-static int do_trespass(int fd, int hr, int short_cmd)
+static int
+do_trespass(int fd, bool hr, bool short_cmd)
 {
         unsigned char long_trespass_pg[] =
                 { 0, 0, 0, 0, 0, 0, 0, 0x00,
@@ -62,11 +66,11 @@ static int do_trespass(int fd, int hr, int short_cmd)
                 long_trespass_pg[10] = 0x01;
         }
         if (short_cmd)
-                res = sg_ll_mode_select6(fd, 1 /* pf */, 0 /* sp */,
+                res = sg_ll_mode_select6(fd, true /* pf */, false /* sp */,
                                  short_trespass_pg, sizeof(short_trespass_pg),
                                  true, (debug ? 2 : 0));
         else
-                res = sg_ll_mode_select10(fd, 1 /* pf */, 0 /* sp */,
+                res = sg_ll_mode_select10(fd, true /* pf */, false /* sp */,
                                  long_trespass_pg, sizeof(long_trespass_pg),
                                  true, (debug ? 2 : 0));
 
@@ -118,8 +122,8 @@ int main(int argc, char * argv[])
         char **argptr;
         char * file_name = 0;
         int k, fd;
-        int hr = 0;
-        int short_cmd = 0;
+        bool hr = false;
+        bool short_cmd = false;
         int ret = 0;
 
         if (argc < 2)
@@ -130,27 +134,27 @@ int main(int argc, char * argv[])
                 if (!strcmp (*argptr, "-d"))
                         ++debug;
                 else if (!strcmp (*argptr, "-s"))
-                        short_cmd = 1;
+                        short_cmd = true;
                 else if (!strcmp (*argptr, "-hr"))
-                        hr = 1;
+                        hr = true;
                 else if (!strcmp (*argptr, "-V")) {
                         printf("Version string: %s\n", version_str);
                         exit(0);
                 }
                 else if (*argv[k] == '-') {
                         pr2serr("Unrecognized switch: %s\n", argv[k]);
-                        file_name = 0;
+                        file_name = NULL;
                         break;
                 }
-                else if (0 == file_name)
+                else if (NULL == file_name)
                         file_name = argv[k];
                 else {
                         pr2serr("too many arguments\n");
-                        file_name = 0;
+                        file_name = NULL;
                         break;
                 }
         }
-        if (0 == file_name) {
+        if (NULL == file_name) {
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }

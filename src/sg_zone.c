@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -32,7 +34,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.04 20170917";
+static const char * version_str = "1.05 20171008";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -80,7 +82,8 @@ usage()
             "    --open|-o          issue OPEN ZONE command\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
-            "    --zone=ID|-z ID    ID is the starting LBA of the zone\n\n"
+            "    --zone=ID|-z ID    ID is the starting LBA of the zone "
+            "(def: 0)\n\n"
             "Performs a SCSI OPEN ZONE, CLOSE ZONE or FINISH ZONE command. "
             "ID is\ndecimal by default, for hex use a leading '0x' or a "
             "trailing 'h'.\nEither --close, --finish, or --open option "
@@ -90,14 +93,14 @@ usage()
 /* Invokes the zone out command indicated by 'sa' (ZBC).  Return of 0
  * -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, bool noisy,
+sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, bool all, bool noisy,
                int verbose)
 {
     int k, ret, res, sense_cat;
+    struct sg_pt_base * ptvp;
     unsigned char zo_cdb[SG_ZONING_OUT_CMDLEN] =
           {SG_ZONING_OUT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
     char b[64];
 
     zo_cdb[1] = 0x1f & sa;
@@ -120,8 +123,9 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, bool noisy,
     set_scsi_pt_cdb(ptvp, zo_cdb, sizeof(zo_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res,
+                               SG_NO_DATA_IN, sense_b, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -144,19 +148,18 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, int all, bool noisy,
 int
 main(int argc, char * argv[])
 {
+    bool all = false;
+    bool close = false;
+    bool finish = false;
+    bool open = false;
     int sg_fd, res, c;
-    int all = 0;
-    int close = 0;
-    int finish = 0;
-    int open = 0;
     int verbose = 0;
-    int zid_given = 0;
+    int ret = 0;
     int sa = 0;
     uint64_t zid = 0;
     int64_t ll;
     const char * device_name = NULL;
     const char * sa_name;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -169,14 +172,14 @@ main(int argc, char * argv[])
         switch (c) {
         case 'a':
         case 'R':
-            ++all;
+            all = true;
             break;
         case 'c':
-            ++close;
+            close = true;
             sa = CLOSE_ZONE_SA;
             break;
         case 'f':
-            ++finish;
+            finish = true;
             sa = FINISH_ZONE_SA;
             break;
         case 'h':
@@ -184,7 +187,7 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'o':
-            ++open;
+            open = true;
             sa = OPEN_ZONE_SA;
             break;
         case 'v':
@@ -200,7 +203,6 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             zid = (uint64_t)ll;
-            ++zid_given;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
@@ -222,7 +224,7 @@ main(int argc, char * argv[])
         }
     }
 
-    if (1 != ((!! close) + (!! finish) + (!! open))) {
+    if (1 != ((int)close + (int)finish + (int)open)) {
         pr2serr("one from the --close, --finish and --open options must be "
                 "given\n");
         usage();
@@ -236,7 +238,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

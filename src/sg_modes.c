@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.49 20170917";
+static const char * version_str = "1.50 20171007";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -59,6 +59,8 @@ static struct option long_options[] = {
         {"old", no_argument, 0, 'O'},
         {"page", required_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
+        {"read-write", no_argument, 0, 'w'},
+        {"read_write", no_argument, 0, 'w'},
         {"six", no_argument, 0, '6'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
@@ -66,26 +68,27 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
+    bool do_dbd;
+    bool do_dbout;
+    bool do_examine;
+    bool do_flexible;
+    bool do_list;
+    bool do_llbaa;
+    bool do_six;
+    bool do_version;
+    bool o_readwrite;
+    bool subpg_code_given;
+    bool opt_new;
     int do_all;
-    int do_dbd;
-    int do_dbout;
-    int do_examine;
-    int do_flexible;
     int do_help;
     int do_hex;
-    int do_list;
-    int do_llbaa;
     int maxlen;
     int do_raw;
-    int do_six;
     int do_verbose;
-    int do_version;
     int page_control;
     int pg_code;
     int subpg_code;
-    bool subpg_code_given;
     const char * device_name;
-    int opt_new;
 };
 
 
@@ -97,8 +100,8 @@ usage()
            "                [--flexible] [--help] [--hex] [--list] "
            "[--llbaa]\n"
            "                [--maxlen=LEN] [--page=PG[,SPG]] [--raw] [-R] "
-           "[--six]\n"
-           "                [--verbose] [--version] [DEVICE]\n"
+           "[--readwrite]\n"
+           "                [--six] [--verbose] [--version] [DEVICE]\n"
            "  where:\n"
            "    --all|-a        get all mode pages supported by device\n"
            "                    use twice to get all mode pages and subpages\n"
@@ -132,6 +135,8 @@ usage()
            "    -R              mode page response to stdout, a byte per "
            "line in ASCII\n"
            "                    hex (same result as '--raw --raw')\n"
+           "    --readwrite|-w    open DEVICE read-write (def: open "
+           "read-only)\n"
            "    --six|-6        use MODE SENSE(6), by default uses MODE "
            "SENSE(10)\n"
            "    --verbose|-v    increase verbosity\n"
@@ -206,7 +211,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 
         switch (c) {
         case '6':
-            ++op->do_six;
+            op->do_six = true;
             break;
         case 'a':
             ++op->do_all;
@@ -224,16 +229,16 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->page_control = n;
             break;
         case 'd':
-            ++op->do_dbd;
+            op->do_dbd = true;
             break;
         case 'D':
-            ++op->do_dbout;
+            op->do_dbout = true;
             break;
         case 'e':
-            ++op->do_examine;
+            op->do_examine = true;
             break;
         case 'f':
-            ++op->do_flexible;
+            op->do_flexible = true;
             break;
         case 'h':
         case '?':
@@ -243,10 +248,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_hex;
             break;
         case 'l':
-            ++op->do_list;
+            op->do_list = true;
             break;
         case 'L':
-            ++op->do_llbaa;
+            op->do_llbaa = true;
             break;
         case 'm':
             n = sg_get_num(optarg);
@@ -260,7 +265,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
         case 'p':
             cp = strchr(optarg, ',');
@@ -289,13 +294,16 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->do_raw += 2;
             break;
         case 's':
-            ++op->do_six;
+            op->do_six = true;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
+            break;
+        case 'w':
+            op->o_readwrite = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -326,9 +334,9 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
+    bool jmp_out;
     int k, plen, num, n;
     unsigned int u, uu;
-    bool jmp_out;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
@@ -340,7 +348,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case '6':
-                    ++op->do_six;
+                    op->do_six = true;
                     break;
                 case 'a':
                     ++op->do_all;
@@ -349,29 +357,29 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     op->do_all += 2;
                     break;
                 case 'd':
-                    ++op->do_dbd;
+                    op->do_dbd = true;
                     break;
                 case 'D':
-                    ++op->do_dbout;
+                    op->do_dbout = true;
                     break;
                 case 'e':
-                    ++op->do_examine;
+                    op->do_examine = true;
                     break;
                 case 'f':
-                    ++op->do_flexible;
+                    op->do_flexible = true;
                     break;
                 case 'h':
                 case 'H':
                     op->do_hex += 2;
                     break;
                 case 'l':
-                    ++op->do_list;
+                    op->do_list = true;
                     break;
                 case 'L':
-                    ++op->do_llbaa;
+                    op->do_llbaa = true;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
@@ -382,7 +390,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     ++op->do_verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case '?':
                     ++op->do_help;
@@ -480,14 +488,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = process_cl_old(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = process_cl_new(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (! op->opt_new))
             res = process_cl_old(op, argc, argv);
     }
     return res;
@@ -949,7 +957,7 @@ static const char * pg_control_str_arr[] = {
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, len, res, md_len, bd_len, longlba, page_num, spf;
+    int sg_fd, k, num, len, res, md_len, bd_len, page_num;
     char ebuff[EBUFF_SZ];
     const char * descp;
     unsigned char * rsp_buff = NULL;
@@ -957,7 +965,8 @@ main(int argc, char * argv[])
     unsigned char * malloc_rsp_buff = NULL;
     int rsp_buff_size = DEF_ALLOC_LEN;
     int ret = 0;
-    int density_code_off, t_proto, inq_pdt, inq_byte6, resp_mode6;
+    int density_code_off, t_proto, inq_pdt, inq_byte6;
+    bool resp_mode6, longlba, spf;
     int num_ua_pages;
     unsigned char * bp;
     unsigned char uc;
@@ -1008,7 +1017,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((op->do_six) && (op->do_llbaa)) {
+    if (op->do_six && op->do_llbaa) {
         pr2serr("LLBAA not defined for MODE SENSE 6, try without '-L'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1042,7 +1051,7 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+    if ((sg_fd = sg_cmds_open_device(op->device_name, ! op->o_readwrite,
                                      op->do_verbose)) < 0) {
         pr2serr("error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
@@ -1133,8 +1142,8 @@ main(int argc, char * argv[])
         if (op->do_flexible) {
             num = rsp_buff[0];
             if (op->do_six && (num < 3))
-                resp_mode6 = 0;
-            if ((0 == op->do_six) && (num > 5)) {
+                resp_mode6 = false;
+            if ((! op->do_six) && (num > 5)) {
                 if ((num > 11) && (0 == (num % 2)) && (0 == rsp_buff[4]) &&
                     (0 == rsp_buff[5]) && (0 == rsp_buff[6])) {
                     rsp_buff[1] = num;
@@ -1142,7 +1151,7 @@ main(int argc, char * argv[])
                     pr2serr(">>> msense(10) but resp[0]=%d and not msense(6) "
                             "response so fix length\n", num);
                 } else
-                    resp_mode6 = 1;
+                    resp_mode6 = true;
             }
         }
         if (op->do_raw || (1 == op->do_hex) || (op->do_hex > 2))
@@ -1162,14 +1171,14 @@ main(int argc, char * argv[])
             bd_len = rsp_buff[3];
             medium_type = rsp_buff[1];
             specific = rsp_buff[2];
-            longlba = 0;
+            longlba = false;
         } else {
             headerlen = 8;
             md_len = sg_get_unaligned_be16(rsp_buff + 0) + 2;
             bd_len = sg_get_unaligned_be16(rsp_buff + 6);
             medium_type = rsp_buff[2];
             specific = rsp_buff[3];
-            longlba = rsp_buff[4] & 1;
+            longlba = !!(rsp_buff[4] & 1);
         }
         if ((bd_len + headerlen) > md_len) {
             pr2serr("Invalid block descriptor length=%d, ignore\n", bd_len);
@@ -1181,7 +1190,7 @@ main(int argc, char * argv[])
             else if (op->do_raw > 1) {
                 bp = rsp_buff + bd_len + headerlen;
                 md_len -= bd_len + headerlen;
-                spf = ((bp[0] & 0x40) ? 1 : 0);
+                spf = !!(bp[0] & 0x40);
                 len = (spf ? (sg_get_unaligned_be16(bp + 2) + 4) :
                              (bp[1] + 2));
                 len = (len < md_len) ? len : md_len;
@@ -1199,11 +1208,11 @@ main(int argc, char * argv[])
         if (0 == inq_pdt)
             printf("  Mode data length=%d, medium type=0x%.2x, WP=%d,"
                    " DpoFua=%d, longlba=%d\n", md_len, medium_type,
-                   !!(specific & 0x80), !!(specific & 0x10), longlba);
+                   !!(specific & 0x80), !!(specific & 0x10), (int)longlba);
         else
             printf("  Mode data length=%d, medium type=0x%.2x, specific"
                    " param=0x%.2x, longlba=%d\n", md_len, medium_type,
-                   specific, longlba);
+                   specific, (int)longlba);
         if (md_len > rsp_buff_size) {
             printf("Only fetched %d bytes of response, truncate output\n",
                    rsp_buff_size);
@@ -1252,7 +1261,7 @@ main(int argc, char * argv[])
                 break;
             }
             uc = *bp;
-            spf = ((uc & 0x40) ? 1 : 0);
+            spf = !!(uc & 0x40);
             len = (spf ? (sg_get_unaligned_be16(bp + 2) + 4) : (bp[1] + 2));
             page_num = bp[0] & PG_CODE_MASK;
             if (0x0 == page_num) {

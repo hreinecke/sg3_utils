@@ -15,6 +15,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
@@ -31,7 +33,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.96 20170917";
+static const char * version_str = "3.97 20171007";
 
 #define ME "sg_readcap: "
 
@@ -39,38 +41,38 @@ static const char * version_str = "3.96 20170917";
 #define RCAP16_REPLY_LEN 32
 
 static struct option long_options[] = {
-    {"brief", 0, 0, 'b'},
-    {"help", 0, 0, 'h'},
-    {"hex", 0, 0, 'H'},
-    {"lba", 1, 0, 'L'},
-    {"long", 0, 0, 'l'},
-    {"16", 0, 0, 'l'},
-    {"new", 0, 0, 'N'},
-    {"old", 0, 0, 'O'},
-    {"pmi", 0, 0, 'p'},
-    {"raw", 0, 0, 'r'},
-    {"readonly", 0, 0, 'R'},
-    {"verbose", 0, 0, 'v'},
-    {"version", 0, 0, 'V'},
-    {"zbc", 0, 0, 'z'},
+    {"brief", no_argument, 0, 'b'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"lba", required_argument, 0, 'L'},
+    {"long", no_argument, 0, 'l'},
+    {"16", no_argument, 0, 'l'},
+    {"new", no_argument, 0, 'N'},
+    {"old", no_argument, 0, 'O'},
+    {"pmi", no_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"zbc", no_argument, 0, 'z'},
     {0, 0, 0, 0},
 };
 
 struct opts_t {
-    int do_brief;
+    bool do_brief;
+    bool do_long;
+    bool do_pmi;
+    bool do_raw;
+    bool o_readonly;
+    bool do_version;
+    bool do_zbc;
+    bool opt_new;
     int do_help;
     int do_hex;
     int do_lba;
-    int do_long;
-    int do_pmi;
-    int do_raw;
-    int o_readonly;
     int do_verbose;
-    int do_version;
-    int do_zbc;
     uint64_t llba;
     const char * device_name;
-    int opt_new;
 };
 
 
@@ -166,10 +168,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             break;
         case '6':
             if (a_one)
-                ++op->do_long;
+                op->do_long = true;
             break;
         case 'b':
-            ++op->do_brief;
+            op->do_brief = true;
             break;
         case 'h':
         case '?':
@@ -179,7 +181,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_hex;
             break;
         case 'l':
-            ++op->do_long;
+            op->do_long = true;
             break;
         case 'L':
             nn = sg_get_llnum(optarg);
@@ -191,31 +193,31 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->llba = nn;
             /* force READ_CAPACITY16 for large lbas */
             if (op->llba > 0xfffffffeULL)
-                ++op->do_long;
+                op->do_long = true;
             ++op->do_lba;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
         case 'p':
-            ++op->do_pmi;
+            op->do_pmi = true;
             break;
         case 'r':
-            ++op->do_raw;
+            op->do_raw = true;
             break;
         case 'R':
-            ++op->o_readonly;
+            op->o_readonly = true;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         case 'z':
-            ++op->do_zbc;
+            op->do_zbc = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -243,7 +245,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num;
+    bool jmp_out;
+    int k, plen, num;
     const char * cp;
     uint64_t uu;
 
@@ -253,18 +256,18 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case '1':
                     if ('6' == *(cp + 1)) {
-                        ++op->do_long;
+                        op->do_long = true;
                         ++cp;
                         --plen;
                     } else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 'b':
-                    ++op->do_brief;
+                    op->do_brief = true;
                     break;
                 case 'h':
                 case '?':
@@ -274,35 +277,35 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     ++op->do_hex;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'p':
                     if (0 == strncmp("pmi", cp, 3)) {
-                        ++op->do_pmi;
+                        op->do_pmi = true;
                         cp += 2;
                         plen -= 2;
                     } else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 'r':
-                    ++op->do_raw;
+                    op->do_raw = true;
                     break;
                 case 'R':
-                    ++op->o_readonly;
+                    op->o_readonly = true;
                     break;
                 case 'v':
                     ++op->do_verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case 'z':
-                    ++op->do_zbc;
+                    op->do_zbc = true;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -319,7 +322,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 }
                 /* force READ_CAPACITY16 for large lbas */
                 if (uu > 0xfffffffeULL)
-                    ++op->do_long;
+                    op->do_long = true;
                 op->llba = uu;
                 ++op->do_lba;
             } else if (0 == strncmp("-old", cp, 4))
@@ -349,14 +352,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = process_cl_old(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = process_cl_new(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (! op->opt_new))
             res = process_cl_old(op, argc, argv);
     }
     return res;
@@ -392,10 +395,11 @@ rc_basis_str(int rc_basis, char * b, int blen)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, prot_en, p_type, lbppbe, rw_0_flag;
-    uint64_t llast_blk_addr;
+    bool rw_0_flag;
+    int sg_fd, res, prot_en, p_type, lbppbe;
     int ret = 0;
     uint32_t last_blk_addr, block_size;
+    uint64_t llast_blk_addr;
     unsigned char resp_buff[RCAP16_REPLY_LEN];
     char b[80];
     struct opts_t opts;
@@ -428,12 +432,12 @@ main(int argc, char * argv[])
     }
     if (op->do_zbc) {
         if (! op->do_long)
-            ++op->do_long;
+            op->do_long = true;
     }
 
     memset(resp_buff, 0, sizeof(resp_buff));
 
-    if ((0 == op->do_pmi) && (op->llba > 0)) {
+    if ((! op->do_pmi) && (op->llba > 0)) {
         pr2serr(ME "lba can only be non-zero when '--pmi' is set\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
@@ -441,7 +445,7 @@ main(int argc, char * argv[])
     if (op->do_long)
         rw_0_flag = op->o_readonly;
     else
-        rw_0_flag = 1;  /* RCAP(10) has opened RO in past, so leave */
+        rw_0_flag = true;  /* RCAP(10) has opened RO in past, so leave */
     if ((sg_fd = sg_cmds_open_device(op->device_name, rw_0_flag,
                                      op->do_verbose)) < 0) {
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
@@ -504,10 +508,10 @@ main(int argc, char * argv[])
             } else {
                 printf("READ CAPACITY (10) indicates device capacity too "
                        "large\n  now trying 16 byte cdb variant\n");
-                op->do_long = 1;
+                op->do_long = true;
             }
         } else if (SG_LIB_CAT_INVALID_OP == res) {
-            op->do_long = 1;
+            op->do_long = true;
             sg_cmds_close_device(sg_fd);
             if ((sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
                                              op->do_verbose)) < 0) {

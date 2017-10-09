@@ -1,14 +1,16 @@
 /*
- * Copyright (c) 2007-2015 Douglas Gilbert.
+ * Copyright (c) 2007-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.04 20151220 */
+/* sg_pt_solaris version 1.05 20171005 */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -46,7 +48,7 @@ struct sg_pt_base {
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
-scsi_pt_open_device(const char * device_name, int read_only, int verbose)
+scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 

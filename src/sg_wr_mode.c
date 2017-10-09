@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
@@ -27,7 +29,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.17 20170917";
+static const char * version_str = "1.18 20171008";
 
 #define ME "sg_wr_mode: "
 
@@ -38,16 +40,16 @@ static const char * version_str = "1.17 20170917";
 
 
 static struct option long_options[] = {
-        {"contents", 1, 0, 'c'},
-        {"dbd", 0, 0, 'd'},
-        {"force", 0, 0, 'f'},
-        {"help", 0, 0, 'h'},
-        {"len", 1, 0, 'l'},
-        {"mask", 1, 0, 'm'},
-        {"page", 1, 0, 'p'},
-        {"save", 0, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"contents", required_argument, 0, 'c'},
+        {"dbd", no_argument, 0, 'd'},
+        {"force", no_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"len", required_argument, 0, 'l'},
+        {"mask", required_argument, 0, 'm'},
+        {"page", required_argument, 0, 'p'},
+        {"save", no_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -302,19 +304,19 @@ static int build_mask(const char * inp, unsigned char * mask_arr,
 
 int main(int argc, char * argv[])
 {
+    bool dbd = false;
+    bool force = false;
+    bool got_contents = false;
+    bool got_mask = false;
+    bool mode_6 = false;
+    bool save = false;
     int sg_fd, res, c, num, alloc_len, off, pdt;
     int k, md_len, hdr_len, bd_len, mask_in_len;
-    unsigned u, uu;
-    int dbd = 0;
-    int got_contents = 0;
-    int force = 0;
-    int got_mask = 0;
-    int mode_6 = 0;
     int pg_code = -1;
     int sub_pg_code = 0;
-    int save = 0;
     int verbose = 0;
     int read_in_len = 0;
+    unsigned u, uu;
     const char * device_name = NULL;
     unsigned char read_in[MX_ALLOC_LEN];
     unsigned char mask_in[MX_ALLOC_LEN];
@@ -340,13 +342,13 @@ int main(int argc, char * argv[])
                 pr2serr("bad argument to '--contents'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            got_contents = 1;
+            got_contents = true;
             break;
         case 'd':
-            dbd = 1;
+            dbd = true;
             break;
         case 'f':
-            force = 1;
+            force = true;
             break;
         case 'h':
         case '?':
@@ -355,7 +357,7 @@ int main(int argc, char * argv[])
         case 'l':
             num = sscanf(optarg, "%d", &res);
             if ((1 == num) && ((6 == res) || (10 == res)))
-                mode_6 = (6 == res) ? 1 : 0;
+                mode_6 = (6 == res);
             else {
                 pr2serr("length (of cdb) must be 6 or 10\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -368,7 +370,7 @@ int main(int argc, char * argv[])
                 pr2serr("bad argument to '--mask'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            got_mask = 1;
+            got_mask = true;
             break;
         case 'p':
            if (NULL == strchr(optarg, ',')) {
@@ -394,7 +396,7 @@ int main(int argc, char * argv[])
             }
             break;
         case 's':
-            save = 1;
+            save = true;
             break;
         case 'v':
             ++verbose;
@@ -436,7 +438,7 @@ int main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
@@ -454,9 +456,9 @@ int main(int argc, char * argv[])
                                 sub_pg_code, ref_md, alloc_len, true,
                                 verbose);
      else
-        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd, 0 /* current */,
-                                 pg_code, sub_pg_code, ref_md, alloc_len,
-                                 true, verbose);
+        res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, dbd,
+                                 0 /* current */, pg_code, sub_pg_code,
+                                 ref_md, alloc_len, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -540,10 +542,10 @@ int main(int argc, char * argv[])
 
         memcpy(ref_md + off, read_in, read_in_len);
         if (mode_6)
-            res = sg_ll_mode_select6(sg_fd, 1 /* PF */, save, ref_md, md_len,
-                                     true, verbose);
+            res = sg_ll_mode_select6(sg_fd, true /* PF */, save, ref_md,
+                                     md_len, true, verbose);
         else
-            res = sg_ll_mode_select10(sg_fd, 1 /* PF */, save, ref_md,
+            res = sg_ll_mode_select10(sg_fd, true /* PF */, save, ref_md,
                                       md_len, true, verbose);
         ret = res;
         if (res) {

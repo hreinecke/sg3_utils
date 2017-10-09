@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2016 Douglas Gilbert.
+ * Copyright (c) 2005-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -41,7 +42,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.13 20160423";
+static const char * version_str = "1.14 20171006";
 
 #define ME "sg_map26: "
 
@@ -102,13 +103,13 @@ static const char * def_dev_dir = "/dev";
 
 
 static struct option long_options[] = {
-        {"dev_dir", 1, 0, 'd'},
-        {"given_is", 1, 0, 'g'},
-        {"help", 0, 0, 'h'},
-        {"result", 1, 0, 'r'},
-        {"symlink", 0, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"dev_dir", required_argument, 0, 'd'},
+        {"given_is", required_argument, 0, 'g'},
+        {"help", no_argument, 0, 'h'},
+        {"result", required_argument, 0, 'r'},
+        {"symlink", no_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -305,7 +306,7 @@ struct node_match_item {
         int file_type;
         int majj;
         int minn;
-        int follow_symlink;
+        bool follow_symlink;
 };
 
 static struct node_match_item nd_match;
@@ -365,7 +366,7 @@ nd_match_scandir_select(const struct dirent * s)
 
 static int
 list_matching_nodes(const char * dir_name, int file_type, int majj, int minn,
-                    int follow_symlink, int verbose)
+                    bool follow_symlink, int verbose)
 {
         struct dirent ** namelist;
         int num, k;
@@ -630,7 +631,7 @@ get_value(const char * dir_name, const char * base_name, char * value,
 
 static int
 map_hd(const char * device_dir, int ma, int mi, int result,
-       int follow_symlink, int verbose)
+       bool follow_symlink, int verbose)
 {
         char c, num;
 
@@ -661,7 +662,7 @@ map_hd(const char * device_dir, int ma, int mi, int result,
 
 static int
 map_sd(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, int follow_symlink, int verbose)
+       int result, bool follow_symlink, int verbose)
 {
         int index, m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -740,7 +741,7 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_sr(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, int follow_symlink, int verbose)
+       int result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -797,7 +798,7 @@ map_sr(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_st(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, int follow_symlink, int verbose)
+       int result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -855,7 +856,7 @@ map_st(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_osst(const char * device_name, const char * device_dir, int ma, int mi,
-         int result, int follow_symlink, int verbose)
+         int result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -913,7 +914,7 @@ map_osst(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_ch(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, int follow_symlink, int verbose)
+       int result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -970,7 +971,7 @@ map_ch(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_sg(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, int follow_symlink, int verbose)
+       int result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
@@ -1038,16 +1039,16 @@ int
 main(int argc, char * argv[])
 {
         int c, num, tt, cont, res;
-        int do_dev_dir = 0;
         int given_is = -1;
         int result = 0;
-        int follow_symlink = 0;
         int verbose = 0;
+        int ret = 1;
+        int ma, mi;
+        bool do_dev_dir = false;
+        bool follow_symlink = false;
         char device_name[D_NAME_LEN_MAX];
         char device_dir[D_NAME_LEN_MAX];
         char value[D_NAME_LEN_MAX];
-        int ret = 1;
-        int ma, mi;
 
         memset(device_name, 0, sizeof(device_name));
         memset(device_dir, 0, sizeof(device_dir));
@@ -1062,7 +1063,7 @@ main(int argc, char * argv[])
                 switch (c) {
                 case 'd':
                         strncpy(device_dir, optarg, sizeof(device_dir));
-                        do_dev_dir = 1;
+                        do_dev_dir = true;
                         break;
                 case 'g':
                         num = sscanf(optarg, "%d", &res);
@@ -1089,7 +1090,7 @@ main(int argc, char * argv[])
                         }
                         break;
                 case 's':
-                        follow_symlink = 1;
+                        follow_symlink = true;
                         break;
                 case 'v':
                         ++verbose;

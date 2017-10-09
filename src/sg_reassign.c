@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -35,7 +36,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.21 20170917";
+static const char * version_str = "1.22 20171008";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -47,16 +48,16 @@ static const char * version_str = "1.21 20170917";
 
 
 static struct option long_options[] = {
-        {"address", 1, 0, 'a'},
-        {"dummy", 0, 0, 'd'},
-        {"eight", 1, 0, 'e'},
-        {"grown", 0, 0, 'g'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"longlist", 1, 0, 'l'},
-        {"primary", 0, 0, 'p'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"address", required_argument, 0, 'a'},
+        {"dummy", no_argument, 0, 'd'},
+        {"eight", required_argument, 0, 'e'},
+        {"grown", no_argument, 0, 'g'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"longlist", required_argument, 0, 'l'},
+        {"primary", no_argument, 0, 'p'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -216,15 +217,16 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, num, k, j;
-    int dummy = 0;
+    bool dummy = false;
+    bool eight = false;
+    bool eight_given = false;
     bool got_addr = false;
-    int eight = -1;
+    bool longlist = false;
+    bool primary = false;
+    bool grown = false;
+    int sg_fd, res, c, num, k, j;
     int addr_arr_len = 0;
-    int grown = 0;
     int do_hex = 0;
-    int longlist = 0;
-    int primary = 0;
     int verbose = 0;
     const char * device_name = NULL;
     uint64_t addr_arr[MAX_NUM_ADDR];
@@ -252,19 +254,20 @@ main(int argc, char * argv[])
             got_addr = true;
             break;
         case 'd':
-            dummy = 1;
+            dummy = true;
             break;
         case 'e':
             num = sscanf(optarg, "%d", &res);
             if ((1 == num) && ((0 == res) || (1 == res)))
-                eight = res;
+                eight = !! res;
             else {
                 pr2serr("value for '--eight=' must be 0 or 1\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            eight_given = true;
             break;
         case 'g':
-            grown = 1;
+            grown = true;
             break;
         case 'h':
         case '?':
@@ -276,14 +279,14 @@ main(int argc, char * argv[])
         case 'l':
             num = sscanf(optarg, "%d", &res);
             if ((1 == num) && ((0 == res) || (1 == res)))
-                longlist = res;
+                longlist = !!res;
             else {
                 pr2serr("value for '--longlist=' must be 0 or 1\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'p':
-            primary = 1;
+            primary = true;
             break;
         case 'v':
             ++verbose;
@@ -328,18 +331,18 @@ main(int argc, char * argv[])
     if (got_addr) {
         for (k = 0; k < addr_arr_len; ++k) {
             if (addr_arr[k] >= UINT32_MAX) {
-                if (eight < 0) {
-                    eight = 1;
+                if (! eight_given) {
+                    eight = true;
                     break;
-                } else if (0 == eight) {
+                } else if (! eight) {
                     pr2serr("address number %d exceeds 32 bits so "
                             "'--eight=0' invalid\n", k + 1);
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
         }
-        if (eight < 0)
-            eight = 0;
+        if (! eight_given)
+            eight = false;
 
         k = 4;
         for (j = 0; j < addr_arr_len; ++j) {
@@ -359,7 +362,7 @@ main(int argc, char * argv[])
             sg_put_unaligned_be16((uint16_t)k, param_arr + 2);
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
