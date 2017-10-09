@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -31,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.51 20171001";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.52 20171009";    /* spc5r17 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -139,34 +140,34 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
+    bool do_name;
+    bool do_pcb;
+    bool do_ppc;
+    bool do_raw;
+    bool o_readonly;
+    bool do_pcreset;
+    bool do_select;
+    bool do_sp;
+    bool do_temperature;
+    bool do_transport;
+    bool do_version;
+    bool filter_given;
+    bool opt_new;
     int do_all;
     int do_brief;
     int do_enumerate;
     int do_help;
     int do_hex;
     int do_list;
-    int do_name;
-    int do_pcb;
-    int do_ppc;
-    int do_raw;
-    int o_readonly;
-    int do_pcreset;
-    int do_select;
-    int do_sp;
-    int do_temperature;
-    int do_transport;
     int vend_prod_num;  /* one of the VP_* constants or -1 (def) */
     int deduced_vpn;    /* deduced vendor_prod_num; from INQUIRY, etc */
     int verbose;
-    int do_version;
     int filter;
-    bool filter_given;
     int page_control;
     int maxlen;
     int pg_code;
     int subpg_code;
     int paramp;
-    int opt_new;
     int no_inq;
     int dev_pdt;        /* from device or --pdt=DT */
     const char * device_name;
@@ -970,12 +971,12 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
                 op->vend_prod = optarg;
             break;
         case 'n':
-            ++op->do_name;
+            op->do_name = true;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
         case 'p':
             op->pg_arg = optarg;
@@ -990,41 +991,41 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->paramp = n;
             break;
         case 'q':
-            ++op->do_pcb;
+            op->do_pcb = true;
             break;
         case 'Q':       /* N.B. PPC bit obsoleted in SPC-4 rev 18 */
-            ++op->do_ppc;
+            op->do_ppc = true;
             break;
         case 'r':
-            ++op->do_raw;
+            op->do_raw = true;
             break;
         case 'R':
-            ++op->do_pcreset;
-            ++op->do_select;
+            op->do_pcreset = true;
+            op->do_select = true;
             break;
         case 's':
-            ++op->do_sp;
+            op->do_sp = true;
             break;
         case 'S':
-            ++op->do_select;
+            op->do_select = true;
             break;
         case 't':
-            ++op->do_temperature;
+            op->do_temperature = true;
             break;
         case 'T':
-            ++op->do_transport;
+            op->do_transport = true;
             break;
         case 'v':
             ++op->verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         case 'x':
             ++op->no_inq;
             break;
         case 'X':
-            ++op->o_readonly;
+            op->o_readonly = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -1054,7 +1055,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num, n;
+    bool jmp_out;
+    int k, plen, num, n;
     unsigned int u, uu;
     const char * cp;
 
@@ -1064,7 +1066,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'a':
                     ++op->do_all;
@@ -1089,44 +1091,44 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     op->do_list += 2;
                     break;
                 case 'n':
-                    ++op->do_name;
+                    op->do_name = true;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'r':
-                    op->do_pcreset = 1;
-                    op->do_select = 1;
+                    op->do_pcreset = true;
+                    op->do_select = true;
                     break;
                 case 't':
-                    ++op->do_temperature;
+                    op->do_temperature = true;
                     break;
                 case 'T':
-                    ++op->do_transport;
+                    op->do_transport = true;
                     break;
                 case 'v':
                     ++op->verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case 'x':
                     ++op->no_inq;
                     break;
                 case 'X':
-                    ++op->o_readonly;
+                    op->o_readonly = true;
                     break;
                 case '?':
                     ++op->do_help;
                     break;
                 case '-':
                     ++cp;
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -1249,13 +1251,13 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 }
                 op->paramp = u;
             } else if (0 == strncmp("pcb", cp, 3))
-                op->do_pcb = 1;
+                op->do_pcb = true;
             else if (0 == strncmp("ppc", cp, 3))
-                op->do_ppc = 1;
+                op->do_ppc = true;
             else if (0 == strncmp("select", cp, 6))
-                op->do_select = 1;
+                op->do_select = true;
             else if (0 == strncmp("sp", cp, 2))
-                op->do_sp = 1;
+                op->do_sp = true;
             else if (0 == strncmp("old", cp, 3))
                 ;
             else if (jmp_out) {
@@ -1289,12 +1291,12 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = process_cl_old(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = process_cl_new(op, argc, argv);
         if ((0 == res) && (0 == op->opt_new))
             res = process_cl_old(op, argc, argv);
@@ -1352,7 +1354,7 @@ num_or_unknown(const uint8_t * xp, int num_bytes /* max is 8 */, bool in_hex,
  * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
  * error. */
 static int
-f2hex_arr(const char * fname, int as_binary, int no_space,
+f2hex_arr(const char * fname, bool as_binary, bool no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
     int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
@@ -1567,7 +1569,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
                                    true /* noisy */, vb)))
             return res;
         actual_len = sg_get_unaligned_be16(resp + 2) + 4;
-        if ((0 == op->do_raw) && (vb > 1)) {
+        if ((! op->do_raw) && (vb > 1)) {
             pr2serr("  Log sense (find length) response:\n");
             dStrHexErr((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
             pr2serr("  hence calculated response length=%d\n", actual_len);
@@ -1594,7 +1596,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
                                op->subpg_code, op->paramp,
                                resp, actual_len, true /* noisy */, vb)))
         return res;
-    if ((0 == op->do_raw) && (vb > 1)) {
+    if ((! op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense response:\n");
         dStrHexErr((const char *)resp, actual_len, 1);
     }
@@ -1639,7 +1641,7 @@ show_supported_pgs_page(const uint8_t * resp, int len,
     const struct log_elem * lep;
     char b[64];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Supported log pages  [0x0]:\n");  /* introduced: SPC-2 */
     num = len - 4;
     bp = &resp[0] + 4;
@@ -1671,7 +1673,7 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
     const struct log_elem * lep;
     char b[64];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (op->pg_code > 0)
             printf("Supported subpages  [0x%x, 0xff]:\n", op->pg_code);
         else
@@ -1712,7 +1714,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
     const char * cp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Buffer over-run/under-run page  [0x1]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -1836,7 +1838,7 @@ show_error_counter_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
 
     pg_code = resp[0] & 0x3f;
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         switch(pg_code) {
         case WRITE_ERR_LPAGE:
             printf("Write error counter page  [0x%x]\n", pg_code);
@@ -1907,7 +1909,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Non-medium error page  [0x6]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -1958,7 +1960,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Power condition transitions page  [0x1a]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2046,7 +2048,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
     char b[32];
 
     blen = sizeof(b);
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Environmental reporting page  [0xd,0x1]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2138,7 +2140,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
     char b[32];
 
     blen = sizeof(b);
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Environmental limits page  [0xd,0x2]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2225,7 +2227,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
         pr2serr("badly formed tape usage page\n");
         return false;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape usage page  (LTO-5 and LTO-6 specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
         pc = sg_get_unaligned_be16(bp + 0);
@@ -2330,7 +2332,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         pr2serr("badly formed tape capacity page\n");
         return false;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape capacity page  (LTO-5 and LTO-6 specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
         pc = sg_get_unaligned_be16(bp + 0);
@@ -2396,7 +2398,7 @@ show_data_compression_page(const uint8_t * resp, int len,
         pr2serr("badly formed data compression page\n");
         return false;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (0x1b == pg_code)
             printf("Data compression page  (ssc-4) [0x1b]\n");
         else
@@ -2496,7 +2498,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
         printf("No error events logged\n");
         return true;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n error events page  [0x7]\n");
     for (k = num; k > 0; k -= pl, bp += pl) {
         if (k < 3) {
@@ -2551,7 +2553,7 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
         printf("No deferred errors logged\n");
         return true;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n deferred errors page  [0xb]\n");
     for (k = num; k > 0; k -= pl, bp += pl) {
         if (k < 3) {
@@ -2590,7 +2592,7 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n Inquiry data changed  [0xb,0x1]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2649,7 +2651,7 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n Mode page data changed  [0xb,0x2]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2735,7 +2737,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
                 "0x190 bytes]\n", num);
         return true;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Self-test results page  [0x10]\n");
     for (k = 0, bp = resp + 4; k < 20; ++k, bp += 20 ) {
         pl = bp[3] + 4;
@@ -2799,7 +2801,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         pr2serr("badly formed Temperature page\n");
         return false;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (! op->do_temperature)
             printf("Temperature page  [0xd]\n");
     }
@@ -2872,7 +2874,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
         pr2serr("badly formed Start-stop cycle counter page\n");
         return false;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Start-stop cycle counter page  [0xe]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
         if (k < 3) {
@@ -2981,7 +2983,7 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         pr2serr("badly formed Application Client page\n");
         return false;
     }
-    if (op->verbose || ((op->do_raw == 0) && (op->do_hex == 0)))
+    if (op->verbose || ((! op->do_raw) && (op->do_hex == 0)))
         printf("Application client page  [0xf]\n");
     if (0 == op->filter_given) {
         if ((len > 128) && (0 == op->do_hex)) {
@@ -3040,7 +3042,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         pr2serr("badly formed Informational Exceptions page\n");
         return false;
     }
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (full)
             printf("Informational Exceptions page  [0x2f]\n");
     }
@@ -3382,7 +3384,7 @@ show_sas_port_param(const uint8_t * bp, int param_len,
         printf("  num_phys=%d\n", nphys);
     else {
         printf("  number of phys = %d\n", nphys);
-        if ((op->do_pcb) && (0 == op->do_name))
+        if ((op->do_pcb) && (! op->do_name))
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
     }
 
@@ -3523,7 +3525,7 @@ show_protocol_specific_page(const uint8_t * resp, int len,
     const uint8_t * bp;
 
     num = len - 4;
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (op->do_name)
             printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
     }
@@ -3547,7 +3549,7 @@ show_protocol_specific_page(const uint8_t * resp, int len,
                     "is 6\n", pid);
             return false;   /* only decode SAS log page */
         }
-        if ((0 == k) && (0 == op->do_name))
+        if ((0 == k) && (! op->do_name))
             printf("Protocol Specific port page for SAS SSP  (sas-2) "
                    "[0x18]\n");
         show_sas_port_param(bp, pl, op);
@@ -3566,8 +3568,8 @@ static bool
 show_stats_perform_pages(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
-    int k, num, param_len, param_code, subpg_code, extra, nam;
-    bool spf;
+    int k, num, param_len, param_code, subpg_code, extra;
+    bool nam, spf;
     unsigned int ui;
     const uint8_t * bp;
     const char * ccp;
@@ -3579,7 +3581,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
     bp = resp + 4;
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (nam) {
             printf("log_page=0x%x\n", STATS_LPAGE);
             if (subpg_code > 0)
@@ -3733,7 +3735,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     dStrHexErr((const char *)bp, extra, 1);
                 break;
             }
-            if ((op->do_pcb) && (0 == op->do_name))
+            if ((op->do_pcb) && (! op->do_name))
                 printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
             if (op->filter_given)
                 break;
@@ -3839,7 +3841,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     dStrHexErr((const char *)bp, extra, 1);
                 break;
             }
-            if ((op->do_pcb) && (0 == op->do_name))
+            if ((op->do_pcb) && (! op->do_name))
                 printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
             if (op->filter_given)
                 break;
@@ -3853,8 +3855,8 @@ show_stats_perform_pages(const uint8_t * resp, int len,
 static bool
 show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, pc, subpg_code, extra, nam;
-    bool spf;
+    int k, num, pc, subpg_code, extra;
+    bool nam, spf;
     unsigned int ui;
     const uint8_t * bp;
     const char * ccp;
@@ -3870,7 +3872,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     }
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (nam) {
             printf("log_page=0x%x\n", STATS_LPAGE);
             if (subpg_code > 0)
@@ -3973,7 +3975,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrHexErr((const char *)bp, extra, 1);
             break;
         }
-        if ((op->do_pcb) && (0 == op->do_name))
+        if ((op->do_pcb) && (! op->do_name))
             printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
@@ -3993,7 +3995,7 @@ show_format_status_page(const uint8_t * resp, int len,
     uint64_t ull;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Format status page  [0x8]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4078,7 +4080,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Non-volatile cache page  [0x17]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4165,7 +4167,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
     const char * cp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Logical block provisioning page  [0xc]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4256,7 +4258,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Utilization page  [0xe,0x1]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4327,7 +4329,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Solid state media page  [0x11]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4405,7 +4407,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[64];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("DT device status page (ssc-3, adc-3) [0x11]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4544,7 +4546,7 @@ show_tapealert_response_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("TapeAlert response page (ssc-3, adc-3) [0x12]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4633,7 +4635,7 @@ show_requested_recovery_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Requested recovery page (ssc-3) [0x13]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4695,7 +4697,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
     const uint8_t * dp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("ATA pass-through results page (sat-2) [0x16]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4784,7 +4786,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Background scan results page  [0x15]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -4909,7 +4911,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Zoned block device statistics page  [0x14,0x1]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5096,7 +5098,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Pending defects page  [0x15,0x1]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5164,7 +5166,7 @@ show_background_op_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Background operation page  [0x15,0x2]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5221,7 +5223,7 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("LPS misalignment page  [0x15,0x3]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5283,7 +5285,7 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Service buffer information page (adc-3) [0x15]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5340,7 +5342,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
     bool all_set;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Sequential access device page (ssc-3)\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5452,7 +5454,7 @@ show_device_stats_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Device statistics page (ssc-3 and adc)\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5631,7 +5633,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     uint64_t ull;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Media statistics page (smc-3)\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5767,7 +5769,7 @@ show_element_stats_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Element statistics page (smc-3) [0x15]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5820,7 +5822,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[80];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape diagnostics data page (ssc-3) [0x16]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -5910,7 +5912,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[80];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Media changer diagnostics data page (smc-3) [0x16]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -6074,7 +6076,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
 
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (subpg_code < 0x10)
             printf("Volume statistics page (ssc-4), subpage=%d\n",
                    subpg_code);
@@ -6362,7 +6364,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
 
     /* N.B. the Tape alert log page for smc-3 is different */
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape alert page (ssc-3) [0x2e]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -6411,7 +6413,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Seagate cache page [0x37]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -6462,12 +6464,13 @@ static bool
 show_seagate_factory_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
-    int num, pl, pc, valid;
+    bool valid = false;
+    int num, pl, pc;
     const uint8_t * bp;
     uint64_t ull;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((0 == op->do_raw) && (0 == op->do_hex)))
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Seagate/Hitachi factory page [0x3e]\n");
     num = len - 4;
     bp = &resp[0] + 4;
@@ -6485,13 +6488,13 @@ show_seagate_factory_page(const uint8_t * resp, int len,
                 break;
             }
         }
-        valid = 1;
+        valid = true;
         switch (pc) {
         case 0: printf("  number of hours powered up"); break;
         case 8: printf("  number of minutes until next internal SMART test");
             break;
         default:
-            valid = 0;
+            valid = false;
             printf("  Unknown Seagate/Hitachi parameter code = 0x%x", pc);
             break;
         }
@@ -6715,11 +6718,11 @@ main(int argc, char * argv[])
             int pg_code, subpg_code, pdt, n;
             uint16_t u;
 
-            if (f2hex_arr(op->in_fn, op->do_raw, 0, rsp_buff, &in_len,
+            if (f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
                           sizeof(rsp_buff)))
                 return SG_LIB_FILE_ERROR;
             if (op->do_raw)
-                op->do_raw = 0;    /* can interfere on decode */
+                op->do_raw = false;    /* can interfere on decode */
             if (in_len < 4) {
                 pr2serr("--in=%s only decoded %d bytes (needs 4 at least)\n",
                         op->in_fn, in_len);
@@ -6800,7 +6803,7 @@ main(int argc, char * argv[])
                     "given\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (f2hex_arr(op->in_fn, op->do_raw, 0, rsp_buff, &in_len,
+        if (f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
                       sizeof(rsp_buff)))
             return SG_LIB_FILE_ERROR;
     }
@@ -6826,8 +6829,8 @@ main(int argc, char * argv[])
 #endif
     sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
                                 op->verbose);
-    if ((sg_fd < 0) && (0 == op->o_readonly))
-        sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+    if ((sg_fd < 0) && (! op->o_readonly))
+        sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                     op->verbose);
     if (sg_fd < 0) {
         pr2serr("error opening file: %s: %s \n", op->device_name,
@@ -6859,7 +6862,7 @@ main(int argc, char * argv[])
             return SG_LIB_CAT_OTHER;
         }
         op->dev_pdt = inq_out.peripheral_type;
-        if ((0 == op->do_raw) && (0 == op->do_hex) && (0 == op->do_name) &&
+        if ((! op->do_raw) && (0 == op->do_hex) && (! op->do_name) &&
             (0 == op->no_inq) && (0 == op->do_brief))
             printf("    %.8s  %.16s  %.4s\n", inq_out.vendor,
                    inq_out.product, inq_out.revision);
@@ -6869,11 +6872,11 @@ main(int argc, char * argv[])
             op->deduced_vpn = find_vpn_by_inquiry();
     }
 
-    if (1 == op->do_temperature)
+    if (op->do_temperature)
         return fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op);
 
     if (op->do_select) {
-        k = sg_ll_log_select(sg_fd, !!(op->do_pcreset), op->do_sp,
+        k = sg_ll_log_select(sg_fd, op->do_pcreset, op->do_sp,
                              op->page_control, op->pg_code, op->subpg_code,
                              rsp_buff, ((in_len > 0) ? in_len : 0),
                              true, op->verbose);
@@ -6956,7 +6959,7 @@ main(int argc, char * argv[])
         }
         memcpy(parr, rsp_buff + 4, my_len);
         for (k = 0; k < my_len; ++k) {
-            if (0 == op->do_raw)
+            if (! op->do_raw)
                 printf("\n");
             op->pg_code = parr[k] & 0x3f;
             if (spf)

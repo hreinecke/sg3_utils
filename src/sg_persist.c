@@ -12,6 +12,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -28,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.55 20170917";
+static const char * version_str = "0.56 20171006";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -55,19 +57,19 @@ struct opts_t {
     uint64_t param_rk;
     uint64_t param_sark;
     unsigned int param_rtp;
-    int prin;
+    int hex;
+    int num_transportids;
     int prin_sa;
     int prout_sa;
-    int param_alltgpt;
-    int param_aptpl;
-    int param_unreg;
-    int inquiry;
-    int hex;
-    int readonly;
-    unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
-    int num_transportids;
-    unsigned int alloc_len;
+    int readonly;       /* 0, 1 or 2 (2 for override environment variable) */
     int verbose;
+    bool inquiry;       /* set true by default (unlike most bools) */
+    bool param_alltgpt;
+    bool param_aptpl;
+    bool param_unreg;
+    bool pr_in;         /* true: PR_IN (def); false: PR_OUT */
+    unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
+    unsigned int alloc_len;
 };
 
 
@@ -451,7 +453,7 @@ prout_work(int sg_fd, struct opts_t * op)
         len += (t_arr_len + 4);
         sg_put_unaligned_be32((uint32_t)t_arr_len, pr_buff + 24);
     }
-    res = sg_ll_persistent_reserve_out(sg_fd, op->prout_sa, 0,
+    res = sg_ll_persistent_reserve_out(sg_fd, op->prout_sa, 0 /* rq_scope */,
                                        op->prout_type, pr_buff, len, true,
                                        op->verbose);
     if (res || op->verbose) {
@@ -497,9 +499,9 @@ prout_reg_move_work(int sg_fd, struct opts_t * op)
         len += t_arr_len;
         sg_put_unaligned_be32((uint32_t)t_arr_len, pr_buff + 20);
     }
-    res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA, 0,
-                                       op->prout_type, pr_buff, len, true,
-                                       op->verbose);
+    res = sg_ll_persistent_reserve_out(sg_fd, PROUT_REG_MOVE_SA,
+                                       0 /* rq_scope */, op->prout_type,
+                                       pr_buff, len, true, op->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("PR out (register and move): command not supported\n");
@@ -675,14 +677,14 @@ static int
 decode_file_tids(const char * fnp, struct opts_t * op)
 {
     FILE * fp = stdin;
-    int in_len, k, j, m, split_line;
-    unsigned int h;
     const char * lcp;
-    char line[1024];
-    char carry_over[4];
+    unsigned char * tid_arr = op->transportid_arr;
+    int in_len, k, j, m, split_line;
     int off = 0;
     int num = 0;
-    unsigned char * tid_arr = op->transportid_arr;
+    unsigned int h;
+    char line[1024];
+    char carry_over[4];
 
     if (fnp) {
         fp = fopen(fnp, "r");
@@ -872,14 +874,14 @@ main(int argc, char * argv[])
     int sg_fd, c, k, res;
     const char * device_name = NULL;
     char buff[48];
-    int help =0;
+    int help = 0;
     int num_prin_sa = 0;
     int num_prout_sa = 0;
     int num_prout_param = 0;
-    int want_prin = 0;
-    int want_prout = 0;
     int peri_type = 0;
     int ret = 0;
+    bool want_prin = false;
+    bool want_prout = false;
     struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
     struct opts_t opts;
@@ -887,10 +889,10 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(op, 0, sizeof(opts));
-    op->prin = 1;
+    op->pr_in = true;
     op->prin_sa = -1;
     op->prout_sa = -1;
-    op->inquiry = 1;
+    op->inquiry = true;
     op->alloc_len = MX_ALLOC_LEN;
 
     while (1) {
@@ -928,7 +930,7 @@ main(int argc, char * argv[])
             ++op->hex;
             break;
         case 'i':
-            want_prin = 1;
+            want_prin = true;
             break;
         case 'I':
             op->prout_sa = PROUT_REG_IGN_SA;
@@ -964,10 +966,10 @@ main(int argc, char * argv[])
             ++num_prout_sa;
             break;
         case 'n':
-            op->inquiry = 0;
+            op->inquiry = false;
             break;
         case 'o':
-            want_prout = 1;
+            want_prout = true;
             break;
         case 'P':
             op->prout_sa = PROUT_PREE_SA;
@@ -1012,7 +1014,7 @@ main(int argc, char * argv[])
             ++num_prout_param;
             break;
         case 'U':
-            op->param_unreg = 1;
+            op->param_unreg = true;
             break;
         case 'v':
             ++op->verbose;
@@ -1027,11 +1029,11 @@ main(int argc, char * argv[])
             }
             ++num_prout_param;
             break;
-        case 'y':
+        case 'y':       /* 3 valued */
             ++op->readonly;
             break;
         case 'Y':
-            op->param_alltgpt = 1;
+            op->param_alltgpt = true;
             ++num_prout_param;
             break;
         case 'z':
@@ -1039,7 +1041,7 @@ main(int argc, char * argv[])
             ++num_prout_sa;
             break;
         case 'Z':
-            op->param_aptpl = 1;
+            op->param_aptpl = true;
             ++num_prout_param;
             break;
         case '?':
@@ -1073,12 +1075,12 @@ main(int argc, char * argv[])
         usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((want_prout + want_prin) > 1) {
+    if (want_prout && want_prin) {
         pr2serr("choose '--in' _or_ '--out' (not both)\n");
         usage(1);
         return SG_LIB_SYNTAX_ERROR;
     } else if (want_prout) { /* syntax check on PROUT arguments */
-        op->prin = 0;
+        op->pr_in = false;
         if ((1 != num_prout_sa) || (0 != num_prin_sa)) {
             pr2serr(">> For Persistent Reserve Out one and only one "
                     "appropriate\n>> service action must be chosen (e.g. "
@@ -1139,13 +1141,13 @@ main(int argc, char * argv[])
     }
 
     if (op->inquiry) {
-        if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */,
+        if ((sg_fd = sg_cmds_open_device(device_name, true /* ro */,
                                          op->verbose)) < 0) {
             pr2serr("sg_persist: error opening file (ro): %s: %s\n",
                     device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, op->verbose)) {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);
             peri_type = inq_resp.peripheral_type;
@@ -1164,18 +1166,18 @@ main(int argc, char * argv[])
 
     if (0 == op->readonly) {
         cp = getenv(SG_PERSIST_IN_RDONLY);
-        if (cp && op->prin)
+        if (cp && op->pr_in)
             op->readonly = 1;
     } else if (op->readonly > 1)        /* -yy forces open(RW) */
         op->readonly = 0;
-    if ((sg_fd = sg_cmds_open_device(device_name, op->readonly,
+    if ((sg_fd = sg_cmds_open_device(device_name, !!op->readonly,
                                      op->verbose)) < 0) {
         pr2serr("sg_persist: error opening file (rw): %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
-    if (op->prin)
+    if (op->pr_in)
         ret = prin_work(sg_fd, op);
     else if (PROUT_REG_MOVE_SA == op->prout_sa)
         ret = prout_reg_move_work(sg_fd, op);

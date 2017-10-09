@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -32,7 +33,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.01 20170917";
+static const char * version_str = "1.02 20171008";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -112,8 +113,8 @@ sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
     set_scsi_pt_cdb(ptvp, bcCDB, sizeof(bcCDB));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cmd_name, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cmd_name, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -200,7 +201,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

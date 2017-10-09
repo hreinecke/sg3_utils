@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
@@ -47,7 +49,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.12 20160528";
+static const char * version_str = "1.13 20171007";
 
 static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
@@ -103,18 +105,20 @@ usage()
 
 static int
 do_set_features(int sg_fd, int feature, int count, uint64_t lba,
-                int cdb_len, int ck_cond, int extend, int verbose)
+                int cdb_len, bool ck_cond, bool extend, int verbose)
 {
+    const bool t_type = false;  /* false -> 512 byte blocks, true -> device's
+                                   LB size */
+    const bool t_dir = true;    /* false -> to device, true -> from device */
+    const bool byte_block = true; /* false -> bytes, true -> 512 byte blocks
+                                     (if t_type=false) */
+    bool got_ard = false;       /* got ATA result descriptor */
     int res, ret;
     /* Following for ATA READ/WRITE MULTIPLE (EXT) cmds, normally 0 */
     int multiple_count = 0;
     int protocol = 3;   /* non-data */
-    int t_type = 0;     /* 0 -> 512 byte blocks, 1 -> device's LB size */
-    int t_dir = 1;      /* 0 -> to device, 1 -> from device */
-    int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks (if t_type=0) */
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
     int resid = 0;
-    int got_ard = 0;    /* got ATA result descriptor */
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
     unsigned char sense_buffer[64];
@@ -140,9 +144,18 @@ do_set_features(int sg_fd, int feature, int count, uint64_t lba,
         apt_cdb[7] = (lba >> 24) & 0xff;
         apt_cdb[9] = (lba >> 32) & 0xff;
         apt_cdb[11] = (lba >> 40) & 0xff;
-        apt_cdb[1] = (multiple_count << 5) | (protocol << 1) | extend;
-        apt_cdb[2] = (ck_cond << 5) | (t_type << 4)| (t_dir << 3) |
-                       (byte_block << 2) | t_length;
+        apt_cdb[1] = (multiple_count << 5) | (protocol << 1);
+        if (extend)
+           apt_cdb[1] |= 0x1;
+        apt_cdb[2] = t_length;
+        if (ck_cond)
+            apt_cdb[2] |= 0x20;
+        if (t_type)
+            apt_cdb[2] |= 0x10;
+        if (t_dir)
+            apt_cdb[2] |= 0x8;
+        if (byte_block)
+            apt_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt_cdb, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -156,8 +169,15 @@ do_set_features(int sg_fd, int feature, int count, uint64_t lba,
         apt12_cdb[6] = (lba >> 8) & 0xff;
         apt12_cdb[7] = (lba >> 16) & 0xff;
         apt12_cdb[1] = (multiple_count << 5) | (protocol << 1);
-        apt12_cdb[2] = (ck_cond << 5) | (t_type << 4) | (t_dir << 3) |
-                         (byte_block << 2) | t_length;
+        apt12_cdb[2] = t_length;
+        if (ck_cond)
+            apt12_cdb[2] |= 0x20;
+        if (t_type)
+            apt12_cdb[2] |= 0x10;
+        if (t_dir)
+            apt12_cdb[2] |= 0x8;
+        if (byte_block)
+            apt12_cdb[2] |= 0x4;
         res = sg_ll_ata_pt(sg_fd, apt12_cdb, cdb_len, DEF_TIMEOUT, NULL,
                            NULL /* doutp */, 0, sense_buffer,
                            sb_sz, ata_return_desc,
@@ -280,16 +300,16 @@ do_set_features(int sg_fd, int feature, int count, uint64_t lba,
 int
 main(int argc, char * argv[])
 {
+    bool ck_cond = false;
+    bool extend = false;
+    bool rdonly = false;
     int sg_fd, c, ret, res;
-    const char * device_name = NULL;
     int count = 0;
-    int extend = 0;
-    int rdonly = 0;
     int feature = 0;
-    uint64_t lba = 0;
     int verbose = 0;
-    int ck_cond = 0;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
+    uint64_t lba = 0;
+    const char * device_name = NULL;
 
     while (1) {
         int option_index = 0;
@@ -308,10 +328,10 @@ main(int argc, char * argv[])
             }
             break;
         case 'C':
-            ck_cond = 1;
+            ck_cond = true;
             break;
         case 'e':
-            extend = 1;
+            extend = true;
             break;
         case 'f':
             feature = sg_get_num(optarg);
@@ -337,11 +357,9 @@ main(int argc, char * argv[])
                 pr2serr("bad argument for '--lba'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            if (lba > 0xffffffff)
-                extend = 1;
             break;
         case 'r':
-            ++rdonly;
+            rdonly = true;
             break;
         case 'v':
             ++verbose;
@@ -374,10 +392,19 @@ main(int argc, char * argv[])
         return 1;
     }
 
-    if ((lba > 0xffffff) && (12 == cdb_len)) {
-        cdb_len = 16;
-        if (verbose)
-            pr2serr("Since lba > 0xffffff, forcing cdb length to 16\n");
+    if (lba > 0xffffff) {
+        if (12 == cdb_len) {
+            cdb_len = 16;
+            if (verbose)
+                pr2serr("Since lba > 0xffffff, forcing cdb length to 16\n");
+        }
+        if (16 == cdb_len) {
+            if (! extend) {
+                extend = true;
+                if (verbose)
+                    pr2serr("Since lba > 0xffffff, set extend bit\n");
+            }
+        }
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, rdonly, verbose)) < 0) {

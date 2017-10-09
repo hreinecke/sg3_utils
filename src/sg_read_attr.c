@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -34,7 +35,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.03 20170926";
+static const char * version_str = "1.04 20171006";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -60,9 +61,11 @@ static const char * version_str = "1.03 20170926";
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 struct opts_t {
-    int cache;
-    int ea;
-    int enumerate;
+    bool cache;
+    bool enumerate;
+    bool do_raw;
+    bool o_readonly;
+    int elem_addr;
     int filter;
     int fai;
     int do_hex;
@@ -70,8 +73,6 @@ struct opts_t {
     int maxlen;
     int pn;
     int quiet;
-    int do_raw;
-    int o_readonly;
     int sa;
     int verbose;
 };
@@ -246,8 +247,8 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
     struct sg_pt_base * ptvp;
 
     ra_cdb[1] = 0x1f & op->sa;
-    if (op->ea)
-        sg_put_unaligned_be16(op->ea, ra_cdb + 2);
+    if (op->elem_addr)
+        sg_put_unaligned_be16(op->elem_addr, ra_cdb + 2);
     if (op->lvn)
         ra_cdb[5] = 0xff & op->lvn;
     if (op->pn)
@@ -373,7 +374,7 @@ enum_sa_acrons(void)
  * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
  * error. */
 static int
-f2hex_arr(const char * fname, int as_binary, int no_space,
+f2hex_arr(const char * fname, bool as_binary, bool no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
     int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
@@ -926,15 +927,15 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'c':
-            ++op->cache;
+            op->cache = true;
             break;
         case 'e':
-            ++op->enumerate;
+            op->enumerate = true;
             break;
         case 'E':
-           op->ea = sg_get_num(optarg);
-           if ((op->ea < 0) || (op->ea > 65535)) {
-                pr2serr("bad argument to '--ea=EA', expect 0 to 65535\n");
+           op->elem_addr = sg_get_num(optarg);
+           if ((op->elem_addr < 0) || (op->elem_addr > 65535)) {
+                pr2serr("bad argument to '--element=EA', expect 0 to 65535\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -989,10 +990,10 @@ main(int argc, char * argv[])
             ++op->quiet;
             break;
         case 'r':
-            ++op->do_raw;
+            op->do_raw = true;
             break;
         case 'R':
-            ++op->o_readonly;
+            op->o_readonly = true;
             break;
         case 's':
            if (isdigit(*optarg)) {
@@ -1057,12 +1058,13 @@ main(int argc, char * argv[])
 
     if (NULL == device_name) {
         if (fname) {
-            if (f2hex_arr(fname, op->do_raw, 0, rabp, &in_len, op->maxlen)) {
+            if (f2hex_arr(fname, op->do_raw, 0 /* no space */, rabp,
+                          &in_len, op->maxlen)) {
                 ret = SG_LIB_FILE_ERROR;
                 goto clean_up;
             }
             if (op->do_raw)
-                op->do_raw = 0;    /* can interfere on decode */
+                op->do_raw = false;    /* can interfere on decode */
             if (in_len < 4) {
                 pr2serr("--in=%s only decoded %d bytes (needs 4 at least)\n",
                         fname, in_len);

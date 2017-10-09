@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -33,7 +34,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.03 20170917";
+static const char * version_str = "1.04 20171008";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -209,8 +210,8 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "set timestamp", res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "set timestamp", res, SG_NO_DATA_IN,
+                               sense_b, noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -242,20 +243,20 @@ dStrRaw(const char* str, int len)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c;
-    int do_origin = 0;
-    int do_set = 0;
-    int do_srep = 0;
-    int do_raw = 0;
-    int readonly = 0;
+    bool do_origin = false;
+    bool do_srep = false;
+    bool do_raw = false;
+    bool readonly = false;
     bool secs_given = false;
+    int sg_fd, res, c;
+    int do_set = 0;
+    int ret = 0;
     int verbose = 0;
     uint64_t secs = 0;
     uint64_t msecs = 0;
     int64_t ll;
     const char * device_name = NULL;
     const char * cmd_name;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -280,13 +281,13 @@ main(int argc, char * argv[])
             ++do_set;
             break;
         case 'o':
-            ++do_origin;
+            do_origin = true;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++readonly;
+            readonly = true;
             break;
         case 's':
             ll = sg_get_llnum(optarg);
@@ -299,7 +300,7 @@ main(int argc, char * argv[])
             secs_given = true;
             break;
         case 'S':
-            ++do_srep;
+            do_srep = true;
             break;
         case 'v':
             ++verbose;

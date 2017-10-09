@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
@@ -29,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20170924";
+static const char * version_str = "1.17 20171008";
 
 
 #define ME "sg_write_same: "
@@ -78,23 +79,22 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int anchor;
+    bool anchor;
+    bool ndob;
+    bool lbdata;
+    bool pbdata;
+    bool unmap;
+    bool want_ws10;
     int grpnum;
-    char ifilename[256];
-    uint64_t lba;
-    int lbdata;
-    int ndob;
     int numblocks;
-    int pbdata;
     int timeout;
-    int unmap;
     int verbose;
     int wrprotect;
     int xfer_len;
     int pref_cdb_size;
-    int want_ws10;
+    uint64_t lba;
+    char ifilename[256];
 };
-
 
 
 static void
@@ -167,7 +167,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     if (WRITE_SAME10_LEN == cdb_len) {
         llba = op->lba + op->numblocks;
         if ((op->numblocks > 0xffff) || (llba > UINT32_MAX) ||
-            op->ndob || (op->unmap && (0 == op->want_ws10))) {
+            op->ndob || (op->unmap && (! op->want_ws10))) {
             cdb_len = WRITE_SAME16_LEN;
             if (op->verbose) {
                 const char * cp = "use WRITE SAME(16) instead of 10 byte "
@@ -264,8 +264,9 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
-    ret = sg_cmds_process_resp(ptvp, "Write same", res, 0, sense_b,
-                               true /*noisy */, op->verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "Write same", res, SG_NO_DATA_IN,
+                               sense_b, true /*noisy */, op->verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -276,7 +277,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             break;
         case SG_LIB_CAT_MEDIUM_HARD:
             {
-                int valid, slen;
+                bool valid;
+                int slen;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
@@ -302,21 +304,22 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, infd, prot_en, act_cdb_len, vb;
-    bool num_given = false;
-    bool lba_given = false;
-    bool if_given = false;
     bool got_stdin = false;
-    int64_t ll;
+    bool if_given = false;
+    bool lba_given = false;
+    bool num_given = false;
+    bool prot_en;
+    int sg_fd, res, c, infd, act_cdb_len, vb;
+    int ret = -1;
     uint32_t block_size;
+    int64_t ll;
     const char * device_name = NULL;
+    struct opts_t * op;
+    unsigned char * wBuff = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
     unsigned char resp_buff[RCAP16_RESP_LEN];
-    unsigned char * wBuff = NULL;
-    int ret = -1;
     struct opts_t opts;
-    struct opts_t * op;
     struct stat a_stat;
 
     op = &opts;
@@ -334,7 +337,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'a':
-            ++op->anchor;
+            op->anchor = true;
             break;
         case 'g':
             op->grpnum = sg_get_num(optarg);
@@ -361,7 +364,7 @@ main(int argc, char * argv[])
             lba_given = true;
             break;
         case 'L':
-            ++op->lbdata;
+            op->lbdata = true;
             break;
         case 'n':
             op->numblocks = sg_get_num(optarg);
@@ -372,13 +375,13 @@ main(int argc, char * argv[])
             num_given = true;
             break;
         case 'N':
-            ++op->ndob;
+            op->ndob = true;
             break;
         case 'P':
-            ++op->pbdata;
+            op->pbdata = true;
             break;
         case 'R':
-            ++op->want_ws10;
+            op->want_ws10 = true;
             break;
         case 'S':
             if (DEF_WS_CDB_SIZE != op->pref_cdb_size) {
@@ -402,7 +405,7 @@ main(int argc, char * argv[])
             op->pref_cdb_size = 32;
             break;
         case 'U':
-            ++op->unmap;
+            op->unmap = true;
             break;
         case 'v':
             ++op->verbose;
@@ -484,20 +487,21 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
 
     if (! op->ndob) {
-        prot_en = 0;
+        prot_en = false;
         if (0 == op->xfer_len) {
-            res = sg_ll_readcap_16(sg_fd, 0 /* pmi */, 0 /* llba */, resp_buff,
-                                   RCAP16_RESP_LEN, true, (vb ? (vb - 1): 0));
+            res = sg_ll_readcap_16(sg_fd, false /* pmi */, 0 /* llba */,
+                                   resp_buff, RCAP16_RESP_LEN, true,
+                                   (vb ? (vb - 1): 0));
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 pr2serr("Read capacity(16) unit attention, try again\n");
-                res = sg_ll_readcap_16(sg_fd, 0, 0, resp_buff,
+                res = sg_ll_readcap_16(sg_fd, false, 0, resp_buff,
                                        RCAP16_RESP_LEN, true,
                                        (vb ? (vb - 1): 0));
             }
@@ -514,7 +518,7 @@ main(int argc, char * argv[])
                 if (vb)
                     pr2serr("Read capacity(16) not supported, try Read "
                             "capacity(10)\n");
-                res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */,
+                res = sg_ll_readcap_10(sg_fd, false /* pmi */, 0 /* lba */,
                                        resp_buff, RCAP10_RESP_LEN, true,
                                        (vb ? (vb - 1): 0));
                 if (0 == res) {

@@ -450,7 +450,9 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
-CC = @CC@
+
+# For C++/clang testing
+CC = clang++
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
@@ -564,15 +566,12 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 sg_scan_SOURCES = $(am__append_2) $(am__append_4) $(am__append_6)
 
-# For C++/clang testing
-
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu89 (gnu90 is the same)
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
 AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
-AM_CFLAGS = -Wall -W @os_cflags@
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11
 # AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c11 --analyze
-# AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c++14
+AM_CFLAGS = -Wall -W @os_cflags@ -pedantic -std=c++14
 sg_bg_ctl_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_compare_and_write_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_copy_results_LDADD = ../lib/libsgutils2.la @os_libs@

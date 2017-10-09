@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
@@ -29,7 +31,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.22 20170917";    /* spc5r10 */
+static const char * version_str = "1.23 20171008";    /* spc5r10 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -48,6 +50,8 @@ static struct option long_options[] = {
         {"length", required_argument, 0, 'l'},
         {"mode", required_argument, 0, 'm'},
         {"offset", required_argument, 0, 'o'},
+        {"read-stdin", no_argument, 0, 'r'},
+        {"read_stdin", no_argument, 0, 'r'},
         {"raw", no_argument, 0, 'r'},
         {"skip", required_argument, 0, 's'},
         {"specific", required_argument, 0, 'S'},
@@ -64,7 +68,7 @@ usage()
     pr2serr("Usage: "
             "sg_write_buffer [--bpw=CS] [--help] [--id=ID] [--in=FILE]\n"
             "                       [--length=LEN] [--mode=MO] "
-            "[--offset=OFF] [--raw]\n"
+            "[--offset=OFF] [--read-stdin]\n"
             "                       [--skip=SKIP] [--specific=MS] "
             "[--timeout=TO]\n"
             "                       [--verbose] [--version] DEVICE\n"
@@ -86,7 +90,7 @@ usage()
             "                           (def: 0 -> 'combined header and "
             "data' (obs))\n"
             "    --offset=OFF|-o OFF    buffer offset (unit: bytes, def: 0)\n"
-            "    --raw|-r               read from stdin (same as '-I -')\n"
+            "    --read-stdin|-r        read from stdin (same as '-I -')\n"
             "    --skip=SKIP|-s SKIP    bytes in file FILE to skip before "
             "reading\n"
             "    --specific=MS|-S MS    mode specific value; 3 bit field "
@@ -169,104 +173,31 @@ print_modes(void)
             "dmc_offs_ev_defer mode downloads.\n");
 }
 
-/* <<<< This function may be moved to the library in the future >>> */
-/* Invokes a SCSI WRITE BUFFER command (SPC). Return of 0 ->
- * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
-static int
-sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
-                      uint32_t buffer_offset, void * paramp,
-                      uint32_t param_len, int to_secs, bool noisy,
-                      int verbose)
-{
-    int k, res, ret, sense_cat;
-    uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
-        {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
-
-    if (buffer_offset > 0xffffff) {
-        pr2serr("%s: buffer_offset value too large for 24 bits\n", __func__);
-        return -1;
-    }
-    if (param_len > 0xffffff) {
-        pr2serr("%s: param_len value too large for 24 bits\n", __func__);
-        return -1;
-    }
-    wbuf_cdb[1] = (uint8_t)(mode & 0x1f);
-    wbuf_cdb[1] |= (uint8_t)((m_specific & 0x7) << 5);
-    wbuf_cdb[2] = (uint8_t)(buffer_id & 0xff);
-    sg_put_unaligned_be24(buffer_offset, wbuf_cdb + 3);
-    sg_put_unaligned_be24(param_len, wbuf_cdb + 6);
-    if (verbose) {
-        pr2serr("    Write buffer cdb: ");
-        for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
-            pr2serr("%02x ", wbuf_cdb[k]);
-        pr2serr("\n");
-        if ((verbose > 1) && paramp && param_len) {
-            pr2serr("    Write buffer parameter list%s:\n",
-                    ((param_len > 256) ? " (first 256 bytes)" : ""));
-            dStrHexErr((const char *)paramp,
-                       ((param_len > 256) ? 256 : param_len), -1);
-        }
-    }
-
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2serr("%s: out of memory\n", __func__);
-        return -1;
-    }
-    set_scsi_pt_cdb(ptvp, wbuf_cdb, sizeof(wbuf_cdb));
-    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
-    res = do_scsi_pt(ptvp, sg_fd, to_secs, verbose);
-    ret = sg_cmds_process_resp(ptvp, "Write buffer", res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
-        switch (sense_cat) {
-        case SG_LIB_CAT_RECOVERED:
-        case SG_LIB_CAT_NO_SENSE:
-            ret = 0;
-            break;
-        default:
-            ret = sense_cat;
-            break;
-        }
-    } else
-        ret = 0;
-
-    destruct_scsi_pt_obj(ptvp);
-    return ret;
-}
-
 
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, infd, res, c, len, k, n, got_stdin;
+    bool bpw_then_activate = false;
+    bool got_stdin;
+    bool wb_len_given = false;
+    int sg_fd, infd, res, c, len, k, n;
     int bpw = 0;
-    int bpw_then_activate = 0;
     int do_help = 0;
+    int ret = 0;
+    int verbose = 0;
     int wb_id = 0;
     int wb_len = 0;
-    int wb_len_given = 0;
     int wb_mode = 0;
     int wb_offset = 0;
     int wb_skip = 0;
     int wb_timeout = DEF_PT_TIMEOUT;
     int wb_mspec = 0;
-    int verbose = 0;
     const char * device_name = NULL;
     const char * file_name = NULL;
     unsigned char * dop = NULL;
     char * cp;
     const struct mode_s * mp;
     char ebuff[EBUFF_SZ];
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -286,7 +217,7 @@ main(int argc, char * argv[])
             }
             if ((cp = strchr(optarg, ','))) {
                 if (0 == strncmp("act", cp + 1, 3))
-                    ++bpw_then_activate;
+                    bpw_then_activate = true;
             }
             break;
         case 'h':
@@ -310,7 +241,7 @@ main(int argc, char * argv[])
                 pr2serr("bad argument to '--length'\n");
                 return SG_LIB_SYNTAX_ERROR;
              }
-             wb_len_given = 1;
+             wb_len_given = true;
              break;
         case 'm':
             if (isdigit(*optarg)) {
@@ -341,7 +272,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
-        case 'r':
+        case 'r':       /* --read-stdin and --raw (previous name) */
             file_name = "-";
             break;
         case 's':
@@ -419,7 +350,7 @@ main(int argc, char * argv[])
 #endif
 #endif
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -435,7 +366,7 @@ main(int argc, char * argv[])
         }
         memset(dop, 0xff, wb_len);
         if (file_name) {
-            got_stdin = (0 == strcmp(file_name, "-")) ? 1 : 0;
+            got_stdin = (0 == strcmp(file_name, "-"));
             if (got_stdin) {
                 if (wb_skip > 0) {
                     pr2serr("Can't skip on stdin\n");
@@ -516,7 +447,9 @@ main(int argc, char * argv[])
         if (bpw_then_activate) {
             if (verbose)
                 pr2serr("sending Activate deferred microcode [0xf]\n");
-            res = sg_ll_write_buffer_v2(sg_fd, MODE_ACTIVATE_MC, 0, 0, 0,
+            res = sg_ll_write_buffer_v2(sg_fd, MODE_ACTIVATE_MC,
+			   	        0 /* buffer_id */,
+				       	0 /* buffer_offset */, 0,
                                         NULL, 0, wb_timeout, true, verbose);
         }
     } else {

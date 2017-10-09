@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -32,7 +34,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.10 20170917";
+static const char * version_str = "1.11 20171006";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -91,7 +93,7 @@ usage()
 /* Invokes a SCSI REPORT ZONES command (ZBC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_report_zones(int sg_fd, uint64_t zs_lba, int partial, int report_opts,
+sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
                    void * resp, int mx_resp_len, int * residp, bool noisy,
                    int verbose)
 {
@@ -245,20 +247,20 @@ static const char * same_desc_arr[16] = {
 int
 main(int argc, char * argv[])
 {
+    bool do_partial = false;
+    bool do_raw = false;
+    bool o_readonly = false;
     int sg_fd, k, res, c, zl_len, len, zones, resid, rlen, zt, zc, same;
     int do_hex = 0;
     int maxlen = 0;
-    int do_partial = 0;
-    int do_raw = 0;
-    int o_readonly = 0;
     int reporting_opt = 0;
+    int ret = 0;
     int verbose = 0;
     uint64_t st_lba = 0;
     int64_t ll;
     const char * device_name = NULL;
     unsigned char * reportZonesBuff = NULL;
     unsigned char * bp;
-    int ret = 0;
     char b[80];
 
     while (1) {
@@ -294,13 +296,13 @@ main(int argc, char * argv[])
             }
             break;
         case 'p':
-            ++do_partial;
+            do_partial = true;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 's':
             ll = sg_get_llnum(optarg);

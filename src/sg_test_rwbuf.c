@@ -26,6 +26,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #include <sys/ioctl.h>
@@ -41,7 +43,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.10 20170921";
+static const char * version_str = "1.11 20171007";
 
 #define BPI (signed)(sizeof(int))
 
@@ -65,24 +67,25 @@ static unsigned char *cmpbuf = NULL;
 
 /* Options */
 static int size = -1;
-static char do_quick = 0;
+static bool do_quick = false;
 static int addwrite  = 0;
 static int addread   = 0;
 static int verbose   = 0;
 
 static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
-        {"quick", 0, 0, 'q'},
-        {"addrd", 1, 0, 'r'},
-        {"size", 1, 0, 's'},
-        {"times", 1, 0, 't'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"addwr", 1, 0, 'w'},
+        {"help", no_argument, 0, 'h'},
+        {"quick", no_argument, 0, 'q'},
+        {"addrd", required_argument, 0, 'r'},
+        {"size", required_argument, 0, 's'},
+        {"times", required_argument, 0, 't'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"addwr", required_argument, 0, 'w'},
         {0, 0, 0, 0},
 };
 
-int find_out_about_buffer (int sg_fd)
+static int
+find_out_about_buffer(int sg_fd)
 {
         unsigned char rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         unsigned char rbBuff[RB_DESC_LEN];
@@ -118,7 +121,7 @@ int find_out_about_buffer (int sg_fd)
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
                 sg_chk_n_print3("READ BUFFER descriptor, continuing",
-                                &io_hdr, 1);
+                                &io_hdr, true);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
                 __attribute__((fallthrough));
@@ -128,7 +131,8 @@ int find_out_about_buffer (int sg_fd)
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
-                sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr, 1);
+                sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr,
+                                true);
                 return res;
         }
 
@@ -144,7 +148,8 @@ int find_out_about_buffer (int sg_fd)
         return 0;
 }
 
-int mymemcmp (unsigned char *bf1, unsigned char *bf2, int len)
+static int
+mymemcmp (unsigned char *bf1, unsigned char *bf2, int len)
 {
         int df;
         for (df = 0; df < len; df++)
@@ -153,7 +158,8 @@ int mymemcmp (unsigned char *bf1, unsigned char *bf2, int len)
 }
 
 /* return 0 if good, else 2222 */
-int do_checksum (int *buf, int len, int quiet)
+static int
+do_checksum(int *buf, int len, bool quiet)
 {
         int sum = base;
         int i; int rln = len;
@@ -208,7 +214,7 @@ void do_fill_buffer (int *buf, int len)
         }
         if (len >= BPI) buf[len/BPI - 1] = 0x12345678 - sum;
         else ((char*)buf)[0] = 0x12345678 + ((char*)buf)[0] - sum;
-        if (do_checksum (buf, len, 1)) {
+        if (do_checksum(buf, len, true)) {
                 if (len < BPI) goto retry;
                 printf ("sg_test_rwbuf: Memory corruption?\n");
                 exit (1);
@@ -257,7 +263,7 @@ int read_buffer (int sg_fd, unsigned size)
         res = sg_err_category3(&io_hdr);
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, 1);
+            sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr, true);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -267,12 +273,12 @@ int read_buffer (int sg_fd, unsigned size)
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
-                sg_chk_n_print3("READ BUFFER data error", &io_hdr, 1);
+                sg_chk_n_print3("READ BUFFER data error", &io_hdr, true);
                 free(rbBuff);
                 return res;
         }
 
-        res = do_checksum ((int*)rbBuff, size, 0);
+        res = do_checksum((int*)rbBuff, size, false);
         free(rbBuff);
         return res;
 }
@@ -319,7 +325,7 @@ int write_buffer (int sg_fd, unsigned size)
         res = sg_err_category3(&io_hdr);
         switch (res) {
         case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3("WRITE BUFFER data, continuing", &io_hdr, 1);
+            sg_chk_n_print3("WRITE BUFFER data, continuing", &io_hdr, true);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -329,7 +335,7 @@ int write_buffer (int sg_fd, unsigned size)
         case SG_LIB_CAT_CLEAN:
                 break;
         default: /* won't bother decoding other categories */
-                sg_chk_n_print3("WRITE BUFFER data error", &io_hdr, 1);
+                sg_chk_n_print3("WRITE BUFFER data error", &io_hdr, true);
                 free(wbBuff);
                 return res;
         }
@@ -391,7 +397,7 @@ int main (int argc, char * argv[])
                         usage();
                         return 0;
                 case 'q':
-                        do_quick = 1;
+                        do_quick = true;
                         break;
                 case 'r':
                         addread = sg_get_num(optarg);

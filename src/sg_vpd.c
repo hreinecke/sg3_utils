@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -37,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.28 20170926";  /* spc5r16 + sbc4r14 */
+static const char * version_str = "1.29 20171007";  /* spc5r16 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -102,15 +103,15 @@ static const char * version_str = "1.28 20170926";  /* spc5r16 + sbc4r14 */
 /* These structures are duplicates of those of the same name in
  * sg_vpd_vendor.c . Take care that both are the same. */
 struct opts_t {
-    int do_all;
-    int do_enum;
-    int do_force;
+    bool do_all;
+    bool do_enum;
+    bool do_force;
+    bool do_long;
+    bool do_quiet;
     int do_hex;
     int vpd_pn;
     int do_ident;
-    int do_long;
     int maxlen;
-    int do_quiet;
     int do_raw;
     int vend_prod_num;
     int verbose;
@@ -476,81 +477,6 @@ bad:
     return 1;
 }
 
-/* Local version of sg_ll_inquiry() [found in libsgutils] that additionally
- * passes back resid. Same return values as sg_ll_inquiry() (0 is good). */
-static int
-pt_inquiry(int sg_fd, int evpd, int pg_op, void * resp, int mx_resp_len,
-           int * residp, bool noisy, int verbose)
-{
-    int res, ret, k, sense_cat, resid;
-    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char * up;
-    struct sg_pt_base * ptvp;
-
-    if (evpd)
-        inq_cdb[1] |= 1;
-    inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
-    sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
-    if (verbose) {
-        pr2serr("    inquiry cdb: ");
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            pr2serr("%02x ", inq_cdb[k]);
-        pr2serr("\n");
-    }
-    if (resp && (mx_resp_len > 0)) {
-        up = (unsigned char *)resp;
-        up[0] = 0x7f;   /* defensive prefill */
-        if (mx_resp_len > 4)
-            up[4] = 0;
-    }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2serr("%s: out of memory\n", __func__);
-        return -1;
-    }
-    set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
-    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
-                               noisy, verbose, &sense_cat);
-    resid = get_scsi_pt_resid(ptvp);
-    if (residp)
-        *residp = resid;
-    destruct_scsi_pt_obj(ptvp);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
-        switch (sense_cat) {
-        case SG_LIB_CAT_RECOVERED:
-        case SG_LIB_CAT_NO_SENSE:
-            ret = 0;
-            break;
-        default:
-            ret = sense_cat;
-            break;
-        }
-    } else if (ret < 4) {
-        if (verbose)
-            pr2serr("%s: got too few bytes (%d)\n", __func__, ret);
-        ret = SG_LIB_CAT_MALFORMED;
-    } else
-        ret = 0;
-
-    if (resid > 0) {
-        if (resid > mx_resp_len) {
-            pr2serr("INQUIRY resid (%d) should never exceed requested "
-                    "len=%d\n", resid, mx_resp_len);
-            return ret ? ret : SG_LIB_CAT_MALFORMED;
-        }
-        /* zero unfilled section of response buffer */
-        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
-    }
-    return ret;
-}
-
 /* mxlen is command line --maxlen=LEN option (def: 0) or -1 for a VPD page
  * with a short length (1 byte). Returns 0 for success. */
 int     /* global: use by sg_vpd_vendor.c */
@@ -573,7 +499,8 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         return SG_LIB_SYNTAX_ERROR;
     }
     n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
-    res = pt_inquiry(sg_fd, 1, page, rp, n, &resid, 1, vb);
+    res = sg_ll_inquiry_v2(sg_fd, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
+                           true, vb);
     if (res)
         return res;
     rlen = n - resid;
@@ -615,7 +542,8 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
         return SG_LIB_CAT_MALFORMED;
     } else {
-        res = pt_inquiry(sg_fd, 1, page, rp, len, &resid, 1, vb);
+        res = sg_ll_inquiry_v2(sg_fd, true, page, rp, len, DEF_PT_TIMEOUT,
+                               &resid, true, vb);
         if (res)
             return res;
         rlen = len - resid;
@@ -1222,8 +1150,8 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
         }
         if (NULL == print_if_found)
             printf("  %s:\n", sg_get_desig_assoc_str(assoc));
-        sg_get_designation_descriptor_str("", bp, i_len + 4, 0, op->do_long,
-                                          sizeof(b), b);
+        sg_get_designation_descriptor_str("", bp, i_len + 4, false,
+                                          op->do_long, sizeof(b), b);
         printf("%s", b);
     }
     if (-2 == u) {
@@ -1235,8 +1163,8 @@ decode_dev_ids(const char * print_if_found, unsigned char * buff, int len,
 
 /* VPD_EXT_INQ    Extended Inquiry VPD */
 static void
-decode_x_inq_vpd(unsigned char * b, int len, int do_hex, int do_long,
-                 int protect)
+decode_x_inq_vpd(unsigned char * b, int len, int do_hex, bool do_long,
+                 bool protect)
 {
     int n;
 
@@ -2812,8 +2740,8 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
 static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
-    int len, pdt, num, k, resid, alloc_len, pn, vb;
     bool allow_name, long_notquiet;
+    int len, pdt, num, k, resid, alloc_len, pn, vb;
     int res = 0, vpd_supported = 0;
     char b[48];
     const struct svpd_values_name_t * vnp;
@@ -2858,7 +2786,8 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 alloc_len = DEF_ALLOC_LEN;
             else
                 alloc_len = 36;
-            res = pt_inquiry(sg_fd, 0, 0, rp, alloc_len, &resid, 1, vb);
+            res = sg_ll_inquiry_v2(sg_fd, false, 0, rp, alloc_len,
+                                   DEF_PT_TIMEOUT, &resid, true, vb);
         } else {
             alloc_len = op->maxlen;
             resid = 0;
@@ -3005,7 +2934,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             if (op->do_raw)
                 dStrRaw((const char *)rp, len);
             else {
-                int protect = 0;
+                bool protect = false;
                 struct sg_simple_inquiry_resp sir;
 
                 if ((sg_fd >= 0) && long_notquiet) {
@@ -3015,7 +2944,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                             pr2serr("%s: sg_simple_inquiry() failed, "
                                     "res=%d\n", __func__, res);
                     } else
-                        protect = sir.byte_5 & 0x1;  /* SPC-3 and later */
+                        protect = !!(sir.byte_5 & 0x1); /* SPC-3 and later */
                 }
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3597,13 +3526,13 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'a':
-            ++op->do_all;
+            op->do_all = true;
             break;
         case 'e':
-            ++op->do_enum;
+            op->do_enum = true;
             break;
         case 'f':
-            ++op->do_force;
+            op->do_force = true;
             break;
         case 'h':
         case '?':
@@ -3624,7 +3553,7 @@ main(int argc, char * argv[])
                 op->inhex_fn = optarg;
             break;
         case 'l':
-            ++op->do_long;
+            op->do_long = true;
             break;
         case 'm':
             op->maxlen = sg_get_num(optarg);
@@ -3651,7 +3580,7 @@ main(int argc, char * argv[])
                 op->page_str = optarg;
             break;
         case 'q':
-            ++op->do_quiet;
+            op->do_quiet = true;
             break;
         case 'r':
             ++op->do_raw;
@@ -3817,7 +3746,7 @@ main(int argc, char * argv[])
         if (op->verbose > 3)
             dStrHexErr((const char *)rsp_buff, inhex_len, 0);
         op->do_raw = 0;         /* don't want raw on output with --inhex= */
-        if ((NULL == op->page_str) && (0 == op->do_all)) {
+        if ((NULL == op->page_str) && (! op->do_all)) {
             /* may be able to deduce VPD page */
             if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
                 if (op->verbose)
@@ -3856,8 +3785,8 @@ main(int argc, char * argv[])
     if (op->do_ident) {
         op->vpd_pn = VPD_DEVICE_ID;
         if (op->do_ident > 1) {
-            if (0 == op->do_long)
-                ++op->do_quiet;
+            if (! op->do_long)
+                op->do_quiet = true;
             subvalue = VPD_DI_SEL_LU;
         }
     }
@@ -3884,7 +3813,7 @@ main(int argc, char * argv[])
         return res;
     }
 
-    if ((sg_fd = sg_cmds_open_device(op->device_name, 1 /* ro */,
+    if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                      op->verbose)) < 0) {
         pr2serr("error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));

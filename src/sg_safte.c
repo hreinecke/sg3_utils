@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -28,7 +30,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.27 20170917";
+static const char * version_str = "0.28 20171006";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -508,16 +510,17 @@ static struct option long_options[] = {
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, ret, peri_type, no_hex_raw;
+    bool no_hex_raw;
+    int sg_fd, c, ret, peri_type;
     int res = SG_LIB_CAT_OTHER;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
     unsigned char *rb_buff;
-    int do_config = 0;
-    int do_status = 0;
-    int do_slots = 0;
-    int do_flags = 0;
-    int do_usage = 0;
+    bool do_config = false;
+    bool do_status = false;
+    bool do_slots = false;
+    bool do_flags = false;
+    bool do_usage = false;
     int do_hex = 0;
     int do_raw = 0;
     int verbose = 0;
@@ -539,13 +542,13 @@ main(int argc, char * argv[])
 
         switch (c) {
             case 'c':
-                do_config = 1;
+                do_config = true;
                 break;
             case 'd':
-                do_slots = 1;
+                do_slots = true;
                 break;
             case 'f':
-                do_flags = 1;
+                do_flags = true;
                 break;
             case 'h':
             case '?':
@@ -561,10 +564,10 @@ main(int argc, char * argv[])
                 ++do_raw;
                 break;
             case 's':
-                do_status = 1;
+                do_status = true;
                 break;
             case 'u':
-                do_usage = 1;
+                do_usage = true;
                 break;
             case 'v':
                 ++verbose;
@@ -603,7 +606,8 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose))
+        < 0) {
         snprintf(ebuff, EBUFF_SZ, "sg_safte: error opening file: %s (rw)",
                  device_name);
         perror(ebuff);

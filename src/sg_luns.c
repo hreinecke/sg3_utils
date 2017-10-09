@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.33 20170917";
+static const char * version_str = "1.34 20171005";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -355,24 +355,25 @@ dStrRaw(const char* str, int len)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, m, off, res, c, list_len, len_cap, luns, trunc;
+    int sg_fd, k, m, off, res, c, list_len, len_cap, luns;
     int decode_arg = 0;
     int do_hex = 0;
 #ifdef SG_LIB_LINUX
-    int do_linux = 0;
+    bool do_linux = false;
 #endif
     int lu_cong_arg = 0;
-    bool lu_cong_arg_given = false;
     int maxlen = 0;
-    int do_quiet = 0;
-    int do_raw = 0;
-    int o_readonly = 0;
     int select_rep = 0;
     int verbose = 0;
+    bool lu_cong_arg_given = false;
+    bool do_quiet = false;
+    bool do_raw = false;
+    bool o_readonly = false;
 #ifdef SG_LIB_LINUX
-    int test_linux_in = 0;
+    bool test_linux_in = false;
     bool test_linux_out = false;
 #endif
+    bool trunc;
     unsigned int h;
     const char * test_arg = NULL;
     const char * device_name = NULL;
@@ -408,7 +409,7 @@ main(int argc, char * argv[])
             break;
 #ifdef SG_LIB_LINUX
         case 'l':
-            ++do_linux;
+            do_linux = false;
             break;
 #endif
         case 'L':
@@ -424,13 +425,13 @@ main(int argc, char * argv[])
             }
             break;
         case 'q':
-            ++do_quiet;
+            do_quiet = true;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 's':
            select_rep = sg_get_num(optarg);
@@ -485,7 +486,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             linux2t10_lun(ull, lun_arr);
-            test_linux_in = 1;
+            test_linux_in = true;
         } else
 #endif
         {
@@ -597,7 +598,7 @@ main(int argc, char * argv[])
         pr2serr("unable to malloc %d bytes\n", maxlen);
         return SG_LIB_CAT_OTHER;
     }
-    trunc = 0;
+    trunc = false;
 
     res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen, true,
                             verbose);
@@ -616,12 +617,12 @@ main(int argc, char * argv[])
             goto the_end;
         }
         luns = (list_len / 8);
-        if (0 == do_quiet)
+        if (! do_quiet)
             printf("Lun list length = %d which imples %d lun entr%s\n",
                    list_len, luns, ((1 == luns) ? "y" : "ies"));
         if ((list_len + 8) > maxlen) {
             luns = ((maxlen - 8) / 8);
-            trunc = 1;
+            trunc = true;
             pr2serr("  <<too many luns for internal buffer, will show %d "
                     "lun%s>>\n", luns, ((1 == luns) ? "" : "s"));
         }
@@ -631,7 +632,7 @@ main(int argc, char * argv[])
                        (trunc ? maxlen : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k, off += 8) {
-            if (0 == do_quiet) {
+            if (! do_quiet) {
                 if (0 == k)
                     printf("Report luns [select_report=0x%x]:\n", select_rep);
                 printf("    ");

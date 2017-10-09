@@ -19,6 +19,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
@@ -32,45 +34,45 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.61 20170917";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.62 20171007";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
-        {"eject", 0, 0, 'e'},
-        {"fl", 1, 0, 'f'},
-        {"help", 0, 0, 'h'},
-        {"immed", 0, 0, 'i'},
-        {"load", 0, 0, 'l'},
-        {"loej", 0, 0, 'L'},
-        {"mod", 1, 0, 'm'},
-        {"noflush", 0, 0, 'n'},
-        {"new", 0, 0, 'N'},
-        {"old", 0, 0, 'O'},
-        {"pc", 1, 0, 'p'},
-        {"readonly", 0, 0, 'r'},
-        {"start", 0, 0, 's'},
-        {"stop", 0, 0, 'S'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"eject", no_argument, 0, 'e'},
+        {"fl", required_argument, 0, 'f'},
+        {"help", no_argument, 0, 'h'},
+        {"immed", no_argument, 0, 'i'},
+        {"load", no_argument, 0, 'l'},
+        {"loej", no_argument, 0, 'L'},
+        {"mod", required_argument, 0, 'm'},
+        {"noflush", no_argument, 0, 'n'},
+        {"new", no_argument, 0, 'N'},
+        {"old", no_argument, 0, 'O'},
+        {"pc", required_argument, 0, 'p'},
+        {"readonly", no_argument, 0, 'r'},
+        {"start", no_argument, 0, 's'},
+        {"stop", no_argument, 0, 'S'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
 struct opts_t {
-    int do_eject;
+    bool do_eject;
+    bool do_immed;
+    bool do_load;
+    bool do_loej;
+    bool do_noflush;
+    bool do_readonly;
+    bool do_start;
+    bool do_stop;
+    bool do_version;
+    bool opt_new;
     int do_fl;
     int do_help;
-    int do_immed;
-    int do_load;
-    int do_loej;
     int do_mod;
-    int do_noflush;
-    int do_readonly;
     int do_pc;
-    int do_start;
-    int do_stop;
     int do_verbose;
-    int do_version;
     const char * device_name;
-    int opt_new;
 };
 
 static void
@@ -179,8 +181,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 
         switch (c) {
         case 'e':
-            ++op->do_eject;
-            ++op->do_loej;
+            op->do_eject = true;
+            op->do_loej = true;
             break;
         case 'f':
             n = sg_get_num(optarg);
@@ -189,8 +191,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->do_loej;
-            ++op->do_start;
+            op->do_loej = true;
+            op->do_start = true;
             op->do_fl = n;
             break;
         case 'h':
@@ -198,14 +200,14 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_help;
             break;
         case 'i':
-            ++op->do_immed;
+            op->do_immed = true;
             break;
         case 'l':
-            ++op->do_load;
-            ++op->do_loej;
+            op->do_load = true;
+            op->do_loej = true;
             break;
         case 'L':
-            ++op->do_loej;
+            op->do_loej = true;
             break;
         case 'm':
             n = sg_get_num(optarg);
@@ -217,12 +219,12 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->do_mod = n;
             break;
         case 'n':
-            ++op->do_noflush;
+            op->do_noflush = true;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
         case 'p':
             n = sg_get_num(optarg);
@@ -234,19 +236,19 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->do_pc = n;
             break;
         case 'r':
-            ++op->do_readonly;
+            op->do_readonly = true;
             break;
         case 's':
-            ++op->do_start;
+            op->do_start = true;
             break;
         case 'S':
-            ++op->do_stop;
+            op->do_stop = true;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -260,10 +262,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
     for (; optind < argc; ++optind) {
         if (1 == strlen(argv[optind])) {
             if (0 == strcmp("0", argv[optind])) {
-                ++op->do_stop;
+                op->do_stop = true;
                 continue;
             } else if (0 == strcmp("1", argv[optind])) {
-                ++op->do_start;
+                op->do_start = true;
                 continue;
             }
         }
@@ -284,8 +286,9 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num;
-    int ambigu = 0;
+    bool ambigu = false;
+    bool jmp_out;
+    int k, plen, num;
     int startstop = -1;
     unsigned int u;
     const char * cp;
@@ -296,40 +299,40 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0;
+            for (--plen, ++cp, jmp_out = false; plen > 0;
                  --plen, ++cp) {
                 switch (*cp) {
                 case 'i':
                     if ('\0' == *(cp + 1))
-                        op->do_immed = 1;
+                        op->do_immed = true;
                     else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 'r':
-                    ++op->do_readonly;
+                    op->do_readonly = true;
                     break;
                 case 'v':
                     ++op->do_verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case 'h':
                 case '?':
                     ++op->do_help;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case '-':
                     ++cp;
                     --plen;
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -339,9 +342,9 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 continue;
 
             if (0 == strncmp(cp, "eject", 5)) {
-                op->do_loej = 1;
+                op->do_loej = true;
                 if (startstop == 1)
-                    ambigu = 1;
+                    ambigu = true;
                 else
                     startstop = 0;
             } else if (0 == strncmp("fl=", cp, 3)) {
@@ -352,7 +355,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 startstop = 1;
-                op->do_loej = 1;
+                op->do_loej = true;
                 op->do_fl = u;
             } else if (0 == strncmp("imm=", cp, 4)) {
                 num = sscanf(cp + 4, "%x", &u);
@@ -361,15 +364,15 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                op->do_immed = u;
+                op->do_immed = !! u;
             } else if (0 == strncmp(cp, "load", 4)) {
-                op->do_loej = 1;
+                op->do_loej = true;
                 if (startstop == 0)
-                    ambigu = 1;
+                    ambigu = true;
                 else
                     startstop = 1;
             } else if (0 == strncmp(cp, "loej", 4))
-                op->do_loej = 1;
+                op->do_loej = true;
             else if (0 == strncmp("pc=", cp, 3)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if ((1 != num) || (u > 15)) {
@@ -387,15 +390,15 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 }
                 op->do_mod = u;
             } else if (0 == strncmp(cp, "noflush", 7)) {
-                op->do_noflush = 1;
+                op->do_noflush = true;
             } else if (0 == strncmp(cp, "start", 5)) {
                 if (startstop == 0)
-                    ambigu = 1;
+                    ambigu = true;
                 else
                     startstop = 1;
             } else if (0 == strncmp(cp, "stop", 4)) {
                 if (startstop == 1)
-                    ambigu = 1;
+                    ambigu = true;
                 else
                     startstop = 0;
             } else if (0 == strncmp(cp, "old", 3))
@@ -407,12 +410,12 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             }
         } else if (0 == strcmp("0", cp)) {
             if (1 == startstop)
-                ambigu = 1;
+                ambigu = true;
             else
                 startstop = 0;
         } else if (0 == strcmp("1", cp)) {
             if (0 == startstop)
-                ambigu = 1;
+                ambigu = true;
             else
                 startstop = 1;
         } else if (0 == op->device_name)
@@ -429,9 +432,9 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
         } else if (0 == startstop)
-            ++op->do_stop;
+            op->do_stop = true;
         else if (1 == startstop)
-            ++op->do_start;
+            op->do_start = true;
     }
     return 0;
 }
@@ -444,14 +447,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = process_cl_old(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = process_cl_new(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (! op->opt_new))
             res = process_cl_old(op, argc, argv);
     }
     return res;
@@ -493,13 +496,13 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_load)
-       op->do_start = 1;
-    else if ((op->do_eject) || (op->do_stop))
-       op->do_start = 0;
-    else if (op->opt_new && op->do_loej && (0 == op->do_start))
-        op->do_start = 1;      /* --loej alone in new interface is load */
-    else if ((0 == op->do_loej) && (-1 == op->do_fl) && (0 == op->do_pc))
-       op->do_start = 1;
+       op->do_start = true;
+    else if ((op->do_eject) || op->do_stop)
+       op->do_start = false;
+    else if (op->opt_new && op->do_loej && (! op->do_start))
+        op->do_start = true;      /* --loej alone in new interface is load */
+    else if ((! op->do_loej) && (-1 == op->do_fl) && (0 == op->do_pc))
+       op->do_start = true;
     /* default action is to start when no other active options */
 
     if (0 == op->device_name) {
@@ -512,7 +515,7 @@ main(int argc, char * argv[])
     }
 
     if (op->do_fl >= 0) {
-        if (op->do_start == 0) {
+        if (! op->do_start) {
             pr2serr("Giving '--fl=FL' with '--stop' (or '--eject') is "
                     "invalid\n");
             return SG_LIB_SYNTAX_ERROR;
@@ -534,17 +537,17 @@ main(int argc, char * argv[])
 
     if (op->do_fl >= 0)
         res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_fl, 0 /* pc */,
-                                    1 /* fl */, 1 /* loej */,
-                                    1 /*start */, true /* noisy */,
+                                    true /* fl */, true /* loej */,
+                                    true /*start */, true /* noisy */,
                                     op->do_verbose);
     else if (op->do_pc > 0)
         res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_mod,
-                                    op->do_pc, op->do_noflush, 0, 0, true,
-                                    op->do_verbose);
+                                    op->do_pc, op->do_noflush, false, false,
+                                    true, op->do_verbose);
     else
-        res = sg_ll_start_stop_unit(fd, op->do_immed, 0, 0, op->do_noflush,
-                                    op->do_loej, op->do_start, true,
-                                    op->do_verbose);
+        res = sg_ll_start_stop_unit(fd, op->do_immed, 0, false,
+                                    op->do_noflush, op->do_loej,
+                                    op->do_start, true, op->do_verbose);
     ret = res;
     if (res) {
         if (op->do_verbose < 2) {

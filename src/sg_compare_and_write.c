@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #define __STDC_FORMAT_MACROS 1
@@ -53,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20170924";
+static const char * version_str = "1.17 20171008";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -334,7 +335,8 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                      int64_t lba, int xfer_len, struct caw_flags flags,
                      bool noisy, int verbose)
 {
-        int k, sense_cat, valid, slen, res, ret;
+        bool valid;
+        int k, sense_cat, slen, res, ret;
         unsigned char cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
         unsigned char sense_b[SENSE_BUFF_LEN];
         struct sg_pt_base * ptvp;
@@ -365,8 +367,8 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                 dStrHexErr((const char *)buff, xfer_len, 1);
         }
         res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
-        ret = sg_cmds_process_resp(ptvp, "COMPARE AND WRITE", res, 0,
-                                   sense_b, noisy, verbose,
+        ret = sg_cmds_process_resp(ptvp, "COMPARE AND WRITE", res,
+                                   SG_NO_DATA_IN, sense_b, noisy, verbose,
                                    &sense_cat);
         if (-1 == ret)
                 ;
@@ -436,7 +438,8 @@ open_if(const char * fn, int got_stdin)
 static int
 open_dev(const char * outf, int verbose)
 {
-        int sg_fd = sg_cmds_open_device(outf, 0 /* rw */, verbose);
+        int sg_fd = sg_cmds_open_device(outf, false /* rw */, verbose);
+
         if (sg_fd < 0) {
                 pr2serr(ME "open error: %s: %s\n", outf,
                         safe_strerror(-sg_fd));

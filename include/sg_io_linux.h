@@ -2,14 +2,14 @@
 #define SG_IO_LINUX_H
 
 /*
- * Copyright (c) 2004-2015 Douglas Gilbert.
+ * Copyright (c) 2004-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
 /*
- * Version 1.04 [20151217]
+ * Version 1.05 [20171009]
  */
 
 /*
@@ -147,7 +147,7 @@ void sg_print_driver_status(int driver_status);
    raw sense buffer (in ASCII hex) should be printed. */
 int sg_chk_n_print(const char * leadin, int masked_status, int host_status,
                    int driver_status, const unsigned char * sense_buffer,
-                   int sb_len, int raw_sinfo);
+                   int sb_len, bool raw_sinfo);
 
 /* The following function declaration is for the sg version 3 driver. */
 struct sg_io_hdr;
@@ -155,13 +155,13 @@ struct sg_io_hdr;
    else it prints errors/warnings (prefixed by 'leadin') to
    'sg_warnings_fd' and returns 0. */
 int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
-                    int raw_sinfo);
+                    bool raw_sinfo);
 
 /* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
    its length from the struct sg_io_hdr pointer. If these cannot be
-   obtained, 0 is returned. */
-int sg_normalize_sense(const struct sg_io_hdr * hp,
-                       struct sg_scsi_sense_hdr * sshp);
+   obtained, false is returned. */
+bool sg_normalize_sense(const struct sg_io_hdr * hp,
+                        struct sg_scsi_sense_hdr * sshp);
 
 int sg_err_category(int masked_status, int host_status, int driver_status,
                     const unsigned char * sense_buffer, int sb_len);

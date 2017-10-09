@@ -18,6 +18,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <getopt.h>
@@ -32,7 +34,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20170917";
+static const char * version_str = "1.14 20171008";
 
 
 #define MAX_XFER_LEN 10000
@@ -44,16 +46,16 @@ static const char * version_str = "1.13 20170917";
 #define EBUFF_SZ 256
 
 static struct option long_options[] = {
-        {"16", 0, 0, 'S'},
-        {"cor_dis", 0, 0, 'c'},
-        {"help", 0, 0, 'h'},
-        {"in", 1, 0, 'i'},
-        {"lba", 1, 0, 'l'},
-        {"pblock", 0, 0, 'p'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
-        {"wr_uncor", 0, 0, 'w'},
-        {"xfer_len", 1, 0, 'x'},
+        {"16", no_argument, 0, 'S'},
+        {"cor_dis", no_argument, 0, 'c'},
+        {"help", no_argument, 0, 'h'},
+        {"in", required_argument, 0, 'i'},
+        {"lba", required_argument, 0, 'l'},
+        {"pblock", no_argument, 0, 'p'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
+        {"wr_uncor", no_argument, 0, 'w'},
+        {"xfer_len", required_argument, 0, 'x'},
         {0, 0, 0, 0},
 };
 
@@ -94,24 +96,24 @@ usage()
 int
 main(int argc, char * argv[])
 {
+    bool do_16 = false;
+    bool cor_dis = false;
+    bool got_stdin;
+    bool pblock = false;
+    bool wr_uncor = false;
     int sg_fd, res, c, infd, offset;
-    unsigned char * writeLongBuff = NULL;
-    void * rawp = NULL;
     int xfer_len = 520;
-    int cor_dis = 0;
-    int pblock = 0;
-    int wr_uncor = 0;
-    int do_16 = 0;
-    uint64_t llba = 0;
+    int ret = 1;
     int verbose = 0;
     int64_t ll;
-    int got_stdin;
+    uint64_t llba = 0;
     const char * device_name = NULL;
+    unsigned char * writeLongBuff = NULL;
+    void * rawp = NULL;
+    const char * ten_or;
     char file_name[256];
     char b[80];
     char ebuff[EBUFF_SZ];
-    const char * ten_or;
-    int ret = 1;
 
     memset(file_name, 0, sizeof file_name);
     while (1) {
@@ -142,7 +144,7 @@ main(int argc, char * argv[])
             llba = (uint64_t)ll;
             break;
         case 'p':
-            pblock = 1;
+            pblock = true;
             break;
         case 'S':
             do_16 = 1;
@@ -154,7 +156,7 @@ main(int argc, char * argv[])
             pr2serr(ME "version: %s\n", version_str);
             return 0;
         case 'w':
-            wr_uncor = 1;
+            wr_uncor = true;
             break;
         case 'x':
             xfer_len = sg_get_num(optarg);
@@ -195,7 +197,7 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
@@ -214,7 +216,7 @@ main(int argc, char * argv[])
         writeLongBuff = (unsigned char *)rawp;
         memset(rawp, 0xff, MAX_XFER_LEN);
         if (file_name[0]) {
-            got_stdin = (0 == strcmp(file_name, "-")) ? 1 : 0;
+            got_stdin = (0 == strcmp(file_name, "-"));
             if (got_stdin) {
                 infd = STDIN_FILENO;
                 if (sg_set_binary_mode(STDIN_FILENO) < 0)
@@ -250,7 +252,7 @@ main(int argc, char * argv[])
         pr2serr(ME "issue write long to device %s\n\t\txfer_len= %d (0x%x), "
                 "lba=%" PRIu64 " (0x%" PRIx64 ")\n    cor_dis=%d, "
                 "wr_uncor=%d, pblock=%d\n", device_name, xfer_len, xfer_len,
-                llba, llba, cor_dis, wr_uncor, pblock);
+                llba, llba, (int)cor_dis, (int)wr_uncor, (int)pblock);
 
     ten_or = do_16 ? "16" : "10";
     if (do_16)

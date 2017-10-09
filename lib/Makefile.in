@@ -230,7 +230,9 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
-CC = @CC@
+
+# For C++/clang testing
+CC = clang++
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
@@ -347,15 +349,12 @@ libsgutils2_la_SOURCES = sg_lib.c sg_lib_data.c sg_cmds_basic.c \
 	$(am__append_1) $(am__append_2) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6)
 
-# For C++/clang testing
-
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu89 (gnu90 is the same)
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
 AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
-AM_CFLAGS = -Wall -W
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
-# AM_CFLAGS = -Wall -W -pedantic -std=c++14
+AM_CFLAGS = -Wall -W -pedantic -std=c++14
 lib_LTLIBRARIES = libsgutils2.la
 libsgutils2_la_LDFLAGS = -version-info 2:0:0 -no-undefined
 libsgutils2_la_LIBADD = @GETOPT_O_FILES@ @os_libs@

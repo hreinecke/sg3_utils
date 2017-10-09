@@ -22,6 +22,7 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,15 +33,31 @@ extern "C" {
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other errors */
-int sg_ll_inquiry(int sg_fd, int cmddt, int evpd, int pg_op, void * resp,
+int sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
                   int mx_resp_len, bool noisy, int verbose);
+
+/* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
+ * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * The CMDDT field is obsolete in the INQUIRY cdb (since spc3r16 in 2003) so
+ * an argument to set it has been removed (use the REPORT SUPPORTED OPERATION
+ * CODES command instead). Adds the ability to set the command abort timeout
+ * and the ability to report the residual count. If timeout_secs is zero
+ * or less the the default command abort timeout (60 seconds) is used.
+ * If residp is non-NULL then the residual value is written where residp
+ * points. A residual value of 0 implies mx_resp_len bytes have be written
+ * where resp points. If the residual value equals mx_resp_len then no
+ * bytes have been written. */
+int
+sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
+                 int mx_resp_len, int timeout_secs, int * residp,
+                 bool noisy, int verbose);
 
 /* Invokes a SCSI LOG SELECT command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Log Select not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_ABORTED_COMMAND, * SG_LIB_CAT_NOT_READY -> device not ready,
  * -1 -> other failure */
-int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
+int sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
                      int subpg_code, unsigned char * paramp, int param_len,
                      bool noisy, int verbose);
 
@@ -49,7 +66,7 @@ int sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
+int sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
                     int subpg_code, int paramp, unsigned char * resp,
                     int mx_resp_len, bool noisy, int verbose);
 
@@ -58,7 +75,7 @@ int sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
+int sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp,
                         int param_len, bool noisy, int verbose);
 
 /* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
@@ -66,7 +83,7 @@ int sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
+int sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp,
                         int param_len, bool noisy, int verbose);
 
 /* Invokes a SCSI MODE SENSE (6) command. Return of 0 -> success,
@@ -74,7 +91,7 @@ int sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code,
+int sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code,
                       int sub_pg_code, void * resp, int mx_resp_len,
                       bool noisy, int verbose);
 
@@ -83,7 +100,7 @@ int sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code,
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
+int sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
                        int sub_pg_code, void * resp, int mx_resp_len,
                        bool noisy, int verbose);
 
@@ -101,7 +118,7 @@ int sg_ll_prevent_allow(int sg_fd, int prevent, bool noisy, int verbose);
  * -> perhaps media changed, SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
+int sg_ll_readcap_10(int sg_fd, bool pmi, unsigned int lba, void * resp,
                      int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI READ CAPACITY (16) command. Returns 0 -> success,
@@ -109,7 +126,7 @@ int sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
  *  -> cdb not supported, SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
+int sg_ll_readcap_16(int sg_fd, bool pmi, uint64_t llba, void * resp,
                      int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
@@ -123,7 +140,7 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
  * SG_LIB_CAT_INVALID_OP -> Request Sense not supported??,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
+int sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
                         bool noisy, int verbose);
 
 /* Invokes a SCSI START STOP UNIT command (SBC + MMC).
@@ -136,16 +153,16 @@ int sg_ll_request_sense(int sg_fd, int desc, void * resp, int mx_resp_len,
  * format_layer_number(mmc) fields. They also overlap on the noflush(sbc)
  * and fl(mmc) one bit field. This is the cause of the awkardly named
  * pc_mod__fl_num and noflush__fl arguments to this function.  */
-int sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
-                          int power_cond, int noflush__fl, int loej,
-                          int start, bool noisy, int verbose);
+int sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
+                          int power_cond, bool noflush__fl, bool loej,
+                          bool start, bool noisy, int verbose);
 
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_INVALID_OP -> cdb not supported,
  * SG_LIB_CAT_IlLEGAL_REQ -> bad field in cdb
  * SG_LIB_CAT_NOT_READY -> device not ready, -1 -> other failure */
-int sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
+int sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
                         unsigned int lba, unsigned int count, bool noisy,
                         int verbose);
 
@@ -196,7 +213,7 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
  * Returns >= 0 is successful or -1 if failure. If there is a failure
  * a message is written to err_buff. */
 int sg_mode_page_offset(const unsigned char * resp, int resp_len,
-                        int mode_sense_6, char * err_buff, int err_buff_len);
+                        bool mode_sense_6, char * err_buff, int err_buff_len);
 
 /* Fetches current, changeable, default and/or saveable modes pages as
  * indicated by pcontrol_arr for given pg_code and sub_pg_code. If
@@ -215,15 +232,15 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * respectively have been fetched. If error on current page
  * then stops and returns that error; otherwise continues if an error is
  * detected but returns the first error encountered.  */
-int sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code,
-                              int sub_pg_code, int dbd, int flexible,
+int sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code,
+                              int sub_pg_code, bool dbd, bool flexible,
                               int mx_mpage_len, int * success_mask,
                               void * pcontrol_arr[], int * reported_len,
                               int verbose);
 
 /* Returns file descriptor >= 0 if successful. If error in Unix returns
    negated errno. Implementation calls scsi_pt_open_device(). */
-int sg_cmds_open_device(const char * device_name, int read_only, int verbose);
+int sg_cmds_open_device(const char * device_name, bool read_only, int verbose);
 
 /* Returns file descriptor >= 0 if successful. If error in Unix returns
    negated errno. Implementation calls scsi_pt_open_flags(). */
@@ -235,6 +252,7 @@ int sg_cmds_close_device(int device_fd);
 
 const char * sg_cmds_version();
 
+#define SG_NO_DATA_IN 0
 
 struct sg_pt_base;
 

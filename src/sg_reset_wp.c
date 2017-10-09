@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -32,7 +34,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.06 20170917";
+static const char * version_str = "1.07 20171008";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -75,7 +77,7 @@ usage()
 /* Invokes a SCSI RESET WRITE POINTER command (ZBC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, bool noisy,
+sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, bool all, bool noisy,
                           int verbose)
 {
     int k, ret, res, sense_cat;
@@ -103,8 +105,9 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, bool noisy,
     set_scsi_pt_cdb(ptvp, rwp_cdb, sizeof(rwp_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res, 0, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res,
+                               SG_NO_DATA_IN, sense_b, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -127,14 +130,14 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, int all, bool noisy,
 int
 main(int argc, char * argv[])
 {
+    bool all = false;
+    bool zid_given = false;
     int sg_fd, res, c;
-    int all = 0;
+    int ret = 0;
     int verbose = 0;
-    int zid_given = 0;
     uint64_t zid = 0;
     int64_t ll;
     const char * device_name = NULL;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -147,7 +150,7 @@ main(int argc, char * argv[])
         switch (c) {
         case 'a':
         case 'R':
-            ++all;
+            all = true;
             break;
         case 'h':
         case '?':
@@ -166,7 +169,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             zid = (uint64_t)ll;
-            ++zid_given;
+            zid_given = true;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
@@ -188,7 +191,7 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((! zid_given) && (0 == all)) {
+    if ((! zid_given) && (! all)) {
         pr2serr("either the --zone=ID or --all option is required\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
@@ -199,7 +202,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

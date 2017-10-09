@@ -171,12 +171,12 @@ struct sg_scsi_sense_hdr {
 /* Maps the salient data from a sense buffer which is in either fixed or
  * descriptor format into a structure mimicking a descriptor format
  * header (i.e. the first 8 bytes of sense descriptor format).
- * If zero response code returns 0. Otherwise returns 1 and if 'sshp' is
- * non-NULL then zero all fields and then set the appropriate fields in
+ * If zero response code returns false. Otherwise returns true and if 'sshp'
+ * is non-NULL then zero all fields and then set the appropriate fields in
  * that structure. sshp::additional_length is always 0 for response
  * codes 0x70 and 0x71 (fixed format). */
-int sg_scsi_normalize_sense(const unsigned char * sensep, int sense_len,
-                            struct sg_scsi_sense_hdr * sshp);
+bool sg_scsi_normalize_sense(const unsigned char * sensep, int sense_len,
+                             struct sg_scsi_sense_hdr * sshp);
 
 /* Attempt to find the first SCSI sense data descriptor that matches the
  * given 'desc_type'. If found return pointer to start of sense data
@@ -194,27 +194,28 @@ char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
 /* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
 char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff);
 
-/* Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
+/* Returns true if valid bit set, false if valid bit clear. Irrespective the
  * information field is written out via 'info_outp' (except when it is
  * NULL). Handles both fixed and descriptor sense formats. */
-int sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
-                          uint64_t * info_outp);
+bool sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
+                           uint64_t * info_outp);
 
-/* Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
+/* Returns true if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
  * In descriptor format if the stream commands descriptor not found
- * then returns 0. Writes 1 or 0 corresponding to these bits to the
- * last three arguments if they are non-NULL. */
-int sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
-                                  int * filemark_p, int * eom_p, int * ili_p);
+ * then returns false. Writes true or false corresponding to these bits to
+ * the last three arguments if they are non-NULL. */
+bool sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
+                                   bool * filemark_p, bool * eom_p,
+                                   bool * ili_p);
 
-/* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
- * returns 1 if progress indication sense data descriptor found. Places
+/* Returns true if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
+ * returns true if progress indication sense data descriptor found. Places
  * progress field from sense data where progress_outp points. If progress
- * field is not available returns 0. Handles both fixed and descriptor
+ * field is not available returns false. Handles both fixed and descriptor
  * sense formats. N.B. App should multiply by 100 and divide by 65536
  * to get percentage completion from given value. */
-int sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
-                              int * progress_outp);
+bool sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
+                               int * progress_outp);
 
 /* Closely related to sg_print_sense(). Puts decoded sense data in 'buff'.
  * Usually multiline with multiple '\n' including one trailing. If
@@ -224,7 +225,7 @@ int sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
  * N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the first
  * line output. Also this function returned type void. */
 int sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
-                     int sb_len, int raw_sinfo, int buff_len, char * buff);
+                     int sb_len, bool raw_sinfo, int buff_len, char * buff);
 
 /* Decode descriptor format sense descriptors (assumes sense buffer is
  * in descriptor format). 'leadin' is string prepended to each line written
@@ -241,8 +242,8 @@ int sg_get_sense_descriptors_str(const char * leadin,
  * trailing '\0'. */
 int sg_get_designation_descriptor_str(const char * leadin,
                                       const unsigned char * ddp, int dd_len,
-                                      int print_assoc, int do_long, int blen,
-                                      char * b);
+                                      bool print_assoc, bool do_long,
+                                      int blen, char * b);
 
 /* Yield string associated with peripheral device type (pdt). Returns
  * 'buff'. If 'pdt' out of range yields "bad pdt" string. */
@@ -256,7 +257,7 @@ char * sg_get_pdt_str(int pdt, int buff_len, char * buff);
 int sg_lib_pdt_decay(int pdt);
 
 /* Yield string associated with transport protocol identifier (tpi). Returns
- *    'buff'. If 'tpi' out of range yields "bad tpi" string. */
+ * 'buff'. If 'tpi' out of range yields "bad tpi" string. */
 char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
 
 /* Decode TransportID pointed to by 'bp' of length 'bplen'. Place decoded
@@ -281,9 +282,12 @@ const char * sg_get_desig_assoc_str(int val);
 /* Yield SCSI Feature Set (sfs) string. When 'peri_type' is < -1 (or > 31)
  * returns pointer to string (same as 'buff') associated with 'sfs_code'.
  * When 'peri_type' is between -1 (for SPC) and 31 (inclusive) then a match
- * on both 'sfs_code' and 'peri_type' is required. If a match is found and
- * 'foundp' is not NULL then the bool it points to is set to true; else if
- * 'foundp' is not NULL then the bool it points to is set to false.
+ * on both 'sfs_code' and 'peri_type' is required. If 'foundp' is not NULL
+ * then where it points is set to true if a match is found else it is set to
+ * false. If 'buff' is not NULL then in the case of a match a descriptive
+ * string is written to 'buff' while if there is not a not then a string
+ * ending in "Reserved" is written (and may be prefixed with SPC, SBC, SSC
+ * or ZBC). Returns 'buff' (i.e. a pointer value) even if it is NULL.
  * Example:
  *    char b[64];
  *    ...
@@ -306,7 +310,7 @@ void sg_print_scsi_status(int scsi_status);
  * "". N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the
  * first line printed. */
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
-                    int sb_len, int raw_info);
+                    int sb_len, bool raw_info);
 
 /* Utilities can use these exit status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */

@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -122,30 +124,30 @@ usage()
 int
 main(int argc, char * argv[])
 {
+    bool bpc_given = false;
+    bool dpo = false;
+    bool got_stdin = false;
+    bool quiet = false;
+    bool readonly = false;
+    bool verify16 = false;
     int sg_fd, res, c, num, nread, infd;
-    int64_t ll;
-    int dpo = 0;
+    int bpc = 128;
+    int group = 0;
     int bytchk = 0;
     int ndo = 0;
-    char *ref_data = NULL;
+    int verbose = 0;
+    int ret = 0;
     int vrprotect = 0;
+    unsigned int info = 0;
+    int64_t ll;
     int64_t count = 1;
     int64_t orig_count;
-    int bpc = 128;
-    int bpc_given = 0;
-    int got_stdin = 0;
-    int group = 0;
     uint64_t lba = 0;
     uint64_t orig_lba;
-    int quiet = 0;
-    int readonly = 0;
-    int verbose = 0;
-    int verify16 = 0;
+    char *ref_data = NULL;
     const char * device_name = NULL;
     const char * file_name = NULL;
     const char * vc;
-    int ret = 0;
-    unsigned int info = 0;
     uint64_t info64 = 0;
     char ebuff[EBUFF_SZ];
 
@@ -164,7 +166,7 @@ main(int argc, char * argv[])
                 pr2serr("bad argument to '--bpc'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++bpc_given;
+            bpc_given = true;
             break;
         case 'c':
             count = sg_get_llnum(optarg);
@@ -174,7 +176,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'd':
-            dpo = 1;
+            dpo = true;
             break;
         case 'E':
             bytchk = sg_get_num(optarg);
@@ -226,13 +228,13 @@ main(int argc, char * argv[])
             }
             break;
         case 'q':
-            ++quiet;
+            quiet = true;
             break;
         case 'r':
-            ++readonly;
+            readonly = true;
             break;
         case 'S':
-            ++verify16;
+            verify16 = false;
             break;
         case 'v':
             ++verbose;
@@ -279,16 +281,16 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((bpc > 0xffff) && (0 == verify16)) {
+    if ((bpc > 0xffff) && (! verify16)) {
         pr2serr("'%s' exceeds 65535, so use VERIFY(16)\n",
                 (ndo > 0) ? "count" : "bpc");
-        ++verify16;
+        verify16 = true;
     }
-    if (((lba + count - 1) > 0xffffffffLLU) && (0 == verify16)) {
+    if (((lba + count - 1) > 0xffffffffLLU) && (! verify16)) {
         pr2serr("'lba' exceed 32 bits, so use VERIFY(16)\n");
-        ++verify16;
+        verify16 = true;
     }
-    if ((group > 0) && (0 == verify16))
+    if ((group > 0) && (! verify16))
         pr2serr("group number ignored with VERIFY(10) command, use the --16 "
                 "option\n");
 
@@ -302,7 +304,7 @@ main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         }
         if ((NULL == file_name) || (0 == strcmp(file_name, "-"))) {
-            ++got_stdin;
+            got_stdin = true;
             infd = STDIN_FILENO;
             if (sg_set_binary_mode(STDIN_FILENO) < 0)
                 perror("sg_set_binary_mode");

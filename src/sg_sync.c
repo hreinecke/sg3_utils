@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <limits.h>
 #include <getopt.h>
@@ -27,7 +29,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.16 20170924";
+static const char * version_str = "1.17 20171005";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -83,7 +85,7 @@ static void usage()
 }
 
 static int
-ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
+ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
                  uint64_t lba, unsigned int num_lb, int to_secs,
                  bool noisy, int verbose)
 {
@@ -116,8 +118,9 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
     set_scsi_pt_cdb(ptvp, sc_cdb, sizeof(sc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, to_secs, verbose);
-    ret = sg_cmds_process_resp(ptvp, "synchronize cache(16)", res, 0,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "synchronize cache(16)", res,
+                               SG_NO_DATA_IN, sense_b, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -140,18 +143,18 @@ ll_sync_cache_16(int sg_fd, int sync_nv, int immed, int group,
 
 int main(int argc, char * argv[])
 {
+    bool do_16 = false;
+    bool immed = false;
+    bool sync_nv = false;
     int sg_fd, res, c;
-    int64_t count = 0;
-    unsigned int num_lb = 0;
-    int do_16 = 0;
     int group = 0;
-    int64_t lba = 0;
-    int immed = 0;
-    int sync_nv = 0;
+    int ret = 0;
     int to_secs = DEF_PT_TIMEOUT;
     int verbose = 0;
+    unsigned int num_lb = 0;
+    int64_t count = 0;
+    int64_t lba = 0;
     const char * device_name = NULL;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -182,7 +185,7 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'i':
-            immed = 1;
+            immed = true;
             break;
         case 'l':
             lba = sg_get_llnum(optarg);
@@ -192,10 +195,10 @@ int main(int argc, char * argv[])
             }
             break;
         case 's':
-            sync_nv = 1;
+            sync_nv = true;
             break;
         case 'S':
-            do_16 = 1;
+            do_16 = true;
             break;
         case 't':
             to_secs = sg_get_num(optarg);
@@ -234,7 +237,7 @@ int main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

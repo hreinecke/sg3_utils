@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.50 20170917";
+static const char * version_str = "0.51 20171007";
 
 #define ME "sg_senddiag: "
 
@@ -56,24 +56,24 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int do_doff;
-    int do_extdur;
+    bool do_deftest;
+    bool do_doff;
+    bool do_extdur;
+    bool do_list;
+    bool do_pf;
+    bool do_raw;
+    bool do_uoff;
+    bool do_version;
+    bool opt_new;
     int do_help;
     int do_hex;
-    int do_list;
     int maxlen;
     int page_code;
-    int do_pf;
-    int do_raw;
     int do_selftest;
-    int do_deftest;
     int timeout;
-    int do_uoff;
     int do_verbose;
-    int do_version;
     const char * device_name;
     const char * raw_arg;
-    int opt_new;
 };
 
 
@@ -172,10 +172,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 
         switch (c) {
         case 'd':
-            op->do_doff = 1;
+            op->do_doff = true;
             break;
         case 'e':
-            op->do_extdur = 1;
+            op->do_extdur = true;
             break;
         case 'h':
         case '?':
@@ -185,7 +185,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             ++op->do_hex;
             break;
         case 'l':
-            ++op->do_list;
+            op->do_list = true;
             break;
         case 'm':
             n = sg_get_num(optarg);
@@ -199,10 +199,10 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
         case 'N':
             break;      /* ignore */
         case 'O':
-            op->opt_new = 0;
+            op->opt_new = false;
             return 0;
         case 'p':
-            op->do_pf = 1;
+            op->do_pf = true;
             break;
         case 'P':
             n = sg_get_num(optarg);
@@ -215,7 +215,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             break;
         case 'r':
             op->raw_arg = optarg;
-            op->do_raw = 1;
+            op->do_raw = true;
             break;
         case 's':
             n = sg_get_num(optarg);
@@ -227,7 +227,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->do_selftest = n;
             break;
         case 't':
-            op->do_deftest = 1;
+            op->do_deftest = true;
             break;
         case 'T':
             n = sg_get_num(optarg);
@@ -238,13 +238,13 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             op->timeout = n;
             break;
         case 'u':
-            op->do_uoff = 1;
+            op->do_uoff = true;
             break;
         case 'v':
             ++op->do_verbose;
             break;
         case 'V':
-            ++op->do_version;
+            op->do_version = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -272,7 +272,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen, num, n;
+    bool jmp_out;
+    int k, plen, num, n;
     unsigned int u;
     const char * cp;
 
@@ -282,61 +283,61 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'd':
                     if (0 == strncmp("doff", cp, 4)) {
-                        op->do_doff = 1;
+                        op->do_doff = true;
                         cp += 3;
                         plen -= 3;
                     } else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 'e':
-                    op->do_extdur = 1;
+                    op->do_extdur = true;
                     break;
                 case 'h':
                 case 'H':
                     ++op->do_hex;
                     break;
                 case 'l':
-                    ++op->do_list;
+                    op->do_list = true;
                     break;
                 case 'N':
-                    op->opt_new = 1;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'p':
                     if (0 == strncmp("pf", cp, 2)) {
-                        op->do_pf = 1;
+                        op->do_pf = true;
                         ++cp;
                         --plen;
                     } else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 't':
-                    op->do_deftest = 1;
+                    op->do_deftest = true;
                     break;
                 case 'u':
                     if (0 == strncmp("uoff", cp, 4)) {
-                        op->do_uoff = 1;
+                        op->do_uoff = true;
                         cp += 3;
                         plen -= 3;
                     } else
-                        jmp_out = 1;
+                        jmp_out = true;
                     break;
                 case 'v':
                     ++op->do_verbose;
                     break;
                 case 'V':
-                    ++op->do_version;
+                    op->do_version = true;
                     break;
                 case '?':
                     ++op->do_help;
                     break;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)
@@ -346,7 +347,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 continue;
             if (0 == strncmp("raw=", cp, 4)) {
                 op->raw_arg = cp + 4;
-                op->do_raw = 1;
+                op->do_raw = true;
             } else if (0 == strncmp("s=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", &u);
                 if ((1 != num) || (u > 7)) {
@@ -390,14 +391,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        op->opt_new = 0;
+        op->opt_new = false;
         res = process_cl_old(op, argc, argv);
         if ((0 == res) && op->opt_new)
             res = process_cl_new(op, argc, argv);
     } else {
-        op->opt_new = 1;
+        op->opt_new = true;
         res = process_cl_new(op, argc, argv);
-        if ((0 == res) && (0 == op->opt_new))
+        if ((0 == res) && (! op->opt_new))
             res = process_cl_old(op, argc, argv);
     }
     return res;
@@ -405,9 +406,9 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 
 /* Return of 0 -> success, otherwise see sg_ll_send_diag() */
 static int
-do_senddiag(int sg_fd, int sf_code, int pf_bit, int sf_bit, int devofl_bit,
-            int unitofl_bit, void * outgoing_pg, int outgoing_len, int tmout,
-            bool noisy, int verbose)
+do_senddiag(int sg_fd, int sf_code, bool pf_bit, bool sf_bit,
+            bool devofl_bit, bool unitofl_bit, void * outgoing_pg,
+            int outgoing_len, int tmout, bool noisy, int verbose)
 {
     int long_duration = 0;
 
@@ -431,11 +432,13 @@ do_modes_0a(int sg_fd, void * resp, int mx_resp_len, bool noisy, bool mode6,
     int res;
 
     if (mode6)
-        res = sg_ll_mode_sense6(sg_fd, 1 /* dbd */, 0 /* pc */, 0xa /* page */,
-                                0, resp, mx_resp_len, noisy, verbose);
+        res = sg_ll_mode_sense6(sg_fd, true /* dbd */, false /* pc */,
+                                0xa /* page */, false, resp, mx_resp_len,
+                                noisy, verbose);
     else
-        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, 1 /* dbd */, 0, 0xa, 0,
-                                 resp, mx_resp_len, noisy, verbose);
+        res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, true /* dbd */,
+                                 false, 0xa, false, resp, mx_resp_len,
+                                 noisy, verbose);
     if (res) {
         char b[80];
 
@@ -770,7 +773,7 @@ main(int argc, char * argv[])
 #endif
 #endif
 
-    if ((sg_fd = sg_cmds_open_device(op->device_name, 0 /* rw */,
+    if ((sg_fd = sg_cmds_open_device(op->device_name, false /* rw */,
                                      op->do_verbose)) < 0) {
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
@@ -806,11 +809,11 @@ main(int argc, char * argv[])
             printf("Extended self-test duration (mode page 0xa) failed\n");
             goto err_out9;
         }
-    } else if ((op->do_list) || (op->page_code >= 0x0)) {
+    } else if (op->do_list || (op->page_code >= 0x0)) {
         pg = op->page_code;
         if (pg < 0)
-            res = do_senddiag(sg_fd, 0, 1 /* pf */, 0, 0, 0, rsp_buff, 4,
-                              op->timeout, 1, op->do_verbose);
+            res = do_senddiag(sg_fd, 0, true /* pf */, false, false, false,
+                              rsp_buff, 4, op->timeout, 1, op->do_verbose);
         else
             res = 0;
         if (0 == res) {
@@ -851,7 +854,7 @@ main(int argc, char * argv[])
             goto err_out;
         }
     } else if (op->do_raw) {
-        res = do_senddiag(sg_fd, 0, op->do_pf, 0, 0, 0, read_in,
+        res = do_senddiag(sg_fd, 0, op->do_pf, false, false, false, read_in,
                           read_in_len, op->timeout, 1, op->do_verbose);
         if (res) {
             ret = res;

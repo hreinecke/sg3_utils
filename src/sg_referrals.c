@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -31,7 +33,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.07 20170917";    /* sbc4r10 */
+static const char * version_str = "1.08 20171006";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -166,19 +168,19 @@ decode_referral_desc(const unsigned char * bp, int bytes)
 int
 main(int argc, char * argv[])
 {
+    bool do_one_segment = false;
+    bool o_readonly = false;
+    bool do_raw = false;
     int sg_fd, k, res, c, rlen;
     int do_hex = 0;
-    int do_one_segment = 0;
-    int o_readonly = 0;
-    int64_t ll;
-    uint64_t lba = 0;
     int maxlen = DEF_REFER_BUFF_LEN;
-    int do_raw = 0;
     int verbose = 0;
     int desc = 0;
+    int ret = 0;
+    int64_t ll;
+    uint64_t lba = 0;
     const char * device_name = NULL;
     const unsigned char * bp;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -213,13 +215,13 @@ main(int argc, char * argv[])
             }
             break;
         case 's':
-            ++do_one_segment;
+            do_one_segment = true;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 'v':
             ++verbose;

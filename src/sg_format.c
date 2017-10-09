@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2016  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2017  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
@@ -36,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.38 20160629";
+static const char * version_str = "1.39 20171005";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -91,7 +92,7 @@ struct opts_t {
         int tape;               /* -T <format>, def: -1 */
         int timeout;            /* -m SEC, def: depends on IMMED bit */
         int verbose;            /* -v */
-        int verify;             /* -y */
+        bool verify;            /* -y */
         const char * device_name;
 };
 
@@ -225,7 +226,7 @@ usage()
 /* Invokes a SCSI FORMAT MEDIUM command (SSC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_format_medium(int sg_fd, int verify, int immed, int format,
+sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
                     void * paramp, int transfer_len, int timeout, bool noisy,
                     int verbose)
 {
@@ -285,7 +286,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
 {
         int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
         int resp_len, ip_desc, timeout;
-        int immed = ! op->fwait;
+        bool immed = ! op->fwait;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
@@ -346,7 +347,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
-                                                             1, verb);
+                                                             true, verb);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
@@ -360,8 +361,9 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, sizeof(reqSense));
-                        res = sg_ll_request_sense(fd, 0, reqSense,
-                                                  sizeof(reqSense), 0, verb);
+                        res = sg_ll_request_sense(fd, false /* desc */,
+                                                  reqSense, sizeof(reqSense),
+                                                  false, verb);
                         if (res) {
                                 pr2serr("polling with Request Sense command "
                                         "failed [res=%d]\n", res);
@@ -391,7 +393,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         sleep_for(30);
                 memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
                 res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
-                                          maxlen, 1, op->verbose);
+                                          maxlen, true, op->verbose);
                 if (res) {
                         ret = res;
                         sg_get_category_sense_str(res, sizeof(b), b,
@@ -432,7 +434,7 @@ static int
 scsi_format_medium(int fd, const struct opts_t * op)
 {
         int res, progress, pr, rem, verb, resp_len, timeout;
-        int immed = ! op->fwait;
+        bool immed = ! op->fwait;
         unsigned char reqSense[MAX_BUFF_SZ];
         char b[80];
 
@@ -440,7 +442,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
         if (op->timeout > timeout)
                 timeout = op->timeout;
         res = sg_ll_format_medium(fd, op->verify, immed, 0xf & op->tape, NULL,
-                                  0, timeout, 1, op->verbose);
+                                  0, timeout, true, op->verbose);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format medium command: %s\n", b);
@@ -464,7 +466,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
-                                                             1, verb);
+                                                             true, verb);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
@@ -478,8 +480,9 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, sizeof(reqSense));
-                        res = sg_ll_request_sense(fd, 0, reqSense,
-                                                  sizeof(reqSense), 0, verb);
+                        res = sg_ll_request_sense(fd, false /* desc */,
+                                                  reqSense, sizeof(reqSense),
+                                                  false, verb);
                         if (res) {
                                 pr2serr("polling with Request Sense command "
                                         "failed [res=%d]\n", res);
@@ -583,8 +586,9 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen,
 
         verb = (op->verbose > 1) ? op->verbose - 1 : 0;
         memset(sinq_resp, 0, max_rlen);
-        res = sg_ll_inquiry(fd, 0, 0 /* evpd */, 0 /* pg_op */, b,
-                            SAFE_STD_INQ_RESP_LEN, 1, verb);
+        res = sg_ll_inquiry(fd, false /* cmddt */, false /* evpd */,
+                            0 /* pg_op */, b, SAFE_STD_INQ_RESP_LEN, true,
+                            verb);
         if (res)
                 return res;
         n = b[4] + 5;
@@ -607,8 +611,8 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen,
                         "36\n", n);
                 return SG_LIB_CAT_OTHER;
         }
-        res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
-                            SAFE_STD_INQ_RESP_LEN, 1, verb);
+        res = sg_ll_inquiry(fd, false, true, VPD_SUPPORTED_VPDS, b,
+                            SAFE_STD_INQ_RESP_LEN, true, verb);
         if (res) {
                 if (op->verbose)
                         pr2serr("VPD_SUPPORTED_VPDS gave res=%d\n", res);
@@ -637,8 +641,9 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen,
                 }
         }
         if (has_sn) {
-                res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_UNIT_SERIAL_NUM,
-                                    b, sizeof(b), 1, verb);
+                res = sg_ll_inquiry(fd, false, true /* evpd */,
+                                    VPD_UNIT_SERIAL_NUM, b, sizeof(b), true,
+                                    verb);
                 if (res) {
                         if (op->verbose)
                                 pr2serr("VPD_UNIT_SERIAL_NUM gave res=%d\n",
@@ -657,8 +662,8 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen,
                        (const char *)(b + 4));
         }
         if (has_di) {
-                res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_DEVICE_ID, b,
-                                    sizeof(b), 1, verb);
+                res = sg_ll_inquiry(fd, false, true /* evpd */, VPD_DEVICE_ID,
+                                    b, sizeof(b), true, verb);
                 if (res) {
                         if (op->verbose)
                                 pr2serr("VPD_DEVICE_ID gave res=%d\n", res);
@@ -693,8 +698,8 @@ print_read_cap(int fd, const struct opts_t * op)
         char b[80];
 
         if (op->do_rcap16) {
-                res = sg_ll_readcap_16(fd, 0 /* pmi */, 0 /* llba */,
-                                       resp_buff, 32, 1, op->verbose);
+                res = sg_ll_readcap_16(fd, false /* pmi */, 0 /* llba */,
+                                       resp_buff, 32, true, op->verbose);
                 if (0 == res) {
                         llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);
                         block_size = sg_get_unaligned_be32(resp_buff + 8);
@@ -719,8 +724,8 @@ print_read_cap(int fd, const struct opts_t * op)
                         return (int)block_size;
                 }
         } else {
-                res = sg_ll_readcap_10(fd, 0 /* pmi */, 0 /* lba */,
-                                       resp_buff, 8, 1, op->verbose);
+                res = sg_ll_readcap_10(fd, false /* pmi */, 0 /* lba */,
+                                       resp_buff, 8, true, op->verbose);
                 if (0 == res) {
                         last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
                         block_size = sg_get_unaligned_be32(resp_buff + 4);
@@ -749,11 +754,12 @@ int
 main(int argc, char **argv)
 {
         int fd, res, calc_len, bd_len, dev_specific_param;
-        int offset, j, n, bd_blk_len, prob, len, pdt;
+        int offset, j, n, bd_blk_len, len, pdt;
+        int ret = 0;
+        bool prob = false;
         uint64_t ull;
         char b[80];
         unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
-        int ret = 0;
         struct opts_t opts;
         struct opts_t * op;
 
@@ -910,7 +916,7 @@ main(int argc, char **argv)
                         op->pollt_given = true;
                         break;
                 case 'y':
-                        op->verify++;
+                        op->verify = true;
                         break;
                 case '6':
                         op->mode6 = true;
@@ -979,7 +985,7 @@ main(int argc, char **argv)
                         op->fmtpinfo |= 1;
         }
 
-        if ((fd = sg_cmds_open_device(op->device_name, 0 /* read write */,
+        if ((fd = sg_cmds_open_device(op->device_name, false /* rw=false */,
                                       op->verbose)) < 0) {
                 pr2serr("error opening device file: %s: %s\n",
                         op->device_name, safe_strerror(-fd));
@@ -1014,14 +1020,14 @@ main(int argc, char **argv)
 again_with_long_lba:
         memset(dbuff, 0, MAX_BUFF_SZ);
         if (op->mode6)
-                res = sg_ll_mode_sense6(fd, 0 /* DBD */, 0 /* current */,
+                res = sg_ll_mode_sense6(fd, false /* DBD */, 0 /* current */,
                                         op->mode_page, 0 /* subpage */, dbuff,
-                                        MAX_BUFF_SZ, 1, op->verbose);
+                                        MAX_BUFF_SZ, true, op->verbose);
         else
-                res = sg_ll_mode_sense10(fd, op->long_lba, 0 /* DBD */,
+                res = sg_ll_mode_sense10(fd, op->long_lba, false /* DBD */,
                                          0 /* current */, op->mode_page,
                                          0 /* subpage */, dbuff,
-                                         MAX_BUFF_SZ, 1, op->verbose);
+                                         MAX_BUFF_SZ, true, op->verbose);
         ret = res;
         if (res) {
                 if (SG_LIB_CAT_ILLEGAL_REQ == res) {
@@ -1067,7 +1073,7 @@ again_with_long_lba:
         }
         if ((offset + bd_len) < calc_len)
                 dbuff[offset + bd_len] &= 0x7f;  /* clear PS bit in mpage */
-        prob = 0;
+        prob = false;
         bd_blk_len = 0;
         printf("Mode Sense (block descriptor) data, prior to changes:\n");
         if (dev_specific_param & 0x40)
@@ -1090,15 +1096,15 @@ again_with_long_lba:
                 if (op->long_lba) {
                         printf("  <<< longlba flag set (64 bit lba) >>>\n");
                         if (bd_len != 16)
-                                prob = 1;
+                                prob = true;
                 } else if (bd_len != 8)
-                        prob = 1;
+                        prob = true;
                 printf("  Number of blocks=%" PRIu64 " [0x%" PRIx64 "]\n",
                        ull, ull);
                 printf("  Block size=%d [0x%x]\n", bd_blk_len, bd_blk_len);
         } else {
                 printf("  No block descriptors present\n");
-                prob = 1;
+                prob = true;
         }
         if (op->resize || (op->format && ((op->blk_count != 0) ||
               ((op->blk_size > 0) && (op->blk_size != bd_blk_len))))) {
@@ -1167,11 +1173,13 @@ again_with_long_lba:
                                                       dbuff + offset + 5);
                 }
                 if (op->mode6)
-                        res = sg_ll_mode_select6(fd, 1 /* PF */, 1 /* SP */,
-                                         dbuff, calc_len, 1, op->verbose);
+                        res = sg_ll_mode_select6(fd, true /* PF */,
+                                                 true /* SP */, dbuff,
+                                                 calc_len, true, op->verbose);
                 else
-                        res = sg_ll_mode_select10(fd, 1 /* PF */, 1 /* SP */,
-                                          dbuff, calc_len, 1, op->verbose);
+                        res = sg_ll_mode_select10(fd, true /* PF */,
+                                                  true /* SP */, dbuff,
+                                                  calc_len, true, op->verbose);
                 ret = res;
                 if (res) {
                         sg_get_category_sense_str(res, sizeof(b), b,

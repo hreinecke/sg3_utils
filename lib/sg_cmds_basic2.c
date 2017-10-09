@@ -100,7 +100,7 @@ create_pt_obj(const char * cname)
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
+sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
                     unsigned int lba, unsigned int count, bool noisy,
                     int verbose)
 {
@@ -134,8 +134,8 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
     set_scsi_pt_cdb(ptvp, sc_cdb, sizeof(sc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -158,7 +158,7 @@ sg_ll_sync_cache_10(int sg_fd, int sync_nv, int immed, int group,
 /* Invokes a SCSI READ CAPACITY (16) command. Returns 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
+sg_ll_readcap_16(int sg_fd, bool pmi, uint64_t llba, void * resp,
                  int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read capacity(16)";
@@ -211,7 +211,7 @@ sg_ll_readcap_16(int sg_fd, int pmi, uint64_t llba, void * resp,
 /* Invokes a SCSI READ CAPACITY (10) command. Returns 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
+sg_ll_readcap_10(int sg_fd, bool pmi, unsigned int lba, void * resp,
                  int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "read capacity(10)";
@@ -261,7 +261,7 @@ sg_ll_readcap_10(int sg_fd, int pmi, unsigned int lba, void * resp,
 /* Invokes a SCSI MODE SENSE (6) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
+sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode sense(6)";
@@ -336,7 +336,7 @@ sg_ll_mode_sense6(int sg_fd, int dbd, int pc, int pg_code, int sub_pg_code,
 /* Invokes a SCSI MODE SENSE (10) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
+sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
                    int sub_pg_code, void * resp, int mx_resp_len,
                    bool noisy, int verbose)
 {
@@ -412,7 +412,7 @@ sg_ll_mode_sense10(int sg_fd, int llbaa, int dbd, int pc, int pg_code,
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
+sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
                    bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode select(6)";
@@ -422,7 +422,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    modes_cdb[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
+    modes_cdb[1] = (unsigned char)((pf ? 0x10 : 0x0) | (sp ? 0x1 : 0x0));
     modes_cdb[4] = (unsigned char)(param_len & 0xff);
     if (param_len > 0xff) {
         pr2ws("%s: param_len too big\n", cdb_name_s);
@@ -445,8 +445,8 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -469,7 +469,7 @@ sg_ll_mode_select6(int sg_fd, int pf, int sp, void * paramp, int param_len,
 /* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
+sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
                     bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode select(10)";
@@ -479,7 +479,7 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    modes_cdb[1] = (unsigned char)(((pf << 4) & 0x10) | (sp & 0x1));
+    modes_cdb[1] = (unsigned char)((pf ? 0x10 : 0x0) | (sp ? 0x1 : 0x0));
     sg_put_unaligned_be16((int16_t)param_len, modes_cdb + 7);
     if (param_len > 0xffff) {
         pr2ws("%s: param_len too big\n", cdb_name_s);
@@ -502,8 +502,8 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -526,12 +526,12 @@ sg_ll_mode_select10(int sg_fd, int pf, int sp, void * paramp, int param_len,
 /* MODE SENSE commands yield a response that has block descriptors followed
  * by mode pages. In most cases users are interested in the first mode page.
  * This function returns the (byte) offset of the start of the first mode
- * page. Set mode_sense_6 to 1 for MODE SENSE (6) and 0 for MODE SENSE (10).
- * Returns >= 0 is successful or -1 if failure. If there is a failure
+ * page. Set mode_sense_6 to true for MODE SENSE (6) and false for MODE SENSE
+ * 10). Returns >= 0 is successful or -1 if failure. If there is a failure
  * a message is written to err_buff if err_buff_len > 0. */
 int
 sg_mode_page_offset(const unsigned char * resp, int resp_len,
-                    int mode_sense_6, char * err_buff, int err_buff_len)
+                    bool mode_sense_6, char * err_buff, int err_buff_len)
 {
     int bd_len, calc_len, offset;
 
@@ -570,7 +570,7 @@ sg_mode_page_offset(const unsigned char * resp, int resp_len,
 
 /* Fetches current, changeable, default and/or saveable modes pages as
  * indicated by pcontrol_arr for given pg_code and sub_pg_code. If
- * mode6==0 then use MODE SENSE (10) else use MODE SENSE (6). If
+ * mode6==false then use MODE SENSE (10) else use MODE SENSE (6). If
  * flexible set and mode data length seems wrong then try and
  * fix (compensating hack for bad device or driver). pcontrol_arr
  * should have 4 elements for output of current, changeable, default
@@ -584,8 +584,8 @@ sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * then stops and returns that error; otherwise continues if an error is
  * detected but returns the first error encountered.  */
 int
-sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
-                          int dbd, int flexible, int mx_mpage_len,
+sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
+                          bool dbd, bool flexible, int mx_mpage_len,
                           int * success_mask, void * pcontrol_arr[],
                           int * reported_len, int verbose)
 {
@@ -608,7 +608,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
                                 sub_pg_code, buff, MODE10_RESP_HDR_LEN, true,
                                 verbose);
     else
-        res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd,
+        res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, dbd,
                                  0 /* pc */, pg_code, sub_pg_code, buff,
                                  MODE10_RESP_HDR_LEN, true, verbose);
     if (0 != res)
@@ -662,7 +662,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
                                     pg_code, sub_pg_code, buff,
                                     calc_len, true, verbose);
         else
-            res = sg_ll_mode_sense10(sg_fd, 0 /* llbaa */, dbd,
+            res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, dbd,
                                      k /* pc */, pg_code, sub_pg_code,
                                      buff, calc_len, true, verbose);
         if (0 != res) {
@@ -684,7 +684,7 @@ sg_get_mode_page_controls(int sg_fd, int mode6, int pg_code, int sub_pg_code,
 /* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
+sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
                 int mx_resp_len, bool noisy, int verbose)
 {
@@ -757,7 +757,7 @@ sg_ll_log_sense(int sg_fd, int ppc, int sp, int pc, int pg_code,
 /* Invokes a SCSI LOG SELECT command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
+sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
                  int subpg_code, unsigned char * paramp, int param_len,
                  bool noisy, int verbose)
 {
@@ -793,8 +793,8 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -823,8 +823,8 @@ sg_ll_log_select(int sg_fd, int pcr, int sp, int pc, int pg_code,
  * pc_mod__fl_num and noflush__fl arguments to this function.
  *  */
 int
-sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
-                      int power_cond, int noflush__fl, int loej, int start,
+sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
+                      int power_cond, bool noflush__fl, bool loej, bool start,
                       bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "start stop unit";
@@ -833,10 +833,16 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
     unsigned char ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
 
-    ssuBlk[1] = immed & 1;
+    if (immed)
+        ssuBlk[1] = 0x1;
     ssuBlk[3] = pc_mod__fl_num & 0xf;  /* bits 2 and 3 are reserved in MMC */
-    ssuBlk[4] = ((power_cond & 0xf) << 4) | (noflush__fl ? 0x4 : 0) |
-                 (loej ? 0x2 : 0) | (start ? 0x1 : 0);
+    ssuBlk[4] = ((power_cond & 0xf) << 4);
+    if (noflush__fl)
+        ssuBlk[4] |= 0x4;
+    if (loej)
+        ssuBlk[4] |= 0x2;
+    if (start)
+        ssuBlk[4] |= 0x1;
     if (verbose) {
         pr2ws("    %s command:", cdb_name_s);
         for (k = 0; k < (int)sizeof(ssuBlk); ++k)
@@ -849,8 +855,8 @@ sg_ll_start_stop_unit(int sg_fd, int immed, int pc_mod__fl_num,
     set_scsi_pt_cdb(ptvp, ssuBlk, sizeof(ssuBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, START_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -901,8 +907,8 @@ sg_ll_prevent_allow(int sg_fd, int prevent, bool noisy, int verbose)
     set_scsi_pt_cdb(ptvp, p_cdb, sizeof(p_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, 0, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {

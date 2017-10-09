@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.29 20170920";/* spc5r17, sbc4r14 */
+const char * sg_lib_version_str = "2.30 20171003";/* spc5r17, sbc4r14 */
 
 
 /* indexed by pdt; those that map to own index do not decay */

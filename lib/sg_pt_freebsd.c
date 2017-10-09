@@ -1,15 +1,16 @@
 /*
- * Copyright (c) 2005-2016 Douglas Gilbert.
+ * Copyright (c) 2005-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.14 20160405 */
+/* sg_pt_freebsd version 1.15 20171005 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -95,7 +96,7 @@ pr2ws(const char * fmt, ...)
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
-scsi_pt_open_device(const char * device_name, int read_only, int verbose)
+scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 

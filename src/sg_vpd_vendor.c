@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -87,16 +87,17 @@
 
 /* These structures are duplicates of those of the same name in
  * sg_vpd.c . Take care that both are the same. */
+
 struct opts_t {
-    int do_all;
-    int do_enum;
-    int do_force;
+    bool do_all;
+    bool do_enum;
+    bool do_force;
+    bool do_long;
+    bool do_quiet;
     int do_hex;
     int vpd_pn;
     int do_ident;
-    int do_long;
     int maxlen;
-    int do_quiet;
     int do_raw;
     int vend_prod_num;
     int verbose;

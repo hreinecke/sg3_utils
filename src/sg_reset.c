@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -29,7 +30,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.63 20170921";
+static const char * version_str = "0.64 20171006";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -121,12 +122,12 @@ usage(int compat_mode)
 
 int main(int argc, char * argv[])
 {
+    bool do_device_reset = false;
+    bool do_bus_reset = false;
+    bool do_host_reset = false;
+    bool no_escalate = false;
+    bool do_target_reset = false;
     int c, sg_fd, res, k, hold_errno;
-    int do_device_reset = 0;
-    int do_bus_reset = 0;
-    int do_host_reset = 0;
-    int no_escalate = 0;
-    int do_target_reset = 0;
     int verbose = 0;
     char * device_name = NULL;
     char * cp = NULL;
@@ -145,29 +146,28 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'b':
-            ++do_bus_reset;
+            do_bus_reset = true;
             break;
         case 'd':
-            ++do_device_reset;
+            do_device_reset = true;
             break;
         case 'h':
             if (cp) {
-                ++do_host_reset;
+                do_host_reset = true;
                 break;
             } else {
                 usage(!!cp);
                 return 0;
             }
         case 'H':
-            ++do_host_reset;
+            do_host_reset = true;
             break;
         case 'N':
-            ++no_escalate;
+            no_escalate = true;
             break;
         case 't':
-            ++do_target_reset;
+            do_target_reset = true;
             break;
-
         case 'v':
             ++verbose;
             break;
@@ -204,8 +204,8 @@ int main(int argc, char * argv[])
     if (cp && (0 == verbose))
         ++verbose;      // older behaviour was more verbose
 
-    if ((!!do_device_reset + !!do_target_reset + !!do_bus_reset +
-         !!do_host_reset) > 1) {
+    if (((int)do_device_reset + (int)do_target_reset + (int)do_bus_reset +
+         (int)do_host_reset) > 1) {
         pr2serr("Can only request one type of reset per invocation\n");
         return 1;
     }

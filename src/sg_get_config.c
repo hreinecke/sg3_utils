@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -29,7 +31,7 @@
 
 */
 
-static const char * version_str = "0.43 20170917";    /* mmc6r02 */
+static const char * version_str = "0.44 20171008";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -40,18 +42,18 @@ static const char * version_str = "0.43 20170917";    /* mmc6r02 */
 static unsigned char resp_buffer[MX_ALLOC_LEN];
 
 static struct option long_options[] = {
-        {"brief", 0, 0, 'b'},
-        {"current", 0, 0, 'c'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"inner-hex", 0, 0, 'i'},
-        {"list", 0, 0, 'l'},
-        {"raw", 0, 0, 'R'},
-        {"readonly", 0, 0, 'q'},
-        {"rt", 1, 0, 'r'},
-        {"starting", 1, 0, 's'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"brief", no_argument, 0, 'b'},
+        {"current", no_argument, 0, 'c'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"inner-hex", no_argument, 0, 'i'},
+        {"list", no_argument, 0, 'l'},
+        {"raw", no_argument, 0, 'R'},
+        {"readonly", no_argument, 0, 'q'},
+        {"rt", required_argument, 0, 'r'},
+        {"starting", required_argument, 0, 's'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -880,8 +882,8 @@ decode_feature(int feature, unsigned char * bp, int len)
 }
 
 static void
-decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
-              int inner_hex)
+decode_config(unsigned char * resp, int max_resp_len, int len, bool brief,
+              bool inner_hex)
 {
     int k, curr_profile, extra_len, feature;
     unsigned char * bp;
@@ -923,7 +925,7 @@ decode_config(unsigned char * resp, int max_resp_len, int len, int brief,
 }
 
 static void
-list_known(int brief)
+list_known(bool brief)
 {
     int k, num;
 
@@ -947,15 +949,15 @@ main(int argc, char * argv[])
 {
     int sg_fd, res, c, len;
     int peri_type = 0;
-    int brief = 0;
-    int do_hex = 0;
-    int inner_hex = 0;
-    int list = 0;
-    int do_raw = 0;
-    int readonly = 0;
     int rt = 0;
     int starting = 0;
     int verbose = 0;
+    bool brief = false;
+    int do_hex = 0;
+    bool inner_hex = false;
+    bool list = false;
+    bool do_raw = false;
+    bool readonly = false;
     const char * device_name = NULL;
     char buff[64];
     const char * cp;
@@ -972,7 +974,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'b':
-            brief = 1;
+            brief = true;
             break;
         case 'c':
             rt = 1;
@@ -985,13 +987,13 @@ main(int argc, char * argv[])
             ++do_hex;
             break;
         case 'i':
-            inner_hex = 1;
+            inner_hex = true;
             break;
         case 'l':
-            list = 1;
+            list = true;
             break;
         case 'q':
-            ++readonly;
+            readonly = true;
             break;
         case 'r':
             rt = sg_get_num(optarg);
@@ -1001,7 +1003,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'R':
-            ++do_raw;
+            do_raw = true;
             break;
         case 's':
             starting = sg_get_num(optarg);
@@ -1044,18 +1046,19 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((sg_fd = sg_cmds_open_device(device_name, 1 /* ro */, verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(device_name, true /* ro */, verbose))
+        < 0) {
         pr2serr(ME "error opening file: %s (ro): %s\n", device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
-        if (0 == do_raw)
+        if (! do_raw)
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);
         peri_type = inq_resp.peripheral_type;
         cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
-        if (0 == do_raw) {
+        if (! do_raw) {
             if (strlen(cp) > 0)
                 printf("  Peripheral device type: %s\n", cp);
             else

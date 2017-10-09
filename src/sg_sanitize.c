@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
@@ -28,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.03 20170917";
+static const char * version_str = "1.04 20171008";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -85,23 +87,23 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    int ause;
-    int block;
+    bool ause;
+    bool block;
+    bool crypto;
+    bool desc;
+    bool early;
+    bool fail;
+    bool invert;
+    bool overwrite;
+    bool quick;
+    bool wait;
+    bool znr;
     int count;
-    int crypto;
-    int desc;
-    int early;
-    int fail;
-    int invert;
     int ipl;    /* initialization pattern length */
-    int overwrite;
-    int quick;
     int test;
     int timeout;        /* in seconds */
     int verbose;
-    int wait;
     int zero;
-    int znr;
     const char * pattern_fn;
 };
 
@@ -168,15 +170,16 @@ static int
 do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             int param_lst_len)
 {
-    int k, ret, res, sense_cat, immed, timeout;
+    bool immed;
+    int k, ret, res, sense_cat, timeout;
     unsigned char san_cdb[SANITIZE_OP_LEN];
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (op->early || op->wait)
-        immed = op->early ? 1 : 0;
+        immed = op->early;
     else
-        immed = 1;
+        immed = true;
     timeout = (immed ? SHORT_TIMEOUT : LONG_TIMEOUT);
     /* only use command line timeout if it exceeds previous defaults */
     if (op->timeout > timeout)
@@ -223,7 +226,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)param_lstp, param_lst_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout, op->verbose);
-    ret = sg_cmds_process_resp(ptvp, "Sanitize", res, 0, sense_b,
+    ret = sg_cmds_process_resp(ptvp, "Sanitize", res, SG_NO_DATA_IN, sense_b,
                                true /*noisy */, op->verbose, &sense_cat);
     if (-1 == ret)
         ;
@@ -235,7 +238,8 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             break;
         case SG_LIB_CAT_MEDIUM_HARD:
             {
-                int valid, slen;
+                bool valid;
+                int slen;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
@@ -331,7 +335,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
 
     verb = (verbose > 1) ? verbose - 1 : 0;
     memset(sinq_resp, 0, max_rlen);
-    res = sg_ll_inquiry(fd, 0, 0 /* evpd */, 0 /* pg_op */, b,
+    res = sg_ll_inquiry(fd, false, false /* evpd */, 0 /* pg_op */, b,
                         SAFE_STD_INQ_RESP_LEN, 1, verb);
     if (res)
         return res;
@@ -353,7 +357,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         pr2serr("Short INQUIRY response: %d bytes, expect at least 36\n", n);
         return SG_LIB_CAT_OTHER;
     }
-    res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_SUPPORTED_VPDS, b,
+    res = sg_ll_inquiry(fd, false, true /* evpd */, VPD_SUPPORTED_VPDS, b,
                         SAFE_STD_INQ_RESP_LEN, 1, verb);
     if (res) {
         if (verbose)
@@ -382,8 +386,8 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         }
     }
     if (has_sn) {
-        res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_UNIT_SERIAL_NUM, b,
-                            sizeof(b), 1, verb);
+        res = sg_ll_inquiry(fd, false, true /* evpd */, VPD_UNIT_SERIAL_NUM,
+                            b, sizeof(b), 1, verb);
         if (res) {
             if (verbose)
                 pr2serr("VPD_UNIT_SERIAL_NUM gave res=%d\n", res);
@@ -400,7 +404,7 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
         printf("      Unit serial number: %.*s\n", n, (const char *)(b + 4));
     }
     if (has_di) {
-        res = sg_ll_inquiry(fd, 0, 1 /* evpd */, VPD_DEVICE_ID, b,
+        res = sg_ll_inquiry(fd, false, true /* evpd */, VPD_DEVICE_ID, b,
                             sizeof(b), 1, verb);
         if (res) {
             if (verbose)
@@ -426,15 +430,15 @@ print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
 int
 main(int argc, char * argv[])
 {
+    bool got_stdin = false;
     int sg_fd, k, res, c, infd, progress, vb, n, resp_len;
-    int got_stdin = 0;
     int param_lst_len = 0;
+    int ret = -1;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
     unsigned char rsBuff[DEF_REQS_RESP_LEN];
     unsigned char * wBuff = NULL;
-    int ret = -1;
     struct opts_t opts;
     struct opts_t * op;
     struct stat a_stat;
@@ -453,10 +457,10 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'A':
-            ++op->ause;
+            op->ause = true;
             break;
         case 'B':
-            ++op->block;
+            op->block = true;
             break;
         case 'c':
             op->count = sg_get_num(optarg);
@@ -466,16 +470,16 @@ main(int argc, char * argv[])
             }
             break;
         case 'C':
-            ++op->crypto;
+            op->crypto = true;
             break;
         case 'd':
-            ++op->desc;
+            op->desc = true;
             break;
         case 'e':
-            ++op->early;
+            op->early = true;
             break;
         case 'F':
-            ++op->fail;
+            op->fail = true;
             break;
         case 'h':
         case '?':
@@ -489,16 +493,16 @@ main(int argc, char * argv[])
             }
             break;
         case 'I':
-            ++op->invert;
+            op->invert = true;
             break;
         case 'O':
-            ++op->overwrite;
+            op->overwrite = true;
             break;
         case 'p':
             op->pattern_fn = optarg;
             break;
         case 'Q':
-            ++op->quick;
+            op->quick = true;
             break;
         case 't':
             op->timeout = sg_get_num(optarg);
@@ -521,13 +525,13 @@ main(int argc, char * argv[])
             pr2serr(ME "version: %s\n", version_str);
             return 0;
         case 'w':
-            ++op->wait;
+            op->wait = true;
             break;
         case 'z':
             ++op->zero;
             break;
         case 'Z':
-            ++op->znr;
+            op->znr = true;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
@@ -553,7 +557,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     vb = op->verbose;
-    n = !!op->block + !!op->crypto + !!op->fail + !!op->overwrite;
+    n = (int)op->block + (int)op->crypto + (int)op->fail + (int)op->overwrite;
     if (1 != n) {
         pr2serr("one and only one of '--block', '--crypto', '--fail' or "
                 "'--overwrite' please\n");
@@ -573,7 +577,7 @@ main(int argc, char * argv[])
                         "option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            got_stdin = (0 == strcmp(op->pattern_fn, "-")) ? 1 : 0;
+            got_stdin = (0 == strcmp(op->pattern_fn, "-"));
             if (! got_stdin) {
                 memset(&a_stat, 0, sizeof(a_stat));
                 if (stat(op->pattern_fn, &a_stat) < 0) {
@@ -598,7 +602,7 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name,
                 safe_strerror(-sg_fd));
@@ -664,7 +668,7 @@ main(int argc, char * argv[])
         sg_put_unaligned_be16((uint16_t)op->ipl, wBuff + 2);
     }
 
-    if ((0 == op->quick) && (! op->fail)) {
+    if ((! op->quick) && (! op->fail)) {
         printf("\nA SANITIZE will commence in 15 seconds\n");
         printf("    ALL data on %s will be DESTROYED\n", device_name);
         printf("        Press control-C to abort\n");
@@ -685,7 +689,7 @@ main(int argc, char * argv[])
         pr2serr("Sanitize failed: %s\n", b);
     }
 
-    if ((0 == ret) && (0 == op->early) && (0 == op->wait)) {
+    if ((0 == ret) && (! op->early) && (! op->wait)) {
         for (k = 0 ;; ++k) {
             sleep_for(POLL_DURATION_SECS);
             memset(rsBuff, 0x0, sizeof(rsBuff));
@@ -697,10 +701,10 @@ main(int argc, char * argv[])
                     pr2serr("Request Sense command not supported\n");
                 else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
                     pr2serr("bad field in Request Sense cdb\n");
-                    if (1 == op->desc) {
+                    if (op->desc) {
                         pr2serr("Descriptor type sense may not be supported, "
                                 "try again with fixed type\n");
-                        op->desc = 0;
+                        op->desc = false;
                         continue;
                     }
                 } else {

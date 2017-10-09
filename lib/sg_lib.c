@@ -318,10 +318,10 @@ sg_scsi_sense_desc_find(const unsigned char * sbp, int sb_len,
     return NULL;
 }
 
-/* Returns 1 if valid bit set, 0 if valid bit clear. Irrespective the
+/* Returns true if valid bit set, false if valid bit clear. Irrespective the
  * information field is written out via 'info_outp' (except when it is
  * NULL). Handles both fixed and descriptor sense formats. */
-int
+bool
 sg_get_sense_info_fld(const unsigned char * sbp, int sb_len,
                       uint64_t * info_outp)
 {
@@ -331,13 +331,13 @@ sg_get_sense_info_fld(const unsigned char * sbp, int sb_len,
     if (info_outp)
         *info_outp = 0;
     if (sb_len < 7)
-        return 0;
+        return false;
     switch (sbp[0] & 0x7f) {
     case 0x70:
     case 0x71:
         if (info_outp)
             *info_outp = sg_get_unaligned_be32(sbp + 3);
-        return (sbp[0] & 0x80) ? 1 : 0;
+        return !!(sbp[0] & 0x80);
     case 0x72:
     case 0x73:
         bp = sg_scsi_sense_desc_find(sbp, sb_len, 0 /* info desc */);
@@ -347,24 +347,24 @@ sg_get_sense_info_fld(const unsigned char * sbp, int sb_len,
                 *info_outp = ull;
             return !!(bp[2] & 0x80);   /* since spc3r23 should be set */
         } else
-            return 0;
+            return false;
     default:
-        return 0;
+        return false;
     }
 }
 
-/* Returns 1 if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
+/* Returns true if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
  * In descriptor format if the stream commands descriptor not found
- * then returns 0. Writes 1 or 0 corresponding to these bits to the
- * last three arguments if they are non-NULL. */
-int
+ * then returns false. Writes true or false corresponding to these bits to
+ * the last three arguments if they are non-NULL. */
+bool
 sg_get_sense_filemark_eom_ili(const unsigned char * sbp, int sb_len,
-                              int * filemark_p, int * eom_p, int * ili_p)
+                              bool * filemark_p, bool * eom_p, bool * ili_p)
 {
     const unsigned char * bp;
 
     if (sb_len < 7)
-        return 0;
+        return false;
     switch (sbp[0] & 0x7f) {
     case 0x70:
     case 0x71:
@@ -375,9 +375,9 @@ sg_get_sense_filemark_eom_ili(const unsigned char * sbp, int sb_len,
                 *eom_p = !!(sbp[2] & 0x40);
             if (ili_p)
                 *ili_p = !!(sbp[2] & 0x20);
-            return 1;
+            return true;
         } else
-            return 0;
+            return false;
     case 0x72:
     case 0x73:
        /* Look for stream commands sense data descriptor */
@@ -390,23 +390,23 @@ sg_get_sense_filemark_eom_ili(const unsigned char * sbp, int sb_len,
                     *eom_p = !!(bp[3] & 0x40);
                 if (ili_p)
                     *ili_p = !!(bp[3] & 0x20);
-                return 1;
+                return true;
             }
         }
-        return 0;
+        return false;
     default:
-        return 0;
+        return false;
     }
 }
 
-/* Returns 1 if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
- * returns 1 if progress indication sense data descriptor found. Places
+/* Returns true if SKSV is set and sense key is NO_SENSE or NOT_READY. Also
+ * returns true if progress indication sense data descriptor found. Places
  * progress field from sense data where progress_outp points. If progress
- * field is not available returns 0 and *progress_outp is unaltered. Handles
- * both fixed and descriptor sense formats.
- * Hint: if 1 is returned *progress_outp may be multiplied by 100 then
+ * field is not available returns false and *progress_outp is unaltered.
+ * Handles both fixed and descriptor sense formats.
+ * Hint: if true is returned *progress_outp may be multiplied by 100 then
  * divided by 65536 to get the percentage completion. */
-int
+bool
 sg_get_sense_progress_fld(const unsigned char * sbp, int sb_len,
                           int * progress_outp)
 {
@@ -414,20 +414,20 @@ sg_get_sense_progress_fld(const unsigned char * sbp, int sb_len,
     int sk, sk_pr;
 
     if (sb_len < 7)
-        return 0;
+        return false;
     switch (sbp[0] & 0x7f) {
     case 0x70:
     case 0x71:
         sk = (sbp[2] & 0xf);
         if ((sb_len < 18) ||
             ((SPC_SK_NO_SENSE != sk) && (SPC_SK_NOT_READY != sk)))
-            return 0;
+            return false;
         if (sbp[15] & 0x80) {        /* SKSV bit set */
             if (progress_outp)
                 *progress_outp = sg_get_unaligned_be16(sbp + 16);
-            return 1;
+            return true;
         } else
-            return 0;
+            return false;
     case 0x72:
     case 0x73:
         /* sense key specific progress (0x2) or progress descriptor (0xa) */
@@ -437,16 +437,16 @@ sg_get_sense_progress_fld(const unsigned char * sbp, int sb_len,
             (0x6 == bp[1]) && (0x80 & bp[4])) {
             if (progress_outp)
                 *progress_outp = sg_get_unaligned_be16(bp + 5);
-            return 1;
+            return true;
         } else if (((bp = sg_scsi_sense_desc_find(sbp, sb_len, 0xa))) &&
                    ((0x6 == bp[1]))) {
             if (progress_outp)
                 *progress_outp = sg_get_unaligned_be16(bp + 6);
-            return 1;
+            return true;
         } else
-            return 0;
+            return false;
     default:
-        return 0;
+        return false;
     }
 }
 
@@ -714,7 +714,7 @@ sg_get_desig_type_str(int val)
 
 int
 sg_get_designation_descriptor_str(const char * lip, const unsigned char * ddp,
-                                  int dd_len, int print_assoc, int do_long,
+                                  int dd_len, bool print_assoc, bool do_long,
                                   int blen, char * b)
 {
     int m, p_id, piv, c_set, assoc, desig_type, ci_off, c_id, d_id, naa;
@@ -1459,7 +1459,7 @@ sg_get_sense_descriptors_str(const char * lip, const unsigned char * sbp,
                 if (add_d_len > 2) {
                     /* recursing; hope not to get carried away */
                     n += scnpr(b + n, blen - n, "%s vvvvvvvvvvvvvvvv\n", lip);
-                    sg_get_sense_str(lip, descp + 4, add_d_len - 2, 0,
+                    sg_get_sense_str(lip, descp + 4, add_d_len - 2, false,
                                      sizeof(c), c);
                     n += scnpr(b + n, blen - n, "%s", c);
                     n += scnpr(b + n, blen - n, "%s ^^^^^^^^^^^^^^^^\n", lip);
@@ -1507,7 +1507,8 @@ sg_get_sense_descriptors_str(const char * lip, const unsigned char * sbp,
                 n += scnpr(b + n, blen - n, "%s    Usage reason: "
                            "reserved[%d]\n", lip, descp[3]);
             n += sg_get_designation_descriptor_str(z, descp + 4, descp[1] - 2,
-                                                   1, 0, blen - n, b + n);
+                                                   true, false, blen - n,
+                                                   b + n);
             break;
         case 0xf:       /* Added in SPC-5 rev 10 (for Write buffer) */
             n += scnpr(b + n, blen - n, "Microcode activation ");
@@ -1585,7 +1586,7 @@ sg_get_sense_sat_pt_fixed_str(const char * lip, const unsigned char * sp,
 /* Fetch sense information */
 int
 sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
-                 int raw_sinfo, int buff_len, char * buff)
+                 bool raw_sinfo, int buff_len, char * buff)
 {
     int len, progress, n, r, pr, rem, blen;
     unsigned int info;
@@ -1796,7 +1797,7 @@ sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
 /* Print sense information */
 void
 sg_print_sense(const char * leadin, const unsigned char * sbp, int sb_len,
-               int raw_sinfo)
+               bool raw_sinfo)
 {
     char b[2048];
 
@@ -1805,14 +1806,14 @@ sg_print_sense(const char * leadin, const unsigned char * sbp, int sb_len,
 }
 
 /* See description in sg_lib.h header file */
-int
+bool
 sg_scsi_normalize_sense(const unsigned char * sbp, int sb_len,
                         struct sg_scsi_sense_hdr * sshp)
 {
     if (sshp)
         memset(sshp, 0, sizeof(struct sg_scsi_sense_hdr));
     if ((NULL == sbp) || (0 == sb_len) || (0x70 != (0x70 & sbp[0])))
-        return 0;
+        return false;
     if (sshp) {
         sshp->response_code = (0x7f & sbp[0]);
         if (sshp->response_code >= 0x72) {  /* descriptor format */
@@ -1836,7 +1837,7 @@ sg_scsi_normalize_sense(const unsigned char * sbp, int sb_len,
             }
         }
     }
-    return 1;
+    return true;
 }
 
 /* Returns a SG_LIB_CAT_* value. If cannot decode sense buffer (sbp) or a
@@ -2247,18 +2248,21 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
     return buff;
 }
 
-static const char * sg_sfs_spc_reserved = "SPC reserved";
-static const char * sg_sfs_sbc_reserved = "SBC reserved";
-static const char * sg_sfs_ssc_reserved = "SSC reserved";
-static const char * sg_sfs_zbc_reserved = "ZBC reserved";
+static const char * sg_sfs_spc_reserved = "SPC Reserved";
+static const char * sg_sfs_sbc_reserved = "SBC Reserved";
+static const char * sg_sfs_ssc_reserved = "SSC Reserved";
+static const char * sg_sfs_zbc_reserved = "ZBC Reserved";
 static const char * sg_sfs_reserved = "Reserved";
 
 /* Yield SCSI Feature Set (sfs) string. When 'peri_type' is < -1 (or > 31)
  * returns pointer to string (same as 'buff') associated with 'sfs_code'.
  * When 'peri_type' is between -1 (for SPC) and 31 (inclusive) then a match
- * on both 'sfs_code' and 'peri_type' is required. If a match is found and
- * 'foundp' is not NULL then the bool it points to is set to true; else if
- * 'foundp' is not NULL then the bool it points to is set to false.
+ * on both 'sfs_code' and 'peri_type' is required. If 'foundp' is not NULL
+ * then where it points is set to true if a match is found else it is set to
+ * false. If 'buff' is not NULL then in the case of a match a descriptive
+ * string is written to 'buff' while if there is not a not then a string
+ * ending in "Reserved" is written (and may be prefixed with SPC, SBC, SSC
+ * or ZBC). Returns 'buff' (i.e. a pointer value) even if it is NULL.
  * Example:
  *    char b[64];
  *    ...
@@ -2711,7 +2715,7 @@ sg_get_num(const char * buf)
         if (n == len)
             return -1;
         buf += n;
-        len -=n;
+        len -= n;
     }
     /* following hack to keep C++ happy */
     cp = strpbrk((char *)buf, " \t,#-");
@@ -2850,7 +2854,7 @@ sg_get_llnum(const char * buf)
         len -= n;
     }
     /* following hack to keep C++ happy */
-    cp = strpbrk((char *)buf, " \t-,#");
+    cp = strpbrk((char *)buf, " \t,#-");
     if (cp) {
         len = cp - buf;
         n = (int)sizeof(lb) - 1;
@@ -2861,10 +2865,10 @@ sg_get_llnum(const char * buf)
     } else
         b = buf;
     if (('0' == b[0]) && (('x' == b[1]) || ('X' == b[1]))) {
-        res = sscanf(b + 2, "%" SCNx64 "", &unum);
+        res = sscanf(b + 2, "%" SCNx64 , &unum);
         num = unum;
     } else if ('H' == toupper((int)b[len - 1])) {
-        res = sscanf(b, "%" SCNx64 "", &unum);
+        res = sscanf(b, "%" SCNx64 , &unum);
         num = unum;
     } else
         res = sscanf(b, "%" SCNd64 "%c%c%c", &num, &c, &c2, &c3);

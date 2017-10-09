@@ -38,6 +38,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <signal.h>
 #include <ctype.h>
@@ -64,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.47 20170917";
+static const char * version_str = "1.48 20171008";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -112,21 +114,21 @@ static int64_t out_full = 0;
 static int out_partial = 0;
 static int verbose = 0;
 
-static int do_time = 0;
-static int start_tm_valid = 0;
+static bool do_time = false;
+static bool start_tm_valid = false;
 static struct timeval start_tm;
 static int blk_sz = 0;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 struct flags_t {
-    int append;
-    int dio;
-    int direct;
-    int dpo;
-    int dsync;
-    int excl;
-    int fua;
+    bool append;
+    bool dio;
+    bool direct;
+    bool dpo;
+    bool dsync;
+    bool excl;
+    bool fua;
 };
 
 
@@ -155,10 +157,10 @@ print_stats()
 }
 
 static void
-calc_duration_throughput(int contin)
+calc_duration_throughput(bool contin)
 {
-    struct timeval end_tm, res_tm;
     double a, b;
+    struct timeval end_tm, res_tm;
 
     if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
         gettimeofday(&end_tm, NULL);
@@ -193,7 +195,7 @@ interrupt_handler(int sig)
     pr2serr("Interrupted by signal,");
     print_stats ();
     if (do_time)
-        calc_duration_throughput(0);
+        calc_duration_throughput(false);
     kill (getpid (), sig);
 }
 
@@ -204,14 +206,14 @@ siginfo_handler(int sig)
     pr2serr("Progress report, continuing ...\n");
     print_stats();
     if (do_time)
-        calc_duration_throughput(1);
+        calc_duration_throughput(true);
 }
 
 static int
 dd_filetype(const char * filename)
 {
-    struct stat st;
     size_t len = strlen(filename);
+    struct stat st;
 
     if ((1 == len) && ('.' == filename[0]))
         return FT_DEV_NULL;
@@ -303,10 +305,9 @@ usage()
 static int
 scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
-    int res;
+    int res, verb;
     unsigned int ui;
     unsigned char rcBuff[RCAP16_REPLY_LEN];
-    int verb;
 
     verb = (verbose ? verbose - 1: 0);
     res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, false,
@@ -382,11 +383,11 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 
 static int
 sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
-                  int64_t start_block, int write_true, int fua, int dpo)
+                  int64_t start_block, bool write_true, bool fua, bool dpo)
 {
+    int sz_ind;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
-    int sz_ind;
 
     memset(cdbp, 0, cdb_sz);
     if (dpo)
@@ -454,14 +455,15 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
  * -2 -> recoverable (ENOMEM), -1 -> unrecoverable error */
 static int
 sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
-        int bs, int cdbsz, int fua, int dpo, int do_mmap)
+        int bs, int cdbsz, bool fua, bool dpo, bool do_mmap)
 {
+    int k, res;
     unsigned char rdCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
-    int k, res;
 
-    if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, 0, fua, dpo)) {
+    if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,
+                          dpo)) {
         pr2serr(ME "bad rd cdb build, from_block=%" PRId64 ", blocks=%d\n",
                 from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
@@ -544,14 +546,14 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
  * -2 -> recoverable (ENOMEM), -1 -> unrecoverable error */
 static int
 sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
-         int bs, int cdbsz, int fua, int dpo, int do_mmap, int * diop)
+         int bs, int cdbsz, bool fua, bool dpo, bool do_mmap, bool * diop)
 {
+    int k, res;
     unsigned char wrCmd[MAX_SCSI_CDBSZ];
     unsigned char senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
-    int k, res;
 
-    if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, 1, fua, dpo)) {
+    if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, true, fua, dpo)) {
         pr2serr(ME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
                 to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
@@ -628,7 +630,7 @@ sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
     }
     if (diop && *diop &&
         ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
-        *diop = 0;      /* flag that dio not done (completely) */
+        *diop = false;      /* flag that dio not done (completely) */
     return 0;
 }
 
@@ -651,19 +653,19 @@ process_flags(const char * arg, struct flags_t * fp)
         if (np)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
-            fp->append = 1;
+            fp->append = true;
         else if (0 == strcmp(cp, "dio"))
-            fp->dio = 1;
+            fp->dio = true;
         else if (0 == strcmp(cp, "direct"))
-            fp->direct = 1;
+            fp->direct = true;
         else if (0 == strcmp(cp, "dpo"))
-            fp->dpo = 1;
+            fp->dpo = true;
         else if (0 == strcmp(cp, "dsync"))
-            fp->dsync = 1;
+            fp->dsync = true;
         else if (0 == strcmp(cp, "excl"))
-            fp->excl = 1;
+            fp->excl = true;
         else if (0 == strcmp(cp, "fua"))
-            fp->fua = 1;
+            fp->fua = true;
         else if (0 == strcmp(cp, "null"))
             ;
         else {
@@ -684,43 +686,42 @@ process_flags(const char * arg, struct flags_t * fp)
 int
 main(int argc, char * argv[])
 {
-    int64_t skip = 0;
-    int64_t seek = 0;
-    int ibs = 0;
-    int obs = 0;
+    bool cdbsz_given = false;
+    bool do_coe = false;     /* dummy, just accept + ignore */
+    bool do_sync = false;
+    int res, k, t, infd, outfd, blocks, n, flags;
+    int blocks_per;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
     int bpt_given = 0;
-    char str[STR_SZ];
-    char * key;
-    char * buf;
-    char inf[INOUTF_SZ];
+    int ibs = 0;
+    int in_res_sz = 0;
+    int in_sect_sz;
     int in_type = FT_OTHER;
-    char outf[INOUTF_SZ];
+    int obs = 0;
+    int out_res_sz = 0;
+    int out_sect_sz;
     int out_type = FT_OTHER;
-    int res, k, t;
-    int infd, outfd, blocks;
+    int num_dio_not_done = 0;
+    int ret = 0;
+    int scsi_cdbsz_in = DEF_SCSI_CDBSZ;
+    int scsi_cdbsz_out = DEF_SCSI_CDBSZ;
+    size_t psz;
+    int64_t in_num_sect = -1;
+    int64_t out_num_sect = -1;
+    int64_t skip = 0;
+    int64_t seek = 0;
+    char * buf;
+    char * key;
     unsigned char * wrkPos;
     unsigned char * wrkBuff = NULL;
     unsigned char * wrkMmap = NULL;
-    int64_t in_num_sect = -1;
-    int in_res_sz = 0;
-    int64_t out_num_sect = -1;
-    int out_res_sz = 0;
-    int scsi_cdbsz_in = DEF_SCSI_CDBSZ;
-    int scsi_cdbsz_out = DEF_SCSI_CDBSZ;
-    int cdbsz_given = 0;
-    int do_coe = 0;     /* dummy, just accept + ignore */
-    int do_sync = 0;
-    int num_dio_not_done = 0;
-    int in_sect_sz, out_sect_sz;
-    int n, flags;
+    char inf[INOUTF_SZ];
+    char str[STR_SZ];
+    char outf[INOUTF_SZ];
     char ebuff[EBUFF_SZ];
     char b[80];
-    int blocks_per;
-    size_t psz;
     struct flags_t in_flags;
     struct flags_t out_flags;
-    int ret = 0;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
@@ -757,9 +758,9 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key,"cdbsz")) {
             scsi_cdbsz_in = sg_get_num(buf);
             scsi_cdbsz_out = scsi_cdbsz_in;
-            cdbsz_given = 1;
+            cdbsz_given = true;
         } else if (0 == strcmp(key,"coe")) {
-            do_coe = sg_get_num(buf);   /* dummy, just accept + ignore */
+            do_coe = !! sg_get_num(buf);   /* dummy, just accept + ignore */
             if (do_coe) { ; }   /* unused, dummy to suppress warning */
         } else if (0 == strcmp(key,"count")) {
             if (0 != strcmp("-1", buf)) {
@@ -770,13 +771,13 @@ main(int argc, char * argv[])
                 }
             }   /* treat 'count=-1' as calculate count (same as not given) */
         } else if (0 == strcmp(key,"dio"))
-            out_flags.dio = sg_get_num(buf);
+            out_flags.dio = !! sg_get_num(buf);
         else if (0 == strcmp(key,"fua")) {
             n = sg_get_num(buf);
             if (n & 1)
-                out_flags.fua = 1;
+                out_flags.fua = true;
             if (n & 2)
-                in_flags.fua = 1;
+                in_flags.fua = true;
         } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
             if (-1 == ibs) {
@@ -824,7 +825,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"sync"))
-            do_sync = sg_get_num(buf);
+            do_sync = !! sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
             do_time = sg_get_num(buf);
         else if (0 == strncmp(key, "verb", 4))
@@ -857,7 +858,7 @@ main(int argc, char * argv[])
         pr2serr("skip and seek cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((out_flags.append > 0) && (seek > 0)) {
+    if (out_flags.append && (seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1165,7 +1166,7 @@ main(int argc, char * argv[])
     }
 
     if (out_flags.dio && (FT_SG != in_type)) {
-        out_flags.dio = 0;
+        out_flags.dio = false;
         pr2serr(">>> dio only performed on 'of' side when 'if' is an sg "
                 "device\n");
     }
@@ -1188,7 +1189,7 @@ main(int argc, char * argv[])
     } else {
         if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
             wrkBuff = (unsigned char *)malloc(blk_sz * bpt + psz);
-            if (0 == wrkBuff) {
+            if (NULL == wrkBuff) {
                 pr2serr("Not enough user memory for raw\n");
                 return SG_LIB_FILE_ERROR;
             }
@@ -1198,7 +1199,7 @@ main(int argc, char * argv[])
         }
         else {
             wrkBuff = (unsigned char *)malloc(blk_sz * bpt);
-            if (0 == wrkBuff) {
+            if (NULL == wrkBuff) {
                 pr2serr("Not enough user memory\n");
                 return SG_LIB_FILE_ERROR;
             }
@@ -1215,11 +1216,11 @@ main(int argc, char * argv[])
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
-        start_tm_valid = 1;
+        start_tm_valid = true;
     }
     req_count = dd_count;
 
-    if (verbose && (dd_count > 0) && (0 == out_flags.dio) &&
+    if (verbose && (dd_count > 0) && (! out_flags.dio) &&
         (FT_SG == in_type) && (FT_SG == out_type))
         pr2serr("Since both 'if' and 'of' are sg devices, only do mmap-ed "
                 "transfers on 'if'\n");
@@ -1228,13 +1229,14 @@ main(int argc, char * argv[])
         blocks = (dd_count > blocks_per) ? blocks_per : dd_count;
         if (FT_SG == in_type) {
             ret = sg_read(infd, wrkPos, blocks, skip, blk_sz, scsi_cdbsz_in,
-                          in_flags.fua, in_flags.dpo, 1);
+                          in_flags.fua, in_flags.dpo, true);
             if ((SG_LIB_CAT_UNIT_ATTENTION == ret) ||
                 (SG_LIB_CAT_ABORTED_COMMAND == ret)) {
                 pr2serr("Unit attention or aborted command, continuing "
                         "(r)\n");
                 ret = sg_read(infd, wrkPos, blocks, skip, blk_sz,
-                              scsi_cdbsz_in, in_flags.fua, in_flags.dpo, 1);
+                              scsi_cdbsz_in, in_flags.fua, in_flags.dpo,
+                              true);
             }
             if (0 != ret) {
                 pr2serr("sg_read failed, skip=%" PRId64 "\n", skip);
@@ -1272,8 +1274,8 @@ main(int argc, char * argv[])
             break;      /* read nothing so leave loop */
 
         if (FT_SG == out_type) {
-            int do_mmap = (FT_SG == in_type) ? 0 : 1;
-            int dio_res = out_flags.dio;
+            bool dio_res = out_flags.dio;
+            bool do_mmap = (FT_SG != in_type);
 
             ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz, scsi_cdbsz_out,
                            out_flags.fua, out_flags.dpo, do_mmap, &dio_res);
@@ -1291,7 +1293,7 @@ main(int argc, char * argv[])
             }
             else {
                 out_full += blocks;
-                if (out_flags.dio && (0 == dio_res))
+                if (out_flags.dio && (! dio_res))
                     num_dio_not_done++;
             }
         }
@@ -1328,7 +1330,7 @@ main(int argc, char * argv[])
     }
 
     if (do_time)
-        calc_duration_throughput(0);
+        calc_duration_throughput(false);
     if (do_sync) {
         if (FT_SG == out_type) {
             pr2serr(">> Synchronizing cache on %s\n", outf);
@@ -1344,7 +1346,8 @@ main(int argc, char * argv[])
         }
     }
 
-    if (wrkBuff) free(wrkBuff);
+    if (wrkBuff)
+        free(wrkBuff);
     if (STDIN_FILENO != infd)
         close(infd);
     if ((STDOUT_FILENO != outfd) && (FT_DEV_NULL != out_type))

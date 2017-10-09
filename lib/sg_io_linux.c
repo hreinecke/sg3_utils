@@ -118,7 +118,7 @@ sg_print_driver_status(int driver_status)
 static int
 sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
                      int driver_status, const unsigned char * sense_buffer,
-                     int sb_len, int raw_sinfo)
+                     int sb_len, bool raw_sinfo)
 {
     bool done_leadin = false;
     bool done_sense = false;
@@ -169,7 +169,7 @@ sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
 
 #ifdef SG_IO
 
-int
+bool
 sg_normalize_sense(const struct sg_io_hdr * hp,
                    struct sg_scsi_sense_hdr * sshp)
 {
@@ -185,7 +185,7 @@ sg_normalize_sense(const struct sg_io_hdr * hp,
    returns 0. */
 int
 sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
-                int raw_sinfo)
+                bool raw_sinfo)
 {
     return sg_linux_sense_print(leadin, hp->status, hp->host_status,
                                 hp->driver_status, hp->sbp, hp->sb_len_wr,
@@ -198,7 +198,7 @@ sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
 int
 sg_chk_n_print(const char * leadin, int masked_status, int host_status,
                int driver_status, const unsigned char * sense_buffer,
-               int sb_len, int raw_sinfo)
+               int sb_len, bool raw_sinfo)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 

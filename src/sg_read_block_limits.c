@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -30,7 +32,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.05 20170917";
+static const char * version_str = "1.06 20171006";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -41,6 +43,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -51,12 +54,14 @@ static void
 usage()
 {
     pr2serr("Usage: sg_read_block_limits  [--help] [--hex] [--raw] "
-            "[--verbose] [--version]\n"
-            "                             DEVICE\n"
+            "[--readonly]\n"
+            "                             [--verbose] [--version] "
+            "DEVICE\n"
             "  where:\n"
             "    --help|-h          print out usage message\n"
             "    --hex|-H           output response in hexadecimal\n"
             "    --raw|-r           output response in binary to stdout\n"
+            "    --readonly|-R      open DEVICE in read-only mode\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI READ BLOCK LIMITS command and decode the "
@@ -78,17 +83,18 @@ main(int argc, char * argv[])
 {
     int sg_fd, k, m, res, c;
     int do_hex = 0;
-    int do_raw = 0;
     int verbose = 0;
-    const char * device_name = NULL;
     int ret = 0;
     uint32_t max_block_size;
     uint16_t min_block_size;
+    bool do_raw = false;
+    bool readonly = false;
+    const char * device_name = NULL;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHrvV", long_options,
+        c = getopt_long(argc, argv, "hHrRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -102,7 +108,10 @@ main(int argc, char * argv[])
             ++do_hex;
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
+            break;
+        case 'R':
+            readonly = true;
             break;
         case 'v':
             ++verbose;
@@ -135,7 +144,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;

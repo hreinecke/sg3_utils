@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
@@ -32,7 +33,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.11 20170924";
+static const char * version_str = "1.12 20171007";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -100,8 +101,8 @@ build_lba_arr(const char * inp, uint64_t * lba_arr, int * lba_arr_len,
               int max_arr_len)
 {
     int in_len, k;
-    const char * lcp;
     int64_t ll;
+    const char * lcp;
     char * cp;
     char * c2p;
 
@@ -154,8 +155,8 @@ build_lba_arr(const char * inp, uint64_t * lba_arr, int * lba_arr_len,
  * by '0x', '0X' or contains trailing 'h' or 'H' (which indicate hex).
  * Returns 0 if ok, or 1 if error. */
 static int
-build_num_arr(const char * inp, uint32_t * num_arr,
-              int * num_arr_len, int max_arr_len)
+build_num_arr(const char * inp, uint32_t * num_arr, int * num_arr_len,
+              int max_arr_len)
 {
     int in_len, k;
     const char * lcp;
@@ -219,15 +220,15 @@ build_num_arr(const char * inp, uint32_t * num_arr,
  * Returns 0 if ok, or 1 if error. */
 static int
 build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
-              int * arr_len, int max_arr_len)
+                int * arr_len, int max_arr_len)
 {
-    char line[1024];
+    bool have_stdin;
     int off = 0;
     int in_len, k, j, m, ind, bit0;
-    bool have_stdin;
+    int64_t ll;
+    char line[1024];
     char * lcp;
     FILE * fp;
-    int64_t ll;
 
     have_stdin = ((1 == strlen(file_name)) && ('-' == file_name[0]));
     if (have_stdin)
@@ -324,22 +325,22 @@ bad_exit:
 int
 main(int argc, char * argv[])
 {
+    bool anchor = false;
     int sg_fd, res, c, num, k, j;
     int grpnum = 0;
+    int addr_arr_len = 0;
+    int num_arr_len = 0;
+    int param_len = 4;
+    int ret = 0;
+    int timeout = DEF_TIMEOUT_SECS;
+    int verbose = 0;
     const char * lba_op = NULL;
     const char * num_op = NULL;
     const char * in_op = NULL;
-    int addr_arr_len = 0;
-    int num_arr_len = 0;
-    int anchor = 0;
-    int timeout = DEF_TIMEOUT_SECS;
-    int verbose = 0;
     const char * device_name = NULL;
     uint64_t addr_arr[MAX_NUM_ADDR];
     uint32_t num_arr[MAX_NUM_ADDR];
     unsigned char param_arr[8 + (MAX_NUM_ADDR * 16)];
-    int param_len = 4;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -351,7 +352,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'a':
-            ++anchor;
+            anchor = true;
             break;
         case 'g':
             num = sscanf(optarg, "%d", &res);
@@ -478,7 +479,7 @@ main(int argc, char * argv[])
     sg_put_unaligned_be16((uint16_t)num, param_arr + k);
 
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;

@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 
@@ -28,17 +30,17 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.13 20170917";
+static const char * version_str = "1.14 20171006";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
 
 static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
-        {"raw", 0, 0, 'r'},
-        {"readonly", 0, 0, 'R'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"help", no_argument, 0, 'h'},
+        {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -60,14 +62,14 @@ static void usage()
 
 int main(int argc, char * argv[])
 {
+    bool raw = false;
+    bool readonly = false;
     int sg_fd, res, c, sn_len, n;
+    int ret = 0;
+    int verbose = 0;
     unsigned char rmsn_buff[4];
     unsigned char * bp = NULL;
-    int raw = 0;
-    int readonly = 0;
-    int verbose = 0;
     const char * device_name = NULL;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -83,10 +85,10 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'r':
-            ++raw;
+            raw = true;
             break;
         case 'R':
-            ++readonly;
+            readonly = true;
             break;
         case 'v':
             ++verbose;

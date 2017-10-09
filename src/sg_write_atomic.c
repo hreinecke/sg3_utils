@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
@@ -29,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.00 20170924";
+static const char * version_str = "1.01 20171008";
 
 
 #define ME "sg_write_atomic: "
@@ -94,25 +95,25 @@ static struct option long_options[] = {
 struct opts_t {
     bool do_16;
     bool do_32;
-    bool non_atomic;
-    bool strict;
-    uint16_t app_tag;
-    uint16_t atomic_boundary;
-    uint32_t bs;        /* 0 implies use READ CAPACITY(10 or 16) */
-    int dld;            /* only used by WRITE(16) [why not WRITE(32) ?] */
     bool dpo;
     bool fua;
+    bool non_atomic;
+    bool strict;
+    int dld;            /* only used by WRITE(16) [why not WRITE(32) ?] */
     int grpnum;
-    const char * ifilename;
-    uint64_t lba;
-    uint32_t numblocks;
-    uint64_t offset;
-    uint32_t ref_tag;
-    uint16_t tag_mask;
     int timeout;
     int verbose;
     int wrprotect;
+    uint16_t app_tag;
+    uint16_t atomic_boundary;
+    uint16_t tag_mask;
+    uint32_t bs;        /* 0 implies use READ CAPACITY(10 or 16) */
+    uint32_t numblocks;
+    uint32_t ref_tag;
+    uint64_t lba;
+    uint64_t offset;
     ssize_t xfer_bytes;     /* derived value: bs*numblocks */
+    const char * ifilename;
 };
 
 
@@ -249,8 +250,9 @@ do_write_atomic(int sg_fd, const struct opts_t * op, const void * dataoutp)
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_bytes);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
-    ret = sg_cmds_process_resp(ptvp, "Write atomic", res, 0, sense_b,
-                               true /*noisy */, op->verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "Write atomic", res, SG_NO_DATA_IN,
+                               sense_b, true /*noisy */, op->verbose,
+                               &sense_cat);
     if (-1 == ret)
         ;
     else if (-2 == ret) {
@@ -261,7 +263,8 @@ do_write_atomic(int sg_fd, const struct opts_t * op, const void * dataoutp)
             break;
         case SG_LIB_CAT_MEDIUM_HARD:
             {
-                int valid, slen;
+                bool valid;
+                int slen;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
@@ -359,7 +362,7 @@ do_write_normal(int sg_fd, const struct opts_t * op, const void * dataoutp)
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_bytes);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
-    ret = sg_cmds_process_resp(ptvp, "Write", res, 0, sense_b,
+    ret = sg_cmds_process_resp(ptvp, "Write", res, SG_NO_DATA_IN, sense_b,
                                true /*noisy */, op->verbose, &sense_cat);
     if (-1 == ret)
         ;
@@ -371,7 +374,8 @@ do_write_normal(int sg_fd, const struct opts_t * op, const void * dataoutp)
             break;
         case SG_LIB_CAT_MEDIUM_HARD:
             {
-                int valid, slen;
+                bool valid;
+                int slen;
                 uint64_t ull = 0;
 
                 slen = get_scsi_pt_sense_len(ptvp);
@@ -397,20 +401,21 @@ do_write_normal(int sg_fd, const struct opts_t * op, const void * dataoutp)
 int
 main(int argc, char * argv[])
 {
-    int c, j, prot_en, vb;
-    ssize_t res;
-    int sg_fd = -1;
-    int infd = -1;
+    bool prot_en;
     bool got_stdin = false;
+    int c, j, vb;
+    int infd = -1;
+    int sg_fd = -1;
+    int ret = -1;
+    ssize_t res;
     int64_t ll;
     const char * device_name = NULL;
+    struct opts_t * op;
+    unsigned char * wBuff = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
     unsigned char resp_buff[RCAP16_RESP_LEN];
-    unsigned char * wBuff = NULL;
-    int ret = -1;
     struct opts_t opts;
-    struct opts_t * op;
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -630,17 +635,19 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, 0 /* rw */, vb);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
+        pr2serr(ME "open error: %s: %s\n", device_name,
+                safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (0 == op->bs) {  /* ask DEVICE about logical/actual block size */
-        res = sg_ll_readcap_16(sg_fd, 0 /* pmi */, 0 /* llba */, resp_buff,
-                               RCAP16_RESP_LEN, true, (vb ? (vb - 1): 0));
+        res = sg_ll_readcap_16(sg_fd, false /* pmi */, 0 /* llba */,
+                               resp_buff, RCAP16_RESP_LEN, true,
+                               (vb ? (vb - 1): 0));
         if (SG_LIB_CAT_UNIT_ATTENTION == res) {
             pr2serr("Read capacity(16) unit attention, try again\n");
-            res = sg_ll_readcap_16(sg_fd, 0, 0, resp_buff,
+            res = sg_ll_readcap_16(sg_fd, false, 0, resp_buff,
                                    RCAP16_RESP_LEN, true,
                                    (vb ? (vb - 1): 0));
         }
@@ -661,7 +668,7 @@ main(int argc, char * argv[])
             if (vb)
                 pr2serr("Read capacity(16) not supported, try Read "
                         "capacity(10)\n");
-            res = sg_ll_readcap_10(sg_fd, 0 /* pmi */, 0 /* lba */,
+            res = sg_ll_readcap_10(sg_fd, false /* pmi */, 0 /* lba */,
                                    resp_buff, RCAP10_RESP_LEN, true,
                                    (vb ? (vb - 1): 0));
             if (0 == res) {

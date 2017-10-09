@@ -26,6 +26,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
@@ -42,7 +44,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.10 20170917";
+static const char * version_str = "1.11 20171007";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -299,7 +301,7 @@ int main(int argc, char * argv[])
         if (do_inquiry) {
             char buff[INQUIRY_RESP_INITIAL_LEN];
 
-            if (0 == sg_ll_inquiry(sg_fd, 0, 0, 0, buff, sizeof(buff),
+            if (0 == sg_ll_inquiry(sg_fd, false, false, 0, buff, sizeof(buff),
                                    true, 0)) {
                 memcpy(map_arr[k].vendor, &buff[8], 8);
                 memcpy(map_arr[k].product, &buff[16], 16);

@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -30,7 +32,7 @@
  * device.
  */
 
-static const char * version_str = "1.11 20170921";
+static const char * version_str = "1.12 20171005";
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -157,12 +159,12 @@ main(int argc, char * argv[])
     uint32_t element_id = 0;
     uint32_t scan_len = 0;
     int maxlen = DEF_GLBAS_BUFF_LEN;
-    int do_raw = 0;
-    int o_readonly = 0;
     int rt = 0;
     int verbose = 0;
     bool do_16 = false;
     bool do_32 = false;
+    bool do_raw = false;
+    bool o_readonly = false;
     const char * device_name = NULL;
     const unsigned char * bp;
     int ret = 0;
@@ -212,10 +214,10 @@ main(int argc, char * argv[])
             }
             break;
         case 'r':
-            ++do_raw;
+            do_raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 's':
             ll = sg_get_llnum(optarg);

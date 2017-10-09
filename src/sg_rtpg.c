@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 
@@ -28,7 +30,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.21 20170917";
+static const char * version_str = "1.22 20171006";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -45,14 +47,14 @@ static const char * version_str = "1.21 20170917";
 #define STATUS_CODE_CHANGED_BY_IMPLICIT 0x2
 
 static struct option long_options[] = {
-        {"decode", 0, 0, 'd'},
-        {"extended", 0, 0, 'e'},
-        {"help", 0, 0, 'h'},
-        {"hex", 0, 0, 'H'},
-        {"raw", 0, 0, 'r'},
-        {"readonly", 0, 0, 'R'},
-        {"verbose", 0, 0, 'v'},
-        {"version", 0, 0, 'V'},
+        {"decode", no_argument, 0, 'd'},
+        {"extended", no_argument, 0, 'e'},
+        {"help", no_argument, 0, 'h'},
+        {"hex", no_argument, 0, 'H'},
+        {"raw", no_argument, 0, 'r'},
+        {"readonly", no_argument, 0, 'R'},
+        {"verbose", no_argument, 0, 'v'},
+        {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
 };
 
@@ -135,17 +137,17 @@ static void decode_tpgs_state(const int st)
 
 int main(int argc, char * argv[])
 {
+    bool decode = false;
+    bool raw = false;
+    bool o_readonly = false;
+    bool extended = false;
     int sg_fd, k, j, off, res, c, report_len, tgt_port_count;
+    int hex = 0;
+    int ret = 0;
+    int verbose = 0;
     unsigned char reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
     unsigned char * bp;
-    int decode = 0;
-    int hex = 0;
-    int raw = 0;
-    int o_readonly = 0;
-    int verbose = 0;
-    int extended = 0;
     const char * device_name = NULL;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -157,10 +159,10 @@ int main(int argc, char * argv[])
 
         switch (c) {
         case 'd':
-            decode = 1;
+            decode = true;
             break;
         case 'e':
-             extended = 1;
+             extended = true;
              break;
         case 'h':
         case '?':
@@ -170,10 +172,10 @@ int main(int argc, char * argv[])
             hex = 1;
             break;
         case 'r':
-            raw = 1;
+            raw = true;
             break;
         case 'R':
-            ++o_readonly;
+            o_readonly = true;
             break;
         case 'v':
             ++verbose;

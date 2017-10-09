@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2016 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2017 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,11 +14,12 @@
 
 #define _XOPEN_SOURCE 600       /* clear up posix_memalign() warning */
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <stdio.h>
 #include <string.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -31,7 +32,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.17 (2016-04-23)"
+#define SG_RAW_VERSION "0.4.18 (2017-10-09)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -71,29 +72,29 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
-    char *device_name;
-    unsigned char cdb[MAX_SCSI_CDBSZ];
-    int cdb_length;
     bool do_datain;
-    int datain_len;
-    const char *datain_file;
     bool datain_binary;
     bool do_dataout;
-    int dataout_len;
-    const char *dataout_file;
-    off_t dataout_offset;
     bool do_enumerate;
-    int timeout;
     bool no_sense;
-    int readonly;
     bool do_help;
-    int verbose;
     bool do_version;
+    int cdb_length;
+    int datain_len;
+    int dataout_len;
+    int timeout;
+    int readonly;
+    int verbose;
+    off_t dataout_offset;
+    unsigned char cdb[MAX_SCSI_CDBSZ];
+    const char *datain_file;
+    const char *dataout_file;
+    char *device_name;
 };
 
 
 static void
-version()
+pr_version()
 {
     pr2serr("sg_raw " SG_RAW_VERSION "\n"
             "Copyright (C) 2007-2012 Ingo van Lil <inguin@gmx.de>\n"
@@ -223,7 +224,7 @@ process_cl(struct opts_t * op, int argc, char *argv[])
             break;
         case 'V':
             op->do_version = true;
-            return 0;
+            break;
         default:
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -365,10 +366,10 @@ skip(int fd, off_t offset)
 static unsigned char *
 fetch_dataout(struct opts_t * op)
 {
+    bool ok = false;
+    int fd, len;
     unsigned char *buf = NULL;
     unsigned char *wrkBuf = NULL;
-    int fd, len;
-    int ok = 0;
 
     if (op->dataout_file) {
         fd = open(op->dataout_file, O_RDONLY);
@@ -406,12 +407,12 @@ fetch_dataout(struct opts_t * op)
         goto bail;
     }
 
-    ok = 1;
+    ok = true;
 
 bail:
     if (fd >= 0 && fd != STDIN_FILENO)
         close(fd);
-    if (!ok) {
+    if (! ok) {
         if (wrkBuf)
             free(wrkBuf);
         return NULL;
@@ -479,7 +480,7 @@ main(int argc, char *argv[])
         usage();
         goto done;
     } else if (op->do_version) {
-        version();
+        pr_version();
         goto done;
     } else if (op->do_enumerate)
         goto done;
