@@ -107,7 +107,7 @@ usage()
             "    --help|-h          print out usage message\n"
             "    --hex|-H           print out report response in hex, then "
             "exit\n"
-            "    --offline|-l       set asymm. access state to offline, takes "
+            "    --offline|-l|-O    set asymm. access state to offline, takes "
             "relative\n"
             "                       target port id, rather than target port "
             "group id\n"
