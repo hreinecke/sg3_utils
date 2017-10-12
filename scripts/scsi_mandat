@@ -42,10 +42,10 @@ aborted_command=0
 usage()
 {
   echo "Usage: scsi_mandat [-h] [-L] [-q] [-v] <device>"
-  echo "  where:  -h    print usage message"
-  echo "          -L, --log        append stderr to 'scsi_mandat.err'"
-  echo "          -q    suppress some output"
-  echo "          -v    increase verbosity of output"
+  echo "  where:  -h, --help        print usage message"
+  echo "          -L, --log         append stderr to 'scsi_mandat.err'"
+  echo "          -q, --quiet       suppress some output"
+  echo "          -v, --verbose     increase verbosity of output"
   echo ""
   echo "Check <device> for mandatory SCSI command support"
 }
@@ -71,7 +71,7 @@ if [ $# -lt 1 ]
   then
     usage
     exit 1
-fi 
+fi
 
 for command in "sg_inq" "sg_luns" "sg_turs" "sg_requests" "sg_vpd" \
                 "sg_vpd -i" "sg_senddiag -t"
