@@ -305,16 +305,16 @@ svpd_find_vendor_by_acron(const char * ap)
 void
 svpd_enumerate_vendor(int vend_prod_num)
 {
+    bool seen;
     const struct svpd_vp_name_t * vpp;
     const struct svpd_values_name_t * vnp;
-    int seen;
 
     if (vend_prod_num < 0) {
-        for (seen = 0, vpp = vp_arr; vpp->acron; ++vpp) {
+        for (seen = false, vpp = vp_arr; vpp->acron; ++vpp) {
             if (vpp->name) {
                 if (! seen) {
                     printf("\nVendor/product identifiers:\n");
-                    seen = 1;
+                    seen = true;
                 }
                 printf("  %-10s %d      %s\n", vpp->acron,
                        vpp->vend_prod_num, vpp->name);
@@ -323,13 +323,13 @@ svpd_enumerate_vendor(int vend_prod_num)
     }
     if (-1 == vend_prod_num)
         return;
-    for (seen = 0, vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
+    for (seen = false, vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
         if ((vend_prod_num >= 0) && (vend_prod_num != vnp->subvalue))
             continue;
         if (vnp->name) {
             if (! seen) {
                 printf("\nVendor specific VPD pages:\n");
-                seen = 1;
+                seen = true;
             }
             printf("  %-10s 0x%02x,%d      %s\n", vnp->acron,
                    vnp->value, vnp->subvalue, vnp->name);

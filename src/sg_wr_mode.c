@@ -29,7 +29,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.18 20171008";
+static const char * version_str = "1.19 20171010";
 
 #define ME "sg_wr_mode: "
 
@@ -114,10 +114,10 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
     if (0 == in_len)
         *mp_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
-        char line[512];
-        char carry_over[4];
+        bool split_line;
         int off = 0;
-        int split_line;
+        char carry_over[4];
+        char line[512];
 
         carry_over[0] = 0;
         for (j = 0; j < 512; ++j) {
@@ -128,9 +128,9 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
                 if ('\n' == line[in_len - 1]) {
                     --in_len;
                     line[in_len] = '\0';
-                    split_line = 0;
+                    split_line = false;
                 } else
-                    split_line = 1;
+                    split_line = true;
             }
             if (in_len < 1) {
                 carry_over[0] = 0;

@@ -827,8 +827,8 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
 /* Invokes a FORMAT UNIT (SBC-3) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
-                  int cmplst, int dlist_format, int timeout_secs,
+sg_ll_format_unit(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                  bool cmplst, int dlist_format, int timeout_secs,
                   void * paramp, int param_len, bool noisy, int verbose)
 {
     return sg_ll_format_unit2(sg_fd, fmtpinfo, longlist, fmtdata, cmplst,
@@ -840,8 +840,8 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
  * various SG_LIB_CAT_* positive values or -1 -> other errors.
  * FFMT field added in sbc4r10 [20160121] */
 int
-sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
-                   int cmplst, int dlist_format, int ffmt, int timeout_secs,
+sg_ll_format_unit2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                   bool cmplst, int dlist_format, int ffmt, int timeout_secs,
                    void * paramp, int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "format unit";

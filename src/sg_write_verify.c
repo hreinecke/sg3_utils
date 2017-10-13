@@ -312,7 +312,7 @@ main(int argc, char * argv[])
             }
             break;
         case 'd':
-            dpo = 1;
+            dpo = true;
             break;
         case 'g':
             group = sg_get_num(optarg);

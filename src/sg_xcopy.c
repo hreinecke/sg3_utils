@@ -65,7 +65,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.57 20171008";
+static const char * version_str = "0.58 20171010";
 
 #define ME "sg_xcopy: "
 
@@ -176,20 +176,19 @@ static struct timeval start_tm;
 
 
 struct xcopy_fp_t {
-    char fname[INOUTF_SZ];
+    bool append;
+    bool excl;
+    bool flock;
+    bool pad;     /* Data descriptor PAD bit (residual data treatment) */
+    bool xcopy_given;
+    int sect_sz;
+    int sg_type, sg_fd;
+    int pdt;     /* Peripheral device type */
     dev_t devno;
-    int sg_type;
-    int sg_fd;
     uint32_t min_bytes;
     uint32_t max_bytes;
     int64_t num_sect;
-    int sect_sz;
-    int append;
-    int excl;
-    int flock;
-    int pad;     /* Data descriptor PAD bit (residual data treatment) */
-    int pdt;     /* Peripheral device type */
-    int xcopy_given;
+    char fname[INOUTF_SZ];
 };
 
 static struct xcopy_fp_t ixcf;
@@ -253,7 +252,7 @@ siginfo_handler(int sig)
     print_stats("  ");
 }
 
-static int bsg_major_checked = 0;
+static bool bsg_major_checked = false;
 static int bsg_major = 0;
 
 static void
@@ -377,7 +376,7 @@ dd_filetype(struct xcopy_fp_t * fp)
         if (SCSI_TAPE_MAJOR == major(st.st_rdev))
             return FT_ST;
         if (! bsg_major_checked) {
-            bsg_major_checked = 1;
+            bsg_major_checked = true;
             find_bsg_major();
         }
         if (bsg_major == (int)major(st.st_rdev))
@@ -1008,7 +1007,7 @@ decode_designation_descriptor(const unsigned char * bp, int i_len)
 
 static int
 desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
-                 unsigned int block_size, int pad)
+                 unsigned int block_size, bool pad)
 {
     int res, verb;
     unsigned char rcBuff[256], *bp, *best = NULL;
@@ -1100,7 +1099,8 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
             desc[0] = 0xe4;
             memcpy(desc + 4, best, best_len + 4);
             desc[4] &= 0x1f;
-            desc[28] = pad << 2;
+            if (pad)
+                desc[28] = 0x4;
             sg_put_unaligned_be24((uint32_t)block_size, desc + 29);
             if (verbose > 3) {
                 pr2serr("Descriptor in hex (bs %d):\n", block_size);
@@ -1163,17 +1163,17 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
         if (np)
             *np++ = '\0';
         if (0 == strcmp(cp, "append"))
-            fp->append = 1;
+            fp->append = true;
         else if (0 == strcmp(cp, "excl"))
-            fp->excl = 1;
+            fp->excl = true;
         else if (0 == strcmp(cp, "flock"))
-            ++fp->flock;
+            fp->flock = true;
         else if (0 == strcmp(cp, "null"))
             ;
         else if (0 == strcmp(cp, "pad"))
-            fp->pad = 1;
+            fp->pad = true;
         else if (0 == strcmp(cp, "xcopy"))
-            ++fp->xcopy_given;   /* for ddpt compatibility */
+            fp->xcopy_given = true;   /* for ddpt compatibility */
         else {
             pr2serr("unrecognised flag: %s\n", cp);
             return 1;
@@ -1337,7 +1337,7 @@ main(int argc, char * argv[])
             *buf++ = '\0';
         keylen = (int)strlen(key);
         if (0 == strncmp(key, "app", 3)) {
-            ixcf.append = sg_get_num(buf);
+            ixcf.append = !! sg_get_num(buf);
             oxcf.append = ixcf.append;
         } else if (0 == strcmp(key, "bpt")) {
             bpt = sg_get_num(buf);
@@ -1505,7 +1505,7 @@ main(int argc, char * argv[])
         return 0;
     }
     if (! on_src_dst_given) {
-        if ((!! ixcf.xcopy_given) == (!! oxcf.xcopy_given)) {
+        if (ixcf.xcopy_given == oxcf.xcopy_given) {
             char * csp;
             char * cdp;
 
@@ -1546,7 +1546,7 @@ main(int argc, char * argv[])
         pr2serr("skip and seek cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((oxcf.append > 0) && (seek > 0)) {
+    if (oxcf.append && (seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_SYNTAX_ERROR;
     }

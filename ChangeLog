@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171009] [svn: r720]
+Changelog for sg3_utils-1.43 [20171012] [svn: r721]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)

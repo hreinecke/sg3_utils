@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.34 20171005";
+static const char * version_str = "1.35 20171011";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -128,11 +128,11 @@ static void
 decode_lun(const char * leadin, const unsigned char * lunp, bool lu_cong,
            int do_hex, int verbose)
 {
-    int k, x, a_method, bus_id, target, lun, len_fld, e_a_method;
     bool next_level, admin_lu_cong;
+    int k, x, a_method, bus_id, target, lun, len_fld, e_a_method;
+    uint64_t ull;
     char l_leadin[128];
     char b[256];
-    uint64_t ull;
 
     if (0xff == lunp[0]) {
         printf("%sLogical unit _not_ specified\n", leadin);
@@ -355,33 +355,33 @@ dStrRaw(const char* str, int len)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, m, off, res, c, list_len, len_cap, luns;
-    int decode_arg = 0;
-    int do_hex = 0;
 #ifdef SG_LIB_LINUX
     bool do_linux = false;
 #endif
-    int lu_cong_arg = 0;
-    int maxlen = 0;
-    int select_rep = 0;
-    int verbose = 0;
-    bool lu_cong_arg_given = false;
     bool do_quiet = false;
     bool do_raw = false;
+    bool lu_cong_arg_given = false;
     bool o_readonly = false;
 #ifdef SG_LIB_LINUX
     bool test_linux_in = false;
     bool test_linux_out = false;
 #endif
     bool trunc;
+    int sg_fd, k, m, off, res, c, list_len, len_cap, luns;
+    int decode_arg = 0;
+    int do_hex = 0;
+    int lu_cong_arg = 0;
+    int maxlen = 0;
+    int ret = 0;
+    int select_rep = 0;
+    int verbose = 0;
     unsigned int h;
     const char * test_arg = NULL;
     const char * device_name = NULL;
     const char * cp;
+    unsigned char * reportLunsBuff = NULL;
     unsigned char lun_arr[8];
     struct sg_simple_inquiry_resp sir;
-    unsigned char * reportLunsBuff = NULL;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;

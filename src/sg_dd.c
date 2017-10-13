@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.90 20171008";
+static const char * version_str = "5.91 20171010";
 
 
 #define ME "sg_dd: "
@@ -130,7 +130,7 @@ static int64_t in_full = 0;
 static int in_partial = 0;
 static int64_t out_full = 0;
 static int out_partial = 0;
-static int64_t out_sparse = 0;
+static int64_t out_sparse_num = 0;
 static int recovered_errs = 0;
 static int unrecovered_errs = 0;
 static int read_longs = 0;
@@ -161,11 +161,11 @@ struct flags_t {
     bool flock;
     bool fua;
     bool sgio;
+    bool sparse;
     int cdbsz;
     int coe;
     int nocache;
     int pdt;
-    int sparse;
     int retries;
 };
 
@@ -200,7 +200,7 @@ print_stats(const char * str)
     pr2serr("%s%" PRId64 "+%d records out\n", str, out_full - out_partial,
             out_partial);
     if (oflag.sparse)
-        pr2serr("%s%" PRId64 " bypassed records out\n", str, out_sparse);
+        pr2serr("%s%" PRId64 " bypassed records out\n", str, out_sparse_num);
     if (recovered_errs > 0)
         pr2serr("%s%d recovered errors\n", str, recovered_errs);
     if (num_retries > 0)
@@ -241,7 +241,7 @@ siginfo_handler(int sig)
     print_stats("  ");
 }
 
-static int bsg_major_checked = 0;
+static bool bsg_major_checked = false;
 static int bsg_major = 0;
 
 static void
@@ -305,7 +305,7 @@ dd_filetype(const char * filename)
         if (SCSI_TAPE_MAJOR == major(st.st_rdev))
             return FT_ST;
         if (! bsg_major_checked) {
-            bsg_major_checked = 1;
+            bsg_major_checked = true;
             find_bsg_major();
         }
         if (bsg_major == (int)major(st.st_rdev))
@@ -716,8 +716,9 @@ static int
 sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
         int bs, struct flags_t * ifp, bool * diop, int * blks_readp)
 {
-    int res, blks, repeat, xferred;
-    int may_coe = 0;
+    bool may_coe = false;
+    bool repeat;
+    int res, blks, xferred;
     int ret = 0;
     int retries_tmp;
     uint64_t io_addr;
@@ -728,8 +729,8 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     for (xferred = 0, blks = blocks, lba = from_block, bp = buff;
          blks > 0; blks = blocks - xferred) {
         io_addr = 0;
-        repeat = 0;
-        may_coe = 0;
+        repeat = false;
+        may_coe = false;
         res = sg_read_low(sg_fd, bp, blks, lba, bs, ifp, diop, &io_addr);
         switch (res) {
         case 0:
@@ -746,7 +747,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
         case SG_LIB_CAT_ABORTED_COMMAND:
             if (--max_aborted > 0) {
                 pr2serr("Aborted command, continuing (r)\n");
-                repeat = 1;
+                repeat = true;
             } else {
                 pr2serr("Aborted command, too many (r)\n");
                 return res;
@@ -755,7 +756,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
         case SG_LIB_CAT_UNIT_ATTENTION:
             if (--max_uas > 0) {
                 pr2serr("Unit attention, continuing (r)\n");
-                repeat = 1;
+                repeat = true;
             } else {
                 pr2serr("Unit attention, too many (r)\n");
                 return res;
@@ -769,7 +770,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 ++num_retries;
                 if (unrecovered_errs > 0)
                     --unrecovered_errs;
-                repeat = 1;
+                repeat = true;
             }
             ret = SG_LIB_CAT_MEDIUM_HARD;
             break; /* unrecovered read error at lba=io_addr */
@@ -781,7 +782,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
             ret = res;
             goto err_out;
         case SG_LIB_CAT_MEDIUM_HARD:
-            may_coe = 1;
+            may_coe = true;
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -796,7 +797,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 ++num_retries;
                 if (unrecovered_errs > 0)
                     --unrecovered_errs;
-                repeat = 1;
+                repeat = true;
                 break;
             }
             ret = res;
@@ -810,7 +811,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                         "correct range:\n\t[0x%" PRIx64 ",0x%" PRIx64 "]\n",
                         io_addr, (uint64_t)lba,
                         (uint64_t)(lba + blks - 1));
-            may_coe = 1;
+            may_coe = true;
             goto err_out;
         }
         blks = (int)(io_addr - (uint64_t)lba);
@@ -1995,7 +1996,7 @@ main(int argc, char * argv[])
         }
         if (sparse_skip) {
             if (FT_SG & out_type) {
-                out_sparse += blocks;
+                out_sparse_num += blocks;
                 if (verbose > 2)
                     pr2serr("sparse bypassing sg_write: seek blk=%" PRId64
                             ", offset blks=%d\n", seek, blocks);
@@ -2020,7 +2021,7 @@ main(int argc, char * argv[])
                 } else if (verbose > 4)
                     pr2serr("oflag=sparse lseek64 result=%" PRId64 "\n",
                             (int64_t)off_res);
-                out_sparse += blocks;
+                out_sparse_num += blocks;
             }
         } else if (FT_SG & out_type) {
             dio_tmp = oflag.dio;

@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.29 20171007";  /* spc5r16 + sbc4r14 */
+static const char * version_str = "1.30 20171012";  /* spc5r16 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1271,11 +1271,11 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, bool do_long,
            !!(b[6] & 0x8), !!(b[6] & 0x4), !!(b[6] & 0x2), !!(b[6] & 0x1));
     printf("  NO_PI_CHK=%d P_I_I_SUP=%d LUICLR=%d\n", !!(b[7] & 0x20),
            !!(b[7] & 0x10), !!(b[7] & 0x1));
-    /* LU_COLL_TYPE added in spc5r09, HSSRELEF added in spc5r02;
-     * CBCS obsolete in spc5r01 */
-    printf("  LU_COLL_TYPE=%d R_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
-           (b[8] >> 5) & 0x7, !!(b[8] & 0x10), !!(b[8] & 0x2),
-           !!(b[8] & 0x1));
+    /* RTD_SUP added in spc5r11, LU_COLL_TYPE added in spc5r09,
+     * HSSRELEF added in spc5r02; CBCS obsolete in spc5r01 */
+    printf("  LU_COLL_TYPE=%d R_SUP=%d RTD_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
+           (b[8] >> 5) & 0x7, !!(b[8] & 0x10), !!(b[8] & 0x8),
+           !!(b[8] & 0x2), !!(b[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            sg_get_unaligned_be16(b + 10));    /* spc4r27 */
@@ -2117,7 +2117,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         }
         if (len > 43) {     /* added in sbc3r26 */
             ull = sg_get_unaligned_be64(buff + 36);
-            printf("  Maximum write same length: \n");
+            printf("  Maximum write same length: ");
             if (0 == ull)
                 printf("0 blocks [not reported]\n");
             else
@@ -2741,12 +2741,13 @@ static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
     bool allow_name, long_notquiet;
+    bool vpd_supported = false;
     int len, pdt, num, k, resid, alloc_len, pn, vb;
-    int res = 0, vpd_supported = 0;
-    char b[48];
+    int res = 0;
     const struct svpd_values_name_t * vnp;
-    char obuff[DEF_ALLOC_LEN];
     unsigned char * rp;
+    char obuff[DEF_ALLOC_LEN];
+    char b[48];
 
     pn = op->vpd_pn;
     vb = op->verbose;
@@ -2770,11 +2771,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             num = (len - 4);
         for (k = 0; k < num; ++k) {
             if (pn == rp[4 + k]) {
-                vpd_supported = 1;
+                vpd_supported = true;
                 break;
             }
         }
-        if (!vpd_supported)
+        if (! vpd_supported)
             return SG_LIB_CAT_ILLEGAL_REQ;
     }
     switch(pn) {
@@ -3504,13 +3505,13 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, c, res, matches;
-    const struct svpd_values_name_t * vnp;
-    const char * cp;
     int inhex_len = 0;
     int ret = 0;
     int subvalue = 0;
-    struct opts_t opts;
+    const char * cp;
     struct opts_t * op;
+    const struct svpd_values_name_t * vnp;
+    struct opts_t opts;
 
     op = &opts;
     memset(&opts, 0, sizeof(opts));

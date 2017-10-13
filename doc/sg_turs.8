@@ -1,4 +1,4 @@
-.TH SG_TURS "8" "Fenruary 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_TURS "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
@@ -87,9 +87,10 @@ the "not ready" sense key. For other exit status values see the sg3_utils(8)
 man page.
 .SH OLDER COMMAND LINE OPTIONS
 The options in this section were the only ones available prior to sg3_utils
-version 1.23 . In sg3_utils version 1.23 and later these older options can
-be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
-or using '\-\-old' (or '\-O) as the first option.
+version 1.23 . Since then this utility defaults to the newer command line
+options which can be overridden by using \fI\-\-old\fR (or \fI\-O\fR) as the
+first option. See the ENVIRONMENT VARIABLES section for another way to
+force the use of these older command line options.
 .TP
 \fB\-n\fR=\fINUM\fR
 performs TEST UNIT READY \fINUM\fR times. If not given defaults to 1.
@@ -112,10 +113,15 @@ increase level of verbosity.
 .TP
 \fB\-V\fR
 print out version string then exit.
+.SH ENVIRONMENT VARIABLES
+Since sg3_utils version 1.23 the environment variable SG3_UTILS_OLD_OPTS
+can be given. When it is present this utility will expect the older command
+line options. So the presence of this environment variable is equivalent to
+using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2016 Douglas Gilbert
+Copyright \(co 2000\-2017 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

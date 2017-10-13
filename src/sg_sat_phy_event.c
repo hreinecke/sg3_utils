@@ -24,7 +24,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.08 20171007";
+static const char * version_str = "1.09 20171010";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -266,7 +266,7 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
                                     "Descriptor\n");
                         return SG_LIB_CAT_RECOVERED;
                     }
-                    got_ard = 1;
+                    got_ard = true;
                     break;
                 } else if (SPC_SK_RECOVERED_ERROR == ssh.sense_key)
                     return SG_LIB_CAT_RECOVERED;
@@ -333,7 +333,7 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
         return -1;
     }
 
-    if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (0 == got_ard))
+    if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (! got_ard))
         pr2serr("Seem to have got ATA Result Descriptor but it was not "
                 "indicated\n");
     if (got_ard) {

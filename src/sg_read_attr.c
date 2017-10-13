@@ -35,7 +35,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.04 20171006";
+static const char * version_str = "1.05 20171010";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -377,13 +377,14 @@ static int
 f2hex_arr(const char * fname, bool as_binary, bool no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
+    bool split_line, has_stdin;
+    int fn_len, in_len, k, j, m, fd;
+    int off = 0;
     unsigned int h;
     const char * lcp;
     FILE * fp;
     char line[512];
     char carry_over[4];
-    int off = 0;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
         return 1;
@@ -441,9 +442,9 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-                split_line = 0;
+                split_line = false;
             } else
-                split_line = 1;
+                split_line = true;
         }
         if (in_len < 1) {
             carry_over[0] = 0;

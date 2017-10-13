@@ -510,6 +510,7 @@ static struct option long_options[] = {
 int
 main(int argc, char * argv[])
 {
+    bool do_insertions = false;
     bool no_hex_raw;
     int sg_fd, c, ret, peri_type;
     int res = SG_LIB_CAT_OTHER;
@@ -524,7 +525,6 @@ main(int argc, char * argv[])
     int do_hex = 0;
     int do_raw = 0;
     int verbose = 0;
-    int do_insertions = 0;
     const char * cp;
     char buff[48];
     char b[80];
@@ -558,7 +558,7 @@ main(int argc, char * argv[])
                 ++do_hex;
                 break;
             case 'i':
-                do_insertions = 1;
+                do_insertions = true;
                 break;
             case 'r':
                 ++do_raw;

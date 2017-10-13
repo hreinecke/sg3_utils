@@ -44,11 +44,11 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.11 20171007";
+static const char * version_str = "1.12 20171010";
 
 static const char * devfs_id = "/dev/.devfsd";
 
-#define NUMERIC_SCAN_DEF 1   /* change to 0 to make alpha scan default */
+#define NUMERIC_SCAN_DEF true /* set to false to make alpha scan default */
 
 #define INQUIRY_RESP_INITIAL_LEN 36
 #define MAX_SG_DEVS 4096
@@ -98,7 +98,7 @@ typedef struct my_scsi_idlun {
 #define EBUFF_SZ 256
 static char ebuff[EBUFF_SZ];
 
-static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
+static void scan_dev_type(const char * leadin, int max_dev, bool do_numeric,
                           int lin_dev_type, int last_sg_ind);
 
 static void usage()
@@ -150,7 +150,7 @@ static int sysfs_sg_scan(const char * dir_name)
 }
 
 static void make_dev_name(char * fname, const char * leadin, int k,
-                          int do_numeric)
+                          bool do_numeric)
 {
     char buff[64];
     int  ones,tens,hundreds; /* for lack of a better name */
@@ -187,45 +187,45 @@ static void make_dev_name(char * fname, const char * leadin, int k,
 
 int main(int argc, char * argv[])
 {
+    bool do_all_s = true;
+    bool do_extra = false;
+    bool do_inquiry = false;
+    bool do_numeric = NUMERIC_SCAN_DEF;
+    bool do_osst = false;
+    bool do_scd = false;
+    bool do_sd = false;
+    bool do_sr = false;
+    bool do_st = false;
+    bool eacces_err = false;
     int sg_fd, res, k;
-    int do_numeric = NUMERIC_SCAN_DEF;
-    int do_all_s = 1;
-    int do_sd = 0;
-    int do_st = 0;
-    int do_osst = 0;
-    int do_sr = 0;
-    int do_scd = 0;
-    int do_extra = 0;
-    int do_inquiry = 0;
-    char fname[64];
     int num_errors = 0;
     int num_silent = 0;
-    int eacces_err = 0;
     int last_sg_ind = -1;
+    char fname[64];
     struct stat a_stat;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp("-n", argv[k]))
-            do_numeric = 1;
+            do_numeric = true;
         else if (0 == strcmp("-a", argv[k]))
-            do_numeric = 0;
+            do_numeric = false;
         else if (0 == strcmp("-x", argv[k]))
-            do_extra = 1;
+            do_extra = true;
         else if (0 == strcmp("-i", argv[k]))
-            do_inquiry = 1;
+            do_inquiry = true;
         else if (0 == strcmp("-sd", argv[k])) {
-            do_sd = 1;
-            do_all_s = 0;
+            do_sd = true;
+            do_all_s = false;
         } else if (0 == strcmp("-st", argv[k])) {
-            do_st = 1;
-            do_osst = 1;
-            do_all_s = 0;
+            do_st = true;
+            do_osst = true;
+            do_all_s = false;
         } else if (0 == strcmp("-sr", argv[k])) {
-            do_sr = 1;
-            do_all_s = 0;
+            do_sr = true;
+            do_all_s = false;
         } else if (0 == strcmp("-scd", argv[k])) {
-            do_scd = 1;
-            do_all_s = 0;
+            do_scd = true;
+            do_all_s = false;
         } else if (0 == strcmp("-V", argv[k])) {
             fprintf(stderr, "Version string: %s\n", version_str);
             exit(0);
@@ -264,7 +264,7 @@ int main(int argc, char * argv[])
                 sg_fd = -1;
                 continue;
             }
-            make_dev_name(fname, "/dev/sg", k, 1);
+            make_dev_name(fname, "/dev/sg", k, true);
         } else
             make_dev_name(fname, "/dev/sg", k, do_numeric);
 
@@ -283,7 +283,7 @@ int main(int argc, char * argv[])
             }
             else {
                 if (EACCES == errno)
-                    eacces_err = 1;
+                    eacces_err = true;
                 snprintf(ebuff, EBUFF_SZ, "Error opening %s ", fname);
                 perror(ebuff);
                 ++num_errors;
@@ -341,7 +341,7 @@ int main(int argc, char * argv[])
            if (0 == gen_index_arr[k]) {
                 continue;
             }
-            make_dev_name(fname, "/dev/sg", k, 1);
+            make_dev_name(fname, "/dev/sg", k, true);
         } else
             make_dev_name(fname, "/dev/sg", k, do_numeric);
         printf("%s", fname);
@@ -416,7 +416,7 @@ static int find_dev_in_sg_arr(My_scsi_idlun * my_idlun, int host_no,
     return -1;
 }
 
-static void scan_dev_type(const char * leadin, int max_dev, int do_numeric,
+static void scan_dev_type(const char * leadin, int max_dev, bool do_numeric,
                           int lin_dev_type, int last_sg_ind)
 {
     int k, res, ind, sg_fd = 0;

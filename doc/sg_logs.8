@@ -10,7 +10,7 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 [\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
 [\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR] \fIDEVICE\fR
 .PP
-.B sg_logs 
+.B sg_logs
 [\fI\-\-brief\fR] [\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] \fI\-\-in=FN\fR
 [\fI\-\-name\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
 .PP
@@ -351,9 +351,10 @@ The exit status of sg_logs is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH OLDER COMMAND LINE OPTIONS
 The options in this section were the only ones available prior to sg3_utils
-version 1.23 . In sg3_utils version 1.23 and later these older options can
-be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
-or using '\-\-old' (or '\-O) as the first option.
+version 1.23 . Since then this utility defaults to the newer command line
+options which can be overridden by using \fI\-\-old\fR (or \fI\-O\fR) as the
+first option. See the ENVIRONMENT VARIABLES section for another way to
+force the use of these older command line options.
 .PP
 Options with arguments or with two or more letters can have an extra '\-'
 prepended. For example: both '\-pcb' and '\-\-pcb' are acceptable.
@@ -461,6 +462,11 @@ description.
 .TP
 \fB\-?\fR
 output usage message then exit.
+.SH ENVIRONMENT VARIABLES
+Since sg3_utils version 1.23 the environment variable SG3_UTILS_OLD_OPTS
+can be given. When it is present this utility will expect the older command
+line options. So the presence of this environment variable is equivalent to
+using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHOR
 Written by Douglas Gilbert
 .SH "REPORTING BUGS"

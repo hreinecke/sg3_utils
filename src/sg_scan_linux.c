@@ -51,7 +51,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.14 20171009";
+static const char * version_str = "4.15 20171011";
 
 #define ME "sg_scan: "
 
@@ -177,6 +177,8 @@ int main(int argc, char * argv[])
     bool has_file_args = false;
     bool has_sysfs_sg = false;
     bool jmp_out;
+    bool sg_ver3 = false;
+    bool sg_ver3_set = false;
     bool writeable = false;
     int sg_fd, res, k, j, f, plen;
     int emul = -1;
@@ -185,7 +187,6 @@ int main(int argc, char * argv[])
     const int max_file_args = PRESENT_ARRAY_SIZE;
     int num_errors = 0;
     int num_silent = 0;
-    int sg_ver3 = -1;
     int verbose = 0;
     char * file_namep;
     const char * cp;
@@ -368,13 +369,14 @@ int main(int argc, char * argv[])
         else
             printf("\n");
         if (do_inquiry) {
-            if (-1 == sg_ver3) {
-                sg_ver3 = 0;
+            if (! sg_ver3_set) {
+                sg_ver3 = false;
+                sg_ver3_set = true;
                 if ((ioctl(sg_fd, SG_GET_VERSION_NUM, &f) >= 0) &&
                     (f >= 30000))
-                    sg_ver3 = 1;
+                    sg_ver3 = true;
             }
-            if (1 == sg_ver3) {
+            if (sg_ver3) {
                 res = sg3_inq(sg_fd, inqBuff, do_extra);
                 if (res)
                     ++num_errors;

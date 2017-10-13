@@ -53,11 +53,11 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_format_unit(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
-                      int cmplist, int dlist_format, int timeout_secs,
+int sg_ll_format_unit(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                      bool cmplist, int dlist_format, int timeout_secs,
                       void * paramp, int param_len, bool noisy, int verbose);
-int sg_ll_format_unit2(int sg_fd, int fmtpinfo, int longlist, int fmtdata,
-                       int cmplist, int dlist_format, int ffmt,
+int sg_ll_format_unit2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                       bool cmplist, int dlist_format, int ffmt,
                        int timeout_secs, void * paramp, int param_len,
                        bool noisy, int verbose);
 
