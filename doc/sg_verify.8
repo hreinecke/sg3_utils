@@ -5,7 +5,7 @@ sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .B sg_verify
 [\fI\-\-16\fR] [\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR]
 [\fI\-\-ebytchk=BCH\fR] [\fI\-\-group=GN\fR] [\fI\-\-help\fR]
-[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-ndo=NDO\fR] [\fI\-\-quiet\fR]
+[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-nbo=NBO\fR] [\fI\-\-quiet\fR]
 [\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -15,7 +15,7 @@ Sends one or more SCSI VERIFY (10 or 16) commands to \fIDEVICE\fR. These SCSI
 commands are defined in the SBC\-2 (draft) standard at http://www.t10.org and
 SBC\-3 drafts.
 .PP
-When \fI\-\-ndo=NDO\fR is not given then the verify starts at the logical
+When \fI\-\-nbo=NBO\fR is not given then the verify starts at the logical
 block address given by the \fI\-\-lba=LBA\fR option and continues for
 \fI\-\-count=COUNT\fR blocks. No more than \fI\-\-bpc=BPC\fR blocks are
 verified by each VERIFY command so if necessary multiple VERIFY commands are
@@ -24,11 +24,11 @@ assuming each block has additional EEC data, check this against the logical
 block contents). No news is good news (i.e. if there are no verify errors
 detected then no messages are sent to stderr and the Unix exit status is 0).
 .PP
-When \fI\-\-ndo=NDO\fR is given then the \fI\-\-bpc=BPC\fR option is
+When \fI\-\-nbo=NBO\fR is given then the \fI\-\-bpc=BPC\fR option is
 ignored. A single VERIFY command is issued and a comparison starts at the
 logical block address given by the \fI\-\-lba=LBA\fR option and continues for
 \fI\-\-count=COUNT\fR blocks. The VERIFY command has an associated data\-out
-buffer that is \fINDO\fR bytes long. The contents of the data\-out buffer are
+buffer that is \fINBO\fR bytes long. The contents of the data\-out buffer are
 obtained from the \fIFN\fR file (if \fI\-\-in=FN\fR is given) or from stdin.
 A comparison takes place between data\-out buffer and the logical blocks
 on the \fIDEVICE\fR. If the comparison is good then no messages are sent to
@@ -51,7 +51,7 @@ using an \fI\-\-lba=LBA\fR which is too large, will cause the utility
 to issue a VERIFY(16) command.
 .TP
 \fB\-b\fR, \fB\-\-bpc\fR=\fIBPC\fR
-this option is ignored if \fI\-\-ndo=NDO\fR is given. Otherwise \fIBPC\fR
+this option is ignored if \fI\-\-nbo=NBO\fR is given. Otherwise \fIBPC\fR
 specifies the maximum number of blocks that will be verified by a single SCSI
 VERIFY command. The default value is 128 blocks which equates to 64 KB for a
 disk with 512 byte blocks. If \fIBPC\fR is less than \fICOUNT\fR then
@@ -64,7 +64,7 @@ field in the block limits VPD page.
 \fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
 where \fICOUNT\fR specifies the number of blocks to verify. The default value
 is 1 . If \fICOUNT\fR is greater than \fIBPC\fR (or its default value of 128)
-and \fINDO\fR is not given, 0 or less then multiple SCSI VERIFY commands are
+and \fINBO\fR is not given, 0 or less then multiple SCSI VERIFY commands are
 sent to the device. Otherwise \fICOUNT\fR becomes the contents of the
 verification length field of the SCSI VERIFY command issued. The
 .B sg_readcap
@@ -78,10 +78,10 @@ other commands are more likely to remain in the device's cache.
 .TP
 \fB\-E\fR, \fB\-\-ebytchk\fR=\fIBCH\fR
 sets the BYTCHK field to \fIBCH\fR overriding the value (1) set by the
-\fI\-\-ndo=NDO\fR option. Values of 1, 2 or 3 are accepted for \fIBCH\fR
+\fI\-\-nbo=NBO\fR option. Values of 1, 2 or 3 are accepted for \fIBCH\fR
 however sbc3r34 reserves the value 2. If this option is given then
-\fI\-\-ndo=NDO\fR must also be given. If \fIBCH\fR is 3 then \fICOUNT\fR
-must be 1 and \fINDO\fR should be the size of one logical block (plus the
+\fI\-\-nbo=NBO\fR must also be given. If \fIBCH\fR is 3 then \fICOUNT\fR
+must be 1 and \fINBO\fR should be the size of one logical block (plus the
 size of some or all of the protection infomation if \fIVRP\fR is greater
 than 0).
 .TP
@@ -95,9 +95,9 @@ command.
 output the usage message then exit.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
-where \fIIF\fR is the name of a file from which \fINDO\fR bytes will be read
+where \fIIF\fR is the name of a file from which \fINBO\fR bytes will be read
 and placed in the data\-out buffer. This is only done when the
-\fI\-\-ndo=NDO\fR option is given. If this option is not given then stdin
+\fI\-\-nbo=NBO\fR option is given. If this option is not given then stdin
 is read. If \fIIF\fR is "\-" then stdin is also used.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
@@ -106,12 +106,12 @@ start the verify operation. \fILBA\fR is assumed to be decimal unless prefixed
 by '0x' or a trailing 'h' (see below). The default value is 0 (i.e. the start
 of the device).
 .TP
-\fB\-n\fR, \fB\-\-ndo\fR=\fINDO\fR
-\fINDO\fR is the number of bytes to obtain from the \fIFN\fR file (if
+\fB\-n\fR, \fB\-\-nbo\fR=\fINBO\fR
+\fINBO\fR is the number of bytes to obtain from the \fIFN\fR file (if
 \fI\-\-in=FN\fR is given) or from stdin. Those bytes are placed in the
-data\-out buffer associated with the SCSI VERIFY command and \fINDO\fR
+data\-out buffer associated with the SCSI VERIFY command and \fINBO\fR
 is placed in the verification length field in the cdb. The default value
-for \fINDO\fR is 0 and the maximum value is dependant on the OS. If the
+for \fINBO\fR is 0 and the maximum value is dependant on the OS. If the
 \fI\-\-ebytchk=BCH\fR option is not given then the BYTCHK field in the cdb
 is set to 1.
 .TP
@@ -139,13 +139,13 @@ zero.
 BYTCHK is the name of a field (two bits wide) in the VERIFY(10) and
 VERIFY(16) commands. When set to 1 or 3 (sbc3r34 reserves the value 2) it
 indicates that associated with the SCSI VERIFY command, a data\-out buffer
-will be sent for the device (disk) to check. Using the \fI\-\-ndo=NDO\fR
-option sets the BYTCHK field to 1 and \fINDO\fR is the number of bytes
+will be sent for the device (disk) to check. Using the \fI\-\-nbo=NBO\fR
+option sets the BYTCHK field to 1 and \fINBO\fR is the number of bytes
 placed in the data\-out buffer. Those bytes are obtained from stdin or
 \fIIF\fR (from the \fI\-\-in=FN\fR option). The \fI\-\-ebytchk=BCH\fR
 option may be used to override the BYTCHK field value of 1 with \fIBCH\fR.
 .PP
-The calculation of \fINDO\fR is left up to the user. Its value depends
+The calculation of \fINBO\fR is left up to the user. Its value depends
 on the logical block size (which can be found with the sg_readcap utility),
 the \fICOUNT\fR and the \fIVRP\fR values. If the \fIVRP\fR is greater than
 0 then each logical block will contain an extra 8 bytes (at least) of
@@ -160,12 +160,12 @@ Many Operating Systems put limits on the maximum size of the
 data\-out (and data\-in) buffer. For Linux at one time the limit was
 less than 1 MB but has been increased somewhat.
 .SH OPTION CHANGES
-Earlier versions of this utility had a \fI\-\-bytchk=NDO\fR option which
-set the BYTCHK bit and set the cdb verification length field to \fINDO\fR.
-The shorter form of that option was \fI\-B NDO\fR. For backward
+Earlier versions of this utility had a \fI\-\-bytchk=NBO\fR option which
+set the BYTCHK bit and set the cdb verification length field to \fINBO\fR.
+The shorter form of that option was \fI\-B NBO\fR. For backward
 compatibility that option is still present but not documented. In its place
-is the \fI\-\-ndo=NDO\fR whose shorter form of \fI\-n NDO\fR.
-\fI\-\-ndo=NDO\fR sets the BYTCHK field to 1 unless that is overridden by
+is the \fI\-\-nbo=NBO\fR whose shorter form of \fI\-n NBO\fR.
+\fI\-\-nbo=NBO\fR sets the BYTCHK field to 1 unless that is overridden by
 the \fI\-\-ebytchk=BCH\fR.
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
