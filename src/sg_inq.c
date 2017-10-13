@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.68 20171008";    /* SPC-5 rev 17 */
+static const char * version_str = "1.69 20171012";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -322,8 +322,8 @@ usage()
             "Performs a SCSI INQUIRY command on DEVICE or decodes INQUIRY "
             "response\nheld in file FN. If no options given then does a "
             "'standard' INQUIRY.\nCan list VPD pages with '--vpd' or "
-            "'--page=PG' option. sg_vpd and\nsdparm decode more VPD pages "
-            "than this utility.\n");
+            "'--page=PG' option. The sg_vpd\nand sdparm utilities decode "
+            "more VPD pages than this utility.\n");
 }
 
 #ifdef SG_SCSI_STRINGS
@@ -765,14 +765,15 @@ static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
           unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line, fd;
     bool has_stdin;
+    bool split_line;
+    int fn_len, in_len, k, j, m, fd;
+    int off = 0;
     unsigned int h;
     const char * lcp;
     FILE * fp;
     char line[512];
     char carry_over[4];
-    int off = 0;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
         return 1;
@@ -830,9 +831,9 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-                split_line = 0;
+                split_line = false;
             } else
-                split_line = 1;
+                split_line = true;
         }
         if (in_len < 1) {
             carry_over[0] = 0;
@@ -2090,9 +2091,9 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
     /* NO_PI_CHK and HSSRELEF added in spc5r02 */
     printf("  NO_PI_CHK=%d P_I_I_SUP=%d LUICLR=%d\n", !!(buff[7] & 0x20),
            !!(buff[7] & 0x10), !!(buff[7] & 0x1));
-    /* LU_COLL_TYPE in spc5r09, CBCS obsolete in spc5r01, RTD_SUP added in
-     * spc5r11 */
-    printf("LU_COLL_TYPE=%d R_SUP=%d RTD_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
+    /* RTD_SUP added in spc5r11, LU_COLL_TYPE added in spc5r09,
+     * HSSRELEF added in spc5r02; CBCS obsolete in spc5r01 */
+    printf("  LU_COLL_TYPE=%d R_SUP=%d RTD_SUP=%d HSSRELEF=%d [CBCS=%d]\n",
            (buff[8] >> 5) & 0x7, !!(buff[8] & 0x10), !!(buff[8] & 0x8),
            !!(buff[8] & 0x2), !!(buff[8] & 0x1));
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
@@ -2352,7 +2353,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
             }
             if (len > 43) {     /* added in sbc3r26 */
                 ull = sg_get_unaligned_be64(buff + 36);
-                printf("  Maximum write same length: \n");
+                printf("  Maximum write same length: ");
                 if (0 == ull)
                     printf("0 blocks [not reported]\n");
                 else
@@ -3297,8 +3298,8 @@ cmddt_process(int sg_fd, const struct opts_t * op)
             else if (op->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else {
+                bool prnt_cmd = false;
                 const char * desc_p;
-                int prnt_cmd = 0;
 
                 support_num = rsp_buff[1] & 7;
                 num = rsp_buff[5];
@@ -3313,11 +3314,11 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                 case 1: desc_p = "not supported"; break;
                 case 2: desc_p = "reserved (2)"; break;
                 case 3: desc_p = "supported as per standard";
-                        prnt_cmd = 1;
+                        prnt_cmd = true;
                         break;
                 case 4: desc_p = "vendor specific (4)"; break;
                 case 5: desc_p = "supported in vendor specific way";
-                        prnt_cmd = 1;
+                        prnt_cmd = true;
                         break;
                 case 6: desc_p = "vendor specific (6)"; break;
                 case 7: desc_p = "reserved (7)"; break;
@@ -3652,8 +3653,8 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         break;
     case 0xb2:  /* VPD pages in B0h to BFh range depend on pdt */
         if (!op->do_raw && (op->do_hex < 2))
-            pr2serr(" Only hex output supported. sg_vpd decodes the B2h "
-                    "page.\n");
+            pr2serr(" Only hex output supported. The sg_vpd utility decodes "
+                    "the B2h page.\n");
         return vpd_mainly_hex(sg_fd, op, inhex_len);
     case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
@@ -3734,8 +3735,8 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             }
         } else {
             if (op->do_hex < 2)
-                pr2serr(" Only hex output supported. sg_vpd and sdparm "
-                        "decode more VPD pages.\n");
+                pr2serr(" Only hex output supported. The sg_vpd and sdparm "
+                        "utilies decode more VPD pages.\n");
             return vpd_mainly_hex(sg_fd, op, inhex_len);
         }
     }
@@ -4085,13 +4086,13 @@ struct ata_identify_device {
 #define HDIO_DRIVE_CMD_OFFSET 4
 
 static int
-ata_command_interface(int device, char *data, int * atapi_flag, int verbose)
+ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
 {
     unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     unsigned short get_ident[256];
 
     if (atapi_flag)
-        *atapi_flag = 0;
+        *atapi_flag = false;
     memset(buff, 0, sizeof(buff));
     if (ioctl(device, HDIO_GET_IDENTITY, &get_ident) < 0) {
         if (ENOTTY == errno) {
@@ -4138,7 +4139,7 @@ ata_command_interface(int device, char *data, int * atapi_flag, int verbose)
                 return errno;
             }
         } else if (atapi_flag) {
-            *atapi_flag = 1;
+            *atapi_flag = true;
             if (verbose > 1)
                 pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) succeeded\n");
         }
@@ -4162,11 +4163,12 @@ ata_command_interface(int device, char *data, int * atapi_flag, int verbose)
 static int
 try_ata_identify(int ata_fd, int do_hex, int do_raw, int verbose)
 {
-    struct ata_identify_device ata_ident;
+    bool atapi;
+    int res;
     char model[64];
     char serial[64];
     char firm[64];
-    int res, atapi;
+    struct ata_identify_device ata_ident;
 
     memset(&ata_ident, 0, sizeof(ata_ident));
     res = ata_command_interface(ata_fd, (char *)&ata_ident, &atapi, verbose);

@@ -30,7 +30,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.22 20171006";
+static const char * version_str = "1.23 20171010";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -138,11 +138,11 @@ static void decode_tpgs_state(const int st)
 int main(int argc, char * argv[])
 {
     bool decode = false;
+    int hex = false;
     bool raw = false;
     bool o_readonly = false;
     bool extended = false;
     int sg_fd, k, j, off, res, c, report_len, tgt_port_count;
-    int hex = 0;
     int ret = 0;
     int verbose = 0;
     unsigned char reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
@@ -169,7 +169,7 @@ int main(int argc, char * argv[])
             usage();
             return 0;
         case 'H':
-            hex = 1;
+            hex = true;
             break;
         case 'r':
             raw = true;

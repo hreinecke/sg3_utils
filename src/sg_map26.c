@@ -302,11 +302,11 @@ nt_typ_from_major(int ma)
 
 
 struct node_match_item {
-        char dir_name[D_NAME_LEN_MAX];
+        bool follow_symlink;
         int file_type;
         int majj;
         int minn;
-        bool follow_symlink;
+        char dir_name[D_NAME_LEN_MAX];
 };
 
 static struct node_match_item nd_match;
@@ -314,9 +314,9 @@ static struct node_match_item nd_match;
 static int
 nd_match_scandir_select(const struct dirent * s)
 {
+        bool symlnk = false;
         struct stat st;
         char name[D_NAME_LEN_MAX];
-        int symlnk = 0;
 
         switch (s->d_type) {
         case DT_BLK:
@@ -334,7 +334,7 @@ nd_match_scandir_select(const struct dirent * s)
         case DT_LNK:    /* follow symlinks */
                 if (! nd_match.follow_symlink)
                         return 0;
-                symlnk = 1;
+                symlnk = true;
                 break;
         default:
                 return 0;
@@ -1038,7 +1038,8 @@ map_sg(const char * device_name, const char * device_dir, int ma, int mi,
 int
 main(int argc, char * argv[])
 {
-        int c, num, tt, cont, res;
+        bool cont;
+        int c, num, tt, res;
         int given_is = -1;
         int result = 0;
         int verbose = 0;
@@ -1201,7 +1202,7 @@ main(int argc, char * argv[])
 
         tt = NT_NO_MATCH;
         do {
-                cont = 0;
+                cont = false;
                 switch (ret) {
                 case NT_NO_MATCH:
                         res = 1;
@@ -1253,7 +1254,7 @@ main(int argc, char * argv[])
                                 return SG_LIB_FILE_ERROR;
                         }
                         tt = nt_typ_from_major(ma);
-                        cont = 1;
+                        cont = true;
                         break;
                 case NT_DIR:
                         if (! get_value(device_name, "dev", value,
@@ -1269,7 +1270,7 @@ main(int argc, char * argv[])
                                 return SG_LIB_FILE_ERROR;
                         }
                         tt = nt_typ_from_major(ma);
-                        cont = 1;
+                        cont = true;
                         break;
                 default:
                         break;

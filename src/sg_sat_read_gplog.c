@@ -51,7 +51,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.14 20171007";
+static const char * version_str = "1.15 20171010";
 
 struct opts_t {
     bool ck_cond;
@@ -247,7 +247,7 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
                                     "Descriptor\n");
                         return SG_LIB_CAT_RECOVERED;
                     }
-                    got_ard = 1;
+                    got_ard = true;
                     break;
                 } else if (SPC_SK_RECOVERED_ERROR == ssh.sense_key)
                     return SG_LIB_CAT_RECOVERED;
@@ -310,7 +310,7 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
         return -1;
     }
 
-    if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (0 == got_ard))
+    if ((SAT_ATA_RETURN_DESC == ata_return_desc[0]) && (! got_ard))
         pr2serr("Seem to have got ATA Result Descriptor but it was not "
                 "indicated\n");
     if (got_ard) {

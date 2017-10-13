@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.51 20171007";
+static const char * version_str = "0.52 20171011";
 
 #define ME "sg_senddiag: "
 
@@ -469,10 +469,10 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
     if (0 == in_len)
         *mp_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
+        bool split_line;
+        int off = 0;
         char line[512];
         char carry_over[4];
-        int off = 0;
-        int split_line;
 
         carry_over[0] = 0;
         for (j = 0; j < 512; ++j) {
@@ -483,9 +483,9 @@ build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
                 if ('\n' == line[in_len - 1]) {
                     --in_len;
                     line[in_len] = '\0';
-                    split_line = 0;
+                    split_line = false;
                 } else
-                    split_line = 1;
+                    split_line = true;
             }
             if (in_len < 1) {
                 carry_over[0] = 0;

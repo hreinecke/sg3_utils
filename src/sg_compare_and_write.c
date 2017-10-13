@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.17 20171008";
+static const char * version_str = "1.18 20171010";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -89,23 +89,23 @@ static struct option long_options[] = {
 };
 
 struct caw_flags {
-        int dpo;
-        int fua;
-        int fua_nv;
+        bool dpo;
+        bool fua;
+        bool fua_nv;
         int group;
         int wrprotect;
 };
 
 struct opts_t {
-        const char * ifn;
-        const char * wfn;
-        int wfn_given;
-        uint64_t lba;
+        bool quiet;
+        bool wfn_given;
         int numblocks;
-        int quiet;
         int verbose;
         int timeout;
         int xfer_len;
+        uint64_t lba;
+        const char * ifn;
+        const char * wfn;
         const char * device_name;
         struct caw_flags flags;
 };
@@ -164,9 +164,9 @@ usage()
 static int
 parse_args(int argc, char* argv[], struct opts_t * op)
 {
+        bool lba_given = false;
+        bool if_given = false;
         int c;
-        int lba_given = 0;
-        int if_given = 0;
         int64_t ll;
 
         op->numblocks = DEF_NUM_BLOCKS;
@@ -186,20 +186,20 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                 case 'C':
                 case 'i':
                         op->ifn = optarg;
-                        if_given = 1;
+                        if_given = true;
                         break;
                 case 'd':
-                        op->flags.dpo = 1;
+                        op->flags.dpo = true;
                         break;
                 case 'D':
                         op->wfn = optarg;
-                        op->wfn_given = 1;
+                        op->wfn_given = true;
                         break;
                 case 'F':
-                        op->flags.fua_nv = 1;
+                        op->flags.fua_nv = true;
                         break;
                 case 'f':
-                        op->flags.fua = 1;
+                        op->flags.fua = true;
                         break;
                 case 'g':
                         op->flags.group = sg_get_num(optarg);
@@ -221,7 +221,7 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                                 goto out_err_no_usage;
                         }
                         op->lba = (uint64_t)ll;
-                        lba_given = 1;
+                        lba_given = true;
                         break;
                 case 'n':
                         op->numblocks = sg_get_num(optarg);
@@ -232,7 +232,7 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                         }
                         break;
                 case 'q':
-                        ++op->quiet;
+                        op->quiet = true;
                         break;
                 case 't':
                         op->timeout = sg_get_num(optarg);
@@ -283,11 +283,11 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                 pr2serr("missing device name!\n");
                 goto out_err;
         }
-        if (!if_given) {
+        if (! if_given) {
                 pr2serr("missing input file\n");
                 goto out_err;
         }
-        if (!lba_given) {
+        if (! lba_given) {
                 pr2serr("missing lba\n");
                 goto out_err;
         }
@@ -331,16 +331,16 @@ sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
 /* Returns 0 for success, SG_LIB_CAT_MISCOMPARE if compare fails,
  * various other SG_LIB_CAT_*, otherwise -1 . */
 static int
-sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
-                     int64_t lba, int xfer_len, struct caw_flags flags,
-                     bool noisy, int verbose)
+sg_ll_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
+                        int64_t lba, int xfer_len, struct caw_flags flags,
+                        bool noisy, int verbose)
 {
         bool valid;
         int k, sense_cat, slen, res, ret;
+        uint64_t ull = 0;
+        struct sg_pt_base * ptvp;
         unsigned char cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
         unsigned char sense_b[SENSE_BUFF_LEN];
-        struct sg_pt_base * ptvp;
-        uint64_t ull = 0;
 
         if (sg_build_scsi_cdb(cawCmd, blocks, lba, flags)) {
                 pr2serr(ME "bad cdb build, lba=0x%" PRIx64 ", blocks=%d\n",
@@ -414,7 +414,7 @@ sg_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
 }
 
 static int
-open_if(const char * fn, int got_stdin)
+open_if(const char * fn, bool got_stdin)
 {
         int fd;
 
@@ -453,13 +453,14 @@ open_dev(const char * outf, int verbose)
 int
 main(int argc, char * argv[])
 {
-        int res, half_xlen, ifn_stdin;
+        bool ifn_stdin;
+        int res, half_xlen;
         int infd = -1;
         int wfd = -1;
         int devfd = -1;
         unsigned char * wrkBuff = NULL;
-        struct opts_t opts;
         struct opts_t * op;
+        struct opts_t opts;
 
         op = &opts;
         memset(op, 0, sizeof(opts));
@@ -490,7 +491,7 @@ main(int argc, char * argv[])
                         res = SG_LIB_FILE_ERROR;
                         goto out;
                 }
-                wfd = open_if(op->wfn, 0);
+                wfd = open_if(op->wfn, false);
                 if (wfd < 0) {
                         res = -wfd;
                         goto out;
@@ -541,8 +542,9 @@ main(int argc, char * argv[])
                         goto out;
                 }
         }
-        res = sg_compare_and_write(devfd, wrkBuff, op->numblocks, op->lba,
-                op->xfer_len, op->flags, !op->quiet, op->verbose);
+        res = sg_ll_compare_and_write(devfd, wrkBuff, op->numblocks, op->lba,
+                                      op->xfer_len, op->flags, ! op->quiet,
+                                      op->verbose);
 
 out:
         if (0 != res) {

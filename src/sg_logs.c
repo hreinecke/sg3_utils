@@ -461,8 +461,8 @@ static char t10_vendor_str[10];
 static char t10_product_str[18];
 
 #ifdef SG_LIB_WIN32
-static int win32_spt_init_state = 0;
-static int win32_spt_curr_state = 0;
+static bool win32_spt_init_state = false;
+static bool win32_spt_curr_state = false;
 #endif
 
 
@@ -1357,13 +1357,14 @@ static int
 f2hex_arr(const char * fname, bool as_binary, bool no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line, fd, has_stdin;
+    bool split_line, has_stdin;
+    int fn_len, in_len, k, j, m, fd;
+    int off = 0;
     unsigned int h;
     const char * lcp;
     FILE * fp;
     char line[512];
     char carry_over[4];
-    int off = 0;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
         return 1;
@@ -1421,9 +1422,9 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-                split_line = 0;
+                split_line = false;
             } else
-                split_line = 1;
+                split_line = true;
         }
         if (in_len < 1) {
             carry_over[0] = 0;
@@ -1542,16 +1543,16 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
-    if (0 == win32_spt_init_state) {
+    if (! win32_spt_init_state) {
         if (win32_spt_curr_state) {
             if (mx_resp_len < 16384) {
                 scsi_pt_win32_direct(0);
-                win32_spt_curr_state = 0;
+                win32_spt_curr_state = false;
             }
         } else {
             if (mx_resp_len >= 16384) {
                 scsi_pt_win32_direct(SG_LIB_WIN32_DIRECT /* SPT direct */);
-                win32_spt_curr_state = 1;
+                win32_spt_curr_state = true;
             }
         }
     }
@@ -6821,7 +6822,7 @@ main(int argc, char * argv[])
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
-    win32_spt_init_state = scsi_pt_win32_spt_state();
+    win32_spt_init_state = !! scsi_pt_win32_spt_state();
     if (op->verbose > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
                 win32_spt_init_state ? "direct" : "indirect");

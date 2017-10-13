@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.55 20171008";
+static const char * version_str = "5.56 20171011";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -121,7 +121,7 @@ typedef struct request_collection
     int64_t in_count;               /*  | blocks remaining for next read */
     int64_t in_rem_count;           /*  | count of remaining in blocks */
     int in_partial;                   /*  | */
-    int in_stop;                      /*  | */
+    bool in_stop;                     /*  | */
     pthread_mutex_t in_mutex;         /* -/ */
     int outfd;
     int64_t seek;
@@ -378,7 +378,7 @@ static void
 guarded_stop_in(Rq_coll * clp)
 {
     pthread_mutex_lock(&clp->in_mutex);
-    clp->in_stop = 1;
+    clp->in_stop = true;
     pthread_mutex_unlock(&clp->in_mutex);
 }
 
@@ -485,7 +485,7 @@ cleanup_in(void * v_clp)
     Rq_coll * clp = (Rq_coll *)v_clp;
 
     pr2serr("thread cancelled while in mutex held\n");
-    clp->in_stop = 1;
+    clp->in_stop = true;
     pthread_mutex_unlock(&clp->in_mutex);
     guarded_stop_out(clp);
     pthread_cond_broadcast(&clp->out_sync_cv);
@@ -623,7 +623,7 @@ read_write_thread(void * v_clp)
     status = pthread_mutex_lock(&clp->in_mutex);
     if (0 != status) err_exit(status, "lock in_mutex");
     if (! clp->in_stop)
-        clp->in_stop = 1;  /* flag other workers to stop */
+        clp->in_stop = true;  /* flag other workers to stop */
     status = pthread_mutex_unlock(&clp->in_mutex);
     if (0 != status) err_exit(status, "unlock in_mutex");
     pthread_cond_broadcast(&clp->out_sync_cv);
@@ -653,7 +653,7 @@ normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
         else {
             pr2serr("error in normal read, %s\n",
                     tsafe_strerror(errno, strerr_buff));
-            clp->in_stop = 1;
+            clp->in_stop = true;
             guarded_stop_out(clp);
             return 1;
         }
@@ -1109,7 +1109,7 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "excl"))
             fp->excl = true;
         else if (0 == strcmp(cp, "fua"))
-            fp->fua = 1;
+            fp->fua = true;
         else if (0 == strcmp(cp, "null"))
             ;
         else {

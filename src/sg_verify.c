@@ -36,7 +36,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.22 20170924";    /* sbc4r01 */
+static const char * version_str = "1.23 20171012";    /* sbc4r01 */
 
 #define ME "sg_verify: "
 
@@ -46,15 +46,16 @@ static const char * version_str = "1.22 20170924";    /* sbc4r01 */
 static struct option long_options[] = {
         {"16", no_argument, 0, 'S'},
         {"bpc", required_argument, 0, 'b'},
-        {"bytchk", required_argument, 0, 'B'},
+        {"bytchk", required_argument, 0, 'B'},  /* 4 backward compatibility */
         {"count", required_argument, 0, 'c'},
         {"dpo", no_argument, 0, 'd'},
-        {"ebytchk", required_argument, 0, 'E'},
+        {"ebytchk", required_argument, 0, 'E'}, /* extended bytchk (2 bits) */
         {"group", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'i'},
         {"lba", required_argument, 0, 'l'},
-        {"nbo", required_argument, 0, 'n'},
+        {"nbo", required_argument, 0, 'n'},     /* misspelling, legacy */
+        {"ndo", required_argument, 0, 'n'},
         {"quiet", no_argument, 0, 'q'},
         {"readonly", no_argument, 0, 'r'},
         {"verbose", no_argument, 0, 'v'},
@@ -96,7 +97,7 @@ usage()
             "    --help|-h           print out usage message\n"
             "    --in=IF|-i IF       input from file called IF (def: "
             "stdin)\n"
-            "                        only active if --bytchk=N given\n"
+            "                        only active if --ebytchk=BCH given\n"
             "    --lba=LBA|-l LBA    logical block address to start "
             "verify (def: 0)\n"
             "    --ndo=NDO|-n NDO    NDO is number of bytes placed in "
@@ -134,21 +135,21 @@ main(int argc, char * argv[])
     int bpc = 128;
     int group = 0;
     int bytchk = 0;
-    int ndo = 0;
+    int ndo = 0;        /* number of bytes in data-out buffer */
     int verbose = 0;
     int ret = 0;
     int vrprotect = 0;
     unsigned int info = 0;
-    int64_t ll;
     int64_t count = 1;
+    int64_t ll;
     int64_t orig_count;
+    uint64_t info64 = 0;
     uint64_t lba = 0;
     uint64_t orig_lba;
     char *ref_data = NULL;
     const char * device_name = NULL;
     const char * file_name = NULL;
     const char * vc;
-    uint64_t info64 = 0;
     char ebuff[EBUFF_SZ];
 
     while (1) {
@@ -207,7 +208,7 @@ main(int argc, char * argv[])
             }
             lba = (uint64_t)ll;
             break;
-        case 'n':
+        case 'n':       /* number of bytes in data-out buffer */
         case 'B':       /* undocumented, old --bytchk=NDO option */
             ndo = sg_get_num(optarg);
             if (ndo < 1) {

@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "4.99 20171007";
+static const char * version_str = "5.00 20171010";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -350,24 +350,24 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
 int
 main(int argc, char * argv[])
 {
+#ifdef SG_DEBUG
+    bool clear = true;
+#endif
+    bool dio_incomplete = false;
     int sg_fd, res, j;
+    int buf_capacity = 0;
+    int buf_size = 0;
+    size_t psz;
     unsigned int k, num;
-    unsigned char rb_cdb [RB_CMD_LEN];
+    int64_t total_size = RB_DEF_SIZE;
+    struct opts_t * op;
     unsigned char * rbBuff = NULL;
     void * rawp = NULL;
     unsigned char sense_buffer[32];
-    int buf_capacity = 0;
-    int buf_size = 0;
-    int64_t total_size = RB_DEF_SIZE;
-    size_t psz;
-    int dio_incomplete = 0;
+    unsigned char rb_cdb [RB_CMD_LEN];
     struct sg_io_hdr io_hdr;
     struct timeval start_tm, end_tm;
-#ifdef SG_DEBUG
-    int clear = 1;
-#endif
     struct opts_t opts;
-    struct opts_t * op;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
@@ -606,13 +606,13 @@ main(int argc, char * argv[])
         }
         if (op->do_dio &&
             ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
-            dio_incomplete = 1;    /* flag that dio not done (completely) */
+            dio_incomplete = true;  /* flag that dio not done (completely) */
 
 #ifdef SG_DEBUG
         if (clear) {
             for (j = 0; j < buf_size; ++j) {
                 if (rbBuff[j] != 0) {
-                    clear = 0;
+                    clear = false;
                     break;
                 }
             }

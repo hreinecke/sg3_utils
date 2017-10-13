@@ -541,7 +541,7 @@ struct sg_pt_base {
     struct sg_pt_linux_scsi impl;
 };
 
-static int bsg_major_checked = 0;
+static bool bsg_major_checked = false;
 static int bsg_major = 0;
 
 
@@ -604,7 +604,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     int fd;
 
     if (! bsg_major_checked) {
-        bsg_major_checked = 1;
+        bsg_major_checked = true;
         find_bsg_major(verbose);
     }
     if (verbose > 1)
@@ -1000,7 +1000,7 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (! bsg_major_checked) {
-        bsg_major_checked = 1;
+        bsg_major_checked = true;
         find_bsg_major(verbose);
     }
     ptp->os_err = 0;

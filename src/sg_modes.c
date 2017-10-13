@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.50 20171007";
+static const char * version_str = "1.51 20171011";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -882,12 +882,13 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
 static int
 examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
 {
-    int k, res, header, mresp_len, len;
+    bool header_printed;
+    int k, res, mresp_len, len;
     unsigned char rbuf[256];
     const char * cp;
 
     mresp_len = (op->do_raw || op->do_hex) ? sizeof(rbuf) : 4;
-    for (header = 0, k = 0; k < PG_CODE_MAX; ++k) {
+    for (header_printed = false, k = 0; k < PG_CODE_MAX; ++k) {
         if (op->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
                                     true, op->do_verbose);
@@ -924,9 +925,9 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
                 dStrHex((const char *)rbuf, len, -1);
                 continue;
             }
-            if (0 == header) {
+            if (! header_printed) {
                 printf("Discovered mode pages:\n");
-                header = 1;
+                header_printed = true;
             }
             cp = find_page_code_desc(k, 0, inq_pdt, inq_byte6, -1);
             if (cp)

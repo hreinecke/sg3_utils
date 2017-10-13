@@ -33,7 +33,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.35 20171007";
+static const char * version_str = "3.36 20171011";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -188,7 +188,8 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 static int
 process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
-    int k, jmp_out, plen;
+    bool jmp_out;
+    int k, plen;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
@@ -197,7 +198,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
         if (plen <= 0)
             continue;
         if ('-' == *cp) {
-            for (--plen, ++cp, jmp_out = 0; plen > 0; --plen, ++cp) {
+            for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'N':
                     op->opts_new = true;
@@ -220,7 +221,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     usage_old();
                     return 0;
                 default:
-                    jmp_out = 1;
+                    jmp_out = true;
                     break;
                 }
                 if (jmp_out)

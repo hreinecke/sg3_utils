@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.56 20171006";
+static const char * version_str = "0.57 20171012";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -53,23 +53,25 @@ static const char * version_str = "0.56 20171006";
 #define SG_PERSIST_IN_RDONLY "SG_PERSIST_IN_RDONLY"
 
 struct opts_t {
-    unsigned int prout_type;
-    uint64_t param_rk;
-    uint64_t param_sark;
-    unsigned int param_rtp;
-    int hex;
-    int num_transportids;
-    int prin_sa;
-    int prout_sa;
-    int readonly;       /* 0, 1 or 2 (2 for override environment variable) */
-    int verbose;
     bool inquiry;       /* set true by default (unlike most bools) */
     bool param_alltgpt;
     bool param_aptpl;
     bool param_unreg;
     bool pr_in;         /* true: PR_IN (def); false: PR_OUT */
-    unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
+    bool readonly;
+    bool readwrite_force;/* set when '-yy' given. Ooverrides environment
+                            variable SG_PERSIST_IN_RDONLY and opens RW */
+    int hex;
+    int num_transportids;
+    int prin_sa;
+    int prout_sa;
+    int verbose;
     unsigned int alloc_len;
+    unsigned int param_rtp;
+    unsigned int prout_type;
+    uint64_t param_rk;
+    uint64_t param_sark;
+    unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
 };
 
 
@@ -676,13 +678,14 @@ decode_sym_transportid(const char * lcp, unsigned char * tidp)
 static int
 decode_file_tids(const char * fnp, struct opts_t * op)
 {
-    FILE * fp = stdin;
-    const char * lcp;
-    unsigned char * tid_arr = op->transportid_arr;
-    int in_len, k, j, m, split_line;
+    bool split_line;
+    int in_len, k, j, m;
     int off = 0;
     int num = 0;
     unsigned int h;
+    FILE * fp = stdin;
+    const char * lcp;
+    unsigned char * tid_arr = op->transportid_arr;
     char line[1024];
     char carry_over[4];
 
@@ -702,9 +705,9 @@ decode_file_tids(const char * fnp, struct opts_t * op)
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-                split_line = 0;
+                split_line = false;
             } else
-                split_line = 1;
+                split_line = true;
         }
         if (in_len < 1) {
             carry_over[0] = 0;
@@ -871,21 +874,21 @@ my_cont_b:
 int
 main(int argc, char * argv[])
 {
+    bool want_prin = false;
+    bool want_prout = false;
     int sg_fd, c, k, res;
-    const char * device_name = NULL;
-    char buff[48];
     int help = 0;
     int num_prin_sa = 0;
     int num_prout_sa = 0;
     int num_prout_param = 0;
     int peri_type = 0;
     int ret = 0;
-    bool want_prin = false;
-    bool want_prout = false;
-    struct sg_simple_inquiry_resp inq_resp;
     const char * cp;
-    struct opts_t opts;
+    const char * device_name = NULL;
     struct opts_t * op;
+    char buff[48];
+    struct opts_t opts;
+    struct sg_simple_inquiry_resp inq_resp;
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -1029,8 +1032,14 @@ main(int argc, char * argv[])
             }
             ++num_prout_param;
             break;
-        case 'y':       /* 3 valued */
-            ++op->readonly;
+        case 'y':       /* differentiates -y, -yy and -yyy */
+            if (! op->readwrite_force) {
+                if (op->readonly) {
+                    op->readwrite_force = true;
+                    op->readonly = false;
+                } else
+                    op->readonly = true;
+            }
             break;
         case 'Y':
             op->param_alltgpt = true;
@@ -1164,13 +1173,14 @@ main(int argc, char * argv[])
         sg_cmds_close_device(sg_fd);
     }
 
-    if (0 == op->readonly) {
+    if (! op->readwrite_force) {
         cp = getenv(SG_PERSIST_IN_RDONLY);
         if (cp && op->pr_in)
-            op->readonly = 1;
-    } else if (op->readonly > 1)        /* -yy forces open(RW) */
-        op->readonly = 0;
-    if ((sg_fd = sg_cmds_open_device(device_name, !!op->readonly,
+            op->readonly = true;  /* SG_PERSIST_IN_RDONLY overrides default
+                                     which is open(RW) */
+    } else
+        op->readonly = false;      /* '-yy' force open(RW) */
+    if ((sg_fd = sg_cmds_open_device(device_name, op->readonly,
                                      op->verbose)) < 0) {
         pr2serr("sg_persist: error opening file (rw): %s: %s\n", device_name,
                 safe_strerror(-sg_fd));

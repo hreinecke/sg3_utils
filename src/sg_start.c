@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.62 20171007";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.63 20171010";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", no_argument, 0, 'e'},
@@ -288,8 +288,9 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
 {
     bool ambigu = false;
     bool jmp_out;
+    bool startstop = false;
+    bool startstop_set = false;
     int k, plen, num;
-    int startstop = -1;
     unsigned int u;
     const char * cp;
 
@@ -343,10 +344,12 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
 
             if (0 == strncmp(cp, "eject", 5)) {
                 op->do_loej = true;
-                if (startstop == 1)
+                if (startstop_set && startstop)
                     ambigu = true;
-                else
-                    startstop = 0;
+                else {
+                    startstop = false;
+                    startstop_set = true;
+                }
             } else if (0 == strncmp("fl=", cp, 3)) {
                 num = sscanf(cp + 3, "%x", &u);
                 if (1 != num) {
@@ -354,7 +357,8 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                startstop = 1;
+                startstop = true;
+                startstop_set = true;
                 op->do_loej = true;
                 op->do_fl = u;
             } else if (0 == strncmp("imm=", cp, 4)) {
@@ -367,10 +371,12 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 op->do_immed = !! u;
             } else if (0 == strncmp(cp, "load", 4)) {
                 op->do_loej = true;
-                if (startstop == 0)
+                if (startstop_set && (! startstop))
                     ambigu = true;
-                else
-                    startstop = 1;
+                else {
+                    startstop = true;
+                    startstop_set = true;
+                }
             } else if (0 == strncmp(cp, "loej", 4))
                 op->do_loej = true;
             else if (0 == strncmp("pc=", cp, 3)) {
@@ -392,15 +398,19 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp(cp, "noflush", 7)) {
                 op->do_noflush = true;
             } else if (0 == strncmp(cp, "start", 5)) {
-                if (startstop == 0)
+                if (startstop_set && (! startstop))
                     ambigu = true;
-                else
-                    startstop = 1;
+                else {
+                    startstop = true;
+                    startstop_set = true;
+                }
             } else if (0 == strncmp(cp, "stop", 4)) {
-                if (startstop == 1)
+                if (startstop_set && startstop)
                     ambigu = true;
-                else
-                    startstop = 0;
+                else {
+                    startstop = false;
+                    startstop_set = true;
+                }
             } else if (0 == strncmp(cp, "old", 3))
                 ;
             else if (jmp_out) {
@@ -409,15 +419,19 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp("0", cp)) {
-            if (1 == startstop)
+            if (startstop_set && startstop)
                 ambigu = true;
-            else
-                startstop = 0;
+            else {
+                startstop = false;
+                startstop_set = true;
+            }
         } else if (0 == strcmp("1", cp)) {
-            if (0 == startstop)
+            if (startstop_set && (! startstop))
                 ambigu = true;
-            else
-                startstop = 1;
+            else {
+                startstop = true;
+                startstop_set = true;
+            }
         } else if (0 == op->device_name)
                 op->device_name = cp;
         else {
@@ -431,10 +445,12 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                     "--load, --start or --stop\n");
             usage_old();
             return SG_LIB_SYNTAX_ERROR;
-        } else if (0 == startstop)
-            op->do_stop = true;
-        else if (1 == startstop)
-            op->do_start = true;
+        } else if (startstop_set) {
+            if (startstop)
+                op->do_start = true;
+            else
+                op->do_stop = true;
+        }
     }
     return 0;
 }

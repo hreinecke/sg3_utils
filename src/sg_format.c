@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.39 20171005";
+static const char * version_str = "1.39 20171012";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -47,7 +47,8 @@ static const char * version_str = "1.39 20171005";
 /* Seagate ST32000444SS 2TB disk takes 9.5 hours, now there are 4TB disks */
 
 #define POLL_DURATION_SECS 60
-#define DEF_POLL_TYPE 0
+#define DEF_POLL_TYPE_RS false     /* false -> test unit ready;
+                                      true -> request sense */
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -66,33 +67,33 @@ static const char * version_str = "1.39 20171005";
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 struct opts_t {
-        int64_t blk_count;      /* -c value */
-        int blk_size;           /* -s value */
-        int cmplst;             /* -C value */
+        bool cmplst;             /* -C value */
         bool dcrt;              /* -D */
         bool early;             /* -e */
-        int ffmt;               /* -t value */
-        int fmtpinfo;
-        int format;             /* -F */
         bool fwait;             /* -w (negate for immed) */
         bool ip_def;            /* -I */
         bool long_lba;          /* -l */
-        int mode_page;          /* -M value */
         bool mode6;             /* -6 */
-        int pfu;                /* -P value */
-        int pie;                /* -q value */
         bool pinfo;             /* -p, deprecated, prefer fmtpinfo */
-        int pollt;              /* -x value */
-        bool pollt_given;
+        bool poll_type;         /* -x 0|1 */
+        bool poll_type_given;
         bool quick;             /* -Q */
         bool do_rcap16;         /* -l */
         bool resize;            /* -r */
         bool rto_req;           /* -R, deprecated, prefer fmtpinfo */
+        bool verify;            /* -y */
+        int blk_size;           /* -s value */
+        int ffmt;               /* -t value */
+        int fmtpinfo;
+        int format;             /* -F */
+        int mode_page;          /* -M value */
+        int pfu;                /* -P value */
+        int pie;                /* -q value */
         int sec_init;           /* -S */
         int tape;               /* -T <format>, def: -1 */
         int timeout;            /* -m SEC, def: depends on IMMED bit */
         int verbose;            /* -v */
-        bool verify;            /* -y */
+        int64_t blk_count;      /* -c value */
         const char * device_name;
 };
 
@@ -284,9 +285,11 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
 static int
 scsi_format_unit(int fd, const struct opts_t * op)
 {
-        int res, need_hdr, progress, pr, rem, verb, fmt_pl_sz, longlist, off;
-        int resp_len, ip_desc, timeout;
+        bool need_hdr, longlist;
         bool immed = ! op->fwait;
+        bool ip_desc;
+        int res, progress, pr, rem, verb, fmt_pl_sz, off, resp_len;
+        int timeout;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
@@ -342,7 +345,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
         }
 
         verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
-        if (0 == op->pollt) {
+        if (! op->poll_type) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
@@ -357,7 +360,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                                 break;
                 }
         }
-        if (op->pollt || (SG_LIB_CAT_NOT_READY == res)) {
+        if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, sizeof(reqSense));
@@ -461,7 +464,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
         }
 
         verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
-        if (0 == op->pollt) {
+        if (! op->poll_type) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
@@ -476,7 +479,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                                 break;
                 }
         }
-        if (op->pollt || (SG_LIB_CAT_NOT_READY == res)) {
+        if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, sizeof(reqSense));
@@ -765,9 +768,9 @@ main(int argc, char **argv)
 
         op = &opts;
         memset(op, 0, sizeof(opts));
-        op->cmplst = 1;
+        op->cmplst = true;
         op->mode_page = RW_ERROR_RECOVERY_PAGE;
-        op->pollt = DEF_POLL_TYPE;
+        op->poll_type = DEF_POLL_TYPE_RS;
         op->tape = -1;
         while (1) {
                 int option_index = 0;
@@ -792,15 +795,16 @@ main(int argc, char **argv)
                         }
                         break;
                 case 'C':
-                        op->cmplst = sg_get_num(optarg);
-                        if ((op->cmplst < 0) || (op->cmplst > 1)) {
+                        j = sg_get_num(optarg);
+                        if ((j < 0) || (j > 1)) {
                                 pr2serr("bad argument to '--cmplst', want 0 "
                                         "or 1\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
+                        op->cmplst = !! j;
                         break;
                 case 'D':
-                        op->dcrt = 1;
+                        op->dcrt = true;
                         break;
                 case 'e':
                         op->early = true;
@@ -911,9 +915,9 @@ main(int argc, char **argv)
                 case 'w':
                         op->fwait = true;
                         break;
-                case 'x':
-                        op->pollt = !!sg_get_num(optarg);
-                        op->pollt_given = true;
+                case 'x':       /* false: TUR; true: request sense */
+                        op->poll_type = !! sg_get_num(optarg);
+                        op->poll_type_given = true;
                         break;
                 case 'y':
                         op->verify = true;
@@ -1053,7 +1057,7 @@ again_with_long_lba:
                 calc_len = dbuff[0] + 1;
                 dev_specific_param = dbuff[2];
                 bd_len = dbuff[3];
-                op->long_lba = 0;
+                op->long_lba = false;
                 offset = 4;
                 /* prepare for mode select */
                 dbuff[0] = 0;
@@ -1063,7 +1067,7 @@ again_with_long_lba:
                 calc_len = sg_get_unaligned_be16(dbuff + 0);
                 dev_specific_param = dbuff[3];
                 bd_len = sg_get_unaligned_be16(dbuff + 6);
-                op->long_lba = (dbuff[4] & 1);
+                op->long_lba = !! (dbuff[4] & 1);
                 offset = 8;
                 /* prepare for mode select */
                 dbuff[0] = 0;
@@ -1081,13 +1085,13 @@ again_with_long_lba:
         if (bd_len > 0) {
                 ull = op->long_lba ? sg_get_unaligned_be64(dbuff + offset) :
                                  sg_get_unaligned_be32(dbuff + offset);
-                if ((0 == op->long_lba) && (0xffffffff == ull)) {
+                if ((! op->long_lba) && (0xffffffff == ull)) {
                         if (op->verbose)
                                 pr2serr("Mode sense number of blocks maxed "
                                         "out, set longlba\n");
-                        op->long_lba = 1;
-                        op->mode6 = 0;
-                        op->do_rcap16 = 1;
+                        op->long_lba = true;
+                        op->mode6 = false;
+                        op->do_rcap16 = true;
                         goto again_with_long_lba;
                 }
                 bd_blk_len = op->long_lba ?
@@ -1196,7 +1200,7 @@ again_with_long_lba:
         } else if (! op->format) {
                 res = print_read_cap(fd, op);
                 if (-2 == res) {
-                        op->do_rcap16 = 1;
+                        op->do_rcap16 = true;
                         res = print_read_cap(fd, op);
                 }
                 if (res < 0)
@@ -1253,8 +1257,8 @@ skip_f_unit_reconsider:
         goto out;
 
 format_med:
-        if (! op->pollt_given)
-                op->pollt = 1;  /* SSC-5 specifies REQUEST SENSE polling */
+        if (! op->poll_type_given) /* SSC-5 specifies REQUEST SENSE polling */
+                op->poll_type = true;
         if (op->quick)
                 goto skip_f_med_reconsider;
         printf("\nA FORMAT MEDIUM will commence in 15 seconds\n");

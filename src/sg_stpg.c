@@ -338,7 +338,8 @@ static int
 build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 int max_arr_len)
 {
-    int in_len, k, v, try_num;
+    bool try_num;
+    int in_len, k, v;
     const char * lcp;
     char * cp;
 
@@ -355,9 +356,9 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
         return 1;
     }
     for (k = 0; k < max_arr_len; ++k) {
-        try_num = 1;
+        try_num = true;
         if (isalpha(*lcp)) {
-            try_num = 0;
+            try_num = false;
             switch (toupper(*lcp)) {
             case 'A':
                 if ('N' == toupper(*(lcp + 1)))
@@ -365,7 +366,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 else if ('O' == toupper(*(lcp + 1)))
                     state_arr[k] = 0;
                 else
-                    try_num = 1;
+                    try_num = true;
                 break;
             case 'O':
                 state_arr[k] = 14;
@@ -412,9 +413,9 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
 int
 main(int argc, char * argv[])
 {
+    bool hex = false;
     bool raw = false;
     int sg_fd, k, off, res, c, report_len, tgt_port_count;
-    int hex = 0;
     int port_arr_len = 0;
     int verbose = 0;
     unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
@@ -452,7 +453,7 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'H':
-            hex = 1;
+            hex = true;
             break;
         case 'l':
         case 'O':

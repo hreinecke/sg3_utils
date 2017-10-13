@@ -38,7 +38,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.07 20171007";    /* ses3r07 */
+static const char * version_str = "1.08 20171010";    /* ses3r07 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -266,8 +266,8 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                   struct dout_buff_t * wp, unsigned char * dip,
                   bool last, const struct opts_t * op)
 {
+    bool send_data = false;
     int do_len, rem, res, rsp_len, k, num, mc_status, verb;
-    int send_data = 0;
     int ret = 0;
     uint32_t rec_gen_code;
     const unsigned char * bp;
@@ -278,7 +278,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     case MODE_DNLD_MC_OFFS:
     case MODE_DNLD_MC_OFFS_SAVE:
     case MODE_DNLD_MC_OFFS_DEFER:
-        send_data = 1;
+        send_data = true;
         do_len = 24 + dmp_len;
         rem = do_len % 4;
         if (rem)

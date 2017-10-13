@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.48 20171008";
+static const char * version_str = "1.49 20171011";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -686,13 +686,13 @@ process_flags(const char * arg, struct flags_t * fp)
 int
 main(int argc, char * argv[])
 {
+    bool bpt_given = false;
     bool cdbsz_given = false;
     bool do_coe = false;     /* dummy, just accept + ignore */
     bool do_sync = false;
     int res, k, t, infd, outfd, blocks, n, flags;
     int blocks_per;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
-    int bpt_given = 0;
     int ibs = 0;
     int in_res_sz = 0;
     int in_sect_sz;
@@ -748,7 +748,7 @@ main(int argc, char * argv[])
                 pr2serr(ME "bad argument to 'bpt'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            bpt_given = 1;
+            bpt_given = true;
         } else if (0 == strcmp(key,"bs")) {
             blk_sz = sg_get_num(buf);
             if (-1 == blk_sz) {
@@ -869,7 +869,7 @@ main(int argc, char * argv[])
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
        SG_IO ioctl. So reduce it in that case. */
-    if ((blk_sz >= 2048) && (0 == bpt_given))
+    if ((blk_sz >= 2048) && (! bpt_given))
         bpt = DEF_BLOCKS_PER_2048TRANSFER;
 
 #ifdef SG_DEBUG

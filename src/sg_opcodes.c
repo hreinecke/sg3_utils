@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.51 20171006";    /* spc5r10 */
+static const char * version_str = "0.52 20171011";    /* spc5r10 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -62,7 +62,7 @@ static struct option long_options[] = {
         {"pdt", required_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"rctd", no_argument, 0, 'R'},
-        {"repd", 0, 0, 'q'},
+        {"repd", no_argument, 0, 'q'},
         {"sa", required_argument, 0, 's'},
         {"tmf", no_argument, 0, 't'},
         {"unsorted", no_argument, 0, 'u'},
@@ -79,6 +79,7 @@ struct opts_t {
     bool do_mask;
     bool do_raw;
     bool do_rctd;
+    bool do_repd;
     bool do_version;
     bool do_unsorted;
     bool do_taskman;
@@ -86,7 +87,6 @@ struct opts_t {
     int do_help;
     int do_hex;
     int opcode;
-    int do_repd;
     int servact;
     int verbose;
     const char * device_name;
@@ -242,7 +242,7 @@ static const char * const rstmf_s = "Report supported task management "
                                     "functions";
 
 static int
-do_rstmf(int sg_fd, int repd, void * resp, int mx_resp_len, bool noisy,
+do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len, bool noisy,
          int verbose)
 {
     int k, ret, res, sense_cat;
@@ -384,7 +384,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
             peri_dtype = n;
             break;
         case 'q':
-            ++op->do_repd;
+            op->do_repd = true;
             break;
         case 'r':
             op->do_raw = true;
@@ -475,7 +475,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
                 case 'O':
                     break;
                 case 'q':
-                    ++op->do_repd;
+                    op->do_repd = true;
                     break;
                 case 'r':
                     op->do_raw = true;
@@ -585,11 +585,11 @@ dStrRaw(const char* str, int len)
 static int
 opcode_num_compare(const void * left, const void * right)
 {
-    const unsigned char * ll = *(unsigned char **)left;
-    const unsigned char * rr = *(unsigned char **)right;
     int l_serv_act = 0;
     int r_serv_act = 0;
     int l_opc, r_opc;
+    const unsigned char * ll = *(unsigned char **)left;
+    const unsigned char * rr = *(unsigned char **)right;
 
     if (NULL == ll)
         return -1;
@@ -647,13 +647,13 @@ static void
 list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                int sg_fd)
 {
-    int k, j, m, cd_len, serv_act, len, opcode, res;
     bool sa_v;
+    int k, j, m, cd_len, serv_act, len, opcode, res;
     unsigned int timeout;
     unsigned char * bp;
+    unsigned char ** sort_arr = NULL;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
-    unsigned char ** sort_arr = NULL;
 
     cd_len = sg_get_unaligned_be32(rsoc_buff + 0);
     if (cd_len > (rsoc_len - 4)) {
@@ -822,12 +822,12 @@ static void
 list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
          struct opts_t * op)
 {
+    bool valid = false;
     int k;
-    char name_buff[NAME_BUFF_SZ];
     unsigned char * bp;
     const char * cp;
     const char * dlp;
-    int v = 0;
+    char name_buff[NAME_BUFF_SZ];
 
 
     printf("\n  Opcode=0x%.2x", op->opcode);
@@ -847,11 +847,11 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
         break;
     case 3:
         cp = "supported [conforming to SCSI standard]";
-        v = 1;
+        valid = true;
         break;
     case 5:
         cp = "supported [in a vendor specific manner]";
-        v = 1;
+        valid = true;
         break;
     default:
         snprintf(name_buff, NAME_BUFF_SZ, "support reserved [0x%x]",
@@ -875,7 +875,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
         break;
     }
     printf("  Command %s, [%s]\n", cp, dlp);
-    if (v) {
+    if (valid) {
         printf("  Usage data: ");
         bp = rsoc_buff + 4;
         for (k = 0; k < cd_len; ++k)
@@ -894,15 +894,15 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, cd_len, res, len;
-    unsigned char rsoc_buff[MX_ALLOC_LEN];
     int rep_opts = 0;
     const char * cp;
+    struct opts_t * op;
+    const char * op_name;
+    unsigned char rsoc_buff[MX_ALLOC_LEN];
     char buff[48];
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;
-    const char * op_name;
     struct opts_t opts;
-    struct opts_t * op;
 
     op = &opts;
     memset(op, 0, sizeof(opts));

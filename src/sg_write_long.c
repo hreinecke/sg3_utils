@@ -126,7 +126,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'c':
-            cor_dis = 1;
+            cor_dis = true;
             break;
         case 'h':
         case '?':
@@ -147,7 +147,7 @@ main(int argc, char * argv[])
             pblock = true;
             break;
         case 'S':
-            do_16 = 1;
+            do_16 = true;
             break;
         case 'v':
             ++verbose;

@@ -1,4 +1,4 @@
-.TH SG_START "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_START "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_start \- send SCSI START STOP UNIT command: start, stop, load or eject
 medium
@@ -168,9 +168,10 @@ The exit status of sg_start is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH OLDER COMMAND LINE OPTIONS
 The options in this section were the only ones available prior to sg3_utils
-version 1.23 . In sg3_utils version 1.23 and later these older options can
-be selected by either setting the SG3_UTILS_OLD_OPTS environment variable
-or using '\-\-old' (or '\-O) as the first option.
+version 1.23 . Since then this utility defaults to the newer command line
+options which can be overridden by using \fI\-\-old\fR (or \fI\-O\fR) as the
+first option. See the ENVIRONMENT VARIABLES section for another way to
+force the use of these older command line options.
 .PP
 Note that the action of \fI\-\-loej\fR is slightly different in the older
 interface: when neither \fI\-\-start\fR nor \fI\-\-stop\fR (nor proxies
@@ -253,12 +254,17 @@ it. '\-vv' and '\-vvv' are also accepted yielding greater verbosity.
 .TP
 \fB\-V\fR
 print out version string then exit.
+.SH ENVIRONMENT VARIABLES
+Since sg3_utils version 1.23 the environment variable SG3_UTILS_OLD_OPTS
+can be given. When it is present this utility will expect the older command
+line options. So the presence of this environment variable is equivalent to
+using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHOR
 Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2012 Kurt Garloff, Douglas Gilbert
+Copyright \(co 2002\-2017 Kurt Garloff, Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

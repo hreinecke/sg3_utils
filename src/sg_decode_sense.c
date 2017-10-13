@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.12 20171005";
+static const char * version_str = "1.13 20171010";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -49,19 +49,19 @@ static struct option long_options[] = {
 struct opts_t {
     bool do_binary;
     bool do_cdb;
+    bool do_help;
+    bool do_hex;
     bool no_space;
     bool do_status;
     bool do_version;
+    bool file_given;
     const char * fname;
-    int do_file;
-    int do_help;
-    int do_hex;
+    int sense_len;
     int sstatus;
     int do_verbose;
     const char * wfname;
-    unsigned char sense[MAX_SENSE_LEN + 4];
     const char * no_space_str;
-    int sense_len;
+    unsigned char sense[MAX_SENSE_LEN + 4];
 };
 
 static char concat_buff[1024];
@@ -142,15 +142,15 @@ process_cl(struct opts_t *op, int argc, char *argv[])
                         "option\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            ++op->do_file;
+            op->file_given = true;
             op->fname = optarg;
             break;
         case 'h':
         case '?':
-            op->do_help = 1;
+            op->do_help = true;
             return 0;
         case 'H':
-            ++op->do_hex;
+            op->do_hex = true;
             break;
         case 'n':
             op->no_space = true;
@@ -230,13 +230,14 @@ static int
 f2hex_arr(const char * fname, bool no_space, unsigned char * mp_arr,
           int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, split_line;
+    bool split_line;
+    int fn_len, in_len, k, j, m;
+    int off = 0;
     unsigned int h;
     const char * lcp;
     FILE * fp;
     char line[512];
     char carry_over[4];
-    int off = 0;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
         return 1;
@@ -262,9 +263,9 @@ f2hex_arr(const char * fname, bool no_space, unsigned char * mp_arr,
             if ('\n' == line[in_len - 1]) {
                 --in_len;
                 line[in_len] = '\0';
-                split_line = 0;
+                split_line = false;
             } else
-                split_line = 1;
+                split_line = true;
         }
         if (in_len < 1) {
             carry_over[0] = 0;
@@ -408,11 +409,11 @@ main(int argc, char *argv[])
     int ret = 0;
     unsigned int ui;
     size_t s;
-    struct opts_t opts;
     struct opts_t * op;
-    char b[2048];
     FILE * fp = NULL;
     const char * cp;
+    char b[2048];
+    struct opts_t opts;
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -448,19 +449,19 @@ main(int argc, char *argv[])
         }
     }
 
-    if ((0 == op->sense_len) && (! op->do_binary) && (! op->do_file)) {
+    if ((0 == op->sense_len) && (! op->do_binary) && (! op->file_given)) {
         if (op->do_status)
             return 0;
         pr2serr(">> Need sense data on the command line or in a file\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (op->sense_len && (op->do_binary || op->do_file)) {
+    if (op->sense_len && (op->do_binary || op->file_given)) {
         pr2serr(">> Need sense data on command line or in a file, not "
                 "both\n\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (op->do_binary && op->do_file) {
+    if (op->do_binary && op->file_given) {
         pr2serr(">> Either a binary file or a ASCII hexadecimal, file not "
                 "both\n\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -479,7 +480,7 @@ main(int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         op->sense_len = s;
-    } else if (op->do_file) {
+    } else if (op->file_given) {
         ret = f2hex_arr(op->fname, op->no_space, op->sense, &op->sense_len,
                         MAX_SENSE_LEN);
         if (ret) {

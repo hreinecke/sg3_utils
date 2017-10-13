@@ -38,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.15 20171005";
+static const char * version_str = "1.16 20171010";
 
 
 #define MAX_XFER_LEN 10000
@@ -106,9 +106,9 @@ struct descriptor_type segment_descriptor_codes [] = {
 static void
 scsi_failed_segment_details(unsigned char *rcBuff, unsigned int rcBuffLen)
 {
+    int senseLen;
     unsigned int len;
     char senseBuff[1024];
-    int senseLen;
 
     if (rcBuffLen < 4) {
         pr2serr("  <<not enough data to procedd report>>\n");
@@ -253,6 +253,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"list_id", required_argument, 0, 'l'},
+        {"list-id", required_argument, 0, 'l'},
         {"params", no_argument, 0, 'p'},
         {"readonly", no_argument, 0, 'R'},
         {"receive", no_argument, 0, 'r'},
@@ -303,18 +304,18 @@ static const char * rec_copy_name_arr[] = {
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, k;
-    unsigned char * cpResultBuff = NULL;
-    int xfer_len = 520;
-    int sa = 3;
-    uint32_t list_id = 0;
-    int do_hex = 0;
+    bool do_hex = false;
     bool o_readonly = false;
+    int sg_fd, res, c, k;
+    int ret = 1;
+    int sa = 3;
     int verbose = 0;
+    int xfer_len = 520;
+    uint32_t list_id = 0;
     const char * cp;
+    unsigned char * cpResultBuff = NULL;
     const char * device_name = NULL;
     char file_name[256];
-    int ret = 1;
 
     memset(file_name, 0, sizeof file_name);
     while (1) {
@@ -330,7 +331,7 @@ main(int argc, char * argv[])
             sa = 4;
             break;
         case 'H':
-            do_hex = 1;
+            do_hex = true;
             break;
         case 'h':
         case '?':
@@ -432,7 +433,7 @@ main(int argc, char * argv[])
         pr2serr("  SCSI %s failed: %s\n", cp, b);
         goto finish;
     }
-    if (1 == do_hex) {
+    if (do_hex) {
         dStrHex((const char *)cpResultBuff, xfer_len, 1);
         goto finish;
     }
