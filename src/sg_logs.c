@@ -630,6 +630,7 @@ usage_old()
            "    -X     open DEVICE read-only (def: first read-write then "
            "if fails\n"
            "           try open again with read-only)\n"
+           "    -N|--new    use new interface\n"
            "    -?     output this usage message\n\n"
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }

@@ -88,6 +88,7 @@ usage()
            "    --time|-t        outputs total duration and commands per "
            "second\n"
            "    --verbose|-v     increase verbosity\n"
+           "    --old|-O        use old interface (use as first option)\n"
            "    --version|-V     print version string then exit\n\n"
            "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
@@ -105,6 +106,7 @@ usage_old()
            "    -t        outputs total duration and commands per "
            "second\n"
            "    -v        increase verbosity\n"
+           "    -N|--new  use new interface\n"
            "    -V        print version string then exit\n\n"
            "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
