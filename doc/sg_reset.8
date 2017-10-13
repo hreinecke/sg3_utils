@@ -42,7 +42,7 @@ target on the \fIDEVICE\fR path.
 attempt a SCSI device reset. This would typically involve sending a LOGICAL
 UNIT RESET task management function to \fIDEVICE\fR.
 .TP
-\fB\-h\fR, \fB\-\-help\fR
+\fB\-z\fR, \fB\-\-help\fR
 print the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-host\fR
@@ -56,6 +56,9 @@ fails then it will escalate to a bus reset. And if a bus
 reset (\fI\-\-bus\fR) fails then it will escalate to a host reset. With this
 option only the requested reset is attempted. An alternate option name of
 \fI\-\-no-escalate\fR is also accepted.
+.TP
+\fB\-\-no\-escalate\fR
+The same as \fB\-N\fR, \fB\-\-no\-esc\fR.
 .TP
 \fB\-t\fR, \fB\-\-target\fR
 attempt a SCSI target reset. A SCSI target contains one or more LUs. This
