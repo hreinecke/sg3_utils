@@ -30,7 +30,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.64 20171006";
+static const char * version_str = "0.65 20171021";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -57,6 +57,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'z'},
         {"host", no_argument, 0, 'H'},
         {"no-esc", no_argument, 0, 'N'},
+        {"no_esc", no_argument, 0, 'N'},
         {"no-escalate", no_argument, 0, 'N'},
         {"target", no_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
@@ -88,7 +89,7 @@ static void
 usage(int compat_mode)
 {
     pr2serr("Usage: sg_reset [--bus] [--device] [--help] [--host] [--no-esc] "
-            "[--target]\n"
+            "[--no-escalate] [--target]\n"
             "                [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --bus|-b        SCSI bus reset (SPI concept), might be all "
@@ -102,6 +103,7 @@ usage(int compat_mode)
                 "    --host|-H       host (bus adapter: HBA) reset\n");
     }
     pr2serr("    --no-esc|-N     overrides default action and only does "
+            "    --no-escalate   The same as --no-esc|-N"
             "reset requested\n"
             "    --target|-t     target reset. The target holds the DEVICE "
             "and perhaps\n"

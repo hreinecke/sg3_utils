@@ -1,4 +1,4 @@
-.TH "COMPARE AND WRITE" "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH "COMPARE AND WRITE" "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
@@ -79,6 +79,9 @@ read data (binary) from file named \fIIF\fR. This will either be the combined
 compare and write buffers (when the \fI\-\-inw=WF\fR option is not given) or
 just the compare buffer (when the \fI\-\-inw=WF\fR option is given). If
 \fIIF\fR is '\-' then stdin (e.g. a pipe) is read.
+.TP
+\fB\-C\fR, \fB\-\-inc\fR=\fIIF\fR
+The same as the \fB\-\-in\fR option.
 .TP
 \fB\-D\fR, \fB\-\-inw\fR=\fIWF\fR
 read data (binary) from file named \fIWF\fR. This will the write buffer

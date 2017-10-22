@@ -1,11 +1,11 @@
-.TH SG_SAT_IDENTIFY "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SAT_IDENTIFY "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_sat_identify \- send ATA IDENTIFY DEVICE command via SCSI to ATA
 Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_identify
 [\fI\-\-ck_cond\fR] [\fI\-\-extend\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-indent\fR] [\fI\-\-len=CLEN\fR] [\fI\-\-packet\fR] [\fI\-\-raw\fR]
+[\fI\-\-ident\fR] [\fI\-\-len=CLEN\fR] [\fI\-\-packet\fR] [\fI\-\-raw\fR]
 [\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -56,7 +56,7 @@ a header. When given thrice (i.e. '\-HHH') the output is in hex, grouped in
 process. '\-HHHH' simply outputs hex data bytes, space separated, 16 per
 line.
 .TP
-\fB\-i\fR, \fB\-\-indent\fR
+\fB\-i\fR, \fB\-\-ident\fR
 outputs the World Wide Name (WWN) of the device. This should be a NAA\-5
 64 bit number. It is output in hex prefixed with "0x". If not available
 then "0x0000000000000000" is output. The equivalent for a SCSI disk (i.e. its
@@ -110,7 +110,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2016 Douglas Gilbert
+Copyright \(co 2006\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171012] [svn: r721]
+Changelog for sg3_utils-1.43 [20171022] [svn: r722]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)
@@ -20,6 +20,8 @@ Changelog for sg3_utils-1.43 [20171012] [svn: r721]
       belonging to element type IIA
     - add 'offset_temp' and 'rqst_override' to temperature
       sensor element type
+    - interpret '--join --page=aes' to only display join
+      rows that have a corresponding AES dpage element
     - sync to ses4r01
   - sg_luns: resync with drafts (sam6r02+spc5r10)
     - remove undocumented test "W" format
@@ -64,11 +66,16 @@ Changelog for sg3_utils-1.43 [20171012] [svn: r721]
     - decode response's RTP and two more provisioning
       statuses and the additional status (sbc4r12)
     - decode completion condition (sbc4r14)
+  - manpages and usage messages: corrections from
+    Gris Ge via github
   - group_number: is 6 bit field allowing 0 to 63,
     code in several utilities limited it to 31, fix
   - convert many two valued 'int's to bool
   - sg_lib: add SSC maintenance in/out sa names
     - add sg_ll_inquiry_v2()
+    - add sg_ll_log_sense_v2()
+    - add sg_ll_mode_sense10_v2()
+    - add sg_ll_receive_diag_v2()
     - add sg_ll_write_buffer_v2()
     - add sg_get_llnum_nomult()
     - add sg_ll_get_lba_status16()
@@ -92,6 +99,7 @@ Changelog for sg3_utils-1.43 [20171012] [svn: r721]
   - 55-scsi-sg3_id.rules: fixes from Suse
   - https://github.com/hreinecke/sg3_utils
     branch sles15 synced 20170914
+  - gcc 7.2 cleanups (sysmacros.h etc)
   - clang --analyze static checker clean ups
   - shellcheck cleanup on scripts
   - automake: add AM_PROG_AR to configure.ac

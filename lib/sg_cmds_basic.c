@@ -514,6 +514,8 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
         pr2ws("%s: out of memory\n", __func__);
+        if (residp)
+            *residp = 0;
         return -1;
     }
     set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));

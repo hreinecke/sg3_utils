@@ -1,10 +1,10 @@
-.TH SG_REASSIGN "8" "September 2017" "sg3_utils\-1.38" SG3_UTILS
+.TH SG_REASSIGN "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_reassign \- send SCSI REASSIGN BLOCKS command
 .SH SYNOPSIS
 .B sg_reassign
 [\fI\-\-address=A,A...\fR] [\fI\-\-dummy\fR] [\fI\-\-eight=0|1\fR]
-[\fI\-\-grown\fR] [\fI\-\-help\fR] [\fI\-\-longlist=0|1\fR]
+[\fI\-\-grown\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-longlist=0|1\fR]
 [\fI\-\-primary\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -71,6 +71,10 @@ and the grown defect list. This list is sometimes referred to as the GLIST.
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
 .TP
+\fB\-H\fR, \fB\-\-hex\fR
+print response in hex (for \fB\-g\fR, \fB\-\-grown\fR, \fB\-p\fR
+or \fB\-\-primary\fR).
+.TP
 \fB\-l\fR, \fB\-\-longlist\fR=0 | 1
 sets the REASSIGN BLOCKS cdb field of the same name to the given value.
 Only 1000 addresses are permitted so there should be no need to specify
@@ -100,8 +104,8 @@ is reported on not (PER=1 implies do report). Irrespective of the ARRE, AWRE
 or PER field settings, the error counter log pages reflect any
 errors (recovered or otherwise). Whenever a block is reassigned, a new entry
 is added in the "grown" defect list. Apart from doing selftests (see
-sg_senddiag or smartmontools) regularly, monitoring the grown defect list of a disk is
-a reasonable metric of its health. If the grown list starts growing
+sg_senddiag or smartmontools) regularly, monitoring the grown defect list of
+a disk is a reasonable metric of its health. If the grown list starts growing
 quickly that is an ominous sign. The best grown defect lists are empty
 ones. The number of elements in the grown defect list can be viewed with
 the \fI\-\-grown\fR option. The contents of the grown defect list can be

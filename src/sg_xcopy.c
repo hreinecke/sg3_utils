@@ -47,11 +47,13 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#include <sys/sysmacros.h>
+#ifndef major
+#include <sys/types.h>
+#endif
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */
 
@@ -65,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.58 20171010";
+static const char * version_str = "0.59 20171021";
 
 #define ME "sg_xcopy: "
 
@@ -509,20 +511,24 @@ usage(int n_help)
 
 primary_help:
     pr2serr("Usage: "
-            "sg_xcopy  [bpt=BPT] [bs=BS] [cat=0|1] [count=COUNT] [dc=0|1] "
-            "[ibs=BS]\n"
-            "                 [id_usage=hold|discard|disable] [if=IFILE] "
+            "sg_xcopy [app=0|1] [bpt=BPT] [bs=BS] [cat=0|1] [conv=CONV]\n"
+            "                [count=COUNT] [dc=0|1] [ibs=BS]\n"
+            "                [id_usage=hold|discard|disable] [if=IFILE] "
             "[iflag=FLAGS]\n"
-            "                 [list_id=ID] [obs=BS] [of=OFILE] [oflag=FLAGS] "
-            "[prio=PRIO]\n"
-            "                 [seek=SEEK] [skip=SKIP] [time=0|1] "
-            "[verbose=VERB] [--help]\n"
-            "                 [--on_dst|--on_src] [--verbose] [--version]\n\n"
+            "                [list_id=ID] [obs=BS] [of=OFILE] "
+            "[oflag=FLAGS] [prio=PRIO]\n"
+            "                [seek=SEEK] [skip=SKIP] [time=0|1] "
+            "[verbose=VERB]\n"
+            "                [--help] [--on_dst|--on_src] [--verbose] "
+            "[--version]\n\n"
             "  where:\n"
+            "    app         if argument is 1 then open OFILE in append "
+            "mode\n"
             "    bpt         is blocks_per_transfer (default: 128)\n"
             "    bs          block size (default is 512)\n");
     pr2serr("    cat         xcopy segment descriptor CAT bit (default: "
             "0)\n"
+            "    conv        ignored\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    dc          xcopy segment descriptor DC bit (default: 0)\n"
             "    ibs         input block size (if given must be same as "
@@ -548,11 +554,11 @@ primary_help:
             "throughput\n"
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
-            "    --help      print out this usage message then exit\n"
+            "    --help|-h   print out this usage message then exit\n"
             "    --on_dst    send XCOPY command to OFILE\n"
             "    --on_src    send XCOPY command to IFILE\n"
-            "    --verbose   same action as verbose=1\n"
-            "    --version   print version information then exit\n\n"
+            "    --verbose|-v   same action as verbose=1\n"
+            "    --version|-V   print version information then exit\n\n"
             "Copy from IFILE to OFILE, similar to dd command; "
             "but using the SCSI\nEXTENDED COPY (XCOPY(LID1)) command. For "
             "list of flags, use '-hh'.\n");
@@ -560,7 +566,7 @@ primary_help:
 
 secondary_help:
     pr2serr("FLAGS:\n"
-            "  append (o)     ignored\n"
+            "  append (o)     open OFILE in append mode\n"
             "  excl           open corresponding device with O_EXCL\n"
             "  flock          call flock(LOCK_EX|LOCK_NB)\n"
             "  null           does nothing, placeholder\n"

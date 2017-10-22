@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.39 20171012";
+static const char * version_str = "1.39 20171021";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -756,15 +756,16 @@ print_read_cap(int fd, const struct opts_t * op)
 int
 main(int argc, char **argv)
 {
-        int fd, res, calc_len, bd_len, dev_specific_param;
-        int offset, j, n, bd_blk_len, len, pdt;
-        int ret = 0;
         bool prob = false;
+        int fd, res, calc_len, bd_len, dev_specific_param;
+        int offset, j, n, bd_blk_len, len, pdt, rsp_len;
+        int resid = 0;
+        int ret = 0;
         uint64_t ull;
-        char b[80];
+        struct opts_t * op;
         unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
         struct opts_t opts;
-        struct opts_t * op;
+        char b[80];
 
         op = &opts;
         memset(op, 0, sizeof(opts));
@@ -1028,10 +1029,11 @@ again_with_long_lba:
                                         op->mode_page, 0 /* subpage */, dbuff,
                                         MAX_BUFF_SZ, true, op->verbose);
         else
-                res = sg_ll_mode_sense10(fd, op->long_lba, false /* DBD */,
-                                         0 /* current */, op->mode_page,
-                                         0 /* subpage */, dbuff,
-                                         MAX_BUFF_SZ, true, op->verbose);
+                res = sg_ll_mode_sense10_v2(fd, op->long_lba, false /* DBD */,
+                                            0 /* current */, op->mode_page,
+                                            0 /* subpage */, dbuff,
+                                            MAX_BUFF_SZ, 0, &resid, true,
+                                            op->verbose);
         ret = res;
         if (res) {
                 if (SG_LIB_CAT_ILLEGAL_REQ == res) {
@@ -1055,6 +1057,7 @@ again_with_long_lba:
         }
         if (op->mode6) {
                 calc_len = dbuff[0] + 1;
+                rsp_len = calc_len;
                 dev_specific_param = dbuff[2];
                 bd_len = dbuff[3];
                 op->long_lba = false;
@@ -1063,7 +1066,23 @@ again_with_long_lba:
                 dbuff[0] = 0;
                 dbuff[1] = 0;
                 dbuff[2] = 0;
-        } else {
+        } else {        /* MODE SENSE(10) */
+                if (resid > 0)
+                        rsp_len = MAX_BUFF_SZ - resid;
+                else
+                        rsp_len = MAX_BUFF_SZ;
+                if (rsp_len < 0) {
+                        pr2serr("%s: resid=%d implies negative response "
+                                "length of %d\n", __func__, resid, rsp_len);
+                        ret = SG_LIB_WILD_RESID;
+                        goto out;
+                }
+                if (rsp_len < 8) {
+                        pr2serr("%s: MS(10) response length too short (%d)\n",
+                                __func__, rsp_len);
+                        ret = -1;
+                        goto out;
+                }
                 calc_len = sg_get_unaligned_be16(dbuff + 0);
                 dev_specific_param = dbuff[3];
                 bd_len = sg_get_unaligned_be16(dbuff + 6);
@@ -1074,6 +1093,11 @@ again_with_long_lba:
                 dbuff[1] = 0;
                 dbuff[2] = 0;
                 dbuff[3] = 0;
+        }
+        if (rsp_len < calc_len) {
+                pr2serr("%s: MS response length truncated (%d < %d)\n",
+                        __func__, rsp_len, calc_len);
+                goto out;
         }
         if ((offset + bd_len) < calc_len)
                 dbuff[offset + bd_len] &= 0x7f;  /* clear PS bit in mpage */

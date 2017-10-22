@@ -29,7 +29,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.13 20171008";
+static const char * version_str = "1.14 20171021";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -243,7 +243,7 @@ static int fail_this_path(int fd, int lun, bool use_6_byte)
         return res;
 }
 
-static void print_rdac_mode( unsigned char *ptr, int subpg)
+static void print_rdac_mode(unsigned char *ptr, bool exp_subpg)
 {
         int i, k, bd_len, lun_table_len;
         unsigned char * lun_table = NULL;
@@ -251,7 +251,7 @@ static void print_rdac_mode( unsigned char *ptr, int subpg)
         struct rdac_expanded_page *expanded;
         struct rdac_page_common *rdac_ptr = NULL;
 
-        if (subpg == 1) {
+        if (exp_subpg) {
                 bd_len = ptr[7];
                 expanded = (struct rdac_expanded_page *)(ptr + 8 + bd_len);
                 rdac_ptr = &expanded->attr;
@@ -265,7 +265,7 @@ static void print_rdac_mode( unsigned char *ptr, int subpg)
                 lun_table_len = 32;
         }
 
-        printf("RDAC %s page\n", (subpg == 1) ? "Expanded" : "Legacy");
+        printf("RDAC %s page\n", exp_subpg ? "Expanded" : "Legacy");
         printf("  Controller serial: %s\n",
                rdac_ptr->current_serial);
         printf("  Alternate controller serial: %s\n",
@@ -388,7 +388,7 @@ int main(int argc, char * argv[])
         bool fail_all = false;
         bool fail_path = false;
         bool use_6_byte = false;
-        int res, fd, k, lun = -1;
+        int res, fd, k, resid, len, lun = -1;
         int ret = 0;
         char **argptr;
         char * file_name = 0;
@@ -447,6 +447,7 @@ int main(int argc, char * argv[])
         } else if (fail_path) {
                 res = fail_this_path(fd, lun, use_6_byte);
         } else {
+                resid = 0;
                 if (use_6_byte)
                         res = sg_ll_mode_sense6(fd, /* DBD */ false,
                                                 /* PC */ 0,
@@ -455,17 +456,26 @@ int main(int argc, char * argv[])
                                                 rsp_buff, 252,
                                                 true, do_verbose);
                 else
-                        res = sg_ll_mode_sense10(fd, /* llbaa */ false,
-                                                 /* DBD */ false,
-                                                 /* page control */0,
-                                                 0x2c, 0x1 /* subpage */,
-                                                 rsp_buff, 308,
-                                                 true, do_verbose);
+                        res = sg_ll_mode_sense10_v2(fd, /* llbaa */ false,
+                                                    /* DBD */ false,
+                                                    /* page control */0,
+                                                    0x2c, 0x1 /* subpage */,
+                                                    rsp_buff, 308, 0, &resid,
+                                                    true, do_verbose);
 
-                if (!res) {
-                        if (do_verbose)
-                                dump_mode_page(rsp_buff, rsp_buff[0]);
-                        print_rdac_mode(rsp_buff, !use_6_byte);
+                if (! res) {
+                        len = use_6_byte ? (rsp_buff[0] + 1) :
+                                (sg_get_unaligned_be16(rsp_buff + 0) + 2);
+                        if (resid > 0) {
+                                len = ((308 - resid) < len) ? (308 - resid) :
+                                                              len;
+                                if (len < 2)
+                                        pr2serr("MS(10) residual value (%d) "
+                                                "a worry\n", resid);
+                        }
+                        if (do_verbose && (len > 1))
+                                dump_mode_page(rsp_buff, len);
+                        print_rdac_mode(rsp_buff, ! use_6_byte);
                 } else {
                         if (SG_LIB_CAT_INVALID_OP == res)
                                 pr2serr(">>>>>> try again without the '-6' "

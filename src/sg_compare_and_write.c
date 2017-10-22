@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.18 20171010";
+static const char * version_str = "1.19 20171020";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -116,11 +116,12 @@ usage()
 {
         pr2serr("Usage: sg_compare_and_write [--dpo] [--fua] [--fua_nv] "
                 "[--group=GN] [--help]\n"
-                "                            --in=IF [--inw=WF] --lba=LBA "
+                "                            --in=IF|--inc=IF [--inw=WF] "
+                "--lba=LBA "
                 "[--num=NUM]\n"
                 "                            [--quiet] [--timeout=TO] "
                 "[--verbose] [--version]\n"
-                "                            [--wrpotect=WP] [--xferlen=LEN] "
+                "                            [--wrprotect=WP] [--xferlen=LEN] "
                 "DEVICE\n"
                 "  where:\n"
                 "    --dpo|-d            set the dpo bit in cdb (def: "
@@ -137,6 +138,7 @@ usage()
                 "                        optionally a write buffer (when "
                 "--inw=WF is\n"
                 "                        not given)\n"
+                "    --inc=IF|-C IF      The same as the --in option\n"
                 "    --inw=WF|-D WF      WF is a file containing a write "
                 "buffer\n"
                 "    --lba=LBA|-l LBA    LBA of the first block to compare "

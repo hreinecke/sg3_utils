@@ -106,6 +106,7 @@ usage()
             "read-write)\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string and exit\n"
+            "    --old|-O        use old interface (use as first option)\n"
             "    --zbc|-z        show rc_basis ZBC field (implies --16)\n\n"
             "Perform a SCSI READ CAPACITY (10 or 16) command\n");
 }
@@ -134,6 +135,7 @@ usage_old()
             "    -R     open DEVICE read-only (def: RCAP(16) read-write)\n"
             "    -v     increase verbosity\n"
             "    -V     print version string and exit\n"
+            "    -N|--new   use new interface\n"
             "    -z     show rc_basis ZBC field (implies -16)\n\n"
             "Perform a SCSI READ CAPACITY (10 or 16) command\n");
 }

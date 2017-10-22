@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.52 20171009";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.54 20171022";    /* spc5r17 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -85,8 +85,9 @@ static const char * version_str = "1.52 20171009";    /* spc5r17 + sbc4r11 */
 #define VP_ALL    99
 
 #define MVP_OFFSET 8
-/* shared is T10 defined lpage with vendor specific parameter codes */
-#define MVP_SHARED (1 << (MVP_OFFSET - 1))
+/* MVO_STD or-ed with MVP_<vendor> is T10 defined lpage with vendor specific
+ * parameter codes */
+#define MVP_STD    (1 << (MVP_OFFSET - 1))
 #define MVP_SEAG   (1 << (VP_SEAG + MVP_OFFSET))
 #define MVP_HITA   (1 << (VP_HITA + MVP_OFFSET))
 #define MVP_WDC    (1 << (VP_WDC + MVP_OFFSET))
@@ -102,6 +103,7 @@ static const char * version_str = "1.52 20171009";    /* spc5r17 + sbc4r11 */
 #define PCB_STR_LEN 128
 
 #define LOG_SENSE_PROBE_ALLOC_LEN 4
+#define LOG_SENSE_DEF_TIMEOUT 64        /* seconds */
 
 static uint8_t rsp_buff[MX_ALLOC_LEN + 4];
 
@@ -120,6 +122,7 @@ static struct option long_options[] = {
         {"name", no_argument, 0, 'n'},
         {"new", no_argument, 0, 'N'},
         {"no_inq", no_argument, 0, 'x'},
+        {"no-inq", no_argument, 0, 'x'},
         {"old", no_argument, 0, 'O'},
         {"page", required_argument, 0, 'p'},
         {"paramp", required_argument, 0, 'P'},
@@ -144,7 +147,6 @@ struct opts_t {
     bool do_pcb;
     bool do_ppc;
     bool do_raw;
-    bool o_readonly;
     bool do_pcreset;
     bool do_select;
     bool do_sp;
@@ -152,6 +154,7 @@ struct opts_t {
     bool do_transport;
     bool do_version;
     bool filter_given;
+    bool o_readonly;
     bool opt_new;
     int do_all;
     int do_brief;
@@ -298,107 +301,107 @@ static bool show_seagate_factory_page(const uint8_t * resp, int len,
 
 /* elements in page_number/subpage_number order */
 static struct log_elem log_arr[] = {
-    {SUPP_PAGES_LPAGE, 0, 0, -1, 0, "Supported log pages", "sp",
+    {SUPP_PAGES_LPAGE, 0, 0, -1, MVP_STD, "Supported log pages", "sp",
      show_supported_pgs_page},          /* 0, 0 */
-    {SUPP_PAGES_LPAGE, SUPP_SPGS_SUBPG, 0, -1, 0, "Supported log pages and "
-     "subpages", "ssp", show_supported_pgs_sub_page}, /* 0, 0xff */
-    {BUFF_OVER_UNDER_LPAGE, 0, 0, -1, 0, "Buffer over-run/under-run", "bou",
-     show_buffer_over_under_run_page},  /* 0x1, 0x0 */
-    {WRITE_ERR_LPAGE, 0, 0, -1, 0, "Write error", "we",
+    {SUPP_PAGES_LPAGE, SUPP_SPGS_SUBPG, 0, -1, MVP_STD, "Supported log pages "
+     "and subpages", "ssp", show_supported_pgs_sub_page}, /* 0, 0xff */
+    {BUFF_OVER_UNDER_LPAGE, 0, 0, -1, MVP_STD, "Buffer over-run/under-run",
+     "bou", show_buffer_over_under_run_page},  /* 0x1, 0x0 */
+    {WRITE_ERR_LPAGE, 0, 0, -1, MVP_STD, "Write error", "we",
      show_error_counter_page},          /* 0x2, 0x0 */
-    {READ_ERR_LPAGE, 0, 0, -1, 0, "Read error", "re",
+    {READ_ERR_LPAGE, 0, 0, -1, MVP_STD, "Read error", "re",
      show_error_counter_page},          /* 0x3, 0x0 */
-    {READ_REV_ERR_LPAGE, 0, 0, -1, 0, "Read reverse error", "rre",
+    {READ_REV_ERR_LPAGE, 0, 0, -1, MVP_STD, "Read reverse error", "rre",
      show_error_counter_page},          /* 0x4, 0x0 */
-    {VERIFY_ERR_LPAGE, 0, 0, -1, 0, "Verify error", "ve",
+    {VERIFY_ERR_LPAGE, 0, 0, -1, MVP_STD, "Verify error", "ve",
      show_error_counter_page},          /* 0x5, 0x0 */
-    {NON_MEDIUM_LPAGE, 0, 0, -1, 0, "Non medium", "nm",
+    {NON_MEDIUM_LPAGE, 0, 0, -1, MVP_STD, "Non medium", "nm",
      show_non_medium_error_page},       /* 0x6, 0x0 */
-    {LAST_N_ERR_LPAGE, 0, 0, -1, 0, "Last n error", "lne",
+    {LAST_N_ERR_LPAGE, 0, 0, -1, MVP_STD, "Last n error", "lne",
      show_last_n_error_page},           /* 0x7, 0x0 */
-    {FORMAT_STATUS_LPAGE, 0, 0, 0, 0, "Format status", "fs",
+    {FORMAT_STATUS_LPAGE, 0, 0, 0, MVP_STD, "Format status", "fs",
      show_format_status_page},          /* 0x8, 0x0  SBC */
-    {LAST_N_DEFERRED_LPAGE, 0, 0, -1, 0, "Last n deferred error", "lnd",
+    {LAST_N_DEFERRED_LPAGE, 0, 0, -1, MVP_STD, "Last n deferred error", "lnd",
      show_last_n_deferred_error_page},  /* 0xb, 0x0 */
-    {LAST_N_DEFERRED_LPAGE, LAST_N_INQUIRY_DATA_CH_SUBPG, 0, -1, 0,
+    {LAST_N_DEFERRED_LPAGE, LAST_N_INQUIRY_DATA_CH_SUBPG, 0, -1, MVP_STD,
      "Last n inquiry data changed", "lnic",
      show_last_n_inq_data_ch_page},     /* 0xb, 0x1 */
-    {LAST_N_DEFERRED_LPAGE, LAST_N_MODE_PG_DATA_CH_SUBPG, 0, -1, 0,
+    {LAST_N_DEFERRED_LPAGE, LAST_N_MODE_PG_DATA_CH_SUBPG, 0, -1, MVP_STD,
      "Last n mode page data changed", "lnmc",
      show_last_n_mode_pg_data_ch_page}, /* 0xb, 0x2 */
-    {LB_PROV_LPAGE, 0, 0, 0, 0, "Logical block provisioning", "lbp",
+    {LB_PROV_LPAGE, 0, 0, 0, MVP_STD, "Logical block provisioning", "lbp",
      show_lb_provisioning_page},        /* 0xc, 0x0  SBC */
-    {0xc, 0, 0, PDT_TAPE, 0, "Sequential access device", "sad",
+    {0xc, 0, 0, PDT_TAPE, MVP_STD, "Sequential access device", "sad",
      show_sequential_access_page},      /* 0xc, 0x0  SSC */
-    {TEMPERATURE_LPAGE, 0, 0, -1, 0, "Temperature", "temp",
+    {TEMPERATURE_LPAGE, 0, 0, -1, MVP_STD, "Temperature", "temp",
      show_temperature_page},            /* 0xd, 0x0 */
-    {TEMPERATURE_LPAGE, ENV_REPORTING_SUBPG, 0, -1, 0,  /* 0xd, 0x1 */
+    {TEMPERATURE_LPAGE, ENV_REPORTING_SUBPG, 0, -1, MVP_STD,  /* 0xd, 0x1 */
      "Environmental reporting", "enr", show_environmental_reporting_page},
-    {TEMPERATURE_LPAGE, ENV_LIMITS_SUBPG, 0, -1, 0,     /* 0xd, 0x2 */
+    {TEMPERATURE_LPAGE, ENV_LIMITS_SUBPG, 0, -1, MVP_STD,     /* 0xd, 0x2 */
      "Environmental limits", "enl", show_environmental_limits_page},
-    {START_STOP_LPAGE, 0, 0, -1, 0, "Start-stop cycle counter", "sscc",
+    {START_STOP_LPAGE, 0, 0, -1, MVP_STD, "Start-stop cycle counter", "sscc",
      show_start_stop_page},             /* 0xe, 0x0 */
-    {START_STOP_LPAGE, UTILIZATION_SUBPG, 0, 0, 0, "Utilization", "util",
-     show_utilization_page},            /* 0xe, 0x1 SBC */    /* sbc4r04 */
-    {APP_CLIENT_LPAGE, 0, 0, -1, 0, "Application client", "ac",
+    {START_STOP_LPAGE, UTILIZATION_SUBPG, 0, 0, MVP_STD, "Utilization",
+     "util", show_utilization_page},    /* 0xe, 0x1 SBC */    /* sbc4r04 */
+    {APP_CLIENT_LPAGE, 0, 0, -1, MVP_STD, "Application client", "ac",
      show_app_client_page},             /* 0xf, 0x0 */
-    {SELF_TEST_LPAGE, 0, 0, -1, 0, "Self test results", "str",
+    {SELF_TEST_LPAGE, 0, 0, -1, MVP_STD, "Self test results", "str",
      show_self_test_page},              /* 0x10, 0x0 */
-    {SOLID_STATE_MEDIA_LPAGE, 0, 0, 0, 0, "Solid state media", "ssm",
+    {SOLID_STATE_MEDIA_LPAGE, 0, 0, 0, MVP_STD, "Solid state media", "ssm",
      show_solid_state_media_page},      /* 0x11, 0x0  SBC */
-    {0x11, 0, 0, PDT_TAPE, 0, "DT Device status", "dtds",
+    {0x11, 0, 0, PDT_TAPE, MVP_STD, "DT Device status", "dtds",
      show_dt_device_status_page},       /* 0x11, 0x0  SSC,ADC */
-    {0x12, 0, 0, PDT_TAPE, 0, "Tape alert response", "tar",
+    {0x12, 0, 0, PDT_TAPE, MVP_STD, "Tape alert response", "tar",
      show_tapealert_response_page},      /* 0x12, 0x0  SSC,ADC */
-    {0x13, 0, 0, PDT_TAPE, 0, "Requested recovery", "rr",
+    {0x13, 0, 0, PDT_TAPE, MVP_STD, "Requested recovery", "rr",
      show_requested_recovery_page},     /* 0x13, 0x0  SSC,ADC */
-    {0x14, 0, 0, PDT_TAPE, 0, "Device statistics", "ds",
+    {0x14, 0, 0, PDT_TAPE, MVP_STD, "Device statistics", "ds",
      show_device_stats_page},           /* 0x14, 0x0  SSC,ADC */
-    {0x14, 0, 0, PDT_MCHANGER, 0, "Media changer statistics", "mcs",
+    {0x14, 0, 0, PDT_MCHANGER, MVP_STD, "Media changer statistics", "mcs",
      show_media_stats_page},            /* 0x14, 0x0  SMC */
-    {0x14, ZONED_BLOCK_DEV_STATS_SUBPG, 0, 0, 0,        /* 0x14,0x1 zbc2r01 */
+    {0x14, ZONED_BLOCK_DEV_STATS_SUBPG, 0, 0, MVP_STD,  /* 0x14,0x1 zbc2r01 */
      "Zoned block device statistics", "zbds", show_zoned_block_dev_stats},
-    {BACKGROUND_SCAN_LPAGE, 0, 0, 0, 0, "Background scan results", "bsr",
-     show_background_scan_results_page}, /* 0x15, 0x0  SBC */
-    {BACKGROUND_SCAN_LPAGE, BACKGROUND_OP_SUBPG, 0, 0, 0,
+    {BACKGROUND_SCAN_LPAGE, 0, 0, 0, MVP_STD, "Background scan results",
+     "bsr", show_background_scan_results_page}, /* 0x15, 0x0  SBC */
+    {BACKGROUND_SCAN_LPAGE, BACKGROUND_OP_SUBPG, 0, 0, MVP_STD,
      "Background operation", "bop", show_background_op_page},
                                         /* 0x15, 0x2  SBC */
-    {BACKGROUND_SCAN_LPAGE, LPS_MISALIGNMENT_SUBPG, 0, 0, 0,
+    {BACKGROUND_SCAN_LPAGE, LPS_MISALIGNMENT_SUBPG, 0, 0, MVP_STD,
      "LPS misalignment", "lps", show_lps_misalignment_page},
                                         /* 0x15, 0x3  SBC-4 */
-    {0x15, 0, 0, PDT_MCHANGER, 0, "Element statistics", "els",
+    {0x15, 0, 0, PDT_MCHANGER, MVP_STD, "Element statistics", "els",
      show_element_stats_page},          /* 0x15, 0x0  SMC */
-    {0x15, 0, 0, PDT_ADC, 0, "Service buffers information", "sbi",
+    {0x15, 0, 0, PDT_ADC, MVP_STD, "Service buffers information", "sbi",
      show_service_buffer_info_page},    /* 0x15, 0x0  ADC */
-    {BACKGROUND_SCAN_LPAGE, PENDING_DEFECTS_SUBPG, 0, 0, 0,
+    {BACKGROUND_SCAN_LPAGE, PENDING_DEFECTS_SUBPG, 0, 0, MVP_STD,
      "Pending defects", "pd", show_pending_defects_page}, /* 0x15, 0x1  SBC */
-    {SAT_ATA_RESULTS_LPAGE, 0, 0, 0, 0, "ATA pass-through results", "aptr",
-     show_ata_pt_results_page},         /* 0x16, 0x0  SAT */
-    {0x16, 0, 0, PDT_TAPE, 0, "Tape diagnostic data", "tdd",
+    {SAT_ATA_RESULTS_LPAGE, 0, 0, 0, MVP_STD, "ATA pass-through results",
+     "aptr", show_ata_pt_results_page}, /* 0x16, 0x0  SAT */
+    {0x16, 0, 0, PDT_TAPE, MVP_STD, "Tape diagnostic data", "tdd",
      show_tape_diag_data_page},         /* 0x16, 0x0  SSC */
-    {0x16, 0, 0, PDT_MCHANGER, 0, "Media changer diagnostic data", "mcdd",
-     show_mchanger_diag_data_page},     /* 0x16, 0x0  SMC */
-    {0x17, 0, 0, 0, 0, "Non volatile cache", "nvc",
+    {0x16, 0, 0, PDT_MCHANGER, MVP_STD, "Media changer diagnostic data",
+     "mcdd", show_mchanger_diag_data_page}, /* 0x16, 0x0  SMC */
+    {0x17, 0, 0, 0, MVP_STD, "Non volatile cache", "nvc",
      show_non_volatile_cache_page},     /* 0x17, 0x0  SBC */
-    {0x17, 0, 0xf, PDT_TAPE, 0, "Volume statistics", "vs",
+    {0x17, 0, 0xf, PDT_TAPE, MVP_STD, "Volume statistics", "vs",
      show_volume_stats_pages},          /* 0x17, 0x0...0xf  SSC */
-    {PROTO_SPECIFIC_LPAGE, 0, 0, -1, 0, "Protocol specific port", "psp",
-     show_protocol_specific_page},      /* 0x18, 0x0  */
-    {STATS_LPAGE, 0, 0, -1, 0, "General Statistics and Performance", "gsp",
-     show_stats_perform_pages},         /* 0x19, 0x0  */
-    {STATS_LPAGE, 0x1, 0x1f, -1, 0, "Group Statistics and Performance", "grsp",
-     show_stats_perform_pages},         /* 0x19, 0x1...0x1f  */
-    {STATS_LPAGE, 0x20, 0, -1, 0, "Cache memory statistics", "cms",
+    {PROTO_SPECIFIC_LPAGE, 0, 0, -1, MVP_STD, "Protocol specific port",
+     "psp", show_protocol_specific_page},  /* 0x18, 0x0  */
+    {STATS_LPAGE, 0, 0, -1, MVP_STD, "General Statistics and Performance",
+     "gsp", show_stats_perform_pages},  /* 0x19, 0x0  */
+    {STATS_LPAGE, 0x1, 0x1f, -1, MVP_STD, "Group Statistics and Performance",
+     "grsp", show_stats_perform_pages}, /* 0x19, 0x1...0x1f  */
+    {STATS_LPAGE, 0x20, 0, -1, MVP_STD, "Cache memory statistics", "cms",
      show_cache_stats_page},            /* 0x19, 0x20  */
-    {PCT_LPAGE, 0, 0, -1, 0, "Power condition transitions", "pct",
+    {PCT_LPAGE, 0, 0, -1, MVP_STD, "Power condition transitions", "pct",
      show_power_condition_transitions_page}, /* 0x1a, 0  */
-    {0x1b, 0, 0, PDT_TAPE, 0, "Data compression", "dc",
+    {0x1b, 0, 0, PDT_TAPE, MVP_STD, "Data compression", "dc",
      show_data_compression_page},       /* 0x1b, 0  SSC */
-    {0x2d, 0, 0, PDT_TAPE, 0, "Current service information", "csi",
+    {0x2d, 0, 0, PDT_TAPE, MVP_STD, "Current service information", "csi",
      NULL},                             /* 0x2d, 0  SSC */
-    {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, 0, "Tape alert", "ta",
+    {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, MVP_STD, "Tape alert", "ta",
      show_tape_alert_ssc_page},         /* 0x2e, 0  SSC */
-    {IE_LPAGE, 0, 0, -1, (MVP_SHARED | MVP_SMSTR), "Informational exceptions",
+    {IE_LPAGE, 0, 0, -1, (MVP_STD | MVP_SMSTR), "Informational exceptions",
      "ie", show_ie_page},               /* 0x2f, 0  */
 /* vendor specific */
     {0x30, 0, 0, PDT_DISK, MVP_HITA, "Performance counters (Hitachi)",
@@ -440,7 +443,7 @@ static struct log_elem log_arr[] = {
     {0x3e, 0, 0, PDT_TAPE, OVP_LTO, "Device Status (lto-5, 6)",
      "ds_", NULL},                             /* 0x3e, 0  SSC */
 
-    {-1, -1, -1, -1, -1, NULL, "zzzzz", NULL},           /* end sentinel */
+    {-1, -1, -1, -1, 0, NULL, "zzzzz", NULL},           /* end sentinel */
 };
 
 /* Supported vendor product codes */
@@ -608,29 +611,30 @@ usage_old()
            "    -M=VP    vendor/product abbreviation [or number]\n"
            "    -n       decode some pages into multiple name=value "
            "lines\n"
+           "    -N|--new    use new interface\n"
            "    -p=PG    PG is an acronym (def: 'sp')\n"
            "    -p=PGN    page code in hex (def: 0)\n"
            "    -p=PGN,SPGN    page and subpage codes in hex, (defs: 0,0)\n"
            "    -paramp=PP   (in hex) (def: 0)\n"
-           "    -pcb   show parameter control bytes in decoded "
+           "    -pcb     show parameter control bytes in decoded "
            "output\n");
-    printf("    -ppc   set the Parameter Pointer Control (PPC) bit "
+    printf("    -ppc     set the Parameter Pointer Control (PPC) bit "
            "(def: 0)\n"
-           "    -r     reset log parameters (takes PC and SP into "
+           "    -r       reset log parameters (takes PC and SP into "
            "account)\n"
-           "           (uses PCR bit in LOG SELECT)\n"
+           "             (uses PCR bit in LOG SELECT)\n"
            "    -select  perform LOG SELECT (def: LOG SENSE)\n"
-           "    -sp    set the Saving Parameters (SP) bit (def: 0)\n"
-           "    -t     outputs temperature log page (0xd)\n"
-           "    -T     outputs transport (protocol specific port) log "
+           "    -sp      set the Saving Parameters (SP) bit (def: 0)\n"
+           "    -t       outputs temperature log page (0xd)\n"
+           "    -T       outputs transport (protocol specific port) log "
            "page (0x18)\n"
-           "    -v     increase verbosity\n"
-           "    -V     output version string\n"
-           "    -x     no initial INQUIRY output (twice: no INQUIRY call)\n"
-           "    -X     open DEVICE read-only (def: first read-write then "
+           "    -v       increase verbosity\n"
+           "    -V       output version string\n"
+           "    -x       no initial INQUIRY output (twice: no INQUIRY call)\n"
+           "    -X       open DEVICE read-only (def: first read-write then "
            "if fails\n"
-           "           try open again with read-only)\n"
-           "    -?     output this usage message\n\n"
+           "             try open again with read-only)\n"
+           "    -?       output this usage message\n\n"
            "Performs a SCSI LOG SENSE (or LOG SELECT) command\n");
 }
 
@@ -657,16 +661,15 @@ asort_comp(const void * lp, const void * rp)
 }
 
 static void
-enumerate_helper(const struct log_elem * lep, int pos,
+enumerate_helper(const struct log_elem * lep, bool first,
                  const struct opts_t * op)
 {
     char b[80];
     char bb[80];
     const char * cp;
-    bool mvp = !! lep->flags;
-    bool shared_vp = !!(MVP_SHARED & lep->flags);
+    bool vendor_lpage = ! (MVP_STD & lep->flags);
 
-    if (0 == pos) {
+    if (first) {
         if (1 == op->verbose) {
             printf("acronym   pg[,spg]        name\n");
             printf("===============================================\n");
@@ -675,7 +678,7 @@ enumerate_helper(const struct log_elem * lep, int pos,
             printf("===================================================\n");
         }
     }
-    if ((0 == (op->do_enumerate % 2)) && mvp && ! shared_vp)
+    if ((0 == (op->do_enumerate % 2)) && vendor_lpage)
         return;     /* if do_enumerate is even then skip vendor pages */
     else if ((! op->filter_given) || (-1 == op->filter))
         ;           /* otherwise enumerate all lpages if no --filter= */
@@ -744,12 +747,12 @@ enumerate_pages(const struct opts_t * op)
         qsort(lep_arr, k, sizeof(struct log_elem *), asort_comp);
         printf("Known log pages in acronym order:\n");
         for (lepp = lep_arr, j = 0; (*lepp)->pg_code >=0; ++lepp, ++j)
-            enumerate_helper(*lepp, j, op);
+            enumerate_helper(*lepp, (0 == j), op);
         free(lep_arr);
     } else {    /* -eee, -eeee numeric sort (as per table) */
         printf("Known log pages in numerical order:\n");
         for (lep = log_arr, j = 0; lep->pg_code >=0; ++lep, ++j)
-            enumerate_helper(lep, j, op);
+            enumerate_helper(lep, (0 == j), op);
     }
 }
 
@@ -846,7 +849,10 @@ pg_subpg_pdt_search(int pg_code, int subpg_code, int pdt, int vpn)
     for (lep = log_arr; lep->pg_code >=0; ++lep) {
         if (pg_code == lep->pg_code) {
             if (subpg_code == lep->subpg_code) {
-                if (vp_mask && ! (vp_mask & lep->flags))
+                if ((MVP_STD & lep->flags) || (0 == vp_mask) ||
+                    (vp_mask & lep->flags))
+                    ;
+                else
                     continue;
                 if ((lep->pdt < 0) || (pdt == lep->pdt) || (pdt < 0))
                     return lep;
@@ -1539,7 +1545,7 @@ static int
 do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
         const struct opts_t * op)
 {
-    int actual_len, res, vb;
+    int calc_len, request_len, res, resid, vb;
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
@@ -1561,47 +1567,72 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
     memset(resp, 0, mx_resp_len);
     vb = op->verbose;
     if (op->maxlen > 1)
-        actual_len = mx_resp_len;
+        request_len = mx_resp_len;
     else {
-        if ((res = sg_ll_log_sense(sg_fd, op->do_ppc, op->do_sp,
-                                   op->page_control, op->pg_code,
-                                   op->subpg_code, op->paramp,
-                                   resp, LOG_SENSE_PROBE_ALLOC_LEN,
-                                   true /* noisy */, vb)))
+        request_len = LOG_SENSE_PROBE_ALLOC_LEN;
+        if ((res = sg_ll_log_sense_v2(sg_fd, op->do_ppc, op->do_sp,
+                                      op->page_control, op->pg_code,
+                                      op->subpg_code, op->paramp,
+                                      resp, request_len, LOG_SENSE_DEF_TIMEOUT,
+                                      &resid, true /* noisy */, vb)))
             return res;
-        actual_len = sg_get_unaligned_be16(resp + 2) + 4;
+        if (resid > 0) {
+            res = SG_LIB_WILD_RESID;
+            goto resid_err;
+        }
+        calc_len = sg_get_unaligned_be16(resp + 2) + 4;
         if ((! op->do_raw) && (vb > 1)) {
             pr2serr("  Log sense (find length) response:\n");
             dStrHexErr((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
-            pr2serr("  hence calculated response length=%d\n", actual_len);
+            pr2serr("  hence calculated response length=%d\n", calc_len);
         }
         if (op->pg_code != (0x3f & resp[0])) {
             if (vb)
                 pr2serr("Page code does not appear in first byte of "
                         "response so it's suspect\n");
-            if (actual_len > 0x40) {
-                actual_len = 0x40;
+            if (calc_len > 0x40) {
+                calc_len = 0x40;
                 if (vb)
                     pr2serr("Trim response length to 64 bytes due to "
                             "suspect response format\n");
             }
         }
         /* Some HBAs don't like odd transfer lengths */
-        if (actual_len % 2)
-            actual_len += 1;
-        if (actual_len > mx_resp_len)
-            actual_len = mx_resp_len;
+        if (calc_len % 2)
+            calc_len += 1;
+        if (calc_len > mx_resp_len)
+            calc_len = mx_resp_len;
+        request_len = calc_len;
     }
-    if ((res = sg_ll_log_sense(sg_fd, op->do_ppc, op->do_sp,
-                               op->page_control, op->pg_code,
-                               op->subpg_code, op->paramp,
-                               resp, actual_len, true /* noisy */, vb)))
+    if ((res = sg_ll_log_sense_v2(sg_fd, op->do_ppc, op->do_sp,
+                                  op->page_control, op->pg_code,
+                                  op->subpg_code, op->paramp,
+                                  resp, request_len,
+                                  LOG_SENSE_DEF_TIMEOUT, &resid,
+                                  true /* noisy */, vb)))
         return res;
+    if (resid > 0) {
+        request_len -= resid;
+        if (request_len < 4) {
+            request_len += resid;
+            res = SG_LIB_WILD_RESID;
+            goto resid_err;
+        }
+    }
     if ((! op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense response:\n");
-        dStrHexErr((const char *)resp, actual_len, 1);
+        dStrHexErr((const char *)resp, request_len, 1);
     }
     return 0;
+resid_err:
+    pr2serr("%s: request_len=%d, resid=%d, problems\n", __func__, request_len,
+            resid);
+    request_len -= resid;
+    if ((request_len > 0) && (! op->do_raw) && (vb > 1)) {
+        pr2serr("  Log sense (resid_err) response:\n");
+        dStrHexErr((const char *)resp, request_len, 1);
+    }
+    return res;
 }
 
 /* DS made obsolete in spc4r03; TMC and ETC made obsolete in spc5r03. */
@@ -3569,12 +3600,12 @@ static bool
 show_stats_perform_pages(const uint8_t * resp, int len,
                          const struct opts_t * op)
 {
-    int k, num, param_len, param_code, subpg_code, extra;
     bool nam, spf;
+    int k, num, param_len, param_code, subpg_code, extra;
     unsigned int ui;
+    uint64_t ull;
     const uint8_t * bp;
     const char * ccp;
-    uint64_t ull;
     char str[PCB_STR_LEN];
 
     nam = op->do_name;

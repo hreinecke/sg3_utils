@@ -43,9 +43,11 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#ifndef major
+#include <sys/types.h>
+#endif
 #include <sys/time.h>
 #include <linux/major.h>
 #include <linux/fs.h>   /* <sys/mount.h> */

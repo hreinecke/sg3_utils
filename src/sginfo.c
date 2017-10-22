@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.38 [20171009]";
+static const char * version_str = "2.39 [20171019]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3393,7 +3393,7 @@ show_devices(int raw)
     int k, j, fd, err, bus;
     My_scsi_idlun m_idlun;
     char name[MDEV_NAME_SZ];
-    char dev_name[MDEV_NAME_SZ];
+    char dev_name[MDEV_NAME_SZ + 6];
     char ebuff[EBUFF_SZ];
     int do_numeric = 1;
     int max_holes = MAX_HOLES;

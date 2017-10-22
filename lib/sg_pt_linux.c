@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.27 20171005 */
+/* sg_pt_linux version 1.28 20171019 */
 
 
 #include <stdio.h>
@@ -18,8 +18,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>      /* to define 'major' */
+#ifndef major
+#include <sys/types.h>
+#endif
 
 
 #ifdef HAVE_CONFIG_H

@@ -70,6 +70,13 @@ int sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
                     int subpg_code, int paramp, unsigned char * resp,
                     int mx_resp_len, bool noisy, int verbose);
 
+/* Same as sg_ll_log_sense() apart from timeout_secs and residp. See
+ * sg_ll_inquiry_v2() for their description */
+int sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
+                       int subpg_code, int paramp, unsigned char * resp,
+                       int mx_resp_len, int timeout_secs, int * residp,
+                       bool noisy, int verbose);
+
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
  * bad field in cdb, * SG_LIB_CAT_NOT_READY -> device not ready,
@@ -103,6 +110,13 @@ int sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code,
 int sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
                        int sub_pg_code, void * resp, int mx_resp_len,
                        bool noisy, int verbose);
+
+/* Same as sg_ll_mode_sense10() apart from timeout_secs and residp. See
+ * sg_ll_inquiry_v2() for their description */
+int sg_ll_mode_sense10_v2(int sg_fd, bool llbaa, bool dbd, int pc,
+                          int pg_code, int sub_pg_code, void * resp,
+                          int mx_resp_len, int timeout_secs, int * residp,
+                          bool noisy, int verbose);
 
 /* Invokes a SCSI PREVENT ALLOW MEDIUM REMOVAL command (SPC-3)
  * prevent==0 allows removal, prevent==1 prevents removal ...
@@ -235,7 +249,7 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
 int sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code,
                               int sub_pg_code, bool dbd, bool flexible,
                               int mx_mpage_len, int * success_mask,
-                              void * pcontrol_arr[], int * reported_len,
+                              void * pcontrol_arr[], int * reported_lenp,
                               int verbose);
 
 /* Returns file descriptor >= 0 if successful. If error in Unix returns
