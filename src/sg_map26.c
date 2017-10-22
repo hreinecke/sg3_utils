@@ -33,8 +33,11 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>      /* new location for major + minor */
+#ifndef major
+#include <sys/types.h>
+#endif
 #include <linux/major.h>
 
 #ifdef HAVE_CONFIG_H
@@ -42,7 +45,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.14 20171006";
+static const char * version_str = "1.15 20171019";
 
 #define ME "sg_map26: "
 

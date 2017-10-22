@@ -61,20 +61,23 @@ and '\-\-lba=2a6h' are equivalent). Note that with getopt_long(), short form
 options can be elided, for example: '\-all' is equivalent to '\-a \-l \-l'.
 The \fIDEVICE\fR argument may appear after, between or prior to any options.
 .PP
-The older utilities, such as sg_inq, had individual command line processing
-code typically based on a single "\-" followed by one or more characters. If
-an argument is needed then it follows a "=" (e.g. '\-p=1f' in sg_modes with
-its older interface). Various options can be elided as long as it is not
-ambiguous (e.g. '\-vv' to increase the verbosity).
+The older utilities, including as sg_inq, sg_logs, sg_modes, sg_opcode,
+sg_rbuff,  sg_readcap, sg_senddiag, sg_start and sg_turs had individual
+command line processing code typically based on a single "\-" followed by one
+or more characters. If an argument is needed then it follows a "=" (
+e.g. '\-p=1f' in sg_modes with its older interface). Various options can be
+elided as long as it is not ambiguous (e.g. '\-vv' to increase the verbosity).
 .PP
 Over time the command line interface of these older utilities became messy
 and overloaded with options. So in sg3_utils version 1.23 the command line
 interface of these older utilities was altered to have both a cleaner
 getopt_long() interface and their older interface for backward compatibility.
 By default these older utilities use their getopt_long() based interface.
-That can be overridden by defining the SG3_UTILS_OLD_OPTS environment
-variable or using '\-O' or '\-\-old' as the first command line option. The
-man pages of the older utilities documents the details.
+The getopt_long() is a GNU extension (i.e. not yet POSIX certified) but
+more recent command line utilities tend to use it. That can be overridden
+by defining the SG3_UTILS_OLD_OPTS environment variable or using '\-O'
+or '\-\-old' as the first command line option. The man pages of the older
+utilities documents the details.
 .PP
 Several sg3_utils utilities are based on the Unix dd command (e.g. sg_dd)
 and permit copying data at the level of SCSI READ and WRITE commands. sg_dd

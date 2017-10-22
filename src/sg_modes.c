@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.51 20171011";
+static const char * version_str = "1.52 20171020";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -140,6 +140,7 @@ usage()
            "    --six|-6        use MODE SENSE(6), by default uses MODE "
            "SENSE(10)\n"
            "    --verbose|-v    increase verbosity\n"
+           "    --old|-O        use old interface (use as first option)\n"
            "    --version|-V    output version string then exit\n\n"
            "Performs a SCSI MODE SENSE (10 or 6) command. To access and "
            "possibly change\nmode page fields see the sdparm utility.\n");
@@ -180,6 +181,7 @@ usage_old()
            "   -v    verbose\n"
            "   -V    output version string\n"
            "   -6    Use MODE SENSE(6), by default uses MODE SENSE(10)\n"
+           "   -N|--new     use new interface\n"
            "   -?    output this usage message\n\n"
            "Performs a SCSI MODE SENSE (10 or 6) command\n");
 }
@@ -710,7 +712,7 @@ get_mpage_trans_tbl_size(int t_proto, int * sizep)
 
 static const char *
 find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
-                    int inq_byte6, int t_proto)
+                    bool encserv, bool mchngr, int t_proto)
 {
     int k;
     int num;
@@ -738,7 +740,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
                 break;
         }
     }
-    if ((0xd != scsi_ptype) && (inq_byte6 & 0x40)) {
+    if ((0xd != scsi_ptype) && encserv) {
         /* check for attached enclosure services processor */
         pcdp = get_mpage_tbl_size(0xd, &num);
         if (pcdp) {
@@ -751,7 +753,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
             }
         }
     }
-    if ((0x8 != scsi_ptype) && (inq_byte6 & 0x8)) {
+    if ((0x8 != scsi_ptype) && mchngr) {
         /* check for attached medium changer device */
         pcdp = get_mpage_tbl_size(0x8, &num);
         if (pcdp) {
@@ -776,7 +778,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
 }
 
 static void
-list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
+list_page_codes(int scsi_ptype, bool encserv, bool mchngr, int t_proto)
 {
     int num, num_ptype, pg, spg, c, d;
     bool valid_transport;
@@ -835,7 +837,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
         if ((NULL == dp) && (NULL == pe_dp))
             break;
     }
-    if ((0xd != scsi_ptype) && (inq_byte6 & 0x40)) {
+    if ((0xd != scsi_ptype) && encserv) {
         /* check for attached enclosure services processor */
         printf("\n    Attached enclosure services processor\n");
         dp = get_mpage_tbl_size(0xd, &num);
@@ -849,7 +851,7 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
             dp = (--num <= 0) ? NULL : (dp + 1);
         }
     }
-    if ((0x8 != scsi_ptype) && (inq_byte6 & 0x8)) {
+    if ((0x8 != scsi_ptype) && mchngr) {
         /* check for attached medium changer device */
         printf("\n    Attached medium changer device\n");
         dp = get_mpage_tbl_size(0x8, &num);
@@ -879,16 +881,19 @@ list_page_codes(int scsi_ptype, int inq_byte6, int t_proto)
     }
 }
 
+/* Returns 0 for ok, else error value */
 static int
-examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
+examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
+              const struct opts_t * op)
 {
     bool header_printed;
-    int k, res, mresp_len, len;
-    unsigned char rbuf[256];
+    int k, res, mresp_len, len, resid;
     const char * cp;
+    unsigned char rbuf[256];
 
     mresp_len = (op->do_raw || op->do_hex) ? sizeof(rbuf) : 4;
     for (header_printed = false, k = 0; k < PG_CODE_MAX; ++k) {
+        resid = 0;
         if (op->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
                                     true, op->do_verbose);
@@ -901,8 +906,8 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
                 return res;
             }
         } else {
-            res = sg_ll_mode_sense10(sg_fd, 0, 0, 0, k, 0, rbuf, mresp_len,
-                                     true, op->do_verbose);
+            res = sg_ll_mode_sense10_v2(sg_fd, 0, 0, 0, k, 0, rbuf, mresp_len,
+                                        0, &resid, true, op->do_verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again with a '-6' switch for a 6 byte "
                         "MODE SENSE command\n");
@@ -915,6 +920,15 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
         if (0 == res) {
             len = op->do_six ? (rbuf[0] + 1) :
                                (sg_get_unaligned_be16(rbuf + 0) + 2);
+            if (resid > 0) {
+                    mresp_len -= resid;
+                    if (mresp_len < 0) {
+                            pr2serr("%s: MS(10) resid=%d implies negative "
+                                    "response length (%d)\n", __func__,
+                                    resid, mresp_len);
+                            return SG_LIB_WILD_RESID;
+                    }
+            }
             if (len > mresp_len)
                 len = mresp_len;
             if (op->do_raw) {
@@ -929,7 +943,7 @@ examine_pages(int sg_fd, int inq_pdt, int inq_byte6, const struct opts_t * op)
                 printf("Discovered mode pages:\n");
                 header_printed = true;
             }
-            cp = find_page_code_desc(k, 0, inq_pdt, inq_byte6, -1);
+            cp = find_page_code_desc(k, 0, inq_pdt, encserv, mchngr, -1);
             if (cp)
                 printf("    %s\n", cp);
             else
@@ -958,24 +972,25 @@ static const char * pg_control_str_arr[] = {
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, len, res, md_len, bd_len, page_num;
-    char ebuff[EBUFF_SZ];
-    const char * descp;
-    unsigned char * rsp_buff = NULL;
-    unsigned char def_rsp_buff[DEF_ALLOC_LEN];
-    unsigned char * malloc_rsp_buff = NULL;
-    int rsp_buff_size = DEF_ALLOC_LEN;
-    int ret = 0;
-    int density_code_off, t_proto, inq_pdt, inq_byte6;
     bool resp_mode6, longlba, spf;
-    int num_ua_pages;
-    unsigned char * bp;
+    bool encserv = false;
+    bool mchngr = false;
     unsigned char uc;
-    struct sg_simple_inquiry_resp inq_out;
-    char pdt_name[64];
-    char b[80];
-    struct opts_t opts;
+    int sg_fd, k, num, len, res, md_len, bd_len, page_num, resid;
+    int density_code_off, t_proto, inq_pdt, num_ua_pages;
+    int ret = 0;
+    int rsp_buff_size = DEF_ALLOC_LEN;
+    const char * descp;
     struct opts_t * op;
+    unsigned char * rsp_buff = NULL;
+    unsigned char * malloc_rsp_buff = NULL;
+    unsigned char * bp;
+    struct sg_simple_inquiry_resp inq_out;
+    struct opts_t opts;
+    char b[80];
+    unsigned char def_rsp_buff[DEF_ALLOC_LEN];
+    char ebuff[EBUFF_SZ];
+    char pdt_name[64];
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -996,15 +1011,16 @@ main(int argc, char * argv[])
         if (op->do_list) {
             if ((op->pg_code < 0) || (op->pg_code > PG_CODE_MAX)) {
                 printf("    Assume peripheral device type: disk\n");
-                list_page_codes(0, 0, -1);
+                list_page_codes(0, false, false, -1);
             } else {
                 printf("    peripheral device type: %s\n",
                        sg_get_pdt_str(op->pg_code, sizeof(pdt_name),
                                       pdt_name));
                 if (op->subpg_code_given)
-                    list_page_codes(op->pg_code, 0, op->subpg_code);
+                    list_page_codes(op->pg_code, false, false,
+                                    op->subpg_code);
                 else
-                    list_page_codes(op->pg_code, 0, -1);
+                    list_page_codes(op->pg_code, false, false, -1);
             }
             return 0;
         }
@@ -1067,20 +1083,21 @@ main(int argc, char * argv[])
         goto finish;
     }
     inq_pdt = inq_out.peripheral_type;
-    inq_byte6 = inq_out.byte_6;
+    encserv = !! (0x40 & inq_out.byte_6);
+    mchngr = !! (0x8 & inq_out.byte_6);
     if ((0 == op->do_raw) && (op->do_hex < 3))
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
                inq_out.vendor, inq_out.product, inq_out.revision,
                sg_get_pdt_str(inq_pdt, sizeof(pdt_name), pdt_name), inq_pdt);
     if (op->do_list) {
         if (op->subpg_code_given)
-            list_page_codes(inq_pdt, inq_byte6, op->subpg_code);
+            list_page_codes(inq_pdt, encserv, mchngr, op->subpg_code);
         else
-            list_page_codes(inq_pdt, inq_byte6, -1);
+            list_page_codes(inq_pdt, encserv, mchngr, -1);
         goto finish;
     }
     if (op->do_examine) {
-        ret = examine_pages(sg_fd, inq_pdt, inq_byte6, op);
+        ret = examine_pages(sg_fd, inq_pdt, encserv, mchngr, op);
         goto finish;
     }
     if (PG_CODE_ALL == op->pg_code) {
@@ -1104,6 +1121,7 @@ main(int argc, char * argv[])
     }
 
     memset(rsp_buff, 0, rsp_buff_size);
+    resid = 0;
     if (op->do_six) {
         res = sg_ll_mode_sense6(sg_fd, op->do_dbd, op->page_control,
                                 op->pg_code, op->subpg_code, rsp_buff,
@@ -1112,10 +1130,10 @@ main(int argc, char * argv[])
             pr2serr(">>>>>> try again without the '-6' switch for a 10 byte "
                     "MODE SENSE command\n");
     } else {
-        res = sg_ll_mode_sense10(sg_fd, op->do_llbaa, op->do_dbd,
-                                 op->page_control, op->pg_code,
-                                 op->subpg_code, rsp_buff, rsp_buff_size,
-                                 true, op->do_verbose);
+        res = sg_ll_mode_sense10_v2(sg_fd, op->do_llbaa, op->do_dbd,
+                                    op->page_control, op->pg_code,
+                                    op->subpg_code, rsp_buff, rsp_buff_size,
+                                    0, &resid, true, op->do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again with a '-6' switch for a 6 byte MODE "
                     "SENSE command\n");
@@ -1173,9 +1191,23 @@ main(int argc, char * argv[])
             medium_type = rsp_buff[1];
             specific = rsp_buff[2];
             longlba = false;
-        } else {
+        } else {        /* MODE SENSE(10) with resid */
+            rsp_buff_size -= resid;
+            if (rsp_buff_size < 0) {
+                pr2serr("MS(10) resid=%d implies negative response length "
+                        "(%d)\n", resid, rsp_buff_size);
+                ret = SG_LIB_WILD_RESID;
+                goto finish;
+            }
+            if (rsp_buff_size < 8) {
+                pr2serr("MS(10) resid=%d implies abridged header length "
+                        "(%d)\n", resid, rsp_buff_size);
+                ret = SG_LIB_WILD_RESID;
+                goto finish;
+            }
             headerlen = 8;
             md_len = sg_get_unaligned_be16(rsp_buff + 0) + 2;
+            md_len = (md_len < rsp_buff_size) ? md_len : rsp_buff_size;
             bd_len = sg_get_unaligned_be16(rsp_buff + 6);
             medium_type = rsp_buff[2];
             specific = rsp_buff[3];
@@ -1286,10 +1318,11 @@ main(int argc, char * argv[])
                 if ((0x18 == page_num) || (0x19 == page_num)) {
                     t_proto = (spf ? bp[5] : bp[2]) & 0xf;
                     descp = find_page_code_desc(page_num, (spf ? bp[1] : 0),
-                                                inq_pdt, inq_byte6, t_proto);
+                                                inq_pdt, encserv, mchngr,
+                                                t_proto);
                 } else
                     descp = find_page_code_desc(page_num, (spf ? bp[1] : 0),
-                                                inq_pdt, inq_byte6, -1);
+                                                inq_pdt, encserv, mchngr, -1);
                 if (NULL == descp) {
                     if (spf)
                         snprintf(ebuff, EBUFF_SZ, "0x%x, subpage_code: 0x%x",

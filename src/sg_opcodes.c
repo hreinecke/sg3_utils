@@ -137,6 +137,7 @@ usage()
             "                     (def: sort by opcode (then service "
             "action))\n"
             "    --verbose|-v    increase verbosity\n"
+            "    --old|-O        use old interface (use as first option)\n"
             "    --version|-V    print version string then exit\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT "
             "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command.\n");
@@ -170,6 +171,7 @@ usage_old()
             "    -u    output list of operation codes as is (unsorted)\n"
             "    -v    verbose\n"
             "    -V    output version string\n"
+            "    -N|--new   use new interface\n"
             "    -?    output this usage message\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES (or a REPORT "
             "TASK MANAGEMENT\nFUNCTIONS) command\n");

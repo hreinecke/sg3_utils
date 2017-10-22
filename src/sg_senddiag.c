@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.52 20171011";
+static const char * version_str = "0.53 20171021";
 
 #define ME "sg_senddiag: "
 
@@ -118,6 +118,7 @@ usage()
            "                            unit: second (def: 7200 seconds)\n"
            "    --uoff|-u       unit offline (def: 0, only with '--test')\n"
            "    --verbose|-v    increase verbosity\n"
+           "    --old|-O        use old interface (use as first option)\n"
            "    --version|-V    output version string then exit\n\n"
            "Performs a SCSI SEND DIAGNOSTIC (and/or a RECEIVE DIAGNOSTIC "
            "RESULTS) command\n"
@@ -151,6 +152,7 @@ usage_old()
            "    -uoff   unit offline (def: 0, only with '-t')\n"
            "    -v      increase verbosity (print issued SCSI cmds)\n"
            "    -V      output version string\n"
+           "    -N|--new   use new interface\n"
            "    -?      output this usage message\n\n"
            "Performs a SCSI SEND DIAGNOSTIC (and/or a RECEIVE DIAGNOSTIC "
            "RESULTS) command\n"
@@ -426,24 +428,32 @@ do_senddiag(int sg_fd, int sf_code, bool pf_bit, bool sf_bit,
 
 /* Get expected extended self-test time from mode page 0xa (for '-e') */
 static int
-do_modes_0a(int sg_fd, void * resp, int mx_resp_len, bool noisy, bool mode6,
+do_modes_0a(int sg_fd, void * resp, int mx_resp_len, bool mode6, bool noisy,
             int verbose)
 {
     int res;
+    int resid = 0;
 
     if (mode6)
         res = sg_ll_mode_sense6(sg_fd, true /* dbd */, false /* pc */,
                                 0xa /* page */, false, resp, mx_resp_len,
                                 noisy, verbose);
     else
-        res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, true /* dbd */,
-                                 false, 0xa, false, resp, mx_resp_len,
-                                 noisy, verbose);
+        res = sg_ll_mode_sense10_v2(sg_fd, false /* llbaa */, true /* dbd */,
+                                    false, 0xa, false, resp, mx_resp_len,
+                                    0, &resid, noisy, verbose);
     if (res) {
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
         pr2serr("Mode sense (%s): %s\n", (mode6 ? "6" : "10"), b);
+    } else {
+        mx_resp_len -= resid;
+        if (mx_resp_len < 4) {
+            pr2serr("%s: response length (%d) too small (resid=%d)\n",
+                    __func__, mx_resp_len, resid);
+            res = SG_LIB_WILD_RESID;
+        }
     }
     return res;
 }
@@ -657,7 +667,7 @@ list_page_codes()
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg;
+    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg, resid;
     int read_in_len = 0;
     int ret = 0;
     struct opts_t opts;
@@ -787,7 +797,8 @@ main(int argc, char * argv[])
         goto close_fini;
     }
     if (op->do_extdur) {
-        res = do_modes_0a(sg_fd, rsp_buff, 32, true, false, op->do_verbose);
+        res = do_modes_0a(sg_fd, rsp_buff, 32, false /* mode6 */,
+                          true /* noisy */, op->do_verbose);
         if (0 == res) {
             /* Assume mode sense(10) response without block descriptors */
             num = sg_get_unaligned_be16(rsp_buff) - 6;
@@ -817,10 +828,19 @@ main(int argc, char * argv[])
         else
             res = 0;
         if (0 == res) {
-            if (0 == sg_ll_receive_diag(sg_fd, (pg >= 0x0),
-                                        ((pg >= 0x0) ? pg : 0), rsp_buff,
-                                        rsp_buff_size, 1, op->do_verbose)) {
+            resid = 0;
+            if (0 == sg_ll_receive_diag_v2(sg_fd, (pg >= 0x0),
+                                           ((pg >= 0x0) ? pg : 0), rsp_buff,
+                                           rsp_buff_size, 0, &resid,
+                                           true, op->do_verbose)) {
+                rsp_buff_size -= resid;
+                if (rsp_buff_size < 4) {
+                    pr2serr("RD resid (%d) indicates response too small "
+                            "(lem=%d)\n", resid, rsp_buff_size);
+                    goto err_out;
+                }
                 rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
+                rsp_len= (rsp_len < rsp_buff_size) ? rsp_len : rsp_buff_size;
                 if (op->do_hex > 1)
                     dStrHex((const char *)rsp_buff, rsp_len,
                             (2 == op->do_hex) ? 0 : -1);

@@ -164,6 +164,18 @@ int sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist,
 int sg_ll_receive_diag(int sg_fd, bool pcv, int pg_code, void * resp,
                        int mx_resp_len, bool noisy, int verbose);
 
+/* Same as sg_ll_receive_diag() but with added timeout_secs and residp
+ * arguments. Adds the ability to set the command abort timeout
+ * and the ability to report the residual count. If timeout_secs is zero
+ * or less the the default command abort timeout (60 seconds) is used.
+ * If residp is non-NULL then the residual value is written where residp
+ * points. A residual value of 0 implies mx_resp_len bytes have be written
+ * where resp points. If the residual value equals mx_resp_len then no
+ * bytes have been written. */
+int sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
+                          int mx_resp_len, int timeout_secs, int * residp,
+                          bool noisy, int verbose);
+
 /* Invokes a SCSI REPORT IDENTIFYING INFORMATION command. This command was
  * called REPORT DEVICE IDENTIFIER prior to spc4r07. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report identifying information not supported,

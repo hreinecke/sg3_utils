@@ -67,6 +67,7 @@ static struct option long_options[] = {
         {"len", no_argument, 0, 'l'},
         {"raw", no_argument, 0, 'r'},
         {"reset", no_argument, 0, 'R'},
+        {"help", no_argument, 0, 'h'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},

@@ -110,6 +110,7 @@ usage()
             "                    default: 200 MiB\n"
             "    --time|-t       time the data transfer\n"
             "    --verbose|-v    increase verbosity (more debug)\n"
+            "    --old|-O        use old interface (use as first option)\n"
             "    --version|-V    print version string then exit\n\n"
             "Use SCSI READ BUFFER command (data or echo buffer mode, buffer "
             "id 0)\nrepeatedly. This utility only works with Linux sg "
@@ -132,6 +133,7 @@ usage_old()
     printf("             maximum total size is 4000 MiB\n");
     printf("    -t       time the data transfer\n");
     printf("    -v       increase verbosity (more debug)\n");
+    printf("    -N|--new use new interface\n");
     printf("    -V       print version string then exit\n\n");
     printf("Use SCSI READ BUFFER command (data or echo buffer mode, buffer "
            "id 0)\nrepeatedly. This utility only works with Linux sg "

@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.22 20171007";    /* ses4r01 */
+static const char * version_str = "2.23 20171020";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -46,6 +46,7 @@ static const char * version_str = "2.22 20171007";    /* ses4r01 */
                                 /* value of 0 (would imply -20 C) reserved */
 
 /* Send Diagnostic and Receive Diagnostic Results page codes */
+/* Sometimes referred to as "dpage"s in code comments */
 #define SUPPORTED_DPC 0x0
 #define CONFIGURATION_DPC 0x1
 #define ENC_CONTROL_DPC 0x2
@@ -124,12 +125,12 @@ struct opts_t {
     bool do_data;
     bool eiioe_auto;
     bool eiioe_force;
-    bool ind_given;
+    bool ind_given;     /* '--index=...' or '-I ...' */
     bool inner_hex;
     bool do_list;
     bool mask_ign;      /* element read-mask-modify-write actions */
     bool seid_given;
-    bool page_code_given;
+    bool page_code_given;       /* or suitable abbreviation */
     bool o_readonly;
     bool do_status;
     bool do_version;
@@ -140,17 +141,17 @@ struct opts_t {
     int do_filter;
     int do_help;
     int do_hex;
+    int do_join;        /* relational join of Enclosure status, Element
+                           descriptor and Additional element status dpages.
+                           Use twice to add Threshold in dpage to join. */
+    int do_raw;
     int ind_th;    /* type header index, set by build_type_desc_hdr_arr() */
     int ind_indiv;      /* individual element index; -1 for overall */
     int ind_indiv_last; /* if > ind_indiv then [ind_indiv..ind_indiv_last] */
     int ind_et_inst;    /* ETs can have multiple type header instances */
-    int do_join;        /* relational join of Enclosure status, Element
-                           descriptor and Additional element status pages.
-                           Use twice to add Threshold in page to join. */
     int maxlen;
     int seid;
-    int page_code;
-    int do_raw;
+    int page_code;      /* recognised abbreviations converted to dpage num */
     int verbose;
     int num_cgs;        /* number of --clear-, --get= and --set= options */
     int arr_len;
@@ -1227,8 +1228,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                     }
                 }
                 if (NULL == ap->abbrev) {
-                    pr2serr("'--page' abbreviation %s not found\nHere are "
-                            "the choices:\n", optarg);
+                    pr2serr("'--page=' argument abbreviation \"%s\" not "
+                            "found\nHere are the choices:\n", optarg);
                     enumerate_diag_pages();
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1703,7 +1704,7 @@ static int
 do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
             int rsp_buff_size, const struct opts_t * op, int * rsp_lenp)
 {
-    int rsp_len, res;
+    int rsp_len, res, resid;
     const char * cp;
     char b[80];
 
@@ -1719,19 +1720,27 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
             pr2serr("    Receive diagnostic results command for page 0x%x\n",
                     page_code);
     }
-    res = sg_ll_receive_diag(sg_fd, true /* pcv */, page_code, rsp_buff,
-                             rsp_buff_size, true, op->verbose);
+    res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, page_code, rsp_buff,
+                                rsp_buff_size, 0, &resid, true, op->verbose);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {
             if (rsp_buff_size > 8) /* tried to get more than header */
-                pr2serr("<<< warning response buffer too small [%d but need "
-                        "%d]>>>\n", rsp_buff_size, rsp_len);
-            rsp_len = rsp_buff_size;
+                pr2serr("<<< warning response buffer too small [was %d but "
+                        "need %d]>>>\n", rsp_buff_size, rsp_len);
+            if (resid > 0)
+                rsp_buff_size -= resid;
+        } else if (resid > 0)
+            rsp_buff_size -= resid;
+        rsp_len = (rsp_len < rsp_buff_size) ? rsp_len : rsp_buff_size;
+        if (rsp_len < 0) {
+            pr2serr("<<< warning: resid=%d too large, implies negative "
+                    "reply length: %d\n", resid, rsp_len);
+            rsp_len = 0;
         }
         if (rsp_lenp)
             *rsp_lenp = rsp_len;
-        if (page_code != rsp_buff[0]) {
+        if ((rsp_len > 1) && (page_code != rsp_buff[0])) {
             if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
                 pr2serr("Enclosure busy, try again later\n");
                 if (op->do_hex)
@@ -4118,6 +4127,240 @@ try_again:
     return broken_ei;
 }
 
+
+/* User output of join array */
+static void
+join_array_display(struct th_es_t * tesp, struct opts_t * op)
+{
+    bool got1, need_aes;
+    int k, j, blen, desc_len, dn_len;
+    const uint8_t * ae_bp;
+    const char * cp;
+    const uint8_t * ed_bp;
+    struct join_row_t * jrp;
+    uint8_t * t_bp;
+    char b[64];
+
+    blen = sizeof(b);
+    need_aes = (op->page_code_given &&
+                (ADD_ELEM_STATUS_DPC == op->page_code));
+    dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
+    for (k = 0, jrp = tesp->j_base, got1 = false;
+         ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
+        if (op->ind_given) {
+            if (op->ind_th != jrp->th_i)
+                continue;
+            if (! match_ind_indiv(jrp->indiv_i, op))
+                continue;
+        }
+        if (need_aes && (NULL == jrp->ae_statp))
+            continue;
+        ed_bp = jrp->elem_descp;
+        if (op->desc_name) {
+            if (NULL == ed_bp)
+                continue;
+            desc_len = sg_get_unaligned_be16(ed_bp + 2);
+            /* some element descriptor strings have trailing NULLs and
+             * count them in their length; adjust */
+            while (desc_len && ('\0' == ed_bp[4 + desc_len - 1]))
+                --desc_len;
+            if (desc_len != dn_len)
+                continue;
+            if (0 != strncmp(op->desc_name, (const char *)(ed_bp + 4),
+                             desc_len))
+                continue;
+        } else if (op->dev_slot_num >= 0) {
+            if (op->dev_slot_num != jrp->dev_slot_num)
+                continue;
+        } else if (saddr_non_zero(op->sas_addr)) {
+            for (j = 0; j < 8; ++j) {
+                if (op->sas_addr[j] != jrp->sas_addr[j])
+                    break;
+            }
+            if (j < 8)
+                continue;
+        }
+        got1 = true;
+        if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
+            continue;   /* when '-ff' and status!=OK, skip */
+        cp = etype_str(jrp->etype, b, blen);
+        if (ed_bp) {
+            desc_len = sg_get_unaligned_be16(ed_bp + 2) + 4;
+            if (desc_len > 4)
+                printf("%.*s [%d,%d]  Element type: %s\n", desc_len - 4,
+                       (const char *)(ed_bp + 4), jrp->th_i,
+                       jrp->indiv_i, cp);
+            else
+                printf("[%d,%d]  Element type: %s\n", jrp->th_i,
+                       jrp->indiv_i, cp);
+        } else
+            printf("[%d,%d]  Element type: %s\n", jrp->th_i,
+                   jrp->indiv_i, cp);
+        printf("  Enclosure Status:\n");
+        enc_status_helper("    ", jrp->enc_statp, jrp->etype, false, op);
+        if (jrp->ae_statp) {
+            printf("  Additional Element Status:\n");
+            ae_bp = jrp->ae_statp;
+            desc_len = ae_bp[1] + 2;
+            additional_elem_helper("    ",  ae_bp, desc_len, jrp->etype,
+                                   tesp, op);
+        }
+        if (jrp->thresh_inp) {
+            t_bp = jrp->thresh_inp;
+            threshold_helper("  Threshold In:\n", "    ", t_bp, jrp->etype,
+                             op);
+        }
+    }
+    if (! got1) {
+        if (op->ind_given) {
+            printf("      >>> no match on --index=%d,%d", op->ind_th,
+                   op->ind_indiv);
+            if (op->ind_indiv_last > op->ind_indiv)
+                printf("-%d\n", op->ind_indiv_last);
+            else
+                printf("\n");
+        } else if (op->desc_name)
+            printf("      >>> no match on --descriptor=%s\n", op->desc_name);
+        else if (op->dev_slot_num >= 0)
+            printf("      >>> no match on --dev-slot-name=%d\n",
+                   op->dev_slot_num);
+        else if (saddr_non_zero(op->sas_addr)) {
+            printf("      >>> no match on --sas-addr=0x");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", op->sas_addr[j]);
+            printf("\n");
+        }
+    }
+}
+
+/* This is for debugging, output to stderr */
+static void
+join_array_dump(struct th_es_t * tesp, int broken_ei, struct opts_t * op)
+{
+    int k, j, blen, hex;
+    int eiioe_count = 0;
+    int eip_count = 0;
+    struct join_row_t * jrp;
+    char b[64];
+
+    blen = sizeof(b);
+    hex = op->do_hex;
+    pr2serr("Dump of join array, each line is a row. Lines start with\n");
+    pr2serr("[<element_type>: <type_hdr_index>,<elem_ind_within>]\n");
+    pr2serr("'-1' indicates overall element or not applicable.\n");
+    jrp = tesp->j_base;
+    for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
+        pr2serr("[0x%x: %d,%d] ", jrp->etype, jrp->th_i, jrp->indiv_i);
+        if (jrp->se_id > 0)
+            pr2serr("se_id=%d ", jrp->se_id);
+        pr2serr("ei_ioe,_eoe,_aess=%s", offset_str(k, hex, b, blen));
+        pr2serr(",%s", offset_str(jrp->ei_eoe, hex, b, blen));
+        pr2serr(",%s", offset_str(jrp->ei_aess, hex, b, blen));
+        pr2serr(" dsn=%s", offset_str(jrp->dev_slot_num, hex, b, blen));
+        if (op->do_join > 2) {
+            pr2serr(" sa=0x");
+            if (saddr_non_zero(jrp->sas_addr)) {
+                for (j = 0; j < 8; ++j)
+                    pr2serr("%02x", jrp->sas_addr[j]);
+            } else
+                pr2serr("0");
+        }
+        if (jrp->enc_statp)
+            pr2serr(" ES+%s", offset_str(jrp->enc_statp - enc_stat_rsp,
+                                         hex, b, blen));
+        if (jrp->elem_descp)
+            pr2serr(" ED+%s", offset_str(jrp->elem_descp - elem_desc_rsp,
+                                         hex, b, blen));
+        if (jrp->ae_statp) {
+            pr2serr(" AES+%s", offset_str(jrp->ae_statp - add_elem_rsp,
+                                          hex, b, blen));
+            if (jrp->ae_statp[0] & 0x10) {
+                ++eip_count;
+                if (jrp->ae_statp[2] & 0x3)
+                    ++eiioe_count;
+            }
+        }
+        if (jrp->thresh_inp)
+            pr2serr(" TI+%s", offset_str(jrp->thresh_inp - threshold_rsp,
+                                         hex, b, blen));
+        pr2serr("\n");
+    }
+    pr2serr(">> ES len=%s, ", offset_str(enc_stat_rsp_len, hex, b, blen));
+    pr2serr("ED len=%s, ", offset_str(elem_desc_rsp_len, hex, b, blen));
+    pr2serr("AES len=%s, ", offset_str(add_elem_rsp_len, hex, b, blen));
+    pr2serr("TI len=%s\n", offset_str(threshold_rsp_len, hex, b, blen));
+    pr2serr(">> join_arr elements=%s, ", offset_str(k, hex, b, blen));
+    pr2serr("eip_count=%s, ", offset_str(eip_count, hex, b, blen));
+    pr2serr("eiioe_count=%s ", offset_str(eiioe_count, hex, b, blen));
+    pr2serr("broken_ei=%d\n", (int)broken_ei);
+}
+
+/* EIIOE juggling (standards + heuristics) for join with AES page */
+static void
+join_juggle_aes(struct th_es_t * tesp, uint8_t * es_bp, const uint8_t * ed_bp,
+                uint8_t * t_bp)
+{
+    bool et_used_by_aes;
+    int k, j, eoe, ei4aess;
+    struct join_row_t * jrp;
+    const struct type_desc_hdr_t * tdhp;
+
+    jrp = tesp->j_base;
+    tdhp = tesp->th_base;
+    for (k = 0, eoe = 0, ei4aess = 0; k < tesp->num_ths; ++k, ++tdhp) {
+        jrp->th_i = k;
+        jrp->indiv_i = -1;
+        jrp->etype = tdhp->etype;
+        jrp->ei_eoe = -1;
+        et_used_by_aes = is_et_used_by_aes(tdhp->etype);
+        jrp->ei_aess = -1;
+        jrp->se_id = tdhp->se_id;
+        /* check es_bp < es_last_bp still in range */
+        jrp->enc_statp = es_bp;
+        es_bp += 4;
+        jrp->elem_descp = ed_bp;
+        if (ed_bp)
+            ed_bp += sg_get_unaligned_be16(ed_bp + 2) + 4;
+        jrp->ae_statp = NULL;
+        jrp->thresh_inp = t_bp;
+        jrp->dev_slot_num = -1;
+        /* assume sas_addr[8] zeroed since it's static file scope */
+        if (t_bp)
+            t_bp += 4;
+        ++jrp;
+        for (j = 0; j < tdhp->num_elements; ++j, ++jrp) {
+            if (jrp >= join_arr_lastp)
+                break;
+            jrp->th_i = k;
+            jrp->indiv_i = j;
+            jrp->ei_eoe = eoe++;
+            if (et_used_by_aes)
+                jrp->ei_aess = ei4aess++;
+            else
+                jrp->ei_aess = -1;
+            jrp->etype = tdhp->etype;
+            jrp->se_id = tdhp->se_id;
+            jrp->enc_statp = es_bp;
+            es_bp += 4;
+            jrp->elem_descp = ed_bp;
+            if (ed_bp)
+                ed_bp += sg_get_unaligned_be16(ed_bp + 2) + 4;
+            jrp->thresh_inp = t_bp;
+            jrp->dev_slot_num = -1;
+            /* assume sas_addr[8] zeroed since it's static file scope */
+            if (t_bp)
+                t_bp += 4;
+            jrp->ae_statp = NULL;
+            ++tesp->num_j_eoe;
+        }
+        if (jrp >= join_arr_lastp) {
+            ++k;
+            break;      /* leave last row all zeros */
+        }
+    }
+    tesp->num_j_rows = jrp - tesp->j_base;
+}
+
 /* Fetch Configuration, Enclosure Status, Element Descriptor, Additional
  * Element Status and optionally Threshold In pages, place in static arrays.
  * Collate (join) overall and individual elements into the static join_arr[].
@@ -4128,33 +4371,21 @@ try_again:
 static int
 join_work(int sg_fd, struct opts_t * op, bool display)
 {
-    int k, j, res, num_ths, eoe, desc_len, dn_len, ei4aess;
-    int mlen, hex, blen, eip_count, eiioe_count;
+    bool broken_ei;
+    int j, res, num_ths, mlen;
     uint32_t ref_gen_code, gen_code;
-    bool broken_ei, et_used_by_aes, got1;
-    struct join_row_t * jrp;
-    uint8_t * es_bp;
-    const uint8_t * ed_bp;
     const uint8_t * ae_bp;
-    uint8_t * t_bp;
-    /* const uint8_t * es_last_bp; */
-    /* const uint8_t * ed_last_bp; */
     const uint8_t * ae_last_bp;
-    /* const uint8_t * t_last_bp; */
-    const char * cp;
     const char * enc_state_changed = "  <<state of enclosure changed, "
                                      "please try again>>\n";
-    const struct type_desc_hdr_t * tdhp;
+    uint8_t * es_bp;
+    const uint8_t * ed_bp;
+    uint8_t * t_bp;
+    struct th_es_t * tesp;
     struct enclosure_info primary_info;
     struct th_es_t tes;
-    struct th_es_t * tesp;
-    char b[64];
 
-    eip_count = 0;
-    eiioe_count = 0;
     memset(&primary_info, 0, sizeof(primary_info));
-    hex = op->do_hex;
-    blen = sizeof(b);
     num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr, MX_ELEM_HDR,
                                       &ref_gen_code, &primary_info, op);
     if (num_ths < 0)
@@ -4283,208 +4514,23 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         t_bp = NULL;
     }
 
+
     tesp->j_base = join_arr;
-    jrp = tesp->j_base;
-    tdhp = tesp->th_base;
-    for (k = 0, eoe = 0, ei4aess = 0; k < num_ths; ++k, ++tdhp) {
-        jrp->th_i = k;
-        jrp->indiv_i = -1;
-        jrp->etype = tdhp->etype;
-        jrp->ei_eoe = -1;
-        et_used_by_aes = is_et_used_by_aes(tdhp->etype);
-        jrp->ei_aess = -1;
-        jrp->se_id = tdhp->se_id;
-        /* check es_bp < es_last_bp still in range */
-        jrp->enc_statp = es_bp;
-        es_bp += 4;
-        jrp->elem_descp = ed_bp;
-        if (ed_bp)
-            ed_bp += sg_get_unaligned_be16(ed_bp + 2) + 4;
-        jrp->ae_statp = NULL;
-        jrp->thresh_inp = t_bp;
-        jrp->dev_slot_num = -1;
-        /* assume sas_addr[8] zeroed since it's static file scope */
-        if (t_bp)
-            t_bp += 4;
-        ++jrp;
-        for (j = 0; j < tdhp->num_elements; ++j, ++jrp) {
-            if (jrp >= join_arr_lastp)
-                break;
-            jrp->th_i = k;
-            jrp->indiv_i = j;
-            jrp->ei_eoe = eoe++;
-            if (et_used_by_aes)
-                jrp->ei_aess = ei4aess++;
-            else
-                jrp->ei_aess = -1;
-            jrp->etype = tdhp->etype;
-            jrp->se_id = tdhp->se_id;
-            jrp->enc_statp = es_bp;
-            es_bp += 4;
-            jrp->elem_descp = ed_bp;
-            if (ed_bp)
-                ed_bp += sg_get_unaligned_be16(ed_bp + 2) + 4;
-            jrp->thresh_inp = t_bp;
-            jrp->dev_slot_num = -1;
-            /* assume sas_addr[8] zeroed since it's static file scope */
-            if (t_bp)
-                t_bp += 4;
-            jrp->ae_statp = NULL;
-            ++tesp->num_j_eoe;
-        }
-        if (jrp >= join_arr_lastp) {
-            ++k;
-            break;      /* leave last row all zeros */
-        }
-    }
-    tesp->num_j_rows = jrp - tesp->j_base;
+    join_juggle_aes(tesp, es_bp, ed_bp, t_bp);
 
     broken_ei = false;
     if (ae_bp)
         broken_ei = join_aes_helper(ae_bp, ae_last_bp, tesp, op);
 
-    if (op->verbose > 3) {
-        pr2serr("Dump of join array, each line is a row. Lines start with\n");
-        pr2serr("[<element_type>: <type_hdr_index>,<elem_ind_within>]\n");
-        pr2serr("'-1' indicates overall element or not applicable.\n");
-        jrp = tesp->j_base;
-        for (k = 0; ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-            pr2serr("[0x%x: %d,%d] ", jrp->etype, jrp->th_i, jrp->indiv_i);
-            if (jrp->se_id > 0)
-                pr2serr("se_id=%d ", jrp->se_id);
-            pr2serr("ei_ioe,_eoe,_aess=%s", offset_str(k, hex, b, blen));
-            pr2serr(",%s", offset_str(jrp->ei_eoe, hex, b, blen));
-            pr2serr(",%s", offset_str(jrp->ei_aess, hex, b, blen));
-            pr2serr(" dsn=%s", offset_str(jrp->dev_slot_num, hex, b, blen));
-            if (op->do_join > 2) {
-                pr2serr(" sa=0x");
-                if (saddr_non_zero(jrp->sas_addr)) {
-                    for (j = 0; j < 8; ++j)
-                        pr2serr("%02x", jrp->sas_addr[j]);
-                } else
-                    pr2serr("0");
-            }
-            if (jrp->enc_statp)
-                pr2serr(" ES+%s", offset_str(jrp->enc_statp - enc_stat_rsp,
-                                             hex, b, blen));
-            if (jrp->elem_descp)
-                pr2serr(" ED+%s", offset_str(jrp->elem_descp - elem_desc_rsp,
-                                             hex, b, blen));
-            if (jrp->ae_statp) {
-                pr2serr(" AES+%s", offset_str(jrp->ae_statp - add_elem_rsp,
-                                              hex, b, blen));
-                if (jrp->ae_statp[0] & 0x10) {
-                    ++eip_count;
-                    if (jrp->ae_statp[2] & 0x3)
-                        ++eiioe_count;
-                }
-            }
-            if (jrp->thresh_inp)
-                pr2serr(" TI+%s", offset_str(jrp->thresh_inp - threshold_rsp,
-                                             hex, b, blen));
-            pr2serr("\n");
-        }
-        pr2serr(">> ES len=%s, ", offset_str(enc_stat_rsp_len, hex, b, blen));
-        pr2serr("ED len=%s, ", offset_str(elem_desc_rsp_len, hex, b, blen));
-        pr2serr("AES len=%s, ", offset_str(add_elem_rsp_len, hex, b, blen));
-        pr2serr("TI len=%s\n", offset_str(threshold_rsp_len, hex, b, blen));
-        pr2serr(">> join_arr elements=%s, ", offset_str(k, hex, b, blen));
-        pr2serr("eip_count=%s, ", offset_str(eip_count, hex, b, blen));
-        pr2serr("eiioe_count=%s ", offset_str(eiioe_count, hex, b, blen));
-        pr2serr("broken_ei=%d\n", (int)broken_ei);
-    }
+    if (op->verbose > 3)
+        join_array_dump(tesp, broken_ei, op);
 
     join_done = true;
-    if (! display)      /* probably wanted join_arr[] built only */
-        return 0;
+    if (display)      /* probably wanted join_arr[] built only */
+        join_array_display(tesp, op);
 
-    /* Display contents of join_arr */
-    dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
-    for (k = 0, jrp = tesp->j_base, got1 = false;
-         ((k < MX_JOIN_ROWS) && jrp->enc_statp); ++k, ++jrp) {
-        if (op->ind_given) {
-            if (op->ind_th != jrp->th_i)
-                continue;
-            if (! match_ind_indiv(jrp->indiv_i, op))
-                continue;
-        }
-        ed_bp = jrp->elem_descp;
-        if (op->desc_name) {
-            if (NULL == ed_bp)
-                continue;
-            desc_len = sg_get_unaligned_be16(ed_bp + 2);
-            /* some element descriptor strings have trailing NULLs and
-             * count them in their length; adjust */
-            while (desc_len && ('\0' == ed_bp[4 + desc_len - 1]))
-                --desc_len;
-            if (desc_len != dn_len)
-                continue;
-            if (0 != strncmp(op->desc_name, (const char *)(ed_bp + 4),
-                             desc_len))
-                continue;
-        } else if (op->dev_slot_num >= 0) {
-            if (op->dev_slot_num != jrp->dev_slot_num)
-                continue;
-        } else if (saddr_non_zero(op->sas_addr)) {
-            for (j = 0; j < 8; ++j) {
-                if (op->sas_addr[j] != jrp->sas_addr[j])
-                    break;
-            }
-            if (j < 8)
-                continue;
-        }
-        got1 = true;
-        if ((op->do_filter > 1) && (1 != (0xf & jrp->enc_statp[0])))
-            continue;   /* when '-ff' and status!=OK, skip */
-        cp = etype_str(jrp->etype, b, blen);
-        if (ed_bp) {
-            desc_len = sg_get_unaligned_be16(ed_bp + 2) + 4;
-            if (desc_len > 4)
-                printf("%.*s [%d,%d]  Element type: %s\n", desc_len - 4,
-                       (const char *)(ed_bp + 4), jrp->th_i,
-                       jrp->indiv_i, cp);
-            else
-                printf("[%d,%d]  Element type: %s\n", jrp->th_i,
-                       jrp->indiv_i, cp);
-        } else
-            printf("[%d,%d]  Element type: %s\n", jrp->th_i,
-                   jrp->indiv_i, cp);
-        printf("  Enclosure Status:\n");
-        enc_status_helper("    ", jrp->enc_statp, jrp->etype, false, op);
-        if (jrp->ae_statp) {
-            printf("  Additional Element Status:\n");
-            ae_bp = jrp->ae_statp;
-            desc_len = ae_bp[1] + 2;
-            additional_elem_helper("    ",  ae_bp, desc_len, jrp->etype,
-                                   tesp, op);
-        }
-        if (jrp->thresh_inp) {
-            t_bp = jrp->thresh_inp;
-            threshold_helper("  Threshold In:\n", "    ", t_bp, jrp->etype,
-                             op);
-        }
-    }
-    if (! got1) {
-        if (op->ind_given) {
-            printf("      >>> no match on --index=%d,%d", op->ind_th,
-                   op->ind_indiv);
-            if (op->ind_indiv_last > op->ind_indiv)
-                printf("-%d\n", op->ind_indiv_last);
-            else
-                printf("\n");
-        } else if (op->desc_name)
-            printf("      >>> no match on --descriptor=%s\n", op->desc_name);
-        else if (op->dev_slot_num >= 0)
-            printf("      >>> no match on --dev-slot-name=%d\n",
-                   op->dev_slot_num);
-        else if (saddr_non_zero(op->sas_addr)) {
-            printf("      >>> no match on --sas-addr=0x");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", op->sas_addr[j]);
-            printf("\n");
-        }
-    }
     return res;
+
 }
 
 static uint64_t

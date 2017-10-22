@@ -525,12 +525,24 @@ int
 sg_ll_receive_diag(int sg_fd, bool pcv, int pg_code, void * resp,
                    int mx_resp_len, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "receive diagnostic results";
+    return sg_ll_receive_diag_v2(sg_fd, pcv, pg_code, resp, mx_resp_len, 0,
+                                 NULL, noisy, verbose);
+}
+
+/* Invokes a SCSI RECEIVE DIAGNOSTIC RESULTS command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
+int
+sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
+                      int mx_resp_len, int timeout_secs, int * residp,
+                      bool noisy, int verbose)
+{
+    int resid = 0;
     int k, res, ret, sense_cat;
+    static const char * const cdb_name_s = "receive diagnostic results";
+    struct sg_pt_base * ptvp;
     unsigned char rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
 
     if (pcv)
         rcvdiag_cdb[1] = 0x1;
@@ -543,15 +555,23 @@ sg_ll_receive_diag(int sg_fd, bool pcv, int pg_code, void * resp,
             pr2ws("%02x ", rcvdiag_cdb[k]);
         pr2ws("\n");
     }
+    if (timeout_secs <= 0)
+        timeout_secs = DEF_PT_TIMEOUT;
 
-    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s)))) {
+        if (residp)
+            *residp = 0;
         return -1;
+    }
     set_scsi_pt_cdb(ptvp, rcvdiag_cdb, sizeof(rcvdiag_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
+    resid = get_scsi_pt_resid(ptvp);
+    if (residp)
+        *residp = resid;
     if (-1 == ret)
         ;
     else if (-2 == ret) {

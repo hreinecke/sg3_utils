@@ -32,7 +32,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.14 20171007";
+static const char * version_str = "1.15 20171020";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -107,7 +107,7 @@ usage()
             "    --help|-h          print out usage message\n"
             "    --hex|-H           print out report response in hex, then "
             "exit\n"
-            "    --offline|-l       set asymm. access state to offline, takes "
+            "    --offline|-l|-O    set asymm. access state to offline, takes "
             "relative\n"
             "                       target port id, rather than target port "
             "group id\n"

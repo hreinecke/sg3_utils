@@ -4,7 +4,7 @@ sg_rbuf \- reads data using SCSI READ BUFFER command
 .SH SYNOPSIS
 .B sg_rbuf
 [\fI\-\-buffer=EACH\fR] [\fI\-\-dio\fR] [\fI\-\-help\fR] [\fI\-\-mmap\fR]
-[\fI\-\-quick\fR] [\fI\-\-size=OVERALL\fR] [\fI\-\-test\fR]
+[\fI\-\-quick\fR] [\fI\-\-size=OVERALL\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_rbuf
@@ -58,7 +58,7 @@ sg driver will attempt to configure the DMA from the SCSI adapter to transfer
 directly into user memory. This will eliminate the copy via kernel buffers.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
-switch to older style options.
+Switch to older style options. Please use as first option.
 .TP
 \fB\-q\fR, \fB\-\-quick\fR
 only transfer the data into kernel buffers (typically by DMA from the SCSI
@@ -149,8 +149,8 @@ main description.
 use memory mapped IO if available. Equivalent to the \fI\-\-mmap\fR option
 in the main description.
 .TP
-\fB\-N\fR
-switch to the newer style options.
+\fB-N\fR, \fB\-\-new\fR
+Switch to the newer style options.
 .TP
 \fB\-q\fR
 only transfer the data into kernel buffers (typically by DMA from

@@ -340,12 +340,30 @@ sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
                    int sub_pg_code, void * resp, int mx_resp_len,
                    bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "mode sense(10)";
+    return sg_ll_mode_sense10_v2(sg_fd, llbaa, dbd, pc, pg_code, sub_pg_code,
+                                 resp, mx_resp_len, 0, NULL, noisy, verbose);
+}
+
+/* Invokes a SCSI MODE SENSE (10) command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * Adds the ability to set the command abort timeout
+ * and the ability to report the residual count. If timeout_secs is zero
+ * or less the the default command abort timeout (60 seconds) is used.
+ * If residp is non-NULL then the residual value is written where residp
+ * points. A residual value of 0 implies mx_resp_len bytes have be written
+ * where resp points. If the residual value equals mx_resp_len then no
+ * bytes have been written. */
+int
+sg_ll_mode_sense10_v2(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
+                      int sub_pg_code, void * resp, int mx_resp_len,
+                      int timeout_secs, int * residp, bool noisy, int verbose)
+{
     int res, ret, k, sense_cat, resid;
+    static const char * const cdb_name_s = "mode sense(10)";
+    struct sg_pt_base * ptvp;
     unsigned char modes_cdb[MODE_SENSE10_CMDLEN] =
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     unsigned char sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
 
     modes_cdb[1] = (unsigned char)((dbd ? 0x8 : 0) | (llbaa ? 0x10 : 0));
     modes_cdb[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
@@ -353,7 +371,7 @@ sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
     sg_put_unaligned_be16((int16_t)mx_resp_len, modes_cdb + 7);
     if (mx_resp_len > 0xffff) {
         pr2ws("mx_resp_len too big\n");
-        return -1;
+        goto gen_err;
     }
     if (verbose) {
         pr2ws("    %s cdb: ", cdb_name_s);
@@ -361,15 +379,20 @@ sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
             pr2ws("%02x ", modes_cdb[k]);
         pr2ws("\n");
     }
+    if (timeout_secs <= 0)
+        timeout_secs = DEF_PT_TIMEOUT;
+
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        goto gen_err;
     set_scsi_pt_cdb(ptvp, modes_cdb, sizeof(modes_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
+    if (residp)
+        *residp = resid;
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
@@ -407,6 +430,10 @@ sg_ll_mode_sense10(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
         memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
     }
     return ret;
+gen_err:
+    if (residp)
+        *residp = 0;
+    return -1;
 }
 
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
@@ -587,17 +614,19 @@ int
 sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
                           bool dbd, bool flexible, int mx_mpage_len,
                           int * success_mask, void * pcontrol_arr[],
-                          int * reported_len, int verbose)
+                          int * reported_lenp, int verbose)
 {
-    int k, n, res, offset, calc_len, xfer_len, resp_mode6;
+    bool resp_mode6;
+    int k, n, res, offset, calc_len, xfer_len;
+    int resid = 0;
     unsigned char buff[MODE_RESP_ARB_LEN];
     char ebuff[EBUFF_SZ];
     int first_err = 0;
 
     if (success_mask)
         *success_mask = 0;
-    if (reported_len)
-        *reported_len = 0;
+    if (reported_lenp)
+        *reported_lenp = 0;
     if (mx_mpage_len < 4)
         return 0;
     memset(ebuff, 0, sizeof(ebuff));
@@ -607,24 +636,30 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /* pc */, pg_code,
                                 sub_pg_code, buff, MODE10_RESP_HDR_LEN, true,
                                 verbose);
-    else
-        res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, dbd,
-                                 0 /* pc */, pg_code, sub_pg_code, buff,
-                                 MODE10_RESP_HDR_LEN, true, verbose);
+    else        /* MODE SENSE(10) obviously */
+        res = sg_ll_mode_sense10_v2(sg_fd, false /* llbaa */, dbd,
+                                    0 /* pc */, pg_code, sub_pg_code, buff,
+                                    MODE10_RESP_HDR_LEN, 0, &resid, true,
+                                    verbose);
     if (0 != res)
         return res;
     n = buff[0];
-    if (reported_len)
-        *reported_len = mode6 ? (n + 1) : (sg_get_unaligned_be16(buff) + 2);
+    if (reported_lenp) {
+        int m;
+
+        m = (mode6 ? (n + 1) : (sg_get_unaligned_be16(buff) + 2)) - resid;
+        if (m < 0)      /* Grrr, this should happen */
+            m = 0;
+    }
     resp_mode6 = mode6;
     if (flexible) {
         if (mode6 && (n < 3)) {
-            resp_mode6 = 0;
+            resp_mode6 = false;
             if (verbose)
                 pr2ws(">>> msense(6) but resp[0]=%d so try msense(10) "
                       "response processing\n", n);
         }
-        if ((0 == mode6) && (n > 5)) {
+        if ((! mode6) && (n > 5)) {
             if ((n > 11) && (0 == (n % 2)) && (0 == buff[4]) &&
                 (0 == buff[5]) && (0 == buff[6])) {
                 buff[1] = n;
@@ -633,7 +668,7 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
                     pr2ws(">>> msense(10) but resp[0]=%d and not msense(6) "
                           "response so fix length\n", n);
             } else
-                resp_mode6 = 1;
+                resp_mode6 = true;
         }
     }
     if (verbose && (resp_mode6 != mode6))
@@ -657,17 +692,27 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
         if (NULL == pcontrol_arr[k])
             continue;
         memset(pcontrol_arr[k], 0, mx_mpage_len);
+        resid = 0;
         if (mode6)
             res = sg_ll_mode_sense6(sg_fd, dbd, k /* pc */,
                                     pg_code, sub_pg_code, buff,
                                     calc_len, true, verbose);
         else
-            res = sg_ll_mode_sense10(sg_fd, false /* llbaa */, dbd,
-                                     k /* pc */, pg_code, sub_pg_code,
-                                     buff, calc_len, true, verbose);
-        if (0 != res) {
-            if (0 == first_err)
-                first_err = res;
+            res = sg_ll_mode_sense10_v2(sg_fd, false /* llbaa */, dbd,
+                                        k /* pc */, pg_code, sub_pg_code,
+                                        buff, calc_len, 0, &resid, true,
+                                        verbose);
+        if (res || resid) {
+            if (0 == first_err) {
+                if (res)
+                    first_err = res;
+                else {
+                    first_err = -49;    /* unexpected resid != 0 */
+                    if (verbose)
+                        pr2ws("%s: unexpected resid=%d, page=0x%x, "
+                              "pcontrol=%d\n", __func__, resid, pg_code, k);
+                }
+            }
             if (0 == k)
                 break;  /* if problem on current page, it won't improve */
             else
@@ -682,11 +727,31 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
 }
 
 /* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
- * various SG_LIB_CAT_* positive values or -1 -> other errors */
+ * various SG_LIB_CAT_* positive values or -1 -> other errors. */
 int
 sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
                 int subpg_code, int paramp, unsigned char * resp,
                 int mx_resp_len, bool noisy, int verbose)
+{
+    return sg_ll_log_sense_v2(sg_fd, ppc, sp, pc, pg_code, subpg_code,
+                              paramp, resp, mx_resp_len, 0, NULL, noisy,
+                              verbose);
+}
+
+/* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * Adds the ability to set the command abort timeout
+ * and the ability to report the residual count. If timeout_secs is zero
+ * or less the the default command abort timeout (60 seconds) is used.
+ * If residp is non-NULL then the residual value is written where residp
+ * points. A residual value of 0 implies mx_resp_len bytes have be written
+ * where resp points. If the residual value equals mx_resp_len then no
+ * bytes have been written. */
+int
+sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
+                   int subpg_code, int paramp, unsigned char * resp,
+                   int mx_resp_len, int timeout_secs, int * residp,
+                   bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "log sense";
     int res, ret, k, sense_cat, resid;
@@ -697,7 +762,7 @@ sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
 
     if (mx_resp_len > 0xffff) {
         pr2ws("mx_resp_len too big\n");
-        return -1;
+        goto gen_err;
     }
     logs_cdb[1] = (unsigned char)((ppc ? 2 : 0) | (sp ? 1 : 0));
     logs_cdb[2] = (unsigned char)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
@@ -710,16 +775,20 @@ sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
             pr2ws("%02x ", logs_cdb[k]);
         pr2ws("\n");
     }
+    if (timeout_secs <= 0)
+        timeout_secs = DEF_PT_TIMEOUT;
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        goto gen_err;
     set_scsi_pt_cdb(ptvp, logs_cdb, sizeof(logs_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
+    if (residp)
+        *residp = resid;
     destruct_scsi_pt_obj(ptvp);
     if (-1 == ret)
         ;
@@ -752,6 +821,10 @@ sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
         memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
     }
     return ret;
+gen_err:
+    if (residp)
+        *residp = 0;
+    return -1;
 }
 
 /* Invokes a SCSI LOG SELECT command. Return of 0 -> success,
