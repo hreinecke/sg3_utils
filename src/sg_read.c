@@ -38,9 +38,7 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
-#ifndef major
-#include <sys/types.h>
-#endif
+#include <sys/types.h>  /* needed for lseek64() */
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <linux/major.h>
@@ -54,7 +52,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.27 20171008";
+static const char * version_str = "1.28 20171023";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

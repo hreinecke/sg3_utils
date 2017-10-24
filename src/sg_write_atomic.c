@@ -14,7 +14,8 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-#include <sys/types.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>  /* needed for lseek() */
 #include <sys/stat.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -30,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.01 20171008";
+static const char * version_str = "1.02 20171024";
 
 
 #define ME "sg_write_atomic: "
@@ -623,10 +624,10 @@ main(int argc, char * argv[])
             perror("sg_set_binary_mode");
     }
     if (op->offset > 0) {
-        off64_t off = op->offset;
+        off_t off = op->offset;
 
-/* lseek64() won't work with stdin or pipes, for example */
-        if (lseek64(infd, off, SEEK_SET) < 0) {
+        /* lseek() won't work with stdin or pipes, for example */
+        if (lseek(infd, off, SEEK_SET) < 0) {
             snprintf(ebuff,  EBUFF_SZ,
                 "couldn't offset to required position on %s",
                  op->ifilename);
