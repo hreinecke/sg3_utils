@@ -14,7 +14,6 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-#include <sys/sysmacros.h>
 #include <sys/types.h>  /* needed for lseek() */
 #include <sys/stat.h>
 #include <getopt.h>

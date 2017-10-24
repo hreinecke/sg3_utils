@@ -79,7 +79,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sun Oct 22 2017 - dgilbert at interlog dot com
+* Tue Oct 24 2017 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.43
 
