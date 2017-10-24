@@ -692,8 +692,8 @@ main(int argc, char * argv[])
         /* fill allocated buffer with zeros */
         wBuff = (unsigned char*)calloc(op->numblocks, op->bs);
         if (NULL == wBuff) {
-            pr2serr("unable to allocate %zd bytes of memory with "
-                    "calloc()\n", op->xfer_bytes);
+            pr2serr("unable to allocate %" PRId64 " bytes of memory with "
+                    "calloc()\n", (int64_t)op->xfer_bytes);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
@@ -706,8 +706,9 @@ main(int argc, char * argv[])
         }
         if (op->strict && (res != op->xfer_bytes)) {
             if (vb)
-                pr2serr("Wanted to read %zd bytes but got %zd bytes and "
-                        "--strict given\n", op->xfer_bytes, res);
+                pr2serr("Wanted to read %" PRId64 " bytes but got %" PRId64
+                        " bytes and --strict given\n",
+                        (int64_t)op->xfer_bytes, (int64_t)res);
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
