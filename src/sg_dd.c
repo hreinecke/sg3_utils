@@ -48,9 +48,7 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <sys/sysmacros.h>
-#ifndef major
-#include <sys/types.h>
-#endif
+#include <sys/types.h>  /* needed for lseek64() */
 #include <linux/fs.h>   /* <sys/mount.h> */
 #include <linux/major.h>
 
@@ -64,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.91 20171010";
+static const char * version_str = "5.92 20171023";
 
 
 #define ME "sg_dd: "
