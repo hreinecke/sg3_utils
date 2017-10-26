@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.59 20171021";
+static const char * version_str = "0.60 20171025";
 
 #define ME "sg_xcopy: "
 
@@ -309,7 +309,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
     devminor = minor(fp->devno);
 
     if (fp->sg_type & FT_SG) {
-        snprintf(ebuff, EBUFF_SZ, "%s", fp->fname);
+        snprintf(ebuff, EBUFF_SZ, "%.500s", fp->fname);
     } else if (fp->sg_type & FT_BLOCK || fp->sg_type & FT_OTHER) {
         int fd;
 
@@ -1216,7 +1216,7 @@ open_if(struct xcopy_fp_t * ifp, int verbose)
         fl = O_RDONLY;
         if ((infd = open(ifp->fname, fl | flags)) < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                     ME "could not open %s for sg reading", ifp->fname);
+                     ME "could not open %.500s for sg reading", ifp->fname);
             perror(ebuff);
             return -SG_LIB_FILE_ERROR;
         }
@@ -1228,7 +1228,7 @@ open_if(struct xcopy_fp_t * ifp, int verbose)
         res = flock(infd, LOCK_EX | LOCK_NB);
         if (res < 0) {
             close(infd);
-            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %.500s "
                      "failed", ifp->fname);
             perror(ebuff);
             return -SG_LIB_FLOCK_ERR;
@@ -1259,7 +1259,7 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
             flags |= O_EXCL;
         if ((outfd = open(ofp->fname, flags)) < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                     ME "could not open %s for sg writing", ofp->fname);
+                     ME "could not open %.500s for sg writing", ofp->fname);
             perror(ebuff);
             return -SG_LIB_FILE_ERROR;
         }
@@ -1271,7 +1271,7 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
         res = flock(outfd, LOCK_EX | LOCK_NB);
         if (res < 0) {
             close(outfd);
-            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %.500s "
                      "failed", ofp->fname);
             perror(ebuff);
             return -SG_LIB_FLOCK_ERR;

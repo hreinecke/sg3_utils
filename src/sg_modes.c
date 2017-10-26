@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.52 20171020";
+static const char * version_str = "1.53 20171025";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -678,6 +678,7 @@ static struct page_code_desc pc_desc_t_sas[] = {
     {0x19, 0x1, "Phy control and discover (SAS)"},
     {0x19, 0x2, "Shared port control (SAS)"},
     {0x19, 0x3, "Enhanced phy control (SAS)"},
+    {0x19, 0x4, "Out of band management control (SAS)"},        /* spl5r01 */
 };
 
 static struct page_code_desc pc_desc_t_adc[] = {
