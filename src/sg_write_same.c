@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.17 20171008";
+static const char * version_str = "1.18 20171025";
 
 
 #define ME "sg_write_same: "
@@ -50,7 +50,7 @@ static const char * version_str = "1.17 20171008";
 #define DEF_WS_CDB_SIZE WRITE_SAME10_LEN
 #define DEF_WS_NUMBLOCKS 1
 #define MAX_XFER_LEN (64 * 1024)
-#define EBUFF_SZ 256
+#define EBUFF_SZ 512
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -564,7 +564,7 @@ main(int argc, char * argv[])
                     perror("sg_set_binary_mode");
             } else {
                 if ((infd = open(op->ifilename, O_RDONLY)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
+                    snprintf(ebuff, EBUFF_SZ, ME "could not open %.400s for "
                              "reading", op->ifilename);
                     perror(ebuff);
                     ret = SG_LIB_FILE_ERROR;
@@ -574,7 +574,7 @@ main(int argc, char * argv[])
             }
             res = read(infd, wBuff, op->xfer_len);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
+                snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %.400s",
                          op->ifilename);
                 perror(ebuff);
                 if (! got_stdin)
