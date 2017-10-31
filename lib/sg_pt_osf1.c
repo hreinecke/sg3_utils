@@ -492,6 +492,15 @@ get_scsi_pt_os_err(const struct sg_pt_base * vp)
     return ptp->os_err;
 }
 
+bool
+pt_device_is_nvme(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    if (vp) { ; }       /* suppress warings */
+    return false;
+}
+
 char *
 get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
                               char * b)

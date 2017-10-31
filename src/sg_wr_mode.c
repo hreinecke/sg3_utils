@@ -29,7 +29,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.19 20171010";
+static const char * version_str = "1.20 20171030";
 
 #define ME "sg_wr_mode: "
 
@@ -322,6 +322,7 @@ int main(int argc, char * argv[])
     unsigned char mask_in[MX_ALLOC_LEN];
     unsigned char ref_md[MX_ALLOC_LEN];
     char ebuff[EBUFF_SZ];
+    char errStr[128];
     char b[80];
     struct sg_simple_inquiry_resp inq_data;
     int ret = 0;
@@ -450,6 +451,7 @@ int main(int argc, char * argv[])
 
     /* do MODE SENSE to fetch current values */
     memset(ref_md, 0, MX_ALLOC_LEN);
+    snprintf(errStr, sizeof(errStr), "MODE SENSE (%d): ", mode_6 ? 6 : 10);
     alloc_len = mode_6 ? SHORT_ALLOC_LEN : MX_ALLOC_LEN;
     if (mode_6)
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /*current */, pg_code,
@@ -462,28 +464,25 @@ int main(int argc, char * argv[])
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("MODE SENSE (%d) not supported, try '--len=%d'\n",
-                    (mode_6 ? 6 : 10), (mode_6 ? 10 : 6));
+            pr2serr("%snot supported, try '--len=%d'\n", errStr,
+                    (mode_6 ? 10 : 6));
         else {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            pr2serr("MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), b);
+            pr2serr("%s%s\n", errStr, b);
         }
         goto err_out;
     }
     off = sg_mode_page_offset(ref_md, alloc_len, mode_6, ebuff, EBUFF_SZ);
     if (off < 0) {
-        pr2serr("MODE SENSE (%d): %s\n", (mode_6 ? 6 : 10), ebuff);
+        pr2serr("%s%s\n", errStr, ebuff);
         goto err_out;
     }
-    if (mode_6) {
-        hdr_len = 4;
-        md_len = ref_md[0] + 1;
-        bd_len = ref_md[3];
-    } else {
-        hdr_len = 8;
-        md_len = sg_get_unaligned_be16(ref_md + 0) + 2;
-        bd_len = sg_get_unaligned_be16(ref_md + 6);
+    md_len = sg_msense_calc_length(ref_md, alloc_len, mode_6, &bd_len);
+    if (md_len < 0) {
+        pr2serr("%ssg_msense_calc_length() failed\n", errStr);
+        goto err_out;
     }
+    hdr_len = mode_6 ? 4 : 8;
     if (got_contents) {
         if (read_in_len < 2) {
             pr2serr("contents length=%d too short\n", read_in_len);

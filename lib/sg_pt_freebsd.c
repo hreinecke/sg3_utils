@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.15 20171005 */
+/* sg_pt_freebsd version 1.16 20171030 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -527,6 +527,16 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
 #endif
     return b;
 }
+
+bool
+pt_device_is_nvme(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    if (ptp) { ; }      /* suppress warning */
+    return false;
+}
+
 
 char *
 get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)

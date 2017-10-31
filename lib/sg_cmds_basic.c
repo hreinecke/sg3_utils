@@ -35,7 +35,7 @@
 #endif
 
 
-static const char * const version_str = "1.76 20171007";
+static const char * const version_str = "1.77 20171030";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -313,6 +313,12 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                cat);
         return -1;
     }
+}
+
+bool
+sg_cmds_is_nvme(const struct sg_pt_base * ptvp)
+{
+    return pt_device_is_nvme(ptvp);
 }
 
 static struct sg_pt_base *

@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.17 20171005 */
+/* sg_pt_win32 version 1.18 20171030 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -765,6 +765,14 @@ get_scsi_pt_os_err(const struct sg_pt_base * vp)
     return psp->os_err;
 }
 
+bool
+pt_device_is_nvme(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_win32_scsi * psp = vp->implp;
+
+    if (vp) { ; }       /* suppress warings */
+    return false;
+}
 
 char *
 get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171025] [svn: r726]
+Changelog for sg3_utils-1.43 [20171030] [svn: r727]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)
@@ -83,6 +83,7 @@ Changelog for sg3_utils-1.43 [20171025] [svn: r726]
     - add sg_ll_get_lba_status32()
     - add sg_get_sfs_name() for spc5r11 (Feature sets)
     - add sg_decode_transportid_str()
+    - add sg_msense_calc_length()
     - implement 'format' argument in dStrHexStr()
     - add read buffer(16) command mode names
     - add Microcode activation sense descriptor spc5r10
@@ -93,6 +94,7 @@ Changelog for sg3_utils-1.43 [20171025] [svn: r726]
   - sg_cmds_extra: expand sg_ll_ata_pt() to send new
     Ata pass-through(32) command (sat4r05)
   - sg_sat_identify: expand to take --len=32
+  - sg_pt: add dummy pt_device_is_nvme()
   - rescan-scsi-bus.sh: harden code
     - fixes from Suse; bump version to: 20160511
     - add to install list in Makefile, hope it does

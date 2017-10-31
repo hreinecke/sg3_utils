@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.53 20171025";
+static const char * version_str = "1.54 20171030";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -919,8 +919,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
             }
         }
         if (0 == res) {
-            len = op->do_six ? (rbuf[0] + 1) :
-                               (sg_get_unaligned_be16(rbuf + 0) + 2);
+            len = sg_msense_calc_length(rbuf, mresp_len, op->do_six, NULL);
             if (resid > 0) {
                     mresp_len -= resid;
                     if (mresp_len < 0) {
@@ -986,6 +985,7 @@ main(int argc, char * argv[])
     unsigned char * rsp_buff = NULL;
     unsigned char * malloc_rsp_buff = NULL;
     unsigned char * bp;
+    const char * cdbLenStr;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts;
     char b[80];
@@ -1174,32 +1174,37 @@ main(int argc, char * argv[])
                     resp_mode6 = true;
             }
         }
+        cdbLenStr = resp_mode6 ? "6" : "10";
         if (op->do_raw || (1 == op->do_hex) || (op->do_hex > 2))
             ;
         else {
             if (resp_mode6 == op->do_six)
                 printf("Mode parameter header from MODE SENSE(%s):\n",
-                       (op->do_six ? "6" : "10"));
+                       cdbLenStr);
             else
                 printf(" >>> Mode parameter header from MODE SENSE(%s),\n"
                        "     decoded as %s byte response:\n",
-                       (op->do_six ? "6" : "10"), (resp_mode6 ? "6" : "10"));
+                       cdbLenStr, (resp_mode6 ? "6" : "10"));
+        }
+        rsp_buff_size -= resid;
+        if (rsp_buff_size < 0) {
+            pr2serr("MS(%s) resid=%d implies negative response length "
+                    "(%d)\n", cdbLenStr, resid, rsp_buff_size);
+            ret = SG_LIB_WILD_RESID;
+            goto finish;
         }
         if (resp_mode6) {
-            headerlen = 4;
-            md_len = rsp_buff[0] + 1;
-            bd_len = rsp_buff[3];
-            medium_type = rsp_buff[1];
-            specific = rsp_buff[2];
-            longlba = false;
-        } else {        /* MODE SENSE(10) with resid */
-            rsp_buff_size -= resid;
-            if (rsp_buff_size < 0) {
-                pr2serr("MS(10) resid=%d implies negative response length "
+            if (rsp_buff_size < 4) {
+                pr2serr("MS(6) resid=%d implies abridged header length "
                         "(%d)\n", resid, rsp_buff_size);
                 ret = SG_LIB_WILD_RESID;
                 goto finish;
             }
+            headerlen = 4;
+            medium_type = rsp_buff[1];
+            specific = rsp_buff[2];
+            longlba = false;
+        } else {        /* MODE SENSE(10) with resid */
             if (rsp_buff_size < 8) {
                 pr2serr("MS(10) resid=%d implies abridged header length "
                         "(%d)\n", resid, rsp_buff_size);
@@ -1207,13 +1212,18 @@ main(int argc, char * argv[])
                 goto finish;
             }
             headerlen = 8;
-            md_len = sg_get_unaligned_be16(rsp_buff + 0) + 2;
-            md_len = (md_len < rsp_buff_size) ? md_len : rsp_buff_size;
-            bd_len = sg_get_unaligned_be16(rsp_buff + 6);
             medium_type = rsp_buff[2];
             specific = rsp_buff[3];
             longlba = !!(rsp_buff[4] & 1);
         }
+        md_len = sg_msense_calc_length(rsp_buff, rsp_buff_size, resp_mode6,
+                                       &bd_len);
+        if (md_len < 0) {
+            pr2serr("MS(%s): sg_msense_calc_length() failed\n", cdbLenStr);
+            ret = SG_LIB_CAT_MALFORMED;
+            goto finish;
+        }
+        md_len = (md_len < rsp_buff_size) ? md_len : rsp_buff_size;
         if ((bd_len + headerlen) > md_len) {
             pr2serr("Invalid block descriptor length=%d, ignore\n", bd_len);
             bd_len = 0;

@@ -550,49 +550,81 @@ sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
     return ret;
 }
 
-/* MODE SENSE commands yield a response that has block descriptors followed
- * by mode pages. In most cases users are interested in the first mode page.
- * This function returns the (byte) offset of the start of the first mode
- * page. Set mode_sense_6 to true for MODE SENSE (6) and false for MODE SENSE
- * 10). Returns >= 0 is successful or -1 if failure. If there is a failure
- * a message is written to err_buff if err_buff_len > 0. */
+/* MODE SENSE commands yield a response that has header then zero or more
+ * block descriptors followed by mode pages. In most cases users are
+ * interested in the first mode page. This function returns the (byte)
+ * offset of the start of the first mode page. Set mode_sense_6 to true for
+ * MODE SENSE (6) and false for MODE SENSE (10). Returns >= 0 is successful
+ * or -1 if failure. If there is a failure a message is written to err_buff
+ * if it is non-NULL and err_buff_len > 0. */
 int
 sg_mode_page_offset(const unsigned char * resp, int resp_len,
                     bool mode_sense_6, char * err_buff, int err_buff_len)
 {
     int bd_len, calc_len, offset;
+    bool err_buff_ok = ((err_buff_len > 0) && err_buff);
 
-    if ((NULL == resp) || (resp_len < 4) ||
-        ((! mode_sense_6) && (resp_len < 8))) {
-        if ((err_buff_len > 0) && err_buff)
-            snprintf(err_buff, err_buff_len, "given response length too "
-                     "short: %d\n", resp_len);
-        return -1;
-    }
+    if ((NULL == resp) || (resp_len < 4))
+            goto too_short;
     if (mode_sense_6) {
         calc_len = resp[0] + 1;
         bd_len = resp[3];
         offset = bd_len + MODE6_RESP_HDR_LEN;
-    } else {
+    } else {    /* Mode sense(10) */
+        if (resp_len < 8)
+            goto too_short;
         calc_len = sg_get_unaligned_be16(resp) + 2;
         bd_len = sg_get_unaligned_be16(resp + 6);
         /* LongLBA doesn't change this calculation */
         offset = bd_len + MODE10_RESP_HDR_LEN;
     }
-    if ((offset + 2) > resp_len) {
-        if ((err_buff_len > 0) && err_buff)
-            snprintf(err_buff, err_buff_len, "given response length "
-                     "too small, offset=%d given_len=%d bd_len=%d\n",
-                     offset, resp_len, bd_len);
-        offset = -1;
-    } else if ((offset + 2) > calc_len) {
-        if ((err_buff_len > 0) && err_buff)
+    if ((offset + 2) > calc_len) {
+        if (err_buff_ok)
             snprintf(err_buff, err_buff_len, "calculated response "
                      "length too small, offset=%d calc_len=%d bd_len=%d\n",
                      offset, calc_len, bd_len);
         offset = -1;
     }
     return offset;
+too_short:
+    if (err_buff_ok)
+        snprintf(err_buff, err_buff_len, "given MS(%d) response length (%d) "
+                 "too short\n", (mode_sense_6 ? 6 : 10), resp_len);
+    return -1;
+}
+
+/* MODE SENSE commands yield a response that has header then zero or more
+ * block descriptors followed by mode pages. This functions returns the
+ * length (in bytes) of those three components. Note that the return value
+ * can exceed resp_len in which case the MODE SENSE command should be
+ * re-issued with a larger response buffer. If bd_lenp is non-NULL and if
+ * successful the block descriptor length (in bytes) is written to *bd_lenp.
+ * Set mode_sense_6 to true for MODE SENSE (6) and false for MODE SENSE (10)
+ * responses. Returns -1 if there is an error (e.g. response too short). */
+int
+sg_msense_calc_length(const unsigned char * resp, int resp_len,
+                      bool mode_sense_6, int * bd_lenp)
+{
+    int calc_len;
+
+    if (NULL == resp)
+        goto an_err;
+    if (mode_sense_6) {
+        if (resp_len < 4)
+            goto an_err;
+        calc_len = resp[0] + 1;
+    } else {
+        if (resp_len < 8)
+            goto an_err;
+        calc_len = sg_get_unaligned_be16(resp + 0) + 2;
+    }
+    if (bd_lenp)
+        *bd_lenp = mode_sense_6 ? resp[3] : sg_get_unaligned_be16(resp + 6);
+    return calc_len;
+an_err:
+    if (bd_lenp)
+        *bd_lenp = 0;
+    return -1;
 }
 
 /* Fetches current, changeable, default and/or saveable modes pages as
@@ -619,6 +651,7 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
     bool resp_mode6;
     int k, n, res, offset, calc_len, xfer_len;
     int resid = 0;
+    const int msense10_hlen = MODE10_RESP_HDR_LEN;
     unsigned char buff[MODE_RESP_ARB_LEN];
     char ebuff[EBUFF_SZ];
     int first_err = 0;
@@ -631,24 +664,23 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
         return 0;
     memset(ebuff, 0, sizeof(ebuff));
     /* first try to find length of current page response */
-    memset(buff, 0, MODE10_RESP_HDR_LEN);
+    memset(buff, 0, msense10_hlen);
     if (mode6)  /* want first 8 bytes just in case */
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /* pc */, pg_code,
-                                sub_pg_code, buff, MODE10_RESP_HDR_LEN, true,
+                                sub_pg_code, buff, msense10_hlen, true,
                                 verbose);
     else        /* MODE SENSE(10) obviously */
         res = sg_ll_mode_sense10_v2(sg_fd, false /* llbaa */, dbd,
                                     0 /* pc */, pg_code, sub_pg_code, buff,
-                                    MODE10_RESP_HDR_LEN, 0, &resid, true,
-                                    verbose);
+                                    msense10_hlen, 0, &resid, true, verbose);
     if (0 != res)
         return res;
     n = buff[0];
     if (reported_lenp) {
         int m;
 
-        m = (mode6 ? (n + 1) : (sg_get_unaligned_be16(buff) + 2)) - resid;
-        if (m < 0)      /* Grrr, this should happen */
+        m = sg_msense_calc_length(buff, msense10_hlen, mode6, NULL) - resid;
+        if (m < 0)      /* Grrr, this should not happen */
             m = 0;
     }
     resp_mode6 = mode6;
@@ -674,11 +706,10 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
     if (verbose && (resp_mode6 != mode6))
         pr2ws(">>> msense(%d) but resp[0]=%d so switch response "
               "processing\n", (mode6 ? 6 : 10), buff[0]);
-    calc_len = resp_mode6 ? (buff[0] + 1) : (sg_get_unaligned_be16(buff) + 2);
+    calc_len = sg_msense_calc_length(buff, msense10_hlen, resp_mode6, NULL);
     if (calc_len > MODE_RESP_ARB_LEN)
         calc_len = MODE_RESP_ARB_LEN;
-    offset = sg_mode_page_offset(buff, calc_len, resp_mode6,
-                                 ebuff, EBUFF_SZ);
+    offset = sg_mode_page_offset(buff, calc_len, resp_mode6, ebuff, EBUFF_SZ);
     if (offset < 0) {
         if (('\0' != ebuff[0]) && (verbose > 0))
             pr2ws("%s: %s\n", __func__, ebuff);

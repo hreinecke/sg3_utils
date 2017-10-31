@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.28 20171019 */
+/* sg_pt_linux version 1.29 20171030 */
 
 
 #include <stdio.h>
@@ -125,6 +125,7 @@ struct sg_pt_linux_scsi {
     struct sg_io_hdr io_hdr;
     int in_err;
     int os_err;
+    bool is_nvme;
 };
 
 struct sg_pt_base {
@@ -435,6 +436,14 @@ get_scsi_pt_os_err(const struct sg_pt_base * vp)
     return ptp->os_err;
 }
 
+bool
+pt_device_is_nvme(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return ptp->is_nvme;
+}
+
 /* Returns b which will contain a null char terminated string (if
  * max_b_len > 0). That string should decode Linux driver and host
  * status values. */
@@ -538,6 +547,7 @@ struct sg_pt_linux_scsi {
     int in_err;
     int os_err;
     unsigned char tmf_request[4];
+    bool is_nvme;
 };
 
 struct sg_pt_base {
@@ -930,6 +940,14 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
     if ((int)strlen(cp) >= max_b_len)
         b[max_b_len - 1] = '\0';
     return b;
+}
+
+bool
+pt_device_is_nvme(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return ptp->is_nvme;
 }
 
 /* Executes SCSI command using sg v3 interface */
