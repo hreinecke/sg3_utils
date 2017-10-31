@@ -220,14 +220,26 @@ struct sg_simple_inquiry_resp {
 int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                       bool noisy, int verbose);
 
-/* MODE SENSE commands yield a response that has block descriptors followed
- * by mode pages. In most cases users are interested in the first mode page.
- * This function returns the (byte) offset of the start of the first mode
- * page. Set mode_sense_6 to 1 for MODE SENSE (6) and 0 for MODE SENSE (10).
- * Returns >= 0 is successful or -1 if failure. If there is a failure
- * a message is written to err_buff. */
+/* MODE SENSE commands yield a response that has header then zero or more
+ * block descriptors followed by mode pages. In most cases users are
+ * interested in the first mode page. This function returns the (byte)
+ * offset of the start of the first mode page. Set mode_sense_6 to true for
+ * MODE SENSE (6) and false for MODE SENSE (10). Returns >= 0 is successful
+ * or -1 if failure. If there is a failure a message is written to err_buff
+ * if it is non-NULL and err_buff_len > 0. */
 int sg_mode_page_offset(const unsigned char * resp, int resp_len,
                         bool mode_sense_6, char * err_buff, int err_buff_len);
+
+/* MODE SENSE commands yield a response that has header then zero or more
+ * block descriptors followed by mode pages. This functions returns the
+ * length (in bytes) of those three components. Note that the return value
+ * can exceed resp_len in which case the MODE SENSE command should be
+ * re-issued with a larger response buffer. If bd_lenp is non-NULL and if
+ * successful the block descriptor length (in bytes) is written to *bd_lenp.
+ * Set mode_sense_6 to true for MODE SENSE (6) and false for MODE SENSE (10)
+ * responses. Returns -1 if there is an error (e.g. response too short). */
+int sg_msense_calc_length(const unsigned char * resp, int resp_len,
+                          bool mode_sense_6, int * bd_lenp);
 
 /* Fetches current, changeable, default and/or saveable modes pages as
  * indicated by pcontrol_arr for given pg_code and sub_pg_code. If
@@ -285,6 +297,11 @@ int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                          int pt_res, int mx_di_len,
                          const unsigned char * sense_b, bool noisy,
                          int verbose, int * o_sense_cat);
+
+/* NVMe devices use a different command set. This function will return true
+ * if the device associated with 'pvtp' is a NVME device, else it will
+ * return false (e.g. for SCSI devices). */
+bool sg_cmds_is_nvme(const struct sg_pt_base * ptvp);
 
 #ifdef __cplusplus
 }

@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.53 20171021";
+static const char * version_str = "0.54 20171030";
 
 #define ME "sg_senddiag: "
 
@@ -667,7 +667,7 @@ list_page_codes()
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg, resid;
+    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg, bd_len, resid;
     int read_in_len = 0;
     int ret = 0;
     struct opts_t opts;
@@ -796,16 +796,18 @@ main(int argc, char * argv[])
         ret = SG_LIB_CAT_OTHER;
         goto close_fini;
     }
-    if (op->do_extdur) {
+    if (op->do_extdur) {  /* fetch Extended self-test time from Control
+                           * mode page with Mode Sense(10) command*/
         res = do_modes_0a(sg_fd, rsp_buff, 32, false /* mode6 */,
                           true /* noisy */, op->do_verbose);
         if (0 == res) {
-            /* Assume mode sense(10) response without block descriptors */
-            num = sg_get_unaligned_be16(rsp_buff) - 6;
+            /* Mode sense(10) response, step over any block descriptors */
+            num = sg_msense_calc_length(rsp_buff, 32, false, &bd_len);
+            num -= (8 /* MS(10) header length */ + bd_len);
             if (num >= 0xc) {
                 int secs;
 
-                secs = sg_get_unaligned_be16(rsp_buff + 18);
+                secs = sg_get_unaligned_be16(rsp_buff + 8 + bd_len + 10);
 #ifdef SG_LIB_MINGW
                 printf("Expected extended self-test duration=%d seconds "
                        "(%g minutes)\n", secs, secs / 60.0);

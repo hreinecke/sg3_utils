@@ -122,6 +122,9 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * objp,
 /* If not available return -1 */
 int get_scsi_pt_duration_ms(const struct sg_pt_base * objp);
 
+/* Return true if device associated with 'objp' uses NVMe command set. */
+bool pt_device_is_nvme(const struct sg_pt_base * objp);
+
 
 /* Should be invoked once per objp after other processing is complete in
  * order to clean up resources. For ever successful construct_scsi_pt_obj()

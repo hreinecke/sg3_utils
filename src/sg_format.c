@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.39 20171021";
+static const char * version_str = "1.40 20171030";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -1055,11 +1055,22 @@ again_with_long_lba:
                         pr2serr("    try '-v' for more information\n");
                 goto out;
         }
+        rsp_len = (resid > 0) ? (MAX_BUFF_SZ - resid) : MAX_BUFF_SZ;
+        if (rsp_len < 0) {
+                pr2serr("%s: resid=%d implies negative response "
+                        "length of %d\n", __func__, resid, rsp_len);
+                ret = SG_LIB_WILD_RESID;
+                goto out;
+        }
+        calc_len = sg_msense_calc_length(dbuff, rsp_len, op->mode6, &bd_len);
         if (op->mode6) {
-                calc_len = dbuff[0] + 1;
-                rsp_len = calc_len;
+                if (rsp_len < 4) {
+                        pr2serr("%s: MS(6) response length too short (%d)\n",
+                                __func__, rsp_len);
+                        ret = -1;
+                        goto out;
+                }
                 dev_specific_param = dbuff[2];
-                bd_len = dbuff[3];
                 op->long_lba = false;
                 offset = 4;
                 /* prepare for mode select */
@@ -1067,25 +1078,13 @@ again_with_long_lba:
                 dbuff[1] = 0;
                 dbuff[2] = 0;
         } else {        /* MODE SENSE(10) */
-                if (resid > 0)
-                        rsp_len = MAX_BUFF_SZ - resid;
-                else
-                        rsp_len = MAX_BUFF_SZ;
-                if (rsp_len < 0) {
-                        pr2serr("%s: resid=%d implies negative response "
-                                "length of %d\n", __func__, resid, rsp_len);
-                        ret = SG_LIB_WILD_RESID;
-                        goto out;
-                }
                 if (rsp_len < 8) {
                         pr2serr("%s: MS(10) response length too short (%d)\n",
                                 __func__, rsp_len);
                         ret = -1;
                         goto out;
                 }
-                calc_len = sg_get_unaligned_be16(dbuff + 0);
                 dev_specific_param = dbuff[3];
-                bd_len = sg_get_unaligned_be16(dbuff + 6);
                 op->long_lba = !! (dbuff[4] & 1);
                 offset = 8;
                 /* prepare for mode select */

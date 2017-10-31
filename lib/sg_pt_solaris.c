@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.05 20171005 */
+/* sg_pt_solaris version 1.06 20171030 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -338,6 +338,15 @@ get_scsi_pt_os_err(const struct sg_pt_base * vp)
     const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
     return ptp->os_err;
+}
+
+bool
+pt_device_is_nvme(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+
+    if (vp) { ; }       /* suppress warings */
+    return false;
 }
 
 char *

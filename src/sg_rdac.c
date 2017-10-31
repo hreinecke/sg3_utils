@@ -29,7 +29,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.14 20171021";
+static const char * version_str = "1.15 20171030";
 
 unsigned char mode6_hdr[] = {
     0x75, /* Length */
@@ -464,8 +464,8 @@ int main(int argc, char * argv[])
                                                     true, do_verbose);
 
                 if (! res) {
-                        len = use_6_byte ? (rsp_buff[0] + 1) :
-                                (sg_get_unaligned_be16(rsp_buff + 0) + 2);
+                        len = sg_msense_calc_length(rsp_buff, 308, use_6_byte,
+                                                    NULL);
                         if (resid > 0) {
                                 len = ((308 - resid) < len) ? (308 - resid) :
                                                               len;
