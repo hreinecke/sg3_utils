@@ -32,7 +32,7 @@
  * device.
  */
 
-static const char * version_str = "1.19 20171005";
+static const char * version_str = "1.20 20171103";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -143,9 +143,9 @@ print_modes(void)
 /* Invokes a SCSI READ BUFFER(10) command (spc5r02).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
-                  uint32_t rb_offset, void * resp, int mx_resp_len,
-                  int * residp, bool noisy, int verbose)
+sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
+                     uint32_t rb_offset, void * resp, int mx_resp_len,
+                     int * residp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rb10_cb[SG_READ_BUFFER_10_CMDLEN] =
@@ -206,9 +206,9 @@ ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
 /* Invokes a SCSI READ BUFFER(16) command (spc5r02).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
-                  uint64_t rb_offset, void * resp, int mx_resp_len,
-                  int * residp, bool noisy, int verbose)
+sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
+                     uint64_t rb_offset, void * resp, int mx_resp_len,
+                     int * residp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rb16_cb[SG_READ_BUFFER_16_CMDLEN] =
@@ -453,17 +453,18 @@ main(int argc, char * argv[])
     }
 
     if (do_long)
-        res = ll_read_buffer_16(sg_fd, rb_mode, rb_mode_sp, rb_id, rb_offset,
-                                resp, rb_len, &resid, true, verbose);
+        res = sg_ll_read_buffer_16(sg_fd, rb_mode, rb_mode_sp, rb_id,
+                                   rb_offset, resp, rb_len, &resid, true,
+                                   verbose);
     else if (rb_offset > 0xffffff) {
         pr2serr("--offset value is too large for READ BUFFER(10), try "
                 "--16\n");
         ret = SG_LIB_SYNTAX_ERROR;
         goto fini;
     } else
-        res = ll_read_buffer_10(sg_fd, rb_mode, rb_mode_sp, rb_id,
-                                (uint32_t)rb_offset, resp, rb_len, &resid,
-                                true, verbose);
+        res = sg_ll_read_buffer_10(sg_fd, rb_mode, rb_mode_sp, rb_id,
+                                   (uint32_t)rb_offset, resp, rb_len, &resid,
+                                   true, verbose);
     if (0 != res) {
         char b[80];
 

@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.52 20171011";    /* spc5r10 */
+static const char * version_str = "0.53 20171102";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -181,7 +181,8 @@ static const char * const rsoc_s = "Report supported operation codes";
 
 static int
 do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
-        void * resp, int mx_resp_len, bool noisy, int verbose)
+        void * resp, int mx_resp_len, int * act_resp_lenp, bool noisy,
+        int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
@@ -229,6 +230,8 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
             break;
         }
     } else {
+        if (act_resp_lenp)
+            *act_resp_lenp = ret;
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("%s response:\n", rsoc_s);
             dStrHexErr((const char *)resp, ret, 1);
@@ -244,8 +247,8 @@ static const char * const rstmf_s = "Report supported task management "
                                     "functions";
 
 static int
-do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len, bool noisy,
-         int verbose)
+do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
+         int * act_resp_lenp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     unsigned char rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
@@ -287,6 +290,8 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len, bool noisy,
             break;
         }
     } else {
+        if (act_resp_lenp)
+            *act_resp_lenp = ret;
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("%s response:\n", rstmf_s);
             dStrHexErr((const char *)resp, ret, 1);
@@ -650,7 +655,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
                int sg_fd)
 {
     bool sa_v;
-    int k, j, m, cd_len, serv_act, len, opcode, res;
+    int k, j, m, cd_len, serv_act, len, act_len, opcode, res;
     unsigned int timeout;
     unsigned char * bp;
     unsigned char ** sort_arr = NULL;
@@ -768,9 +773,10 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
 
             memset(b, 0, sizeof(b));
             res = do_rsoc(sg_fd, false, (sa_v ? 2 : 1), opcode, serv_act,
-                          b, sizeof(b), 1, op->verbose);
+                          b, sizeof(b), &act_len, true, op->verbose);
             if (0 == res) {
                 cdb_sz = sg_get_unaligned_be16(b + 2);
+                cdb_sz = (cdb_sz < act_len) ? cdb_sz : act_len;
                 if ((cdb_sz > 0) && (cdb_sz <= 80)) {
                     if (op->do_compact)
                         printf("             usage: ");
@@ -895,7 +901,7 @@ list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, cd_len, res, len;
+    int sg_fd, cd_len, res, len, act_len, rq_len;
     int rep_opts = 0;
     const char * cp;
     struct opts_t * op;
@@ -1019,26 +1025,29 @@ main(int argc, char * argv[])
     if (op->opcode >= 0)
         rep_opts = ((op->servact >= 0) ? 2 : 1);
     memset(rsoc_buff, 0, sizeof(rsoc_buff));
-    if (op->do_taskman)
+    if (op->do_taskman) {
+        rq_len = (op->do_repd ? 16 : 4);
         res = do_rstmf(sg_fd, op->do_repd, rsoc_buff,
-                       (op->do_repd ? 16 : 4), 1, op->verbose);
-    else
-        res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->opcode,
-                      op->servact, rsoc_buff, sizeof(rsoc_buff), 1,
-                      op->verbose);
+                       rq_len, &act_len, true, op->verbose);
+    } else {
+        rq_len = sizeof(rsoc_buff);
+        res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->opcode, op->servact,
+                      rsoc_buff, rq_len, &act_len, true, op->verbose);
+    }
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
         pr2serr("%s: %s\n", op_name, b);
         goto err_out;
     }
+    act_len = (rq_len < act_len) ? rq_len : act_len;
     if (op->do_taskman) {
         if (op->do_raw) {
-            dStrRaw((const char *)rsoc_buff, (op->do_repd ? 16 : 4));
+            dStrRaw((const char *)rsoc_buff, act_len);
             goto err_out;
         }
         printf("\nTask Management Functions supported by device:\n");
         if (op->do_hex) {
-            dStrHex((const char *)rsoc_buff, (op->do_repd ? 16 : 4), 1);
+            dStrHex((const char *)rsoc_buff, act_len, 1);
             goto err_out;
         }
         if (rsoc_buff[0] & 0x80)
@@ -1088,8 +1097,7 @@ main(int argc, char * argv[])
         }
     } else if (0 == rep_opts) {  /* list all supported operation codes */
         len = sg_get_unaligned_be32(rsoc_buff + 0) + 4;
-        if (len > (int)sizeof(rsoc_buff))
-            len = sizeof(rsoc_buff);
+        len = (len < act_len) ? len : act_len;
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, len);
             goto err_out;
@@ -1098,12 +1106,12 @@ main(int argc, char * argv[])
             dStrHex((const char *)rsoc_buff, len, 1);
             goto err_out;
         }
-        list_all_codes(rsoc_buff, sizeof(rsoc_buff), op, sg_fd);
+        list_all_codes(rsoc_buff, len, op, sg_fd);
     } else {    /* asked about specific command */
         cd_len = sg_get_unaligned_be16(rsoc_buff + 2);
         len = cd_len + 4;
-        if (len > (int)sizeof(rsoc_buff))
-            len = sizeof(rsoc_buff);
+        len = (len < act_len) ? len : act_len;
+        cd_len = (cd_len < act_len) ? cd_len : act_len;
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, len);
             goto err_out;
