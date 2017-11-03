@@ -29,7 +29,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.17 20171005";
+static const char * version_str = "1.18 20171103";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -85,9 +85,9 @@ static void usage()
 }
 
 static int
-ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
-                 uint64_t lba, unsigned int num_lb, int to_secs,
-                 bool noisy, int verbose)
+sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
+                    uint64_t lba, unsigned int num_lb, int to_secs,
+                    bool noisy, int verbose)
 {
     int res, ret, k, sense_cat;
     unsigned char sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
@@ -245,8 +245,8 @@ int main(int argc, char * argv[])
     }
 
     if (do_16)
-        res = ll_sync_cache_16(sg_fd, sync_nv, immed, group, lba, num_lb,
-                               to_secs, true, verbose);
+        res = sg_ll_sync_cache_16(sg_fd, sync_nv, immed, group, lba, num_lb,
+                                  to_secs, true, verbose);
     else
         res = sg_ll_sync_cache_10(sg_fd, sync_nv, immed, group,
                                   (unsigned int)lba, num_lb, true, verbose);

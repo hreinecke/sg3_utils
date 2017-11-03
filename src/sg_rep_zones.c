@@ -34,7 +34,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.11 20171006";
+static const char * version_str = "1.12 20171103";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -63,22 +63,27 @@ static struct option long_options[] = {
 
 
 static void
-usage()
+usage(int h)
 {
+    if (h > 1) goto h_twoormore;
     pr2serr("Usage: "
             "sg_rep_zones  [--help] [--hex] [--maxlen=LEN] [--partial]\n"
             "                     [--raw] [--readonly] [--report=OPT] "
             "[--start=LBA]\n"
             "                     [--verbose] [--version] DEVICE\n");
     pr2serr("  where:\n"
-            "    --help|-h          print out usage message\n"
+            "    --help|-h          print out usage message, use twice for "
+            "more help\n"
             "    --hex|-H           output response in hexadecimal; used "
             "twice\n"
             "                       shows decoded values in hex\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> 8192 bytes)\n"
-            "    --partial|-p       sets PARTIAL bit in cdb\n"
+            "    --partial|-p       sets PARTIAL bit in cdb (def: 0 -> "
+            "zone list\n"
+            "                       length not altered by allocation length "
+            "in cdb)\n"
             "    --raw|-r           output response in binary\n"
             "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
             "    --report=OPT|-o OP    reporting options (def: 0: all "
@@ -87,7 +92,27 @@ usage()
             "                          need not be a zone starting LBA\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
-            "Performs a SCSI REPORT ZONES command.\n");
+            "Sends a SCSI REPORT ZONES command and decodes the response. "
+            "Give\nhelp option twice (e.g. '-hh') to see reporting options "
+            "enumerated.\n");
+    return;
+h_twoormore:
+    pr2serr("Reporting options:\n"
+            "    0x0    list all zones\n"
+            "    0x1    list zones with a zone condition of EMPTY\n"
+            "    0x2    list zones with a zone condition of IMPLICITLY "
+            "OPENED\n"
+            "    0x3    list zones with a zone condition of EXPLICITLY "
+            "OPENED\n"
+            "    0x4    list zones with a zone condition of CLOSED\n"
+            "    0x5    list zones with a zone condition of FULL\n"
+            "    0x6    list zones with a zone condition of READ ONLY\n"
+            "    0x7    list zones with a zone condition of OFFLINE\n"
+            "    0x10   list zones with RWP Recommended set to true\n"
+            "    0x11   list zones with Non-sequential write resources "
+            "active set to true\n"
+            "    0x3f   list zones with a zone condition of NOT WRITE "
+            "POINTER\n");
 }
 
 /* Invokes a SCSI REPORT ZONES command (ZBC).  Return of 0 -> success,
@@ -251,6 +276,7 @@ main(int argc, char * argv[])
     bool do_raw = false;
     bool o_readonly = false;
     int sg_fd, k, res, c, zl_len, len, zones, resid, rlen, zt, zc, same;
+    int do_help = 0;
     int do_hex = 0;
     int maxlen = 0;
     int reporting_opt = 0;
@@ -274,8 +300,8 @@ main(int argc, char * argv[])
         switch (c) {
         case 'h':
         case '?':
-            usage();
-            return 0;
+            ++do_help;
+            break;
         case 'H':
             ++do_hex;
             break;
@@ -320,7 +346,7 @@ main(int argc, char * argv[])
             return 0;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
-            usage();
+            usage(1);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -332,14 +358,18 @@ main(int argc, char * argv[])
         if (optind < argc) {
             for (; optind < argc; ++optind)
                 pr2serr("Unexpected extra argument: %s\n", argv[optind]);
-            usage();
+            usage(1);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
+    if (do_help) {
+        usage(do_help);
+        return 0;
+    }
     if (NULL == device_name) {
         pr2serr("missing device name!\n");
-        usage();
+        usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
 

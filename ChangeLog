@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171030] [svn: r727]
+Changelog for sg3_utils-1.43 [20171103] [svn: r728]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)
@@ -58,6 +58,7 @@ Changelog for sg3_utils-1.43 [20171030] [svn: r727]
   - sg_zone: fix debug cdb naming
   - sg_opcode: add '--enumerate' and '--pdt=' options
     - support CDLP (command duration limit page)
+    - check resid and trim response if necessary
   - sg_raw: add '--enumerate' option
   - sg_get_lba_status: add --report-type= option (sbc4r12)
     - add support for 32 byte cdb variant (sbc4r14)
@@ -67,6 +68,7 @@ Changelog for sg3_utils-1.43 [20171030] [svn: r727]
       statuses and the additional status (sbc4r12)
     - decode completion condition (sbc4r14)
   - sg_modes: add Out of band management control mpage
+  - sg_rep_zones: expand --help option information
   - manpages and usage messages: corrections from
     Gris Ge via github
   - group_number: is 6 bit field allowing 0 to 63,
