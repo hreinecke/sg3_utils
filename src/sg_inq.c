@@ -43,7 +43,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.70 20171021";    /* SPC-5 rev 17 */
+static const char * version_str = "1.71 20171104";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -94,6 +94,7 @@ static const char * version_str = "1.70 20171021";    /* SPC-5 rev 17 */
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
 #define VPD_MAN_ASS_SN 0xb1
+#define VPD_ES_DEV_CHARS 0xb1
 #define VPD_LB_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
 #define VPD_SUP_BLOCK_LENS 0xb4         /* sbc4r01 */
@@ -169,6 +170,8 @@ static struct svpd_values_name_t vpd_pg[] = {
      "identification, target device only"},
 #endif
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
+    {VPD_ES_DEV_CHARS, 0, PDT_SES, 0, "esdc",
+     "Enclosure services device characteristics (SES-4)"},
     {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv", "Logical block provisioning "
      "(SBC)"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
@@ -1108,6 +1111,8 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_REFERRALS, 0, "Referrals (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
+    {VPD_ES_DEV_CHARS, PDT_SES,
+     "Enclosure services device characteristics (ses4)"},
     {0xb0, PDT_OSD, "OSD information (osd)"},
     {0xb1, PDT_OSD, "Security token (osd)"},
     /* 0xc0 to 0xff are vendor specific */
@@ -2410,6 +2415,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_BLOCK_DEV_CHARS sbc */
 /* VPD_MAN_ASS_SN ssc */
+/* VPD_ES_DEV_CHARS ses-4 */
 static void
 decode_b1_vpd(unsigned char * buff, int len, int do_hex)
 {
@@ -2475,6 +2481,8 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
             printf("  Manufacturer-assigned serial number: %.*s\n",
                    len - 4, buff + 4);
             break;
+        case PDT_SES:   /* VPD_ES_DEV_CHARS implemented in sg_vpd, not here */
+            /* fall through */
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
             dStrHex((const char *)buff, len, 0);

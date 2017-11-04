@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.30 20171012";  /* spc5r16 + sbc4r14 */
+static const char * version_str = "1.31 20171104";  /* spc5r17 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -66,6 +66,7 @@ static const char * version_str = "1.30 20171012";  /* spc5r16 + sbc4r14 */
 #define VPD_BLOCK_DEV_CHARS 0xb1        /* SBC-3 */
 #define VPD_MAN_ASS_SN 0xb1             /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1         /* OSD */
+#define VPD_ES_DEV_CHARS 0xb1           /* SES-4 */
 #define VPD_TA_SUPPORTED 0xb2           /* SSC-3 */
 #define VPD_LB_PROVISIONING 0xb2        /* SBC-3 */
 #define VPD_REFERRALS 0xb3              /* SBC-3 */
@@ -197,6 +198,8 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_DTDE_ADDRESS, 0, 1, "dtde",
      "Data transfer device element address (SSC)"},
     {VPD_EXT_INQ, 0, -1, "ei", "Extended inquiry data"},
+    {VPD_ES_DEV_CHARS, 0, PDT_SES, "esdc",
+     "Enclosure services device characteristics"},
     {VPD_IMP_OP_DEF, 0, -1, "iod",
      "Implemented operating definition (obsolete)"},
     {VPD_LB_PROTECTION, 0, 0, "lbpro", "Logical block protection (SSC)"},
@@ -2185,6 +2188,7 @@ static const char * product_type_arr[] =
 /* VPD_BLOCK_DEV_CHARS sbc */
 /* VPD_MAN_ASS_SN ssc */
 /* VPD_SECURITY_TOKEN osd */
+/* VPD_ES_DEV_CHARS ses-4 */
 static void
 decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
 {
@@ -2257,6 +2261,22 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         printf("  Manufacturer-assigned serial number: %.*s\n",
                len - 4, buff + 4);
         break;
+    case PDT_SES:	/* T10/17-142r1 -> ses4r02 ?? */
+        if (len < 8) {
+            pr2serr("Enclosure service device characteristics VPD page "
+		    "length too short=%d\n", len);
+            return;
+        }
+        printf("  SESDNLD=%d\n", !! (0x2 & buff[4]));
+        printf("  SPCDNLD=%d\n", !! (0x1 & buff[4]));
+        printf("  DMAS=%d\n", !! (0x80 & buff[6]));
+        printf("  DMSAS=%d\n", !! (0x40 & buff[6]));
+        printf("  DMOAS=%d\n", !! (0x20 & buff[6]));
+        printf("  DMOSAS=%d\n", !! (0x10 & buff[6]));
+        printf("  DMOSASDS=%d\n", !! (0x8 & buff[6]));
+        printf("  DMOSDS=%d\n", !! (0x4 & buff[6]));
+        printf("  ADMS=%d\n", !! (0x1 & buff[6]));
+	break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
         dStrHexErr((const char *)buff, len, 0);

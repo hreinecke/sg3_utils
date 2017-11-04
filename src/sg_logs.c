@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.54 20171022";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.55 20171103";    /* spc5r17 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128

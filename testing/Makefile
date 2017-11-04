@@ -7,12 +7,10 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 CC = gcc
 LD = gcc
 
-EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
-	scsi_inquiry sg_excl sg_simple5 sg__sat_identify \
-	sg__sat_phy_event sg__sat_set_features sg_sat_chk_power \
-	sg_sat_smart_rd_data
-
-EXTRAS = sgq_dd
+EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
+	tst_sg_lib
+	
+EXTRAS =
 
 BSG_EXTRAS =
 
@@ -22,9 +20,17 @@ MAN_PREF = man8
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
+# For C++/clang testing
+# ## CC = gcc
+# ## CC = g++
+# ## CC = clang
+# ## CC = clang++
+
 CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -iquote ../include -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -pedantic -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+# CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c11 --analyze
+# CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c++14
 
 LDFLAGS =
 
@@ -45,47 +51,24 @@ depend dep:
 clean:
 	/bin/rm -f *.o $(EXECS) $(EXTRAS) $(BSG_EXTRAS) core .depend
 
-sg_simple1: sg_simple1.o $(LIBFILESOLD)
+sg_iovec_tst: sg_iovec_tst.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_simple2: sg_simple2.o
+sg_sense_test: sg_sense_test.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_simple3: sg_simple3.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg_simple4: sg_simple4.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg_simple16: sg_simple16.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-scsi_inquiry: scsi_inquiry.o
+sg_queue_tst: sg_queue_tst.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_excl: sg_excl.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg_simple5: sg_simple5.o $(LIBFILESNEW)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg__sat_identify: sg__sat_identify.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg__sat_phy_event: sg__sat_phy_event.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg__sat_set_features: sg__sat_set_features.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg_sat_chk_power: sg_sat_chk_power.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sg_sat_smart_rd_data: sg_sat_smart_rd_data.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^
-
-sgq_dd: sgq_dd.o $(LIBFILESOLD)
+bsg_queue_tst: bsg_queue_tst.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
+
+# building sg_chk_asc depends on a prior successful make in ../lib
+sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
+	$(LD) -o $@ $(LDFLAGS) $^
+
+tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
+	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)

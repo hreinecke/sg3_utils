@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171103] [svn: r728]
+Changelog for sg3_utils-1.43 [20171104] [svn: r729]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_atomic: new 16 and 32 byte cdbs (sbc4r04)
     - also can issue plain WRITE(16 or 32)
@@ -45,6 +45,8 @@ Changelog for sg3_utils-1.43 [20171103] [svn: r728]
     page (spc5r09)
     - block limits and block limit extension VPD pages:
       add extra info about corner cases
+    - add enclosure services device characteristics
+      VPD page (T10/170-142r1 --> ses4r02 ??)
     - add --force option to bypass checking supported
       vpd pages page and fetch requested page directly
     - add maximum inquiry|mode_page change logs fields
@@ -104,6 +106,10 @@ Changelog for sg3_utils-1.43 [20171103] [svn: r728]
   - 55-scsi-sg3_id.rules: fixes from Suse
   - https://github.com/hreinecke/sg3_utils
     branch sles15 synced 20170914
+  - move some testing utilities out of the
+    'examples' and 'utils' directory into the new
+    'testing' directory
+    directory into the 'testing' directory
   - gcc 7.2 cleanups (sysmacros.h etc)
   - clang --analyze static checker clean ups
   - shellcheck cleanup on scripts

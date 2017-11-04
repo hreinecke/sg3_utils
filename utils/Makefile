@@ -8,7 +8,7 @@ CC = gcc
 LD = gcc
 
 EXECS = hxascdmp
-EXTRA_EXECS = hxascdmp sg_chk_asc tst_sg_lib
+EXTRA_EXECS = hxascdmp
 
 MAN_PGS = hxascdmp.1
 MAN_PREF = man1
@@ -28,13 +28,6 @@ clean:
 	/bin/rm -f *.o $(EXTRA_EXECS) core .depend
 
 hxascdmp: hxascdmp.o
-	$(LD) -o $@ $(LDFLAGS) $^
-
-# building sg_chk_asc depends on a prior successful make in ../lib
-sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
-	$(LD) -o $@ $(LDFLAGS) $^
-
-tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 
