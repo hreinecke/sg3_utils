@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_MODES "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
@@ -18,8 +18,11 @@ sg_modes \- reads mode pages with SCSI MODE SENSE command
 .\" Add any additional description here
 .PP
 This utility sends a MODE SENSE SCSI command to the \fIDEVICE\fR and
-outputs the response. There is a 6 byte and 10 byte (cdb) variant of
-the MODE SENSE command, this utility defaults to the 10 byte variant.
+outputs the response. There is a 6 byte and 10 byte (cdb) variant of the
+MODE SENSE command, this utility defaults to the 10 byte variant. The SPC\-4
+standard (and SPC\-5 drafts) include a note stating that implementers should
+migrate away from the SCSI MODE SELECT(6) and MODE SENSE(6) commands in
+favour of the 10 byte variants (e.g.  MODE SEMSE(10)).
 .PP
 This utility decodes mode page headers and block descriptors but outputs
 the contents of each mode page in hex. It also has no facility to change

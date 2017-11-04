@@ -262,17 +262,31 @@ refer to the COVERAGE file.
 
 Here is a list in alphabetical order of utilities found in the 'examples'
 subdirectory:
-  - bsg_queue_tst, sg_excl, scsi_inquiry, sg_iovec_tst, sg_queue_tst,
-    sg_sat_chk_power, sg__sat_identify, sg__sat_phy_event,
-    sg__sat_set_features, sg_sat_smart_rd_data, sg_simple1, sg_simple2,
-    sg_simple3, sg_simple4, sg_simple5, sg_simple16, sg_tst_excl,
-    sg_tst_excl2, sg_tst_excl3, sg_tst_context and sg_tst_async
+  - sg_excl, scsi_inquiry, sg_sat_chk_power, sg__sat_identify,
+    sg__sat_phy_event, sg__sat_set_features, sg_sat_smart_rd_data,
+    sg_simple1, sg_simple2, sg_simple3, sg_simple4, sg_simple5,
+    sg_simple16
 
 Also in that subdirectory is a script to test sg_persist, an example data
 file for sg_persist (called "transport_ids.txt") and an example data file for
 sg_reassign (called "reassign_addr.txt"). There are several scripts
 for 'sg_senddiag -pf -raw=-' that will put some SAS disk phys into
 a "compliant jitter tolerance pattern" (CJTPAT).
+
+The 'testing' subdirectory contains source and a Makefiles to test
+kernel pass-through and associated drivers, mainly for Linux. There is
+both C code (with the extension ".c") and C++ code (with the extension
+".cpp"). There is a "Makefile" to build the C code and a "Makefile.cplus"
+to build the C++ code. Both depend on some object files from the "lib"
+subdirectory. So a sequence like this may be required prior to invoking
+one of the Mkaefiles in the directory: "cd <top_of_package> ;
+./configure ; cd lib ; make ; cd ../testing".
+
+Here is a list in alphabetical order of utilities found in the 'testing'
+subdirectory:
+  - bsg_queue_tst, sg_iovec_tst, sg_queue_tst, sg_sense_tst,
+    sg_tst_async (C++), sg_tst_context (C++), sg_tst_excl (C++),
+    sg_tst_excl2 (C++), sg_tst_excl3 (C++)
 
 The 'utils' subdirectory contains source and a Makefile to build "hxascdmp"
 which accepts binary data from stdin (or a file on the command line) and
@@ -462,4 +476,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-21st September 2017
+4th November 2017

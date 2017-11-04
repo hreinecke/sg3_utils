@@ -1,0 +1,29 @@
+PROPS-END
+Building files in this directory depends on several files being already
+built in the ../lib directory. So to build files here, the ./configure
+needs to be executed in the parent directory followed by changing
+directory to the lib directory and calling 'make' there.
+Another way is to do a top level 'make' after the ./configure which
+will make the libraries followed by all the utilities in the src/
+directory.
+
+There is an brief explanation of each example in the README file in
+the main (i.e. this directory's parent) directory. There are also
+some notes at the top of each source file.
+
+The sg_chk_asc utility decodes the SCSI additional sense code table
+found at http://www.t10.org/lists/asc-num.txt and checks it against
+the table found in sg_lib_data.c in the lib/ subdirectory. It is
+designed to keep the table in sg_lib_data.c in "sync" with the
+table at the t10.org web site.
+
+The tst_sg_lib utility exercises several functions found in sg_lib.c
+and related files in the 'lib' sibling directory. Use 'tst_sg_lib -h'
+to get more information.
+
+Those files with the extension "cpp" are C++ examples that use facilities
+in C++11. They can be built by calling 'make -f Makefile.cplus'. A
+gcc/g++ compiler of 4.7.3 vintage or later will be required.
+
+Douglas Gilbert
+4th November 2017
