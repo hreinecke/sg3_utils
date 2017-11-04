@@ -317,6 +317,7 @@ usage()
             "inquiry\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string then exit\n"
+            "    --old|-O        use old interface (use as first option)\n"
             "    --vpd|-e        vital product data (set page with "
             "'--page=PG')\n\n"
             "Performs a SCSI INQUIRY command on DEVICE or decodes INQUIRY "
@@ -380,6 +381,7 @@ usage_old()
             "    -V    output version string\n"
             "    -x    decode extended INQUIRY data VPD page (0x86)\n"
             "    -36   perform standard INQUIRY with a 36 byte response\n"
+            "    -N|--new   use new interface\n"
             "    -?    output this usage message\n\n"
             "If no options given then does a standard SCSI INQUIRY\n");
 }

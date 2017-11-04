@@ -353,17 +353,17 @@ void usage ()
                 " or\n"
                 "       sg_test_rwbuf DEVICE SZ [AW] [AR]\n");
         printf ("  where:\n"
-                "    --addrd=AR       extra bytes to fetch during READ "
+                "    --addrd=AR|-r    extra bytes to fetch during READ "
                 "BUFFER\n"
-                "    --addwr=AW       extra bytes to send to WRITE BUFFER\n"
-                "    --help           output this usage message then exit\n"
-                "    --quick          output read buffer size then exit\n"
-                "    --size=SZ        size of buffer (in bytes) to write "
+                "    --addwr=AW|-w    extra bytes to send to WRITE BUFFER\n"
+                "    --help|-l        output this usage message then exit\n"
+                "    --quick|-q       output read buffer size then exit\n"
+                "    --size=SZ|-s     size of buffer (in bytes) to write "
                 "then read back\n"
-                "    --times=NUM      number of times to run test "
+                "    --times=NUM|-t   number of times to run test "
                 "(default 1)\n"
-                "    --verbose        increase verbosity of output\n"
-                "    --version        output version then exit\n");
+                "    --verbose|-v     increase verbosity of output\n"
+                "    --version|-V     output version then exit\n");
         printf ("\nWARNING: If you access the device at the same time, e.g. "
                 "because it's a\n");
         printf (" mounted hard disk, the device's buffer may be used by the "

@@ -4,7 +4,7 @@ sg_reassign \- send SCSI REASSIGN BLOCKS command
 .SH SYNOPSIS
 .B sg_reassign
 [\fI\-\-address=A,A...\fR] [\fI\-\-dummy\fR] [\fI\-\-eight=0|1\fR]
-[\fI\-\-grown\fR] [\fI\-\-help\fR] [\fI\-\-longlist=0|1\fR]
+[\fI\-\-grown\fR] [\fI\-\-help\fR] [\fI\-\-longlist=0|1\fR] [\fI\-\-hex\fR]
 [\fI\-\-primary\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -85,6 +85,10 @@ manufacturing process. When this option is given there is no reassignment
 of blocks (i.e. this utility is passive). When this option is given then
 the \fI\-\-address=\fR option is not permitted. This list is sometimes
 referred to as the PLIST.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+print response in hex (for \fB\-g\fR, \fB\-\-grown\fR or
+\fB\-p\fR, \fB\-\-primary\fR)
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).

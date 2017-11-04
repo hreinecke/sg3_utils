@@ -70,7 +70,7 @@ usage()
     pr2serr("Usage: sg_verify [--16] [--bpc=BPC] [--count=COUNT] [--dpo] "
             "[--ebytchk=BCH]\n"
             "                 [--group=GN] [--help] [--in=IF] "
-            "[--lba=LBA] [--ndo=NDO]\n"
+            "[--lba=LBA] [--nbo=NBO]\n"
             "                 [--quiet] [--readonly] [--verbose] "
             "[--version]\n"
             "                 [--vrprotect=VRP] DEVICE\n"
@@ -88,8 +88,8 @@ usage()
             "    --ebytchk=BCH|-E BCH    sets BYTCHK value, either 1, 2 "
             "or 3 (def: 0).\n"
             "                            BCH overrides BYTCHK=1 set by "
-            "'--ndo='. If\n"
-            "                            BCH is 3 then NDO must be the LBA "
+            "'--nbo='. If\n"
+            "                            BCH is 3 then NBO must be the LBA "
             "size\n"
             "                            (plus protection size if DIF "
             "active)\n"
@@ -100,7 +100,7 @@ usage()
             "                        only active if --ebytchk=BCH given\n"
             "    --lba=LBA|-l LBA    logical block address to start "
             "verify (def: 0)\n"
-            "    --ndo=NDO|-n NDO    NDO is number of bytes placed in "
+            "    --nbo=NBO|-n NBO    NBO is number of bytes placed in "
             "data-out buffer.\n"
             "                        These are fetched from IF (or "
             "stdin) and used\n"
@@ -208,11 +208,11 @@ main(int argc, char * argv[])
             }
             lba = (uint64_t)ll;
             break;
-        case 'n':       /* number of bytes in data-out buffer */
-        case 'B':       /* undocumented, old --bytchk=NDO option */
+        case 'n':
+        case 'B':       /* undocumented, old --bytchk=NBO option */
             ndo = sg_get_num(optarg);
             if (ndo < 1) {
-                pr2serr("bad argument to '--ndo'\n");
+                pr2serr("bad argument to '--nbo'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -277,7 +277,7 @@ main(int argc, char * argv[])
         }
         bpc = (int)count;
     } else if (bytchk > 0) {
-        pr2serr("when the 'ebytchk=BCH' option is given, then '--bytchk=NDO' "
+        pr2serr("when the 'ebytchk=BCH' option is given, then '--bytchk=NBO' "
                 "must also be given\n");
         return SG_LIB_SYNTAX_ERROR;
     }

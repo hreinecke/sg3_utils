@@ -140,6 +140,7 @@ usage()
            "    --six|-6        use MODE SENSE(6), by default uses MODE "
            "SENSE(10)\n"
            "    --verbose|-v    increase verbosity\n"
+           "    --old|-O        use old interface (use as first option)\n"
            "    --version|-V    output version string then exit\n\n"
            "Performs a SCSI MODE SENSE (10 or 6) command. To access and "
            "possibly change\nmode page fields see the sdparm utility.\n");
@@ -180,6 +181,7 @@ usage_old()
            "   -v    verbose\n"
            "   -V    output version string\n"
            "   -6    Use MODE SENSE(6), by default uses MODE SENSE(10)\n"
+           "   -N|--new     use new interface\n"
            "   -?    output this usage message\n\n"
            "Performs a SCSI MODE SENSE (10 or 6) command\n");
 }

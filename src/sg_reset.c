@@ -88,7 +88,7 @@ static void
 usage(int compat_mode)
 {
     pr2serr("Usage: sg_reset [--bus] [--device] [--help] [--host] [--no-esc] "
-            "[--target]\n"
+            "[--target] [--no-escalate]\n"
             "                [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --bus|-b        SCSI bus reset (SPI concept), might be all "
@@ -106,6 +106,7 @@ usage(int compat_mode)
             "    --target|-t     target reset. The target holds the DEVICE "
             "and perhaps\n"
             "                    other LUs\n"
+            "    --no-escalate   The same as --no-esc|-N"
             "    --verbose|-v    increase the level of verbosity\n"
             "    --version|-V    print version number then exit\n\n"
             "Use SG_SCSI_RESET ioctl to send a reset to the "
