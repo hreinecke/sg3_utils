@@ -3,7 +3,7 @@
 # in the sg3_utils package. This script works as expected on the
 # author's Fujitsu MAM3184, Seagate ST373455 and ST9146803SS disks.
 #
-#  Version 1.9 20140612
+#  Version 2.0 20171104
 
 # N.B. make sure the device name is correct for your environment.
 
@@ -17,8 +17,8 @@ usage()
 {
   echo "Usage: sg_persist_tst.sh [-e] [-h] [-s] [-v] <device>"
   echo "  where:"
-  echo -n "    -e, --exclusive      exclusive access (def: write "
-  echo "exclusive)"
+  echo "    -e, --exclusive      exclusive access (def: write " \
+   "exclusive)"
   echo "    -h, --help           print usage message"
   echo "    -s, --second         use second key"
   echo "    -v, --verbose        more verbose output"
@@ -57,7 +57,7 @@ if [ $# -lt 1 ]
 fi
 
 echo ">>> try to report capabilities:"
-sg_persist -c ${verbose} $1
+sg_persist -c ${verbose} "$1"
 res=$?
 case "$res" in
     0) ;;
@@ -81,50 +81,50 @@ echo ""
 sleep 1
 
 echo ">>> check if any keys are registered:"
-sg_persist --no-inquiry --read-keys ${verbose} $1
+sg_persist --no-inquiry --read-keys ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> register a key:"
-sg_persist -n --out --register --param-sark=${kk} ${verbose} $1
+sg_persist -n --out --register --param-sark=${kk} ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> now key ${kk} should be registered:"
-sg_persist -n --read-keys ${verbose} $1
+sg_persist -n --read-keys ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> reserve the device (based on key ${kk}):"
-sg_persist -n --out --reserve --param-rk=${kk} --prout-type=${rtype} ${verbose} $1
+sg_persist -n --out --reserve --param-rk=${kk} --prout-type=${rtype} ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> check if the device is reserved (it should be now):"
-sg_persist -n --read-reservation ${verbose} $1
+sg_persist -n --read-reservation ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> try to 'read full status' (may not be supported):"
-sg_persist -n --read-full-status ${verbose} $1
+sg_persist -n --read-full-status ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> now release reservation:"
-sg_persist -n --out --release --param-rk=${kk} --prout-type=${rtype} ${verbose} $1
+sg_persist -n --out --release --param-rk=${kk} --prout-type=${rtype} ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> check if the device is reserved (it should _not_ be now):"
-sg_persist -n --read-reservation ${verbose} $1
+sg_persist -n --read-reservation ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> unregister key ${kk}:"
-sg_persist -n --out --register --param-rk=${kk} ${verbose} $1
+sg_persist -n --out --register --param-rk=${kk} ${verbose} "$1"
 sleep 1
 
 echo
 echo ">>> now key ${kk} should not be registered:"
-sg_persist -n -k ${verbose} $1
+sg_persist -n -k ${verbose} "$1"
 sleep 1
