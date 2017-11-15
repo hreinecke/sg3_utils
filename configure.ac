@@ -16,11 +16,6 @@ ifdef([AM_PROG_AR], [AM_PROG_AR], [])
 
 # check for headers
 AC_HEADER_STDC
-AC_CHECK_HEADERS([linux/types.h linux/bsg.h linux/kdev_t.h], [], [],
-     [[#ifdef HAVE_LINUX_TYPES_H
-     # include <linux/types.h>
-     #endif
-     ]])
 
 # check for functions
 AC_CHECK_FUNCS(getopt_long,
@@ -40,13 +35,26 @@ case "${host}" in
         *-*-linux-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 AC_SUBST([os_cflags], [''])
-                AC_SUBST([os_libs], ['']) ;;
+                AC_SUBST([os_libs], [''])
+		AC_CHECK_HEADERS([linux/nvme_ioctl.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+		AC_CHECK_HEADERS([linux/types.h linux/bsg.h linux/kdev_t.h], [], [],
+		     [[#ifdef HAVE_LINUX_TYPES_H
+		     # include <linux/types.h>
+		     #endif
+		     ]]) ;;
         *-*-linux*)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 AC_SUBST([os_cflags], [''])
-                AC_SUBST([os_libs], ['']) ;;
+                AC_SUBST([os_libs], [''])
+		AC_CHECK_HEADERS([linux/nvme_ioctl.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+		AC_CHECK_HEADERS([linux/types.h linux/bsg.h linux/kdev_t.h], [], [],
+		     [[#ifdef HAVE_LINUX_TYPES_H
+		     # include <linux/types.h>
+		     #endif
+		     ]]) ;;
         *-*-freebsd*|*-*-kfreebsd*-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
+		AC_DEFINE(HAVE_NVME, 1, ['Found NVMe'])
                 AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['-lcam']);;
         *-*-solaris*)
@@ -69,7 +77,13 @@ case "${host}" in
         *)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [assume sg3_utils on linux])
                 AC_SUBST([os_cflags], [''])
-                AC_SUBST([os_libs], ['']) ;;
+                AC_SUBST([os_libs], [''])
+		AC_CHECK_HEADERS([linux/nvme_ioctl.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+		AC_CHECK_HEADERS([linux/types.h linux/bsg.h linux/kdev_t.h], [], [],
+		     [[#ifdef HAVE_LINUX_TYPES_H
+		     # include <linux/types.h>
+		     #endif
+		     ]]) ;;
 esac
 
 # Define platform-specific symbol.

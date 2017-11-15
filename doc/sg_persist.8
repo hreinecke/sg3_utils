@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_PERSIST "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -414,7 +414,7 @@ The above sequence of commands was tested successfully on a Seagate Savvio
 The exit status of sg_persist is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH ENVIRONMENT VARIABLES
-If the SG_PERSIST_IN_RDONLY enviroment variable is present and only if a
+If the SG_PERSIST_IN_RDONLY environment variable is present and only if a
 PRIN command has been selected then the given \fIDEVICE\fR is opened
 read\-only (e.g. in Unix that is with the O_RDONLY flag) unless
 overridden. See the \fI\-\-readonly\fR option.

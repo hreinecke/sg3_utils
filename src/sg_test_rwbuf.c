@@ -3,7 +3,7 @@
  * heavily based on Douglas Gilbert's sg_rbuf program.
  * (c) 1999-2017 Douglas Gilbert
  *
- * Program to test the SCSI host adapter by issueing
+ * Program to test the SCSI host adapter by issuing
  * write and read operations on a device's buffer
  * and calculating checksums.
  * NOTE: If you can not reserve the buffer of the device
@@ -43,7 +43,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.12 20171020";
+static const char * version_str = "1.13 20171107";
 
 #define BPI (signed)(sizeof(int))
 

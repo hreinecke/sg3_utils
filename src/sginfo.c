@@ -5,7 +5,7 @@
  * ./sginfo [options] /dev/sg2 [replace parameters]
  *
  * Options are:
- * -6    do 6 byte mode sense + select (deafult: 10 byte)
+ * -6    do 6 byte mode sense + select (default: 10 byte)
  * -a    display all mode pages reported by the device: equivalent to '-t 63'.
  * -A    display all mode pages and subpages reported by the device: equivalent
  *       to '-t 63,255'.

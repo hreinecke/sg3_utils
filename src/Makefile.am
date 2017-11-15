@@ -8,8 +8,8 @@ bin_PROGRAMS = \
 	sg_reset_wp sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify \
 	sg_sat_phy_event sg_sat_read_gplog sg_sat_set_features sg_senddiag \
 	sg_ses sg_ses_microcode sg_start sg_stpg sg_sync sg_timestamp \
-	sg_turs sg_unmap sg_verify sg_vpd sg_wr_mode sg_write_atomic \
-	sg_write_buffer sg_write_long sg_write_same sg_write_verify sg_zone
+	sg_turs sg_unmap sg_verify sg_vpd sg_wr_mode sg_write_buffer \
+	sg_write_long sg_write_same sg_write_verify sg_write_x sg_zone
 sg_scan_SOURCES =
 
 
@@ -168,8 +168,6 @@ sg_vpd_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
 
-sg_write_atomic_LDADD = ../lib/libsgutils2.la @os_libs@
-
 sg_write_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_write_long_LDADD = ../lib/libsgutils2.la @os_libs@
@@ -177,6 +175,8 @@ sg_write_long_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_write_same_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_write_verify_LDADD = ../lib/libsgutils2.la @os_libs@
+
+sg_write_x_LDADD = ../lib/libsgutils2.la @os_libs@
 
 sg_xcopy_LDADD = ../lib/libsgutils2.la @os_libs@
 

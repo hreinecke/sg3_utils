@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_VERIFY "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -82,7 +82,7 @@ sets the BYTCHK field to \fIBCH\fR overriding the value (1) set by the
 however sbc3r34 reserves the value 2. If this option is given then
 \fI\-\-ndo=NDO\fR must also be given. If \fIBCH\fR is 3 then \fICOUNT\fR
 must be 1 and \fINDO\fR should be the size of one logical block (plus the
-size of some or all of the protection infomation if \fIVRP\fR is greater
+size of some or all of the protection information if \fIVRP\fR is greater
 than 0).
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
@@ -111,7 +111,7 @@ of the device).
 \fI\-\-in=FN\fR is given) or from stdin. Those bytes are placed in the
 data\-out buffer associated with the SCSI VERIFY command and \fINDO\fR
 is placed in the verification length field in the cdb. The default value
-for \fINDO\fR is 0 and the maximum value is dependant on the OS. If the
+for \fINDO\fR is 0 and the maximum value is dependent on the OS. If the
 \fI\-\-ebytchk=BCH\fR option is not given then the BYTCHK field in the cdb
 is set to 1.
 .TP

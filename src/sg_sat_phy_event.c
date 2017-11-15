@@ -24,7 +24,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.09 20171010";
+static const char * version_str = "1.10 20171107";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -46,7 +46,7 @@ static const char * version_str = "1.09 20171010";
 
 #define SAT_ATA_PASS_THROUGH16 0x85
 #define SAT_ATA_PASS_THROUGH16_LEN 16
-#define SAT_ATA_PASS_THROUGH12 0xa1     /* clashes with MMC BLANK comand */
+#define SAT_ATA_PASS_THROUGH12 0xa1     /* clashes with MMC BLANK command */
 #define SAT_ATA_PASS_THROUGH12_LEN 12
 #define SAT_ATA_RETURN_DESC 9  /* ATA Return (sense) Descriptor */
 #define ASCQ_ATA_PT_INFO_AVAILABLE 0x1d

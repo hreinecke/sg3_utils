@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.40 20171030";
+static const char * version_str = "1.41 20171107";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -734,7 +734,7 @@ print_read_cap(int fd, const struct opts_t * op)
                         block_size = sg_get_unaligned_be32(resp_buff + 4);
                         if (0xffffffff == last_blk_addr) {
                                 if (op->verbose)
-                                        printf("Read Capacity (10) reponse "
+                                        printf("Read Capacity (10) response "
                                                "indicates that Read Capacity "
                                                "(16) is required\n");
                                 return -2;

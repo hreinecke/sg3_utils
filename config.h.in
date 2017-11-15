@@ -15,6 +15,9 @@
 /* Define to 1 if you have the <linux/kdev_t.h> header file. */
 #undef HAVE_LINUX_KDEV_T_H
 
+/* Define to 1 if you have the <linux/nvme_ioctl.h> header file. */
+#undef HAVE_LINUX_NVME_IOCTL_H
+
 /* Define to 1 if you have the <linux/types.h> header file. */
 #undef HAVE_LINUX_TYPES_H
 
@@ -23,6 +26,9 @@
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
+
+/* Found NVMe */
+#undef HAVE_NVME
 
 /* Define to 1 if you have the `posix_fadvise' function. */
 #undef HAVE_POSIX_FADVISE

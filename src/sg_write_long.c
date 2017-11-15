@@ -8,7 +8,7 @@
  * This program issues the SCSI command WRITE LONG to a given SCSI device.
  * It sends the command with the logical block address passed as the lba
  * argument, and the transfer length set to the xfer_len argument. the
- * buffer to be writen to the device filled with 0xff, this buffer includes
+ * buffer to be written to the device filled with 0xff, this buffer includes
  * the sector data and the ECC bytes.
  *
  * This code was contributed by Saeed Bishara
@@ -34,7 +34,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20171008";
+static const char * version_str = "1.15 20171107";
 
 
 #define MAX_XFER_LEN 10000
