@@ -40,7 +40,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.17 (win32) 20171007";
+static const char * version_str = "1.18 (win32) 20171107";
 
 #define MAX_SCSI_ELEMS 2048
 #define MAX_ADAPTER_NUM 128
@@ -341,7 +341,7 @@ query_dev_uid(HANDLE hdevice, union STORAGE_DEVICE_UID_DATA * data)
 }
 
 /* Updates storage_arr based on sep. Returns 1 if update occurred, 0 if
- * no update occured. */
+ * no update occurred. */
 static int
 check_devices(const struct storage_elem * sep)
 {

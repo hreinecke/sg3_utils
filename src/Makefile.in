@@ -106,9 +106,9 @@ bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
 	sg_start$(EXEEXT) sg_stpg$(EXEEXT) sg_sync$(EXEEXT) \
 	sg_timestamp$(EXEEXT) sg_turs$(EXEEXT) sg_unmap$(EXEEXT) \
 	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) \
-	sg_write_atomic$(EXEEXT) sg_write_buffer$(EXEEXT) \
-	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
-	sg_write_verify$(EXEEXT) sg_zone$(EXEEXT) $(am__EXEEXT_1) \
+	sg_write_buffer$(EXEEXT) sg_write_long$(EXEEXT) \
+	sg_write_same$(EXEEXT) sg_write_verify$(EXEEXT) \
+	sg_write_x$(EXEEXT) sg_zone$(EXEEXT) $(am__EXEEXT_1) \
 	$(am__EXEEXT_2) $(am__EXEEXT_3)
 @OS_LINUX_TRUE@am__append_1 = \
 @OS_LINUX_TRUE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
@@ -317,9 +317,6 @@ sg_vpd_DEPENDENCIES = ../lib/libsgutils2.la
 sg_wr_mode_SOURCES = sg_wr_mode.c
 sg_wr_mode_OBJECTS = sg_wr_mode.$(OBJEXT)
 sg_wr_mode_DEPENDENCIES = ../lib/libsgutils2.la
-sg_write_atomic_SOURCES = sg_write_atomic.c
-sg_write_atomic_OBJECTS = sg_write_atomic.$(OBJEXT)
-sg_write_atomic_DEPENDENCIES = ../lib/libsgutils2.la
 sg_write_buffer_SOURCES = sg_write_buffer.c
 sg_write_buffer_OBJECTS = sg_write_buffer.$(OBJEXT)
 sg_write_buffer_DEPENDENCIES = ../lib/libsgutils2.la
@@ -332,6 +329,9 @@ sg_write_same_DEPENDENCIES = ../lib/libsgutils2.la
 sg_write_verify_SOURCES = sg_write_verify.c
 sg_write_verify_OBJECTS = sg_write_verify.$(OBJEXT)
 sg_write_verify_DEPENDENCIES = ../lib/libsgutils2.la
+sg_write_x_SOURCES = sg_write_x.c
+sg_write_x_OBJECTS = sg_write_x.$(OBJEXT)
+sg_write_x_DEPENDENCIES = ../lib/libsgutils2.la
 sg_xcopy_SOURCES = sg_xcopy.c
 sg_xcopy_OBJECTS = sg_xcopy.$(OBJEXT)
 sg_xcopy_DEPENDENCIES = ../lib/libsgutils2.la
@@ -394,10 +394,9 @@ SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_sat_read_gplog.c sg_sat_set_features.c $(sg_scan_SOURCES) \
 	sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c \
 	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
-	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_atomic.c \
-	sg_write_buffer.c sg_write_long.c sg_write_same.c \
-	sg_write_verify.c sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c \
-	sgp_dd.c
+	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
+	sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	sg_dd.c sg_decode_sense.c sg_emc_trespass.c sg_format.c \
 	sg_get_config.c sg_get_lba_status.c sg_ident.c \
@@ -412,10 +411,9 @@ DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	$(am__sg_scan_SOURCES_DIST) sg_senddiag.c sg_ses.c \
 	sg_ses_microcode.c sg_start.c sg_stpg.c sg_sync.c \
 	sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
-	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_atomic.c \
-	sg_write_buffer.c sg_write_long.c sg_write_same.c \
-	sg_write_verify.c sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c \
-	sgp_dd.c
+	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
+	sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -636,11 +634,11 @@ sg_verify_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_vpd_SOURCES = sg_vpd.c sg_vpd_vendor.c
 sg_vpd_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_wr_mode_LDADD = ../lib/libsgutils2.la @os_libs@
-sg_write_atomic_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_write_buffer_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_write_long_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_write_same_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_write_verify_LDADD = ../lib/libsgutils2.la @os_libs@
+sg_write_x_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_xcopy_LDADD = ../lib/libsgutils2.la @os_libs@
 sg_zone_LDADD = ../lib/libsgutils2.la @os_libs@
 all: all-am
@@ -950,10 +948,6 @@ sg_wr_mode$(EXEEXT): $(sg_wr_mode_OBJECTS) $(sg_wr_mode_DEPENDENCIES) $(EXTRA_sg
 	@rm -f sg_wr_mode$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_wr_mode_OBJECTS) $(sg_wr_mode_LDADD) $(LIBS)
 
-sg_write_atomic$(EXEEXT): $(sg_write_atomic_OBJECTS) $(sg_write_atomic_DEPENDENCIES) $(EXTRA_sg_write_atomic_DEPENDENCIES) 
-	@rm -f sg_write_atomic$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(sg_write_atomic_OBJECTS) $(sg_write_atomic_LDADD) $(LIBS)
-
 sg_write_buffer$(EXEEXT): $(sg_write_buffer_OBJECTS) $(sg_write_buffer_DEPENDENCIES) $(EXTRA_sg_write_buffer_DEPENDENCIES) 
 	@rm -f sg_write_buffer$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_write_buffer_OBJECTS) $(sg_write_buffer_LDADD) $(LIBS)
@@ -969,6 +963,10 @@ sg_write_same$(EXEEXT): $(sg_write_same_OBJECTS) $(sg_write_same_DEPENDENCIES) $
 sg_write_verify$(EXEEXT): $(sg_write_verify_OBJECTS) $(sg_write_verify_DEPENDENCIES) $(EXTRA_sg_write_verify_DEPENDENCIES) 
 	@rm -f sg_write_verify$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_write_verify_OBJECTS) $(sg_write_verify_LDADD) $(LIBS)
+
+sg_write_x$(EXEEXT): $(sg_write_x_OBJECTS) $(sg_write_x_DEPENDENCIES) $(EXTRA_sg_write_x_DEPENDENCIES) 
+	@rm -f sg_write_x$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_write_x_OBJECTS) $(sg_write_x_LDADD) $(LIBS)
 
 sg_xcopy$(EXEEXT): $(sg_xcopy_OBJECTS) $(sg_xcopy_DEPENDENCIES) $(EXTRA_sg_xcopy_DEPENDENCIES) 
 	@rm -f sg_xcopy$(EXEEXT)
@@ -1055,11 +1053,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd_vendor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_wr_mode.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_atomic.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_buffer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_long.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_same.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_verify.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_x.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_xcopy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_zone.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sginfo.Po@am__quote@

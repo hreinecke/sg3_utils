@@ -80,11 +80,11 @@ Here is a list of utilities that have been ported:
     sg_verify
     sg_vpd
     sg_wr_mode
-    sg_write_atomic
     sg_write_buffer
     sg_write_long
     sg_write_same
     sg_write_verify
+    sg_write_x
     sg_zone
 
 Most utility names are indicative of the main SCSI command that they execute.

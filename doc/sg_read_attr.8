@@ -1,4 +1,4 @@
-.TH SG_READ_ATTR "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_READ_ATTR "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_read_attr \- send SCSI READ ATTRIBUTE command
 .SH SYNOPSIS
@@ -37,8 +37,8 @@ is set to zero.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR=\fIFL\fR
 where \fIFL\fR is an attribute identifier in the range 0 to 65535 or \-1.
-Attribute identifiers are typical given in hexadecimal in which case the
-hex number should be prefixed by "0x" ot has a trailing "h". "\-1" is
+Attribute identifiers are typically given in hexadecimal in which case the
+hex number should be prefixed by "0x" or has a trailing "h". "\-1" is
 the default value and means 'match all'; for all other values of \fIFL\fR
 on the matching attribute is output.
 .TP

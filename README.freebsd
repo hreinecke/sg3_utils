@@ -35,6 +35,7 @@ Here is a list of utilities that have been ported:
     sg_readcap
     sg_reassign
     sg_referrals
+    sg_rep_zones
     sg_requests
     sg_rmsn
     sg_rtpg
@@ -53,11 +54,12 @@ Here is a list of utilities that have been ported:
     sg_unmap
     sg_vpd
     sg_wr_mode
-    sg_write_atomic
     sg_write_buffer
     sg_write_long
     sg_write_same
     sg_write_verify
+    sg_write_x
+    sg_zone
 
 Most utility names are indicative of the main SCSI command
 that they execute.  Some utilities are slightly higher level, for
@@ -138,4 +140,4 @@ utilities.
 
 
 Douglas Gilbert
-21st September 2017
+15th November 2017

@@ -57,6 +57,8 @@ struct sg_pt_osf1_scsi {
     int in_err;
     int os_err;
     int transport_err;
+    bool is_nvme;
+    int dev_fd;
 };
 
 struct sg_pt_base {
@@ -181,16 +183,25 @@ scsi_pt_close_device(int device_fd)
 }
 
 struct sg_pt_base *
-construct_scsi_pt_obj()
+construct_scsi_pt_obj_with_fd(int device_fd, int verbose)
 {
     struct sg_pt_osf1_scsi * ptp;
 
     ptp = (struct sg_pt_osf1_scsi *)malloc(sizeof(struct sg_pt_osf1_scsi));
     if (ptp) {
         bzero(ptp, sizeof(struct sg_pt_osf1_scsi));
+        ptp->dev_fd = (device_fd < 0) ? -1 : device_fd;
+        ptp->is_nvme = false;
         ptp->dxfer_dir = CAM_DIR_NONE;
-    }
+    } else if (verbose)
+        pr2ws("%s: malloc() out of memory\n", __func__);
     return (struct sg_pt_base *)ptp;
+}
+
+struct sg_pt_base *
+construct_scsi_pt_obj(void)
+{
+    return construct_scsi_pt_obj_with_fd(-1, 0);
 }
 
 void
@@ -353,19 +364,36 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
             pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
+    if (device_fd < 0) {
+        if (ptp->dev_fd < 0) {
+            if (verbose)
+                pr2ws("%s: No device file descriptor given\n", __func__);
+            return SCSI_PT_DO_BAD_PARAMS;
+        }
+    } else {
+        if (ptp->dev_fd >= 0) {
+            if (device_fd != ptp->dev_fd) {
+                if (verbose)
+                    pr2ws("%s: file descriptor given to create and this "
+                          "differ\n", __func__);
+                return SCSI_PT_DO_BAD_PARAMS;
+            }
+        } else
+            ptp->dev_fd = device_fd;
+    }
     if (NULL == ptp->cdb) {
         if (verbose)
             pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
-    if ((device_fd < 0) || (device_fd >= OSF1_MAXDEV)) {
+    if ((ptp->dev_fd < 0) || (ptp->dev_fd >= OSF1_MAXDEV)) {
         if (verbose)
             pr2ws("Bad file descriptor\n");
         ptp->os_err = ENODEV;
         return -ptp->os_err;
     }
-    fdchan = devicetable[device_fd];
+    fdchan = devicetable[ptp->dev_fd];
     if (NULL == fdchan) {
         if (verbose)
             pr2ws("File descriptor closed??\n");
@@ -419,7 +447,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
 
     /* If the SIM queue is frozen, release SIM queue. */
     if (ccb.cam_ch.cam_status & CAM_SIM_QFRZN)
-        release_sim(vp, device_fd, verbose);
+        release_sim(vp, ptp->dev_fd, verbose);
 
     return 0;
 }
@@ -497,8 +525,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 {
     const struct sg_pt_osf1_scsi * ptp = &vp->impl;
 
-    if (vp) { ; }       /* suppress warings */
-    return false;
+    return ptp ? ptp->is_nvme : false;
 }
 
 char *

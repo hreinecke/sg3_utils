@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.18 20171030 */
+/* sg_pt_win32 version 1.18 20171108 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,6 +81,8 @@ struct sg_pt_win32_scsi {
     int in_err;
     int os_err;                 /* pseudo unix error */
     int transport_err;          /* windows error number */
+    int dev_fd;                 /* -1 for no "file descriptor" given */
+    bool is_nvme;
     union {
         SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb_d;
         /* Last entry in structure so data buffer can be extended */
@@ -273,7 +275,7 @@ scsi_pt_close_device(int device_fd)
 }
 
 struct sg_pt_base *
-construct_scsi_pt_obj()
+construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
 {
     struct sg_pt_win32_scsi * psp;
     struct sg_pt_base * vp = NULL;
@@ -300,6 +302,8 @@ construct_scsi_pt_obj()
                 offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
             psp->swb_i.spt.TimeOutValue = DEF_TIMEOUT;
         }
+        psp->dev_fd = (dev_fd < 0) ? -1 : dev_fd;
+        psp->is_nvme = false;
         vp = malloc(sizeof(struct sg_pt_win32_scsi *)); // yes a pointer
         if (vp)
             vp->implp = psp;
@@ -307,6 +311,12 @@ construct_scsi_pt_obj()
             free(psp);
     }
     return vp;
+}
+
+struct sg_pt_base *
+construct_scsi_pt_obj(void)
+{
+    return construct_scsi_pt_obj_with_fd(-1, 0);
 }
 
 void
@@ -567,7 +577,7 @@ static int
 do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
                     int verbose)
 {
-    int index = device_fd - WIN32_FDOFFSET;
+    int index;
     struct sg_pt_win32_scsi * psp = vp->implp;
     struct sg_pt_handle * shp;
     BOOL status;
@@ -579,13 +589,30 @@ do_scsi_pt_indirect(struct sg_pt_base * vp, int device_fd, int time_secs,
             pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
+    if (device_fd < 0) {
+        if (ptp->dev_fd < 0) {
+            if (verbose)
+                pr2ws("%s: No device file descriptor given\n", __func__);
+            return SCSI_PT_DO_BAD_PARAMS;
+        }
+    } else {
+        if (ptp->dev_fd >= 0) {
+            if (device_fd != ptp->dev_fd) {
+                if (verbose)
+                    pr2ws("%s: file descriptor given to create and this "
+                          "differ\n", __func__);
+                return SCSI_PT_DO_BAD_PARAMS;
+            }
+        } else
+            ptp->dev_fd = device_fd;
+    }
     if (0 == psp->swb_i.spt.CdbLength) {
         if (verbose)
             pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
-    index = device_fd - WIN32_FDOFFSET;
+    index = psp->dev_fd - WIN32_FDOFFSET;
     if ((index < 0) || (index >= WIN32_FDOFFSET)) {
         if (verbose)
             pr2ws("Bad file descriptor\n");
@@ -770,8 +797,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = vp->implp;
 
-    if (vp) { ; }       /* suppress warings */
-    return false;
+    return psp ? psp->is_nvme : false;;
 }
 
 char *

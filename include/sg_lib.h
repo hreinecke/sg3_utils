@@ -440,6 +440,12 @@ int dStrHexStr(const char * str, int len, const char * leadin, int format,
 */
 bool sg_is_big_endian();
 
+/* Returns true if byte sequence starting at bp with a length of b_len is
+ * all zeros (for sg_all_zeros()) or all 0xff_s (for sg_all_ffs());
+ * otherwise returns false. If bp is NULL ir b_len <= 0 returns false. */
+bool sg_all_zeros(const uint8_t * bp, int b_len);
+bool sg_all_ffs(const uint8_t * bp, int b_len);
+
 /* Extract character sequence from ATA words as in the model string
  * in a IDENTIFY DEVICE response. Returns number of characters
  * written to 'ochars' before 0 character is found or 'num' words

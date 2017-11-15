@@ -42,8 +42,11 @@
 #include "sg_pt.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
+#ifdef HAVE_NVME
+#include "sg_pt_nvme.h"
+#endif
 
-static const char * version_str = "1.71 20171104";    /* SPC-5 rev 17 */
+static const char * version_str = "1.73 20171114";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -429,10 +432,10 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "B:cdeEhHiI:l:m:NOp:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:m:NOp:rsuvVx", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEhHiI:l:m:p:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:m:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #endif /* SG_LIB_LINUX */
@@ -467,7 +470,7 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
         case 'e':
             op->do_vpd = true;
             break;
-        case 'E':
+        case 'E':       /* --extended */
         case 'x':
             op->do_decode = true;
             op->do_vpd = true;
@@ -3220,8 +3223,8 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
         res = try_ata_identify(sg_fd, op->do_hex, op->do_raw,
                                op->do_verbose);
         if (0 != res) {
-            pr2serr("Both SCSI INQUIRY and fetching ATA information "
-                    "failed on %s\n", op->device_name);
+            pr2serr("SCSI INQUIRY, NVMe Identify and fetching ATA "
+                    "information failed on %s\n", op->device_name);
             return SG_LIB_CAT_OTHER;
         }
 #else
@@ -3765,6 +3768,236 @@ out:
     return res;
 }
 
+#ifdef HAVE_NVME
+
+static void
+do_nvme_identify_hex_raw(const unsigned char * b, int b_len,
+                         const struct opts_t * op)
+{
+    if (op->do_raw)
+        dStrRaw((const char *)b, b_len);
+    else if (op->do_hex) {
+        if (op->do_hex < 3) {
+            printf("data_in buffer:\n");
+            dStrHex((const char *)b, b_len, 0);
+        } else
+            dStrHex((const char *)b, b_len, -1);
+    }
+}
+
+const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
+
+static int
+do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
+              struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_din,
+              int id_din_len, const struct opts_t * op)
+{
+    bool got_eui_128 = false;
+    int ret = 0;
+    int vb = op->do_verbose;
+    uint32_t u, k, off, num_lbaf, flbas, flba_info, md_size, lb_size;
+    uint64_t ns_sz, eui_64;
+    struct sg_nvme_passthru_cmd cmd_back;
+
+    clear_scsi_pt_obj(ptvp);
+    id_cmdp->nsid = nsid;
+    id_cmdp->cdw10 = 0x0;       /* CNS=0x0 Identify NS */
+    set_scsi_pt_data_in(ptvp, id_din, id_din_len);
+    set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
+    set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
+    ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
+    if (vb > 2) {
+        pr2serr("do_scsi_pt() result is %d\n", ret);
+        pr2serr("do_scsi_pt() result via sense buffer:\n");
+        dStrHex((const char *)&cmd_back, sizeof(cmd_back), 0);
+    }
+    if (ret)
+        return ret;
+    num_lbaf = id_din[25] + 1;  /* spec says this is "0's based value" */
+    flbas = id_din[26] & 0xf;   /* index of active LBA format (for this ns) */
+    if (op->do_hex || op->do_raw) {
+        do_nvme_identify_hex_raw(id_din, sizeof(id_din), op);
+        return ret;
+    }
+    ns_sz = sg_get_unaligned_le64(id_din + 0);
+    eui_64 = sg_get_unaligned_be64(id_din + 120);  /* N.B. big endian */
+    if (! sg_all_zeros(id_din + 104, 16))
+        got_eui_128 = true;
+    printf("    Namespace size/capacity: %" PRIu64 "/%" PRIu64
+           " blocks\n", ns_sz, sg_get_unaligned_le64(id_din + 8));
+    printf("    Namespace utilization: %" PRIu64 " blocks\n",
+           sg_get_unaligned_le64(id_din + 16));
+    if (got_eui_128) {          /* N.B. big endian */
+        printf("    NGUID: 0x%02x", id_din[104]);
+        for (k = 1; k < 16; ++k)
+            printf("%02x", id_din[104 + k]);
+        printf("\n");
+    } else if (op->do_force)
+        printf("    NGUID: 0x0\n");
+    if (eui_64)
+        printf("    EUI-64: 0x%" PRIx64 "\n", eui_64); /* N.B. big endian */
+    printf("    Number of LBA formats: %u\n", num_lbaf);
+    printf("    Index LBA size: %u\n", flbas);
+    for (k = 0, off = 128; k < num_lbaf; ++k, off += 4) {
+        printf("    LBA format %u support:", k);
+        if (k == flbas)
+            printf(" <-- active\n");
+        else
+            printf("\n");
+        flba_info = sg_get_unaligned_le32(id_din + off);
+        md_size = flba_info & 0xffff;
+        lb_size = flba_info >> 16 & 0xff;
+        if (lb_size > 31) {
+            pr2serr("%s: logical block size exponent of %u implies a LB "
+                    "size larger than 4 billion bytes, ignore\n", __func__,
+                    lb_size);
+            continue;
+        }
+        lb_size = 1U << lb_size;
+        ns_sz *= lb_size;
+        ns_sz /= 500*1000*1000;
+        if (ns_sz & 0x1)
+            ns_sz = (ns_sz / 2) + 1;
+        else
+            ns_sz = ns_sz / 2;
+        u = (flba_info >> 24) & 0x3;
+        printf("      Logical block size: %u bytes\n", lb_size);
+        printf("      Approximate namespace size: %" PRIu64 " GB\n", ns_sz);
+        printf("      Metadata size: %u bytes\n", md_size);
+        printf("      Relative performance: %s [0x%x]\n", rperf[u], u);
+    }
+    return ret;
+}
+
+/* Send a NVMe Identify(CNS=1) and decode Controller info */
+static int
+do_nvme_identify(int pt_fd, const struct opts_t * op)
+{
+    bool got_fguid;
+    int ret = 0;
+    int vb = op->do_verbose;
+    uint8_t ver_min, ver_ter;
+    uint16_t ver_maj;
+    uint32_t k, ver, nsid, max_nsid;
+    uint64_t sz1, sz2;
+    struct sg_pt_base * ptvp;
+    struct sg_nvme_passthru_cmd identify_cmd;
+    struct sg_nvme_passthru_cmd cmd_back;
+    struct sg_nvme_passthru_cmd * id_cmdp = &identify_cmd;
+    uint8_t id_din[4096];
+
+    if (op->do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
+    ptvp = construct_scsi_pt_obj_with_fd(pt_fd, vb);
+    if (NULL == ptvp) {
+        pr2serr("%s: memory problem\n", __func__);
+        return SG_LIB_CAT_OTHER;
+    }
+    memset(id_cmdp, 0, sizeof(*id_cmdp));
+    id_cmdp->opcode = 0x6;
+    nsid = get_pt_nvme_nsid(ptvp);
+    id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
+    set_scsi_pt_data_in(ptvp, id_din, sizeof(id_din));
+    set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
+    set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
+    ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
+    if (vb > 2) {
+        pr2serr("do_scsi_pt result is %d\n", ret);
+        pr2serr("do_scsi_pt result via sense buffer:\n");
+        dStrHex((const char *)&cmd_back, sizeof(cmd_back), 0);
+    }
+    if (ret)
+        goto err_out;
+    max_nsid = sg_get_unaligned_le16(id_din + 516);
+    if (op->do_raw || op->do_hex) {
+        do_nvme_identify_hex_raw(id_din, sizeof(id_din), op);
+        goto skip1;
+    }
+    printf("Identify controller for %s:\n", op->device_name);
+    printf("  Model number: %.40s\n", (const char *)(id_din + 24));
+    printf("  Serial number: %.20s\n", (const char *)(id_din + 4));
+    printf("  Firmware revision: %.8s\n", (const char *)(id_din + 64));
+    ver = sg_get_unaligned_le32(id_din + 80);
+    ver_maj = (ver >> 16);
+    ver_min = (ver >> 8) & 0xff;
+    ver_ter = (ver & 0xff);
+    printf("  Version: %u.%u", ver_maj, ver_min);
+    if ((ver_maj > 1) || ((1 == ver_maj) && (ver_min > 2)) ||
+        ((1 == ver_maj) && (2 == ver_min) && (ver_ter > 0)))
+        printf(".%u\n", ver_ter);
+    else
+        printf("\n");
+    printf("  PCI vendor ID VID/SSVID: 0x%x/0x%x\n",
+           sg_get_unaligned_le16(id_din + 0),
+           sg_get_unaligned_le16(id_din + 2));
+    printf("  IEEE OUI Identifier: 0x%x\n",
+           sg_get_unaligned_le24(id_din + 73));
+    got_fguid = ! sg_all_zeros(id_din + 112, 16);
+    if (got_fguid) {
+        printf("  FGUID: 0x%02x", id_din[112]);
+        for (k = 1; k < 16; ++k)
+            printf("%02x", id_din[112 + k]);
+        printf("\n");
+    } else if (op->do_force)
+        printf("  FGUID: 0x0\n");
+    printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(id_din + 78));
+    if (op->do_force) {
+        printf("  Management endpoint capabilities, over a PCIe port: %d\n",
+               !! (0x2 & id_din[255]));
+        printf("  Management endpoint capabilities, over a SMBus/I2C port: "
+               "%d\n", !! (0x1 & id_din[255]));
+    }
+    printf("  Number of namespaces: %u\n", max_nsid);
+    sz1 = sg_get_unaligned_le64(id_din + 280);  /* lower 64 bits */
+    sz2 = sg_get_unaligned_le64(id_din + 288);  /* upper 64 bits */
+    if (sz2)
+        printf("  Total NVM capacity: huge ...\n");
+    else if (sz1)
+        printf("  Total NVM capacity: %" PRIu64 " bytes\n", sz1);
+    else if (op->do_force)
+        printf("  Total NVM capacity: 0 bytes\n");
+skip1:
+    if (nsid > 0) {
+        if ((! op->do_raw) || (op->do_hex < 3)) {
+            printf("  Namespace %u (derived from device name):\n", nsid);
+            if (nsid > max_nsid)
+                pr2serr("NSID from device (%u) should not exceed number of "
+                        "namespaces (%u)\n", nsid, max_nsid);
+        }
+        ret = do_nvme_id_ns(ptvp, nsid, id_cmdp, id_din, sizeof(id_din), op);
+        if (ret)
+            goto err_out;
+
+    } else {        /* nsid=0 so char device; loop over all namespaces */
+        for (k = 1; k <= max_nsid; ++k) {
+            if ((! op->do_raw) || (op->do_hex < 3))
+                printf("  Namespace %u (of %u):\n", k, max_nsid);
+            ret = do_nvme_id_ns(ptvp, k, id_cmdp, id_din, sizeof(id_din), op);
+            if (ret)
+                goto err_out;
+        }
+    }
+err_out:
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+#else
+
+static int
+do_nvme_identify(int pt_fd, const struct opts_t * op)
+{
+    pr2serr("%s: not implemented, no <linux/nvme_ioctl.h>\n", __func__);
+    if (op->do_verbose)
+        pr2serr("Need to build on system with NVMe development headers\n");
+    return 0;
+}
+#endif
+
 
 int
 main(int argc, char * argv[])
@@ -4007,6 +4240,11 @@ main(int argc, char * argv[])
     }
 #endif
     memset(rsp_buff, 0, sizeof(rsp_buff));
+    n = check_pt_file_handle(sg_fd, op->device_name, op->do_verbose);
+    if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
+        ret = do_nvme_identify(sg_fd, op);
+        goto fini;
+    }
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
     if (op->do_ata) {
@@ -4018,7 +4256,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_CAT_OTHER;
         } else
             ret = 0;
-        goto err_out;
+        goto fini;
     }
 #endif
 
@@ -4045,6 +4283,7 @@ main(int argc, char * argv[])
         }
     }
 
+fini:
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

@@ -30,10 +30,10 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.02 20171024";
+static const char * version_str = "1.03 20171115";
 
 
-#define ME "sg_write_atomic: "
+#define ME "sg_write_x: "
 
 #define WRITE_ATOMIC16_OP 0x9c
 #define WRITE_16_OP 0x8a
@@ -121,7 +121,7 @@ struct opts_t {
 static void
 usage()
 {
-    pr2serr("Usage: sg_write_atomic [--16] [--32] [--app-tag=AT] "
+    pr2serr("Usage: sg_write_x [--16] [--32] [--app-tag=AT] "
             "[--boundary=AB]\n"
             "                       [--bs=LBS] [--dld=DLD] [--dpo] "
             "[--fua] "

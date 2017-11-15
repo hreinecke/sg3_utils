@@ -1,4 +1,4 @@
-.TH SG_DD "8" "June 2013" "sg3_utils\-1.37" SG3_UTILS
+.TH SG_DD "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -151,10 +151,10 @@ unless 'oflag=append' or \fISEEK\fR is given.
 \fBof2\fR=\fIOFILE2\fR
 write output to \fIOFILE2\fR. The default action is not to do this additional
 write (i.e. when this option is not given). \fIOFILE2\fR is assumed to be
-a normal file or a fifo (i.e. a named pipe). \fIOFILE2\fR is opened for writing,
-created if necessary, and closed at the end of the transfer. If \fIOFILE2\fR
-is a fifo (named pipe) then some other command should be consuming that
-data (e.g. 'md5sum OFILE2'), otherwise this utility will block.
+a normal file or a fifo (i.e. a named pipe). \fIOFILE2\fR is opened for
+writing, created if necessary, and closed at the end of the transfer. If
+\fIOFILE2\fR is a fifo (named pipe) then some other command should be
+consuming that data (e.g. 'md5sum OFILE2'), otherwise this utility will block.
 .TP
 \fBoflag\fR=\fIFLAGS\fR
 where \fIFLAGS\fR is a comma separated list of one or more flags outlined
@@ -214,7 +214,7 @@ this conversion is very close to "iflag=coe" and is treated as such. See
 the "coe" flag. Note that an error on \fIOFILE\fR will stop the copy.
 .TP
 notrunc
-this conversion is accepted for compatibilty with dd and ignored since
+this conversion is accepted for compatibility with dd and ignored since
 the default action of this utility is not to truncate \fIOFILE\fR.
 .TP
 null
@@ -483,7 +483,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2013 Douglas Gilbert
+Copyright \(co 2000\-2017 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.23 20171020";    /* ses4r01 */
+static const char * version_str = "2.24 20171112";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2894,13 +2894,7 @@ truncated:
 static bool
 saddr_non_zero(const uint8_t * bp)
 {
-    int k;
-
-    for (k = 0; k < 8; ++k) {
-        if (bp[k])
-            return true;
-    }
-    return false;
+    return ! sg_all_zeros(bp, 8);
 }
 
 static const char * sas_device_type[] = {

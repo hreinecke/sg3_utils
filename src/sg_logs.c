@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.55 20171103";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.57 20171112";    /* spc5r17 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -535,9 +535,9 @@ usage(int hval)
         pr2serr(
            "  where sg_logs' lesser used options are:\n"
            "    --control=PC|-c PC    page control(PC) (default: 1)\n"
-           "                          0: current threshhold, 1: current "
+           "                          0: current threshold, 1: current "
            "cumulative\n"
-           "                          2: default threshhold, 3: default "
+           "                          2: default threshold, 3: default "
            "cumulative\n"
            "    --list|-l       list supported log page names (equivalent to "
            "'-p sp')\n"
@@ -593,8 +593,8 @@ usage_old()
            "    -A     fetch and decode all log pages and subpages\n"
            "    -b     shorten the output of some log pages\n"
            "    -c=PC    page control(PC) (default: 1)\n"
-           "                  0: current threshhold, 1: current cumulative\n"
-           "                  2: default threshhold, 3: default cumulative\n"
+           "                  0: current threshold, 1: current cumulative\n"
+           "                  2: default threshold, 3: default cumulative\n"
            "    -e     enumerate known log pages\n"
            "    -f=FL    filter match parameter code or pdt\n"
            "    -h     output in hex (default: decode if known)\n"
@@ -1319,20 +1319,6 @@ dStrRaw(const char* str, int len)
         printf("%c", str[k]);
 }
 
-/* Assumes an integral numbers of bytes pointed to by 'xp' of length
- * 'num_bytes' given. [So the number of bits modulo 8 must be zero.]
- * Returns true if all bytes are 0xff (which is the same as all bits
- * being set), else returns false. */
-static bool
-all_bits_set(const uint8_t * xp, int num_bytes)
-{
-    for ( ; num_bytes > 0; ++xp, --num_bytes) {
-        if (0xff != *xp)
-            return false;
-    }
-    return true;  /* also in degenerate case when 'num_bytes' <= 0 */
-}
-
 /* Returns 'xp' with "unknown" if all bits set; otherwise decoded (big endian)
  * number in 'xp'. Number rendered in decimal if in_hex=false otherwise in
  * hex with leading '0x' prepended. */
@@ -1340,7 +1326,7 @@ static char *
 num_or_unknown(const uint8_t * xp, int num_bytes /* max is 8 */, bool in_hex,
                char * b, int blen)
 {
-    if (all_bits_set(xp, num_bytes))
+    if (sg_all_ffs(xp, num_bytes))
         snprintf(b, blen, "unknown");
     else {
         uint64_t num = sg_get_unaligned_be(num_bytes, xp);
@@ -2796,7 +2782,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
         printf("    self-test result: %s [%d]\n", self_test_result[res], res);
         if (bp[5])
             printf("    self-test number = %d\n", (int)bp[5]);
-        if (! all_bits_set(bp + 8, 8)) {
+        if (! sg_all_ffs(bp + 8, 8)) {
             ull = sg_get_unaligned_be64(bp + 8);
             if ((res > 0) && ( res < 0xf))
                 printf("    address of first error = 0x%" PRIx64 "\n", ull);
@@ -2950,7 +2936,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 3:
             if (extra > 7) {
-                if (all_bits_set(bp + 4, 4))
+                if (sg_all_ffs(bp + 4, 4))
                     printf("  Specified cycle count over device lifetime "
                            "= -1");
                 else
@@ -2960,7 +2946,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 4:
             if (extra > 7) {
-                if (all_bits_set(bp + 4, 4))
+                if (sg_all_ffs(bp + 4, 4))
                     printf("  Accumulated start-stop cycles = -1");
                 else
                     printf("  Accumulated start-stop cycles = %u",
@@ -2969,7 +2955,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 5:
             if (extra > 7) {
-                if (all_bits_set(bp + 4, 4))
+                if (sg_all_ffs(bp + 4, 4))
                     printf("  Specified load-unload count over device "
                            "lifetime = -1");
                 else
@@ -2979,7 +2965,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         case 6:
             if (extra > 7) {
-                if (all_bits_set(bp + 4, 4))
+                if (sg_all_ffs(bp + 4, 4))
                     printf("  Accumulated load-unload cycles = -1");
                 else
                     printf("  Accumulated load-unload cycles = %u",
@@ -4051,7 +4037,7 @@ show_format_status_page(const uint8_t * resp, int len,
             if (pl < 5)
                 printf("  Format data out: <empty>\n");
             else {
-                if (all_bits_set(bp + 4, pl - 4))
+                if (sg_all_ffs(bp + 4, pl - 4))
                     printf("  Format data out: <not available>\n");
                 else {
                     printf("  Format data out:\n");
@@ -4081,7 +4067,7 @@ show_format_status_page(const uint8_t * resp, int len,
         if (is_count) {
             k = pl - 4;
             xp = bp + 4;
-            if (all_bits_set(xp, k))
+            if (sg_all_ffs(xp, k))
                 printf(" <not available>\n");
             else {
                 if (k > (int)sizeof(ull)) {
@@ -5393,7 +5379,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             }
         }
         ull = sg_get_unaligned_be(pl - 4, bp + 4);
-        all_set = all_bits_set(bp + 4, pl - 4);
+        all_set = sg_all_ffs(bp + 4, pl - 4);
         gbytes = ull / 1000000000;
         switch (pc) {
         case 0:
@@ -6000,7 +5986,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         v = sg_get_unaligned_be16(bp + 48);
         printf("    Medium transport address: 0x%x\n", v);
         v = sg_get_unaligned_be16(bp + 50);
-        printf("    Intial address: 0x%x\n", v);
+        printf("    Initial address: 0x%x\n", v);
         v = sg_get_unaligned_be16(bp + 52);
         printf("    Last successful address: 0x%x\n", v);
         v = sg_get_unaligned_be16(bp + 54);
@@ -6040,7 +6026,7 @@ volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
         pn = sg_get_unaligned_be16(xp + 2);
         ffs_last_fe = false;
         all_ffs = false;
-        if (all_bits_set(xp + 4, dl - 3)) {
+        if (sg_all_ffs(xp + 4, dl - 3)) {
             switch (xp[4 + dl - 3]) {
             case 0xff:
                 all_ffs = true;
