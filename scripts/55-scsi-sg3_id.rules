@@ -8,6 +8,9 @@ SUBSYSTEM!="block", GOTO="sg3_utils_id_end"
 ENV{DEVTYPE}=="partition", IMPORT{parent}="ID_SCSI", IMPORT{parent}="SCSI_*"
 ENV{DEVTYPE}=="partition", ENV{ID_SCSI}=="1", GOTO="compat"
 
+# Handle non-SCSI devices that implement SCSI inquiry
+KERNEL=="cciss*", ENV{DEVTYPE}=="disk", GOTO="sg_inquiry"
+
 # Ignore everything else except sd/sr
 KERNEL!="sd*[!0-9]|sr*", GOTO="sg3_utils_id_end"
 
