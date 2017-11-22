@@ -2,7 +2,24 @@
 
 ACTION=="remove", GOTO="sg3_utils_id_end"
 
-SUBSYSTEM!="block", GOTO="sg3_utils_id_end"
+SUBSYSTEM=="block", GOTO="block_dev"
+
+# SCSI devices other than "block"
+# This code used to live in 60-persistent-storage-tape.rules.
+
+# type 8 devices are "Medium Changers"
+SUBSYSTEM=="scsi_generic", KERNEL=="sg*[0-9]", ATTRS{type}=="8", \
+  GOTO="scsi_inquiry"
+SUBSYSTEM=="scsi_changer", KERNEL=="sch*[0-9]", ATTRS{type}=="8", \
+  ENV{.INQUIRY_DEV}="$root/bsg/$id", GOTO="scsi_inquiry"
+
+# tapes need to be accessed through their bsg device
+KERNEL=="st*[0-9]|nst*[0-9]", SUBSYSTEMS=="scsi", KERNELS=="[0-9]*:*[0-9]", \
+  ENV{.INQUIRY_DEV}="$root/bsg/$id", GOTO="scsi_inquiry"
+
+GOTO="sg3_utils_id_end"
+
+LABEL="block_dev"
 
 # Import values for partitions
 ENV{DEVTYPE}=="partition", IMPORT{parent}="ID_SCSI", IMPORT{parent}="SCSI_*"
@@ -22,25 +39,32 @@ KERNEL!="sd*[!0-9]|sr*", GOTO="sg3_utils_id_end"
 # Set 'ID_SCSI_INQUIRY=0' in an earlier udev rule if the kernel
 # fails to scan VPD pages correctly; the rules will then fall
 # back to calling sg_vpd directly.
+LABEL="scsi_inquiry"
 ENV{ID_SCSI_INQUIRY}=="0", GOTO="sg_inquiry"
-ATTRS{inquiry}!="*", GOTO="sg_inquiry"
+# "inquiry" is an attribute of the scsi_device in sysfs,
+# we obtain it by using $id after an ATTRS match.
+SUBSYSTEMS=="scsi", ATTRS{inquiry}=="*", KERNELS=="[0-9]*:*[0-9]", \
+  ENV{.SYSFS_PATH}="$sys/class/scsi_device/$id/device"
+ENV{.SYSFS_PATH}=="", GOTO="sg_inquiry"
 
-IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/inquiry --raw", \
+IMPORT{program}="/usr/bin/sg_inq --export --inhex=$env{.SYSFS_PATH}/inquiry --raw", \
   ENV{ID_SCSI}="1", ENV{ID_SCSI_INQUIRY}="1"
 # If inquiry sysfs attribute reading it failed, fallback to sg
 ENV{ID_SCSI}!="1", GOTO="sg_inquiry"
 # Read VPD pages 80 (sn) and 83 (di)
-IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/vpd_pg80 --raw"
-IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/vpd_pg83 --raw"
+IMPORT{program}="/usr/bin/sg_inq --export --inhex=$env{.SYSFS_PATH}/vpd_pg80 --raw"
+IMPORT{program}="/usr/bin/sg_inq --export --inhex=$env{.SYSFS_PATH}/vpd_pg83 --raw"
 GOTO="compat"
 
 LABEL="sg_inquiry"
 # Handle devices that have no inquiry attributes in sysfs
-IMPORT{program}="/usr/bin/sg_inq --export $tempnode", ENV{ID_SCSI}="1"
+ENV{.INQUIRY_DEV}=="", ENV{.INQUIRY_DEV}="$tempnode"
+
+IMPORT{program}="/usr/bin/sg_inq --export $env{.INQUIRY_DEV}", ENV{ID_SCSI}="1"
 # Give up if this fails, too
 ENV{ID_SCSI}!="1", GOTO="sg3_utils_id_end"
-IMPORT{program}="/usr/bin/sg_inq --export --page=sn $tempnode"
-IMPORT{program}="/usr/bin/sg_inq --export --page=di $tempnode"
+IMPORT{program}="/usr/bin/sg_inq --export --page=sn $env{.INQUIRY_DEV}"
+IMPORT{program}="/usr/bin/sg_inq --export --page=di $env{.INQUIRY_DEV}"
 
 LABEL="compat"
 
