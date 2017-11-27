@@ -359,6 +359,9 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                                 /*       [sk,asc,ascq: 0xb,0x10,*] */
 #define SG_LIB_WILD_RESID 49    /* Residual value for data-in transfer of a */
                                 /* SCSI command is nonsensical */
+#define SG_LIB_OS_BASE_ERR 50   /* in Linux: values found in: */
+                                /* include/uapi/asm-generic/errno-base.h */
+                                /* Example: ENOMEM reported as 62 (=50+12) */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */

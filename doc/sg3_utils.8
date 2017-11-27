@@ -319,6 +319,18 @@ low level driver reports a residual count (i.e. number of bytes actually
 received by HBA is 'requested_bytes - residual_count') that is high enough
 to indicate that no useful processing can be done on that response.
 .TP
+.B 50 + <os_error_number>
+OS system calls that fail often return a small integer number to help
+indicate what the error is. For example in Unix the inability of a system
+call to allocate memory returns (in 'errno') ENOMEM which often is
+associated with the integer 12. So 62 (i.e. '50 + 12') may be returned
+by a utility in this case. It is also possible that a utiity in this
+package reports 50+ENOMEM when it can't allocate memory, not necessarily
+from an OS system call. In recent versions of Linux the file showing the
+mapping between symbolic constants (e.g. ENOMEM) and the corresponding
+integer is in the kernel source code file:
+include/uapi/asm-generic/errno-base.h
+.TP
 .B 97
 a SCSI command response failed sanity checks.
 .TP

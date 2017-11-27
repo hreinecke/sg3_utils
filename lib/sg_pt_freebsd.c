@@ -69,6 +69,13 @@ struct sg_pt_freebsd_scsi {
     unsigned char * dxferp;
     int dxfer_len;
     int dxfer_dir;
+    unsigned char * dxferip;
+    unsigned char * dxferop;
+    unsigned char * mdxferp;
+    uint32_t dxfer_ilen;
+    uint32_t dxfer_olen;
+    uint32_t mdxfer_len;
+    bool mdxfer_out;
     int scsi_status;
     int resid;
     int sense_resid;
@@ -76,7 +83,7 @@ struct sg_pt_freebsd_scsi {
     int os_err;
     int transport_err;
     int dev_han;                // -1 if not provided
-    uint32_t result;            // NVMe result from completion
+    uint32_t nvme_result;       // from completion
 };
 
 struct sg_pt_base {
@@ -433,11 +440,13 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
-    if (ptp->dxferp)
+    if (ptp->dxferip)
         ++ptp->in_err;
     if (dxfer_len > 0) {
         ptp->dxferp = dxferp;
+        ptp->dxferip = dxferp;
         ptp->dxfer_len = dxfer_len;
+        ptp->dxfer_ilen = dxfer_len;
         ptp->dxfer_dir = CAM_DIR_IN;
     }
 }
@@ -449,12 +458,29 @@ set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
-    if (ptp->dxferp)
+    if (ptp->dxferop)
         ++ptp->in_err;
     if (dxfer_len > 0) {
         ptp->dxferp = (unsigned char *)dxferp;
+        ptp->dxferop = (unsigned char *)dxferp;
         ptp->dxfer_len = dxfer_len;
+        ptp->dxfer_olen = dxfer_len;
         ptp->dxfer_dir = CAM_DIR_OUT;
+    }
+}
+
+void
+set_pt_metadata_xfer(struct sg_pt_base * vp, unsigned char * mdxferp,
+                     uint32_t mdxfer_len, bool out_true)
+{
+    struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    if (ptp->mdxferp)
+        ++ptp->in_err;
+    if (mdxfer_len > 0) {
+        ptp->mdxferp = mdxferp;
+        ptp->mdxfer_len = mdxfer_len;
+        ptp->mdxfer_out = out_true;
     }
 }
 
@@ -589,7 +615,7 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
                       ptp->os_err);
             return -ptp->os_err;
         }
-        ptp->result = npc.cpl.cdw0;
+        ptp->nvme_result = npc.cpl.cdw0;
         if (ptp->sense_len > 0) {
             n = (int)sizeof(npc.cpl);
             n = ptp->sense_len <  n ? ptp->sense_len : n;
@@ -707,7 +733,27 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
         fdchan = devicetable[han];
         if (NULL == fdchan)
             return -1;
-        return fdchan->is_nvme ? (int)ptp->result : ptp->scsi_status;
+        return fdchan->is_nvme ? (int)ptp->nvme_result : ptp->scsi_status;
+    }
+    return -1;
+}
+
+uint32_t
+get_pt_result(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    if (ptp) {
+        int han = ptp->dev_han - FREEBSD_FDOFFSET;
+        struct freebsd_dev_channel *fdchan;
+
+        if ((han < 0) || (han >= FREEBSD_MAXDEV))
+            return -1;
+        fdchan = devicetable[han];
+        if (NULL == fdchan)
+            return -1;
+        return fdchan->is_nvme ? ptp->nvme_result :
+                                 (uint32_t)ptp->scsi_status;
     }
     return -1;
 }
@@ -791,7 +837,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
             errno = ENODEV;
             return false;
         }
-        return fdchan->is_nvme ;
+        return fdchan->is_nvme;
     }
     return false;
 }

@@ -2,10 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171115] [svn: r731]
+Changelog for sg3_utils-1.43 [20171127] [svn: r732]
   - sg_bg_ctl: new Background control command (sbc4r08)
-  - sg_write_x: where X can be normal, atomic,
-     scattered, or stream writes with 16 or 32 byte
+  - sg_write_x: where x can be normal, atomic, orwrite,
+    same, scattered, or stream writes with 16 or 32 byte
      cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
@@ -79,6 +79,7 @@ Changelog for sg3_utils-1.43 [20171115] [svn: r731]
     code in several utilities limited it to 31, fix
   - convert many two valued 'int's to bool
   - sg_lib: add SSC maintenance in/out sa names
+    - enhance exit status, add SG_LIB_OS_BASE_ERR (50)
     - add sg_ll_inquiry_v2()
     - add sg_ll_log_sense_v2()
     - add sg_ll_mode_sense10_v2()
@@ -605,7 +606,7 @@ Changelog for sg3_utils-1.28 [20091002] [svn: r315]
   - sg_persist: add transport specific transportID format
     - allow transportIDs to be read from named file
   - sg_opcodes: allow --opcode= option to take OP and SA
-    values (comma seperated)
+    values (comma separated)
     - tweak print format, remove test code
   - sg_requests: remove test code in progress calculation
   - sg_reset: add target reset option
@@ -1427,7 +1428,7 @@ Changelog for sg3_utils-0.95 [20010915]
 Changelog for sg3_utils-0.94 [20010419]
 ----------------------------
   - add sg_start, documented in README.sg_start [Kurt Garloff]
-  - add osst suport in sg_map [Kurt Garloff]
+  - add osst support in sg_map [Kurt Garloff]
   - improvements to sginfo [Kurt Garloff]
 
 Changelog for sg3_utils-0.93 [20010415]

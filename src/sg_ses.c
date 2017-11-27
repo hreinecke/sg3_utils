@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.24 20171112";    /* ses4r01 */
+static const char * version_str = "2.24 20171120";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -787,7 +787,7 @@ static bool saddr_non_zero(const uint8_t * bp);
 static void
 usage(int help_num)
 {
-    if (1 == help_num) {
+    if (help_num < 2) {
         pr2serr(
             "Usage: sg_ses [--descriptor=DN] [--dev-slot-num=SN] "
             "[--eiioe=A_F]\n"
@@ -795,20 +795,38 @@ usage(int help_num)
             "[--index=IIA | =TIA,II]\n"
             "              [--inner-hex] [--join] [--maxlen=LEN] "
             "[--page=PG]\n"
-            "              [--raw] [--sas-addr=SA] [--status] [--verbose] "
-            "[--warn]\n"
-            "              DEVICE\n\n"
+            "              [--raw] [--readonly] [--sas-addr=SA] [--status] "
+            "[--verbose]\n"
+            "              [--warn] DEVICE\n\n"
             "       sg_ses [--byte1=B1] [--clear=STR] [--control] "
             "[--data=H,H...]\n"
             "              [--descriptor=DN] [--dev-slot-num=SN] "
             "[--index=IIA | =TIA,II]\n"
-            "              [--mask] [--maxlen=LEN] [--nickname=SEN] "
-            "[--nickid=SEID]\n"
+            "              [--mask] [--maxlen=LEN] [--nickid=SEID] "
+            "[--nickname=SEN]\n"
             "              [--page=PG] [--sas-addr=SA] [--set=STR] "
             "[--verbose]\n"
             "              DEVICE\n\n"
             "       sg_ses [--enumerate] [--help] [--index=IIA] [--list] "
             "[--version]\n\n"
+               );
+        if (help_num < 1) {
+            pr2serr("Or the corresponding short option usage: \n"
+                    "  sg_ses [-D DN] [-x SN] [-E A_F] [-f] [-G STR] [-H] "
+                    "[-I IIA|TIA,II] [-i]\n"
+                    "         [-j] [-m LEN] [-p PG] [-r] [-R] [-A SA] [-s] "
+                    "[-v] [-w] DEVICE\n\n"
+                    "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DN] "
+                    "[-x SN] [-I IIA|TIA,II]\n"
+                    "         [-M] [-m LEN] [-N SEID] [-n SEN] [-p PG] "
+                    "[-A SA] [-S STR]\n"
+                    "         [-v] DEVICE\n\n"
+                    "  sg_ses [-e] [-h] [-I IIA] [-l] [-V]\n"
+                   );
+            pr2serr("\nFor help use with '-h' one or more times\n");
+            return;
+        }
+        pr2serr(
             "  where the main options are:\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
             "    --control|-c        send control information (def: fetch "
@@ -886,11 +904,11 @@ usage(int help_num)
             "mask)\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
-            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
             "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
             "(def: 0)\n"
             "                            used to specify which nickname to "
             "change\n"
+            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
             "                        when used twice outputs page in binary "
@@ -1098,7 +1116,7 @@ cl_process(struct opts_t *op, int argc, char *argv[])
                 saddr >>= 8;
             }
             if (ff) {
-                pr2serr("decode error from argument to '--sas-addr'\n");
+                pr2serr("error decoding '--sas-addr=' argument\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -1170,9 +1188,12 @@ cl_process(struct opts_t *op, int argc, char *argv[])
             }
             break;
         case 'h':
-        case '?':
             ++op->do_help;
             break;
+        case '?':
+            pr2serr("\n");
+            usage(0);
+            return SG_LIB_SYNTAX_ERROR;
         case 'H':
             ++op->do_hex;
             break;
@@ -1393,7 +1414,8 @@ cl_process(struct opts_t *op, int argc, char *argv[])
     return 0;
 
 err_help:
-    pr2serr("  For more information use '--help'\n");
+    pr2serr("\n");
+    usage(0);
     return SG_LIB_SYNTAX_ERROR;
 }
 
