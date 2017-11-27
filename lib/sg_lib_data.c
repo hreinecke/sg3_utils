@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.31 20171112";/* spc5r17, sbc4r14 */
+const char * sg_lib_version_str = "2.32 20171127";/* spc5r17, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -125,11 +125,11 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x4d, 0, "Log sense"},
     {0x4e, 0, "Stop play/scan"},
     {0x50, 0, "Xdwrite(10)"},           /* obsolete in SBC-3 r31 */
-    {0x51, 0, "Xpwrite(10)"},
+    {0x51, 0, "Xpwrite(10)"},           /* obsolete in SBC-4 r15 */
     {0x51, PDT_MMC, "Read disk information"},
     {0x52, 0, "Xdread(10)"},            /* obsolete in SBC-3 r31 */
     {0x52, PDT_MMC, "Read track information"},
-    {0x53, 0, "Xdwriteread(10)"},
+    {0x53, 0, "Xdwriteread(10)"},       /* obsolete in SBC-4 r15 */
     {0x54, 0, "Send OPC information"},
     {0x55, 0, "Mode select(10)"},
     {0x56, 0, "Reserve(10)"},           /* obsolete in SPC-4 r11 */
@@ -144,7 +144,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x5e, 0, "Persistent reserve in"},
     {0x5f, 0, "Persistent reserve out"},
     {0x7e, 0, "Extended cdb (XCBD)"},           /* added in SPC-4 r12 */
-    {0x80, 0, "Xdwrite extended(16)"},
+    {0x80, 0, "Xdwrite extended(16)"},          /* obsolete in SBC-4 r15 */
     {0x80, PDT_TAPE, "Write filemarks(16)"},
     {0x81, 0, "Rebuild(16)"},
     {0x81, PDT_TAPE, "Read reverse(16)"},
@@ -434,10 +434,10 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x2, 0, "Regenerate(32)"},
     {0x3, 0, "Xdread(32)"},     /* obsolete in SBC-3 r31 */
     {0x4, 0, "Xdwrite(32)"},    /* obsolete in SBC-3 r31 */
-    {0x5, 0, "Xdwrite extended(32)"},
-    {0x6, 0, "Xpwrite(32)"},
-    {0x7, 0, "Xdwriteread(32)"},
-    {0x8, 0, "Xdwrite extended(64)"},
+    {0x5, 0, "Xdwrite extended(32)"},   /* obsolete in SBC-4 r15 */
+    {0x6, 0, "Xpwrite(32)"},            /* obsolete in SBC-4 r15 */
+    {0x7, 0, "Xdwriteread(32)"},        /* obsolete in SBC-4 r15 */
+    {0x8, 0, "Xdwrite extended(64)"},   /* obsolete in SBC-4 r15 */
     {0x9, 0, "Read(32)"},
     {0xa, 0, "Verify(32)"},
     {0xb, 0, "Write(32)"},

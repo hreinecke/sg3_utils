@@ -2088,7 +2088,7 @@ sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
     return (k == page_len) ? -1 : -2;
 }
 
-static const char * bad_sense_cat = "Bad sense category";
+static const char * const bad_sense_cat = "Bad sense category";
 
 /* Yield string associated with sense category. Returns 'buff' (or pointer
  * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then

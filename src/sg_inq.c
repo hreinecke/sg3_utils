@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.73 20171114";    /* SPC-5 rev 17 */
+static const char * version_str = "1.73 20171115";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -3133,7 +3133,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
 }
 
 /* Returns 0 if Unit Serial Number VPD page contents found, else see
- * sg_ll_inquiry() return values */
+ * sg_ll_inquiry_v2() return values */
 static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
@@ -3186,6 +3186,10 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
     res = sg_ll_inquiry_v2(sg_fd, false, 0, rsp_buff, rlen, DEF_PT_TIMEOUT,
                            &resid, false, verb);
     if (0 == res) {
+        if ((verb > 4) && ((rlen - resid) > 0)) {
+            pr2serr("Safe (36 byte) Inquiry response:\n");
+            dStrHex((const char *)rsp_buff, rlen - resid, 0);
+        }
         len = rsp_buff[4] + 5;
         if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
             (0 == op->resp_len)) {
@@ -3878,8 +3882,9 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     int vb = op->do_verbose;
     uint8_t ver_min, ver_ter;
     uint16_t ver_maj;
-    uint32_t k, ver, nsid, max_nsid;
+    uint32_t k, ver, nsid, max_nsid, npss, j, n, m;
     uint64_t sz1, sz2;
+    uint8_t * up;
     struct sg_pt_base * ptvp;
     struct sg_nvme_passthru_cmd identify_cmd;
     struct sg_nvme_passthru_cmd cmd_back;
@@ -3958,8 +3963,48 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         printf("  Total NVM capacity: huge ...\n");
     else if (sz1)
         printf("  Total NVM capacity: %" PRIu64 " bytes\n", sz1);
-    else if (op->do_force)
+    else if (op->do_force) {
+        const char * const non_op = "does not process I/O";
+        const char * const operat = "processes I/O";
+        const char * cp;
+
         printf("  Total NVM capacity: 0 bytes\n");
+        npss = id_din[263] + 1;
+        up = id_din + 2048;
+        for (k = 0; k < npss; ++k, up += 32) {
+            n = sg_get_unaligned_le16(up + 0);
+            n *= (0x1 & up[3]) ? 1 : 100;    /* unit: 100 microWatts */
+            j = n / 10;                      /* unit: 1 milliWatts */
+            m = j % 1000;
+            j /= 1000;
+            cp = (0x2 & up[3]) ? non_op : operat;
+            printf("  Power state %u: Max power: ", k);
+            if (0 == j) {
+                m = n % 10;
+                n /= 10;
+                printf("%u.%u milliWatts, %s\n", n, m, cp);
+            } else
+                printf("%u.%03u Watts, %s\n", j, m, cp);
+            n = sg_get_unaligned_le32(up + 4);
+            if (0 == n)
+                printf("    [ENLAT], ");
+            else
+                printf("    ENLAT=%u, ", n);
+            n = sg_get_unaligned_le32(up + 8);
+            if (0 == n)
+                printf("[EXLAT], ");
+            else
+                printf("EXLAT=%u, ", n);
+            n = 0x1f & up[12];
+            printf("RRT=%u, ", n);
+            n = 0x1f & up[13];
+            printf("RRL=%u, ", n);
+            n = 0x1f & up[14];
+            printf("RWT=%u, ", n);
+            n = 0x1f & up[15];
+            printf("RWL=%u\n", n);
+        }
+    }
 skip1:
     if (nsid > 0) {
         if ((! op->do_raw) || (op->do_hex < 3)) {

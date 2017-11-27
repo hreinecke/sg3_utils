@@ -96,6 +96,10 @@ void set_scsi_pt_data_in(struct sg_pt_base * objp,   /* from device */
 /* Set a pointer and length to be used for data transferred to device */
 void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
                           const unsigned char * dxferp, int dxfer_olen);
+/* Set a pointer and length to be used for metadata transferred to
+ * (out_true=true) or from (out_true-false) device */
+void set_pt_metadata_xfer(struct sg_pt_base * objp, unsigned char * mdxferp,
+		          uint32_t mdxfer_len, bool out_true);
 /* The following "set_"s implementations may be dummies */
 void set_scsi_pt_packet_id(struct sg_pt_base * objp, int pack_id);
 void set_scsi_pt_tag(struct sg_pt_base * objp, uint64_t tag);
@@ -144,6 +148,10 @@ int get_scsi_pt_resid(const struct sg_pt_base * objp);
 /* Returns SCSI status value (from device that received the
    command). */
 int get_scsi_pt_status_response(const struct sg_pt_base * objp);
+
+/* Returns SCSI status value or NVMe result (from device that received the
+   command). */
+uint32_t get_pt_result(const struct sg_pt_base * objp);
 
 /* Actual sense length returned. If sense data is present but
    actual sense length is not known, return 'max_sense_len' */

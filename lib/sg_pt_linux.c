@@ -34,6 +34,7 @@
 #include "sg_pt.h"
 #include "sg_lib.h"
 #include "sg_linux_inc.h"
+#include "sg_pt_nvme.h"
 
 #if (__STDC_VERSION__ >= 199901L)  /* C99 or later */
 typedef intptr_t sg_intptr_t;
@@ -62,6 +63,7 @@ typedef long sg_intptr_t;
  * more details.
  */
 
+#if 0
 #include <linux/types.h>
 
 struct nvme_user_io {
@@ -99,6 +101,7 @@ struct nvme_passthru_cmd {
         __u32   timeout_ms;
         __u32   result;
 };
+#endif
 
 #define nvme_admin_cmd nvme_passthru_cmd
 
@@ -401,9 +404,17 @@ struct sg_pt_linux_scsi {
     int dev_fd;                 /* -1 if not given */
     int in_err;
     int os_err;
-    bool is_sg;
-    bool is_nvme;
+    bool is_sg;         /* is_sg,is_nvme: (F,F)-->unknown; (T,F)-->sg; */
+    bool is_nvme;       /* (F,T)-->nvme; (T,T)-->illegal */
+    bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
     uint32_t nvme_nsid;
+    uint32_t nvme_result;
+    uint32_t dxfer_ilen;
+    uint32_t dxfer_olen;
+    uint32_t mdxfer_len;
+    void * dxferip;
+    void * dxferop;
+    void * mdxferp;
 };
 
 struct sg_pt_base {
@@ -589,11 +600,13 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if (ptp->io_hdr.dxferp)
+    if (ptp->dxferip)
         ++ptp->in_err;
     if (dxfer_ilen > 0) {
         ptp->io_hdr.dxferp = dxferp;
+        ptp->dxferip = dxferp;
         ptp->io_hdr.dxfer_len = dxfer_ilen;
+        ptp->dxfer_ilen = dxfer_ilen;
         ptp->io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
     }
 }
@@ -605,12 +618,29 @@ set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if (ptp->io_hdr.dxferp)
+    if (ptp->dxferop)
         ++ptp->in_err;
     if (dxfer_olen > 0) {
         ptp->io_hdr.dxferp = (unsigned char *)dxferp;
+        ptp->dxferop = (void *)dxferp;
         ptp->io_hdr.dxfer_len = dxfer_olen;
+        ptp->dxfer_olen = dxfer_olen;
         ptp->io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
+    }
+}
+
+void
+set_pt_metadata_xfer(struct sg_pt_base * vp, unsigned char * dxferp,
+                     uint32_t dxfer_len, bool out_true)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (ptp->mdxferp)
+        ++ptp->in_err;
+    if (dxfer_len > 0) {
+        ptp->mdxferp = dxferp;
+        ptp->mdxfer_len = dxfer_len;
+        ptp->mdxfer_out = out_true;
     }
 }
 
@@ -684,7 +714,7 @@ do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 {
     int n, len;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
-    struct nvme_passthru_cmd cmd;
+    struct sg_nvme_passthru_cmd cmd;
 
     if (vb > 3)
         pr2ws("%s: fd=%d, time_secs=%d\n", __func__, fd, time_secs);
@@ -730,10 +760,12 @@ do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
         n = (n < len) ? n : len;
         memcpy(ptp->io_hdr.sbp, &cmd, n);
         ptp->io_hdr.sb_len_wr = n;
-    }
+    } else
+        ptp->io_hdr.sb_len_wr = 0;
+    ptp->nvme_result = cmd.result;
     if (vb > 2)
         pr2ws("%s: timeout_ms=%u, result=%u\n", __func__, cmd.timeout_ms,
-              cmd.result);
+              ptp->nvme_result);
     return 0;
 }
 
@@ -821,7 +853,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return ptp->io_hdr.resid;
+    return ((NULL == ptp) || ptp->is_nvme) ? 0 : ptp->io_hdr.resid;
 }
 
 int
@@ -829,7 +861,19 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return ptp->io_hdr.status;
+    if (NULL == ptp)
+        return 0;
+    return ptp->is_nvme ? (int)ptp->nvme_result : ptp->io_hdr.status;
+}
+
+uint32_t
+get_pt_result(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (NULL == ptp)
+        return 0;
+    return ptp->is_nvme ? ptp->nvme_result : (uint32_t)ptp->io_hdr.status;
 }
 
 int
@@ -837,7 +881,9 @@ get_scsi_pt_sense_len(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return ptp->io_hdr.sb_len_wr;
+    if (NULL == ptp)
+        return 0;
+    return ptp->io_hdr.sb_len_wr;       /* NVMe stuffs that variable */
 }
 
 int
@@ -873,7 +919,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 }
 
 /* If a NVMe block device (which includes the NSID) handle is associated
- * with 'objp', then its NSID is returned (values range from 0x1 to
+ * with 'vp', then its NSID is returned (values range from 0x1 to
  * 0xffffffe). Otherwise 0 is returned. */
 uint32_t
 get_pt_nvme_nsid(const struct sg_pt_base * vp)
@@ -990,10 +1036,14 @@ struct sg_pt_linux_scsi {
     bool is_sg;
     bool is_bsg;
     bool is_nvme;
+    bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
     uint32_t nvme_nsid;         /* 1 to 0xfffffffe are possibly valid, 0
                                  * implies dev_fd is not a NVMe device
                                  * (is_nvme=false) or it is a NVMe char
                                  * device (e.g. /dev/nvme0 ) */
+    uint32_t nvme_result;
+    uint32_t mdxfer_len;
+    void * mdxferp;
 };
 
 struct sg_pt_base {
@@ -1221,6 +1271,19 @@ set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
 }
 
 void
+set_pt_metadata_xfer(struct sg_pt_base * vp, unsigned char * dxferp,
+                     uint32_t dxfer_len, bool out_true)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (dxfer_len > 0) {
+        ptp->mdxferp = dxferp;
+        ptp->mdxfer_len = dxfer_len;
+        ptp->mdxfer_out = out_true;
+    }
+}
+
+void
 set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
@@ -1294,7 +1357,9 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return ptp->io_hdr.din_resid;
+    if (NULL == ptp)
+        return 0;
+    return ptp->is_nvme ? 0 : ptp->io_hdr.din_resid;
 }
 
 int
@@ -1302,7 +1367,22 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
+    if (NULL == ptp)
+        return 0;
+    return (int)(ptp->is_nvme ? ptp->nvme_result :
+                                ptp->io_hdr.device_status);
     return ptp->io_hdr.device_status;
+}
+
+uint32_t
+get_pt_result(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (NULL == ptp)
+        return 0;
+    return ptp->is_nvme ? ptp->nvme_result :
+                          ptp->io_hdr.device_status;
 }
 
 int
@@ -1429,7 +1509,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 }
 
 /* If a NVMe block device (which includes the NSID) handle is associated
- * with 'objp', then its NSID is returned (values range from 0x1 to
+ * with 'vp', then its NSID is returned (values range from 0x1 to
  * 0xffffffe). Otherwise 0 is returned. */
 uint32_t
 get_pt_nvme_nsid(const struct sg_pt_base * vp)
@@ -1511,7 +1591,7 @@ do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 {
     int n, len;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
-    struct nvme_passthru_cmd cmd;
+    struct sg_nvme_passthru_cmd cmd;
 
     if (vb > 3)
         pr2ws("%s: fd=%d, time_secs=%d\n", __func__, fd, time_secs);
@@ -1555,10 +1635,12 @@ do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
         return -ptp->os_err;
     } else
         ptp->os_err = 0;
+    ptp->nvme_result = cmd.result;
     n = ptp->io_hdr.max_response_len;
     if ((n > 0) && ptp->io_hdr.response) {
         n = (n < len) ? n : len;
         memcpy((uint8_t *)ptp->io_hdr.response, &cmd, n);
+        ptp->io_hdr.response_len = n;
     }
     if (vb > 2)
         pr2ws("%s: timeout_ms=%u, result=%u\n", __func__, cmd.timeout_ms,
