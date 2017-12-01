@@ -3786,13 +3786,30 @@ main(int argc, char * argv[])
                     pr2serr("Guessing from --inhex= this is a standard "
                             "INQUIRY\n");
             } else if (rsp_buff[2] <= 2) {
-                if (op->do_verbose)
-                    pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
-                            rsp_buff[1]);
-                op->page_num = rsp_buff[1];
-                ++op->do_vpd;
-                if ((1 != op->do_hex) && (0 == op->do_raw))
-                    ++op->do_decode;
+                /*
+                 * Removable devices have the RMB bit set, which would
+                 * present itself as vpd page 0x80 output if we're not
+                 * careful
+                 *
+                 * Serial number must be right-aligned ASCII data in
+                 * bytes 5-7; standard INQUIRY will have flags here.
+                 */
+                if (rsp_buff[1] == 0x80 &&
+                    (rsp_buff[5] < 0x20 || rsp_buff[5] > 0x80 ||
+                     rsp_buff[6] < 0x20 || rsp_buff[6] > 0x80 ||
+                     rsp_buff[7] < 0x20 || rsp_buff[7] > 0x80)) {
+                    if (op->do_verbose)
+                        pr2serr("Guessing from --inhex= this is a "
+                                "standard INQUIRY\n");
+                } else {
+                    if (op->do_verbose)
+                        pr2serr("Guessing from --inhex= this is VPD "
+                                "page 0x%x\n", rsp_buff[1]);
+                    op->page_num = rsp_buff[1];
+                    op->do_vpd = true;
+                    if ((1 != op->do_hex) && (0 == op->do_raw))
+                        op->do_decode = true;
+                }
             } else {
                 if (op->do_verbose)
                     pr2serr("page number unclear from --inhex, hope it's a "
