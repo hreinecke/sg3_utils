@@ -3025,6 +3025,91 @@ sg_ata_get_chars(const uint16_t * word_arr, int start_word,
     return op - ochars;
 }
 
+int
+pr2serr(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
+uint32_t
+sg_get_page_size(void)
+{
+#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
+    return sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+#elif defined(SG_LIB_WIN32)
+    return win_pagesize();
+#elif defined(SG_LIB_FREEBSD)
+#include <sys/param.h>
+    return PAGE_SIZE;
+#else
+    return 4096;     /* give up, pick likely figure */
+#endif
+}
+
+/* Returns pointer to heap (or NULL) that is aligned to a align_to byte
+ * boundary. Sends back *buff_to_free pointer in third argument that may be
+ * different from the return value. If it is different then the *buff_to_free
+ * pointer should be freed (rather than the returned value) when the heap is
+ * no longer needed. If align_to is 0 then aligns to OS's page size. Sets all
+ * returned heap to zeros. If num_bytes is 0 then set to page size. */
+uint8_t *
+sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
+            bool vb)
+{
+    size_t psz;
+    uint8_t * res;
+
+    psz = (align_to > 0) ? align_to : sg_get_page_size();
+    if (0 == num_bytes)
+        num_bytes = psz;        /* ugly to handle otherwise */
+
+#ifdef HAVE_POSIX_MEMALIGN
+    {
+        int err;
+        void * wp = NULL;
+
+        err = posix_memalign(&wp, psz, num_bytes);
+        if (err || (NULL == wp)) {
+            pr2ws("%s: posix_memalign: error [%d], out of memory?\n",
+                  __func__, err);
+            return NULL;
+        }
+        memset(wp, 0, num_bytes);
+        if (buff_to_free)
+            *buff_to_free = (uint8_t *)wp;
+        res = (uint8_t *)wp;
+        if (vb)
+            pr2ws("%s: posix, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
+                  __func__, num_bytes, (void *)*buff_to_free, (int)psz,
+                  (void *)res);
+        return res;
+    }
+#else
+    {
+        uint8_t * wrkBuff;
+
+        wrkBuff = (uint8_t)calloc(length + psz, 1);
+        if (NULL == wrkBuff) {
+            if (buff_to_free)
+                *buff_to_free = NULL;
+            return NULL;
+        } else if (buff_to_free)
+            *buff_to_free = wrkBuff;
+        res = (uint8_t *)(((uintptr_t)wrkBuff + psz - 1) & (~(psz - 1)));
+        if (vb)
+            pr2ws("%s: hack, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n", __func__,
+                  length, (void *)*wrkBuffp, (int)psz, (void *)res);
+        return res;
+    }
+#endif
+}
+
 const char *
 sg_lib_version()
 {
@@ -3069,15 +3154,3 @@ sg_set_binary_mode(int fd)
 }
 
 #endif
-
-int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}

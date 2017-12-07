@@ -1438,7 +1438,7 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --disable-linuxbsg      ignore linux bsg (sgv4) if present
+  --disable-linuxbsg      option ignored, this is placeholder
   --enable-win32-spt-direct
                           enable Win32 SPT Direct
   --disable-scsistrings   Disable full SCSI sense strings

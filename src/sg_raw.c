@@ -32,7 +32,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.18 (2017-10-09)"
+#define SG_RAW_VERSION "0.4.19 (2017-12-06)"
 
 #ifdef SG_LIB_WIN32
 #ifndef HAVE_SYSCONF
@@ -275,63 +275,6 @@ process_cl(struct opts_t * op, int argc, char *argv[])
     return 0;
 }
 
-/* Allocate aligned memory (heap) starting on page boundary */
-static unsigned char *
-my_memalign(int length, unsigned char ** wrkBuffp, const struct opts_t * op)
-{
-    size_t psz;
-    unsigned char * res;
-
-#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
-    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
-#elif defined(SG_LIB_WIN32)
-    psz = win_pagesize();
-#else
-    psz = 4096;     /* give up, pick likely figure */
-#endif
-
-#ifdef HAVE_POSIX_MEMALIGN
-    {
-        int err;
-        void * wp = NULL;
-
-        err = posix_memalign(&wp, psz, length);
-        if (err || (NULL == wp)) {
-            pr2serr("posix_memalign: error [%d], out of memory?\n", err);
-            return NULL;
-        }
-        memset(wp, 0, length);
-        if (wrkBuffp)
-            *wrkBuffp = (unsigned char *)wp;
-        res = (unsigned char *)wp;
-        if (op->verbose > 3)
-            pr2serr("%s: posix, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
-                    __func__, length, (void *)*wrkBuffp, (int)psz,
-                    (void *)res);
-        return res;
-    }
-#else
-    {
-        unsigned char * wrkBuff;
-
-        wrkBuff = (unsigned char*)calloc(length + psz, 1);
-        if (NULL == wrkBuff) {
-            if (wrkBuffp)
-                *wrkBuffp = NULL;
-            return NULL;
-        } else if (wrkBuffp)
-            *wrkBuffp = wrkBuff;
-        res = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
-                                (~(psz - 1)));
-        if (op->verbose > 3)
-            pr2serr("%s: hack, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
-                    __func__, length, (void *)*wrkBuffp, (int)psz,
-                    (void *)res);
-        return res;
-    }
-#endif
-}
-
 static int
 skip(int fd, off_t offset)
 {
@@ -392,7 +335,8 @@ fetch_dataout(struct opts_t * op)
         }
     }
 
-    buf = my_memalign(op->dataout_len, &wrkBuf, op);
+    buf = sg_memalign(op->dataout_len, 0 /* page_size */, &wrkBuf,
+                      op->verbose > 3);
     if (buf == NULL) {
         perror("malloc");
         goto bail;
@@ -528,7 +472,8 @@ main(int argc, char *argv[])
         set_scsi_pt_data_out(ptvp, dxfer_buffer_out, op->dataout_len);
     }
     if (op->do_datain) {
-        dxfer_buffer_in = my_memalign(op->datain_len, &wrkBuf, op);
+        dxfer_buffer_in = sg_memalign(op->datain_len, 0 /* page_size */,
+                                      &wrkBuf, op->verbose > 3);
         if (dxfer_buffer_in == NULL) {
             perror("malloc");
             ret = SG_LIB_CAT_OTHER;

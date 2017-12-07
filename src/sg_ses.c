@@ -314,27 +314,11 @@ static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 static bool join_done = false;
 
-#ifdef SG_LIB_FREEBSD
-
-#include <sys/param.h>  /* contains PAGE_SIZE */
-
-static uint8_t enc_stat_rsp[MX_ALLOC_LEN]
-        __attribute__ ((aligned (PAGE_SIZE)));
-static uint8_t elem_desc_rsp[MX_ALLOC_LEN]
-        __attribute__ ((aligned (PAGE_SIZE)));
-static uint8_t add_elem_rsp[MX_ALLOC_LEN]
-        __attribute__ ((aligned (PAGE_SIZE)));
-static uint8_t threshold_rsp[MX_ALLOC_LEN]
-        __attribute__ ((aligned (PAGE_SIZE)));
-
-#else
-
-static uint8_t enc_stat_rsp[MX_ALLOC_LEN];
-static uint8_t elem_desc_rsp[MX_ALLOC_LEN];
-static uint8_t add_elem_rsp[MX_ALLOC_LEN];
-static uint8_t threshold_rsp[MX_ALLOC_LEN];
-
-#endif
+/* Large buffers on heap, aligned to page size and zeroed */
+static uint8_t * enc_stat_rsp;
+static uint8_t * elem_desc_rsp;
+static uint8_t * add_elem_rsp;
+static uint8_t * threshold_rsp;
 
 static int enc_stat_rsp_len;
 static int elem_desc_rsp_len;
@@ -5096,24 +5080,31 @@ enumerate_work(const struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, res;
-    int pd_type = 0;
     bool have_cgs = false;
+    int k, res;
+    int sg_fd = -1;
+    int pd_type = 0;
     int ret = 0;
-    struct sg_simple_inquiry_resp inq_resp;
-    char buff[128];
-    char b[80];
-    struct tuple_acronym_val tav_arr[CGS_CL_ARR_MAX_SZ];
+    uint32_t pg_sz;
     const char * cp;
     struct opts_t opts;
     struct opts_t * op;
     struct tuple_acronym_val * tavp;
     struct cgs_cl_t * cgs_clp;
+    uint8_t * free_enc_stat_rsp = NULL;
+    uint8_t * free_elem_desc_rsp = NULL;
+    uint8_t * free_add_elem_rsp = NULL;
+    uint8_t * free_threshold_rsp = NULL;
+    struct tuple_acronym_val tav_arr[CGS_CL_ARR_MAX_SZ];
+    struct sg_simple_inquiry_resp inq_resp;
+    char buff[128];
+    char b[80];
 
     op = &opts;
     memset(op, 0, sizeof(*op));
     op->dev_slot_num = -1;
     op->ind_indiv_last = -1;
+    pg_sz = sg_get_page_size();
     res = cl_process(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -5129,6 +5120,31 @@ main(int argc, char * argv[])
         enumerate_work(op);
         return 0;
     }
+    enc_stat_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_enc_stat_rsp,
+                               op->verbose > 3);
+    if (NULL == enc_stat_rsp) {
+        pr2serr("Unable to get heap for enc_stat_rsp\n");
+        goto err_out;
+    }
+    elem_desc_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_elem_desc_rsp,
+                               op->verbose > 3);
+    if (NULL == elem_desc_rsp) {
+        pr2serr("Unable to get heap for elem_desc_rsp\n");
+        goto err_out;
+    }
+    add_elem_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_add_elem_rsp,
+                               op->verbose > 3);
+    if (NULL == add_elem_rsp) {
+        pr2serr("Unable to get heap for add_elem_rsp\n");
+        goto err_out;
+    }
+    threshold_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_threshold_rsp,
+                               op->verbose > 3);
+    if (NULL == threshold_rsp) {
+        pr2serr("Unable to get heap for threshold_rsp\n");
+        goto err_out;
+    }
+
     if (op->num_cgs) {
         have_cgs = true;
         if (op->page_code_given &&
@@ -5332,7 +5348,18 @@ err_out:
     if (ret && (0 == op->verbose))
         pr2serr("Problem detected, try again with --verbose option for more "
                 "information\n");
-    res = sg_cmds_close_device(sg_fd);
+    if (sg_fd >= 0)
+        res = sg_cmds_close_device(sg_fd);
+    else
+        res = 0;
+    if (free_enc_stat_rsp)
+        free(free_enc_stat_rsp);
+    if (free_elem_desc_rsp)
+        free(free_elem_desc_rsp);
+    if (free_add_elem_rsp)
+        free(free_add_elem_rsp);
+    if (free_threshold_rsp)
+        free(free_threshold_rsp);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)

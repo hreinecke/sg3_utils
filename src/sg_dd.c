@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.92 20171023";
+static const char * version_str = "5.93 20171206";
 
 
 #define ME "sg_dd: "
@@ -1838,7 +1838,7 @@ main(int argc, char * argv[])
     }
 
     if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
-        (FT_RAW & out_type)) {
+        (FT_RAW & out_type)) {  /* want heap buffer aligned to page_size */
         size_t psz;
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
@@ -1847,26 +1847,11 @@ main(int argc, char * argv[])
         psz = 4096;     /* give up, pick likely figure */
 #endif
 
-#ifdef HAVE_POSIX_MEMALIGN
-        {
-            int err;
-
-            err = posix_memalign((void **)&wrkBuff, psz, blk_sz * bpt);
-            if (err) {
-                pr2serr("posix_memalign: error [%d] out of memory?\n", err);
-                return SG_LIB_CAT_OTHER;
-            }
-            wrkPos = wrkBuff;
-        }
-#else
-        wrkBuff = (unsigned char*)malloc(blk_sz * bpt + psz);
-        if (0 == wrkBuff) {
-            pr2serr("Not enough user memory for work buffer\n");
+        wrkPos = sg_memalign(blk_sz * bpt, psz, &wrkBuff, verbose > 3);
+        if (NULL == wrkPos) {
+            pr2serr("sg_memalign: error, out of memory?\n");
             return SG_LIB_CAT_OTHER;
         }
-        wrkPos = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
-                                   (~(psz - 1)));
-#endif
     } else {
         wrkBuff = (unsigned char*)malloc(blk_sz * bpt);
         if (0 == wrkBuff) {
