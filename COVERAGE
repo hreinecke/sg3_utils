@@ -37,6 +37,8 @@ MODE SENSE(6)       sdparm, sg_modes, sg_wr_mode, sginfo, sg_format,
 MODE SENSE(10)      sdparm, sg_modes, sg_wr_mode, sginfo, sg_format,
                     sg_senddiag('-e'), sg_rdac, ++
 OPEN ZONE           sg_zone
+ORWRITE(16)         sg_write_x
+ORWRITE(32)         sg_write_x
 PERSISTENT RESERVE IN       sg_persist, ++
 PERSISTENT RESERVE OUT      sg_persist, ++
 POPULATE TOKEN      ddpt, ddptctl, ++
@@ -99,15 +101,18 @@ WRITE BUFFER        sg_test_rwbuf, sg_write_buffer, ++
 WRITE LONG(10)      sg_write_long, ++
 WRITE LONG(16)      sg_write_long, ++
 WRITE SAME(10)      sg_write_same
-WRITE SAME(16)      sg_write_same
-WRITE SAME(32)      sg_write_same
+WRITE SAME(16)      sg_write_same, sg_write_x
+WRITE SAME(32)      sg_write_same, sg_write_x
+WRITE SCATTERED(16)    sg_write_x
+WRITE SCATTERED(32)    sg_write_x
+WRITE STREAM(16)    sg_write_x
+WRITE STREAM(32)    sg_write_x
 WRITE USING TOKEN   ddpt, ddptctl, ++
 <most commands>     sg_raw
 
 
-
-ATA command         sg3_utils utilities that use this SCSI command
------------         ----------------------------------------------
+ATA command         sg3_utils utilities that use this (S)ATA command
+-----------         ------------------------------------------------
 CHECK POWER MODE    examples/sg_sat_chk_power
 IDENTIFY DEVICE     sg_inq, sg_scan, sg_sat_identify,
                     examples/sg__sat_identify
@@ -119,6 +124,13 @@ READ LOG DMA EXT    sg_sat_read_gplog
 SET FEATURES        sg_sat_set_features
                     examples/sg__sat_set_features
 SMART READ DATA     examples/sg_sat_smart_rd_data
+
+
+NVMe command        sg3_utild utilities that use this NVMe command
+------------        ------------------------------------------------
+IDENTIFY            sg_inq
+SES READ            sg_senddiag, sg_ses (NVME-MI command)
+SES WRITE           sg_senddiag, sg_ses (NVME-MI command)
 
 
 ++  command wrapper found in sg_cmds_basic.c, sg_cmds_mmc.c  or
@@ -137,4 +149,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-15th November 2017
+30th November 2017

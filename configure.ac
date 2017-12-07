@@ -95,8 +95,8 @@ AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 
 AC_ARG_ENABLE([linuxbsg],
-  AC_HELP_STRING([--disable-linuxbsg], [ignore linux bsg (sgv4) if present]),
-  [AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [ignore linux bsg], )], [])
+  AC_HELP_STRING([--disable-linuxbsg], [option ignored, this is placeholder]),
+  [AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [option ignored], )], [])
 
 AC_ARG_ENABLE([win32-spt-direct],
   AC_HELP_STRING([--enable-win32-spt-direct], [enable Win32 SPT Direct]),

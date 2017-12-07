@@ -10,7 +10,8 @@ libsgutils2_la_SOURCES = \
 if OS_LINUX
 libsgutils2_la_SOURCES += \
 	sg_pt_linux.c \
-	sg_io_linux.c
+	sg_io_linux.c \
+	sg_pt_linux_nvme.c
 endif
 
 if OS_WIN32_MINGW

@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.31 20171104";  /* spc5r17 + sbc4r14 */
+static const char * version_str = "1.32 20171206";  /* spc5r17 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1086,7 +1086,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
             break;
         case 9: /* Protocol specific port identifier */
             break;
-        case 0xa: /* UUID identifier */
+        case 0xa: /* UUID identifier [spc5r08] RFC 4122 */
             if ((1 != c_set) || (18 != i_len) || (1 != ((ip[0] >> 4) & 0xf)))
                 break;
             for (m = 0; m < 16; ++m) {
@@ -2261,10 +2261,10 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         printf("  Manufacturer-assigned serial number: %.*s\n",
                len - 4, buff + 4);
         break;
-    case PDT_SES:	/* T10/17-142r1 -> ses4r02 ?? */
+    case PDT_SES:       /* T10/17-142r1 -> ses4r02 ?? */
         if (len < 8) {
             pr2serr("Enclosure service device characteristics VPD page "
-		    "length too short=%d\n", len);
+                    "length too short=%d\n", len);
             return;
         }
         printf("  SESDNLD=%d\n", !! (0x2 & buff[4]));
@@ -2276,7 +2276,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         printf("  DMOSASDS=%d\n", !! (0x8 & buff[6]));
         printf("  DMOSDS=%d\n", !! (0x4 & buff[6]));
         printf("  ADMS=%d\n", !! (0x1 & buff[6]));
-	break;
+        break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
         dStrHexErr((const char *)buff, len, 0);

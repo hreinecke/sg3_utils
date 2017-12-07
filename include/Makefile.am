@@ -8,12 +8,14 @@ scsiinclude_HEADERS = \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
 	sg_cmds_mmc.h \
-	sg_pt.h
+	sg_pt.h \
+	sg_pt_nvme.h
 
 if OS_LINUX
 scsiinclude_HEADERS += \
 	sg_linux_inc.h \
-	sg_io_linux.h
+	sg_io_linux.h \
+	sg_pt_linux.h
 	
 noinst_HEADERS = \
 	sg_pt_win32.h

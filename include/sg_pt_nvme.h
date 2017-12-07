@@ -47,6 +47,21 @@ __packed;
 ;
 #endif
 
+/* Using byte offsets and unaligned be/le copies safer than packed
+ * structures. These are for sg_nvme_user_io . */
+#define SG_NVME_IO_OPCODE 0
+#define SG_NVME_IO_FLAGS 1
+#define SG_NVME_IO_CONTROL 2
+#define SG_NVME_IO_NBLOCKS 4
+#define SG_NVME_IO_RSVD 6
+#define SG_NVME_IO_METADATA 8
+#define SG_NVME_IO_ADDR 16
+#define SG_NVME_IO_SLBA 24
+#define SG_NVME_IO_DSMGMT 32
+#define SG_NVME_IO_REFTAG 36
+#define SG_NVME_IO_APPTAG 40
+#define SG_NVME_IO_APPMASK 42
+
 #ifdef __GNUC__
 #ifndef __clang__
   struct __attribute__((__packed__)) sg_nvme_passthru_cmd
@@ -82,6 +97,28 @@ __packed;
 #else
 ;
 #endif
+
+/* Using byte offsets and unaligned be/le copies safer than packed
+ * structures. These are for sg_nvme_passthru_cmd . */
+#define SG_NVME_PT_OPCODE 0
+#define SG_NVME_PT_FLAGS 1
+#define SG_NVME_PT_RSVD1 2
+#define SG_NVME_PT_NSID 4
+#define SG_NVME_PT_CDW2 8
+#define SG_NVME_PT_CDW3 12
+#define SG_NVME_PT_METADATA 16
+#define SG_NVME_PT_ADDR 24
+#define SG_NVME_PT_METADATA_LEN 32
+#define SG_NVME_PT_DATA_LEN 36
+#define SG_NVME_PT_CDW10 40
+#define SG_NVME_PT_CDW11 44
+#define SG_NVME_PT_CDW12 48
+#define SG_NVME_PT_CDW13 52
+#define SG_NVME_PT_CDW14 56
+#define SG_NVME_PT_CDW15 60
+
+#define SG_NVME_PT_TIMEOUT_MS 64
+#define SG_NVME_PT_RESULT 68
 
 #ifdef __cplusplus
 }

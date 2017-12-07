@@ -37,10 +37,17 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.05 20171127";
+static const char * version_str = "1.05 20171202";
 
-
-#define ME "sg_write_x: "
+/* Protection Information refers to 8 bytes of extra information usually
+ * associated with each logical block and is often abbreviated to PI while
+ * its fields: reference-tag (4 bytes), application-tag (2 bytes) and
+ * tag-mask (2 bytes) are often abbreviated to RT, AT and TM respectively.
+ * And the LBA Range Descriptor associated with the WRITE SCATTERED command
+ * is abbreviated to RD. A degenerate RD is one where both the LBA and length
+ * components are zero; they are not illegal according to T10 but are a
+ * little tricky to handle when scanning and little extra information
+ * is provided. */
 
 #define ORWRITE16_OP 0x8b
 #define WRITE_16_OP 0x8a
@@ -102,12 +109,13 @@ static struct option long_options[] = {
     {"num", required_argument, 0, 'n'},
     {"offset", required_argument, 0, 'o'},
     {"or", no_argument, 0, 'O'},
-    {"raw", no_argument, 0, 'r'},
-    {"ref-tag", required_argument, 0, 'R'},
-    {"ref_tag", required_argument, 0, 'R'},
+    {"ref-tag", required_argument, 0, 'r'},
+    {"ref_tag", required_argument, 0, 'r'},
     {"same", required_argument, 0, 'M'},
     {"scat-file", required_argument, 0, 'q'},
     {"scat_file", required_argument, 0, 'q'},
+    {"scat-raw", no_argument, 0, 'R'},
+    {"scat_raw", no_argument, 0, 'R'},
     {"scattered", required_argument, 0, 'S'},
     {"stream", required_argument, 0, 'T'},
     {"strict", no_argument, 0, 's'},
@@ -130,11 +138,11 @@ struct opts_t {
     bool do_combined;           /* -c DOF --> .scat_lbdof */
     bool do_dry_run;
     bool do_or;                 /* -O  ORWRITE(16 or 32) */
-    bool do_raw;
+    bool do_scat_raw;
     bool do_same;               /* -M  WRITE SAME(16 or 32) */
                                 /*  --same=NDOB  NDOB --> .ndob */
     bool do_scattered;          /* -S  WRITE SCATTERED(16 or 32) */
-                                /*  --scattered=RD  RD --> .scat_num_lbard */
+                                /*  --scattered=RD  RD --> .scat_num_lbrd */
     bool do_stream;             /* -T  WRITE STREAM(16 or 32) */
                                 /*  --stream=ID  ID --> .str_id */
     bool do_unmap;
@@ -143,6 +151,7 @@ struct opts_t {
                                  * is 8 bytes long following each logical
                                  * block in the data out buffer. */
     bool dpo;
+    bool explicit_lba;          /* .numblocks defaults to 0 when false */
     bool fua;
     bool ndob;
     bool strict;
@@ -158,19 +167,21 @@ struct opts_t {
     uint16_t app_tag;   /* part of protection information (def: 0xffff) */
     uint16_t atomic_boundary;
     uint16_t scat_lbdof;
-    uint16_t scat_num_lbard;
+    uint16_t scat_num_lbrd;
     uint16_t str_id;    /* (stream ID) is for WRITE STREAM */
     uint16_t tag_mask;  /* part of protection information (def: 0xffff) */
     uint32_t bs;        /* logical block size (def: 0). 0 implies use READ
                          * CAPACITY(10 or 16) to determine */
     uint32_t bs_pi_do;  /* logical block size plus PI, if any */
-    uint32_t numblocks;
+    uint32_t if_dlen;   /* bytes to read after .if_offset from .if_name,
+                         * if 0 given, read rest of .if_name */
+    uint32_t numblocks; /* defaults to 0 if .explicit_lba is false, else
+                         * derives from IF and/or sum of NUMs */
     uint32_t orw_eog;
     uint32_t orw_nog;
     uint32_t ref_tag;   /* part of protection information (def: 0xffffffff) */
     uint64_t lba;
-    uint64_t offset;    /* byte offset in if_name to start reading */
-    uint64_t dlen;    /* bytes to read after offset from if_name, 0->rest */
+    uint64_t if_offset; /* byte offset in .if_name to start reading */
     uint64_t tot_lbs;   /* from READ CAPACITY */
     ssize_t xfer_bytes;     /* derived value: bs_pi_do * numblocks */
     const char * device_name;
@@ -193,24 +204,24 @@ usage(int do_help)
             "           [--fua] [--generation=EOG,NOG] [--grpnum=GN] "
             "[--help] --in=IF\n"
             "           [--lba=LBA,LBA...] [--normal] [--num=NUM,NUM...]\n"
-            "           [--offset=OFF[,DLEN]] [--or] [--raw] [--ref-tag=RT] "
+            "           [--offset=OFF[,DLEN]] [--or] [--ref-tag=RT] "
             "[--same=NDOB]\n"
-            "           [--scat-file=SF] [--scattered=RD] [--stream=ID] "
-            "[--strict]\n"
-            "           [--tag-mask=TM] [--timeout=TO] [--unmap=U_A] "
-            "[--verbose]\n"
-            "           [--version] [--wrprotect=WRP] DEVICE\n");
+            "           [--scat-file=SF] [--scat-raw] [--scattered=RD] "
+            "[--stream=ID]\n"
+            "           [--strict] [--tag-mask=TM] [--timeout=TO] "
+            "[--unmap=U_A]\n"
+            "           [--verbose] [--version] [--wrprotect=WRP] DEVICE\n");
         if (1 != do_help) {
             pr2serr("\nOr the corresponding short option usage:\n"
                 "sg_write_x [-6] [-3] [-a AT] [-A AB] [-B OP,PGP] [-b LBS] "
                 "[-c DOF] [-D DLD]\n"
                 "           [-d] [-x] [-f] [-G EOG,NOG] [-g GN] [-h] -i IF "
                 "[-l LBA,LBA...]\n"
-                "           [-N] [-n NUM,NUM...] [-o OFF[,DLEN]] [-O] [-r] "
-                "[-R RT] [-M NDOB]\n"
-                "           [-q SF] [-S RD] [-T ID] [-s] [-t TM] [-I TO] "
-                "[-u U_A] [-v] [-V]\n"
-                "           [-w WPR] DEVICE\n"
+                "           [-N] [-n NUM,NUM...] [-o OFF[,DLEN]] [-O] "
+                "[-r RT] [-M NDOB]\n"
+                "           [-q SF] [-R] [-S RD] [-T ID] [-s] [-t TM] [-I TO] "
+                "[-u U_A] [-v]\n"
+                "           [-V] [-w WPR] DEVICE\n"
                    );
             pr2serr("\nUse '-h' or '--help' for more help\n");
             return;
@@ -274,9 +285,7 @@ usage(int do_help)
             "        |-o OFF[,DLEN]     (def: 0), then read DLEN bytes(def: "
             "rest of IF)\n"
             "    --or|-O            send ORWRITE command\n"
-            "    --raw|-r           read --scat_file=SF as binary (def: "
-            "ASCII hex)\n"
-            "    --ref-tag=RT|-R RT     expected reference tag field (def: "
+            "    --ref-tag=RT|-r RT     expected reference tag field (def: "
             "0xffffffff)\n"
             "    --same=NDOB|-M NDOB    send WRITE SAME command. NDOB (no "
             "data out buffer)\n"
@@ -284,6 +293,8 @@ usage(int do_help)
             "1 (don't)\n"
             "    --scat-file=SF|-q SF    file containing LBA, NUM pairs, "
             "see manpage\n"
+            "    --scat-raw|-R      read --scat_file=SF as binary (def: "
+            "ASCII hex)\n"
             "    --scattered=RD|-S RD    send WRITE SCATTERED command with "
             "RD range\n"
             "                            descriptors (RD can be 0 when "
@@ -376,7 +387,7 @@ usage(int do_help)
             "             [--combined=DOF] [--dpo] [--fua] [--grpnum=GN]\n"
             "             [--lba=LBA,LBA...] [--num=NUM,NUM...] "
             "[--offset=OFF[,DLEN]]\n"
-            "             [--raw] [--ref-tag=RT] [--scat-file=SF] "
+            "             [--ref-tag=RT] [--scat-file=SF] [--scat-raw] "
             "[--strict]\n"
             "             [--tag-mask=TM] [--timeout=TO] [--wrprotect=WRP] "
             "DEVICE\n"
@@ -385,10 +396,11 @@ usage(int do_help)
             "  sg_write_x --scattered --in=IF [--bs=LBS] [--combined=DOF] "
             "[--dld=DLD]\n"
             "             [--dpo] [--fua] [--grpnum=GN] [--lba=LBA,LBA...]\n"
-            "             [--num=NUM,NUM...] [--offset=OFF[,DLEN]] [--raw] "
-            "[--scat-file=SF]\n"
-            "             [--strict] [--timeout=TO] [--wrprotect=WRP] "
-            "DEVICE\n"
+            "             [--num=NUM,NUM...] [--offset=OFF[,DLEN]] "
+            "[--scat-raw]\n"
+            "             [--scat-file=SF] [--strict] [--timeout=TO] "
+            "[--wrprotect=WRP]\n"
+            "             DEVICE\n"
             "\n"
             "WRITE STREAM (32) applicable options:\n"
             "  sg_write_x --stream=ID --in=IF --32 [--app-tag=AT] "
@@ -417,10 +429,10 @@ usage(int do_help)
             "and/or the\n"
             "   --dry-run option\n"
             " - all WRITE X commands will accept --scat-file=SF and "
-            "optionally --raw\n"
+            "optionally --scat-raw\n"
             "   options but only the first addr,num pair is used (any "
             "more are ignored)\n"
-            " - when '--raw --scat-file=SF' are used then the binary "
+            " - when '--rscat-aw --scat-file=SF' are used then the binary "
             "format expected in\n"
             "   SF is as defined for the WRITE SCATTERED commands. "
             "That is 32 bytes\n"
@@ -456,7 +468,7 @@ usage(int do_help)
 
 /* Returns true if num_of_f_chars of ASCII 'f' or 'F' characters are found
  * in sequence. Any leading "0x" or "0X" is ignored; otherwise false is
- * returned (and the comparsion stops when the first mismatch is found).
+ * returned (and the comparison stops when the first mismatch is found).
  * For example a sequence of 'f' characters in a null terminated C string
  * that is two characters shorter than the requested num_of_f_chars will
  * compare the null character in the string with 'f', find them unequal,
@@ -601,13 +613,13 @@ build_num_arr(const char * inp, uint32_t * num_arr, uint32_t * num_arr_len,
  * SG_LIB_SYNTAX_ERROR). If protection information fields not given, then
  * default values are given (i.e. all 0xff bytes). Ignores all spaces and
  * tabs and everything after '#' on lcp (assumed to be an ASCII line that
- * is null terminated. If successful writes a LBA range descriptor starting
- * at 'up'. */
+ * is null terminated). If successful writes a LBA range descriptor starting
+ * at 'up'. The array starting at 'up' should be at least 20 bytes long. */
 static int
 parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
 {
     bool ok;
-    int n;
+    int k;
     int64_t ll;
     const char * cp;
     const char * bp;
@@ -615,13 +627,12 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
 
     bp = c;
     cp = strchr(lcp, '#');
-    n = strspn(lcp, " \t");
-    lcp = lcp + n;
+    lcp += strspn(lcp, " \t");
     if (('\0' == *lcp) || (cp && (lcp >= cp)))
         return 999;   /* blank line or blank prior to first '#' */
     if (cp) {   /* copy from first non whitespace ... */
-        memcpy(c, lcp, cp - lcp);
-        c[cp - lcp] = '\0';     /* ... to just before first '#' */
+        memcpy(c, lcp, cp - lcp);  /* ... to just prior to first '#' */
+        c[cp - lcp] = '\0';
     } else
         strcpy(c, lcp);         /* ... to end of line, including null */
     ll = sg_get_llnum(bp);
@@ -635,7 +646,7 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
     cp = strchr(bp, ',');
     if (cp) {
         bp = cp + 1;
-        if (*cp) {
+        if (*bp) {
             ll = sg_get_llnum(bp);
             if (-1 != ll)
                 ok = true;
@@ -647,64 +658,92 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
     }
     sg_put_unaligned_be32((uint32_t)ll, up + 8);
     *sum_num += (uint32_t)ll;
-    cp = strchr(bp, ',');
-    if (NULL == cp) {
-        sg_put_unaligned_be32((uint32_t)DEF_RT, up + 12);
-        sg_put_unaligned_be16((uint16_t)DEF_AT, up + 16);
-        sg_put_unaligned_be16((uint16_t)DEF_TM, up + 18);
-        return 0;
-    }
-    ok = false;
-    bp = cp + 1;
-    if (*cp) {
-        ll = sg_get_llnum(bp);
-        if (-1 != ll)
-            ok = true;
-    }
-    if ((! ok) || (ll > UINT32_MAX)) {
-        pr2serr("%s: error reading RT (third) item on ", __func__);
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    sg_put_unaligned_be32((uint32_t)ll, up + 12);
-    ok = false;
-    cp = strchr(bp, ',');
-    if (cp) {
+    /* now for 3 PI items */
+    for (k = 0; k < 3; ++k) {
+        ok = true;
+        cp = strchr(bp, ',');
+        if (NULL == cp)
+            break;
         bp = cp + 1;
-        if (*cp) {
-            n = sg_get_num(bp);
-            if (-1 != ll)
-                ok = true;
+        if (*bp) {
+            cp += strspn(bp, " \t");
+            if ('\0' == *cp)
+                break;
+            else if (',' == *cp) {
+                if (0 == k)
+                    ll = DEF_RT;
+                else
+                    ll = DEF_AT; /* DEF_AT and DEF_TM have same value */
+            } else {
+                ll = sg_get_llnum(bp);
+                if (-1 == ll)
+                    ok = false;
+            }
+        }
+        if (! ok) {
+            pr2serr("%s: error reading item %d NUM item on ", __func__,
+                    k + 3);
+            break;
+        }
+        switch (k) {
+        case 0:
+            if (ll > UINT32_MAX) {
+                pr2serr("%s: error with item 3, >0xffffffff; on ", __func__);
+                ok = false;
+            } else
+                sg_put_unaligned_be32((uint32_t)ll, up + 12);
+            break;
+        case 1:
+            if (ll > UINT16_MAX) {
+                pr2serr("%s: error with item 4, >0xffff; on ", __func__);
+                ok = false;
+            } else
+                sg_put_unaligned_be16((uint16_t)ll, up + 16);
+            break;
+        case 2:
+            if (ll > UINT16_MAX) {
+                pr2serr("%s: error with item 5, >0xffff; on ", __func__);
+                ok = false;
+            } else
+                sg_put_unaligned_be16((uint16_t)ll, up + 18);
+            break;
+        default:
+            pr2serr("%s: k=%d should not be >= 3\n", __func__, k);
+            ok = false;
+            break;
+        }
+        if (! ok)
+            break;
+    }
+    if (! ok)
+        return SG_LIB_SYNTAX_ERROR;
+    for ( ; k < 3; ++k) {
+        switch (k) {
+        case 0:
+            sg_put_unaligned_be32((uint32_t)DEF_RT, up + 12);
+            break;
+        case 1:
+            sg_put_unaligned_be16((uint16_t)DEF_AT, up + 16);
+            break;
+        case 2:
+            sg_put_unaligned_be16((uint16_t)DEF_TM, up + 18);
+            break;
+        default:
+            pr2serr("%s: k=%d should not be >= 3\n", __func__, k);
+            ok = false;
+            break;
         }
     }
-    if ((! ok) || (n > UINT16_MAX)) {
-        pr2serr("%s: error reading AT (fourth) item on ", __func__);
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    sg_put_unaligned_be32((uint16_t)n, up + 16);
-    ok = false;
-    cp = strchr(bp, ',');
-    if (cp) {
-        bp = cp + 1;
-        if (*cp) {
-            n = sg_get_num(bp);
-            if (-1 != ll)
-                ok = true;
-        }
-    }
-    if ((! ok) || (n > UINT16_MAX)) {
-        pr2serr("%s: error reading TM (fifth) item on ", __func__);
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    return 0;
+    return ok ? 0 : SG_LIB_SYNTAX_ERROR;
 }
 
 /* Read pairs or LBAs and NUMs from a scat_file. A T10 scatter list array is
  * built at t10_scat_list_out (e.g. as per T10 the first 32 bytes are zeros
  * followed by the first LBA range descriptor (also 32 bytes long) then the
- * second LBA range descriptor, etc. If pi_as_well is false then only LBA,NUM
+ * second LBA range descriptor, etc. If do_16 is true then only LBA,NUM
  * pairs are expected, loosely formatted if they are in the scat_file (e.g.
  * single line entries alternating LBA and NUM, with an even number of
- * elements. If pa_as_well is true then a stricter format for quintets is
+ * elements. If do_16 is false then a stricter format for quintets is
  * expected: on each non comment line should contain: LBA,NUM[,RT,AT,TM] . If
  * RT,AT,TM are not given then they assume their defaults (i.e. 0xffffffff,
  * 0xffff, 0xffff). Each number (up to 64 bits in size) from command line or
@@ -714,7 +753,7 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
  * actual byte length of t10_scat_list_out written into act_list_blen and the
  * number of LBA range descriptors written in num_scat_elems . */
 static int
-build_t10_scat(const char * scat_fname, bool pi_as_well,
+build_t10_scat(const char * scat_fname, bool do_16,
                uint8_t * t10_scat_list_out, uint32_t * act_list_blen,
                uint32_t * num_scat_elems, uint32_t * sum_num,
                int max_list_blen)
@@ -776,7 +815,7 @@ build_t10_scat(const char * scat_fname, bool pi_as_well,
                     __func__, scat_fname, j + 1, m + k + 1);
             goto bad_exit;
         }
-        if (pi_as_well) {
+        if (! do_16) {
             res = parse_scat_pi_line(lcp, up + n, sum_num);
             if (999 == res)
                 ;
@@ -829,7 +868,7 @@ build_t10_scat(const char * scat_fname, bool pi_as_well,
         }   /* inner for loop(k) over line elements */
         off += (k + 1);
     }       /* outer for loop(j) over lines */
-    if ((! pi_as_well) && (0x1 & off)) {
+    if (do_16 && (0x1 & off)) {
         pr2serr("%s: expect LBA,NUM pairs but decoded odd number\n  from "
                 "%s\n", __func__, scat_fname);
         goto bad_exit;
@@ -850,6 +889,99 @@ is_pi_default(const struct opts_t * op)
 {
     return ((DEF_AT == op->app_tag) && (DEF_RT == op->ref_tag) &&
             (DEF_TM == op->tag_mask));
+}
+
+/* Given a t10 parameter list header (32 zero bytes) for WRITE SCATTERED
+ * (16 or 32) followed by n RDs with a total length of at least
+ * max_lbrds_blen bytes, find "n" and increment where num_lbrds points
+ * n times. Further get the LBA length component from each RD and add each
+ * length into where sum_num points. Note: the caller probably wants to zero
+ * where num_lbrds and sum_num point before invoking this function. If all
+ * goes well return true, else false. If a degenerate RD is detected then
+ * if 'RD' (from --scattered=RD) is 0 then stop looking for further RDs;
+ * otherwise keep going. Currently overlapping LBA range descriptors are no
+ * checked for. If op->strict > 0 then the first 32 bytes are checked for
+ * zeros; any non-zero bytes will report to stderr, stop the check and
+ * return false. If op->strict > 0 then the trailing 20 or 12 bytes (only
+ * 12 if RT, AT and TM fields (for PI) are present) are checked for zeros;
+ * any non-zero bytes cause the same action as the previous check. If
+ * the number of RDs (when 'RD' from --scattered=RD > 0) is greater than
+ * the number of RDs found then a report is sent to stderr and if op->strict
+ * > 0 then returns false, else returns true.  */
+static bool
+check_lbrds(const uint8_t * up, int max_lbrds_blen, const struct opts_t * op,
+            uint32_t * num_lbrds, uint32_t * sum_num)
+{
+    bool ok;
+    int k, j, n;
+    const int max_lbrd_start = max_lbrds_blen - 32;
+    int vb = op->verbose;
+
+    if (op->strict) {
+        if (max_lbrds_blen < 32) {
+            pr2serr("%s: logical block range descriptors too short "
+                    "(%d < 32)\n", __func__, max_lbrds_blen);
+            return false;
+        }
+        if (! sg_all_zeros(up, 32)) {
+            pr2serr("%s: first 32 bytes of WRITE SCATTERED data-out buffer "
+                    "should be zero.\nFound non-zero byte.\n", __func__);
+            return false;
+        }
+    }
+    if (max_lbrds_blen < 64) {
+        *num_lbrds = 0;
+        return true;
+    }
+    n = op->scat_num_lbrd ? -1 : (int)op->scat_num_lbrd;
+    for (k = 32, j = 0; k < max_lbrd_start; k += 32) {
+        if ((n < 0) && sg_all_zeros(up + k + 0, 12)) { /* degenerate LBA */
+            if (vb)   /* ... range descriptor terminator if --scattered=0 */
+                pr2serr("%s: degenerate LBA range descriptor stops scan at "
+                        "k=%d (RD=0)\n", __func__, k);
+            break;
+        }
+        *sum_num += sg_get_unaligned_be32(up + k + 8);
+        *num_lbrds += 1;
+        if (op->strict) {
+            ok = true;
+            if (op->wrprotect) {
+                if (! sg_all_zeros(up + k + 20, 12))
+                    ok = false;
+            } else if (! sg_all_zeros(up + k + 12, 20))
+                ok = false;
+            if (! ok) {
+                pr2serr("%s: LB range descriptor %d non zero in reserved "
+                        "fields\n", __func__, (k / 32) - 1);
+                return false;
+            }
+        }
+        ++j;
+        if (n >= 0) {
+            if (--n <= 0)
+                break;
+        }
+    }
+    if ((k < max_lbrd_start) && op->strict) { /* check pad all zeros */
+        k += 32;
+        n = max_lbrds_blen - k;
+        if (! sg_all_zeros(up + k, n)) {
+            pr2serr("%s: pad (%d bytes) following LB range descriptors is "
+                    "non zero\n", __func__, n);
+            return false;
+        }
+    }
+    if (vb > 2)
+        pr2serr("%s: about to return true, num_lbrds=%u, sum_num=%u "
+                "[k=%d, n=%d]\n", __func__, *num_lbrds, *sum_num, k, n);
+    if (n > 0) {
+        pr2serr("%s: number of range descriptors found (%d) less than RD "
+                "(%u) given to --scattered=\n", __func__, j,
+                op->scat_num_lbrd);
+        if (op->strict)
+            return false;
+    }
+    return true;
 }
 
 static int
@@ -996,7 +1128,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
                     x_cdb[2] |= 0x1;
             }
             sg_put_unaligned_be16(op->scat_lbdof, x_cdb + 4);
-            sg_put_unaligned_be16(op->scat_num_lbard, x_cdb + 8);
+            sg_put_unaligned_be16(op->scat_num_lbrd, x_cdb + 8);
             sg_put_unaligned_be32(op->numblocks, x_cdb + 10);
 
         } else {
@@ -1007,8 +1139,9 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
             if (op->fua)
                 x_cdb[10] |= 0x8;
             sg_put_unaligned_be16(op->scat_lbdof, x_cdb + 12);
-            sg_put_unaligned_be16(op->scat_num_lbard, x_cdb + 16);
+            sg_put_unaligned_be16(op->scat_num_lbrd, x_cdb + 16);
             sg_put_unaligned_be32(op->numblocks, x_cdb + 28);
+            /* ref_tag, app_tag and tag_mask placed in scatter list */
         }
     } else if (op->do_stream) {
         if (16 == cdb_len) {
@@ -1043,6 +1176,29 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
         for (k = 0; k < cdb_len; ++k)
             pr2serr("%02x ", x_cdb[k]);
         pr2serr("\n");
+    }
+    if (op->do_scattered && (op->verbose > 2) && (dout_len > 63)) {
+        uint32_t sod_off = op->bs_pi_do * op->scat_lbdof;
+        const uint8_t * up = dataoutp;
+
+        pr2serr("    %s scatter list, number of LBA range descriptors: %u\n",
+                op->cdb_name, op->scat_num_lbrd);
+        pr2serr("      byte offset of data_to_write: %u, dout_len: %d\n",
+                sod_off, dout_len);
+        up += 32;       /* step over parameter list header */
+        for (k = 0; k < (int)op->scat_num_lbrd; ++k, up += 32) {
+            pr2serr("        desc %d: LBA=0x%" PRIx64 " numblocks=%" PRIu32
+                    "%s", k, sg_get_unaligned_be64(up + 0),
+                    sg_get_unaligned_be32(up + 8), (op->do_16 ? "\n" : " "));
+            if (! op->do_16)
+                pr2serr("rt=0x%x at=0x%x tm=0x%x\n",
+                        sg_get_unaligned_be32(up + 12),
+                        sg_get_unaligned_be16(up + 16),
+                        sg_get_unaligned_be16(up + 18));
+            if ((uint32_t)(((k + 2) * 32) + 20) > sod_off)
+                pr2serr("Warning: possible clash of descriptor %u with "
+                        "data_to_write\n", k);
+        }
     }
     if ((op->verbose > 3) && (dout_len > 0)) {
         pr2serr("    Data-out buffer contents:\n");
@@ -1205,7 +1361,7 @@ do_read_capacity(int sg_fd, struct opts_t *op)
 
 #define WANT_ZERO_EXIT 9999
 static const char * const opt_long_ctl_str =
-    "36a:A:b:B:c:dD:Efg:G:hi:I:l:M:n:No:Oq:rR:sS:t:T:u:vVw:x";
+    "36a:A:b:B:c:dD:Efg:G:hi:I:l:M:n:No:Oq:r:RsS:t:T:u:vVw:x";
 
 /* command line processing, options and arguments. Returns 0 if ok,
  * returns WANT_ZERO_EXIT so upper level yields an exist status of zero.
@@ -1379,14 +1535,19 @@ cl_process(struct opts_t *op, int argc, char *argv[], const char ** lba_opp,
                 pr2serr("bad first argument to '--offset='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->offset = (uint64_t)ll;
+            op->if_offset = (uint64_t)ll;
             if ((cp = strchr(optarg, ','))) {
                 ll = sg_get_llnum(cp + 1);
                 if (-1 == ll) {
                     pr2serr("bad second argument to '--offset='\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                op->dlen = (uint64_t)ll;
+                if (ll > UINT32_MAX) {
+                    pr2serr("bad second argument to '--offset=', cannot "
+                            "exceed 32 bits\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->if_dlen = (uint32_t)ll;
             }
             break;
         case 'O':
@@ -1396,20 +1557,14 @@ cl_process(struct opts_t *op, int argc, char *argv[], const char ** lba_opp,
         case 'q':
             op->scat_filename = optarg;
             break;
-        case 'r':
+        case 'R':
+            op->do_scat_raw = true;
+            break;
+        case 'r':               /* same as --ref-tag= */
             ll = sg_get_llnum(optarg);
             if ((ll < 0) || (ll > UINT32_MAX)) {
                 pr2serr("bad argument to '--ref-tag='. Expect 0 to "
                         "0xffffffff inclusive\n");
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            op->ref_tag = (uint32_t)ll;
-            break;
-        case 'R':               /* same as --ref-tag= */
-            ll = sg_get_llnum(optarg);
-            if ((ll < 0) || (ll > UINT32_MAX)) {
-                pr2serr("bad argument to '--ref-tag='. Expect 0 to 0xffffffff "
-                        "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->ref_tag = (uint32_t)ll;
@@ -1424,7 +1579,7 @@ cl_process(struct opts_t *op, int argc, char *argv[], const char ** lba_opp,
                         "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->scat_num_lbard = (uint16_t)j;
+            op->scat_num_lbrd = (uint16_t)j;
             op->do_scattered = true;
             op->cmd_name = "Write scattered";
             break;
@@ -1461,7 +1616,7 @@ cl_process(struct opts_t *op, int argc, char *argv[], const char ** lba_opp,
             ++op->verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
+            pr2serr("sg_write_x version: %s\n", version_str);
             return WANT_ZERO_EXIT;
         case 'w':       /* WRPROTECT field (or ORPROTECT for ORWRITE) */
             op->wrprotect = sg_get_num(optarg);
@@ -1506,9 +1661,11 @@ main(int argc, char * argv[])
     int sg_fd = -1;
     int rsl_fd = -1;
     int ret = -1;
-    uint32_t addr_arr_len, num_arr_len, num_lbard, do_len;
+    uint32_t addr_arr_len, num_arr_len, do_len, s;
+    uint32_t num_lbrd = 0;
+    uint32_t if_len = 0;
     ssize_t res;
-    off_t if_len = 0;
+    off_t if_tot_len = 0;
     struct opts_t * op;
     unsigned char * wBuff = NULL;
     const char * lba_op = NULL;
@@ -1528,10 +1685,11 @@ main(int argc, char * argv[])
     op->numblocks = DEF_WR_NUMBLOCKS;
     op->pi_type = -1;           /* Protection information type unknown */
     op->ref_tag = DEF_RT;       /* first 4 bytes of 8 byte protection info */
-    op->app_tag = DEF_AT;       /* part of protection information */
-    op->tag_mask = DEF_TM;      /* part of protection information */
+    op->app_tag = DEF_AT;       /* 2 bytes of protection information */
+    op->tag_mask = DEF_TM;      /* final 2 bytes of protection information */
     op->timeout = DEF_TIMEOUT_SECS;
 
+    /* Process command line */
     ret = cl_process(op, argc, argv, &lba_op, &num_op);
     if (ret) {
         if (WANT_ZERO_EXIT == ret)
@@ -1543,6 +1701,7 @@ main(int argc, char * argv[])
         return 0;
     }
     vb = op->verbose;
+    /* sanity checks */
     if ((! op->do_16) && (! op->do_32)) {
         op->do_16 = true;
         if (vb > 1)
@@ -1566,8 +1725,23 @@ main(int argc, char * argv[])
     }
     snprintf(op->cdb_name, sizeof(op->cdb_name), "%s(%d)", op->cmd_name,
              (op->do_16 ? 16 : 32));
+    if (op->do_combined) {
+        if (! op->do_scattered) {
+            pr2serr("--combined=DOF only allowed with --scattered=RD (i.e. "
+                    "only with\nWRITE SCATTERED command)\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if (lba_op || num_op) {
+            pr2serr("--scattered=RD --combined=DOF does not use --lba= or "
+                    "--num=\nPlease remove.\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+    }
 
+    /* examine .if_name . Open, move to .if_offset, calculate length that we
+     * want to read. */
     if (! op->ndob) {
+        if_len = op->if_dlen;
         if (NULL == op->if_name) {
             pr2serr("Need --if=FN option to be given, exiting.\n");
             if (vb > 1)
@@ -1599,16 +1773,17 @@ main(int argc, char * argv[])
             }
             got_stat = true;
             if (S_ISREG(if_stat.st_mode))
-                if_len = if_stat.st_size;
+                if_tot_len = if_stat.st_size;
         }
-        if (got_stat && if_len && ((int64_t)op->offset >= (if_len - 1))) {
+        if (got_stat && if_tot_len &&
+            ((int64_t)op->if_offset >= (if_tot_len - 1))) {
             pr2serr("Offset (%" PRIu64 ") is at or beyond IF byte length (%"
-                    PRIu64 ")\n", op->offset, if_len);
+                    PRIu64 ")\n", op->if_offset, if_tot_len);
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
-        if (op->offset > 0) {
-            off_t off = op->offset;
+        if (op->if_offset > 0) {
+            off_t off = op->if_offset;
 
             if (got_stdin) {
                 if (vb)
@@ -1623,17 +1798,27 @@ main(int argc, char * argv[])
                     ret = SG_LIB_FILE_ERROR;
                     goto err_out;
                 }
-                if_len -= op->offset;
-                if (if_len <= 0) {
+                if_tot_len -= op->if_offset;
+                if (if_tot_len <= 0) {
                     pr2serr("--offset [0x%" PRIx64 "] at or beyond file "
-                            "length[0x%" PRIx64 "]\n", (uint64_t)op->offset,
-                            (uint64_t)if_len);
+                            "length[0x%" PRIx64 "]\n",
+                            (uint64_t)op->if_offset, (uint64_t)if_tot_len);
                     ret = SG_LIB_FILE_ERROR;
                     goto err_out;
                 }
+                if_len = (uint32_t)((if_tot_len < (off_t)op->if_dlen) ?
+                                        if_tot_len : (off_t)op->if_dlen);
             }
         }
         if (0 != (if_len % op->bs_pi_do)) {
+            if (op->strict) {
+                pr2serr("Error: number of bytes to read from IF [%u] is "
+                        "not a multiple\nblock size %u (including"
+                        "protection information\n", (unsigned int)if_len,
+                        op->bs_pi_do);
+                ret = SG_LIB_FILE_ERROR;
+                goto err_out;
+            }
             pr2serr("Warning: number of bytes to read from IF [%u] is not a "
                     "multiple\nblock size %u (including protection "
                     "information, if any);\npad with zeros",
@@ -1642,32 +1827,26 @@ main(int argc, char * argv[])
                      op->bs_pi_do;      /* round up */
         }
     }
+    /* A bit more sanity */
     if (NULL == op->device_name) {
         pr2serr("missing device name!\n");
         usage((op->help > 0) ? op->help : 0);
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
     }
-    if (op->scat_filename && (lba_op || num_op)) {
-        pr2serr("expect '--scat-file=' by itself, or both '--lba=' and "
-                "'--num='\n");
-        ret = SG_LIB_SYNTAX_ERROR;
-        goto err_out;
-    } else if (op->scat_filename || (lba_op && num_op))
-        ;       /* we want this path */
-    else {
-        if (lba_op)
-            pr2serr("since '--lba=' is given, also need '--num='\n");
-        else
-            pr2serr("expect either both '--lba=' and '--num=', or "
-                    "'--scat-file=' by itself\n");
+    n = (!! op->scat_filename) + (!! (lba_op || num_op)) +
+        (!! op->do_combined);
+    if (1 != n) {
+        pr2serr("want one and only one of: (--lba=LBA or --num=NUM), or "
+                "--scat-file=SF,\nor --combined=DOF\n");
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
     }
 
+    /* Open device file, do READ CAPACITY(16, maybe 10) if no BS */
     sg_fd = sg_cmds_open_device(op->device_name, false /* rw */, vb);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", op->device_name,
+        pr2serr("open error: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
@@ -1677,6 +1856,7 @@ main(int argc, char * argv[])
             goto err_out;
     }
 
+    /* decode --lba= and --num= options */
     memset(addr_arr, 0, sizeof(addr_arr));
     memset(num_arr, 0, sizeof(num_arr));
     addr_arr_len = 0;
@@ -1687,6 +1867,8 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
+        if (addr_arr_len > 0)
+            op->explicit_lba = true;
         if (0 != build_num_arr(num_op, num_arr, &num_arr_len,
                                MAX_NUM_ADDR)) {
             pr2serr("bad argument to '--num'\n");
@@ -1705,6 +1887,7 @@ main(int argc, char * argv[])
         uint32_t sum_num = 0;
 
         do_len = 0;
+        /* if WRITE SCATTERED check for --scat-file=SF, if so state(SF) */
         if (op->scat_filename) {
             if (op->do_combined) {
                 pr2serr("Ambiguous: got --combined=DOF and --scat-file=SF "
@@ -1720,31 +1903,34 @@ main(int argc, char * argv[])
                 goto err_out;
             }
         }
-        if (op->do_combined && op->do_raw) {
-            pr2serr("Ambiguous: do expect --combined=DOF and --raw\n"
+        /* some WRITE SCATTERED sanity checks */
+        if (op->do_combined && op->do_scat_raw) {
+            pr2serr("Ambiguous: do expect --combined=DOF and --scat-raw\n"
                     "Give one or the other\n");
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if ((NULL == op->scat_filename) && op->do_raw) {
-            pr2serr("--raw only applies to the --scat-file=SF option\n"
-                    "Give both or neither\n");
+        if ((NULL == op->scat_filename) && op->do_scat_raw) {
+            pr2serr("--scat-raw only applies to the --scat-file=SF option\n"
+                    "--scat-raw without the --scat-file=SF option is an "
+                    "error\n");
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if ((addr_arr_len > 0) && (op->scat_num_lbard > 0) &&
-            (op->scat_num_lbard < addr_arr_len)) {
+        if ((addr_arr_len > 0) && (op->scat_num_lbrd > 0) &&
+            (op->scat_num_lbrd < addr_arr_len)) {
             pr2serr("less LBA,NUM pairs (%d )than --scattered=%d\n",
-                    addr_arr_len, op->scat_num_lbard);
+                    addr_arr_len, op->scat_num_lbrd);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        num_lbard = (addr_arr_len > 0) ? addr_arr_len : op->scat_num_lbard;
-        if (num_lbard < 15)
-            num_lbard = 15; /* 32 byte leadin, 15  32 byte LRD = 512 bytes */
-        if (op->do_combined)
+        num_lbrd = (addr_arr_len > 0) ? addr_arr_len : op->scat_num_lbrd;
+        if (num_lbrd < 15)
+            num_lbrd = 15; /* 32 byte leadin, 15  32 byte LRD = 512 bytes */
+        if (op->do_combined) {
             goto skip_scat_build;
-        if (op->do_raw) {
+        }
+        if (op->do_scat_raw) {
             if (S_ISREG(sf_stat.st_mode)) {
                 do_len = sf_stat.st_size;
                 d = sf_stat.st_size / 32;
@@ -1756,13 +1942,13 @@ main(int argc, char * argv[])
                 }
                 if (sf_stat.st_size % 32)
                     d += 1;     /* round up, will zero pad unfinished RD */
-                if (op->scat_num_lbard) {
-                    if (op->scat_num_lbard != (d - 1)) {
+                if (op->scat_num_lbrd) {
+                    if (op->scat_num_lbrd != (d - 1)) {
                         pr2serr("Command line RD (%u) contradicts value "
                                 "calculated from raw SF (%u)\n",
-                                 op->scat_num_lbard, d - 1);
-                        if (op->scat_num_lbard < (d - 1))
-                            d = op->scat_num_lbard + 1;
+                                 op->scat_num_lbrd, d - 1);
+                        if (op->scat_num_lbrd < (d - 1))
+                            d = op->scat_num_lbrd + 1;
                         else {
                             pr2serr("Command line RD greater than raw SF "
                                     "file length implies, exit\n");
@@ -1772,14 +1958,16 @@ main(int argc, char * argv[])
                     }
                 }
             } else {
-                pr2serr("--scat-file= --raw wants regular file for length\n");
+                pr2serr("--scat-file= --scat-raw wants regular file for "
+                        "length\n");
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
-            num_lbard = d;
+            num_lbrd = d;
         }
 
-        do_len = (1 + num_lbard) * 32;
+        /* Calculations to work out initial dout length */
+        do_len = (1 + num_lbrd) * 32;
         op->scat_lbdof = do_len / op->bs_pi_do;
         if (0 != (do_len % op->bs_pi_do)) { /* if not multiple, round up */
             op->scat_lbdof += 1;
@@ -1789,13 +1977,13 @@ main(int argc, char * argv[])
             do_len += (uint32_t)if_len;
         } else {        /* IF is stdin, a pipe or a device (special) ... */
             op->xfer_bytes = _SC_PAGE_SIZE;        /* ... so need length */
-            if (op->bs_pi_do > (op->xfer_bytes / 2))
+            if (op->bs_pi_do > ((uint32_t)op->xfer_bytes / 2))
                 op->xfer_bytes = op->bs_pi_do * 3;
-            else if (do_len >= (op->xfer_bytes / 2)) {
+            else if (do_len >= ((uint32_t)op->xfer_bytes / 2)) {
                 op->xfer_bytes *= 4;
-                if (do_len >= (op->xfer_bytes / 2)) {
+                if (do_len >= ((uint32_t)op->xfer_bytes / 2)) {
                     op->xfer_bytes *= 4;
-                    if (do_len >= (op->xfer_bytes / 2)) {
+                    if (do_len >= ((uint32_t)op->xfer_bytes / 2)) {
                         pr2serr("Giving up guessing big enough buffers, "
                                 "please use --offset=OFF,DLEN\n");
                         ret = SG_LIB_SYNTAX_ERROR;
@@ -1805,8 +1993,8 @@ main(int argc, char * argv[])
             }
             do_len = op->xfer_bytes;
         }
-            if (0 != (do_len % op->bs_pi_do)) /* round up */
-                do_len = ((do_len / op->bs_pi_do) + 1) * op->bs_pi_do;
+        if (0 != (do_len % op->bs_pi_do)) /* round up */
+            do_len = ((do_len / op->bs_pi_do) + 1) * op->bs_pi_do;
         if (do_len < op->bs_pi_do) {
             pr2serr("failed calculating data-out buffer size (%u)\n",
                     do_len);
@@ -1825,7 +2013,8 @@ main(int argc, char * argv[])
             ret = SG_LIB_OS_BASE_ERR + ENOMEM;
             goto err_out;
         }
-        if (op->do_raw) {
+
+        if (op->do_scat_raw) {
             rsl_fd = open(op->scat_filename, O_RDONLY);
             if (rsl_fd < 0) {
                 err = errno;
@@ -1861,12 +2050,17 @@ main(int argc, char * argv[])
             close(rsl_fd);
             rsl_fd = -1;
         } else if (op->scat_filename) {
-            ret = build_t10_scat(op->scat_filename, op->expect_pi_do, up, &d,
-                                 &num_lbard, &sum_num,
+            ret = build_t10_scat(op->scat_filename, op->do_16, up, &d,
+                                 &num_lbrd, &sum_num,
                                  op->scat_lbdof * op->bs_pi_do);
             if (ret)
                 goto err_out;
+            if (num_lbrd > 0)
+                op->explicit_lba = true;
             op->numblocks = sum_num;
+            if (vb > 1)
+                pr2serr("After build_t10_scat(): num_lbrd=%u sum_num=%u\n",
+                        num_lbrd, sum_num);
         } else if (addr_arr_len > 0) {  /* build RDs for --addr= --num= */
             for (n = 32, k = 0; k < (int)addr_arr_len; ++k, n += 32) {
                 sg_put_unaligned_be64(addr_arr[k], up + n + 0);
@@ -1886,13 +2080,29 @@ main(int argc, char * argv[])
             }
             op->numblocks = sum_num;
         }
-        /* now read data to write component into up */
+        /* now read data to write component into 'up' */
         d = op->scat_lbdof * op->bs_pi_do;
-        if (d > op->xfer_bytes) {
+        if (d > (uint32_t)op->xfer_bytes) {
             pr2serr("Logic error in scattered, read data into buffer "
                     "(d=%u)\n", d);
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
+        }
+        s = op->scat_lbdof + op->numblocks;
+        if ((uint32_t)op->xfer_bytes < (s * op->bs_pi_do)) {
+            uint8_t * u2p;
+
+            u2p = calloc(s, op->bs_pi_do);
+            if (NULL == u2p) {
+                pr2serr("unable to allocate memory for final "
+                        "scatterlist+data\n");
+                ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+                goto err_out;
+            }
+            memcpy(u2p, up, d);
+            free(up);
+            up = u2p;
+            op->xfer_bytes = s * op->bs_pi_do;
         }
         res = read(infd, up + d, op->xfer_bytes - d);
         d = op->xfer_bytes - d;
@@ -1902,7 +2112,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
-        if (res < d) {
+        if ((uint32_t)res < d) {
             pr2serr("Short (%u) read of IF file, wanted %u\n",
                     (unsigned int)res, d);
             ret = SG_LIB_FILE_ERROR;
@@ -1919,7 +2129,35 @@ skip_scat_build:        // needs more XXXXXXXXX xxxxxx ???
     if (op->do_same)
         op->xfer_bytes = 1 * op->bs_pi_do;
     else if (op->do_scattered) {
-        ;       /* already done, scatter_list+data waiting in 'up' */
+        if (op->do_combined) {
+            int up_len;
+            uint32_t sum_num;
+
+            if ((if_len < 32) || (op->bs_pi_do < 32)) {
+                pr2serr("Logic error combined calloc should be > %u, "
+                        "bs_pi_do=%u\n", (uint32_t)if_len, op->bs_pi_do);
+                ret = SG_LIB_FILE_ERROR;
+                goto err_out;
+            }
+            /* assume if_len % op->bs_pi_do is zero (i.e. no remainder) */
+            up = calloc(if_len / op->bs_pi_do, op->bs_pi_do);
+            if (NULL == up) {
+                pr2serr("unable to allocate memory for combined\n");
+                ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+                goto err_out;
+            }
+            up_len = (op->scat_lbdof > 0) ? (op->scat_lbdof * op->bs_pi_do) :
+                                            if_len;
+            num_lbrd = 0;
+            sum_num = 0;
+            if (! check_lbrds(up, up_len, op, &num_lbrd, &sum_num)) {
+                ret = SG_LIB_FILE_ERROR;
+                goto err_out;
+            }
+            op->numblocks = sum_num;
+        } else {
+            ; /* already done, scatter_list+data waiting in 'up' */
+        }
     } else
         op->xfer_bytes = op->numblocks * op->bs_pi_do;
 

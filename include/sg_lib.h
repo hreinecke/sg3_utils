@@ -504,6 +504,18 @@ int64_t sg_get_llnum(const char * buf);
  * negative numbers and '-1' must be treated separately. */
 int64_t sg_get_llnum_nomult(const char * buf);
 
+/* Returns pointer to heap (or NULL) that is aligned to a align_to byte
+ * boundary. Sends back *buff_to_free pointer in third argument that may be
+ * different from the return value. If it is different then the *buff_to_free
+ * pointer should be freed (rather than the returned value) when the heap is
+ * no longer needed. If align_to is 0 then aligns to OS's page size. Sets all
+ * returned heap to zeros. If num_bytes is 0 then set to page size. */
+uint8_t * sg_memalign(uint32_t num_bytes, uint32_t align_to,
+                      uint8_t ** buff_to_free, bool vb);
+
+/* Returns OS page size in bytes. If uncertain returns 4096. */
+uint32_t sg_get_page_size(void);
+
 
 /* <<< Architectural support functions [is there a better place?] >>> */
 

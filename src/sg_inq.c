@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.73 20171115";    /* SPC-5 rev 17 */
+static const char * version_str = "1.74 20171206";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -300,7 +300,8 @@ usage()
             "                    only supported for VPD pages 0x80 and 0x83\n"
             "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
-            "    --force|-f      skip VPD page 0 checking\n"
+            "    --force|-f      skip VPD page 0 checking; provide more "
+            "NVMe info\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
             "    --id|-i         decode device identification VPD page "
@@ -1748,7 +1749,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                        "identifier\n",
                        sg_get_trans_proto_str(p_id, sizeof(b), b));
             break;
-        case 0xa: /* UUID identifier [spc5r08] */
+        case 0xa: /* UUID identifier [spc5r08] RFC 4122 */
             if (1 != c_set) {
                 pr2serr("      << expected binary code_set >>\n");
                 dStrHexErr((const char *)ip, i_len, 0);
@@ -3793,7 +3794,7 @@ const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
 
 static int
 do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
-              struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_din,
+              struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_dinp,
               int id_din_len, const struct opts_t * op)
 {
     bool got_eui_128 = false;
@@ -3806,7 +3807,7 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     clear_scsi_pt_obj(ptvp);
     id_cmdp->nsid = nsid;
     id_cmdp->cdw10 = 0x0;       /* CNS=0x0 Identify NS */
-    set_scsi_pt_data_in(ptvp, id_din, id_din_len);
+    set_scsi_pt_data_in(ptvp, id_dinp, id_din_len);
     set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
@@ -3817,24 +3818,24 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     }
     if (ret)
         return ret;
-    num_lbaf = id_din[25] + 1;  /* spec says this is "0's based value" */
-    flbas = id_din[26] & 0xf;   /* index of active LBA format (for this ns) */
+    num_lbaf = id_dinp[25] + 1;  /* spec says this is "0's based value" */
+    flbas = id_dinp[26] & 0xf;   /* index of active LBA format (for this ns) */
     if (op->do_hex || op->do_raw) {
-        do_nvme_identify_hex_raw(id_din, sizeof(id_din), op);
+        do_nvme_identify_hex_raw(id_dinp, id_din_len, op);
         return ret;
     }
-    ns_sz = sg_get_unaligned_le64(id_din + 0);
-    eui_64 = sg_get_unaligned_be64(id_din + 120);  /* N.B. big endian */
-    if (! sg_all_zeros(id_din + 104, 16))
+    ns_sz = sg_get_unaligned_le64(id_dinp + 0);
+    eui_64 = sg_get_unaligned_be64(id_dinp + 120);  /* N.B. big endian */
+    if (! sg_all_zeros(id_dinp + 104, 16))
         got_eui_128 = true;
     printf("    Namespace size/capacity: %" PRIu64 "/%" PRIu64
-           " blocks\n", ns_sz, sg_get_unaligned_le64(id_din + 8));
+           " blocks\n", ns_sz, sg_get_unaligned_le64(id_dinp + 8));
     printf("    Namespace utilization: %" PRIu64 " blocks\n",
-           sg_get_unaligned_le64(id_din + 16));
+           sg_get_unaligned_le64(id_dinp + 16));
     if (got_eui_128) {          /* N.B. big endian */
-        printf("    NGUID: 0x%02x", id_din[104]);
+        printf("    NGUID: 0x%02x", id_dinp[104]);
         for (k = 1; k < 16; ++k)
-            printf("%02x", id_din[104 + k]);
+            printf("%02x", id_dinp[104 + k]);
         printf("\n");
     } else if (op->do_force)
         printf("    NGUID: 0x0\n");
@@ -3848,7 +3849,7 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
             printf(" <-- active\n");
         else
             printf("\n");
-        flba_info = sg_get_unaligned_le32(id_din + off);
+        flba_info = sg_get_unaligned_le32(id_dinp + off);
         md_size = flba_info & 0xffff;
         lb_size = flba_info >> 16 & 0xff;
         if (lb_size > 31) {
@@ -3889,7 +3890,9 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     struct sg_nvme_passthru_cmd identify_cmd;
     struct sg_nvme_passthru_cmd cmd_back;
     struct sg_nvme_passthru_cmd * id_cmdp = &identify_cmd;
-    uint8_t id_din[4096];
+    uint8_t * id_dinp = NULL;
+    uint8_t * free_id_dinp = NULL;
+    const uint32_t pg_sz = sg_get_page_size();
 
     if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
@@ -3906,7 +3909,8 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     id_cmdp->opcode = 0x6;
     nsid = get_pt_nvme_nsid(ptvp);
     id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
-    set_scsi_pt_data_in(ptvp, id_din, sizeof(id_din));
+    id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, vb > 3);
+    set_scsi_pt_data_in(ptvp, id_dinp, pg_sz);
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
     set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
@@ -3917,16 +3921,16 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     }
     if (ret)
         goto err_out;
-    max_nsid = sg_get_unaligned_le16(id_din + 516);
+    max_nsid = sg_get_unaligned_le16(id_dinp + 516);
     if (op->do_raw || op->do_hex) {
-        do_nvme_identify_hex_raw(id_din, sizeof(id_din), op);
+        do_nvme_identify_hex_raw(id_dinp, pg_sz, op);
         goto skip1;
     }
     printf("Identify controller for %s:\n", op->device_name);
-    printf("  Model number: %.40s\n", (const char *)(id_din + 24));
-    printf("  Serial number: %.20s\n", (const char *)(id_din + 4));
-    printf("  Firmware revision: %.8s\n", (const char *)(id_din + 64));
-    ver = sg_get_unaligned_le32(id_din + 80);
+    printf("  Model number: %.40s\n", (const char *)(id_dinp + 24));
+    printf("  Serial number: %.20s\n", (const char *)(id_dinp + 4));
+    printf("  Firmware revision: %.8s\n", (const char *)(id_dinp + 64));
+    ver = sg_get_unaligned_le32(id_dinp + 80);
     ver_maj = (ver >> 16);
     ver_min = (ver >> 8) & 0xff;
     ver_ter = (ver & 0xff);
@@ -3937,28 +3941,28 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     else
         printf("\n");
     printf("  PCI vendor ID VID/SSVID: 0x%x/0x%x\n",
-           sg_get_unaligned_le16(id_din + 0),
-           sg_get_unaligned_le16(id_din + 2));
+           sg_get_unaligned_le16(id_dinp + 0),
+           sg_get_unaligned_le16(id_dinp + 2));
     printf("  IEEE OUI Identifier: 0x%x\n",
-           sg_get_unaligned_le24(id_din + 73));
-    got_fguid = ! sg_all_zeros(id_din + 112, 16);
+           sg_get_unaligned_le24(id_dinp + 73));
+    got_fguid = ! sg_all_zeros(id_dinp + 112, 16);
     if (got_fguid) {
-        printf("  FGUID: 0x%02x", id_din[112]);
+        printf("  FGUID: 0x%02x", id_dinp[112]);
         for (k = 1; k < 16; ++k)
-            printf("%02x", id_din[112 + k]);
+            printf("%02x", id_dinp[112 + k]);
         printf("\n");
     } else if (op->do_force)
         printf("  FGUID: 0x0\n");
-    printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(id_din + 78));
+    printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(id_dinp + 78));
     if (op->do_force) {
         printf("  Management endpoint capabilities, over a PCIe port: %d\n",
-               !! (0x2 & id_din[255]));
+               !! (0x2 & id_dinp[255]));
         printf("  Management endpoint capabilities, over a SMBus/I2C port: "
-               "%d\n", !! (0x1 & id_din[255]));
+               "%d\n", !! (0x1 & id_dinp[255]));
     }
     printf("  Number of namespaces: %u\n", max_nsid);
-    sz1 = sg_get_unaligned_le64(id_din + 280);  /* lower 64 bits */
-    sz2 = sg_get_unaligned_le64(id_din + 288);  /* upper 64 bits */
+    sz1 = sg_get_unaligned_le64(id_dinp + 280);  /* lower 64 bits */
+    sz2 = sg_get_unaligned_le64(id_dinp + 288);  /* upper 64 bits */
     if (sz2)
         printf("  Total NVM capacity: huge ...\n");
     else if (sz1)
@@ -3969,8 +3973,8 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         const char * cp;
 
         printf("  Total NVM capacity: 0 bytes\n");
-        npss = id_din[263] + 1;
-        up = id_din + 2048;
+        npss = id_dinp[263] + 1;
+        up = id_dinp + 2048;
         for (k = 0; k < npss; ++k, up += 32) {
             n = sg_get_unaligned_le16(up + 0);
             n *= (0x1 & up[3]) ? 1 : 100;    /* unit: 100 microWatts */
@@ -4013,7 +4017,7 @@ skip1:
                 pr2serr("NSID from device (%u) should not exceed number of "
                         "namespaces (%u)\n", nsid, max_nsid);
         }
-        ret = do_nvme_id_ns(ptvp, nsid, id_cmdp, id_din, sizeof(id_din), op);
+        ret = do_nvme_id_ns(ptvp, nsid, id_cmdp, id_dinp, pg_sz, op);
         if (ret)
             goto err_out;
 
@@ -4021,13 +4025,14 @@ skip1:
         for (k = 1; k <= max_nsid; ++k) {
             if ((! op->do_raw) || (op->do_hex < 3))
                 printf("  Namespace %u (of %u):\n", k, max_nsid);
-            ret = do_nvme_id_ns(ptvp, k, id_cmdp, id_din, sizeof(id_din), op);
+            ret = do_nvme_id_ns(ptvp, k, id_cmdp, id_dinp, pg_sz, op);
             if (ret)
                 goto err_out;
         }
     }
 err_out:
     destruct_scsi_pt_obj(ptvp);
+    free(free_id_dinp);
     return ret;
 }
 

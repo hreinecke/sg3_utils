@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.30 20171113 */
+/* sg_pt_linux version 1.31 20171203 */
 
 
 #include <stdio.h>
@@ -34,88 +34,28 @@
 #include "sg_pt.h"
 #include "sg_lib.h"
 #include "sg_linux_inc.h"
-#include "sg_pt_nvme.h"
+#include "sg_pt_linux.h"
 
 #if (__STDC_VERSION__ >= 199901L)  /* C99 or later */
-typedef intptr_t sg_intptr_t;
+typedef uintptr_t sg_uintptr_t;
 #else
-typedef long sg_intptr_t;
+typedef unsigned long sg_uintptr_t;
 #endif
 
+/* Checking CDB for whether it is a SCSI or NVME command: all NVME coomands
+ * are 64 bytes long. There are very few standardized SCSI commands with
+ * a cdb of 64 bytes. If one does then byte 0 (in the CDB) must contain
+ * 7Fh and at byte offset 7 the value must be 56 (Additional CDB length)a */
+#if 0
 // xxxxxxxxxxxxxxxx testing <<<<<<<<<<<<<<<<<<<<<<<<
-// #undef HAVE_LINUX_NVME_IOCTL_H
+#undef HAVE_LINUX_NVME_IOCTL_H
 
 #ifdef HAVE_LINUX_NVME_IOCTL_H
 #include <linux/nvme_ioctl.h>
 #else
-
-/*
- * Definitions for the NVM Express ioctl interface
- * Copyright (c) 2011-2014, Intel Corporation.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- *
- * This program is distributed in the hope it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- */
-
-#if 0
-#include <linux/types.h>
-
-struct nvme_user_io {
-        __u8    opcode;
-        __u8    flags;
-        __u16   control;
-        __u16   nblocks;
-        __u16   rsvd;
-        __u64   metadata;
-        __u64   addr;
-        __u64   slba;
-        __u32   dsmgmt;
-        __u32   reftag;
-        __u16   apptag;
-        __u16   appmask;
-};
-
-struct nvme_passthru_cmd {
-        __u8    opcode;
-        __u8    flags;
-        __u16   rsvd1;
-        __u32   nsid;
-        __u32   cdw2;
-        __u32   cdw3;
-        __u64   metadata;
-        __u64   addr;
-        __u32   metadata_len;
-        __u32   data_len;
-        __u32   cdw10;
-        __u32   cdw11;
-        __u32   cdw12;
-        __u32   cdw13;
-        __u32   cdw14;
-        __u32   cdw15;
-        __u32   timeout_ms;
-        __u32   result;
-};
+#include "sg_pt_linux.h"
 #endif
-
-#define nvme_admin_cmd nvme_passthru_cmd
-
-#define NVME_IOCTL_ID           _IO('N', 0x40)
-#define NVME_IOCTL_ADMIN_CMD    _IOWR('N', 0x41, struct nvme_admin_cmd)
-#define NVME_IOCTL_SUBMIT_IO    _IOW('N', 0x42, struct nvme_user_io)
-#define NVME_IOCTL_IO_CMD       _IOWR('N', 0x43, struct nvme_passthru_cmd)
-#define NVME_IOCTL_RESET        _IO('N', 0x44)
-#define NVME_IOCTL_SUBSYS_RESET _IO('N', 0x45)
-
-#endif  /* end of HAVE_LINUX_NVME_IOCTL_H */
-
-#include <linux/types.h>
-#include <linux/bsg.h>
+#endif
 
 #ifdef major
 #define SG_DEV_MAJOR major
@@ -188,9 +128,11 @@ static const char * linux_driver_suggests[] = {
 #define SG_LIB_SUGGEST_MASK     SUGGEST_MASK
 #define SG_LIB_DRIVER_SENSE    DRIVER_SENSE
 
-static bool bsg_nvme_char_major_checked = false;
-static int bsg_major = 0;
-static volatile int nvme_char_major = 0;
+bool sg_bsg_nvme_char_major_checked = false;
+int sg_bsg_major = 0;
+volatile int sg_nvme_char_major = 0;
+
+long sg_lin_page_size = 4096;   /* default, overridden with correct value */
 
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -216,8 +158,8 @@ pr2ws(const char * fmt, ...)
 /* This function only needs to be called once (unless a NVMe controller
  * can be hot-plugged into system in which case it should be called
  * (again) after that event). */
-static void
-find_bsg_nvme_char_major(int verbose)
+void
+sg_find_bsg_nvme_char_major(int verbose)
 {
     bool got_one = false;
     int n;
@@ -227,6 +169,7 @@ find_bsg_nvme_char_major(int verbose)
     char a[128];
     char b[128];
 
+    sg_lin_page_size = sysconf(_SC_PAGESIZE);
     if (NULL == (fp = fopen(proc_devices, "r"))) {
         if (verbose)
             pr2ws("fopen %s failed: %s\n", proc_devices, strerror(errno));
@@ -240,12 +183,12 @@ find_bsg_nvme_char_major(int verbose)
     while (cp && (cp = fgets(b, sizeof(b), fp))) {
         if (2 == sscanf(b, "%d %126s", &n, a)) {
             if (0 == strcmp("bsg", a)) {
-                bsg_major = n;
+                sg_bsg_major = n;
                 if (got_one)
                     break;
                 got_one = true;
             } else if (0 == strcmp("nvme", a)) {
-                nvme_char_major = n;
+                sg_nvme_char_major = n;
                 if (got_one)
                     break;
                 got_one = true;
@@ -255,17 +198,17 @@ find_bsg_nvme_char_major(int verbose)
     }
     if (verbose > 3) {
         if (cp) {
-            if (bsg_major > 0)
-                pr2ws("found bsg_major=%d\n", bsg_major);
-            if (nvme_char_major > 0)
-                pr2ws("found nvme_char_major=%d\n", nvme_char_major);
+            if (sg_bsg_major > 0)
+                pr2ws("found sg_bsg_major=%d\n", sg_bsg_major);
+            if (sg_nvme_char_major > 0)
+                pr2ws("found sg_nvme_char_major=%d\n", sg_nvme_char_major);
         } else
             pr2ws("found no bsg not nvme char device in %s\n", proc_devices);
     }
     fclose(fp);
 }
 
-/* Assumes that find_bsg_nvme_char_major() has already been called. Returns
+/* Assumes that sg_find_bsg_nvme_char_major() has already been called. Returns
  * true if dev_fd is a scsi generic pass-through device. If yields
  * *is_nvme_p = true with *nsid_p = 0 then dev_fd is a NVMe char device.
  * If yields *nsid_p > 0 then dev_fd is a NVMe block device. */
@@ -294,9 +237,9 @@ check_file_type(int dev_fd, struct stat * dev_statp, bool * is_bsg_p,
         if (S_ISCHR(dev_statp->st_mode)) {
             if (SCSI_GENERIC_MAJOR == major_num)
                 is_sg = true;
-            else if (bsg_major == major_num)
+            else if (sg_bsg_major == major_num)
                 is_bsg = true;
-            else if (nvme_char_major == major_num)
+            else if (sg_nvme_char_major == major_num)
                 is_nvme = true;
         } else if (S_ISBLK(dev_statp->st_mode)) {
             is_block = true;
@@ -361,9 +304,9 @@ check_pt_file_handle(int dev_fd, const char * device_name, int verbose)
         pr2ws("%s: dev_fd=%d, device_name: %s\n", __func__, dev_fd,
               device_name);
     /* Linux doesn't need device_name to determine which pass-through */
-    if (! bsg_nvme_char_major_checked) {
-        bsg_nvme_char_major_checked = true;
-        find_bsg_nvme_char_major(verbose);
+    if (! sg_bsg_nvme_char_major_checked) {
+        sg_bsg_nvme_char_major_checked = true;
+        sg_find_bsg_nvme_char_major(verbose);
     }
     if (dev_fd >= 0) {
         bool is_sg, is_bsg, is_nvme;
@@ -389,614 +332,11 @@ check_pt_file_handle(int dev_fd, const char * device_name, int verbose)
         return 0;
 }
 
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#if defined(IGNORE_LINUX_BSG) || ! defined(HAVE_LINUX_BSG_H)
 /*
- * sg(v3) via SG_IO ioctl on a sg node or other node that accepts that ioctl.
- * Decision has been made at compile time because either:
- *   a) no /usr/include/linux/bsg.h header file was found, or
- *   b) the builder gave the '--enable-no-linux-bsg' option to ./configure
- */
-
-
-struct sg_pt_linux_scsi {
-    struct sg_io_hdr io_hdr;
-    int dev_fd;                 /* -1 if not given */
-    int in_err;
-    int os_err;
-    bool is_sg;         /* is_sg,is_nvme: (F,F)-->unknown; (T,F)-->sg; */
-    bool is_nvme;       /* (F,T)-->nvme; (T,T)-->illegal */
-    bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
-    uint32_t nvme_nsid;
-    uint32_t nvme_result;
-    uint32_t dxfer_ilen;
-    uint32_t dxfer_olen;
-    uint32_t mdxfer_len;
-    void * dxferip;
-    void * dxferop;
-    void * mdxferp;
-};
-
-struct sg_pt_base {
-    struct sg_pt_linux_scsi impl;
-};
-
-
-
-/* Returns >= 0 if successful. If error in Unix returns negated errno. */
-int
-scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
-{
-    int oflags = O_NONBLOCK;
-
-    oflags |= (read_only ? O_RDONLY : O_RDWR);
-    return scsi_pt_open_flags(device_name, oflags, verbose);
-}
-
-/* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
-/* together. The 'flags' argument is advisory and may be ignored. */
-/* Returns >= 0 if successful, otherwise returns negated errno. */
-int
-scsi_pt_open_flags(const char * device_name, int flags, int verbose)
-{
-    int fd;
-
-    if (verbose > 1) {
-        pr2ws("open %s with flags=0x%x\n", device_name, flags);
-    }
-    if (! bsg_nvme_char_major_checked) {
-        bsg_nvme_char_major_checked = true;
-        find_bsg_nvme_char_major(verbose);
-    }
-    fd = open(device_name, flags);
-    if (fd < 0)
-        fd = -errno;
-    return fd;
-}
-
-/* Returns 0 if successful. If error in Unix returns negated errno. */
-int
-scsi_pt_close_device(int device_fd)
-{
-    int res;
-
-    res = close(device_fd);
-    if (res < 0)
-        res = -errno;
-    return res;
-}
-
-/* Caller should additionally call get_scsi_pt_os_err() after this call */
-struct sg_pt_base *
-construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
-{
-    int err;
-    struct sg_pt_linux_scsi * ptp;
-
-    /* The following 2 lines are temporary. It is to avoid a NULL pointer
-     * crash when an old utility is used with a newer library built after
-     * the sg_warnings_strm cleanup */
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-
-    ptp = (struct sg_pt_linux_scsi *)
-          calloc(1, sizeof(struct sg_pt_linux_scsi));
-    if (ptp) {
-        err = set_pt_file_handle((struct sg_pt_base *)ptp, dev_fd, verbose);
-        if ((0 == err) && (! ptp->is_nvme)) {
-            ptp->io_hdr.interface_id = 'S';
-            ptp->io_hdr.dxfer_direction = SG_DXFER_NONE;
-        }
-    } else if (verbose)
-        pr2ws("%s: calloc() failed, out of memory?\n", __func__);
-
-    return (struct sg_pt_base *)ptp;
-}
-
-struct sg_pt_base *
-construct_scsi_pt_obj()
-{
-    return construct_scsi_pt_obj_with_fd(-1 /* dev_fd */, 0 /* verbose */);
-}
-
-void
-destruct_scsi_pt_obj(struct sg_pt_base * vp)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp)
-        free(ptp);
-}
-
-/* Remembers previous device file descriptor */
-void
-clear_scsi_pt_obj(struct sg_pt_base * vp)
-{
-    bool is_sg, is_nvme;
-    int fd, nvme_nsid;
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp) {
-        fd = ptp->dev_fd;
-        is_sg = ptp->is_sg;
-        is_nvme = ptp->is_nvme;
-        nvme_nsid = ptp->nvme_nsid;
-        memset(ptp, 0, sizeof(struct sg_pt_linux_scsi));
-        ptp->io_hdr.interface_id = 'S';
-        ptp->io_hdr.dxfer_direction = SG_DXFER_NONE;
-        ptp->dev_fd = fd;
-        ptp->is_sg = is_sg;
-        ptp->is_nvme = is_nvme;
-        ptp->nvme_nsid = nvme_nsid;
-    }
-}
-
-/* Forget any previous dev_fd and install the one given. May attempt to
- * find file type (e.g. if pass-though) from OS so there could be an error.
- * Returns 0 for success or the the same value as get_scsi_pt_os_err()
- * will return. dev_fd should be >= 0 for a valid file handle or -1 . */
-int
-set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-    struct stat a_stat;
-
-    if (! bsg_nvme_char_major_checked) {
-        bsg_nvme_char_major_checked = true;
-        find_bsg_nvme_char_major(verbose);
-    }
-    ptp->dev_fd = dev_fd;
-    if (dev_fd >= 0)
-        ptp->is_sg = check_file_type(dev_fd, &a_stat, NULL, &ptp->is_nvme,
-                                     &ptp->nvme_nsid, &ptp->os_err, verbose);
-    else {
-        ptp->is_sg = false;
-        ptp->is_nvme = false;
-        ptp->nvme_nsid = 0;
-        ptp->os_err = 0;
-    }
-    return ptp->os_err;
-}
-
-/* Valid file handles (which is the return value) are >= 0 . Returns -1
- * if there is no valid file handle. */
-int
-get_pt_file_handle(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ptp->dev_fd;
-}
-
-void
-set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
-                int cdb_len)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp->io_hdr.cmdp)
-        ++ptp->in_err;
-    ptp->io_hdr.cmdp = (unsigned char *)cdb;
-    ptp->io_hdr.cmd_len = cdb_len;
-}
-
-void
-set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
-                  int max_sense_len)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp->io_hdr.sbp)
-        ++ptp->in_err;
-    memset(sense, 0, max_sense_len);
-    ptp->io_hdr.sbp = sense;
-    ptp->io_hdr.mx_sb_len = max_sense_len;
-}
-
-/* Setup for data transfer from device */
-void
-set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
-                    int dxfer_ilen)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp->dxferip)
-        ++ptp->in_err;
-    if (dxfer_ilen > 0) {
-        ptp->io_hdr.dxferp = dxferp;
-        ptp->dxferip = dxferp;
-        ptp->io_hdr.dxfer_len = dxfer_ilen;
-        ptp->dxfer_ilen = dxfer_ilen;
-        ptp->io_hdr.dxfer_direction = SG_DXFER_FROM_DEV;
-    }
-}
-
-/* Setup for data transfer toward device */
-void
-set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
-                     int dxfer_olen)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp->dxferop)
-        ++ptp->in_err;
-    if (dxfer_olen > 0) {
-        ptp->io_hdr.dxferp = (unsigned char *)dxferp;
-        ptp->dxferop = (void *)dxferp;
-        ptp->io_hdr.dxfer_len = dxfer_olen;
-        ptp->dxfer_olen = dxfer_olen;
-        ptp->io_hdr.dxfer_direction = SG_DXFER_TO_DEV;
-    }
-}
-
-void
-set_pt_metadata_xfer(struct sg_pt_base * vp, unsigned char * dxferp,
-                     uint32_t dxfer_len, bool out_true)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (ptp->mdxferp)
-        ++ptp->in_err;
-    if (dxfer_len > 0) {
-        ptp->mdxferp = dxferp;
-        ptp->mdxfer_len = dxfer_len;
-        ptp->mdxfer_out = out_true;
-    }
-}
-
-void
-set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    ptp->io_hdr.pack_id = pack_id;
-}
-
-void
-set_scsi_pt_tag(struct sg_pt_base * vp, uint64_t tag)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    ++ptp->in_err;
-    if (tag) { ; }     /* unused, suppress warning */
-}
-
-/* Note that task management function codes are transport specific */
-void
-set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    ++ptp->in_err;
-    if (tmf_code) { ; }     /* unused, suppress warning */
-}
-
-void
-set_scsi_pt_task_attr(struct sg_pt_base * vp, int attribute, int priority)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    ++ptp->in_err;
-    if (attribute) { ; }     /* unused, suppress warning */
-    if (priority) { ; }      /* unused, suppress warning */
-}
-
-#ifndef SG_FLAG_Q_AT_TAIL
-#define SG_FLAG_Q_AT_TAIL 0x10
-#endif
-#ifndef SG_FLAG_Q_AT_HEAD
-#define SG_FLAG_Q_AT_HEAD 0x20
-#endif
-
-void
-set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
-{
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    /* default action of sg driver [sg v3 interface] is QUEUE_AT_HEAD */
-    /* default action of block layer SG_IO ioctl is QUEUE_AT_TAIL */
-    if (SCSI_PT_FLAGS_QUEUE_AT_HEAD & flags) {  /* favour AT_HEAD */
-        ptp->io_hdr.flags |= SG_FLAG_Q_AT_HEAD;
-        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_TAIL;
-    } else if (SCSI_PT_FLAGS_QUEUE_AT_TAIL & flags) {
-        ptp->io_hdr.flags |= SG_FLAG_Q_AT_TAIL;
-        ptp->io_hdr.flags &= ~SG_FLAG_Q_AT_HEAD;
-    }
-}
-
-/* Executes NVMe Admin command (or at least forwards it to lower layers).
- * Returns 0 for success, negative numbers are negated 'errno' values from
- * OS system calls. Positive return values are errors from this package.
- * When time_secs is 0 the Linux NVMe Admin command default of 60 seconds
- * is used. */
-int
-do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
-{
-    int n, len;
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-    struct sg_nvme_passthru_cmd cmd;
-
-    if (vb > 3)
-        pr2ws("%s: fd=%d, time_secs=%d\n", __func__, fd, time_secs);
-    if (! ptp->io_hdr.cmdp) {
-        if (vb)
-            pr2ws("No NVMe command given (set_scsi_pt_cdb())\n");
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    n = ptp->io_hdr.cmd_len;
-    len = (int)sizeof(cmd);
-    n = (n < len) ? n : len;
-    if (n < 8) {
-        if (vb)
-            pr2ws("%s: command length of %d bytes is too short\n", __func__,
-                  n);
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    memcpy(&cmd, (unsigned char *)ptp->io_hdr.cmdp, n);
-    if (n < len)        /* zero out rest of 'cmd' */
-        memset((unsigned char *)&cmd + n, 0, len - n);
-    if (ptp->io_hdr.dxfer_len > 0) {
-        cmd.data_len = ptp->io_hdr.dxfer_len;
-        cmd.addr = (__u64)(sg_intptr_t)ptp->io_hdr.dxferp;
-    }
-    if (time_secs < 0)
-        cmd.timeout_ms = 0;
-    else
-        cmd.timeout_ms = 1000 * cmd.timeout_ms;
-    if (vb > 2) {
-        pr2ws("NVMe command:\n");
-        dStrHex((const char *)&cmd, len, 1);
-    }
-    if (ioctl(ptp->dev_fd, NVME_IOCTL_ADMIN_CMD, &cmd) < 0) {
-        ptp->os_err = errno;
-        if (vb > 2)
-            pr2ws("%s: ioctl(NVME_IOCTL_ADMIN_CMD) failed: %s (errno=%d)\n",
-                  __func__, strerror(ptp->os_err), ptp->os_err);
-        return -ptp->os_err;
-    } else
-        ptp->os_err = 0;
-    n = ptp->io_hdr.mx_sb_len;
-    if ((n > 0) && ptp->io_hdr.sbp) {
-        n = (n < len) ? n : len;
-        memcpy(ptp->io_hdr.sbp, &cmd, n);
-        ptp->io_hdr.sb_len_wr = n;
-    } else
-        ptp->io_hdr.sb_len_wr = 0;
-    ptp->nvme_result = cmd.result;
-    if (vb > 2)
-        pr2ws("%s: timeout_ms=%u, result=%u\n", __func__, cmd.timeout_ms,
-              ptp->nvme_result);
-    return 0;
-}
-
-/* Executes SCSI command (or at least forwards it to lower layers).
- * Returns 0 for success, negative numbers are negated 'errno' values from
- * OS system calls. Positive return values are errors from this package. */
-int
-do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
-{
-    int err;
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-    bool have_checked_for_type = (ptp->dev_fd >= 0);
-
-    ptp->os_err = 0;
-    if (ptp->in_err) {
-        if (verbose)
-            pr2ws("Replicated or unused set_scsi_pt... functions\n");
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    if (fd >= 0) {
-        if ((ptp->dev_fd >= 0) && (fd != ptp->dev_fd)) {
-            if (verbose)
-                pr2ws("%s: file descriptor given to create() and here "
-                      "differ\n", __func__);
-            return SCSI_PT_DO_BAD_PARAMS;
-        }
-        ptp->dev_fd = fd;
-    } else if (ptp->dev_fd < 0) {
-        if (verbose)
-            pr2ws("%s: invalid file descriptors\n", __func__);
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    if (! have_checked_for_type) {
-        err = set_pt_file_handle(vp, ptp->dev_fd, verbose);
-        if (err)
-            return -ptp->os_err;
-    }
-    if (ptp->is_nvme)
-        return do_nvme_pt(vp, ptp->dev_fd, time_secs, verbose);
-    if (NULL == ptp->io_hdr.cmdp) {
-        if (verbose)
-            pr2ws("No SCSI command (cdb) given\n");
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    /* io_hdr.timeout is in milliseconds */
-    ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) :
-                                             DEF_TIMEOUT);
-    if (ptp->io_hdr.sbp && (ptp->io_hdr.mx_sb_len > 0))
-        memset(ptp->io_hdr.sbp, 0, ptp->io_hdr.mx_sb_len);
-    if (ioctl(ptp->dev_fd, SG_IO, &ptp->io_hdr) < 0) {
-        ptp->os_err = errno;
-        if (verbose > 1)
-            pr2ws("ioctl(SG_IO) failed: %s (errno=%d)\n",
-                  strerror(ptp->os_err), ptp->os_err);
-        return -ptp->os_err;
-    }
-    return 0;
-}
-
-int
-get_scsi_pt_result_category(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-    int dr_st = ptp->io_hdr.driver_status & SG_LIB_DRIVER_MASK;
-    int scsi_st = ptp->io_hdr.status & 0x7e;
-
-    if (ptp->os_err)
-        return SCSI_PT_RESULT_OS_ERR;
-    else if (ptp->io_hdr.host_status)
-        return SCSI_PT_RESULT_TRANSPORT_ERR;
-    else if (dr_st && (SG_LIB_DRIVER_SENSE != dr_st))
-        return SCSI_PT_RESULT_TRANSPORT_ERR;
-    else if ((SG_LIB_DRIVER_SENSE == dr_st) ||
-             (SAM_STAT_CHECK_CONDITION == scsi_st) ||
-             (SAM_STAT_COMMAND_TERMINATED == scsi_st))
-        return SCSI_PT_RESULT_SENSE;
-    else if (scsi_st)
-        return SCSI_PT_RESULT_STATUS;
-    else
-        return SCSI_PT_RESULT_GOOD;
-}
-
-int
-get_scsi_pt_resid(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ((NULL == ptp) || ptp->is_nvme) ? 0 : ptp->io_hdr.resid;
-}
-
-int
-get_scsi_pt_status_response(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (NULL == ptp)
-        return 0;
-    return ptp->is_nvme ? (int)ptp->nvme_result : ptp->io_hdr.status;
-}
-
-uint32_t
-get_pt_result(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (NULL == ptp)
-        return 0;
-    return ptp->is_nvme ? ptp->nvme_result : (uint32_t)ptp->io_hdr.status;
-}
-
-int
-get_scsi_pt_sense_len(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    if (NULL == ptp)
-        return 0;
-    return ptp->io_hdr.sb_len_wr;       /* NVMe stuffs that variable */
-}
-
-int
-get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ptp->io_hdr.duration;
-}
-
-int
-get_scsi_pt_transport_err(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return (ptp->io_hdr.host_status << 8) + ptp->io_hdr.driver_status;
-}
-
-int
-get_scsi_pt_os_err(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ptp->os_err;
-}
-
-bool
-pt_device_is_nvme(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ptp->is_nvme;
-}
-
-/* If a NVMe block device (which includes the NSID) handle is associated
- * with 'vp', then its NSID is returned (values range from 0x1 to
- * 0xffffffe). Otherwise 0 is returned. */
-uint32_t
-get_pt_nvme_nsid(const struct sg_pt_base * vp)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-
-    return ptp->nvme_nsid;
-}
-
-/* Returns b which will contain a null char terminated string (if
- * max_b_len > 0). That string should decode Linux driver and host
- * status values. */
-char *
-get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
-                              char * b)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-    int ds = ptp->io_hdr.driver_status;
-    int hs = ptp->io_hdr.host_status;
-    int n, m;
-    char * cp = b;
-    int driv;
-    const char * driv_cp = "unknown";
-
-    if (max_b_len < 1)
-        return b;
-    m = max_b_len;
-    n = 0;
-    if (hs) {
-        if ((hs < 0) || (hs >= LINUX_HOST_BYTES_SZ))
-            n = snprintf(cp, m, "Host_status=0x%02x is unknown\n", hs);
-        else
-            n = snprintf(cp, m, "Host_status=0x%02x [%s]\n", hs,
-                         linux_host_bytes[hs]);
-    }
-    m -= n;
-    if (m < 1) {
-        b[max_b_len - 1] = '\0';
-        return b;
-    }
-    cp += n;
-    driv = ds & SG_LIB_DRIVER_MASK;
-    if (driv < LINUX_DRIVER_BYTES_SZ)
-        driv_cp = linux_driver_bytes[driv];
-#if 0
-    sugg = (ds & SG_LIB_SUGGEST_MASK) >> 4;
-    if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
-        sugg_cp = linux_driver_suggests[sugg];
-#endif
-    n = snprintf(cp, m, "Driver_status=0x%02x [%s]\n", ds, driv_cp);
-    m -= n;
-    if (m < 1)
-        b[max_b_len - 1] = '\0';
-    return b;
-}
-
-char *
-get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
-{
-    const struct sg_pt_linux_scsi * ptp = &vp->impl;
-    const char * cp;
-
-    cp = safe_strerror(ptp->os_err);
-    strncpy(b, cp, max_b_len);
-    if ((int)strlen(cp) >= max_b_len)
-        b[max_b_len - 1] = '\0';
-    return b;
-}
-
-
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#else /* allow for runtime selection of sg v3 or v4 (via bsg) */
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-/*
- * So bsg is an option. Thus we make a runtime decision. If all the following
- * are true we use sg v4 which is only currently supported on bsg device
- * nodes:
+ * We make a runtime decision whether to use the sg v3 interface or the sg
+ * v4 interface (currently exclusively used by the bsg driver). If all the
+ * following are true we use sg v4 which is only currently supported on bsg
+ * device nodes:
  *   a) there is a bsg entry in the /proc/devices file
  *   b) the device node given to scsi_pt_open() is a char device
  *   c) the char major number of the device node given to scsi_pt_open()
@@ -1014,9 +354,6 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
  */
 
 
-#include <linux/types.h>
-#include <linux/bsg.h>
-
 #ifdef major
 #define SG_DEV_MAJOR major
 #else
@@ -1025,30 +362,6 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
 #endif
 #define SG_DEV_MAJOR MAJOR  /* MAJOR() macro faulty if > 255 minors */
 #endif
-
-
-struct sg_pt_linux_scsi {
-    struct sg_io_v4 io_hdr;     /* use v4 header as it is more general */
-    int dev_fd;                 /* -1 if not given */
-    int in_err;
-    int os_err;
-    unsigned char tmf_request[4];
-    bool is_sg;
-    bool is_bsg;
-    bool is_nvme;
-    bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
-    uint32_t nvme_nsid;         /* 1 to 0xfffffffe are possibly valid, 0
-                                 * implies dev_fd is not a NVMe device
-                                 * (is_nvme=false) or it is a NVMe char
-                                 * device (e.g. /dev/nvme0 ) */
-    uint32_t nvme_result;
-    uint32_t mdxfer_len;
-    void * mdxferp;
-};
-
-struct sg_pt_base {
-    struct sg_pt_linux_scsi impl;
-};
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
@@ -1069,9 +382,9 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 {
     int fd;
 
-    if (! bsg_nvme_char_major_checked) {
-        bsg_nvme_char_major_checked = true;
-        find_bsg_nvme_char_major(verbose);
+    if (! sg_bsg_nvme_char_major_checked) {
+        sg_bsg_nvme_char_major_checked = true;
+        sg_find_bsg_nvme_char_major(verbose);
     }
     if (verbose > 1) {
         pr2ws("open %s with flags=0x%x\n", device_name, flags);
@@ -1186,9 +499,9 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     struct stat a_stat;
 
-    if (! bsg_nvme_char_major_checked) {
-        bsg_nvme_char_major_checked = true;
-        find_bsg_nvme_char_major(verbose);
+    if (! sg_bsg_nvme_char_major_checked) {
+        sg_bsg_nvme_char_major_checked = true;
+        sg_find_bsg_nvme_char_major(verbose);
     }
     ptp->dev_fd = dev_fd;
     if (dev_fd >= 0)
@@ -1223,7 +536,7 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
 
     if (ptp->io_hdr.request)
         ++ptp->in_err;
-    ptp->io_hdr.request = (__u64)(sg_intptr_t)cdb;
+    ptp->io_hdr.request = (__u64)(sg_uintptr_t)cdb;
     ptp->io_hdr.request_len = cdb_len;
 }
 
@@ -1236,7 +549,7 @@ set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
     if (ptp->io_hdr.response)
         ++ptp->in_err;
     memset(sense, 0, max_sense_len);
-    ptp->io_hdr.response = (__u64)(sg_intptr_t)sense;
+    ptp->io_hdr.response = (__u64)(sg_uintptr_t)sense;
     ptp->io_hdr.max_response_len = max_sense_len;
 }
 
@@ -1250,7 +563,7 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
     if (ptp->io_hdr.din_xferp)
         ++ptp->in_err;
     if (dxfer_ilen > 0) {
-        ptp->io_hdr.din_xferp = (__u64)(sg_intptr_t)dxferp;
+        ptp->io_hdr.din_xferp = (__u64)(sg_uintptr_t)dxferp;
         ptp->io_hdr.din_xfer_len = dxfer_ilen;
     }
 }
@@ -1265,7 +578,7 @@ set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
     if (ptp->io_hdr.dout_xferp)
         ++ptp->in_err;
     if (dxfer_olen > 0) {
-        ptp->io_hdr.dout_xferp = (__u64)(sg_intptr_t)dxferp;
+        ptp->io_hdr.dout_xferp = (__u64)(sg_uintptr_t)dxferp;
         ptp->io_hdr.dout_xfer_len = dxfer_olen;
     }
 }
@@ -1307,7 +620,7 @@ set_scsi_pt_task_management(struct sg_pt_base * vp, int tmf_code)
 
     ptp->io_hdr.subprotocol = 1;        /* SCSI task management function */
     ptp->tmf_request[0] = (unsigned char)tmf_code;      /* assume it fits */
-    ptp->io_hdr.request = (__u64)(sg_intptr_t)(&(ptp->tmf_request[0]));
+    ptp->io_hdr.request = (__u64)(sg_uintptr_t)(&(ptp->tmf_request[0]));
     ptp->io_hdr.request_len = 1;
 }
 
@@ -1581,73 +894,6 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
     return 0;
 }
 
-/* Executes NVMe Admin command (or at least forwards it to lower layers).
- * Returns 0 for success, negative numbers are negated 'errno' values from
- * OS system calls. Positive return values are errors from this package.
- * When time_secs is 0 the Linux NVMe Admin command default of 60 seconds
- * is used. */
-static int
-do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
-{
-    int n, len;
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
-    struct sg_nvme_passthru_cmd cmd;
-
-    if (vb > 3)
-        pr2ws("%s: fd=%d, time_secs=%d\n", __func__, fd, time_secs);
-    if (! ptp->io_hdr.request) {
-        if (vb)
-            pr2ws("No NVMe command given (set_scsi_pt_cdb())\n");
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    n = ptp->io_hdr.request_len;
-    len = (int)sizeof(cmd);
-    n = (n < len) ? n : len;
-    if (n < 64) {
-        if (vb)
-            pr2ws("%s: command length of %d bytes is too short\n", __func__,
-                  n);
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    memcpy(&cmd, (unsigned char *)ptp->io_hdr.request, n);
-    if (n < len)        /* zero out rest of 'cmd' */
-        memset((unsigned char *)&cmd + n, 0, len - n);
-    if (ptp->io_hdr.din_xfer_len > 0) {
-        cmd.data_len = ptp->io_hdr.din_xfer_len;
-        cmd.addr = (__u64)(sg_intptr_t)ptp->io_hdr.din_xferp;
-    } else if (ptp->io_hdr.dout_xfer_len > 0) {
-        cmd.data_len = ptp->io_hdr.dout_xfer_len;
-        cmd.addr = (__u64)(sg_intptr_t)ptp->io_hdr.dout_xferp;
-    }
-    if (time_secs < 0)
-        cmd.timeout_ms = 0;
-    else
-        cmd.timeout_ms = 1000 * cmd.timeout_ms;
-    if (vb > 2) {
-        pr2ws("NVMe command:\n");
-        dStrHex((const char *)&cmd, len, 1);
-    }
-    if (ioctl(ptp->dev_fd, NVME_IOCTL_ADMIN_CMD, &cmd) < 0) {
-        ptp->os_err = errno;
-        if (vb > 2)
-            pr2ws("%s: ioctl(NVME_IOCTL_ADMIN_CMD) failed: %s (errno=%d)\n",
-                  __func__, strerror(ptp->os_err), ptp->os_err);
-        return -ptp->os_err;
-    } else
-        ptp->os_err = 0;
-    ptp->nvme_result = cmd.result;
-    n = ptp->io_hdr.max_response_len;
-    if ((n > 0) && ptp->io_hdr.response) {
-        n = (n < len) ? n : len;
-        memcpy((uint8_t *)ptp->io_hdr.response, &cmd, n);
-        ptp->io_hdr.response_len = n;
-    }
-    if (vb > 2)
-        pr2ws("%s: timeout_ms=%u, result=%u\n", __func__, cmd.timeout_ms,
-              cmd.result);
-    return 0;
-}
-
 /* Executes SCSI command (or at least forwards it to lower layers).
  * Returns 0 for success, negative numbers are negated 'errno' values from
  * OS system calls. Positive return values are errors from this package. */
@@ -1658,9 +904,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     bool have_checked_for_type = (ptp->dev_fd >= 0);
 
-    if (! bsg_nvme_char_major_checked) {
-        bsg_nvme_char_major_checked = true;
-        find_bsg_nvme_char_major(verbose);
+    if (! sg_bsg_nvme_char_major_checked) {
+        sg_bsg_nvme_char_major_checked = true;
+        sg_find_bsg_nvme_char_major(verbose);
     }
     if (ptp->in_err) {
         if (verbose)
@@ -1688,8 +934,8 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     if (ptp->os_err)
         return -ptp->os_err;
     if (ptp->is_nvme)
-        return do_nvme_pt(vp, ptp->dev_fd, time_secs, verbose);
-    else if (bsg_major <= 0)
+        return sg_do_nvme_pt(vp, ptp->dev_fd, time_secs, verbose);
+    else if (sg_bsg_major <= 0)
         return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
     else if (ptp->is_bsg)
         ; /* drop through to sg v4 implementation */
@@ -1722,6 +968,3 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     }
     return 0;
 }
-
-#endif
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

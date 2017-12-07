@@ -17,7 +17,7 @@
 #endif
 
 
-const char * sg_lib_version_str = "2.32 20171127";/* spc5r17, sbc4r15 */
+const char * sg_lib_version_str = "2.33 20171205";/* spc5r17, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -432,8 +432,8 @@ struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = {
 struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x1, 0, "Rebuild(32)"},
     {0x2, 0, "Regenerate(32)"},
-    {0x3, 0, "Xdread(32)"},     /* obsolete in SBC-3 r31 */
-    {0x4, 0, "Xdwrite(32)"},    /* obsolete in SBC-3 r31 */
+    {0x3, 0, "Xdread(32)"},             /* obsolete in SBC-3 r31 */
+    {0x4, 0, "Xdwrite(32)"},            /* obsolete in SBC-3 r31 */
     {0x5, 0, "Xdwrite extended(32)"},   /* obsolete in SBC-4 r15 */
     {0x6, 0, "Xpwrite(32)"},            /* obsolete in SBC-4 r15 */
     {0x7, 0, "Xdwriteread(32)"},        /* obsolete in SBC-4 r15 */

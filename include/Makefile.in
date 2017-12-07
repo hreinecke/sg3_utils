@@ -90,7 +90,8 @@ build_triplet = @build@
 host_triplet = @host@
 @OS_LINUX_TRUE@am__append_1 = \
 @OS_LINUX_TRUE@	sg_linux_inc.h \
-@OS_LINUX_TRUE@	sg_io_linux.h
+@OS_LINUX_TRUE@	sg_io_linux.h \
+@OS_LINUX_TRUE@	sg_pt_linux.h
 
 @OS_WIN32_MINGW_TRUE@am__append_2 = sg_pt_win32.h
 @OS_WIN32_CYGWIN_TRUE@am__append_3 = sg_pt_win32.h
@@ -127,7 +128,8 @@ am__can_run_installinfo = \
 am__noinst_HEADERS_DIST = sg_linux_inc.h sg_io_linux.h sg_pt_win32.h
 am__scsiinclude_HEADERS_DIST = sg_lib.h sg_lib_data.h sg_cmds.h \
 	sg_cmds_basic.h sg_cmds_extra.h sg_cmds_mmc.h sg_pt.h \
-	sg_linux_inc.h sg_io_linux.h sg_pt_win32.h
+	sg_pt_nvme.h sg_linux_inc.h sg_io_linux.h sg_pt_linux.h \
+	sg_pt_win32.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -300,8 +302,8 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 scsiincludedir = $(includedir)/scsi
 scsiinclude_HEADERS = sg_lib.h sg_lib_data.h sg_cmds.h sg_cmds_basic.h \
-	sg_cmds_extra.h sg_cmds_mmc.h sg_pt.h $(am__append_1) \
-	$(am__append_2) $(am__append_3)
+	sg_cmds_extra.h sg_cmds_mmc.h sg_pt.h sg_pt_nvme.h \
+	$(am__append_1) $(am__append_2) $(am__append_3)
 @OS_FREEBSD_TRUE@noinst_HEADERS = \
 @OS_FREEBSD_TRUE@	sg_linux_inc.h \
 @OS_FREEBSD_TRUE@	sg_io_linux.h \

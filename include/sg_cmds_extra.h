@@ -167,7 +167,7 @@ int sg_ll_receive_diag(int sg_fd, bool pcv, int pg_code, void * resp,
 /* Same as sg_ll_receive_diag() but with added timeout_secs and residp
  * arguments. Adds the ability to set the command abort timeout
  * and the ability to report the residual count. If timeout_secs is zero
- * or less the the default command abort timeout (60 seconds) is used.
+ * or less the default command abort timeout (60 seconds) is used.
  * If residp is non-NULL then the residual value is written where residp
  * points. A residual value of 0 implies mx_resp_len bytes have be written
  * where resp points. If the residual value equals mx_resp_len then no
@@ -210,7 +210,7 @@ int sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
                            int verbose);
 
 /* Invokes a SCSI SEND DIAGNOSTIC command. Foreground, extended self tests can
- * take a long time, if so set long_duration flag in which case the timout
+ * take a long time, if so set long_duration flag in which case the timeout
  * is set to 7200 seconds; if the value of long_duration is > 7200 then that
  * value is taken as the timeout value in seconds. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Send diagnostic not supported,

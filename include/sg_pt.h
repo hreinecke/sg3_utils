@@ -71,7 +71,7 @@ struct sg_pt_base *
 
 /* Forget any previous dev_fd and install the one given. May attempt to
  * find file type (e.g. if pass-though) from OS so there could be an error.
- * Returns 0 for success or the the same value as get_scsi_pt_os_err()
+ * Returns 0 for success or the same value as get_scsi_pt_os_err()
  * will return. dev_fd should be >= 0 for a valid file handle or -1 . */
 int set_pt_file_handle(struct sg_pt_base * objp, int dev_fd, int verbose);
 
@@ -99,7 +99,7 @@ void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
 /* Set a pointer and length to be used for metadata transferred to
  * (out_true=true) or from (out_true-false) device */
 void set_pt_metadata_xfer(struct sg_pt_base * objp, unsigned char * mdxferp,
-		          uint32_t mdxfer_len, bool out_true);
+                          uint32_t mdxfer_len, bool out_true);
 /* The following "set_"s implementations may be dummies */
 void set_scsi_pt_packet_id(struct sg_pt_base * objp, int pack_id);
 void set_scsi_pt_tag(struct sg_pt_base * objp, uint64_t tag);
@@ -114,7 +114,7 @@ void set_scsi_pt_task_attr(struct sg_pt_base * objp, int attribute,
  * are given, use the pass-through default. */
 #define SCSI_PT_FLAGS_QUEUE_AT_TAIL 0x10
 #define SCSI_PT_FLAGS_QUEUE_AT_HEAD 0x20
-/* Set (potentially OS dependant) flags for pass-through mechanism.
+/* Set (potentially OS dependent) flags for pass-through mechanism.
  * Apart from contradictions, flags can be OR-ed together. */
 void set_scsi_pt_flags(struct sg_pt_base * objp, int flags);
 
@@ -185,7 +185,7 @@ uint32_t get_pt_nvme_nsid(const struct sg_pt_base * objp);
 /* Should be invoked once per objp after other processing is complete in
  * order to clean up resources. For ever successful construct_scsi_pt_obj()
  * call there should be one destruct_scsi_pt_obj(). If the
- * construct_scsi_pt_obj_with_fd() function was used to create thsi object
+ * construct_scsi_pt_obj_with_fd() function was used to create this object
  * then the dev_fd provided to that constructor is not altered by this
  * destructor. So the user should still close dev_fd (perhaps with
  * scsi_pt_close_device() ).  */

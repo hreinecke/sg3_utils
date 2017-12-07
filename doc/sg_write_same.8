@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WRITE_SAME "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -31,7 +31,7 @@ or the \fI\-\-unmap\fR option is given then WRITE SAME(16) is sent.
 The \fI\-\-10\fR, \fI\-\-16\fR and \fI\-\-32\fR options are mutually
 exclusive.
 .PP
-SBC\-3 revision 35d introduced a "no data\-out buffer" (NDOB) bit which, if
+SBC\-3 revision 35d introduced a "No Data\-Out Buffer" (NDOB) bit which, if
 set, bypasses the requirement to send a single block of data to the
 \fIDEVICE\fR together with the command. Only WRITE SAME (16 and 32 byte)
 support the NDOB bit. If given, a user block of zeros is assumed; if
@@ -94,13 +94,13 @@ sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
 output the usage message then exit.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIIF\fR
-read data (binary) from file named \fIIF\fR and use it as the data out
-buffer for the SCSI WRITE SAME command. The length of the data out buffer
+read data (binary) from file named \fIIF\fR and use it as the data\-out
+buffer for the SCSI WRITE SAME command. The length of the data\-out buffer
 is \fI\-\-xferlen=LEN\fR or, if that is not given, the length of the \fIIF\fR
 file. If \fIIF\fR is "\-" then stdin is read. If this option is not given
-then 0x00 bytes are used as fill with the length of the data out buffer
+then 0x00 bytes are used as fill with the length of the data\-out buffer
 obtained from \fI\-\-xferlen=LEN\fR or by calling READ CAPACITY(16 or 10).
-If the response to READ CAPACITY(16) has the PROT_EN bit set then data
+If the response to READ CAPACITY(16) has the PROT_EN bit set then data\-
 out buffer size is modified accordingly with the last 8 bytes set to 0xff.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
@@ -121,10 +121,10 @@ only be given if \fILEN\fR is 0 .
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the
-data out buffer to. The default value for \fINUM\fR is 1. The value corresponds
-to the 'Number of logical blocks' field in the WRITE SAME cdb.
+data\-out buffer to. The default value for \fINUM\fR is 1. The value
+corresponds to the 'Number of logical blocks' field in the WRITE SAME cdb.
 .br
-Note that a value of 0 in \fINUM\fR may be interpreted as write the data out
+Note that a value of 0 in \fINUM\fR may be interpreted as write the data\-out
 buffer on every block starting at \fILBA\fR to the end of the \fIDEVICE\fR.
 If the WSNZ bit (introduced in sbc3r26, January 2011) in the Block Limits VPD
 page is set then the value of 0 is disallowed, yielding an Invalid request
@@ -154,17 +154,17 @@ sets the "Write protect" field in the WRITE SAME cdb to \fIWPR\fR. The
 default value is zero. \fIWPR\fR should be a value between 0 and 7.
 When \fIWPR\fR is 1 or greater, and the disk's protection type is 1 or
 greater, then 8 extra bytes of protection information are expected or
-generated (to place in the command's data out buffer).
+generated (to place in the command's data\-out buffer).
 .TP
 \fB\-x\fR, \fB\-\-xferlen\fR=\fILEN\fR
-where \fILEN\fR is the data out buffer length. Defaults to the length of
+where \fILEN\fR is the data\-out buffer length. Defaults to the length of
 the \fIIF\fR file or, if that is not given, then the READ CAPACITY(16 or 10)
 command is used to find the 'Logical block length in bytes'. That figure
 may be increased by 8 bytes if the \fIDEVICE\fR's protection type is 1 or
 greater and the WRPROTECT field (see \fI\-\-wrprotect=WPR\fR) is 1 or
 greater. If both this option and the \fIIF\fR option are given and
 \fILEN\fR exceeds the length of the \fIIF\fR file then \fILEN\fR is the
-data out buffer length with zeros used as pad bytes.
+data\-out buffer length with zeros used as pad bytes.
 .SH UNMAP
 Logical block provisioning is a new term introduced in SBC\-3 revision 25
 for the ability to mark blocks as unused. For large storage arrays, it is a
@@ -194,13 +194,13 @@ Logical Block Provisioning VPD page. When LBPU is set it indicates that
 the device supports the UNMAP command (see the sg_unmap utility). When the
 ANC_SUP bit is set it indicates the device supports anchored LBAs.
 .PP
-When the UNMAP bit is set in the cdb then the data out buffer is also sent.
-Additionally the data section of that data out buffer should be full of 0x0
+When the UNMAP bit is set in the cdb then the data\-out buffer is also sent.
+Additionally the data section of that data\-out buffer should be full of 0x0
 bytes while the data protection block, 8 bytes at the end if present, should
 be set to 0xff bytes. If these conditions are not met and the LBPRZ bit is
-set then the UNMAP bit is ignored and the data out buffer is written to the
+set then the UNMAP bit is ignored and the data\-out buffer is written to the
 \fIDEVICE\fR as if the UNMAP bit was zero. In the absence of the
-\fI\-\-in=IF\fR option, this utility will attempt build a data out buffer
+\fI\-\-in=IF\fR option, this utility will attempt build a data\-out buffer
 that meets the requirements for the UNMAP bit in the cdb to be acted on by
 the \fIDEVICE\fR.
 .PP
@@ -239,7 +239,7 @@ of bytes in a logical block.  Let us assume that is 512 bytes. Since
 \fI\-\-in=IF\fR is not given a block of zeros is assumed. So 63 blocks
 of zeros (each block containing 512 bytes) will be written from (and
 including) LBA 0x1234 . Note that only one block of zeros is passed
-to the SCSI WRITE SAME command in the data out buffer (as required by
+to the SCSI WRITE SAME command in the data\-out buffer (as required by
 SBC\-3).
 .PP
 A similar example follows but in this case the blocks
