@@ -28,7 +28,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.54 20171030";
+static const char * version_str = "0.55 20171208";
 
 #define ME "sg_senddiag: "
 
@@ -673,8 +673,10 @@ main(int argc, char * argv[])
     struct opts_t opts;
     struct opts_t * op;
     unsigned char * rsp_buff = NULL;
+    unsigned char * free_rsp_buff = NULL;
     const char * cp;
     unsigned char * read_in = NULL;
+    unsigned char * free_read_in = NULL;
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -709,7 +711,8 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_raw) {
-        read_in = (unsigned char *)calloc(op->maxlen, 1);
+        read_in = (unsigned char *)sg_memalign(op->maxlen, sg_get_page_size(),
+                                       &free_read_in, op->do_verbose > 3);
         if (NULL == read_in) {
             pr2serr("unable to allocate %d bytes\n", op->maxlen);
             return SG_LIB_CAT_OTHER;
@@ -790,7 +793,8 @@ main(int argc, char * argv[])
         ret = SG_LIB_FILE_ERROR;
         goto fini;
     }
-    rsp_buff = (unsigned char *)calloc(op->maxlen, 1);
+    rsp_buff = (unsigned char *)sg_memalign(op->maxlen, sg_get_page_size(),
+                                    &free_rsp_buff, op->do_verbose > 3);
     if (NULL == rsp_buff) {
         pr2serr("unable to allocate %d bytes (2)\n", op->maxlen);
         ret = SG_LIB_CAT_OTHER;
@@ -915,9 +919,9 @@ close_fini:
     if ((res < 0) && (0 == ret))
         ret = SG_LIB_FILE_ERROR;
 fini:
-    if (read_in)
-        free(read_in);
-    if (rsp_buff)
-        free(rsp_buff);
+    if (free_read_in)
+        free(free_read_in);
+    if (free_rsp_buff)
+        free(free_rsp_buff);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.32 20171206";  /* spc5r17 + sbc4r14 */
+static const char * version_str = "1.32 20171207";  /* spc5r17 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0

@@ -120,6 +120,10 @@ __packed;
 #define SG_NVME_PT_TIMEOUT_MS 64
 #define SG_NVME_PT_RESULT 68
 
+/* Valid namespace IDs (nsid_s) range from 1 to 0xfffffffe, leaving: */
+#define SG_NVME_BROADCAST_NSID 0xffffffff
+#define SG_NVME_CTL_NSID 0x0
+
 #ifdef __cplusplus
 }
 #endif

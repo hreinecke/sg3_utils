@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.74 20171206";    /* SPC-5 rev 17 */
+static const char * version_str = "1.75 20171207";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -3921,7 +3921,7 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     }
     if (ret)
         goto err_out;
-    max_nsid = sg_get_unaligned_le16(id_dinp + 516);
+    max_nsid = sg_get_unaligned_le32(id_dinp + 516);
     if (op->do_raw || op->do_hex) {
         do_nvme_identify_hex_raw(id_dinp, pg_sz, op);
         goto skip1;

@@ -38,7 +38,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.08 20171010";    /* ses3r07 */
+static const char * version_str = "1.09 20171208";    /* ses4r01 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -257,6 +257,7 @@ truncated:
 
 struct dout_buff_t {
     unsigned char * doutp;
+    unsigned char * free_doutp;
     int dout_len;
 };
 
@@ -267,7 +268,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                   bool last, const struct opts_t * op)
 {
     bool send_data = false;
-    int do_len, rem, res, rsp_len, k, num, mc_status, verb;
+    int do_len, rem, res, rsp_len, k, num, mc_status, resid, act_len, verb;
     int ret = 0;
     uint32_t rec_gen_code;
     const unsigned char * bp;
@@ -294,9 +295,10 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     if (do_len > wp->dout_len) {
         if (wp->doutp)
             free(wp->doutp);
-        wp->doutp = (unsigned char *)malloc(do_len);
+        wp->doutp = (unsigned char *)sg_memalign(do_len, sg_get_page_size(),
+                                        &wp->free_doutp, op->verbose > 3);
         if (! wp->doutp) {
-            pr2serr("send_then_receive: unable to malloc %d bytes\n", do_len);
+            pr2serr("send_then_receive: unable to alloc %d bytes\n", do_len);
             return SG_LIB_CAT_OTHER;
         }
         wp->dout_len = do_len;
@@ -350,15 +352,22 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
         }
     }
 
-    res = sg_ll_receive_diag(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
-                             dip, DEF_DI_LEN, true, verb);
+    res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
+                                dip, DEF_DI_LEN, 0 /* default timeout */,
+                                &resid, true, verb);
     if (res)
         return ret ? ret : res;
     rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
+    act_len = DEF_DI_LEN - resid;
     if (rsp_len > DEF_DI_LEN) {
         pr2serr("<<< warning response buffer too small [%d but need "
                 "%d]>>>\n", DEF_DI_LEN, rsp_len);
         rsp_len = DEF_DI_LEN;
+    }
+    if (rsp_len > act_len) {
+        pr2serr("<<< warning response too short [actually got %d but need "
+                "%d]>>>\n", act_len, rsp_len);
+        rsp_len = act_len;
     }
     if (rsp_len < 8) {
         pr2serr("Download microcode status dpage too short\n");
@@ -396,7 +405,7 @@ int
 main(int argc, char * argv[])
 {
     bool last, got_stdin, is_reg;
-    int sg_fd, res, c, len, k, n, rsp_len, verb;
+    int sg_fd, res, c, len, k, n, rsp_len, resid, act_len, verb;
     int infd = -1;
     int do_help = 0;
     int ret = 0;
@@ -405,6 +414,7 @@ main(int argc, char * argv[])
     const char * file_name = NULL;
     unsigned char * dmp = NULL;
     unsigned char * dip = NULL;
+    unsigned char * free_dip = NULL;
     char * cp;
     char ebuff[EBUFF_SZ];
     struct stat a_stat;
@@ -686,7 +696,8 @@ main(int argc, char * argv[])
         goto fini;
     }
 
-    if (NULL == (dip = (unsigned char *)malloc(DEF_DI_LEN))) {
+    if (NULL == (dip = (unsigned char *)sg_memalign(DEF_DI_LEN,
+                            sg_get_page_size(), &free_dip, op->verbose > 3))) {
         pr2serr(ME "out of memory (data-in buffer)\n");
         ret = SG_LIB_CAT_OTHER;
         goto fini;
@@ -694,14 +705,21 @@ main(int argc, char * argv[])
     memset(dip, 0, DEF_DI_LEN);
     verb = (op->verbose > 1) ? op->verbose - 1 : 0;
     /* Fetch Download microcode status dpage for generation code ++ */
-    res = sg_ll_receive_diag(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
-                             dip, DEF_DI_LEN, true, verb);
+    res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
+                                dip, DEF_DI_LEN, 0 /*default timeout */,
+                                &resid, true, verb);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
+        act_len = DEF_DI_LEN - resid;
         if (rsp_len > DEF_DI_LEN) {
             pr2serr("<<< warning response buffer too small [%d but need "
                     "%d]>>>\n", DEF_DI_LEN, rsp_len);
             rsp_len = DEF_DI_LEN;
+        }
+        if (rsp_len > act_len) {
+            pr2serr("<<< warning response too short [actually got %d but "
+                    "need %d]>>>\n", act_len, rsp_len);
+            rsp_len = act_len;
         }
         if (rsp_len < 8) {
             pr2serr("Download microcode status dpage too short\n");
@@ -762,8 +780,10 @@ fini:
         close(infd);
     if (dmp)
         free(dmp);
-    if (dout.doutp)
-        free(dout.doutp);
+    if (dout.free_doutp)
+        free(dout.free_doutp);
+    if (free_dip)
+        free(free_dip);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));

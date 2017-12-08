@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.31 20171203 */
+/* sg_pt_linux version 1.32 20171207 */
 
 
 #include <stdio.h>
@@ -69,8 +69,6 @@ typedef unsigned long sg_uintptr_t;
 #ifndef BLOCK_EXT_MAJOR
 #define BLOCK_EXT_MAJOR 259
 #endif
-
-#define SG_NVME_BROADCAST_NSID 0xffffffff
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
 
@@ -934,7 +932,7 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     if (ptp->os_err)
         return -ptp->os_err;
     if (ptp->is_nvme)
-        return sg_do_nvme_pt(vp, ptp->dev_fd, time_secs, verbose);
+        return sg_do_nvme_pt(vp, -1, time_secs, verbose);
     else if (sg_bsg_major <= 0)
         return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
     else if (ptp->is_bsg)
