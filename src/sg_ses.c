@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.24 20171120";    /* ses4r01 */
+static const char * version_str = "2.25 20171208";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1518,7 +1518,7 @@ match_last_ind_indiv(int index, const struct opts_t * op)
 /* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
  * failures */
 static int
-do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
+do_senddiag(int sg_fd, bool pf_bit, void * outgoing_pg, int outgoing_len,
             bool noisy, int verbose)
 {
     const char * cp;
@@ -1533,8 +1533,8 @@ do_senddiag(int sg_fd, int pf_bit, void * outgoing_pg, int outgoing_len,
             pr2serr("    Send diagnostic command page number: 0x%x\n",
                     page_num);
     }
-    return sg_ll_send_diag(sg_fd, 0 /* sf_code */, pf_bit, 0 /* sf_bit */,
-                           0 /* devofl_bit */, 0 /* unitofl_bit */,
+    return sg_ll_send_diag(sg_fd, 0 /* sf_code */, pf_bit, false /* sf_bit */,
+                           false /* devofl_bit */, false /* unitofl_bit */,
                            0 /* long_duration */, outgoing_pg, outgoing_len,
                            noisy, verbose);
 }
@@ -1727,7 +1727,8 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
                     page_code);
     }
     res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, page_code, rsp_buff,
-                                rsp_buff_size, 0, &resid, true, op->verbose);
+                                rsp_buff_size, 0 /* default timeout */,
+                                &resid, true, op->verbose);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {
@@ -1872,11 +1873,13 @@ build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
     int resp_len, k, el, num_subs, sum_type_dheaders, res, n;
     int ret = 0;
     uint32_t gen_code;
-    uint8_t * resp;
+    uint8_t * resp = NULL;
+    uint8_t * free_resp = NULL;
     const uint8_t * bp;
     const uint8_t * last_bp;
 
-    resp = (uint8_t *)calloc(op->maxlen, 1);
+    resp = (uint8_t *)sg_memalign(op->maxlen, sg_get_page_size(), &free_resp,
+                                  op->verbose > 3);
     if (NULL == resp) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
                 op->maxlen);
@@ -1963,8 +1966,8 @@ p_truncated:
     ret = -1;
 
 the_end:
-    if (resp)
-        free(resp);
+    if (free_resp)
+        free(free_resp);
     return ret;
 }
 
@@ -3730,13 +3733,15 @@ process_status_page(int sg_fd, struct opts_t * op)
     int j, resp_len, num_ths;
     int ret = 0;
     uint32_t ref_gen_code;
-    uint8_t *  resp;
+    uint8_t * resp = NULL;
+    uint8_t * free_resp = NULL;
     const char * cp;
     struct enclosure_info primary_info;
     struct th_es_t tes;
     struct th_es_t * tesp;
 
-    resp = (uint8_t *)calloc(op->maxlen, 1);
+    resp = (uint8_t *)sg_memalign(op->maxlen, sg_get_page_size(), &free_resp,
+                                  op->verbose > 3);
     if (NULL == resp) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
                 op->maxlen);
@@ -3899,8 +3904,8 @@ process_status_page(int sg_fd, struct opts_t * op)
     ret = 0;
 
 fini:
-    if (resp)
-        free(resp);
+    if (free_resp)
+        free(free_resp);
     return ret;
 }
 
@@ -4701,7 +4706,8 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
             enc_stat_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(enc_stat_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(sg_fd, 1, enc_stat_rsp, len, 1, op->verbose);
+            ret = do_senddiag(sg_fd, true, enc_stat_rsp, len, true,
+                              op->verbose);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
                 return -1;
@@ -4758,7 +4764,8 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
             threshold_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(sg_fd, 1, threshold_rsp, len, 1, op->verbose);
+            ret = do_senddiag(sg_fd, true, threshold_rsp, len, true,
+                              op->verbose);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
                 return -1;
@@ -4976,7 +4983,7 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
     if (len > 32)
         len = 32;
     memcpy(b + 8, op->nickname_str, len);
-    return do_senddiag(sg_fd, 1, b, control_plen + 4, 1, op->verbose);
+    return do_senddiag(sg_fd, true, b, control_plen + 4, true, op->verbose);
 }
 
 static void
@@ -5261,8 +5268,8 @@ main(int argc, char * argv[])
         case ENC_CONTROL_DPC:  /* Enclosure Control diagnostic page [0x2] */
             printf("Sending Enclosure Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
                 goto err_out;
@@ -5271,8 +5278,8 @@ main(int argc, char * argv[])
         case STRING_DPC:       /* String Out diagnostic page [0x4] */
             printf("Sending String Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send String Out page\n");
                 goto err_out;
@@ -5281,8 +5288,8 @@ main(int argc, char * argv[])
         case THRESHOLD_DPC:       /* Threshold Out diagnostic page [0x5] */
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
                 goto err_out;
@@ -5291,8 +5298,8 @@ main(int argc, char * argv[])
         case ARRAY_CONTROL_DPC:   /* Array control diagnostic page [0x6] */
             printf("Sending Array Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send Array Control page\n");
                 goto err_out;
@@ -5301,8 +5308,8 @@ main(int argc, char * argv[])
         case SUBENC_STRING_DPC: /* Subenclosure String Out page [0xc] */
             printf("Sending Subenclosure String Out [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send Subenclosure String Out page\n");
                 goto err_out;
@@ -5313,8 +5320,8 @@ main(int argc, char * argv[])
                    "page length=%d bytes\n", op->page_code, op->arr_len);
             printf("  Perhaps it would be better to use the sg_ses_microcode "
                    "utility\n");
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send Download Microcode Control page\n");
                 goto err_out;
@@ -5323,8 +5330,8 @@ main(int argc, char * argv[])
         case SUBENC_NICKNAME_DPC: /* Subenclosure Nickname Control [0xf] */
             printf("Sending Subenclosure Nickname Control [0x%x] page, with "
                    "page length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, 1, op->data_arr, op->arr_len + 4, 1,
-                              op->verbose);
+            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
+                              true, op->verbose);
             if (ret) {
                 pr2serr("couldn't send Subenclosure Nickname Control page\n");
                 goto err_out;
