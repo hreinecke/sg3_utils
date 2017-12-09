@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.05 20171202";
+static const char * version_str = "1.06 20171208";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -737,23 +737,25 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
     return ok ? 0 : SG_LIB_SYNTAX_ERROR;
 }
 
-/* Read pairs or LBAs and NUMs from a scat_file. A T10 scatter list array is
- * built at t10_scat_list_out (e.g. as per T10 the first 32 bytes are zeros
- * followed by the first LBA range descriptor (also 32 bytes long) then the
- * second LBA range descriptor, etc. If do_16 is true then only LBA,NUM
- * pairs are expected, loosely formatted if they are in the scat_file (e.g.
- * single line entries alternating LBA and NUM, with an even number of
- * elements. If do_16 is false then a stricter format for quintets is
- * expected: on each non comment line should contain: LBA,NUM[,RT,AT,TM] . If
- * RT,AT,TM are not given then they assume their defaults (i.e. 0xffffffff,
- * 0xffff, 0xffff). Each number (up to 64 bits in size) from command line or
- * scat_file may be a comma or (single) space separated list. Assumed decimal
- * unless prefixed by '0x', '0X' or contains trailing 'h' or 'H' (which
- * indicate hex). Returns 0 if ok, else error number. If ok also yields the
- * actual byte length of t10_scat_list_out written into act_list_blen and the
- * number of LBA range descriptors written in num_scat_elems . */
+/* Read pairs or quintets from a scat_file and places them in a T10 scatter
+ * list array is built starting at at t10_scat_list_out (i.e. as per T10 the
+ * first 32 bytes are zeros followed by the first LBA range descriptor (also
+ * 32 bytes long) then the second LBA range descriptor, etc. If do_16 is
+ * true then only LBA,NUM pairs are expected, loosely formatted with
+ * numbers found alternating between LBA and NUM, with an even number of
+ * elements required overall. If do_16 is false then a stricter format for
+ * quintets is expected: each non comment line should contain: LBA,NUM[,RT,
+ * AT,TM] . If RT,AT,TM are not given then they assume their defaults (i.e.
+ * 0xffffffff, 0xffff, 0xffff). Each number (64 bits for the LBA, 32 bits for
+ * NUM and RT, 16 bit for AT and TM) may be a comma, space or tab separated
+ * list. Assumed decimal unless prefixed by '0x', '0X' or contains trailing
+ * 'h' or 'H' (which indicate hex). Returns 0 if ok, else error number. If
+ * ok also yields the actual byte length of t10_scat_list_out written into
+ * act_list_blen and the number of LBA range descriptors written in
+ * num_scat_elems . If parse_one is true then exits after one LBA range
+ * descriptor is decoded. */
 static int
-build_t10_scat(const char * scat_fname, bool do_16,
+build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
                uint8_t * t10_scat_list_out, uint32_t * act_list_blen,
                uint32_t * num_scat_elems, uint32_t * sum_num,
                int max_list_blen)
@@ -819,9 +821,11 @@ build_t10_scat(const char * scat_fname, bool do_16,
             res = parse_scat_pi_line(lcp, up + n, sum_num);
             if (999 == res)
                 ;
-            else if (0 == res)
+            else if (0 == res) {
                 n += 32;
-            else {
+                if (parse_one)
+                    goto just_one;
+            } else {
                 pr2serr("line %d in %s\n", j + 1, scat_fname);
                 goto bad_exit;
             }
@@ -848,6 +852,8 @@ build_t10_scat(const char * scat_fname, bool do_16,
                     sg_put_unaligned_be32((uint32_t)ll, up + n + 8);
                     *sum_num += (uint32_t)ll;
                     n += 32;  /* skip to next LBA range descriptor */
+                    if (parse_one)
+                        goto just_one;
                 } else
                     sg_put_unaligned_be64((uint64_t)ll, up + n + 0);
                 lcp = strpbrk(lcp, " ,\t");
@@ -873,6 +879,7 @@ build_t10_scat(const char * scat_fname, bool do_16,
                 "%s\n", __func__, scat_fname);
         goto bad_exit;
     }
+just_one:
     *act_list_blen = n - 32;
     *num_scat_elems = (n / 32) - 1;
     if (fp && (stdin != fp))
@@ -989,8 +996,8 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
            const struct opts_t * op)
 {
     int k, ret, res, sense_cat, cdb_len;
-    unsigned char x_cdb[WRITE_X_32_LEN];        /* use for both lengths */
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t x_cdb[WRITE_X_32_LEN];        /* use for both lengths */
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(x_cdb, 0, sizeof(x_cdb));
@@ -1179,7 +1186,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     }
     if (op->do_scattered && (op->verbose > 2) && (dout_len > 63)) {
         uint32_t sod_off = op->bs_pi_do * op->scat_lbdof;
-        const uint8_t * up = dataoutp;
+        const uint8_t * up = (const uint8_t *)dataoutp;
 
         pr2serr("    %s scatter list, number of LBA range descriptors: %u\n",
                 op->cdb_name, op->scat_num_lbrd);
@@ -1217,7 +1224,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     }
     set_scsi_pt_cdb(ptvp, x_cdb, cdb_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_bytes);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)dataoutp, op->xfer_bytes);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
     ret = sg_cmds_process_resp(ptvp, op->cdb_name, res, SG_NO_DATA_IN,
                                sense_b, true /*noisy */, op->verbose,
@@ -1267,7 +1274,7 @@ do_read_capacity(int sg_fd, struct opts_t *op)
     int res;
     int vb = op->verbose;
     char b[80];
-    unsigned char resp_buff[RCAP16_RESP_LEN];
+    uint8_t resp_buff[RCAP16_RESP_LEN];
 
     res = sg_ll_readcap_16(sg_fd, false /* pmi */, 0 /* llba */, resp_buff,
                            RCAP16_RESP_LEN, true, (vb ? (vb - 1): 0));
@@ -1661,16 +1668,18 @@ main(int argc, char * argv[])
     int sg_fd = -1;
     int rsl_fd = -1;
     int ret = -1;
-    uint32_t addr_arr_len, num_arr_len, do_len, s;
+    uint32_t addr_arr_len, num_arr_len, do_len, nn, s;
     uint32_t num_lbrd = 0;
     uint32_t if_len = 0;
     ssize_t res;
     off_t if_tot_len = 0;
     struct opts_t * op;
-    unsigned char * wBuff = NULL;
+    uint8_t * wBuff = NULL;
+    uint8_t * free_wBuff = NULL;
     const char * lba_op = NULL;
     const char * num_op = NULL;
     uint8_t * up = NULL;
+    uint8_t * free_up = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
     uint64_t addr_arr[MAX_NUM_ADDR];
@@ -1886,7 +1895,6 @@ main(int argc, char * argv[])
         uint32_t d;
         uint32_t sum_num = 0;
 
-        do_len = 0;
         /* if WRITE SCATTERED check for --scat-file=SF, if so state(SF) */
         if (op->scat_filename) {
             if (op->do_combined) {
@@ -1933,7 +1941,7 @@ main(int argc, char * argv[])
         if (op->do_scat_raw) {
             if (S_ISREG(sf_stat.st_mode)) {
                 do_len = sf_stat.st_size;
-                d = sf_stat.st_size / 32;
+                d = do_len / 32;
                 if (0 == d) {
                     pr2serr("raw SF must be at least 32 bytes long (followed "
                             "by first LBA range descriptor\n");
@@ -2007,7 +2015,8 @@ main(int argc, char * argv[])
             do_len = d * op->bs_pi_do;
         }
         op->xfer_bytes = do_len;
-        up = calloc(d, op->bs_pi_do); /* zeroed data-out buffer for SL+DATA */
+        up = sg_memalign(d * op->bs_pi_do, sg_get_page_size(), &free_up,
+                         op->verbose); /* zeroed data-out buffer for SL+DATA */
         if (NULL == up) {
             pr2serr("unable to allocate memory for scatterlist+data\n");
             ret = SG_LIB_OS_BASE_ERR + ENOMEM;
@@ -2030,7 +2039,7 @@ main(int argc, char * argv[])
             }
             if (sf_stat.st_size < 32) {
                 pr2serr("Logic error, how did this happen?\n");
-                err = SG_LIB_FILE_ERROR;
+                ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
             res = read(rsl_fd, up, sf_stat.st_size);
@@ -2050,8 +2059,8 @@ main(int argc, char * argv[])
             close(rsl_fd);
             rsl_fd = -1;
         } else if (op->scat_filename) {
-            ret = build_t10_scat(op->scat_filename, op->do_16, up, &d,
-                                 &num_lbrd, &sum_num,
+            ret = build_t10_scat(op->scat_filename, op->do_16, false,
+                                 up, &d, &num_lbrd, &sum_num,
                                  op->scat_lbdof * op->bs_pi_do);
             if (ret)
                 goto err_out;
@@ -2089,10 +2098,13 @@ main(int argc, char * argv[])
             goto err_out;
         }
         s = op->scat_lbdof + op->numblocks;
-        if ((uint32_t)op->xfer_bytes < (s * op->bs_pi_do)) {
+        nn = s * op->bs_pi_do;
+        if ((uint32_t)op->xfer_bytes < nn) {
             uint8_t * u2p;
+            uint8_t * free_u2p;
 
-            u2p = calloc(s, op->bs_pi_do);
+            u2p = sg_memalign(nn, sg_get_page_size(), &free_u2p,
+                              op->verbose > 3);
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
@@ -2100,9 +2112,10 @@ main(int argc, char * argv[])
                 goto err_out;
             }
             memcpy(u2p, up, d);
-            free(up);
+            free(free_up);
             up = u2p;
-            op->xfer_bytes = s * op->bs_pi_do;
+            free_up = free_u2p;
+            op->xfer_bytes = nn;
         }
         res = read(infd, up + d, op->xfer_bytes - d);
         d = op->xfer_bytes - d;
@@ -2134,13 +2147,14 @@ skip_scat_build:        // needs more XXXXXXXXX xxxxxx ???
             uint32_t sum_num;
 
             if ((if_len < 32) || (op->bs_pi_do < 32)) {
-                pr2serr("Logic error combined calloc should be > %u, "
+                pr2serr("Logic error combined alloc should be > %u, "
                         "bs_pi_do=%u\n", (uint32_t)if_len, op->bs_pi_do);
                 ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
             /* assume if_len % op->bs_pi_do is zero (i.e. no remainder) */
-            up = calloc(if_len / op->bs_pi_do, op->bs_pi_do);
+            up = sg_memalign(if_len, sg_get_page_size(), &free_up,
+                             op->verbose > 3);
             if (NULL == up) {
                 pr2serr("unable to allocate memory for combined\n");
                 ret = SG_LIB_OS_BASE_ERR + ENOMEM;
@@ -2166,8 +2180,31 @@ skip_scat_build:        // needs more XXXXXXXXX xxxxxx ???
             op->lba = addr_arr[0];
             op->numblocks = num_arr[0];
         } else if (op->scat_filename) {
-            // need to get first pair or quintet out
-            // xxxxxxxxxxxxxxxxxxxxxx
+            uint32_t dd = 0;
+            uint32_t sum_num = 0;
+            uint8_t upp[96];
+
+            ret = build_t10_scat(op->scat_filename, op->do_16, true,
+                                 upp, &dd, &num_lbrd, &sum_num,
+                                 sizeof(upp));
+            if (ret)
+                goto err_out;
+            if (op->verbose > 2)
+                pr2serr("after build_t10_scat, num_lbrd=%u, sum_num=%u "
+                        "(dd=%u)\n", num_lbrd, sum_num, dd);
+            if (1 != num_lbrd) {
+                pr2serr("Unable to decode one LBA range descriptor from %s\n",
+                        op->scat_filename);
+                ret = SG_LIB_FILE_ERROR;
+                goto err_out;
+            }
+            op->lba = sg_get_unaligned_be64(upp + 32 + 0);
+            op->numblocks = sg_get_unaligned_be32(upp + 32 + 8);
+            if (! op->do_16) {
+                op->ref_tag = sg_get_unaligned_be32(upp + 32 + 12);
+                op->app_tag = sg_get_unaligned_be16(upp + 32 + 16);
+                op->tag_mask = sg_get_unaligned_be16(upp + 32 + 18);
+            }
         }
     }
 
@@ -2177,10 +2214,12 @@ skip_scat_build:        // needs more XXXXXXXXX xxxxxx ???
         wBuff = up;
     else if (op->xfer_bytes > 0) {
         /* fill allocated buffer with zeros */
-        wBuff = (unsigned char*)calloc(op->numblocks, op->bs_pi_do);
+        wBuff = (uint8_t *)sg_memalign(op->numblocks * op->bs_pi_do,
+                                       sg_get_page_size(), &free_wBuff,
+                                       op->verbose > 3);
         if (NULL == wBuff) {
-            pr2serr("unable to allocate %" PRId64 " bytes of memory with "
-                    "calloc()\n", (int64_t)op->xfer_bytes);
+            pr2serr("unable to allocate %" PRId64 " bytes of memory\n",
+                    (int64_t)op->xfer_bytes);
             ret = SG_LIB_OS_BASE_ERR + ENOMEM;
             goto err_out;
         }
@@ -2216,8 +2255,10 @@ skip_scat_build:        // needs more XXXXXXXXX xxxxxx ???
     }
 
 err_out:
-    if (wBuff)
-        free(wBuff);
+    if (free_wBuff)
+        free(free_wBuff);
+    if (free_up)
+        free(free_up);
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {

@@ -797,7 +797,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = vp->implp;
 
-    return psp ? psp->is_nvme : false;;
+    return psp ? psp->is_nvme : false;
 }
 
 char *

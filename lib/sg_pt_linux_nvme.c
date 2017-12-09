@@ -78,15 +78,8 @@
 #define MICROCODE_CHANGED_ASCQ 0x1      /* with TARGET_CHANGED_ASC */
 #define MICROCODE_CHANGED_WO_RESET_ASCQ 0x16
 
-#if (__STDC_VERSION__ >= 199901L)  /* C99 or later */
-typedef intptr_t sg_uintptr_t;
-#else
-typedef long sg_uintptr_t;
-#endif
 
-
-static inline bool is_aligned(const void *restrict pointer,
-                              size_t byte_count)
+static inline bool is_aligned(const void * pointer, size_t byte_count)
 {
        return (sg_uintptr_t)pointer % byte_count == 0;
 }
@@ -327,7 +320,6 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     evpd = !!(0x1 & cdbp[1]);
     pg_cd = cdbp[2];
     if (evpd) {         /* VPD page responses */
-        n = 0;
         switch (pg_cd) {
         case 0:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -437,7 +429,7 @@ sntl_rluns(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         mk_sense_invalid_fld(ptp, true, 2, 7, vb);
         return 0;
     }
-    rl_doutp = calloc(num + 1, 8);
+    rl_doutp = (uint8_t *)calloc(num + 1, 8);
     if (NULL == rl_doutp) {
         pr2ws("%s: calloc() failed to get memory\n", __func__);
         return SG_LIB_OS_BASE_ERR + ENOMEM;

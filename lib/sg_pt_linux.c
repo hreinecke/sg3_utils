@@ -36,26 +36,6 @@
 #include "sg_linux_inc.h"
 #include "sg_pt_linux.h"
 
-#if (__STDC_VERSION__ >= 199901L)  /* C99 or later */
-typedef uintptr_t sg_uintptr_t;
-#else
-typedef unsigned long sg_uintptr_t;
-#endif
-
-/* Checking CDB for whether it is a SCSI or NVME command: all NVME coomands
- * are 64 bytes long. There are very few standardized SCSI commands with
- * a cdb of 64 bytes. If one does then byte 0 (in the CDB) must contain
- * 7Fh and at byte offset 7 the value must be 56 (Additional CDB length)a */
-#if 0
-// xxxxxxxxxxxxxxxx testing <<<<<<<<<<<<<<<<<<<<<<<<
-#undef HAVE_LINUX_NVME_IOCTL_H
-
-#ifdef HAVE_LINUX_NVME_IOCTL_H
-#include <linux/nvme_ioctl.h>
-#else
-#include "sg_pt_linux.h"
-#endif
-#endif
 
 #ifdef major
 #define SG_DEV_MAJOR major
@@ -489,7 +469,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 
 /* Forget any previous dev_fd and install the one given. May attempt to
  * find file type (e.g. if pass-though) from OS so there could be an error.
- * Returns 0 for success or the the same value as get_scsi_pt_os_err()
+ * Returns 0 for success or the same value as get_scsi_pt_os_err()
  * will return. dev_fd should be >= 0 for a valid file handle or -1 . */
 int
 set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)

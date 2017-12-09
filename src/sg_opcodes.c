@@ -198,6 +198,8 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
         rsoc_cdb[3] = (rq_opcode & 0xff);
     if (rq_servact > 0)
         sg_put_unaligned_be16((uint16_t)rq_servact, rsoc_cdb + 4);
+    if (act_resp_lenp)
+        *act_resp_lenp = 0;
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rsoc_cdb + 6);
 
     if (verbose) {
@@ -258,6 +260,8 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
 
     if (repd)
         rstmf_cdb[2] = 0x80;
+    if (act_resp_lenp)
+        *act_resp_lenp = 0;
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rstmf_cdb + 6);
 
     if (verbose) {
