@@ -386,7 +386,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 
 /* Forget any previous dev_han and install the one given. May attempt to
  * find file type (e.g. if pass-though) from OS so there could be an error.
- * Returns 0 for success or the the same value as get_scsi_pt_os_err()
+ * Returns 0 for success or the same value as get_scsi_pt_os_err()
  * will return. dev_han should be >= 0 for a valid file handle or -1 . */
 int set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int verbose)
 {

@@ -79,7 +79,7 @@ static int scnpr(char * cp, int cp_max_len, const char * fmt, ...);
 #endif
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions. Returns number number of chars placed in cp excluding the
+ * functions. Returns number of chars placed in cp excluding the
  * trailing null char. So for cp_max_len > 0 the return value is always
  * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars are
  * written to cp. Note this means that when cp_max_len = 1, this function
@@ -3037,6 +3037,10 @@ pr2serr(const char * fmt, ...)
     return n;
 }
 
+#ifdef SG_LIB_FREEBSD
+#include <sys/param.h>
+#endif
+
 uint32_t
 sg_get_page_size(void)
 {
@@ -3045,7 +3049,6 @@ sg_get_page_size(void)
 #elif defined(SG_LIB_WIN32)
     return win_pagesize();
 #elif defined(SG_LIB_FREEBSD)
-#include <sys/param.h>
     return PAGE_SIZE;
 #else
     return 4096;     /* give up, pick likely figure */
@@ -3084,10 +3087,12 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
         if (buff_to_free)
             *buff_to_free = (uint8_t *)wp;
         res = (uint8_t *)wp;
-        if (vb)
-            pr2ws("%s: posix, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n",
-                  __func__, num_bytes, (void *)*buff_to_free, (int)psz,
-                  (void *)res);
+        if (vb) {
+            pr2ws("%s: posix_ma, len=%d, ", __func__, num_bytes);
+            if (buff_to_free)
+                pr2ws("wrkBuffp=%p, ", (void *)res);
+            pr2ws("psz=%u, rp=%p\n", (unsigned int)psz, (void *)res);
+        }
         return res;
     }
 #else
@@ -3102,9 +3107,12 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
         } else if (buff_to_free)
             *buff_to_free = wrkBuff;
         res = (uint8_t *)(((uintptr_t)wrkBuff + psz - 1) & (~(psz - 1)));
-        if (vb)
-            pr2ws("%s: hack, len=%d, wrkBuffp=%p, psz=%d, rp=%p\n", __func__,
-                  length, (void *)*wrkBuffp, (int)psz, (void *)res);
+        if (vb) {
+            pr2ws("%s: hack, len=%d, ", __func__, length);
+            if (wrkBuffp)
+                pr2ws("wrkBuffp=%p, ", (void *)wrkBuff);
+            pr2ws("psz=%u, rp=%p\n", psz, (void *)res);
+        }
         return res;
     }
 #endif

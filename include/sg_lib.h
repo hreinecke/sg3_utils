@@ -123,6 +123,12 @@ extern "C" {
 #define SG_LIB_UNBOUNDED_32BIT 0xffffffffU
 #define SG_LIB_UNBOUNDED_64BIT 0xffffffffffffffffULL
 
+#if (__STDC_VERSION__ >= 199901L)  /* C99 or later */
+    typedef uintptr_t sg_uintptr_t;
+#else
+    typedef unsigned long sg_uintptr_t;
+#endif
+
 
 /* The format of the version string is like this: "2.26 20170906" */
 const char * sg_lib_version();
