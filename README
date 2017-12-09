@@ -2,13 +2,13 @@
                       ====================
 Introduction
 ============
-This package contains low level utilities for devices that use the SCSI
-command set. Originally the SCSI command set was associated exclusively
-with the SCSI Parallel Interface (SPI) transport. SPI has now almost
-been completely replaced by the Serial Attached SCSI (SAS) transport which
-also accepts the SCSI command set. Additionally many other storage related
-transports use the SCSI command set (amongst others); examples are ATAPI
-devices (CD/DVDs and tapes), USB mass storage devices (including those
+This package contains low level command line utilities for devices that use
+the SCSI command set. Originally the SCSI command set was associated
+exclusively with the SCSI Parallel Interface (SPI) transport. SPI has now
+almost been completely replaced by the Serial Attached SCSI (SAS) transport
+which also accepts the SCSI command set. Additionally many other storage
+related transports use the SCSI command set (amongst others); examples are
+ATAPI devices (CD/DVDs and tapes), USB mass storage devices (including those
 using the newer UAS[P]), Fibre Channel disks, IEEE 1394 storage devices (SBP
 protocol), iSCSI, FCoE and SOP devices.
 
@@ -476,4 +476,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-15th November 2017
+9th December 2017
