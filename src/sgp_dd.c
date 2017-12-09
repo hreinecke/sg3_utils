@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.57 20171023";
+static const char * version_str = "5.58 20171209";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -526,7 +526,7 @@ read_write_thread(void * v_clp)
 #endif
     if (NULL == (rep->alloc_bp = (unsigned char *)malloc(sz + psz)))
         err_exit(ENOMEM, "out of memory creating user buffers\n");
-    rep->buffp = (unsigned char *)(((uintptr_t)rep->alloc_bp + psz - 1) &
+    rep->buffp = (unsigned char *)(((sg_uintptr_t)rep->alloc_bp + psz - 1) &
                                    (~(psz - 1)));
     /* Follow clp members are constant during lifetime of thread */
     rep->bs = clp->bs;

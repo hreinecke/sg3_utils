@@ -3099,19 +3099,19 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
     {
         uint8_t * wrkBuff;
 
-        wrkBuff = (uint8_t)calloc(length + psz, 1);
+        wrkBuff = (uint8_t *)calloc(num_bytes + psz, 1);
         if (NULL == wrkBuff) {
             if (buff_to_free)
                 *buff_to_free = NULL;
             return NULL;
         } else if (buff_to_free)
             *buff_to_free = wrkBuff;
-        res = (uint8_t *)(((uintptr_t)wrkBuff + psz - 1) & (~(psz - 1)));
+        res = (uint8_t *)(((sg_uintptr_t)wrkBuff + psz - 1) & (~(psz - 1)));
         if (vb) {
-            pr2ws("%s: hack, len=%d, ", __func__, length);
-            if (wrkBuffp)
-                pr2ws("wrkBuffp=%p, ", (void *)wrkBuff);
-            pr2ws("psz=%u, rp=%p\n", psz, (void *)res);
+            pr2ws("%s: hack, len=%d, ", __func__, num_bytes);
+            if (buff_to_free)
+                pr2ws("buff_to_free=%p, ", (void *)buff_to_free);
+            pr2ws("psz=%u, rp=%p\n", (uint32_t)psz, (void *)res);
         }
         return res;
     }

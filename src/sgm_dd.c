@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.50 20171023";
+static const char * version_str = "1.51 20171209";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1194,7 +1194,7 @@ main(int argc, char * argv[])
                 return SG_LIB_FILE_ERROR;
             }
             /* perhaps use posix_memalign() instead */
-            wrkPos = (unsigned char *)(((uintptr_t)wrkBuff + psz - 1) &
+            wrkPos = (unsigned char *)(((sg_uintptr_t)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         }
         else {
