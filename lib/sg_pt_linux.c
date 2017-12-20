@@ -660,7 +660,7 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return (int)(ptp->is_nvme ? ptp->nvme_result :
+    return (int)(ptp->is_nvme ? ptp->nvme_status :
                                 ptp->io_hdr.device_status);
     return ptp->io_hdr.device_status;
 }
@@ -672,7 +672,7 @@ get_pt_result(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return ptp->is_nvme ? ptp->nvme_result :
+    return ptp->is_nvme ? ptp->nvme_status :
                           ptp->io_hdr.device_status;
 }
 

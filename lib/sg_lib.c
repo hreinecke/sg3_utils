@@ -3039,6 +3039,11 @@ pr2serr(const char * fmt, ...)
 
 #ifdef SG_LIB_FREEBSD
 #include <sys/param.h>
+#elif defined(SG_LIB_WIN32)
+#include <windows.h>
+
+static bool got_page_size = false;
+static uint32_t win_page_size;
 #endif
 
 uint32_t
@@ -3047,7 +3052,14 @@ sg_get_page_size(void)
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     return sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
 #elif defined(SG_LIB_WIN32)
-    return win_pagesize();
+    if (! got_page_size) {
+        SYSTEM_INFO si;
+
+        GetSystemInfo(&si);
+        win_page_size = si.dwPageSize;
+        got_page_size = true;
+    }
+    return win_page_size;
 #elif defined(SG_LIB_FREEBSD)
     return PAGE_SIZE;
 #else

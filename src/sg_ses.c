@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.25 20171208";    /* ses4r01 */
+static const char * version_str = "2.25 20171217";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1068,7 +1068,7 @@ parse_index(struct opts_t *op)
 
 /* command line process, options and arguments. Returns 0 if ok. */
 static int
-cl_process(struct opts_t *op, int argc, char *argv[])
+parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
     int c, j, ret;
     const char * data_arg = NULL;
@@ -5112,7 +5112,7 @@ main(int argc, char * argv[])
     op->dev_slot_num = -1;
     op->ind_indiv_last = -1;
     pg_sz = sg_get_page_size();
-    res = cl_process(op, argc, argv);
+    res = parse_cmd_line(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
     if (op->do_version) {

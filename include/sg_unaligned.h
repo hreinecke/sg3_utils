@@ -2,7 +2,7 @@
 #define SG_UNALIGNED_H
 
 /*
- * Copyright (c) 2014-2016 Douglas Gilbert.
+ * Copyright (c) 2014-2017 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -172,7 +172,7 @@ static inline void sg_nz_put_unaligned_be64(uint64_t val, void *p)
 
 
 /* Below are the little endian equivalents of the big endian functions
- * above. Little endian is used by ATA, networking and PCI.
+ * above. Little endian is used by ATA, PCI and NVMe.
  */
 
 static inline uint16_t __get_unaligned_le16(const uint8_t *p)

@@ -774,7 +774,7 @@ sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
  * various SG_LIB_CAT_* positive values or -1 -> other errors.
  * Adds the ability to set the command abort timeout
  * and the ability to report the residual count. If timeout_secs is zero
- * or less the the default command abort timeout (60 seconds) is used.
+ * or less the default command abort timeout (60 seconds) is used.
  * If residp is non-NULL then the residual value is written where residp
  * points. A residual value of 0 implies mx_resp_len bytes have be written
  * where resp points. If the residual value equals mx_resp_len then no
