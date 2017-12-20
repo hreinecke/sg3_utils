@@ -3,8 +3,8 @@
 sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 .SH SYNOPSIS
 .B sg_write_x
-[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app-\tag=AT\fR] [\fI\-\-atomic=AB\fR]
-[\fI\-\-bmop=OP,PGP\fR] [\fI\-\-bs=LBS\fR] [\fI\-\-combined=DOF\fR]
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app\-tag=AT\fR] [\fI\-\-atomic=AB\fR]
+[\fI\-\-bmop=OP,PGP\fR] [\fI\-\-bs=BS\fR] [\fI\-\-combined=DOF\fR]
 [\fI\-\-dld=DLD\fR] [\fI\-\-dpo\fR] [\fI\-\-dry\-run\fR] [\fI\-\-fua\fR]
 [\fI\-\-generation=EOG,NOG\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR]
 \fI\-\-in=IF\fR [\fI\-\-lba=LBA[,LBA...]\fR] [\fI\-\-normal\fR]
@@ -16,48 +16,48 @@ sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 [\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
 .PP
 .B sg_write_x
-\fI\-\-normal\fR [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app\-tag=AT\fR]
-[\fI\-\-bs=LBS\fR] [\fI\-\-dld=DLD\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR]
-[\fI\-\-grpnum=GN\fR] \fI\-\-in=IF\fR [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
+\fI\-\-normal\fR \fI\-\-in=IF\fR [\fI\-\-16\fR] [\fI\-\-32\fR]
+[\fI\-\-app\-tag=AT\fR] [\fI\-\-bs=BS\fR] [\fI\-\-dld=DLD\fR] [\fI\-\-dpo\fR]
+[\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
 [\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-ref\-tag=RT\fR] [\fI\-\-strict\fR]
 [\fI\-\-tag\-mask=TM\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-wrprotect=WPR\fR]
 \fIDEVICE\fR
 .PP
 .B sg_write_x
-\fI\-\-or\fR [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-bmop=OP,PGP\fR]
-[\fI\-\-bs=LBS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR]
-\fI\-\-in=IF\fR [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-strict\fR] [\fI\-\-timeout=TO\fR]
-[\fI\-\-wrprotect=OPR\fR] \fIDEVICE\fR
-.PP
-.B sg_write_x
-\fI\-\-atomic=AB\fR [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app-tag=AT\fR]
-[\fI\-\-bs=LBS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR]
-\fI\-\-in=IF\fR [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-ref\-tag=RT\fR] [\fI\-\-strict\fR]
+\fI\-\-or\fR \fI\-\-in=IF\fR [\fI\-\-16\fR] [\fI\-\-32\fR]
+[\fI\-\-bmop=OP,PGP\fR] [\fI\-\-bs=BS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR]
+[\fI\-\-generation=EOG,NOG\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-num=NUM\fR] [\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-strict\fR]
 [\fI\-\-timeout=TO\fR] [\fI\-\-wrprotect=OPR\fR] \fIDEVICE\fR
 .PP
 .B sg_write_x
+\fI\-\-atomic=AB\fR \fI\-\-in=IF\fR [\fI\-\-16\fR] [\fI\-\-32\fR]
+[\fI\-\-app-tag=AT\fR] [\fI\-\-bs=BS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR]
+[\fI\-\-grpnum=GN\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-ref\-tag=RT\fR] [\fI\-\-strict\fR]
+[\fI\-\-timeout=TO\fR] [\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
+.PP
+.B sg_write_x
 \fI\-\-same=NDOB\fR [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app-tag=AT\fR]
-[\fI\-\-bs=LBS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR]
+[\fI\-\-bs=BS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR]
 [\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
 [\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-ref\-tag=RT\fR] [\fI\-\-strict\fR]
 [\fI\-\-timeout=TO\fR] [\fI\-\-unmap=U_A\fR]
-[\fI\-\-wrprotect=OPR\fR] \fIDEVICE\fR
+[\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
 .PP
 .B sg_write_x
-\fI\-\-scattered=RD\fR [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app-tag=AT\fR]
-[\fI\-\-bs=LBS\fR] [\fI\-\-dld=DLD\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR]
-[\fI\-\-grpnum=GN\fR] \fI\-\-in=IF\fR [\fI\-\-lba=LBA[,LBA...]\fR]
+\fI\-\-scattered=RD\fR \fI\-\-in=IF\fR [\fI\-\-16\fR] [\fI\-\-32\fR]
+[\fI\-\-app-tag=AT\fR] [\fI\-\-bs=BS\fR] [\fI\-\-dld=DLD\fR] [\fI\-\-dpo\fR]
+[\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-lba=LBA[,LBA...]\fR]
 [\fI\-\-num=NUM[,NUM...]\fR] [\fI\-\-offset=OFF[,DLEN]\fR]
 [\fI\-\-ref\-tag=RT\fR] [\fI\-\-scat\-file=SF\fR] [\fI\-\-scat\-raw\fR]
 [\fI\-\-strict\fR] [\fI\-\-tag\-mask=TM\fR] [\fI\-\-timeout=TO\fR]
 [\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
 .PP
 .B sg_write_x
-\fI\-\-stream=ID\fR [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-app-tag=AT\fR]
-[\fI\-\-bs=LBS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-grpnum=GN\fR]
-\fI\-\-in=IF\fR [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
+\fI\-\-stream=ID\fR \fI\-\-in=IF\fR [\fI\-\-16\fR] [\fI\-\-32\fR]
+[\fI\-\-app-tag=AT\fR] [\fI\-\-bs=BS\fR] [\fI\-\-dpo\fR] [\fI\-\-fua\fR]
+[\fI\-\-grpnum=GN\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-num=NUM\fR]
 [\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-ref\-tag=RT\fR] [\fI\-\-strict\fR]
 [\fI\-\-tag\-mask=TM\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-wrprotect=WPR\fR]
 \fIDEVICE\fR
@@ -69,16 +69,17 @@ ATOMIC, WRITE SAME, WRITE SCATTERED or WRITE STREAM. This utility supports
 the 16 and 32 byte variants of all six commands. Hence some closely related
 commands are not supported (e.g. WRITE(10)). All 32 byte variants, apart from
 ORWRITE(32), require the \fIDEVICE\fR to be formatted with type 1, 2 or 3
-protection information (PI), making all logical blocks 8 bytes longer on the
-media.
+Protection Information (PI), making all logical blocks 8 bytes (or a multiple
+of 8 bytes) longer on the media.
 .PP
 The command line interface is a little crowded with over thirty options. Hence
 the SYNOPSIS, after listing all the (long) options, lists those applicable
 to each supported command. For each command synopsis, the option that selects
-the SCSI command is shown first. If no command option is given then a "normal"
-WRITE is assumed. Even though the \fI\-\-scat\-file=SF\fR option can be
-given for every command, it is only shown for WRITE SCATTERED where it is
-most useful. If the \fI\-\-scat\-file=SF\fR option is given then neither the
+the SCSI command is shown first followed by any required options. If no
+command option is given then a "normal" WRITE is assumed. Even though the
+\fI\-\-scat\-file=SF\fR option can be given for every command, it is only
+shown for WRITE SCATTERED where it is most useful. If the
+\fI\-\-scat\-file=SF\fR option is given then neither the
 \fI\-\-lba=LBA[,LBA...]\fR nor the \fI\-\-num=NUM[,NUM...]\fR options
 should be given. Only the first item of the \fI\-\-lba=LBA[,LBA...]\fR and
 the \fI\-\-num=NUM[,NUM...]\fR options (or first pair (or quintet) from the
@@ -87,9 +88,9 @@ command. All commands can take \fI\-\-dry\-run\fR and \fI\-\-verbose\fR in
 addition to those shown in the SYNOPSIS.
 .PP
 The logical block size in bytes can be given explicitly with the
-\fI\-\-bs=LBS\fR option, as long as \fILBS\fR is greater than zero. It
-is typically a power of tw0, 512 or greater. If the \fI\-\-bs=LBS\fR option
-is not given or \fILBS\fR is zero then the SCSI READ CAPACITY command is
+\fI\-\-bs=BS\fR option, as long as \fIBS\fR is greater than zero. It
+is typically a power of two, 512 or greater. If the \fI\-\-bs=BS\fR option
+is not given or \fIBS\fR is zero then the SCSI READ CAPACITY command is
 used to find the logical block size. First the READ CAPACITY(16) command is
 tried and if successful the logical block size in the response is typically
 used as the actual block size for this utility. The exception is when
@@ -112,17 +113,18 @@ Attempts to write multi megabyte data with a single command are likely to fail
 for one of several reasons. First the operating system might object to
 allocating a buffer that large. Next the SCSI pass\-through usually limits
 data blocks to a few megabytes or less. Finally the storage device might
-have a limited amount of RAM to support an write operation such as atomic (as
+have a limited amount of RAM to support a write operation such as atomic (as
 it may need to roll back). The storage device can inform the application
 client of its limitations via the block limits VPD page (0xb0), with the
 maximum atomic transfer length field amongst others.
 .PP
-A degenerate LBA range descriptor with no PI has an LBA and NUM of zero.
-A degenerate LBA range descriptor with PI additionally has its RT, AT and
-TM fields set to zero. They are degenerate in the sense that they are
-indistinguishable from a pad of zeros that follow the scatter list in the
-data\-out buffer. SBC\-4 makes clear that the degenerate LBA range descriptor
-is valid. This may become an issue if \fIRD\fR given in the
+A degenerate LBA (Logical Block Address) range descriptor with no PI has
+an LBA and NUM of zero. A degenerate LBA range descriptor with PI
+additionally has its RT, AT and TM fields set to zero (note: that is not
+the default values for RT, AT and TM). They are degenerate in the sense
+that they are indistinguishable from a pad of zeros that follow the scatter
+list in the data\-out buffer. SBC\-4 makes clear that a degenerate LBA
+range descriptor is valid. This may become an issue if \fIRD\fR given in the
 \fI\-\-scattered=RD\fR option has the value 0. In this case the logic may
 need to scan the user provided data to calculate the number of LBA
 range descriptors which is required by the WRITE SCATTERED cdb. In the
@@ -130,8 +132,8 @@ absence of other information the logic will take a degenerate LBA range
 descriptor as a terminator of the scatter list.
 .PP
 The current reference for these commands is draft SBC\-4 (T10/BSR INCITS
-506) revision 15 dated 9 November 2017. All six SCSI commands are
-described in that document.
+506) revision 15 dated 9 November 2017. All six SCSI commands are described
+in that document.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -153,7 +155,7 @@ from ORWRITE(32) all other 32 byte cdb variants require a \fIDEVICE\fR
 formatted with type 1, 2 or 3 protection information.
 .TP
 \fB\-a\fR, \fB\-\-app\-tag\fR=\fIAT\fR
-where \fIAT\fR is the expected logical block application tag field found in
+where \fIAT\fR is the "expected logical block application tag" field found in
 most of the 32 byte cdb variants (the exception is ORWRITE(32)). \fIAT\fR is
 a 16 bit field which means the maximum value is 0xffff. The default value
 is 0xffff .
@@ -170,35 +172,48 @@ BMOP and 'Previous Generation Processing' fields respectively. BMOP is
 a 3 bit field (ranges from 0 to 7) and PGP is a 4 bit field (ranges from
 0 to 15). Both fields default to 0.
 .TP
-\fB\-b\fR, \fB\-\-bs\fR=\fILBS\fR
-where \fILBS\fR is the logical block size which is usually the same as
-the logical block size of the \fIDEVICE\fR. The exception is outlined in
-the DESCRIPTION section above. The default value is zero. If this option
-is not given or is given with a \fILBS\fR of zero then the SCSI READ
+\fB\-b\fR, \fB\-\-bs\fR=\fIBS\fR
+where \fIBS\fR is the logical block size or the actual block size which
+will be slightly bigger. The default value is zero. If this option
+is not given or is given with a \fIBS\fR of zero then the SCSI READ
 CAPACITY(16) command is sent to \fIDEVICE\fR. If that fails then the READ
-CAPACITY(10) command is sent.
+CAPACITY(10) command is sent. The logical and actual block size will be
+derived from the response of the READ CAPACITY command.
+.br
+This section assumes \fIBS\fR is greater than zero. If \fIBS\fR is less than
+512 (bytes) or not a multiple of 8, a warning is issued and the utility
+continues unless the \fI\-\-strict\fR option is also given. If \fIBS\fR
+is a power of two (e.g. 512) then the logical and actual block size is
+set to \fIBS\fR (e.g. 512). If \fIBS\fR is not a power of two (e.g. 520)
+then the logical block size is set to the closest power of two less than
+\fIBS\fR (e.g. 512) and the actual block size is set to \fIBS\fR (e.g.
+520).
+.br
+If the logical and actual block size are different then a later check
+will reduce the actual block size back to the logical block size unless
+\fI\-\-wrprotect=WPR\fR is greater than zero.
 .TP
 \fB\-c\fR, \fB\-\-combined\fR=\fIDOF\fR
 This option only applies to WRITE SCATTERED and assumes the whole data\-out
 buffer can be read from \fIIF\fR given by the \fI\-\-in=IF\fR option. The
-whole data\-out buffer is the parameter list header, followed by one or more
-LBA range descriptors, optional followed by some pad bytes and then the data
-to be written to the media. If the \fI\-\-lba=LBA[,LBA...]\fR,
-\fI\-\-num=NUM[,NUM...]\fR or \fI\-\-scat\-file=SF\fR options are given
+whole data\-out buffer is the parameter list header, followed by zero or more
+LBA range descriptors, optionally followed by some pad bytes and then the
+data to be written to the media. If the \fI\-\-lba=LBA[,LBA...]\fR,
+\fI\-\-num=NUM[,NUM...]\fR or \fI\-\-scat\-file=SF\fR options are also given
 then an error is generated. The \fIDOF\fR argument should be the value
 suitable for the 'Logical Block Data Offset' field in the WRITE SCATTERED
 cdb. This is the offset in the data\-out buffer where the data to write
 to the media commences. The unit of that field is the actual block size
-which is the logical block size plus 8, if protection information (PI) is
-being sent. When \fIWPR\fR (from \fI\-\-wrprotect=WPR\fR) is greater than
-zero then PI is expected. SBC\-4 revision 15 does not state it but it would
-appear that a \fIDOF\fR value of 0 is invalid. It is suggested that this
-option be used with the \fI\-\-strict\fR option while experimenting as
-random or incorrect data fed in via the \fI\-\-in=IF\fR option could write
-a lot of "interesting" data on the \fIDEVICE\fR. If \fIDOF\fR is given as 0
-the utility will scan the data in \fIIF\fR until \fIRD\fR LBA range
-descriptors are found; or if \fIRD\fR is also 0 until a degenerate LBA range
-descriptor is found.
+which is the logical block size plus a multiple of 8, if protection
+information (PI) is being sent. When \fIWPR\fR (from \fI\-\-wrprotect=WPR\fR)
+is greater than zero then PI is expected. SBC\-4 revision 15 does not state
+it but it would appear that a \fIDOF\fR value of 0 is invalid. It is
+suggested that this option be used with the \fI\-\-strict\fR option while
+experimenting as random or incorrect data fed in via the \fI\-\-in=IF\fR
+option could write a lot of "interesting" data all over the \fIDEVICE\fR.
+If \fIDOF\fR is given as 0 the utility will scan the data in \fIIF\fR until
+\fIRD\fR LBA range descriptors are found; or if \fIRD\fR is also 0 until a
+degenerate LBA range descriptor is found.
 .TP
 \fB\-D\fR, \fB\-\-dld\fR=\fIDLD\fR
 where \fIDLD\fR is the duration limits descriptor spread across 3 bits in
@@ -210,8 +225,8 @@ cdbs is set if (0x4 & \fIDLD\fR) is non\-zero.
 .TP
 \fB\-d\fR, \fB\-\-dpo\fR
 if this option is given then the DPO (disable page out) bit field in the
-cdb is set. The default is to clear this bit field. Applies to all write
-commands except WRITE SAME.
+cdb is set. The default is to clear this bit field. Applies to all
+commands supported by thus utility except WRITE SAME.
 .TP
 \fB\-x\fR, \fB\-\-dry\-run\fR
 this option exits (with a status of 0) just before it would otherwise send
@@ -225,8 +240,8 @@ status value.
 .TP
 \fB\-f\fR, \fB\-\-fua\fR
 if this option is given then the FUA (force unit access) bit field in the
-cdb is set. The default is to clear this bit field. Applies to all write
-commands except WRITE SAME.
+cdb is set. The default is to clear this bit field. Applies to all
+commands supported by thus utility except WRITE SAME.
 .TP
 \fB\-G\fR, \fB\-\-generation\fR=\fIEOG,NOG\fR
 the arguments for this option are used by the ORWITE(32) command only.
@@ -250,17 +265,22 @@ SCATTERED(16 or 32) which may include other data in the data\-out buffer.
 For WRITE SCATTERED (16 or 32) the data\-out buffer is made up of 3 or 4
 components in this order: a parameter list header (32 zero bytes); zero or
 more LBA range descriptors, optionally some pad bytes (zeros) and then data
-to write to the media. For WRITE
-SCATTERED \fIIF\fR only provides the data to write to the media unless
-\fI\-\-combined=DOF\fR is given. When the \fI\-\-combined=DOF\fR option is
-given \fIIF\fR contains all 3 components of the WRITE SCATTERED data\-out
-buffer in binary. The data read from \fIIF\fR starts from byte offset
-\fIOFF\fR which defaults to zero and no more than \fIDLEN\fR bytes are read
-from that point (i.e. the file byte offset \fIOFF\fR). If \fIDLEN\fR is
-zero or not given the rest of the file \fIIF\fR is read. This option is
-mandatory apart from when \-\-same=1 is given (that sets the NDOB bit which
-stands for "No Data Out Buffer"). In Unix based OSes, any number of zeros
-can produced by using the /dev/zero device file.
+to write to the media. For WRITE SCATTERED \fIIF\fR only provides the data
+to write to the media unless \fI\-\-combined=DOF\fR is given. When the
+\fI\-\-combined=DOF\fR option is given \fIIF\fR contains all components of
+the WRITE SCATTERED data\-out buffer in binary. The data read from \fIIF\fR
+starts from byte offset \fIOFF\fR which defaults to zero and no more than
+\fIDLEN\fR bytes are read from that point (i.e. from the file byte offset
+\fIOFF\fR). If \fIDLEN\fR is zero or not given the rest of the file \fIIF\fR
+is read. This option is mandatory apart from when \-\-same=1 is given (that
+sets the NDOB bit which stands for "No Data Out Buffer"). In Unix based
+OSes, any number of zeros can be produced by using the /dev/zero device file.
+.br
+\fIIF\fR may be "\-" which is taken as stdin. In this case the
+\fI\-\-offset=OFF,DLEN\fR can be given with \fIOFF\fR set to 0 and
+\fILEN\fR set to a non-zero value, preferably a multiple of the actual block
+size. The utility can also deduce how long the \fIIF\fR should be from
+\fINUM\fR (or the sum of them in the case of a scatter list).
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA[,LBA...]\fR
 where the argument is a single Logical Block Address (LBA) or a comma
@@ -270,17 +290,18 @@ can usefully take more than one \fILBA\fR. Whatever number of \fILBA\fRs is
 given, there needs to be an equal number of \fINUM\fRs given to the
 \fI\-\-num=NUM[,NUM...]\fR option. The first given \fILBA\fR joins with the
 first given \fINUM\fR to form the first LBA range descriptor (which T10
-number from zero in SBC\-4). The second \fILBA\ffR joins with the second
+number from zero in SBC\-4). The second \fILBA\fR joins with the second
 \fILBA\fR to form the second LBA range descriptor, etc. A more convenient
-way to define a large number of LBA range descriptors is the \fISF\fR
-name of the file given with the \fI\-\-scat\-file=SF\fR option. Defaults
-to logical block 0 (which could be dangerous) while \fINUM\fR defaults to
-0 which makes the combination harmless. \fILBA\fR is assumed to be in decimal
-unless prefixed with '0x' or has a trailing 'h'.
+way to define a large number of LBA range descriptors is with the
+\fI\-\-scat\-file=SF\fR option. Defaults to logical block 0 (which could be
+dangerous) while \fINUM\fR defaults to 0 which makes the combination harmless.
+\fILBA\fR is assumed to be in decimal unless prefixed with '0x' or has a
+trailing 'h'.
 .TP
 \fB\-N\fR, \fB\-\-normal\fR
-as well as implicitly selecting a "normal" WRITE (16 or 32) in the absence
-of selecting any other command, the choice of a "normal" WRITE can be made
+the choice of a "normal" WRITE (16 or 32) command can be made explicitly
+with this option. In the absence of selecting any other command (e.g.
+\fI\-\-atomic=AB\fR ), the choice of a "normal" WRITE is the default.
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM[,NUM...]\fR
 where the argument is a single NUMber of blocks (NUM) or a comma separated
@@ -299,7 +320,7 @@ reading from. The default value of \fIOFF\fR is zero which is the beginning
 of file named \fIIF\fR. \fIDLEN\fR is the maximum number of bytes to read,
 starting at byte offset \fIOFF\fR, from the file named \fIIF\fR. Less bytes
 will be read if an end of file occurs before \fIDLEN\fR is exhausted. If
-\fIDLEN\fR is zer or not given then reading from byte offset \fIOFF\fR to
+\fIDLEN\fR is zero or not given then reading from byte offset \fIOFF\fR to
 the end of the file named \fIIF\fR is assumed.
 .TP
 \fB\-O\fR, \fB\-\-or\fR
@@ -312,42 +333,44 @@ command in this utility that does not require a \fIDEVICE\fR formatted with
 type 1, 2 or 3 PI (although it will still work if it is formatted with PI).
 .TP
 \fB\-r\fR, \fB\-\-ref\-tag\fR=\fIRT\fR
-where \fIRT\fR is the expected logical block reference tag field found in
-the 32 byte cdb variants of WRITE, WRITE ATOMIC, WRITE SAME and WRITE STREAM.
-The field is also found in the WRITE SCATTERED(32) LBA range descriptors.
-It is 32 bit field which means the maximum value is 0xffffffff. The default
-value is 0xffffffff.
+where \fIRT\fR is the "expected initial logical block reference tag" field
+found in the 32 byte cdb variants of WRITE, WRITE ATOMIC, WRITE SAME and
+WRITE STREAM.  The field is also found in the WRITE SCATTERED(32) LBA range
+descriptors. It is a 32 bit field which means the maximum value is
+0xffffffff. The default value is 0xffffffff.
 .TP
 \fB\-S\fR, \fB\-\-same\fR=\fINDOB\fR
 selects the WRITE SAME command with the NDOB field set to \fINDOB\fR which
-stands for No Data\-Out Buffer. \fINDOB\fR can take values 0 or 1 (i.e. i
-is a single bit field). When \-\-same=1 are options associated with the
+stands for No Data\-Out Buffer. \fINDOB\fR can take values 0 or 1 (i.e. it
+is a single bit field). When \-\-same=1 all options associated with the
 data\-out buffer are ignored.
 .TP
 \fB\-q\fR, \fB\-\-scat\-file\fR=\fISF\fR
 where \fISF\fR is the name of an auxiliary file containing the scatter list
 for the WRITE SCATTERED command. If the \fI\-\-scat\-raw\fR option is also
 given then \fISF\fR is assumed to contain both the parameter list header (32
-bytes of zeros) followed by one or more LBA range descriptors which are
+bytes of zeros) followed by zero or more LBA range descriptors which are
 also 32 bytes long each. These components are as defined by SBC\-4 (i.e.
 in binary with integers in big endian format). If the \fI\-\-scat\-raw\fR
 option is not given then a file of ACSII hexadecimal is expected as described
 in the SCATTERED FILE ASCII FORMAT section below.
 .br
 If this option is given with the \fI\-\-combined=DOF\fR option then this
-utility will exit with a syntax error.
+utility will exit with a syntax error. \fISF\fR must not be "\-", a way
+of stopping the user trying to redirect stdin.
 .TP
 \fB\-R\fR, \fB\-\-scat\-raw\fR
 this option only effects the way that the file named \fISF\fR from the
 \fI\-\-scat\-file=SF\fR option for WRITE SCATTERED is interpreted. By
 default (i.e. without this option), \fISF\fR is parsed as ASCII hexadecimal
-with blank lines and lines contents from and including '#' to the end of
+with blank lines and line contents from and including '#' to the end of
 line ignored. Hence it can contain comments and other indications. When
 this option is given, the file named \fISF\fR is interpreted as binary.
-It is assumed to contain 32 bytes of zeros (the WRITE SCATTERED parameter
-list header) followed by one or more LBA range descriptors (which are 32
-bytes each). If the \fI\-\-strict\fR option is given the reserved field
-in those two items are checked with any non zero bytes causing an error.
+As binary it is assumed to contain 32 bytes of zeros (the WRITE SCATTERED
+parameter list header) followed by zero or more LBA range descriptors (which
+are 32 bytes each). If the \fI\-\-strict\fR option is given the reserved
+field in those two items are checked with any non zero bytes causing an
+error.
 .TP
 \fB\-S\fR, \fB\-\-scattered\fR=\fIRD\fR
 selects the WRITE SCATTERED command with \fIRD\fR being the number of LBA
@@ -360,6 +383,15 @@ is made up of an 8 byte LBA, followed by a 4 byte number_of_blocks followed
 by 20 bytes of zeros. In the 32 byte variant the LBA and number_of_blocks
 are followed by a RT (4 bytes), an AT (2 bytes) and a TM (2 bytes) then
 12 bytes of zeros.
+.br
+This paragraph applies when \fIRD\fR is greater than zero.
+If \fIRD\fR is less than the number of LBA range descriptors built from
+command line options, from the \fI\-\-scat\-file=SF\fR option or
+decoded from \fIIF\fR (when the \fI\-\-combined=DOF\fR option is given)
+then \fIRD\fR takes precedence; so \fIRD\fR is placed in the "Number of
+LBA Range Descriptors" field in the cdb. If \fIRD\fR is greater than
+the number of LBA range descriptors found from the provided data and
+options, then an error is generated.
 .TP
 \fB\-T\fR, \fB\-\-stream\fR=\fIID\fR
 selects the WRITE STREAM command with the STR_ID field set to \fIID\fR.
@@ -372,17 +404,24 @@ stderr and an indicative exit status. While experimenting with these commands,
 especially WRITE SCATTERED, it is recommended to use this option.
 .TP
 \fB\-t\fR, \fB\-\-tag\-mask\fR=\fITM\fR
-where \fITM\fR is the logical block application tag mask field in the
-WRITE ATOMIC(32) and WRITE(32) cdbs. It is 16 bit field which means the
-maximum value is 0xffff. The default value is 0xffff.
+where \fITM\fR is the "logical block application tag mask" field  found in the
+32 byte cdb variants of WRITE, WRITE ATOMIC, WRITE SAME and WRITE STREAM. The
+field is also found in the WRITE SCATTERED(32) LBA range descriptors. It is a
+16 bit field which means the maximum value is 0xffff. The default value is
+0xffff.
 .TP
 \fB\-I\fR, \fB\-\-timeout\fR=\fITO\fR
 where \fITO\fR is the command timeout value in seconds. The default value is
-120 seconds. If \fINUM\fR is large a WRITE ATOMIC command may require
-considerably more time than 120 seconds to complete.
+120 seconds. If \fINUM\fR is large on slow media then these WRITE commands
+may require considerably more time than 120 seconds to complete.
 .TP
 \fB\-u\fR, \fB\-\-unmap\fR=\fIU_A\fR
-where \fITO\fR is the command timeout value in seconds. The default value is
+where \fIU_A\fR is OR-ed bit values used to set the UNMAP and ANCHOR bit
+fields in the WRITE SAME (16 or 32) cdb. If \fIU_A\fR is 1 then the UNMAP
+bit field is set; if \fIU_A\fR is 2 then the ANCHOR bit field is set; if
+\fIU_A\fR is 3 then both the UNMAP and ANCHOR bit fields are set. The
+default value for both bit fields is clear (0); setting \fIU_A\fR to 0 will
+also clear both bit fields.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the degree of verbosity (debug messages). These messages are usually
@@ -393,17 +432,19 @@ output version string then exit.
 .TP
 \fB\-w\fR, \fB\-\-wrprotect\fR=\fIWPR\fR
 sets the WRPROTECT field (3 bits) in all sg_write_x commands apart from
-ORWRITE which has a 3 bit ORPROTECT field. In all cases \fIWPR\fR is placed
+ORWRITE which has a 3 bit ORPROTECT field (and the synopsis shows \fiOPR\fR
+to highlight the difference). In all cases \fIWPR\fR is placed
 in that 3 bit field. The default value is zero which does not send any PI
 in the data\-out buffer. \fIWPR\fR should be a value between 0 and 7.
 .SH SCATTERED FILE ASCII FORMAT
-This file named with the \fI\-\-scat\-file=SF\fR option only applies to
-the WRITE SCATTERED (16 and 32) command. If the \fI\-\-scat\-raw\fR option
-is also given then the file named \fISF\fR is expected to be binary and
-contain the parameter list header (32 bytes of zeros for both the 16 and 32
-byte variants) followed by "n" LBA range descriptors, each of 32 bytes each.
-This section describes what is expected in \fISF\fR when the
-\fI\-\-scat\-raw\fR option is not given.
+All commands in this utility can take a \fI\-\-scat\-file=SF\fR and that
+option can be seen as a replacement for the \fI\-\-lba=LBA[,LBA...]\fR and
+\fI\-\-num=NUM[,NUM...]\fR options. if both the \fI\-\-scat\-file=SF\fR and
+\fI\-\-scat\-raw\fR options are given then the file named \fISF\fR is
+expected to be binary and contain the parameter list header (32 bytes of
+zeros for both the 16 and 32 byte variants) followed by zero or more LBA
+range descriptors, each of 32 bytes each. This section describes what is
+expected in \fISF\fR when the \fI\-\-scat\-raw\fR option is not given.
 .PP
 The ASCII hexadecimal "scatter file" (named by \fISF\fR) can contain
 comments, empty lines and numbers. If multiple numbers appear on one line
@@ -434,7 +475,6 @@ given, and if no more items are on the line then RT, AT and TM are given
 their default values (all "ff" bytes). Spaces and tabs may appear between
 items but commas are the separators. Two commas with no value between them
 will cause the "missing" item to receive its default value.
-xxxxx
 .SH NOTES
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
@@ -453,7 +493,7 @@ the sg3_utils(8) man page.
 One simple usage is to write 4 blocks of zeros from (and including) a given
 LBA:
 .PP
-  sg_write_x \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4 /dev/sdc
+  sg_write_x \-\-atomic=0 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4 /dev/sdc
 .PP
 Since \fI\-\-bs=BS\fR has not been given, then this utility will call the
 READ CAPACITY(16) command on /dev/sdc to determine the number of bytes in a
@@ -464,21 +504,25 @@ zeros (each block containing 512 bytes) will be written from (and including)
 LBA 0x1234 . Now to bypass the need for the READ CAPACITY command(s) the
 \fI\-\-bs=BS\fR option can be used:
 .PP
-  sg_write_atomic \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4
+  sg_write_x \-\-atomic=0 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4
 /dev/sdc
 .PP
 Both of the examples above issue a SCSI WRITE ATOMIC(16) command. To send the
 32 byte variant add \-\-32 as in:
 .PP
-  sg_write_atomic \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4
-/dev/sdc
+  sg_write_x \-\-atomic=0 \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234
+\-\-num=4 /dev/sdc
 .PP
-To drop the WRITE ATOMIC(32) and replace it with a normal WRITE(32) add the
-\-\-non\-atomic option:
+To send a WRITE STREAM(32) with a STR_ID of 1 use the following:
 .PP
-  sg_write_atomic \-\-non\-atomic \-\-32 \-\-bs=512 \-\-in=/dev/zero
-\-\-lba=0x1234 \-\-num=4 /dev/sdc
+  sg_write_x \-\-stream=1 \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234
+\-\-num=4 /dev/sdc
 .PP
+Example of a WRITE SCATTERED(16) command with the scatter list in
+scat_file.txt
+  sg_write_x  \-\-scattered=3 \-q scat_file.txt \-i /dev/zero /dev/sg
+.PP
+xxxxxx More examples ...
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

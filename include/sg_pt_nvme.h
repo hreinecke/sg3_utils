@@ -18,6 +18,20 @@ extern "C" {
 /* structures copied and slightly modified from <linux/nvme_ioctl.h> which
  * is Copyright (c) 2011-2014, Intel Corporation.  */
 
+
+/* Note that the command input structure is in (packed) "cpu" format. That
+ * means, for example, if the CPU is little endian (most are) then so is the
+ * structure. However what comes out in the data-in buffer (e.g. for the
+ * Admin Identify command response) is almost all little endian following ATA
+ * (but no SCSI and IP which are big endian) and Intel's preference. There
+ * are exceptions, for example the EUI-64 identifiers in the Admin Identify
+ * response are big endian.
+ *
+ * Code online (e.g. nvme-cli at github.com) seems to like packed strcutures,
+ * the author prefers byte offset plus a range of unaligned integer builders
+ * such as those in sg_unaligned.h .
+ */
+
 #ifdef __GNUC__
 #ifndef __clang__
   struct __attribute__((__packed__)) sg_nvme_user_io
@@ -88,15 +102,17 @@ struct sg_nvme_passthru_cmd
         uint32_t cdw13;
         uint32_t cdw14;
         uint32_t cdw15;
-
+#ifdef SG_LIB_LINUX
         uint32_t timeout_ms;
-        uint32_t result;
+        uint32_t result;	/* Dword(0) of completion queue entry */
+#endif
 }
 #ifdef SG_LIB_FREEBSD
 __packed;
 #else
 ;
 #endif
+
 
 /* Using byte offsets and unaligned be/le copies safer than packed
  * structures. These are for sg_nvme_passthru_cmd . */
@@ -117,12 +133,46 @@ __packed;
 #define SG_NVME_PT_CDW14 56
 #define SG_NVME_PT_CDW15 60
 
+#ifdef SG_LIB_LINUX
+/* General references state that "all NVMe commands are 64 bytes long". If
+ * so then the following are add-ons by Linux, go to the OS and not the
+ * the NVMe device. And Linux doesn't seem to use the TIMEOUT_MS field on
+ * output to yield the "time taken" by the command. */
 #define SG_NVME_PT_TIMEOUT_MS 64
 #define SG_NVME_PT_RESULT 68
+#endif
+
+
+#ifdef __GNUC__
+#ifndef __clang__
+  struct __attribute__((__packed__)) sg_nvme_passthru_result
+#else
+  struct sg_nvme_passthru_result
+#endif
+#else
+struct sg_nvme_passthru_result
+#endif
+{
+	uint8_t status;
+	uint16_t transferred;
+	uint8_t reserved;
+}
+#ifdef SG_LIB_FREEBSD
+__packed;
+#else
+;
+#endif
+
+/* Using byte offsets and unaligned be/le copies safer than packed
+ * structures. These are for sg_nvme_passthru_result . */
+#define SG_NVME_PT_RES_STATUS 0
+#define SG_NVME_PT_RES_TRANSFERRED 1
+#define SG_NVME_PT_RES_RESERVED 3
+
 
 /* Valid namespace IDs (nsid_s) range from 1 to 0xfffffffe, leaving: */
 #define SG_NVME_BROADCAST_NSID 0xffffffff
-#define SG_NVME_CTL_NSID 0x0
+#define SG_NVME_CTL_NSID 0x0            /* the "controller's" namespace */
 
 #ifdef __cplusplus
 }

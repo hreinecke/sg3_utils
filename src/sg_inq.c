@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.75 20171207";    /* SPC-5 rev 17 */
+static const char * version_str = "1.76 20171219";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -416,7 +416,7 @@ usage_for(const struct opts_t * op)
 /* Processes command line options according to new option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
-cl_new_process(struct opts_t * op, int argc, char * argv[])
+new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
 
@@ -561,7 +561,7 @@ cl_new_process(struct opts_t * op, int argc, char * argv[])
 /* Processes command line options according to old option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
-cl_old_process(struct opts_t * op, int argc, char * argv[])
+old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     bool jmp_out;
     int k, plen, num, n;
@@ -733,7 +733,7 @@ cl_old_process(struct opts_t * op, int argc, char * argv[])
  * of these options is detected (when processing the other format), processing
  * stops and is restarted using the other format. Clear? */
 static int
-cl_process(struct opts_t * op, int argc, char * argv[])
+parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -741,14 +741,14 @@ cl_process(struct opts_t * op, int argc, char * argv[])
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
         op->opt_new = false;
-        res = cl_old_process(op, argc, argv);
+        res = old_parse_cmd_line(op, argc, argv);
         if ((0 == res) && op->opt_new)
-            res = cl_new_process(op, argc, argv);
+            res = new_parse_cmd_line(op, argc, argv);
     } else {
         op->opt_new = true;
-        res = cl_new_process(op, argc, argv);
+        res = new_parse_cmd_line(op, argc, argv);
         if ((0 == res) && (! op->opt_new))
-            res = cl_old_process(op, argc, argv);
+            res = old_parse_cmd_line(op, argc, argv);
     }
     return res;
 }
@@ -756,9 +756,9 @@ cl_process(struct opts_t * op, int argc, char * argv[])
 #else  /* SG_SCSI_STRINGS */
 
 static int
-cl_process(struct opts_t * op, int argc, char * argv[])
+parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
-    return cl_new_process(op, argc, argv);
+    return new_parse_cmd_line(op, argc, argv);
 }
 
 #endif  /* SG_SCSI_STRINGS */
@@ -3812,9 +3812,14 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
     if (vb > 2) {
+        int rlen;
+
         pr2serr("do_scsi_pt() result is %d\n", ret);
-        pr2serr("do_scsi_pt() result via sense buffer:\n");
-        dStrHex((const char *)&cmd_back, sizeof(cmd_back), 0);
+        rlen = get_scsi_pt_sense_len(ptvp);
+        if (rlen > 0) {
+            pr2serr("do_scsi_pt() result via sense buffer:\n");
+            dStrHex((const char *)&cmd_back, rlen, 0);
+        }
     }
     if (ret)
         return ret;
@@ -3915,9 +3920,14 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
     if (vb > 2) {
+        int rlen;
+
         pr2serr("do_scsi_pt result is %d\n", ret);
-        pr2serr("do_scsi_pt result via sense buffer:\n");
-        dStrHex((const char *)&cmd_back, sizeof(cmd_back), 0);
+        rlen = get_scsi_pt_sense_len(ptvp);
+        if (rlen > 0) {
+            pr2serr("do_scsi_pt result via sense buffer:\n");
+            dStrHex((const char *)&cmd_back, rlen, 0);
+        }
     }
     if (ret)
         goto err_out;
@@ -4043,10 +4053,16 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
 {
     pr2serr("%s: not implemented, no <linux/nvme_ioctl.h>\n", __func__);
     if (op->do_verbose)
-        pr2serr("Need to build on system with NVMe development headers\n");
+        pr2serr("Need to build on system with NVMe development headers "
+                "(pt_fd=%d)\n", pt_fd);
     return 0;
 }
 #endif
+
+// <<<<<<<<<<<<<<<<<<<<<<<< ******************
+#include <linux/nvme_ioctl.h>
+#include "sg_pt_linux.h"
+// <<<<<<<<<<<<<<<<<<<<<<<< ******************
 
 
 int
@@ -4064,7 +4080,7 @@ main(int argc, char * argv[])
     op->page_num = -1;
     op->page_pdt = -1;
     op->do_block = -1;         /* use default for OS */
-    res = cl_process(op, argc, argv);
+    res = parse_cmd_line(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
     if (op->do_help) {
@@ -4290,11 +4306,14 @@ main(int argc, char * argv[])
     }
 #endif
     memset(rsp_buff, 0, sizeof(rsp_buff));
+
+#ifdef HAVE_NVME
     n = check_pt_file_handle(sg_fd, op->device_name, op->do_verbose);
     if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
         ret = do_nvme_identify(sg_fd, op);
         goto fini;
     }
+#endif
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
     if (op->do_ata) {

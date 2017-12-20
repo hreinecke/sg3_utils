@@ -314,6 +314,11 @@ problems with protection information (PI or DIF). For example this error
 may occur when reading a block on a drive that has never been written (or
 is unmapped) if that drive was formatted with type 1, 2 or 3 protection.
 .TP
+.B 48
+this is an internal message indicating a NVMe status field (SF) is other
+than zero after a command has been executed (i.e. something went wrong).
+Work in this area is currently experimental.
+.TP
 .B 49
 low level driver reports a residual count (i.e. number of bytes actually
 received by HBA is 'requested_bytes - residual_count') that is high enough

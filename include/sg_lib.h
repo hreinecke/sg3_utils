@@ -363,6 +363,7 @@ void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
 #define SG_LIB_CAT_TASK_ABORTED 29 /* SCSI status, this command aborted by? */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
                                 /*       [sk,asc,ascq: 0xb,0x10,*] */
+#define SG_LIB_NVME_STATUS 48   /* NVMe Status Field (SF) other than 0 */
 #define SG_LIB_WILD_RESID 49    /* Residual value for data-in transfer of a */
                                 /* SCSI command is nonsensical */
 #define SG_LIB_OS_BASE_ERR 50   /* in Linux: values found in: */

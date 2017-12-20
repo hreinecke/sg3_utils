@@ -1,4 +1,3 @@
-PROPS-END
 #ifndef SG_PT_LINUX_H
 #define SG_PT_LINUX_H
 
@@ -94,24 +93,28 @@ struct sg_io_v4 {
 
 struct sg_pt_linux_scsi {
     struct sg_io_v4 io_hdr;     /* use v4 header as it is more general */
-    int dev_fd;                 /* -1 if not given (yet) */
-    int in_err;
-    int os_err;
-    unsigned char tmf_request[4];
+    /* Leave io_hdr in first place of this structure */
     bool is_sg;
     bool is_bsg;
     bool is_nvme;
     bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
     bool scsi_dsense;   /* SCSI descriptor sense active when true */
+    int dev_fd;                 /* -1 if not given (yet) */
+    int in_err;
+    int os_err;
     uint32_t nvme_nsid;         /* 1 to 0xfffffffe are possibly valid, 0
                                  * implies dev_fd is not a NVMe device
                                  * (is_nvme=false) or it is a NVMe char
                                  * device (e.g. /dev/nvme0 ) */
-    uint32_t nvme_result;
+    uint32_t nvme_result;       /* DW0 from completion queue */
+    uint32_t nvme_status;       /* SF: DW3 31:17 from completion queue, mask
+                                 * with 0x3ff for message lookup, may be
+                                 * OR-ed with 0x4000 for DNR (Do Not Retry) */
     uint32_t mdxfer_len;
     void * mdxferp;
-    uint8_t * nvme_id_ctlp;	/* cached response to controller IDENTIFY */
+    uint8_t * nvme_id_ctlp;     /* cached response to controller IDENTIFY */
     uint8_t * free_nvme_id_ctlp;
+    unsigned char tmf_request[4];
 };
 
 struct sg_pt_base {
