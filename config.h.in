@@ -36,6 +36,12 @@
 /* Define to 1 if you have the `posix_memalign' function. */
 #undef HAVE_POSIX_MEMALIGN
 
+/* Found pthread_cancel */
+#undef HAVE_PTHREAD_CANCEL
+
+/* Found pthread_kill */
+#undef HAVE_PTHREAD_KILL
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -63,6 +69,9 @@
 /* option ignored */
 #undef IGNORE_LINUX_BSG
 
+/* compile out NVMe support */
+#undef IGNORE_NVME
+
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
@@ -87,6 +96,9 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* sg3_utils on android */
+#undef SG_LIB_ANDROID
+
 /* sg3_utils Build Host */
 #undef SG_LIB_BUILD_HOST
 
@@ -108,7 +120,7 @@
 /* sg3_utils on Win32 */
 #undef SG_LIB_WIN32
 
-/* full SCSI sense strings */
+/* full SCSI sense strings and NVMe status strings */
 #undef SG_SCSI_STRINGS
 
 /* Define to 1 if you have the ANSI C header files. */

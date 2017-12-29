@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SGP_DD "8" "December 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sgp_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -17,8 +17,9 @@ devices
 Copy data to and from any files. Specialised for "files" that are
 Linux SCSI generic (sg) and raw devices. Similar syntax and semantics to
 .B dd(1)
-but does not perform any conversions. Uses POSIX threads to increase
-the amount of parallelism. This improves speed in some cases.
+but does not perform any conversions. Uses POSIX threads (often
+called "pthreads") to increase the amount of parallelism. This improves
+speed in some cases.
 .PP
 The first group in the synopsis above are "standard" Unix
 .B dd(1)
@@ -302,7 +303,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2012 Douglas Gilbert
+Copyright \(co 2000\-2017 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

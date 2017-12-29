@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.25 20171217";    /* ses4r01 */
+static const char * version_str = "2.27 20171228";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -54,7 +54,7 @@ static const char * version_str = "2.25 20171217";    /* ses4r01 */
 #define HELP_TEXT_DPC 0x3
 #define STRING_DPC 0x4
 #define THRESHOLD_DPC 0x5
-#define ARRAY_CONTROL_DPC 0x6   /* obsolete */
+#define ARRAY_CONTROL_DPC 0x6   /* obsolete, last seen ses-r08b.pdf */
 #define ARRAY_STATUS_DPC 0x6    /* obsolete */
 #define ELEM_DESC_DPC 0x7
 #define SHORT_ENC_STATUS_DPC 0x8
@@ -319,6 +319,11 @@ static uint8_t * enc_stat_rsp;
 static uint8_t * elem_desc_rsp;
 static uint8_t * add_elem_rsp;
 static uint8_t * threshold_rsp;
+
+static unsigned enc_stat_rsp_sz;
+static unsigned elem_desc_rsp_sz;
+static unsigned add_elem_rsp_sz;
+static unsigned threshold_rsp_sz;
 
 static int enc_stat_rsp_len;
 static int elem_desc_rsp_len;
@@ -2297,6 +2302,27 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
                    pad, statp[0], statp[1], statp[2], statp[3]);
         break;
     case DEVICE_ETC:
+        if (ARRAY_STATUS_DPC == op->page_code) {  /* obsolete after SES-1 */
+            if (nofilter || (0xf0 & statp[1]))
+                printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons "
+                       "check=%d\n", pad, !!(statp[1] & 0x80),
+                       !!(statp[1] & 0x40), !!(statp[1] & 0x20),
+                       !!(statp[1] & 0x10));
+            if (nofilter || (0xf & statp[1]))
+                printf("%sIn crit array=%d, In failed array=%d, Rebuild/"
+                       "remap=%d, R/R abort=%d\n", pad, !!(statp[1] & 0x8),
+                       !!(statp[1] & 0x4), !!(statp[1] & 0x2),
+                       !!(statp[1] & 0x1));
+            if (nofilter || ((0x46 & statp[2]) || (0x8 & statp[3])))
+                printf("%sDo not remove=%d, RMV=%d, Ident=%d, Enable bypass "
+                       "A=%d\n", pad, !!(statp[2] & 0x40), !!(statp[2] & 0x4),
+                       !!(statp[2] & 0x2), !!(statp[3] & 0x8));
+            if (nofilter || (0x7 & statp[3]))
+                printf("%sEnable bypass B=%d, Bypass A enabled=%d, Bypass B "
+                        "enabled=%d\n", pad, !!(statp[3] & 0x4),
+                       !!(statp[3] & 0x2), !!(statp[3] & 0x1));
+            break;
+        }
         printf("%sSlot address: %d\n", pad, statp[1]);
         if (nofilter || (0xe0 & statp[2]))
             printf("%sApp client bypassed A=%d, Do not remove=%d, Enc "
@@ -2319,21 +2345,21 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
         break;
     case POWER_SUPPLY_ETC:
-        if (nofilter || ((0xc0 & statp[1]) || (0xe & statp[2]))) {
+        if (nofilter || ((0xc0 & statp[1]) || (0xc & statp[2]))) {
             printf("%sIdent=%d, Do not remove=%d, DC overvoltage=%d, "
                    "DC undervoltage=%d\n", pad, !!(statp[1] & 0x80),
                    !!(statp[1] & 0x40), !!(statp[2] & 0x8),
                    !!(statp[2] & 0x4));
-            printf("%s DC overcurrent=%d\n", pad, !!(statp[2] & 0x2));
         }
-        if (nofilter || (0xf8 & statp[3]))
-            printf("%sHot swap=%d, Fail=%d, Requested on=%d, Off=%d, "
-                   "Overtmp fail=%d\n", pad, !!(statp[3] & 0x80),
-                   !!(statp[3] & 0x40), !!(statp[3] & 0x20),
-                   !!(statp[3] & 0x10), !!(statp[3] & 0x8));
-        if (nofilter || (0x7 & statp[3]))
-            printf("%sTemperature warn=%d, AC fail=%d, DC fail=%d\n",
-                   pad, !!(statp[3] & 0x4), !!(statp[3] & 0x2),
+        if (nofilter || ((0x2 & statp[2]) || (0xf0 & statp[3])))
+            printf("%sDC overcurrent=%d, Hot swap=%d, Fail=%d, Requested "
+                   "on=%d, Off=%d\n", pad, !!(statp[2] & 0x2),
+                   !!(statp[3] & 0x80), !!(statp[3] & 0x40),
+                   !!(statp[3] & 0x20), !!(statp[3] & 0x10));
+        if (nofilter || (0xf & statp[3]))
+            printf("%sOvertmp fail=%d, Temperature warn=%d, AC fail=%d, "
+                   "DC fail=%d\n", pad, !!(statp[3] & 0x8),
+                   !!(statp[3] & 0x4), !!(statp[3] & 0x2),
                    !!(statp[3] & 0x1));
         break;
     case COOLING_ETC:
@@ -2668,6 +2694,74 @@ enc_status_dp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     return;
 truncated:
     pr2serr("    <<<enc: response too short>>>\n");
+    return;
+}
+
+/* ARRAY_STATUS_DPC [0x6]
+ * Display array status diagnostic page. */
+static void
+array_status_dp(const struct th_es_t * tesp, uint32_t ref_gen_code,
+                const uint8_t * resp, int resp_len,
+                const struct opts_t * op)
+{
+    int j, k;
+    uint32_t gen_code;
+    bool got1, match_ind_th;
+    const uint8_t * bp;
+    const uint8_t * last_bp;
+    const struct type_desc_hdr_t * tdhp = tesp->th_base;
+    char b[64];
+
+    printf("Array Status diagnostic page:\n");
+    if (resp_len < 4)
+        goto truncated;
+    printf("  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
+           !!(resp[1] & 0x10), !!(resp[1] & 0x8), !!(resp[1] & 0x4),
+           !!(resp[1] & 0x2), !!(resp[1] & 0x1));
+    last_bp = resp + resp_len - 1;
+    if (resp_len < 8)
+        goto truncated;
+    gen_code = sg_get_unaligned_be32(resp + 4);
+    printf("  generation code: 0x%x\n", gen_code);
+    if (ref_gen_code != gen_code) {
+        pr2serr("  <<state of enclosure changed, please try again>>\n");
+        return;
+    }
+    printf("  status descriptor list\n");
+    bp = resp + 8;
+    for (k = 0, got1 = false; k < tesp->num_ths; ++k, ++tdhp) {
+        if ((bp + 3) > last_bp)
+            goto truncated;
+        match_ind_th = (op->ind_given && (k == op->ind_th));
+        if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
+            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
+                   etype_str(tdhp->etype, b, sizeof(b)), tdhp->se_id, k);
+            printf("      Overall descriptor:\n");
+            enc_status_helper("        ", bp, tdhp->etype, false, op);
+            got1 = true;
+        }
+        for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
+            if (op->ind_given) {
+                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
+                    (! match_ind_indiv(j, op)))
+                    continue;
+            }
+            printf("      Element %d descriptor:\n", j);
+            enc_status_helper("        ", bp, tdhp->etype, false, op);
+            got1 = true;
+        }
+    }
+    if (op->ind_given && (! got1)) {
+        printf("      >>> no match on --index=%d,%d", op->ind_th,
+               op->ind_indiv);
+        if (op->ind_indiv_last > op->ind_indiv)
+            printf("-%d\n", op->ind_indiv_last);
+        else
+            printf("\n");
+    }
+    return;
+truncated:
+    pr2serr("    <<<arr: response too short>>>\n");
     return;
 }
 
@@ -3800,6 +3894,24 @@ process_status_page(int sg_fd, struct opts_t * op)
             tesp->num_ths = num_ths;
             enc_status_dp(tesp, ref_gen_code, resp, resp_len, op);
             break;
+        case ARRAY_STATUS_DPC:
+            num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                              MX_ELEM_HDR, &ref_gen_code,
+                                              &primary_info, op);
+            if (num_ths < 0) {
+                ret = num_ths;
+                goto fini;
+            }
+            if (primary_info.have_info) {
+                printf("  Primary enclosure logical identifier (hex): ");
+                for (j = 0; j < 8; ++j)
+                    printf("%02x", primary_info.enc_log_id[j]);
+                printf("\n");
+            }
+            tesp->th_base = type_desc_hdr_arr;
+            tesp->num_ths = num_ths;
+            array_status_dp(tesp, ref_gen_code, resp, resp_len, op);
+            break;
         case HELP_TEXT_DPC:
             printf("Help text diagnostic page (for primary "
                    "subenclosure):\n");
@@ -4405,7 +4517,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
             printf("%02x", primary_info.enc_log_id[j]);
         printf("\n");
     }
-    mlen = sizeof(enc_stat_rsp);
+    mlen = enc_stat_rsp_sz;
     if (mlen > op->maxlen)
         mlen = op->maxlen;
     res = do_rec_diag(sg_fd, ENC_STATUS_DPC, enc_stat_rsp, mlen, op,
@@ -4424,7 +4536,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     es_bp = enc_stat_rsp + 8;
     /* es_last_bp = enc_stat_rsp + enc_stat_rsp_len - 1; */
 
-    mlen = sizeof(elem_desc_rsp);
+    mlen = elem_desc_rsp_sz;
     if (mlen > op->maxlen)
         mlen = op->maxlen;
     res = do_rec_diag(sg_fd, ELEM_DESC_DPC, elem_desc_rsp, mlen, op,
@@ -4452,7 +4564,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     /* check if we want to add the AES page to the join */
     if (display || (ADD_ELEM_STATUS_DPC == op->page_code) ||
         (op->dev_slot_num >= 0) || saddr_non_zero(op->sas_addr)) {
-        mlen = sizeof(add_elem_rsp);
+        mlen = add_elem_rsp_sz;
         if (mlen > op->maxlen)
             mlen = op->maxlen;
         res = do_rec_diag(sg_fd, ADD_ELEM_STATUS_DPC, add_elem_rsp, mlen, op,
@@ -4490,7 +4602,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
 
     if ((op->do_join > 1) ||
         ((! display) && (THRESHOLD_DPC == op->page_code))) {
-        mlen = sizeof(threshold_rsp);
+        mlen = threshold_rsp_sz;
         if (mlen > op->maxlen)
             mlen = op->maxlen;
         res = do_rec_diag(sg_fd, THRESHOLD_DPC, threshold_rsp, mlen, op,
@@ -5133,24 +5245,28 @@ main(int argc, char * argv[])
         pr2serr("Unable to get heap for enc_stat_rsp\n");
         goto err_out;
     }
+    enc_stat_rsp_sz = MX_ALLOC_LEN;
     elem_desc_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_elem_desc_rsp,
                                op->verbose > 3);
     if (NULL == elem_desc_rsp) {
         pr2serr("Unable to get heap for elem_desc_rsp\n");
         goto err_out;
     }
+    elem_desc_rsp_sz = MX_ALLOC_LEN;
     add_elem_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_add_elem_rsp,
                                op->verbose > 3);
     if (NULL == add_elem_rsp) {
         pr2serr("Unable to get heap for add_elem_rsp\n");
         goto err_out;
     }
+    add_elem_rsp_sz = MX_ALLOC_LEN;
     threshold_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_threshold_rsp,
                                op->verbose > 3);
     if (NULL == threshold_rsp) {
         pr2serr("Unable to get heap for threshold_rsp\n");
         goto err_out;
     }
+    threshold_rsp_sz = MX_ALLOC_LEN;
 
     if (op->num_cgs) {
         have_cgs = true;

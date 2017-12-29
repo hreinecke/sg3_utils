@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.76 20171219";    /* SPC-5 rev 17 */
+static const char * version_str = "1.79 20171227";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -217,6 +217,7 @@ static struct option long_options[] = {
         {"id", no_argument, 0, 'i'},
         {"inhex", required_argument, 0, 'I'},
         {"len", required_argument, 0, 'l'},
+        {"long", no_argument, 0, 'L'},
         {"maxlen", required_argument, 0, 'm'},
 #ifdef SG_SCSI_STRINGS
         {"new", no_argument, 0, 'N'},
@@ -244,6 +245,7 @@ struct opts_t {
     int do_cmddt;
     int do_help;
     int do_hex;
+    int do_long;
     int do_raw;
     int do_vendor;
     int do_verbose;
@@ -269,9 +271,9 @@ usage()
             "[--export]\n"
             "              [--extended] [--help] [--hex] [--id] [--inhex=FN] "
             "[--len=LEN]\n"
-            "              [--maxlen=LEN] [--page=PG] [--raw] [--vendor] "
-            "[--verbose]\n"
-            "              [--version] [--vpd] DEVICE\n"
+            "              [--long] [--maxlen=LEN] [--page=PG] [--raw] "
+            "[--vendor]\n"
+            "              [--verbose] [--version] [--vpd] DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
@@ -300,8 +302,8 @@ usage()
             "                    only supported for VPD pages 0x80 and 0x83\n"
             "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
-            "    --force|-f      skip VPD page 0 checking; provide more "
-            "NVMe info\n"
+            "    --force|-f      skip VPD page 0 checking; direct fetch "
+            "requested page\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
             "    --id|-i         decode device identification VPD page "
@@ -314,6 +316,7 @@ usage()
             "-> fetch 36\n"
             "                        bytes first, then fetch again as "
             "indicated)\n"
+            "    --long|-L       supply extra information on NVMe devices\n"
             "    --maxlen=LEN|-m LEN    same as '--len='\n"
             "    --page=PG|-p PG     Vital Product Data (VPD) page number "
             "or\n"
@@ -341,7 +344,7 @@ usage_old()
 #ifdef SG_LIB_LINUX
     pr2serr("Usage:  sg_inq [-a] [-A] [-b] [-B=0|1] [-c] [-cl] [-d] [-e] "
             "[-h]\n"
-            "               [-H] [-i] [I=FN] [-l=LEN] [-m] [-M] "
+            "               [-H] [-i] [I=FN] [-l=LEN] [-L] [-m] [-M] "
             "[-o=OPCODE_PG]\n"
             "               [-p=VPD_PG] [-P] [-r] [-s] [-u] [-U] [-v] [-V] "
             "[-x]\n"
@@ -352,7 +355,7 @@ usage_old()
 #else
     pr2serr("Usage:  sg_inq [-a] [-b] [-B 0|1] [-c] [-cl] [-d] [-e] [-h] "
             "[-H]\n"
-            "               [-i] [-l=LEN] [-m] [-M] [-o=OPCODE_PG] "
+            "               [-i] [-l=LEN] [-L] [-m] [-M] [-o=OPCODE_PG] "
             "[-p=VPD_PG]\n"
             "               [-P] [-r] [-s] [-u] [-v] [-V] [-x] [-36] "
             "[-?]\n"
@@ -375,6 +378,7 @@ usage_old()
             "-> fetch 36\n"
             "                    bytes first, then fetch again as "
             "indicated)\n"
+            "    -L    supply extra information on NVMe devices\n"
             "    -m    decode management network addresses VPD page "
             "(0x85)\n"
             "    -M    decode mode page policy VPD page (0x87)\n"
@@ -425,18 +429,18 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 
 #ifdef SG_LIB_LINUX
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "aB:cdeEfhHiI:l:m:NOp:rsuvVx",
+        c = getopt_long(argc, argv, "aB:cdeEfhHiI:l:Lm:NOp:rsuvVx",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:m:p:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:m:NOp:rsuvVx", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:NOp:rsuvVx",
+                        long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:m:p:rsuvVx", long_options,
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:p:rsuvVx", long_options,
                         &option_index);
 #endif /* SG_SCSI_STRINGS */
 #endif /* SG_LIB_LINUX */
@@ -507,6 +511,9 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->resp_len = n;
+            break;
+        case 'L':
+            ++op->do_long;
             break;
 #ifdef SG_SCSI_STRINGS
         case 'N':
@@ -624,6 +631,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->page_num = VPD_DEVICE_ID;
                     op->do_vpd = true;
                     ++op->num_pages;
+                    break;
+                case 'L':
+                    ++op->do_long;
                     break;
                 case 'm':
                     op->page_num = VPD_MAN_NET_ADDR;
@@ -3792,6 +3802,7 @@ do_nvme_identify_hex_raw(const unsigned char * b, int b_len,
 
 const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
 
+/* Send Identify(CNS=0, nsid) and decode the Identify namespace response */
 static int
 do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
               struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_dinp,
@@ -3811,16 +3822,8 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
-    if (vb > 2) {
-        int rlen;
-
-        pr2serr("do_scsi_pt() result is %d\n", ret);
-        rlen = get_scsi_pt_sense_len(ptvp);
-        if (rlen > 0) {
-            pr2serr("do_scsi_pt() result via sense buffer:\n");
-            dStrHex((const char *)&cmd_back, rlen, 0);
-        }
-    }
+    if (vb > 2)
+        pr2serr("%s: do_scsi_pt() result is %d\n", __func__, ret);
     if (ret)
         return ret;
     num_lbaf = id_dinp[25] + 1;  /* spec says this is "0's based value" */
@@ -3842,7 +3845,7 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
         for (k = 1; k < 16; ++k)
             printf("%02x", id_dinp[104 + k]);
         printf("\n");
-    } else if (op->do_force)
+    } else if (op->do_long)
         printf("    NGUID: 0x0\n");
     if (eui_64)
         printf("    EUI-64: 0x%" PRIx64 "\n", eui_64); /* N.B. big endian */
@@ -3879,15 +3882,16 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     return ret;
 }
 
-/* Send a NVMe Identify(CNS=1) and decode Controller info */
+/* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. For each
+ * namespace found call do_nvme_id_ns(). */
 static int
 do_nvme_identify(int pt_fd, const struct opts_t * op)
 {
     bool got_fguid;
     int ret = 0;
     int vb = op->do_verbose;
-    uint8_t ver_min, ver_ter;
-    uint16_t ver_maj;
+    uint8_t ver_min, ver_ter, mtds;
+    uint16_t ver_maj, oacs, oncs;
     uint32_t k, ver, nsid, max_nsid, npss, j, n, m;
     uint64_t sz1, sz2;
     uint8_t * up;
@@ -3919,19 +3923,11 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
     set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
-    if (vb > 2) {
-        int rlen;
-
-        pr2serr("do_scsi_pt result is %d\n", ret);
-        rlen = get_scsi_pt_sense_len(ptvp);
-        if (rlen > 0) {
-            pr2serr("do_scsi_pt result via sense buffer:\n");
-            dStrHex((const char *)&cmd_back, rlen, 0);
-        }
-    }
+    if (vb > 2)
+        pr2serr("%s: do_scsi_pt result is %d\n", __func__, ret);
     if (ret)
         goto err_out;
-    max_nsid = sg_get_unaligned_le32(id_dinp + 516);
+    max_nsid = sg_get_unaligned_le32(id_dinp + 516); /* NN */
     if (op->do_raw || op->do_hex) {
         do_nvme_identify_hex_raw(id_dinp, pg_sz, op);
         goto skip1;
@@ -3950,6 +3946,48 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         printf(".%u\n", ver_ter);
     else
         printf("\n");
+    oacs = sg_get_unaligned_le16(id_dinp + 256);
+    if (0x1ff & oacs) {
+        printf("  Optional admin command support:\n");
+        if (0x100 & oacs)
+            printf("    Doorbell buffer config\n");
+        if (0x80 & oacs)
+            printf("    Virtualization management\n");
+        if (0x40 & oacs)
+            printf("    NVMe-MI send and NVMe-MI receive\n");
+        if (0x20 & oacs)
+            printf("    Directive send and directive receive\n");
+        if (0x10 & oacs)
+            printf("    Device self-test\n");
+        if (0x8 & oacs)
+            printf("    Namespace management and attachment\n");
+        if (0x4 & oacs)
+            printf("    Firmware download and commit\n");
+        if (0x2 & oacs)
+            printf("    Format NVM\n");
+        if (0x1 & oacs)
+            printf("    Security send and receive\n");
+    } else
+        printf("  No optional admin command support\n");
+    oncs = sg_get_unaligned_le16(id_dinp + 256);
+    if (0x7f & oncs) {
+        printf("  Optional NVM command support:\n");
+        if (0x40 & oncs)
+            printf("    Timestamp feature\n");
+        if (0x20 & oncs)
+            printf("    Reservations\n");
+        if (0x10 & oncs)
+            printf("    Save and Select fields non-zero\n");
+        if (0x8 & oncs)
+            printf("    Write zeroes\n");
+        if (0x4 & oncs)
+            printf("    Dataset management\n");
+        if (0x2 & oncs)
+            printf("    Write uncorrectable\n");
+        if (0x1 & oncs)
+            printf("    Compare\n");
+    } else
+        printf("  No optional NVM command support\n");
     printf("  PCI vendor ID VID/SSVID: 0x%x/0x%x\n",
            sg_get_unaligned_le16(id_dinp + 0),
            sg_get_unaligned_le16(id_dinp + 2));
@@ -3961,10 +3999,10 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         for (k = 1; k < 16; ++k)
             printf("%02x", id_dinp[112 + k]);
         printf("\n");
-    } else if (op->do_force)
+    } else if (op->do_long)
         printf("  FGUID: 0x0\n");
     printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(id_dinp + 78));
-    if (op->do_force) {
+    if (op->do_long) {
         printf("  Management endpoint capabilities, over a PCIe port: %d\n",
                !! (0x2 & id_dinp[255]));
         printf("  Management endpoint capabilities, over a SMBus/I2C port: "
@@ -3977,7 +4015,14 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         printf("  Total NVM capacity: huge ...\n");
     else if (sz1)
         printf("  Total NVM capacity: %" PRIu64 " bytes\n", sz1);
-    else if (op->do_force) {
+    mtds = id_dinp[77];
+    printf("  Maximum data transfer size: ");
+    if (mtds)
+        printf("%u pages\n", 1U << mtds);
+    else
+        printf("<unlimited>\n");
+
+    if (op->do_long) {
         const char * const non_op = "does not process I/O";
         const char * const operat = "processes I/O";
         const char * cp;
@@ -4058,11 +4103,6 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     return 0;
 }
 #endif
-
-// <<<<<<<<<<<<<<<<<<<<<<<< ******************
-#include <linux/nvme_ioctl.h>
-#include "sg_pt_linux.h"
-// <<<<<<<<<<<<<<<<<<<<<<<< ******************
 
 
 int

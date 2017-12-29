@@ -5232,7 +5232,8 @@ skip:
     return true;
 }
 
-/* LPS misalignment page [0x15,0x3]  introduced: SBC-4 rev 10 */
+/* LPS misalignment page [0x15,0x3]  introduced: SBC-4 rev 10
+   LPS: "Long Physical Sector" a term from an ATA feature set */
 static bool
 show_lps_misalignment_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
