@@ -104,7 +104,7 @@ struct sg_nvme_passthru_cmd
         uint32_t cdw15;
 #ifdef SG_LIB_LINUX
         uint32_t timeout_ms;
-        uint32_t result;	/* Dword(0) of completion queue entry */
+        uint32_t result;        /* DWord(0) of completion queue entry */
 #endif
 }
 #ifdef SG_LIB_FREEBSD
@@ -116,66 +116,38 @@ __packed;
 
 /* Using byte offsets and unaligned be/le copies safer than packed
  * structures. These are for sg_nvme_passthru_cmd . */
-#define SG_NVME_PT_OPCODE 0
-#define SG_NVME_PT_FLAGS 1
-#define SG_NVME_PT_RSVD1 2
-#define SG_NVME_PT_NSID 4
-#define SG_NVME_PT_CDW2 8
-#define SG_NVME_PT_CDW3 12
-#define SG_NVME_PT_METADATA 16
-#define SG_NVME_PT_ADDR 24
-#define SG_NVME_PT_METADATA_LEN 32
-#define SG_NVME_PT_DATA_LEN 36
-#define SG_NVME_PT_CDW10 40
-#define SG_NVME_PT_CDW11 44
-#define SG_NVME_PT_CDW12 48
-#define SG_NVME_PT_CDW13 52
-#define SG_NVME_PT_CDW14 56
-#define SG_NVME_PT_CDW15 60
+#define SG_NVME_PT_OPCODE 0		/* length: 1 byte */
+#define SG_NVME_PT_FLAGS 1		/* length: 1 byte */
+#define SG_NVME_PT_RSVD1 2		/* length: 2 bytes */
+#define SG_NVME_PT_NSID 4		/* length: 4 bytes */
+#define SG_NVME_PT_CDW2 8		/* length: 4 bytes */
+#define SG_NVME_PT_CDW3 12		/* length: 4 bytes */
+#define SG_NVME_PT_METADATA 16		/* length: 8 bytes */
+#define SG_NVME_PT_ADDR 24		/* length: 8 bytes */
+#define SG_NVME_PT_METADATA_LEN 32	/* length: 4 bytes */
+#define SG_NVME_PT_DATA_LEN 36		/* length: 4 bytes */
+#define SG_NVME_PT_CDW10 40		/* length: 4 bytes */
+#define SG_NVME_PT_CDW11 44		/* length: 4 bytes */
+#define SG_NVME_PT_CDW12 48		/* length: 4 bytes */
+#define SG_NVME_PT_CDW13 52		/* length: 4 bytes */
+#define SG_NVME_PT_CDW14 56		/* length: 4 bytes */
+#define SG_NVME_PT_CDW15 60		/* length: 4 bytes */
 
 #ifdef SG_LIB_LINUX
 /* General references state that "all NVMe commands are 64 bytes long". If
  * so then the following are add-ons by Linux, go to the OS and not the
- * the NVMe device. And Linux doesn't seem to use the TIMEOUT_MS field on
- * output to yield the "time taken" by the command. */
-#define SG_NVME_PT_TIMEOUT_MS 64
-#define SG_NVME_PT_RESULT 68
+ * the NVMe device. */
+#define SG_NVME_PT_TIMEOUT_MS 64	/* length: 4 bytes */
+#define SG_NVME_PT_RESULT 68		/* length: 4 bytes */
 #endif
-
-
-#ifdef __GNUC__
-#ifndef __clang__
-  struct __attribute__((__packed__)) sg_nvme_passthru_result
-#else
-  struct sg_nvme_passthru_result
-#endif
-#else
-struct sg_nvme_passthru_result
-#endif
-{
-	uint8_t status;
-	uint16_t transferred;
-	uint8_t reserved;
-}
-#ifdef SG_LIB_FREEBSD
-__packed;
-#else
-;
-#endif
-
-/* Using byte offsets and unaligned be/le copies safer than packed
- * structures. These are for sg_nvme_passthru_result . */
-#define SG_NVME_PT_RES_STATUS 0
-#define SG_NVME_PT_RES_TRANSFERRED 1
-#define SG_NVME_PT_RES_RESERVED 3
 
 
 /* Valid namespace IDs (nsid_s) range from 1 to 0xfffffffe, leaving: */
-#define SG_NVME_BROADCAST_NSID 0xffffffff
+#define SG_NVME_BROADCAST_NSID 0xffffffff	/* all namespaces */
 #define SG_NVME_CTL_NSID 0x0            /* the "controller's" namespace */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif		/* SG_PT_NVME_H */

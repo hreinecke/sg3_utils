@@ -97,7 +97,7 @@ static inline uint64_t sg_get_unaligned_be64(const void *p)
 
 /* Returns 0 if 'num_bytes' is less than or equal to 0 or greater than
  * 8 (i.e. sizeof(uint64_t)). Else returns result in uint64_t which is
- * an 8 bytes unsigned integer. */
+ * an 8 byte unsigned integer. */
 static inline uint64_t sg_get_unaligned_be(int num_bytes, const void *p)
 {
         if ((num_bytes <= 0) || (num_bytes > (int)sizeof(uint64_t)))
@@ -239,7 +239,7 @@ static inline uint64_t sg_get_unaligned_le64(const void *p)
 
 /* Returns 0 if 'num_bytes' is less than or equal to 0 or greater than
  * 8 (i.e. sizeof(uint64_t)). Else returns result in uint64_t which is
- * an 8 bytes unsigned integer. */
+ * an 8 byte unsigned integer. */
 static inline uint64_t sg_get_unaligned_le(int num_bytes, const void *p)
 {
         if ((num_bytes <= 0) || (num_bytes > (int)sizeof(uint64_t)))

@@ -353,6 +353,42 @@ sg_get_sense_info_fld(const unsigned char * sbp, int sb_len,
     }
 }
 
+/* Returns true if fixed format or command specific information descriptor
+ * is found in the descriptor sense; else false. If available the command
+ * specific information field (4 byte integer in fixed format, 8 byte
+ * integer in descriptor format) is written out via 'cmd_spec_outp'.
+ * Handles both fixed and descriptor sense formats. */
+bool
+sg_get_sense_cmd_spec_fld(const unsigned char * sbp, int sb_len,
+                          uint64_t * cmd_spec_outp)
+{
+    const unsigned char * bp;
+
+    if (cmd_spec_outp)
+        *cmd_spec_outp = 0;
+    if (sb_len < 7)
+        return false;
+    switch (sbp[0] & 0x7f) {
+    case 0x70:
+    case 0x71:
+        if (cmd_spec_outp)
+            *cmd_spec_outp = sg_get_unaligned_be32(sbp + 8);
+        return true;
+    case 0x72:
+    case 0x73:
+        bp = sg_scsi_sense_desc_find(sbp, sb_len,
+                                     1 /* command specific info desc */);
+        if (bp && (0xa == bp[1])) {
+            if (cmd_spec_outp)
+                *cmd_spec_outp = sg_get_unaligned_be64(bp + 4);
+            return true;
+        } else
+            return false;
+    default:
+        return false;
+    }
+}
+
 /* Returns true if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
  * In descriptor format if the stream commands descriptor not found
  * then returns false. Writes true or false corresponding to these bits to
@@ -2342,6 +2378,153 @@ sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len, char * buff,
     return buff;
 }
 
+/* This is a heuristic that takes into account the command bytes and length
+ * to decide whether the presented unstructured sequence of bytes could be
+ * a SCSI command. If so it returns true otherwise false. Vendor specific
+ * SCSI commands (i.e. opcodes from 0xc0 to 0xff), if presented, are assumed
+ * to follow SCSI conventions (i.e. length of 6, 10, 12 or 16 bytes). The
+ * only SCSI commands considered above 16 bytes of length are the Variable
+ * Length Commands (opcode 0x7f) and the XCDB wrapped commands (opcode 0x7e).
+ * Both have an inbuilt length field which can be cross checked with clen.
+ * No NVMe commands (64 bytes long plus some extra added by some OSes) have
+ * opcodes 0x7e or 0x7f yet. ATA is register based but SATA has FIS
+ * structures that are sent across the wire. The FIS register structure is
+ * used to move a command from a SATA host to device, but the ATA 'command'
+ * is not the first byte. So it is harder to say what will happen if a
+ * FIS structure is presented as a SCSI command, hopfully there is a low
+ * probability this function will yield true in that case. */
+bool
+sg_is_scsi_cdb(const uint8_t * cdbp, int clen)
+{
+    int ilen, sa;
+    uint8_t opcode;
+    uint8_t top3bits;
+
+    if (clen < 6)
+        return false;
+    opcode = cdbp[0];
+    top3bits = opcode >> 5;
+    if (0x3 == top3bits) {
+        if ((clen < 12) || (clen % 4))
+            return false;       /* must be modulo 4 and 12 or more bytes */
+        switch (opcode) {
+        case 0x7e:      /* Extended cdb (XCDB) */
+            ilen = 4 + sg_get_unaligned_be16(cdbp + 2);
+            return (ilen == clen);
+        case 0x7f:      /* Variable Length cdb */
+            ilen = 8 + cdbp[7];
+            sa = sg_get_unaligned_be16(cdbp + 8);
+            /* service action (sa) 0x0 is reserved */
+            return ((ilen == clen) && sa);
+        default:
+            return false;
+        }
+    } else if (clen <= 16) {
+        switch (clen) {
+        case 6:
+            if (top3bits > 0x5)         /* vendor */
+                return true;
+            return (0x0 == top3bits);   /* 6 byte cdb */
+        case 10:
+            if (top3bits > 0x5)         /* vendor */
+                return true;
+            return ((0x1 == top3bits) || (0x2 == top3bits)); /* 10 byte cdb */
+        case 16:
+            if (top3bits > 0x5)         /* vendor */
+                return true;
+            return (0x4 == top3bits);   /* 16 byte cdb */
+        case 12:
+            if (top3bits > 0x5)         /* vendor */
+                return true;
+            return (0x5 == top3bits);   /* 12 byte cdb */
+        default:
+            return false;
+        }
+    }
+    /* NVMe probably falls out here, clen > 16 and (opcode < 0x60 or
+     * opcode > 0x7f). */
+    return false;
+}
+
+/* Yield string associated with NVMe command status value in sct_sc. It
+ * expects to decode DW3 bits 27:17 from the completion queue. Bits 27:25
+ * are the Status Code Type (SCT) and bits 24:17 are the Status Code (SC).
+ * Bit 17 in DW3 should be bit 0 in sct_sc. If no status string is found
+ * a string of the form "Reserved [0x<sct_sc_in_hex>]" is generated.
+ * Returns 'buff'. Does nothing if buff_len<=0 or if buff is NULL.*/
+char *
+sg_get_nvme_cmd_status_str(uint16_t sct_sc, int b_len, char * b)
+{
+    int k;
+    uint16_t s = 0x3ff & sct_sc;
+    const struct sg_lib_value_name_t * vp = sg_lib_nvme_cmd_status_arr;
+
+    if ((b_len <= 0) || (NULL == b))
+        return b;
+    else if (1 == b_len) {
+        b[0] = '\0';
+        return b;
+    }
+    for (k = 0; (vp->name && (k < 1000)); ++k, ++vp) {
+        if (s == (uint16_t)vp->value) {
+            strncpy(b, vp->name, b_len);
+            b[b_len - 1] = '\0';
+            return b;
+        }
+    }
+    if (k >= 1000)
+        pr2ws("%s: where is sentinel for sg_lib_nvme_cmd_status_arr ??\n",
+                        __func__);
+    snprintf(b, b_len, "Reserved [0x%x]", sct_sc);
+    return b;
+}
+
+/* Attempts to map NVMe status value (SCT and SC) to SCSI status, sense_key,
+ * asc and ascq tuple. If successful returns true and writes to non-NULL
+ * pointer arguments; otherwise returns false. */
+bool
+sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
+                    uint8_t * asc_p, uint8_t * ascq_p)
+{
+    int k, ind;
+    uint16_t s = 0x3ff & sct_sc;
+    struct sg_lib_value_name_t * vp = sg_lib_nvme_cmd_status_arr;
+    struct sg_lib_4tuple_u8 * mp = sg_lib_scsi_status_sense_arr;
+
+    for (k = 0; (vp->name && (k < 1000)); ++k, ++vp) {
+        if (s == (uint16_t)vp->value)
+            break;
+    }
+    if (k >= 1000) {
+        pr2ws("%s: where is sentinel for sg_lib_nvme_cmd_status_arr ??\n",
+              __func__);
+        return false;
+    }
+    if (NULL == vp->name)
+        return false;
+    ind = vp->peri_dev_type;
+
+
+    for (k = 0; (0xff != mp->t2) && k < 1000; ++k, ++mp)
+        ;       /* count entries for valid index range */
+    if (k >= 1000) {
+        pr2ws("%s: where is sentinel for sg_lib_scsi_status_sense_arr ??\n",
+              __func__);
+        return false;
+    } else if (ind >= k)
+        return false;
+    mp = sg_lib_scsi_status_sense_arr + ind;
+    if (status_p)
+        *status_p = mp->t1;
+    if (sk_p)
+        *sk_p = mp->t2;
+    if (asc_p)
+        *asc_p = mp->t3;
+    if (ascq_p)
+        *ascq_p = mp->t4;
+    return true;
+}
+
 /* safe_strerror() contributed by Clayton Weaver <cgweav at email dot com>
  * Allows for situation in which strerror() is given a wild value (or the
  * C library is incomplete) and returns NULL. Still not thread safe.
@@ -2586,7 +2769,8 @@ sg_is_big_endian()
                                     the most significant byte */
 }
 
-bool sg_all_zeros(const uint8_t * bp, int b_len)
+bool
+sg_all_zeros(const uint8_t * bp, int b_len)
 {
     if ((NULL == bp) || (b_len <= 0))
         return false;
@@ -2597,7 +2781,8 @@ bool sg_all_zeros(const uint8_t * bp, int b_len)
     return true;
 }
 
-bool sg_all_ffs(const uint8_t * bp, int b_len)
+bool
+sg_all_ffs(const uint8_t * bp, int b_len)
 {
     if ((NULL == bp) || (b_len <= 0))
         return false;

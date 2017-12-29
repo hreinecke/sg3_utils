@@ -1,4 +1,4 @@
-.TH SG_SES "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SES "8" "December 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -142,7 +142,7 @@ index field is 1 (in other words a heuristic to guess whether the EIIOE field
 should be set to 1 or 0).
 .br
 If the enclosure sets the actual EIIOE field to 1 or more then this option has
-no effect. It is recommended that HP JBOD users set --eiioe=auto .
+no effect. It is recommended that HP JBOD users set \-\-eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 enumerate all known page names and SES elements when this option is given
@@ -347,6 +347,10 @@ Enclosure Status page has only one "overall" element corresponding to that
 type header. The Element Descriptor page and the Threshold (In and Out)
 pages follow the same pattern as the Enclosure Status page.
 .PP
+The numeric index corresponding to the overall element is "\-1". If the
+Configuration page indicates a particular element type has "n" elements
+and n is greater than 0 then its indexes range from 0 to n-\1 . 
+.PP
 The Additional Element Status page is a bit more complicated. It has
 entries for "Number of possible elements" of certain Element types. It
 does not have entries corresponding to the "overall" elements. To make
@@ -377,7 +381,7 @@ individual index then the option is equivalent to \fI\-\-index=0,II\fR. When
 .PP
 Wherever an individual index is applicable, it can be replaced by an
 individual index range. It has the form: <first_ii>-<last_ii>. For
-example: '3-5' will select individial indexes 3, 4 and 5 .
+example: '3\-5' will select individial indexes 3, 4 and 5 .
 .PP
 To cope with vendor specific Element types (which should be in the range 128
 to 255) the Element type can be given as a number with a leading underscore.

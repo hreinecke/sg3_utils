@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_INQ "8" "December 2017" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -6,15 +6,15 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
 [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-len=LEN\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-len=LEN\fR]  [\fI\-\-long\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
 [\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR]
 [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-l=LEN\fR]
-[\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR] [\fI\-p=VPD_PG\fR]
+[\fI\-L\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR] [\fI\-p=VPD_PG\fR]
 [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -47,6 +47,13 @@ tried. If it succeeds then device identification strings are output. The
 \fI\-\-raw\fR and \fI\-\-hex\fR options can be used to manipulate the output.
 If the \fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
 and the \fIDEVICE\fR is assumed to be ATA (or ATAPI).
+.PP
+In some operating systems a NVMe device (e.g. SSD) may be given as the
+\fIDEVICE\fR. An Identify command is sent to the controller followed
+by an namespace if \fIDEVICE\fR is associated with a namespace. If not,
+for example if \fIDEVICE\fR corresponds to a controller, then an Identify
+is sent to the controller and then an Identify coomand is sent to all
+attached namespaces.
 .PP
 The reference document used for interpreting an INQUIRY is T10/BSR INCITS
 502 Revision 07 which is draft SPC\-5 revision 07, 26 November 2015). It can
@@ -163,6 +170,10 @@ is for 36 bytes and if necessary execute another INQUIRY if the "additional
 length" field in the response indicates that more than 36 bytes is available.
 If \fILEN\fR is greater than 0 then only one INQUIRY command is performed.
 See paragraph below about "36 byte INQUIRYs".
+.TP
+\fB\-L\fR, \fB\-\-long\fR
+this option causes more information to be decoded from the Identify command
+sent to a NVMe \fIDEVICE\fR.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 this option has the same action as the \fI\-\-len=LEN\fR option. It has
@@ -351,6 +362,12 @@ response in hex use '\-p=83 \-h'.
 .TP
 \fB\-I\fR=\fIFN\fR
 equivalent to \fI\-\-inhex=FN\fR in the OPTIONS section.
+.TP
+\fB\-l\fR=\fILEN\fR
+equivalent to \fI\-\-len=LEN\fR in the OPTIONS section.
+.TP
+\fB\-L\fR
+equivalent to \fI\-\-long\fR in the OPTIONS section.
 .TP
 \fB\-m\fR
 decodes the Management network addresses VPD page [0x85]. Equivalent

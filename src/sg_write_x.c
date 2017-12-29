@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.08 20171218";
+static const char * version_str = "1.09 20171222";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -193,6 +193,7 @@ struct opts_t {
     char cdb_name[24];          /* e.g. 'Write atomic(16)' */
 };
 
+static const char * xx_wr_fname = "sg_write_x.bin";
 static const uint32_t lbard_sz = 32;
 static const char * lbard_str = "LBA range descriptor";
 
@@ -480,7 +481,6 @@ bin_read(int fd, uint8_t * up, uint32_t len, const char * fname)
 {
     int res, err;
 
-pr2serr("%s: len=%u, fname: %s\n", __func__, len, fname);
     res = read(fd, up, len);
     if (res < 0) {
         err = errno;
@@ -808,7 +808,6 @@ build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
     FILE * fp = NULL;
     char line[1024];
 
-pr2serr("%s: max_list_blen=%u, have t10_scat_list_out pointer=%u\n", __func__, max_list_blen, (t10_scat_list_out ? 1 : 0));
     if (up) {
         if (max_list_blen < 64) {
             pr2serr("%s: t10_scat_list_out is too short\n", __func__);
@@ -922,7 +921,6 @@ pr2serr("%s: max_list_blen=%u, have t10_scat_list_out pointer=%u\n", __func__, m
     }
 fini:
     *num_scat_elems = (n / lbard_sz) - 1;
-pr2serr("%s: num_scat_elems=%u\n", __func__, *num_scat_elems);
     if (fp && (stdin != fp))
         fclose(fp);
     return 0;
@@ -970,7 +968,6 @@ check_lbrds(const uint8_t * up, uint32_t max_lbrds_blen,
     const int max_lbrd_start = max_lbrds_blen - lbard_sz;
     int vb = op->verbose;
 
-pr2serr("%s: max_lbrds_blen=%u\n", __func__, max_lbrds_blen);
     if (op->strict) {
         if (max_lbrds_blen < lbard_sz) {
             pr2serr("%s: %ss too short (%d < 32)\n", __func__, lbard_str,
@@ -1256,9 +1253,12 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
                         sg_get_unaligned_be32(up + 12),
                         sg_get_unaligned_be16(up + 16),
                         sg_get_unaligned_be16(up + 18));
-            if ((uint32_t)(((k + 2) * lbard_sz) + 20) > sod_off)
+            if ((uint32_t)(((k + 2) * lbard_sz) + 20) > sod_off) {
                 pr2serr("Warning: possible clash of descriptor %u with "
                         "data_to_write\n", k);
+                if (op->strict > 1)
+                    return SG_LIB_FILE_ERROR;
+            }
         }
     }
     if ((vb > 3) && (dout_len > 0)) {
@@ -1279,22 +1279,25 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
                     op->cdb_name);
         if (op->dry_run > 1) {
             int w_fd;
-            const char * w_fname = "sg_write_x.bin";
 
-            w_fd = open(w_fname, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            w_fd = open(xx_wr_fname, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (w_fd < 0) {
-                perror(w_fname);
+                perror(xx_wr_fname);
                 return SG_LIB_FILE_ERROR;
             }
             res = write(w_fd, dataoutp, dout_len);
             if (res < 0) {
-                perror(w_fname);
+                perror(xx_wr_fname);
                 close(w_fd);
                 return SG_LIB_FILE_ERROR;
             }
-            if (vb)
-                pr2serr("Wrote data-out buffer to %s\n", w_fname);
             close(w_fd);
+            printf("Wrote %u bytes to %s", dout_len, xx_wr_fname);
+            if (op->do_scattered)
+                printf(", LB data offset: %u\nNumber of %ss: %u\n",
+                       op->scat_lbdof, lbard_str, op->scat_num_lbard);
+            else
+                printf("\n");
         }
         return 0;
     }
@@ -1307,8 +1310,8 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (dout_len > 0)
         set_scsi_pt_data_out(ptvp, (uint8_t *)dataoutp, dout_len);
-    else if (vb)
-        pr2serr("%s thinks dout_len==0, so empty dout buffer\n",
+    else if (vb && (! op->ndob))
+        pr2serr("%s:  dout_len==0, so empty dout buffer\n",
                 op->cdb_name);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, vb);
     ret = sg_cmds_process_resp(ptvp, op->cdb_name, res, SG_NO_DATA_IN,
@@ -1335,8 +1338,18 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
                         if (0 == ull)
                             pr2serr("%s=<not reported>\n", lbard_str);
                         else
-                            pr2serr("%s=%" PRIu64 "] (origin 0)\n", lbard_str,
+                            pr2serr("%s=%" PRIu64 " (origin 0)\n", lbard_str,
                                     ull - 1);
+                        if (sg_get_sense_cmd_spec_fld(sense_b, slen, &ull)) {
+                            if (0 == ull)
+                                pr2serr("  Number of successfully written "
+                                        "%ss is 0 or not reported\n",
+                                        lbard_str);
+                            else
+                                pr2serr("  Number of successfully written "
+                                        "%ss is %u\n", lbard_str,
+                                        (uint32_t)ull);
+                        }
                     } else
                         pr2serr("lba=%" PRIu64 " [0x%" PRIx64 "]\n", ull,
                                 ull);
@@ -1829,7 +1842,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             bool rd_gt = (op->scat_num_lbard > num_lbard);
 
             if (rd_gt || op->strict || vb) {
-                pr2serr("RD (%u) %s number of %ss (%u) found in SF\n",
+                pr2serr("RD (%u) %s number of %ss (%u) found in IF\n",
                         op->scat_num_lbard, (rd_gt ? ">" : "<"), lbard_str,
                         num_lbard);
                 if (rd_gt)
@@ -1839,15 +1852,48 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             }
             num_lbard = op->scat_num_lbard;
             sum_num = sum_num_lbards(up, op->scat_num_lbard);
-        }
+        } else
+            op->scat_num_lbard = num_lbard;
         dd = lbard_sz * (num_lbard + 1);
         if (0 != (dd % op->bs_pi_do))
             dd = ((dd / op->bs_pi_do) + 1) * op->bs_pi_do; /* round up */
+        nn = op->scat_lbdof * op->bs_pi_do;
+        if (dd != nn) {
+            bool dd_gt = (dd > nn);
+
+            if (dd_gt) {
+                pr2serr("%s: Cannot fit %ss (%u) in given LB data offset "
+                        "(%u)\n", __func__, lbard_str, num_lbard,
+                        op->scat_lbdof);
+                goto file_err_outt;
+            }
+            if (vb || op->strict)
+                pr2serr("%s: empty blocks before LB data offset (%u), could "
+                        "be okay\n", __func__, op->scat_lbdof);
+            if (op->strict) {
+                pr2serr("Exiting due to --strict; perhaps try again with "
+                        "--combined=%u\n", dd / op->bs_pi_do);
+                goto file_err_outt;
+            }
+            dd = nn;
+        }
         dd += (sum_num * op->bs_pi_do);
         if (dd > d) {
             uint8_t * u2p;
             uint8_t * free_u2p;
 
+            if (dd != if_len) {
+                bool dd_gt = (dd > if_len);
+
+                if (dd_gt || op->strict || vb) {
+                    pr2serr("Calculated dout length (%u) %s bytes available "
+                            "in IF (%u)\n", dd, (dd_gt ? ">" : "<"), if_len);
+                    if (dd_gt)
+                        goto file_err_outt;
+                    else if (op->strict)
+                        goto file_err_outt;
+                }
+            }
             u2p = (uint8_t *)sg_memalign(dd, sg_get_page_size(), &free_u2p,
                                          vb > 4);
             if (NULL == u2p) {
@@ -1941,7 +1987,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             }
         }
         ret = bin_read(infd, up + (op->scat_lbdof * op->bs_pi_do), d,
-                       "IF");
+                       "IF 3");
         if (ret)
             goto finii;
         do_len = ((op->scat_lbdof + sum_num) * op->bs_pi_do);
@@ -2019,13 +2065,19 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             } else
                 pr2serr("continuing ...\n");
         }
-        ret = bin_read(infd, up + d, (if_len_gt ? nn - d : if_len), "IF");
+        ret = bin_read(infd, up + d, (if_len_gt ? nn - d : if_len), "IF 4");
         if (ret)
             goto finii;
         do_len = (num_lbard + sum_num) * op->bs_pi_do;
         op->numblocks = sum_num;
         op->xfer_bytes = sum_num * op->bs_pi_do;
     } else if (addr_arr_len > 0) {  /* build RDs for --lba= --num= */
+        if ((op->scat_num_lbard > 0) && (op->scat_num_lbard > addr_arr_len)) {
+            pr2serr("%s: number given to --scattered= (%u) exceeds number of "
+                    "--lba= elements (%u)\n", __func__, op->scat_num_lbard,
+                    addr_arr_len);
+            return SG_LIB_SYNTAX_ERROR;
+        }
         d = lbard_sz * (num_lbard + 1);
         op->scat_lbdof = d / op->bs_pi_do;
         if (0 != (d % op->bs_pi_do))  /* if not multiple, round up */
@@ -2098,11 +2150,13 @@ main(int argc, char * argv[])
     uint32_t nn, addr_arr_len, num_arr_len;     /* --lba= */
     uint32_t do_len = 0;
     uint16_t num_lbard = 0;
-    uint32_t if_len = 0;
+    uint32_t if_len = 0;    /* after accounting for OFF,DLEN and moving file
+                             * file pointer to OFF, is bytes available in IF */
     uint32_t sf_len = 0;
     uint32_t sum_num = 0;
     ssize_t res;
-    off_t if_readable_len = 0;
+    off_t if_readable_len = 0;  /* similar to if_len but doesn't take DLEN
+                                 * into account */
     struct opts_t * op;
     const char * lba_op = NULL;
     const char * num_op = NULL;
@@ -2155,10 +2209,16 @@ main(int argc, char * argv[])
                 "--normal, --or,\n--same=, --scattered= or --stream=\n") ;
         return SG_LIB_SYNTAX_ERROR;
     } else if (n < 1) {
-        op->do_write_normal = true;
-        op->cmd_name = "Write";
-        if (vb)
-            pr2serr("No command selected so choose 'normal' WRITE\n");
+        if (op->strict) {
+            pr2serr("With --strict won't default to a normal WRITE, add "
+                    "--normal\n");
+            return SG_LIB_SYNTAX_ERROR;
+        } else {
+            op->do_write_normal = true;
+            op->cmd_name = "Write";
+            if (vb)
+                pr2serr("No command selected so choose 'normal' WRITE\n");
+        }
     }
     snprintf(op->cdb_name, sizeof(op->cdb_name), "%s(%d)", op->cmd_name,
              (op->do_16 ? 16 : 32));
@@ -2491,17 +2551,21 @@ main(int argc, char * argv[])
         op->xfer_bytes = op->numblocks * op->bs_pi_do;
     do_len = op->xfer_bytes;
 
-    /* fill allocated buffer with zeros */
-    up = (uint8_t *)sg_memalign(do_len, sg_get_page_size(), &free_up,
-                                vb > 4);
-    if (NULL == up) {
-        pr2serr("unable to allocate %u bytes of memory\n", do_len);
-        ret = SG_LIB_OS_BASE_ERR + ENOMEM;
-        goto err_out;
-    }
-    ret = bin_read(infd, up, ((if_len < do_len) ? if_len : do_len), "IF");
-    if (ret)
-        goto fini;
+    if (do_len > 0) {
+        /* fill allocated buffer with zeros */
+        up = (uint8_t *)sg_memalign(do_len, sg_get_page_size(), &free_up,
+                                    vb > 4);
+        if (NULL == up) {
+            pr2serr("unable to allocate %u bytes of memory\n", do_len);
+            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+            goto err_out;
+        }
+        ret = bin_read(infd, up, ((if_len < do_len) ? if_len : do_len),
+                       "IF 5");
+        if (ret)
+            goto fini;
+    } else
+        up = NULL;
 
     ret = do_write_x(sg_fd, up, do_len, op);
     if (ret) {

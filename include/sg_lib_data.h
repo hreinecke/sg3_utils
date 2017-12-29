@@ -67,6 +67,14 @@ struct sg_lib_asc_ascq_range_t {
     const char * text;
 };
 
+/* First use: SCSI status, sense_key, asc, ascq tuple */
+struct sg_lib_4tuple_u8 {
+    uint8_t t1;
+    uint8_t t2;
+    uint8_t t3;
+    uint8_t t4;
+};
+
 
 extern const char * sg_lib_version_str;
 
@@ -98,6 +106,8 @@ extern const char * sg_lib_pdt_strs[];
 extern const char * sg_lib_transport_proto_strs[];
 extern int sg_lib_pdt_decay_arr[];
 
+extern struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[];
+extern struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[];
 
 #ifdef __cplusplus
 }

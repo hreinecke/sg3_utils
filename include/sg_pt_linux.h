@@ -154,6 +154,13 @@ extern long sg_lin_page_size;
 void sg_find_bsg_nvme_char_major(int verbose);
 int sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb);
 
+/* This trims given NVMe block device name in Linux (e.g. /dev/nvme0n1p5)
+ * to the name of its associated char device (e.g. /dev/nvme0). If this
+ * occurs true is returned and the char device name is placed in 'b' (as
+ * long as b_len is sufficient). Otherwise false is returned. */
+bool sg_get_nvme_char_devname(const char * nvme_block_devname, uint32_t b_len,
+                              char * b);
+
 
 #ifdef __cplusplus
 }

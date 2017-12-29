@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.58 20171209";
+static const char * version_str = "5.59 20171222";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -271,6 +271,14 @@ install_handler(int sig_num, void (*sig_handler) (int sig))
         sigaction (sig_num, &sigact, NULL);
     }
 }
+
+#ifdef SG_LIB_ANDROID
+static void
+thread_exit_handler(int sig)
+{
+    pthread_exit(0);
+}
+#endif
 
 /* Make safe_strerror() thread safe */
 static char *
@@ -1147,7 +1155,15 @@ main(int argc, char * argv[])
     int in_sect_sz, out_sect_sz, status, n, flags;
     void * vp;
     char ebuff[EBUFF_SZ];
+#if SG_LIB_ANDROID
+    struct sigaction actions;
 
+    memset(&actions, 0, sizeof(actions));
+    sigemptyset(&actions.sa_mask);
+    actions.sa_flags = 0;
+    actions.sa_handler = thread_exit_handler;
+    sigaction(SIGUSR1, &actions, NULL);
+#endif
     memset(&rcoll, 0, sizeof(Rq_coll));
     rcoll.bpt = DEF_BLOCKS_PER_TRANSFER;
     rcoll.in_type = FT_OTHER;
@@ -1629,7 +1645,13 @@ main(int argc, char * argv[])
         }
     }
 
+#if SG_LIB_ANDROID
+    /* Android doesn't have pthread_cancel() so use pthread_kill() instead.
+     * Also there is no need to link with -lpthread in Android */
+    status = pthread_kill(sig_listen_thread_id, SIGUSR1);
+#else
     status = pthread_cancel(sig_listen_thread_id);
+#endif
     if (0 != status) err_exit(status, "pthread_cancel");
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);

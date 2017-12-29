@@ -428,8 +428,8 @@ The SBC\-2 standard states that the block count can be set back to the
 manufacturer's maximum recommended value in a format or resize operation.
 This can be done by placing an address of 0xffffffff (or the 64 bit
 equivalent) in the appropriate block descriptor field to a MODE SELECT
-command. In signed (two's complement) arithmetic that value corresponds to
-'\-1'. So a \fI\-\-count=\fR\-1 causes the block count to be set back to
+command. In signed (two's complement) arithmetic that value corresponds
+to '\-1'. So a \-\-count=\-1 causes the block count to be set back to
 the manufacturer's maximum recommended value. To see exactly which SCSI
 commands are being executed and parameters passed add the "\-vvv" option to
 the sg_format command line.

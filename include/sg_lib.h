@@ -206,6 +206,14 @@ char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff);
 bool sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
                            uint64_t * info_outp);
 
+/* Returns true if fixed format or command specific information descriptor
+ * is found in the descriptor sense; else false. If available the command
+ * specific information field (4 byte integer in fixed format, 8 byte
+ * integer in descriptor format) is written out via 'cmd_spec_outp'.
+ * Handles both fixed and descriptor sense formats. */
+bool sg_get_sense_cmd_spec_fld(const unsigned char * sensep, int sb_len,
+                               uint64_t * cmd_spec_outp);
+
 /* Returns true if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
  * In descriptor format if the stream commands descriptor not found
  * then returns false. Writes true or false corresponding to these bits to
@@ -301,6 +309,37 @@ const char * sg_get_desig_assoc_str(int val);
  */
 const char * sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len,
                             char * buff, bool * foundp, int verbose);
+
+/* This is a heuristic that takes into account the command bytes and length
+ * to decide whether the presented unstructured sequence of bytes could be
+ * a SCSI command. If so it returns true otherwise false. Vendor specific
+ * SCSI commands (i.e. opcodes from 0xc0 to 0xff), if presented, are assumed
+ * to follow SCSI conventions (i.e. length of 6, 10, 12 or 16 bytes). The
+ * only SCSI commands considered above 16 bytes of length are the Variable
+ * Length Commands (opcode 0x7f) and the XCDB wrapped commands (opcode 0x7e).
+ * Both have an inbuilt length field which can be cross checked with clen.
+ * No NVMe commands (64 bytes long plus some extra added by some OSes) have
+ * opcodes 0x7e or 0x7f yet. ATA is register based but SATA has FIS
+ * structures that are sent across the wire. The 'FIS register' structure is
+ * used to move a command from a SATA host to device, but the ATA 'command'
+ * is not the first byte. So it is harder to say what will happen if a
+ * FIS structure is presented as a SCSI command, hopfully there is a low
+ * probability this function will yield true in that case. */
+bool sg_is_scsi_cdb(const uint8_t * cdbp, int clen);
+
+/* Yield string associated with NVMe command status value in sct_sc. It
+ * expects to decode DW3 bits 27:17 from the completion queue. Bits 27:25
+ * are the Status Code Type (SCT) and bits 24:17 are the Status Code (SC).
+ * Bit 17 in DW3 should be bit 0 in sct_sc. If no status string is found
+ * a string of the form "Reserved [0x<sct_sc_in_hex>]" is generated.
+ * Returns 'buff'. Does nothing if buff_len<=0 or if buff is NULL.*/
+char * sg_get_nvme_cmd_status_str(uint16_t sct_sc, int buff_len, char * buff);
+
+/* Attempts to map NVMe status value (SCT and SC) to SCSI status, sense_key,
+ * asc and ascq tuple. If successful returns true and writes to non-NULL
+ * pointer arguments; otherwise returns false. */
+bool sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
+                         uint8_t * asc_p, uint8_t * ascq_p);
 
 extern FILE * sg_warnings_strm;
 
@@ -539,4 +578,4 @@ int sg_set_binary_mode(int fd);
 }
 #endif
 
-#endif
+#endif          /* SG_LIB_H */

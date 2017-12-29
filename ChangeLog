@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171219] [svn: r737]
+Changelog for sg3_utils-1.43 [20171229] [svn: r738]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_x: where x can be normal, atomic, orwrite,
     same, scattered, or stream writes with 16 or 32 byte
@@ -23,6 +23,9 @@ Changelog for sg3_utils-1.43 [20171219] [svn: r737]
       sensor element type
     - interpret '--join --page=aes' to only display join
       rows that have a corresponding AES dpage element
+    - support NVMe attached enclosure via NVME-MI Send and
+      Receive SES commands
+    - decode array status diagnostic page (obsolete)
     - sync to ses4r01
   - sg_ses, sg_ses_microcode, sg_senddiag: make all access
     buffer page size aligned (typically page_size=4096)
@@ -62,6 +65,8 @@ Changelog for sg3_utils-1.43 [20171219] [svn: r737]
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility
   - sg_zone: fix debug cdb naming
+  - sgp_dd: if SG_LIB_ANDROID defined invoke
+    pthread_kill() rather than pthread_cancel() [Linux]
   - sg_opcode: add '--enumerate' and '--pdt=' options
     - support CDLP (command duration limit page)
     - check resid and trim response if necessary
@@ -94,6 +99,10 @@ Changelog for sg3_utils-1.43 [20171219] [svn: r737]
     - add sg_decode_transportid_str()
     - add sg_msense_calc_length()
     - add sg_all_zeros(), sg_all_ffs()
+    - add sg_get_sense_cmd_spec_fld()
+    - add sg_is_scsi_cdb()
+    - add sg_get_nvme_cmd_status_str()
+    - add sg_nvme_status2scsi()
     - add sg_memalign() and sg_get_page_size()
     - implement 'format' argument in dStrHexStr()
     - add read buffer(16) command mode names
@@ -103,7 +112,7 @@ Changelog for sg3_utils-1.43 [20171219] [svn: r737]
   - sg_pt: add construct_scsi_pt_obj_with_fd()
     - add pt_device_is_nvme(), get_pt_nvme_nsid()
     - add check_pt_file_handle()
-    - add get_pt_file_handle(), get_pt_file_handle()
+    - add get_pt_file_handle(), set_pt_file_handle()
   - sg_lib_data: sync asc/ascq codes with T10 20170114
     - add write scattered (16+32) cdb names sbc4r11
   - sg_cmds_extra: expand sg_ll_ata_pt() to send new
@@ -128,6 +137,9 @@ Changelog for sg3_utils-1.43 [20171219] [svn: r737]
     decision made at runtime
   - automake: add AM_PROG_AR to configure.ac
     - upgrade to version 1.15
+    - add SG_LIB_ANDROID build 'define'. If defined then
+      SG_LIB_LINUX is also defined, so test for Android
+      before Linux if need to differentiate
 
 Changelog for sg3_utils-1.42 [20160217] [svn: r663]
   - sg_timestamp: new, to report or set timestamp

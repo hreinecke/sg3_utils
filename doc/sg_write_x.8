@@ -231,12 +231,22 @@ commands supported by thus utility except WRITE SAME.
 \fB\-x\fR, \fB\-\-dry\-run\fR
 this option exits (with a status of 0) just before it would otherwise send
 the selected SCSI write command. It may still send a SCSI READ CAPACITY
-command (16 byte variant and perhaps 10 byte variant as well) and read
-the data in and process it if the \fI\-\-in=IF\fR and/or the
-\fI\-\-scat\-file=SF\fR options are given. All command line processing
-and sanity checks (e.g. if the \fI\-\-strict\fR option is given) will be
-performed and if there is an error then there will be a non zero exit
-status value.
+command (16 byte variant and perhaps 10 byte variant as well) so the
+\fIDEVICE\fR is still required. It reads the data in and processes it if the
+\fI\-\-in=IF\fR and/or the \fI\-\-scat\-file=SF\fR options are given. All
+command line processing and sanity checks (e.g. if the \fI\-\-strict\fR
+option is given) will be performed and if there is an error then there will
+be a non zero exit status value.
+.br
+If this option is given twice (e.g. \-xx) then instead of performing the
+selected write SCSI command, the data\-out buffer is written to a file
+called sg_write_x.bin . If it doesn't exist then that file is created in
+the current directory and is truncated if it previously did exist with
+longer contents. The data\-out buffer is written in binary with some
+information about it written to stdout. For writes other than scattered
+the filename and its length in bytes is output to stdout. For write
+scattered additionally its number of LBA range descriptors and its
+logical block data offset written to stdout.
 .TP
 \fB\-f\fR, \fB\-\-fua\fR
 if this option is given then the FUA (force unit access) bit field in the
@@ -491,7 +501,9 @@ The exit status of sg_write_x is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH EXAMPLES
 One simple usage is to write 4 blocks of zeros from (and including) a given
-LBA:
+LBA according to the rules of WRITE ATOMIC with an atomic boundary of 0.
+Since no cdb size option is given, the 16 byte cdb will be assumed (i.e.
+WRITE ATOMIC(16)):
 .PP
   sg_write_x \-\-atomic=0 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4 /dev/sdc
 .PP
@@ -507,8 +519,10 @@ LBA 0x1234 . Now to bypass the need for the READ CAPACITY command(s) the
   sg_write_x \-\-atomic=0 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234 \-\-num=4
 /dev/sdc
 .PP
-Both of the examples above issue a SCSI WRITE ATOMIC(16) command. To send the
-32 byte variant add \-\-32 as in:
+Since \-\-bs= is given and its value (512) is a power of 2, then the actual
+block size is also 512. If instead 520 was given then the logical block size
+would be 512 (the highest power of 2 less than 520) and the actual block size
+would be 520 bytes. To send the 32 byte variant add \-\-32 as in:
 .PP
   sg_write_x \-\-atomic=0 \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234
 \-\-num=4 /dev/sdc
@@ -518,11 +532,47 @@ To send a WRITE STREAM(32) with a STR_ID of 1 use the following:
   sg_write_x \-\-stream=1 \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234
 \-\-num=4 /dev/sdc
 .PP
+Next is a WRITE SCATTERED(16) command with the scatter list, split between
+the \-\-lba= and \-\-num= options, on the command line:
+.PP
+  sg_write_x  \-\-scattered=2 \-\-lba=2,0x33 \-\-num=4,1 -i /dev/zero /dev/sg1
+.PP
+Example of a WRITE SCATTERED(16) command with a degenerate LBA range
+descriptor (first element to \-\-lba= and \-\-num=):
+.PP
+  sg_write_x  \-\-scattered=2 \-\-lba=0,0x33 \-\-num=0,1 -i /dev/zero /dev/sg1
+.PP
 Example of a WRITE SCATTERED(16) command with the scatter list in
 scat_file.txt
-  sg_write_x  \-\-scattered=3 \-q scat_file.txt \-i /dev/zero /dev/sg
 .PP
-xxxxxx More examples ...
+  sg_write_x  \-\-scattered=3 \-q scat_file.txt \-i /dev/zero /dev/sg1
+.PP
+Next a WRITE SCATTERED(16) command with its scatter list and data in a
+single file. Note that the argument to \-\-scattered= is 0 so the number of
+LBA range descriptors is calculated by analyzing the first two blocks of
+scat_data.bin (because the argument to \-\-combined= is 2) :
+.PP
+  sg_write_x  \-\-scattered=0 \-\-combined=2 \-i scat_data.bin /dev/sg1
+.PP
+When the \-xx option is used, a WRITE SCATTERED command is not executed
+but instead the contents of the data\-out buffer are written to a file
+called sg_write_x.bin . In the case of WRITE SCATTERED that binary file
+is suitable for supplying to a later invocation to do the actual write
+to media. For example:
+.PP
+  sg_write_x  \-\-scattered=3 \-q scat_file.txt \-xx \-i /dev/zero /dev/sg1
+.br
+Wrote 8192 bytes to sg_write_x.bin, LB data offset: 1
+.br
+Number of LBA range descriptors: 3
+.br
+  sg_write_x  \-\-scattered=0 \-\-combined=1 \-i sg_write_x.bin /dev/sg1
+.PP
+Notice when the sg_write_x.bin is written (and nothing is written to the
+media), a summary of what has happened is sent to stdout. The value shown
+for "LB data offset:" (1) should be given to the \-\-combined= option
+when the write to media actually occurs (i.e. the second invocation shown
+directly above).
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
