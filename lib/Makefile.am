@@ -33,6 +33,10 @@ if OS_OSF
 libsgutils2_la_SOURCES += sg_pt_osf1.c
 endif
 
+if OS_HAIKU
+libsgutils2_la_SOURCES += sg_pt_haiku.c
+endif
+
 # For C++/clang testing
 ## CC = gcc
 ## CC = g++

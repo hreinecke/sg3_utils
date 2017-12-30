@@ -66,6 +66,10 @@ case "${host}" in
 		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
                 AC_SUBST([os_cflags], [''])
                 AC_SUBST([os_libs], ['']) ;;
+        *-*-haiku*)
+		AC_DEFINE_UNQUOTED(SG_LIB_HAIKU, 1, [sg3_utils on Haiku])
+                AC_SUBST([os_cflags], [''])
+                AC_SUBST([os_libs], ['']) ;;
         *)
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [assume sg3_utils on linux])
                 AC_SUBST([os_cflags], [''])
@@ -79,6 +83,7 @@ AM_CONDITIONAL(OS_OSF, [echo $host_os | grep '^osf' > /dev/null])
 AM_CONDITIONAL(OS_SOLARIS, [echo $host_os | grep '^solaris' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
+AM_CONDITIONAL(OS_HAIKU, [echo $host_os | grep '^haiku' > /dev/null])
 
 AC_ARG_ENABLE([linuxbsg],
   AC_HELP_STRING([--disable-linuxbsg], [ignore linux bsg (sgv4) if present]),
