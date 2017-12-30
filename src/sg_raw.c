@@ -32,22 +32,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.19 (2017-12-06)"
-
-#ifdef SG_LIB_WIN32
-#ifndef HAVE_SYSCONF
-#include <windows.h>
-
-static size_t
-win_pagesize(void)
-{
-    SYSTEM_INFO sys_info;
-
-    GetSystemInfo(&sys_info);
-    return sys_info.dwPageSize;
-}
-#endif
-#endif
+#define SG_RAW_VERSION "0.4.20 (2017-12-29)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6

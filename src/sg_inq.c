@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.79 20171227";    /* SPC-5 rev 17 */
+static const char * version_str = "1.80 20171229";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -4090,19 +4090,7 @@ err_out:
     free(free_id_dinp);
     return ret;
 }
-
-#else
-
-static int
-do_nvme_identify(int pt_fd, const struct opts_t * op)
-{
-    pr2serr("%s: not implemented, no <linux/nvme_ioctl.h>\n", __func__);
-    if (op->do_verbose)
-        pr2serr("Need to build on system with NVMe development headers "
-                "(pt_fd=%d)\n", pt_fd);
-    return 0;
-}
-#endif
+#endif          /* HAVE_NVME */
 
 
 int
@@ -4351,7 +4339,7 @@ main(int argc, char * argv[])
     n = check_pt_file_handle(sg_fd, op->device_name, op->do_verbose);
     if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
         ret = do_nvme_identify(sg_fd, op);
-        goto fini;
+        goto fini2;
     }
 #endif
 
@@ -4365,7 +4353,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_CAT_OTHER;
         } else
             ret = 0;
-        goto fini;
+        goto fini3;
     }
 #endif
 
@@ -4392,7 +4380,13 @@ main(int argc, char * argv[])
         }
     }
 
-fini:
+#ifdef HAVE_NVME
+fini2:
+#endif
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+fini3:
+#endif
+
 err_out:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {

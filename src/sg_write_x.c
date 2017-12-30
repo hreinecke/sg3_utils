@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.09 20171222";
+static const char * version_str = "1.10 20171229";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1506,7 +1506,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             break;
         case 'a':
             j = sg_get_num(optarg);
-            if ((j < 0) || (j > UINT16_MAX)) {
+            if ((j < 0) || (j > (int)UINT16_MAX)) {
                 pr2serr("bad argument to '--app-tag='. Expect 0 to 0xffff "
                         "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1515,7 +1515,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             break;
         case 'A':
             j = sg_get_num(optarg);
-            if ((j < 0) || (j > UINT16_MAX)) {
+            if ((j < 0) || (j > (int)UINT16_MAX)) {
                 pr2serr("bad argument to '--atomic='. Expect 0 to 0xffff "
                         "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1720,7 +1720,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             break;
         case 'S':
             j = sg_get_num(optarg);
-            if ((j < 0) || (j > UINT16_MAX)) {
+            if ((j < 0) || (j > (int)UINT16_MAX)) {
                 pr2serr("bad argument to '--scattered='. Expect 0 to 0xffff "
                         "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1731,7 +1731,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             break;
         case 't':               /* same as --tag-mask= */
             j = sg_get_num(optarg);
-            if ((j < 0) || (j > UINT16_MAX)) {
+            if ((j < 0) || (j > (int)UINT16_MAX)) {
                 pr2serr("bad argument to '--tag-mask='. Expect 0 to 0xffff "
                         "inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1740,7 +1740,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             break;
         case 'T':               /* WRITE STREAM */
             j = sg_get_num(optarg);
-            if ((j < 0) || (j > UINT16_MAX)) {
+            if ((j < 0) || (j > (int)UINT16_MAX)) {
                 pr2serr("bad argument to '--stream=', expect 0 to 65535\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
