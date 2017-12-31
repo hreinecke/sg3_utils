@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.57 20171112";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.58 20171229";    /* spc5r17 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -4904,9 +4904,13 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 printf("\n");
             }
             printf("    LBA (associated with medium error): 0x");
-            for (m = 0; m < 8; ++m)
-                printf("%02x", bp[16 + m]);
-            printf("\n");
+            if (sg_all_zeros(bp + 16, 8))
+                printf("0\n");
+            else {
+                for (m = 0; m < 8; ++m)
+                    printf("%02x", bp[16 + m]);
+                printf("\n");
+            }
             break;
         }
         if (op->do_pcb)
