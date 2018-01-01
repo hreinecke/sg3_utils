@@ -360,12 +360,6 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 {
     int fd;
 
-bool ok;
-char b[512];
-ok = sg_get_nvme_char_devname(device_name, sizeof(b), b);
-pr2ws("%s: sg_get_nvme_char_devname() --> ok=%s\n", __func__, ok ? "true" : "false");
-if (ok)
-pr2ws("\t trimmed devname: %s\n", b);
     if (! sg_bsg_nvme_char_major_checked) {
         sg_bsg_nvme_char_major_checked = true;
         sg_find_bsg_nvme_char_major(verbose);
