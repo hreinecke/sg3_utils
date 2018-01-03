@@ -8,6 +8,8 @@ Andries Brouwer <aebr at win dot tue dot nl> rewrite of isosize (original
 
 Bart Van Assche <bart dot vanassche at sandisk dot com>
         harden (improve) code in rescan-scsi-bus.sh [20160224]
+        configure.ac and Makefile.am cleanup plus sgp_dd code
+        to replace pthread_cancel with pthread_kill [20180102]
 
 Brian Bunker <Brian dot Bunker at netapp dot com> contributed
         sg_read_block_limits and the target reset addition to sg_reset
@@ -55,6 +57,7 @@ Hannes Reinecke <hare at suse dot de>
         rescan-scsi-bus.sh patches to Kurt Garloff's v1.57 [20130715]
         55-scsi-sg3_id.rules + 58-scsi-sg3_symlink.rules [20140527]
         sg_sat_read_gplog [20141107]
+        sg_inq --only option plus --inhex fixes [20180102]
 
 Hayashi Naoyuki <titan at culzean dot org>
         port to Tru64 [20060127]
@@ -138,4 +141,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-28th February 2016
+2nd January 2018

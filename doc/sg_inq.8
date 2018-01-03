@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "December 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_INQ "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -7,14 +7,15 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
 [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
 [\fI\-\-inhex=FN\fR] [\fI\-\-len=LEN\fR]  [\fI\-\-long\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-only\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
+[\fI\-\-vendor\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR]
+\fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
 [\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR]
 [\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-l=LEN\fR]
-[\fI\-L\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o=OPCODE_PG\fR] [\fI\-p=VPD_PG\fR]
+[\fI\-L\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o\fR] [\fI\-p=VPD_PG\fR]
 [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -183,6 +184,17 @@ utilities.
 \fB\-O\fR, \fB\-\-old\fR
 Switch to older style options. Please use as first option.
 .TP
+\fB\-o\fR, \fB\-\-only\fR
+Do not attempt to additionally retrieve the serial number VPD page (0x80) to
+enhance the output of a standard INQUIRY. So with this option given and no
+others, this utility will send a standard INQUIRY SCSI command and decode
+its response. No other SCSI commands will be sent to the \fIDEVICE\fR.
+Without this option an additional SCSI command is sent: a (non-standard)
+SCSI INQUIRY to fetch the Serial Number VPD page. However the Serial
+Number VPD page is not mandatory (while the Device Identification page is
+mandatory but a billion USB keys ignore that) and may cause nuisance error
+reports.
+.TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 the \fIPG\fR argument can be either a number of an abbreviation for a VPD
 page. To enumerate the available abbreviations for VPD pages use '\-hh' or
@@ -320,7 +332,7 @@ equivalent to \fI\-\-block=0|1\fR in OPTIONS section.
 .TP
 \fB\-c\fR
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
- conjunction with the \fI\-o=OPCODE_PG\fR option to specify the SCSI command
+ conjunction with the \fI\-p=VPD_PG\fR option to specify the SCSI command
 opcode to query. Equivalent to \fI\-\-cmddt\fR in the OPTIONS section.
 .TP
 \fB\-cl\fR
@@ -380,7 +392,10 @@ in the OPTIONS section.
 \fB-N\fR, \fB\-\-new\fR
 Switch to the newer style options.
 .TP
-\fB\-o\fR=\fIOPCODE_PG\fR
+\fB\-o\fR
+equivalent to \fI\-\-only\fR in the OPTIONS section.
+.TP
+\fB\-p\fR=\fIVPD_PG\fR
 used in conjunction with the \fI\-e\fR or \fI\-c\fR option. If neither given
 then the \fI\-e\fR option assumed. When the \fI\-e\fR option is also
 given (or assumed) then the argument to this option is the VPD page number.
@@ -392,14 +407,6 @@ page (0x83) use the \fI\-i\fR option. A now obsolete usage is when the
 to be a command opcode number. Recent SCSI draft standards have moved this
 facility to a separate command (see sg_opcodes(8)). Defaults to 0 so if
 \fI\-e\fR is given without this option then VPD page 0 is output.
-.TP
-\fB\-p\fR=\fIVPD_PG\fR
-same action as \fI\-o=OPCODE_PG\fR option described in the previous entry.
-Since the opcode value with the CmdDt is now obsolete, the main use of this
-option is to specify the VPD page number. The argument is interpreted as
-hexadecimal and is expected to be in the range 0 to ff inclusive.
-Defaults to 0 so if \fI\-e\fR is given without this option then VPD page 0
-is output.
 .TP
 \fB\-P\fR
 decodes the Unit Path Report VPD page [0xc0] which is EMC specific.

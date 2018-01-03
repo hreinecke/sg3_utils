@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2017 D. Gilbert
+*  Copyright (C) 2000-2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.80 20171229";    /* SPC-5 rev 17 */
+static const char * version_str = "1.81 20180102";    /* SPC-5 rev 17 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -223,6 +223,7 @@ static struct option long_options[] = {
         {"new", no_argument, 0, 'N'},
         {"old", no_argument, 0, 'O'},
 #endif
+        {"only", no_argument, 0, 'o'},
         {"page", required_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"vendor", no_argument, 0, 's'},
@@ -241,6 +242,7 @@ struct opts_t {
     bool do_decode;
     bool do_vpd;
     bool p_given;
+    bool skip_vpd;  /* --only  after standard inq don't fetch VPD page 0x80 */
     int do_block;
     int do_cmddt;
     int do_help;
@@ -253,7 +255,6 @@ struct opts_t {
     int page_num;
     int page_pdt;
     int num_pages;
-    int num_opcodes;
     const char * page_arg;
     const char * device_name;
     const char * inhex_fn;
@@ -271,9 +272,10 @@ usage()
             "[--export]\n"
             "              [--extended] [--help] [--hex] [--id] [--inhex=FN] "
             "[--len=LEN]\n"
-            "              [--long] [--maxlen=LEN] [--page=PG] [--raw] "
-            "[--vendor]\n"
-            "              [--verbose] [--version] [--vpd] DEVICE\n"
+            "              [--long] [--maxlen=LEN] [--only] [--page=PG] "
+            "[--raw]\n"
+            "              [--vendor] [--verbose] [--version] [--vpd] "
+            "DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
@@ -282,9 +284,9 @@ usage()
             "[--export]\n"
             "              [--extended] [--help] [--hex] [--id] [--inhex=FN] "
             "[--len=LEN]\n"
-            "              [--maxlen=LEN] [--page=PG] [--raw] [--verbose] "
-            "[--version]\n"
-            "              [--vpd] DEVICE\n"
+            "              [--long] [--maxlen=LEN] [--only] [--page=PG] "
+            "[--raw]\n"
+            "              [--verbose] [--version] [--vpd] DEVICE\n"
             "  where:\n");
 #endif
     pr2serr("    --block=0|1     0-> open(non-blocking); 1-> "
@@ -318,6 +320,9 @@ usage()
             "indicated)\n"
             "    --long|-L       supply extra information on NVMe devices\n"
             "    --maxlen=LEN|-m LEN    same as '--len='\n"
+            "    --old|-O        use old interface (use as first option)\n"
+            "    --only|-o       for std inquiry do not fetch serial number "
+            "vpd page\n"
             "    --page=PG|-p PG     Vital Product Data (VPD) page number "
             "or\n"
             "                        abbreviation (opcode number if "
@@ -327,7 +332,6 @@ usage()
             "inquiry\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print version string then exit\n"
-            "    --old|-O        use old interface (use as first option)\n"
             "    --vpd|-e        vital product data (set page with "
             "'--page=PG')\n\n"
             "Performs a SCSI INQUIRY command on DEVICE or decodes INQUIRY "
@@ -345,7 +349,7 @@ usage_old()
     pr2serr("Usage:  sg_inq [-a] [-A] [-b] [-B=0|1] [-c] [-cl] [-d] [-e] "
             "[-h]\n"
             "               [-H] [-i] [I=FN] [-l=LEN] [-L] [-m] [-M] "
-            "[-o=OPCODE_PG]\n"
+            "[-o]\n"
             "               [-p=VPD_PG] [-P] [-r] [-s] [-u] [-U] [-v] [-V] "
             "[-x]\n"
             "               [-36] [-?] DEVICE\n"
@@ -355,7 +359,7 @@ usage_old()
 #else
     pr2serr("Usage:  sg_inq [-a] [-b] [-B 0|1] [-c] [-cl] [-d] [-e] [-h] "
             "[-H]\n"
-            "               [-i] [-l=LEN] [-L] [-m] [-M] [-o=OPCODE_PG] "
+            "               [-i] [-l=LEN] [-L] [-m] [-M] [-o] "
             "[-p=VPD_PG]\n"
             "               [-P] [-r] [-s] [-u] [-v] [-V] [-x] [-36] "
             "[-?]\n"
@@ -382,7 +386,9 @@ usage_old()
             "    -m    decode management network addresses VPD page "
             "(0x85)\n"
             "    -M    decode mode page policy VPD page (0x87)\n"
-            "    -o=OPCODE_PG    opcode or page code in hex (def: 0)\n"
+            "    -N|--new   use new interface\n"
+            "    -o    for std inquiry only do that, not serial number vpd "
+            "page\n"
             "    -p=VPD_PG    vpd page code in hex (def: 0)\n"
             "    -P    decode Unit Path Report VPD page (0xc0) (EMC)\n"
             "    -r    output response in binary ('-rr': output for hdparm)\n"
@@ -392,7 +398,6 @@ usage_old()
             "    -V    output version string\n"
             "    -x    decode extended INQUIRY data VPD page (0x86)\n"
             "    -36   perform standard INQUIRY with a 36 byte response\n"
-            "    -N|--new   use new interface\n"
             "    -?    output this usage message\n\n"
             "If no options given then does a standard SCSI INQUIRY\n");
 }
@@ -429,19 +434,19 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 
 #ifdef SG_LIB_LINUX
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "aB:cdeEfhHiI:l:Lm:NOp:rsuvVx",
+        c = getopt_long(argc, argv, "aB:cdeEfhHiI:l:Lm:NoOp:rsuvVx",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:p:rsuvVx", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:op:rsuvVx",
+                        long_options, &option_index);
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:NOp:rsuvVx",
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:NoOp:rsuvVx",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:p:rsuvVx", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:l:Lm:op:rsuvVx",
+                        long_options, &option_index);
 #endif /* SG_SCSI_STRINGS */
 #endif /* SG_LIB_LINUX */
         if (c == -1)
@@ -486,6 +491,9 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'h':
             ++op->do_help;
+            break;
+        case 'o':
+            op->skip_vpd = true;
             break;
         case '?':
             if (! op->do_help)
@@ -648,6 +656,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'N':
                     op->opt_new = true;
                     return 0;
+                case 'o':
+                    op->skip_vpd = true;
+                    break;
                 case 'O':
                     break;
                 case 'P':
@@ -711,9 +722,6 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->resp_len = n;
-            } else if (0 == strncmp("o=", cp, 2)) {
-                op->page_arg = cp + 2;
-                ++op->num_opcodes;
             } else if (0 == strncmp("p=", cp, 2)) {
                 op->page_arg = cp + 2;
                 op->p_given = true;
@@ -1208,29 +1216,31 @@ decode_supported_vpd(unsigned char * buff, int len, int do_hex)
 }
 
 static bool
-vpd_page_is_supported(unsigned char * buff, int len, int pg)
+vpd_page_is_supported(unsigned char * vpd_pg0, int v0_len, int pg_num)
 {
-    int vpd, k, rlen;
-    bool supported = false;
+    int k, rlen;
 
-    if (len < 4)
+    if (v0_len < 4)
         return false;
 
-    rlen = buff[3] + 4;
-    if (rlen > len)
+    rlen = vpd_pg0[3] + 4;
+    if (rlen > v0_len)
         pr2serr("Supported VPD pages VPD page truncated, indicates %d, got "
-                "%d\n", rlen, len);
+                "%d\n", rlen, v0_len);
     else
-        len = rlen;
+        v0_len = rlen;
 
-    for (k = 0; k < len - 4; ++k) {
-        vpd = buff[4 + k];
-        if(vpd == pg) {
-            supported = true;
-            break;
-        }
+    for (k = 4; k < v0_len; ++k) {
+        if(vpd_pg0[k] == pg_num)
+            return true;
     }
-    return supported;
+    return false;
+}
+
+static bool
+vpd_page_not_supported(unsigned char * vpd_pg0, int v0_len, int pg_num)
+{
+    return ! vpd_page_is_supported(vpd_pg0, v0_len, pg_num);
 }
 
 /* ASCII Information VPD pages (page numbers: 0x1 to 0x7f) */
@@ -3151,6 +3161,16 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
     int len, k, res, c;
     unsigned char b[DEF_ALLOC_LEN];
 
+    res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS,
+                                  -1,verbose, &len);
+    if (res) {
+        if (verbose > 2)
+            pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (vpd_page_not_supported(b, len, VPD_UNIT_SERIAL_NUM))
+        return SG_LIB_CAT_ILLEGAL_REQ;
+
     memset(b, 0xff, 4); /* guard against empty response */
     res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, -1, verbose,
                                   &len);
@@ -3226,7 +3246,7 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
             act_len = rlen - resid;
         if (act_len < SAFE_STD_INQ_RESP_LEN)
             rsp_buff[act_len] = '\0';
-        if ((! op->do_export) && (0 == op->resp_len)) {
+        if ((! op->skip_vpd) && (! op->do_export) && (0 == op->resp_len)) {
             if (fetch_unit_serial_num(sg_fd, usn_buff, sizeof(usn_buff),
                                       op->do_verbose))
                 usn_buff[0] = '\0';
@@ -3459,7 +3479,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                                       vb, &len);
         if (res)
             goto out;
-        if (!vpd_page_is_supported(rp, len, pn)) {
+        if (vpd_page_not_supported(rp, len, pn)) {
             res = SG_LIB_CAT_ILLEGAL_REQ;
             goto out;
         }
@@ -4213,13 +4233,30 @@ main(int argc, char * argv[])
                     pr2serr("Guessing from --inhex= this is a standard "
                             "INQUIRY\n");
             } else if (rsp_buff[2] <= 2) {
-                if (op->do_verbose)
-                    pr2serr("Guessing from --inhex this is VPD page 0x%x\n",
-                            rsp_buff[1]);
-                op->page_num = rsp_buff[1];
-                op->do_vpd = true;
-                if ((1 != op->do_hex) && (0 == op->do_raw))
-                    op->do_decode = true;
+                /*
+                 * Removable devices have the RMB bit set, which would
+                 * present itself as vpd page 0x80 output if we're not
+                 * careful
+                 *
+                 * Serial number must be right-aligned ASCII data in
+                 * bytes 5-7; standard INQUIRY will have flags here.
+                 */
+                if (rsp_buff[1] == 0x80 &&
+                    (rsp_buff[5] < 0x20 || rsp_buff[5] > 0x80 ||
+                     rsp_buff[6] < 0x20 || rsp_buff[6] > 0x80 ||
+                     rsp_buff[7] < 0x20 || rsp_buff[7] > 0x80)) {
+                    if (op->do_verbose)
+                        pr2serr("Guessing from --inhex= this is a "
+                                "standard INQUIRY\n");
+                } else {
+                    if (op->do_verbose)
+                        pr2serr("Guessing from --inhex= this is VPD "
+                                "page 0x%x\n", rsp_buff[1]);
+                    op->page_num = rsp_buff[1];
+                    op->do_vpd = true;
+                    if ((1 != op->do_hex) && (0 == op->do_raw))
+                        op->do_decode = true;
+                }
             } else {
                 if (op->do_verbose)
                     pr2serr("page number unclear from --inhex, hope it's a "

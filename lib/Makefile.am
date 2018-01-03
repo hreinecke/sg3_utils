@@ -40,7 +40,7 @@ endif
 ## CC = clang
 ## CC = clang++
 
-# -std=<s> can be c99, c11, gnu11, etc. Default is gnu89 (gnu90 is the same)
+# -std=<s> can be c99, c11, gnu11, etc. Default is gnu11 for C code
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
 AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 AM_CFLAGS = -Wall -W
@@ -52,7 +52,7 @@ lib_LTLIBRARIES = libsgutils2.la
 
 libsgutils2_la_LDFLAGS = -version-info 2:0:0 -no-undefined
 
-libsgutils2_la_LIBADD = @GETOPT_O_FILES@ @os_libs@
+libsgutils2_la_LIBADD = @GETOPT_O_FILES@
 libsgutils2_la_DEPENDENCIES = @GETOPT_O_FILES@
 
 
