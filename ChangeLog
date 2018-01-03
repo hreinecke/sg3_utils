@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20171231] [svn: r741]
+Changelog for sg3_utils-1.43 [20180102] [svn: r742]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_x: where x can be normal, atomic, orwrite,
     same, scattered, or stream writes with 16 or 32 byte
@@ -46,7 +46,11 @@ Changelog for sg3_utils-1.43 [20171231] [svn: r741]
     - fixup enumeration in power condition transition
       log page (from H. Reinecke, Suse)
   - sg_inq: fix potential unbounded loop in --export
+    - add --only to stop standard inquiry decoding also
+      doing a serial number vpd page (0x80) fetch
     - update version descriptor list to 20170114
+    - add further checks so CDROM standard inquiry response
+      doesn't trick --inhex into thinking it's VPD pg 0x80
     - decode NVMe Identify controller/nsid
   - sg_inq+sg_vpd: update Extended inquiry data vpd
     page (spc5r09)
@@ -65,8 +69,9 @@ Changelog for sg3_utils-1.43 [20171231] [svn: r741]
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility
   - sg_zone: fix debug cdb naming
-  - sgp_dd: if SG_LIB_ANDROID defined invoke
-    pthread_kill() rather than pthread_cancel() [Linux]
+  - sgp_dd: pthread_cancel() has issues in C++ (and
+    the Android multi-threaded library doesn't supply it)
+    so use pthread_kill() in its place [Linux only]
   - sg_opcode: add '--enumerate' and '--pdt=' options
     - support CDLP (command duration limit page)
     - check resid and trim response if necessary
@@ -137,6 +142,7 @@ Changelog for sg3_utils-1.43 [20171231] [svn: r741]
     decision made at runtime
   - automake: add AM_PROG_AR to configure.ac
     - upgrade to version 1.15
+    - various configure.ac and Makefile.am cleanups
     - add SG_LIB_ANDROID build 'define'. If defined then
       SG_LIB_LINUX is also defined, so test for Android
       before Linux if need to differentiate

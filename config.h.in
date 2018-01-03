@@ -36,10 +36,10 @@
 /* Define to 1 if you have the `posix_memalign' function. */
 #undef HAVE_POSIX_MEMALIGN
 
-/* Found pthread_cancel */
+/* Define to 1 if you have the `pthread_cancel' function. */
 #undef HAVE_PTHREAD_CANCEL
 
-/* Found pthread_kill */
+/* Define to 1 if you have the `pthread_kill' function. */
 #undef HAVE_PTHREAD_KILL
 
 /* Define to 1 if you have the <stdint.h> header file. */
@@ -105,7 +105,7 @@
 /* sg3_utils on FreeBSD */
 #undef SG_LIB_FREEBSD
 
-/* assume sg3_utils on linux */
+/* sg3_utils on linux */
 #undef SG_LIB_LINUX
 
 /* also MinGW environment */

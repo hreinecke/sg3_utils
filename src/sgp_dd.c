@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2017 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2018 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.59 20171222";
+static const char * version_str = "5.60 20180102";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -181,6 +181,7 @@ static int sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
 
 static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
+static bool shutting_down = false;
 static bool do_sync = false;
 static bool do_time = false;
 static Rq_coll rcoll;
@@ -478,6 +479,8 @@ sig_listen_thread(void * v_clp)
 
     while (1) {
         sigwait(&signal_set, &sig_number);
+        if (shutting_down)
+            break;
         if (SIGINT == sig_number) {
             pr2serr(ME "interrupted by SIGINT\n");
             guarded_stop_both(clp);
@@ -1645,6 +1648,7 @@ main(int argc, char * argv[])
         }
     }
 
+#if 0
 #if SG_LIB_ANDROID
     /* Android doesn't have pthread_cancel() so use pthread_kill() instead.
      * Also there is no need to link with -lpthread in Android */
@@ -1653,6 +1657,11 @@ main(int argc, char * argv[])
     status = pthread_cancel(sig_listen_thread_id);
 #endif
     if (0 != status) err_exit(status, "pthread_cancel");
+#endif          /* 0 */
+
+    shutting_down = true;
+    status = pthread_kill(sig_listen_thread_id, SIGINT);
+    if (0 != status) err_exit(status, "pthread_kill");
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);
     if ((STDOUT_FILENO != rcoll.outfd) && (FT_DEV_NULL != rcoll.out_type))
