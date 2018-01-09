@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.27 20171228";    /* ses4r01 */
+static const char * version_str = "2.28 20180107";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -778,7 +778,7 @@ usage(int help_num)
 {
     if (help_num < 2) {
         pr2serr(
-            "Usage: sg_ses [--descriptor=DN] [--dev-slot-num=SN] "
+            "Usage: sg_ses [--descriptor=DES] [--dev-slot-num=SN] "
             "[--eiioe=A_F]\n"
             "              [--filter] [--get=STR] [--hex] "
             "[--index=IIA | =TIA,II]\n"
@@ -789,7 +789,7 @@ usage(int help_num)
             "              [--warn] DEVICE\n\n"
             "       sg_ses [--byte1=B1] [--clear=STR] [--control] "
             "[--data=H,H...]\n"
-            "              [--descriptor=DN] [--dev-slot-num=SN] "
+            "              [--descriptor=DES] [--dev-slot-num=SN] "
             "[--index=IIA | =TIA,II]\n"
             "              [--mask] [--maxlen=LEN] [--nickid=SEID] "
             "[--nickname=SEN]\n"
@@ -801,11 +801,11 @@ usage(int help_num)
                );
         if (help_num < 1) {
             pr2serr("Or the corresponding short option usage: \n"
-                    "  sg_ses [-D DN] [-x SN] [-E A_F] [-f] [-G STR] [-H] "
+                    "  sg_ses [-D DES] [-x SN] [-E A_F] [-f] [-G STR] [-H] "
                     "[-I IIA|TIA,II] [-i]\n"
                     "         [-j] [-m LEN] [-p PG] [-r] [-R] [-A SA] [-s] "
                     "[-v] [-w] DEVICE\n\n"
-                    "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DN] "
+                    "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DES] "
                     "[-x SN] [-I IIA|TIA,II]\n"
                     "         [-M] [-m LEN] [-N SEID] [-n SEN] [-p PG] "
                     "[-A SA] [-S STR]\n"
@@ -820,7 +820,7 @@ usage(int help_num)
             "    --clear=STR|-C STR    clear field by acronym or position\n"
             "    --control|-c        send control information (def: fetch "
             "status)\n"
-            "    --descriptor=DN|-D DN    descriptor name (for indexing)\n"
+            "    --descriptor=DES|-D DES    descriptor name (for indexing)\n"
             "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
             "(for indexing)\n"
             "    --filter|-f         filter out enclosure status flags that "

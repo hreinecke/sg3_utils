@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2017 Douglas Gilbert.
+ * Copyright (c) 2008-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -13,15 +13,15 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_mmc.h"
 #include "sg_pt.h"
 #include "sg_unaligned.h"
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

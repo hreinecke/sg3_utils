@@ -36,14 +36,14 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
 /* sg_lib_version_str (and datestamp) defined in sg_lib_data.c file */
 

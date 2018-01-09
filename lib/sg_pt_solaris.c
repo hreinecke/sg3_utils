@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2007-2017 Douglas Gilbert.
+ * Copyright (c) 2007-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.07 20171107 */
+/* sg_pt_solaris version 1.08 20180104 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,12 +24,12 @@
 #include <sys/scsi/impl/types.h>
 #include <sys/scsi/impl/uscsi.h>
 
-#include "sg_pt.h"
-#include "sg_lib.h"
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#include "sg_pt.h"
+#include "sg_lib.h"
 
 
 #define DEF_TIMEOUT 60       /* 60 seconds */

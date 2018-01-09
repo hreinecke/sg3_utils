@@ -5117,6 +5117,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
     int num, pl, pc;
+    uint32_t count;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -5140,7 +5141,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
         }
         switch (pc) {
         case 0x0:
-            printf("  Pending defect count:");
+            printf("  Pending defect count: ");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     pr2serr("\n    truncated by response length, expected "
@@ -5150,10 +5151,17 @@ show_pending_defects_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %u\n", sg_get_unaligned_be32(bp + 4));
+            count = sg_get_unaligned_be32(bp + 4);
+            if (0 == count) {
+                printf("0\n");
+                break;
+            }
+            printf("%3u  |     LBA            Accumulated power_on\n", count);
+            printf("-----------------------------|---------------");
+            printf("-----------hours---------\n");
             break;
         default:
-            printf("  Pending defect: %d\n", pc);
+            printf("  Pending defect %4d:  ", pc);
             if ((pl < 16) || (num < 16)) {
                 if (num < 16)
                     pr2serr("\n    truncated by response length, expected "
@@ -5163,7 +5171,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf("    LBA: 0x%" PRIx64 " accumulated_power_on_hours: %u\n",
+            printf("        0x%-16" PRIx64 "      %5u\n",
                    sg_get_unaligned_be64(bp + 8),
                    sg_get_unaligned_be32(bp + 4));
             break;

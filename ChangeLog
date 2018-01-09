@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180102] [svn: r742]
+Changelog for sg3_utils-1.43 [20180108] [svn: r743]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_x: where x can be normal, atomic, orwrite,
     same, scattered, or stream writes with 16 or 32 byte
@@ -51,7 +51,11 @@ Changelog for sg3_utils-1.43 [20180102] [svn: r742]
     - update version descriptor list to 20170114
     - add further checks so CDROM standard inquiry response
       doesn't trick --inhex into thinking it's VPD pg 0x80
-    - decode NVMe Identify controller/nsid
+    - decode NVMe Identify controller/nsid commands
+    - with NVMe --only restricts to a single Identify
+      controller command
+    - add --long which decodes more of the NVMe Identify
+      command responses
   - sg_inq+sg_vpd: update Extended inquiry data vpd
     page (spc5r09)
     - block limits and block limit extension VPD pages:
@@ -118,6 +122,7 @@ Changelog for sg3_utils-1.43 [20180102] [svn: r742]
     - add pt_device_is_nvme(), get_pt_nvme_nsid()
     - add check_pt_file_handle()
     - add get_pt_file_handle(), set_pt_file_handle()
+    - add small SNTL to support sg_ses on NVMe
   - sg_lib_data: sync asc/ascq codes with T10 20170114
     - add write scattered (16+32) cdb names sbc4r11
   - sg_cmds_extra: expand sg_ll_ata_pt() to send new

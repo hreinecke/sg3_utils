@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2005-2017 Douglas Gilbert.
+ * Copyright (c) 2005-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.20 20171227 */
+/* sg_pt_freebsd version 1.21 20180104 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,15 +31,15 @@
 #include <fcntl.h>
 #include <stddef.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "sg_pt.h"
 #include "sg_lib.h"
 #include "sg_unaligned.h"
 #include "sg_pt_nvme.h"
 #include "freebsd_nvme_ioctl.h"
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
 
 #define FREEBSD_MAXDEV 64
@@ -102,7 +102,7 @@ struct sg_pt_base {
     struct sg_pt_freebsd_scsi impl;
 };
 
-static const uint32_t broadcast_nsid = 0xffffffff;
+static const uint32_t broadcast_nsid = SG_NVME_BROADCAST_NSID;
 
 #if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
@@ -1115,9 +1115,12 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
 {
     bool evpd;
     int res;
-    uint16_t k, n, alloc_len, pg_cd;
+    uint16_t n, alloc_len, pg_cd;
+    uint32_t pg_sz = sg_get_page_size();
     struct freebsd_dev_channel * fdc_p;
-    uint8_t inq_dout[128];
+    uint8_t * nvme_id_ns = NULL;
+    uint8_t * free_nvme_id_ns = NULL;
+    uint8_t inq_dout[256];
 
     if (vb > 3)
         pr2ws("%s: starting\n", __func__);
@@ -1145,7 +1148,7 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
     pg_cd = cdbp[2];
     if (evpd) {         /* VPD page responses */
         switch (pg_cd) {
-        case 0:
+        case 0:         /* Supported VPD pages VPD page */
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16(3, inq_dout + 2);
@@ -1154,34 +1157,49 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
             inq_dout[6] = 0x83;
             n = 7;
             break;
-        case 0x80:
+        case 0x80:      /* Serial number VPD page */
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16(20, inq_dout + 2);
             memcpy(inq_dout + 4, fdc_p->nvme_id_ctlp + 4, 20);    /* SN */
             n = 24;
             break;
-        case 0x83:
-            /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
-            inq_dout[1] = pg_cd;
-            inq_dout[4] = 0x2;  /* Prococol id=0, code_set=2 (ASCII) */
-            inq_dout[5] = 0x1;  /* PIV=0, ASSOC=0 (LU ??), desig_id=1 */
-            /* Building T10 Vendor ID base designator, SNTL document 1.5
-             * dated 20150624 confuses this with SCSI name string
-             * descriptor, desig_id=8 */
-            memcpy(inq_dout + 8, nvme_scsi_vendor_str, 8);
-            memcpy(inq_dout + 16, fdc_p->nvme_id_ctlp + 24, 40);  /* MN */
-            for (k = 40; k > 0; --k) {
-                if (' ' == inq_dout[16 + k - 1])
-                    inq_dout[16 + k - 1] = '_'; /* convert trailing spaces */
-                else
-                    break;
+        case 0x83:      /* Device identification VPD page */
+            if ((fdc_p->nsid > 0) && (fdc_p->nsid < SG_NVME_BROADCAST_NSID)) {
+                nvme_id_ns = sg_memalign(pg_sz, pg_sz, &free_nvme_id_ns,
+                                         vb > 3);
+                if (nvme_id_ns) {
+                    struct nvme_pt_command npc;
+                    uint8_t * npc_up = (uint8_t *)&npc;
+
+                    memset(npc_up, 0, sizeof(npc));
+                    npc_up[SG_NVME_PT_OPCODE] = 0x6;   /* Identify */
+                    sg_put_unaligned_le32(fdc_p->nsid,
+                                          npc_up + SG_NVME_PT_NSID);
+                    /* CNS=0x0 Identify: namespace */
+                    sg_put_unaligned_le32(0x0, npc_up + SG_NVME_PT_CDW10);
+                    sg_put_unaligned_le64((sg_uintptr_t)nvme_id_ns,
+                                          npc_up + SG_NVME_PT_ADDR);
+                    sg_put_unaligned_le32(pg_sz,
+                                          npc_up + SG_NVME_PT_DATA_LEN);
+                    res = nvme_pt_low(fdc_p, nvme_id_ns, pg_sz, true, &npc,
+                                      vb > 3);
+                    if (res) {
+                        free(free_nvme_id_ns);
+                        free_nvme_id_ns = NULL;
+                        nvme_id_ns = NULL;
+                    }
+                }
             }
-            /* SN */
-            memcpy(inq_dout + 16 + k + 1, fdc_p->nvme_id_ctlp + 4, 20);
-            n = 16 + k + 1 + 20;
-            inq_dout[7] = 8 + k + 1 + 20;
-            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            n = sg_make_vpd_devid_for_nvme(fdc_p->nvme_id_ctlp, nvme_id_ns, 0,
+                                           -1, inq_dout, sizeof(inq_dout));
+            if (n > 3)
+                sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            if (free_nvme_id_ns) {
+                free(free_nvme_id_ns);
+                free_nvme_id_ns = NULL;
+                nvme_id_ns = NULL;
+            }
             break;
         default:        /* Point to page_code field in cdb */
             mk_sense_invalid_fld(ptp, true, 2, 7, vb);

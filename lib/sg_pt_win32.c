@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2006-2017 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.19 20171209 */
+/* sg_pt_win32 version 1.20 20180104 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,13 +16,14 @@
 #include <ctype.h>
 #include <fcntl.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "sg_pt.h"
 #include "sg_lib.h"
 #include "sg_pt_win32.h"
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
 #ifndef O_EXCL
 // #define O_EXCL 0x80  // cygwin ??
