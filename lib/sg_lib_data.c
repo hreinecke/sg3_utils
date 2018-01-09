@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2017 Douglas Gilbert.
+ * Copyright (c) 2007-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,17 +7,17 @@
 
 #include <stdlib.h>
 
-#include "sg_lib.h"
-#include "sg_lib_data.h"
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #else
 #define SG_SCSI_STRINGS 1
 #endif
 
+#include "sg_lib.h"
+#include "sg_lib_data.h"
 
-const char * sg_lib_version_str = "2.35 20171227";/* spc5r17, sbc4r15 */
+
+const char * sg_lib_version_str = "2.36 20180104";/* spc5r17, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */

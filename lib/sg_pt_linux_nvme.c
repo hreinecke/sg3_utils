@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Douglas Gilbert.
+ * Copyright (c) 2017-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -282,7 +282,7 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
 }
 
 /* Returns 0 for success. Returns SG_LIB_NVME_STATUS if there is non-zero
- * NVMe status (from the completion queue) with the value in
+ * NVMe status (from the completion queue) with the value placed in
  * ptp->nvme_status. If Unix error from ioctl add equivalent errno value to
  * SG_LIB_OS_BASE_ERR. Should not return negative values. CDW0 from
  * the completion queue is placed in ptp->nvme_result on success. */
@@ -389,8 +389,11 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
 {
     bool evpd;
     int res;
-    uint16_t k, n, alloc_len, pg_cd;
-    uint8_t inq_dout[128];
+    uint16_t n, alloc_len, pg_cd;
+    uint32_t pg_sz = sg_get_page_size();
+    uint8_t * nvme_id_ns = NULL;
+    uint8_t * free_nvme_id_ns = NULL;
+    uint8_t inq_dout[256];
 
     if (vb > 3)
         pr2ws("%s: time_secs=%d\n", __func__, time_secs);
@@ -430,25 +433,38 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
             n = 24;
             break;
         case 0x83:
-            /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
-            inq_dout[1] = pg_cd;
-            inq_dout[4] = 0x2;  /* Prococol id=0, code_set=2 (ASCII) */
-            inq_dout[5] = 0x1;  /* PIV=0, ASSOC=0 (LU ??), desig_id=1 */
-            /* Building T10 Vendor ID base designator, SNTL document 1.5
-             * dated 20150624 confuses this with SCSI name string
-             * descriptor, desig_id=8 */
-            memcpy(inq_dout + 8, nvme_scsi_vendor_str, 8);
-            memcpy(inq_dout + 16, ptp->nvme_id_ctlp + 24, 40);  /* MN */
-            for (k = 40; k > 0; --k) {
-                if (' ' == inq_dout[16 + k - 1])
-                    inq_dout[16 + k - 1] = '_'; /* convert trailing spaces */
-                else
-                    break;
+            if ((ptp->nvme_nsid > 0) &&
+                (ptp->nvme_nsid < SG_NVME_BROADCAST_NSID)) {
+                nvme_id_ns = sg_memalign(pg_sz, pg_sz, &free_nvme_id_ns,
+                                         vb > 3);
+                if (nvme_id_ns) {
+                    struct sg_nvme_passthru_cmd cmd;
+
+                    memset(&cmd, 0, sizeof(cmd));
+                    cmd.opcode = 0x6;   /* Identify */
+                    cmd.nsid = ptp->nvme_nsid;
+                    cmd.cdw10 = 0x0;    /* CNS=0x0 Identify namespace */
+                    cmd.addr = (uint64_t)(sg_uintptr_t)nvme_id_ns;
+                    cmd.data_len = pg_sz;
+                    res = do_nvme_admin_cmd(ptp, &cmd, nvme_id_ns, true,
+                                            time_secs, vb > 3);
+                    if (res) {
+                        free(free_nvme_id_ns);
+                        free_nvme_id_ns = NULL;
+                        nvme_id_ns = NULL;
+                    }
+                }
             }
-            memcpy(inq_dout + 16 + k + 1, ptp->nvme_id_ctlp + 4, 20); /* SN */
-            n = 16 + k + 1 + 20;
-            inq_dout[7] = 8 + k + 1 + 20;
-            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            n = sg_make_vpd_devid_for_nvme(ptp->nvme_id_ctlp, nvme_id_ns,
+                                           0 /* pdt */, -1 /*tproto */,
+                                           inq_dout, sizeof(inq_dout));
+            if (n > 3)
+                sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            if (free_nvme_id_ns) {
+                free(free_nvme_id_ns);
+                free_nvme_id_ns = NULL;
+                nvme_id_ns = NULL;
+            }
             break;
         default:        /* Point to page_code field in cdb */
             mk_sense_invalid_fld(ptp, true, 2, 7, vb);

@@ -47,21 +47,16 @@ the SG_IO ioctl is not supported) then an ATA IDENTIFY (PACKET) DEVICE is
 tried. If it succeeds then device identification strings are output. The
 \fI\-\-raw\fR and \fI\-\-hex\fR options can be used to manipulate the output.
 If the \fI\-\-ata\fR option is given then the SCSI INQUIRY is not performed
-and the \fIDEVICE\fR is assumed to be ATA (or ATAPI).
+and the \fIDEVICE\fR is assumed to be ATA (or ATAPI). For more information
+see the ATA DEVICES section below.
 .PP
 In some operating systems a NVMe device (e.g. SSD) may be given as the
-\fIDEVICE\fR. An Identify command is sent to the controller followed
-by an namespace if \fIDEVICE\fR is associated with a namespace. If not,
-for example if \fIDEVICE\fR corresponds to a controller, then an Identify
-is sent to the controller and then an Identify coomand is sent to all
-attached namespaces.
+\fIDEVICE\fR. For more information see the NVME DEVICES section below.
 .PP
 The reference document used for interpreting an INQUIRY is T10/BSR INCITS
-502 Revision 07 which is draft SPC\-5 revision 07, 26 November 2015). It can
+502 Revision 18 which is draft SPC\-5 revision 18, 4 January 2018). It can
 be found at http://www.t10.org . Obsolete and reserved items in the standard
-INQUIRY response output are displayed in brackets. The reference document for
-the ATA IDENTIFY (PACKET) DEVICE command is ATA8\-ACS found at
-http://www.t13.org .
+INQUIRY response output are displayed in brackets.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -194,6 +189,11 @@ SCSI INQUIRY to fetch the Serial Number VPD page. However the Serial
 Number VPD page is not mandatory (while the Device Identification page is
 mandatory but a billion USB keys ignore that) and may cause nuisance error
 reports.
+.br
+For NVMe devices only the Identify controller is performed, even if the
+\fIDEVICE\fR includes a namespace identifier. For example in FreeBSD
+given a \fIDEVICE\fR named /dev/nvme0ns1 then an Identify controller is
+sent to /dev/nvme0 and nothing is sent to its "ns1" (first namespace).
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 the \fIPG\fR argument can be either a number of an abbreviation for a VPD
@@ -299,6 +299,35 @@ DEVICE command, hdparm does a good job at that. The '\-HHH' option has
 been added for use with either the '\-\-ata' or '\-\-page=ai'
 option to produce a format acceptable to "hdparm \-\-Istdin".
 An example: 'sg_inq \-\-ata \-HHH /dev/hdc | hdparm \-\-Istdin'. See hdparm.
+.SH NVME DEVICES
+Currently these device are typically SSDs (Solid State Disks) directly
+connected to a PCIe connector or via a specialized connector such as a M2
+connector. Linux and FreeBSD treat NVMe storage devices as separate from
+SCSI storage with device names like /dev/nvme0n1 (in Linux) and
+/dev/nvme0ns1 (in FreeBSD). The NVM Express group has a document titled "NVM
+Express: SCSI Translation Reference" which defines a partial "SCSI to NVMe
+Translation Layer" often known by its acronym: SNTL.
+.PP
+On operating systems where it is supported by this package, this utility
+will detect NVMe storage devices directly connected and send an Identify
+controller NVMe Admin command and decode its response. A NVMe controller
+is architecturally similar to a SCSI target device. If the NVMe \fIDEVICE\fR
+indicates a namespace then an Identify namespace NVMe Admin command is sent
+to that namespace and its response is decoded. Namespaces are numbered
+sequentially starting from 1. Namespaces are similar to SCSI Logical Units
+and their identifiers (nsid_s) can be thought of as SCSI LUNs. In the
+Linux and FreeBSD example device names above the "n1" and the "ns1" parts
+indicate nsid 1 . If no namespace is given in the \fIDEVICE\fR then all
+namespaces found in the controller are sent Identify namespace commands and
+the responses are decoded.
+.PP
+To get more details in the response use the \fI\-\-long\fR option. To only
+get the controller's Identify decoded use the \fI\-\-only\fR option.
+.PP
+It is possible that even though the \fIDEVICE\fR presents as a NVMe device,
+it has a SNTL and accepts SCSI commands. In this case to send a SCSI INQUIRY
+command (and fetch its VPD pages) use 'sg_vpd -p sinq <dev>' (or to get VPD
+pages: 'sg_vpd -p <vpd_page> <dev>').
 .SH EXIT STATUS
 The exit status of sg_inq is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

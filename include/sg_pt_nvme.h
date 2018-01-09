@@ -116,38 +116,49 @@ __packed;
 
 /* Using byte offsets and unaligned be/le copies safer than packed
  * structures. These are for sg_nvme_passthru_cmd . */
-#define SG_NVME_PT_OPCODE 0		/* length: 1 byte */
-#define SG_NVME_PT_FLAGS 1		/* length: 1 byte */
-#define SG_NVME_PT_RSVD1 2		/* length: 2 bytes */
-#define SG_NVME_PT_NSID 4		/* length: 4 bytes */
-#define SG_NVME_PT_CDW2 8		/* length: 4 bytes */
-#define SG_NVME_PT_CDW3 12		/* length: 4 bytes */
-#define SG_NVME_PT_METADATA 16		/* length: 8 bytes */
-#define SG_NVME_PT_ADDR 24		/* length: 8 bytes */
-#define SG_NVME_PT_METADATA_LEN 32	/* length: 4 bytes */
-#define SG_NVME_PT_DATA_LEN 36		/* length: 4 bytes */
-#define SG_NVME_PT_CDW10 40		/* length: 4 bytes */
-#define SG_NVME_PT_CDW11 44		/* length: 4 bytes */
-#define SG_NVME_PT_CDW12 48		/* length: 4 bytes */
-#define SG_NVME_PT_CDW13 52		/* length: 4 bytes */
-#define SG_NVME_PT_CDW14 56		/* length: 4 bytes */
-#define SG_NVME_PT_CDW15 60		/* length: 4 bytes */
+#define SG_NVME_PT_OPCODE 0             /* length: 1 byte */
+#define SG_NVME_PT_FLAGS 1              /* length: 1 byte */
+#define SG_NVME_PT_RSVD1 2              /* length: 2 bytes */
+#define SG_NVME_PT_NSID 4               /* length: 4 bytes */
+#define SG_NVME_PT_CDW2 8               /* length: 4 bytes */
+#define SG_NVME_PT_CDW3 12              /* length: 4 bytes */
+#define SG_NVME_PT_METADATA 16          /* length: 8 bytes */
+#define SG_NVME_PT_ADDR 24              /* length: 8 bytes */
+#define SG_NVME_PT_METADATA_LEN 32      /* length: 4 bytes */
+#define SG_NVME_PT_DATA_LEN 36          /* length: 4 bytes */
+#define SG_NVME_PT_CDW10 40             /* length: 4 bytes */
+#define SG_NVME_PT_CDW11 44             /* length: 4 bytes */
+#define SG_NVME_PT_CDW12 48             /* length: 4 bytes */
+#define SG_NVME_PT_CDW13 52             /* length: 4 bytes */
+#define SG_NVME_PT_CDW14 56             /* length: 4 bytes */
+#define SG_NVME_PT_CDW15 60             /* length: 4 bytes */
 
 #ifdef SG_LIB_LINUX
 /* General references state that "all NVMe commands are 64 bytes long". If
  * so then the following are add-ons by Linux, go to the OS and not the
  * the NVMe device. */
-#define SG_NVME_PT_TIMEOUT_MS 64	/* length: 4 bytes */
-#define SG_NVME_PT_RESULT 68		/* length: 4 bytes */
+#define SG_NVME_PT_TIMEOUT_MS 64        /* length: 4 bytes */
+#define SG_NVME_PT_RESULT 68            /* length: 4 bytes */
 #endif
 
 
 /* Valid namespace IDs (nsid_s) range from 1 to 0xfffffffe, leaving: */
-#define SG_NVME_BROADCAST_NSID 0xffffffff	/* all namespaces */
+#define SG_NVME_BROADCAST_NSID 0xffffffff       /* all namespaces */
 #define SG_NVME_CTL_NSID 0x0            /* the "controller's" namespace */
+
+/* Given the NVMe Identify Controller response and optionally the NVMe
+ * Identify Namespace response (NULL otherwise), generate the SCSI VPD
+ * page 0x83 (device identification) descriptor(s) in dop. Return the
+ * number of bytes written which will not exceed max_do_len. Probably use
+ * Peripheral Device Type (pdt) of 0 (disk) for don't know. Transport
+ * protocol (tproto) should be -1 if not known, else SCSI value.
+ * N.B. Does not write total VPD page length into dop[2:3] . */
+int sg_make_vpd_devid_for_nvme(const uint8_t * nvme_id_ctl_p,
+                               const uint8_t * nvme_id_ns_p, int pdt,
+                               int tproto, uint8_t * dop, int max_do_len);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif		/* SG_PT_NVME_H */
+#endif          /* SG_PT_NVME_H */

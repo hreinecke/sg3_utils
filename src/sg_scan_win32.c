@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2017 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.18 (win32) 20171107";
+static const char * version_str = "1.19 (win32) 20180104";
 
 #define MAX_SCSI_ELEMS 2048
 #define MAX_ADAPTER_NUM 128
@@ -526,6 +526,8 @@ enum_pds(void)
             CloseHandle(fh);
         } else {
             err = GetLastError();
+            if ((0 == k) && (ERROR_ACCESS_DENIED == err))
+                pr2serr("Access denied on %s, may need Administrator\n");
             if (ERROR_SHARING_VIOLATION == err)
                 pr2serr("%s: in use by other process (sharing violation "
                         "[34])\n", adapter_name);

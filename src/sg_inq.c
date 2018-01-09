@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.81 20180102";    /* SPC-5 rev 17 */
+static const char * version_str = "1.81 20180106";    /* SPC-5 rev 18 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -162,7 +162,7 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_BLOCK_LIMITS_EXT, 0, 0, 0, "ble", "Block limits extension (SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
-#if 0
+#if 0           /* following found in sg_vpd */
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
      "but designators ordered as found"},
     {VPD_DEVICE_ID, VPD_DI_SEL_LU, -1, 0, "di_lu", "Device identification, "
@@ -242,7 +242,7 @@ struct opts_t {
     bool do_decode;
     bool do_vpd;
     bool p_given;
-    bool skip_vpd;  /* --only  after standard inq don't fetch VPD page 0x80 */
+    bool do_only;  /* --only  after standard inq don't fetch VPD page 0x80 */
     int do_block;
     int do_cmddt;
     int do_help;
@@ -322,7 +322,9 @@ usage()
             "    --maxlen=LEN|-m LEN    same as '--len='\n"
             "    --old|-O        use old interface (use as first option)\n"
             "    --only|-o       for std inquiry do not fetch serial number "
-            "vpd page\n"
+            "vpd page;\n"
+            "                    for NVMe device only do Identify "
+            "controller\n"
             "    --page=PG|-p PG     Vital Product Data (VPD) page number "
             "or\n"
             "                        abbreviation (opcode number if "
@@ -493,7 +495,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             ++op->do_help;
             break;
         case 'o':
-            op->skip_vpd = true;
+            op->do_only = true;
             break;
         case '?':
             if (! op->do_help)
@@ -657,7 +659,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->opt_new = true;
                     return 0;
                 case 'o':
-                    op->skip_vpd = true;
+                    op->do_only = true;
                     break;
                 case 'O':
                     break;
@@ -3246,7 +3248,7 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
             act_len = rlen - resid;
         if (act_len < SAFE_STD_INQ_RESP_LEN)
             rsp_buff[act_len] = '\0';
-        if ((! op->skip_vpd) && (! op->do_export) && (0 == op->resp_len)) {
+        if ((! op->do_only) && (! op->do_export) && (0 == op->resp_len)) {
             if (fetch_unit_serial_num(sg_fd, usn_buff, sizeof(usn_buff),
                                       op->do_verbose))
                 usn_buff[0] = '\0';
@@ -3814,7 +3816,7 @@ do_nvme_identify_hex_raw(const unsigned char * b, int b_len,
     else if (op->do_hex) {
         if (op->do_hex < 3) {
             printf("data_in buffer:\n");
-            dStrHex((const char *)b, b_len, 0);
+            dStrHex((const char *)b, b_len, (2 == op->do_hex));
         } else
             dStrHex((const char *)b, b_len, -1);
     }
@@ -3850,7 +3852,7 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     flbas = id_dinp[26] & 0xf;   /* index of active LBA format (for this ns) */
     if (op->do_hex || op->do_raw) {
         do_nvme_identify_hex_raw(id_dinp, id_din_len, op);
-        return ret;
+        return 0;
     }
     ns_sz = sg_get_unaligned_le64(id_dinp + 0);
     eui_64 = sg_get_unaligned_be64(id_dinp + 120);  /* N.B. big endian */
@@ -3903,7 +3905,9 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
 }
 
 /* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. For each
- * namespace found call do_nvme_id_ns(). */
+ * namespace found call do_nvme_id_ns(). CNS (Controller or Namespace
+ * Structure) field is CDW10 7:0, was only bit 0 in NVMe 1.0 and bits 1:0 in
+ * NVMe 1.1, thereafter 8 bits. */
 static int
 do_nvme_identify(int pt_fd, const struct opts_t * op)
 {
@@ -3937,6 +3941,7 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     memset(id_cmdp, 0, sizeof(*id_cmdp));
     id_cmdp->opcode = 0x6;
     nsid = get_pt_nvme_nsid(ptvp);
+    /* leave id_cmdp->nsid at 0 */
     id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
     id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, vb > 3);
     set_scsi_pt_data_in(ptvp, id_dinp, pg_sz);
@@ -3949,7 +3954,11 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         goto err_out;
     max_nsid = sg_get_unaligned_le32(id_dinp + 516); /* NN */
     if (op->do_raw || op->do_hex) {
-        do_nvme_identify_hex_raw(id_dinp, pg_sz, op);
+        if (op->do_only || (SG_NVME_CTL_NSID == nsid ) ||
+	    (SG_NVME_BROADCAST_NSID == nsid)) {
+            do_nvme_identify_hex_raw(id_dinp, pg_sz, op);
+            goto fini;
+        }
         goto skip1;
     }
     printf("Identify controller for %s:\n", op->device_name);
@@ -4085,8 +4094,10 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         }
     }
 skip1:
+    if (op->do_only)
+        goto fini;
     if (nsid > 0) {
-        if ((! op->do_raw) || (op->do_hex < 3)) {
+        if (! (op->do_raw || (op->do_hex > 2))) {
             printf("  Namespace %u (derived from device name):\n", nsid);
             if (nsid > max_nsid)
                 pr2serr("NSID from device (%u) should not exceed number of "
@@ -4103,8 +4114,12 @@ skip1:
             ret = do_nvme_id_ns(ptvp, k, id_cmdp, id_dinp, pg_sz, op);
             if (ret)
                 goto err_out;
+            if (op->do_raw || op->do_hex)
+                goto fini;
         }
     }
+fini:
+    ret = 0;
 err_out:
     destruct_scsi_pt_obj(ptvp);
     free(free_id_dinp);

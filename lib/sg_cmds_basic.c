@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2017 Douglas Gilbert.
+ * Copyright (c) 1999-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,14 +20,15 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include "sg_lib.h"
-#include "sg_cmds_basic.h"
-#include "sg_pt.h"
-#include "sg_unaligned.h"
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#include "sg_lib.h"
+#include "sg_cmds_basic.h"
+#include "sg_pt.h"
+#include "sg_unaligned.h"
 
 /* Needs to be after config.h */
 #ifdef SG_LIB_LINUX
@@ -35,7 +36,7 @@
 #endif
 
 
-static const char * const version_str = "1.77 20171030";
+static const char * const version_str = "1.78 20180104";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

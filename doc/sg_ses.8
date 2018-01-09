@@ -1,9 +1,9 @@
-.TH SG_SES "8" "December 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SES "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
-[\fI\-\-descriptor=DN\fR] [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR]
+[\fI\-\-descriptor=DES\fR] [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR]
 [\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
 [\fI\-\-join\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
@@ -12,7 +12,7 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 .PP
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
-[\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DN\fR]
+[\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DES\fR]
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR]
 [\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-nickname=SEN\fR]
 [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-readonly\fR]
@@ -113,11 +113,11 @@ reads one or more data strings from the file called \fIFN\fR, limit 2048
 bytes. The contents of the file is decoded in the same fashion as stdin
 described in the previous option.
 .TP
-\fB\-D\fR, \fB\-\-descriptor\fR=\fIDN\fR
-where \fIDN\fR is a descriptor name (string) as found in the Element
+\fB\-D\fR, \fB\-\-descriptor\fR=\fIDES\fR
+where \fIDES\fR is a descriptor name (string) as found in the Element
 Descriptor page. This is a medium level indexing alternative to the low
 level \fI\-\-index=\fR options. If the descriptor name contains a space then
-\fIDN\fR needs to be surrounded by quotes (single or double) or the space
+\fIDES\fR needs to be surrounded by quotes (single or double) or the space
 escaped (e.g. preceded by a backslash). See the DESCRIPTOR NAME, DEVICE SLOT
 NUMBER AND SAS ADDRESS section below.
 .TP
@@ -349,7 +349,7 @@ pages follow the same pattern as the Enclosure Status page.
 .PP
 The numeric index corresponding to the overall element is "\-1". If the
 Configuration page indicates a particular element type has "n" elements
-and n is greater than 0 then its indexes range from 0 to n-\1 . 
+and n is greater than 0 then its indexes range from 0 to n-\1 .
 .PP
 The Additional Element Status page is a bit more complicated. It has
 entries for "Number of possible elements" of certain Element types. It
@@ -400,7 +400,7 @@ power supply). They may also be used together with with the
 \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options which
 are described in the STR section below.
 .SH DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS
-The three options: \fI\-\-descriptor=DN\fR, \fI\-\-dev\-slot\-num=SN\fR
+The three options: \fI\-\-descriptor=DES\fR, \fI\-\-dev\-slot\-num=SN\fR
 and \fI\-\-sas\-addr=SA\fR allow medium level indexing, as an alternative
 to the low level \fI\-\-index=\fR options. Only one of the three options
 can be used in an invocation. Each of the three options implicitly set the
@@ -409,7 +409,7 @@ the Additional Element Status page as well as the pages needed by the
 \fI\-\-index=\fR option.
 .PP
 These medium level indexing options need support from the SES device and
-that support is optional. For example the \fI\-\-descriptor=DN\fR needs
+that support is optional. For example the \fI\-\-descriptor=DES\fR needs
 the Element Descriptor page provided by the SES device however that is
 optional. Also the provided descriptor names need to be useful, and having
 descriptor names which are all "0" is not very useful. Also some
@@ -629,7 +629,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2017 Douglas Gilbert
+Copyright \(co 2004\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
