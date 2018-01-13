@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Douglas Gilbert.
+ * Copyright (c) 2014-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <ctype.h>
 #include <string.h>
 #include <getopt.h>
@@ -25,46 +26,52 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
+
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
 #endif
 #endif
-#include "sg_unaligned.h"
-#include "sg_pr2serr.h"
 
 /*
  * This utility issues the SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.09 20171208";    /* ses4r01 */
+static const char * version_str = "1.10 20180112";    /* ses4r01 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
 #define DEF_XFER_LEN (8 * 1024 * 1024)
-#define DEF_DI_LEN (8 * 1024)
+#define DEF_DIN_LEN (8 * 1024)
 #define EBUFF_SZ 256
 
 #define DPC_DOWNLOAD_MICROCODE 0xe
 
 struct opts_t {
+    bool dry_run;
+    bool ealsd;
     bool mc_non;
     bool bpw_then_activate;
     bool mc_len_given;
-    int bpw;
+    int bpw;            /* bytes per write, chunk size */
     int mc_id;
-    int mc_len;
+    int mc_len;         /* --length=LEN */
     int mc_mode;
-    int mc_offset;
-    int mc_skip;
+    int mc_offset;      /* Buffer offset in SCSI commands */
+    int mc_skip;        /* on FILE */
     int mc_subenc;
-    int mc_tlen;
+    int mc_tlen;        /* --tlength=TLEN */
     int verbose;
 };
 
 static struct option long_options[] = {
     {"bpw", required_argument, 0, 'b'},
+    {"dry-run", no_argument, 0, 'd'},
+    {"dry_run", no_argument, 0, 'd'},
+    {"ealsd", no_argument, 0, 'e'},
     {"help", no_argument, 0, 'h'},
     {"id", required_argument, 0, 'i'},
     {"in", required_argument, 0, 'I'},
@@ -80,13 +87,85 @@ static struct option long_options[] = {
     {0, 0, 0, 0},
 };
 
+#define MODE_DNLD_STATUS        0
+#define MODE_DNLD_MC_OFFS       6
+#define MODE_DNLD_MC_OFFS_SAVE  7
+#define MODE_DNLD_MC_OFFS_DEFER 0x0E
+#define MODE_ACTIVATE_MC        0x0F
+#define MODE_ABORT_MC           0xFF    /* actually reserved; any reserved
+                                         * value aborts a microcode download
+                                         * in progress */
+
+struct mode_s {
+        const char *mode_string;
+        int   mode;
+        const char *comment;
+};
+
+static struct mode_s mode_arr[] = {
+    {"dmc_status", MODE_DNLD_STATUS, "report status of microcode "
+     "download"},
+    {"dmc_offs", MODE_DNLD_MC_OFFS, "download microcode with offsets "
+     "and activate"},
+    {"dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
+     "offsets, save and\n\t\t\t\tactivate"},
+    {"dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
+     "with offsets, save and\n\t\t\t\tdefer activation"},
+    {"activate_mc", MODE_ACTIVATE_MC, "activate deferred microcode"},
+    {"dmc_abort", MODE_ABORT_MC, "abort download microcode in progress"},
+    {NULL, 0, NULL},
+};
+
+struct diag_page_code {
+    int page_code;
+    const char * desc;
+};
+
+/* An array of Download microcode status field values and descriptions */
+static struct diag_page_code mc_status_arr[] = {
+    {0x0, "No download microcode operation in progress"},
+    {0x1, "Download in progress, awaiting more"},
+    {0x2, "Download complete, updating storage"},
+    {0x3, "Updating storage with deferred microcode"},
+    {0x10, "Complete, no error, starting now"},
+    {0x11, "Complete, no error, start after hard reset or power cycle"},
+    {0x12, "Complete, no error, start after power cycle"},
+    {0x13, "Complete, no error, start after activate_mc, hard reset or "
+           "power cycle"},
+    {0x80, "Error, discarded, see additional status"},
+    {0x81, "Error, discarded, image error"},
+    {0x82, "Timeout, discarded"},
+    {0x83, "Internal error, need new microcode before reset"},
+    {0x84, "Internal error, need new microcode, reset safe"},
+    {0x85, "Unexpected activate_mc received"},
+    {0x1000, NULL},
+};
+
+struct dout_buff_t {
+    unsigned char * doutp;
+    unsigned char * free_doutp;
+    int dout_len;
+};
+
+/* This dummy response is used when --dry-run skips the RECEIVE DIAGNOSTICS
+ * RESULTS command. Say maximum download MC size is 4 MB. Set generation
+ * code to 0 . */
+uint8_t dummy_rd_resp[] = {
+    0xe,  3,  0, 68,  0, 0, 0, 0,
+    0,  0,  0,  0,  0x0, 0x40, 0x0, 0x0,  0, 0, 0,  0,  0x0, 0x0, 0x0, 0x0,
+    0,  1,  0,  0,  0x0, 0x40, 0x0, 0x0,  0, 0, 0,  0,  0x0, 0x0, 0x0, 0x0,
+    0,  2,  0,  0,  0x0, 0x40, 0x0, 0x0,  0, 0, 0,  0,  0x0, 0x0, 0x0, 0x0,
+    0,  3,  0,  0,  0x0, 0x40, 0x0, 0x0,  0, 0, 0,  0,  0x0, 0x0, 0x0, 0x0,
+};
+
 
 static void
 usage()
 {
     pr2serr("Usage: "
-            "sg_ses_microcode [--bpw=CS] [--help] [--id=ID] [--in=FILE]\n"
-            "                        [--length=LEN] [--mode=MO] "
+            "sg_ses_microcode [--bpw=CS] [--dry-run] [--ealsd] [--help] "
+            "[--id=ID]\n"
+            "                        [--in=FILE] [--length=LEN] [--mode=MO] "
             "[--non]\n"
             "                        [--offset=OFF] [--skip=SKIP] "
             "[--subenc=SEID]\n"
@@ -98,14 +177,20 @@ usage()
             "diagnostic\n"
             "                           command (def: 0 -> as many as "
             "possible)\n"
+            "                           can append ',act' to do activate "
+            "after last\n"
+            "    --dry-run|-d           skip SCSI commands, do everything "
+            "else\n"
+            "    --ealsd|-e             exit after last Send Diagnostic "
+            "command\n"
             "    --help|-h              print out usage message then exit\n"
             "    --id=ID|-i ID          buffer identifier (0 (default) to "
             "255)\n"
             "    --in=FILE|-I FILE      read from FILE ('-I -' read "
             "from stdin)\n"
-            "    --length=LEN|-l LEN    length in bytes to send; may be "
+            "    --length=LEN|-l LEN    length in bytes to send (def: "
             "deduced from\n"
-            "                           FILE\n"
+            "                           FILE taking SKIP into account)\n"
             "    --mode=MO|-m MO        download microcode mode, MO is "
             "number or\n"
             "                           acronym (def: 0 -> 'dmc_status')\n"
@@ -133,32 +218,6 @@ usage()
           );
 }
 
-#define MODE_DNLD_STATUS        0
-#define MODE_DNLD_MC_OFFS       6
-#define MODE_DNLD_MC_OFFS_SAVE  7
-#define MODE_DNLD_MC_OFFS_DEFER 0x0E
-#define MODE_ACTIVATE_MC        0x0F
-
-struct mode_s {
-        const char *mode_string;
-        int   mode;
-        const char *comment;
-};
-
-static struct mode_s mode_arr[] = {
-    {"dmc_status", MODE_DNLD_STATUS, "report status of microcode "
-     "download"},
-    {"dmc_offs", MODE_DNLD_MC_OFFS, "download microcode with offsets "
-     "and activate"},
-    {"dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
-     "offsets, save and\n\t\t\t\tactivate"},
-    {"dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
-     "with offsets, save and\n\t\t\t\tdefer activation"},
-    {"activate_mc", MODE_ACTIVATE_MC, "activate deferred microcode"},
-    {NULL, 0, NULL},
-};
-
-
 static void
 print_modes(void)
 {
@@ -167,38 +226,13 @@ print_modes(void)
     pr2serr("The modes parameter argument can be numeric (hex or decimal)\n"
             "or symbolic:\n");
     for (mp = mode_arr; mp->mode_string; ++mp) {
-        pr2serr(" %2d (0x%02x)  %-18s%s\n", mp->mode, mp->mode,
+        pr2serr(" %3d [0x%02x]  %-18s%s\n", mp->mode, mp->mode,
                 mp->mode_string, mp->comment);
     }
     pr2serr("\nAdditionally '--bpw=<val>,act' does a activate deferred "
             "microcode after a\nsuccessful multipart dmc_offs_defer mode "
             "download.\n");
 }
-
-struct diag_page_code {
-    int page_code;
-    const char * desc;
-};
-
-/* An array of Download microcode status field values and descriptions */
-static struct diag_page_code mc_status_arr[] = {
-    {0x0, "No download microcode operation in progress"},
-    {0x1, "Download in progress, awaiting more"},
-    {0x2, "Download complete, updating storage"},
-    {0x3, "Updating storage with deferred microcode"},
-    {0x10, "Complete, no error, starting now"},
-    {0x11, "Complete, no error, start after hard reset or power cycle"},
-    {0x12, "Complete, no error, start after power cycle"},
-    {0x13, "Complete, no error, start after activate_mc, hard reset or "
-           "power cycle"},
-    {0x80, "Error, discarded, see additional status"},
-    {0x81, "Error, discarded, image error"},
-    {0x82, "Timeout, discarded"},
-    {0x83, "Internal error, need new microcode before reset"},
-    {0x84, "Internal error, need new microcode, reset safe"},
-    {0x85, "Unexpected activate_mc received"},
-    {0x1000, NULL},
-};
 
 static const char *
 get_mc_status_str(unsigned char status_val)
@@ -212,10 +246,10 @@ get_mc_status_str(unsigned char status_val)
     return "";
 }
 
-/* DPC_DOWNLOAD_MICROCODE [0xe] */
+/* display DPC_DOWNLOAD_MICROCODE status dpage [0xe] */
 static void
-ses_download_code_sdg(const unsigned char * resp, int resp_len,
-                      uint32_t gen_code)
+show_download_mc_sdg(const unsigned char * resp, int resp_len,
+                     uint32_t gen_code)
 {
     int k, num_subs, num;
     const unsigned char * bp;
@@ -255,20 +289,14 @@ truncated:
     return;
 }
 
-struct dout_buff_t {
-    unsigned char * doutp;
-    unsigned char * free_doutp;
-    int dout_len;
-};
-
 static int
 send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
                   const unsigned char * dmp, int dmp_len,
                   struct dout_buff_t * wp, unsigned char * dip,
-                  bool last, const struct opts_t * op)
+                  int din_len, bool last, const struct opts_t * op)
 {
     bool send_data = false;
-    int do_len, rem, res, rsp_len, k, num, mc_status, resid, act_len, verb;
+    int do_len, rem, res, rsp_len, k, n, num, mc_status, resid, act_len, verb;
     int ret = 0;
     uint32_t rec_gen_code;
     const unsigned char * bp;
@@ -286,10 +314,11 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
             do_len += (4 - rem);
         break;
     case MODE_ACTIVATE_MC:
+    case MODE_ABORT_MC:
         do_len = 24;
         break;
     default:
-        pr2serr("send_then_receive: unexpected mc_mode=0x%x\n", op->mc_mode);
+        pr2serr("%s: unexpected mc_mode=0x%x\n", __func__, op->mc_mode);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (do_len > wp->dout_len) {
@@ -298,12 +327,12 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
         wp->doutp = (unsigned char *)sg_memalign(do_len, sg_get_page_size(),
                                         &wp->free_doutp, op->verbose > 3);
         if (! wp->doutp) {
-            pr2serr("send_then_receive: unable to alloc %d bytes\n", do_len);
+            pr2serr("%s: unable to alloc %d bytes\n", __func__, do_len);
             return SG_LIB_CAT_OTHER;
         }
         wp->dout_len = do_len;
-    }
-    memset(wp->doutp, 0, do_len);
+    } else
+        memset(wp->doutp, 0, do_len);
     wp->doutp[0] = DPC_DOWNLOAD_MICROCODE;
     wp->doutp[1] = op->mc_subenc;
     sg_put_unaligned_be16(do_len - 4, wp->doutp + 2);
@@ -316,11 +345,36 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     sg_put_unaligned_be32(dmp_len, wp->doutp + 20);
     if (send_data && (dmp_len > 0))
         memcpy(wp->doutp + 24, dmp, dmp_len);
+    if ((op->verbose > 2) || (op->dry_run && op->verbose)) {
+        pr2serr("send diag: sub-enc id=%u exp_gen=%u download_mc_code=%u "
+                "buff_id=%u\n", op->mc_subenc, gen_code, op->mc_mode,
+                op->mc_id);
+        pr2serr("    buff_off=%u image_len=%u this_mc_data_len=%u "
+                "dout_len=%u\n", op->mc_offset + off_off, op->mc_tlen,
+                dmp_len, do_len);
+    }
     /* select long duration timeout (7200 seconds) */
-    res = sg_ll_send_diag(sg_fd, 0 /* sf_code */, true /* pf */,
-                          false /* sf */, false /* devofl */,
-                          false /* unitofl */, 1 /* long_duration */,
-                          wp->doutp, do_len, true /* noisy */, verb);
+    if (op->dry_run) {
+        if (op->mc_subenc < 4) {
+            int s = op->mc_offset + off_off + dmp_len;
+
+            n = 8 + (op->mc_subenc * 16);
+            dummy_rd_resp[n + 11] = op->mc_id;
+            sg_put_unaligned_be32(((send_data && (! last)) ? s : 0),
+                                  dummy_rd_resp + n + 12);
+            if (MODE_ABORT_MC == op->mc_mode)
+                dummy_rd_resp[n + 2] = 0x80;
+            else if (MODE_ACTIVATE_MC == op->mc_mode)
+                dummy_rd_resp[n + 2] = 0x0;     /* done */
+            else
+                dummy_rd_resp[n + 2] = (s >= op->mc_tlen) ? 0x13 : 0x1;
+        }
+        res = 0;
+    } else
+        res = sg_ll_send_diag(sg_fd, 0 /* st_code */, true /* pf */,
+                              false /* st */, false /* devofl */,
+                              false /* unitofl */, 1 /* long_duration */,
+                              wp->doutp, do_len, true /* noisy */, verb);
     if (op->mc_non) {
         /* If non-standard, only call RDR after failed SD */
         if (0 == res)
@@ -333,36 +387,49 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
         case MODE_DNLD_MC_OFFS_SAVE:
             if (res)
                 return res;
-            else if (last)
-                return 0;   /* RDR after last may hit a device reset */
+            else if (last) {
+                if (op->ealsd)
+                    return 0;   /* RDR after last may hit a device reset */
+            }
             break;
         case MODE_DNLD_MC_OFFS_DEFER:
             if (res)
                 return res;
             break;
         case MODE_ACTIVATE_MC:
-            if (0 == res)
-                return 0;   /* RDR after ACTIVATE_MC may hit a device reset */
+        case MODE_ABORT_MC:
+            if (0 == res) {
+                if (op->ealsd)
+                    return 0;   /* RDR after this may hit a device reset */
+            }
             /* SD has failed, so do a RDR but return SD's error */
             ret = res;
             break;
         default:
-            pr2serr("send_then_receive: mc_mode=0x%x\n", op->mc_mode);
+            pr2serr("%s: mc_mode=0x%x\n", __func__, op->mc_mode);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
 
-    res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
-                                dip, DEF_DI_LEN, 0 /* default timeout */,
-                                &resid, true, verb);
+    if (op->dry_run) {
+        n = sizeof(dummy_rd_resp);
+        n = (n < din_len) ? n : din_len;
+        memcpy(dip, dummy_rd_resp, n);
+        resid = din_len - n;
+        res = 0;
+    } else
+        res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */,
+                                    DPC_DOWNLOAD_MICROCODE, dip, din_len,
+                                    0 /* default timeout */, &resid, true,
+                                    verb);
     if (res)
         return ret ? ret : res;
     rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
-    act_len = DEF_DI_LEN - resid;
-    if (rsp_len > DEF_DI_LEN) {
+    act_len = din_len - resid;
+    if (rsp_len > din_len) {
         pr2serr("<<< warning response buffer too small [%d but need "
-                "%d]>>>\n", DEF_DI_LEN, rsp_len);
-        rsp_len = DEF_DI_LEN;
+                "%d]>>>\n", din_len, rsp_len);
+        rsp_len = din_len;
     }
     if (rsp_len > act_len) {
         pr2serr("<<< warning response too short [actually got %d but need "
@@ -370,10 +437,17 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
         rsp_len = act_len;
     }
     if (rsp_len < 8) {
-        pr2serr("Download microcode status dpage too short\n");
+        pr2serr("Download microcode status dpage too short [%d]\n", rsp_len);
         return ret ? ret : SG_LIB_CAT_OTHER;
     }
     rec_gen_code = sg_get_unaligned_be32(dip + 4);
+    if ((op->verbose > 2) || (op->dry_run && op->verbose)) {
+        n = 8 + (op->mc_subenc * 16);
+        pr2serr("rec diag: rsp_len=%d, num_sub-enc=%u rec_gen_code=%u "
+                "exp_buff_off=%u\n", rsp_len, dip[1],
+                sg_get_unaligned_be32(dip + 4),
+                sg_get_unaligned_be32(dip + n + 12));
+    }
     if (rec_gen_code != gen_code)
         pr2serr("gen_code changed from %" PRIu32 " to %" PRIu32
                 ", continuing but may fail\n", gen_code, rec_gen_code);
@@ -387,8 +461,8 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
             mc_status = bp[2];
             cp = get_mc_status_str(mc_status);
             if ((mc_status >= 0x80) || op->verbose)
-                pr2serr("mc offset=%d: status: %s [0x%x, additional=0x%x]\n",
-                        off_off, cp, mc_status, bp[3]);
+                pr2serr("mc offset=%u: status: %s [0x%x, additional=0x%x]\n",
+                        sg_get_unaligned_be32(bp + 12), cp, mc_status, bp[3]);
             if (op->verbose > 1)
                 pr2serr("  subenc_id=%d, expected_buffer_id=%d, "
                         "expected_offset=0x%" PRIx32 "\n", bp[1], bp[11],
@@ -405,7 +479,8 @@ int
 main(int argc, char * argv[])
 {
     bool last, got_stdin, is_reg;
-    int sg_fd, res, c, len, k, n, rsp_len, resid, act_len, verb;
+    bool want_file = false;
+    int sg_fd, res, c, len, k, n, rsp_len, resid, act_len, din_len, verb;
     int infd = -1;
     int do_help = 0;
     int ret = 0;
@@ -426,10 +501,11 @@ main(int argc, char * argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     memset(&dout, 0, sizeof(dout));
+    din_len = DEF_DIN_LEN;
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:hi:I:l:m:No:s:S:t:vV", long_options,
+        c = getopt_long(argc, argv, "b:dehi:I:l:m:No:s:S:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -446,6 +522,12 @@ main(int argc, char * argv[])
                 if (0 == strncmp("act", cp + 1, 3))
                     op->bpw_then_activate = true;
             }
+            break;
+        case 'd':
+            op->dry_run = true;
+            break;
+        case 'e':
+            op->ealsd = true;
             break;
         case 'h':
         case '?':
@@ -562,14 +644,35 @@ main(int argc, char * argv[])
     }
 
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
+    }
+    switch (op->mc_mode) {
+    case MODE_DNLD_MC_OFFS:
+    case MODE_DNLD_MC_OFFS_SAVE:
+    case MODE_DNLD_MC_OFFS_DEFER:
+        want_file = true;
+        break;
+    case MODE_DNLD_STATUS:
+    case MODE_ACTIVATE_MC:
+    case MODE_ABORT_MC:
+        want_file = false;
+        break;
+    default:
+        pr2serr("%s: mc_mode=0x%x, continue for now\n", __func__,
+                op->mc_mode);
+        break;
     }
 
     if ((op->mc_len > 0) && (op->bpw > op->mc_len)) {
         pr2serr("trim chunk size (CS) to be the same as LEN\n");
         op->bpw = op->mc_len;
+    }
+    if ((op->mc_offset > 0) && (op->bpw > 0)) {
+        op->mc_offset = 0;
+        pr2serr("WARNING: --offset= ignored (set back to 0) when --bpw= "
+                "argument given (and > 0)\n");
     }
 
 #ifdef SG_LIB_WIN32
@@ -588,8 +691,7 @@ main(int argc, char * argv[])
         return SG_LIB_FILE_ERROR;
     }
 
-    if (file_name && ((MODE_DNLD_STATUS == op->mc_mode) ||
-                      (MODE_ACTIVATE_MC == op->mc_mode)))
+    if (file_name && (! want_file))
         pr2serr("ignoring --in=FILE option\n");
     else if (file_name) {
         got_stdin = (0 == strcmp(file_name, "-"));
@@ -629,7 +731,7 @@ main(int argc, char * argv[])
             goto fini;
         }
         if (NULL == (dmp = (unsigned char *)malloc(op->mc_len))) {
-            pr2serr(ME "out of memory (to hold microcode)\n");
+            pr2serr(ME "out of memory to hold microcode read from FILE\n");
             ret = SG_LIB_CAT_OTHER;
             goto fini;
         }
@@ -682,8 +784,7 @@ main(int argc, char * argv[])
         if (! got_stdin)
             close(infd);
         infd = -1;
-    } else if (! ((MODE_DNLD_STATUS == op->mc_mode) ||
-                  (MODE_ACTIVATE_MC == op->mc_mode))) {
+    } else if (want_file) {
         pr2serr("need --in=FILE option with given mode\n");
         ret = SG_LIB_SYNTAX_ERROR;
         goto fini;
@@ -696,25 +797,33 @@ main(int argc, char * argv[])
         goto fini;
     }
 
-    if (NULL == (dip = (unsigned char *)sg_memalign(DEF_DI_LEN,
-                            sg_get_page_size(), &free_dip, op->verbose > 3))) {
+    dip = (unsigned char *)sg_memalign(din_len, sg_get_page_size(),
+                                       &free_dip, op->verbose > 3);
+    if (NULL == dip) {
         pr2serr(ME "out of memory (data-in buffer)\n");
         ret = SG_LIB_CAT_OTHER;
         goto fini;
     }
-    memset(dip, 0, DEF_DI_LEN);
     verb = (op->verbose > 1) ? op->verbose - 1 : 0;
     /* Fetch Download microcode status dpage for generation code ++ */
-    res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, DPC_DOWNLOAD_MICROCODE,
-                                dip, DEF_DI_LEN, 0 /*default timeout */,
-                                &resid, true, verb);
+    if (op->dry_run) {
+        n = sizeof(dummy_rd_resp);
+        n = (n < din_len) ? n : din_len;
+        memcpy(dip, dummy_rd_resp, n);
+        resid = din_len - n;
+        res = 0;
+    } else
+        res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */,
+                                    DPC_DOWNLOAD_MICROCODE, dip, din_len,
+                                    0 /*default timeout */, &resid, true,
+                                    verb);
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(dip + 2) + 4;
-        act_len = DEF_DI_LEN - resid;
-        if (rsp_len > DEF_DI_LEN) {
+        act_len = din_len - resid;
+        if (rsp_len > din_len) {
             pr2serr("<<< warning response buffer too small [%d but need "
-                    "%d]>>>\n", DEF_DI_LEN, rsp_len);
-            rsp_len = DEF_DI_LEN;
+                    "%d]>>>\n", din_len, rsp_len);
+            rsp_len = din_len;
         }
         if (rsp_len > act_len) {
             pr2serr("<<< warning response too short [actually got %d but "
@@ -726,6 +835,10 @@ main(int argc, char * argv[])
             ret = SG_LIB_CAT_OTHER;
             goto fini;
         }
+        if ((op->verbose > 2) || (op->dry_run && op->verbose))
+            pr2serr("rec diag(ini): rsp_len=%d, num_sub-enc=%u "
+                    "rec_gen_code=%u\n", rsp_len, dip[1],
+                    sg_get_unaligned_be32(dip + 4));
     } else {
         ret = res;
         goto fini;
@@ -733,11 +846,11 @@ main(int argc, char * argv[])
     gen_code = sg_get_unaligned_be32(dip + 4);
 
     if (MODE_DNLD_STATUS == op->mc_mode) {
-        ses_download_code_sdg(dip, rsp_len, gen_code);
+        show_download_mc_sdg(dip, rsp_len, gen_code);
         goto fini;
-    } else if (MODE_ACTIVATE_MC == op->mc_mode) {
-        res = send_then_receive(sg_fd, gen_code, 0, NULL, 0, &dout, dip, 1,
-                                op);
+    } else if (! want_file) {   /* ACTIVATE and ABORT */
+        res = send_then_receive(sg_fd, gen_code, 0, NULL, 0, &dout, dip,
+                                din_len, true, op);
         ret = res;
         goto fini;
     }
@@ -754,7 +867,7 @@ main(int argc, char * argv[])
                 pr2serr("bpw loop: mode=0x%x, id=%d, off_off=%d, len=%d, "
                         "last=%d\n", op->mc_mode, op->mc_id, k, n, last);
             res = send_then_receive(sg_fd, gen_code, k, dmp + k, n, &dout,
-                                    dip, (int)last, op);
+                                    dip, din_len, last, op);
             if (res)
                 break;
         }
@@ -763,14 +876,14 @@ main(int argc, char * argv[])
             if (op->verbose)
                 pr2serr("sending Activate deferred microcode [0xf]\n");
             res = send_then_receive(sg_fd, gen_code, 0, NULL, 0, &dout,
-                                    dip, 1, op);
+                                    dip, din_len, true, op);
         }
     } else {
         if (op->verbose)
             pr2serr("single: mode=0x%x, id=%d, offset=%d, len=%d\n",
                     op->mc_mode, op->mc_id, op->mc_offset, op->mc_len);
         res = send_then_receive(sg_fd, gen_code, 0, dmp, op->mc_len, &dout,
-                                dip, 1, op);
+                                dip, din_len, true, op);
     }
     if (res)
         ret = res;

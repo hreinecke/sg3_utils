@@ -329,7 +329,7 @@ OS system calls that fail often return a small integer number to help
 indicate what the error is. For example in Unix the inability of a system
 call to allocate memory returns (in 'errno') ENOMEM which often is
 associated with the integer 12. So 62 (i.e. '50 + 12') may be returned
-by a utility in this case. It is also possible that a utiity in this
+by a utility in this case. It is also possible that a utility in this
 package reports 50+ENOMEM when it can't allocate memory, not necessarily
 from an OS system call. In recent versions of Linux the file showing the
 mapping between symbolic constants (e.g. ENOMEM) and the corresponding
@@ -448,7 +448,7 @@ usually sent to stderr so as to not interfere with the output from this
 option.
 .br
 Some utilities that consume data to send to the \fIDEVICE\fR along with the
-SCSI command, use this option. Alernatively the \fI\-\-in=FN\fR option causes
+SCSI command, use this option. Alternatively the \fI\-\-in=FN\fR option causes
 \fIDEVICE\fR to be ignored and the response data (to be decoded) fetched
 from a file named \fIFN\fR. In these cases this option may indicate that
 binary data can be read from stdin or from a nominated file (e.g. \fIFN\fR).

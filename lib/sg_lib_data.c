@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.36 20180104";/* spc5r17, sbc4r15 */
+const char * sg_lib_version_str = "2.37 20180109";/* spc5r17, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1507,6 +1507,8 @@ struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
     {0x0, 0, NULL},     /* 0x0 is reserved sfs; trailing sentinel */
 };
 
+#if (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME))
+
 /* .value is completion queue's DW3 as follows: ((DW3 >> 17) & 0x3ff)
  * .peri_dev_type is an index for the sg_lib_scsi_status_sense_arr[]
  * .name is taken from NVMe 1.3a document, section 4.6.1.2.1 with less
@@ -1516,7 +1518,6 @@ struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
  * Bits 29:28 are reserved, bit 27:25 are the "Status Code Type" (SCT)
  * and bits 24:17 are the Status Code (SC). This table is in ascending
  * order of its .value field so a binary search could be done on it.  */
-#ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
 {
     /* Generic command status values, Status Code Type (SCT): 0h
@@ -1665,7 +1666,7 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
 };
 
 
-#else           /* no SG_SCSI_STRINGS define in config.sys */
+#else           /* (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME)) */
 struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
 {
 
@@ -1680,4 +1681,4 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
     {0xff, 0xff, 0xff, 0xff},
 };
 
-#endif          /* SG_SCSI_STRINGS */
+#endif           /* (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME)) */

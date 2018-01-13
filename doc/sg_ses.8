@@ -248,8 +248,10 @@ the read\-mask\-modify\-write sequence.
 DIAGNOSTIC RESULTS commands sent by the utility. It represents the maximum
 size of data the SES device can return (in bytes). It cannot exceed 65535
 and defaults to 65532 (bytes). Some systems may not permit such large sizes
-hence the need for this option. If \fILEN\fR is set to 0 then the default
-size is used.
+hence the need for this option. If \fILEN\fR is less than 0 or greater than
+65535 then an error is generated. If \fILEN\fR is 0 then the default value
+is used, otherwise if it is less than 4 then it is ignored (and a warning is
+sent to stderr).
 .TP
 \fB\-n\fR, \fB\-\-nickname\fR=\fISEN\fR
 where \fISEN\fR is the new Subenclosure Nickname. Only the first 32
@@ -381,7 +383,7 @@ individual index then the option is equivalent to \fI\-\-index=0,II\fR. When
 .PP
 Wherever an individual index is applicable, it can be replaced by an
 individual index range. It has the form: <first_ii>-<last_ii>. For
-example: '3\-5' will select individial indexes 3, 4 and 5 .
+example: '3\-5' will select individual indexes 3, 4 and 5 .
 .PP
 To cope with vendor specific Element types (which should be in the range 128
 to 255) the Element type can be given as a number with a leading underscore.

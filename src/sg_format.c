@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2017  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2018  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.41 20171107";
+static const char * version_str = "1.42 20180112";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -281,7 +281,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         return ret;
 }
 
-/* Return 0 on success, else see sg_ll_format_unit2() */
+/* Return 0 on success, else see sg_ll_format_unit_v2() */
 static int
 scsi_format_unit(int fd, const struct opts_t * op)
 {
@@ -323,10 +323,11 @@ scsi_format_unit(int fd, const struct opts_t * op)
         if (need_hdr)
                 fmt_pl_sz = off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0);
 
-        res = sg_ll_format_unit2(fd, op->fmtpinfo, longlist,
-                                 need_hdr/* FMTDATA*/, op->cmplst,
-                                 0 /* DEFECT_LIST_FORMAT */, op->ffmt,
-                                 timeout, fmt_pl, fmt_pl_sz, 1, op->verbose);
+        res = sg_ll_format_unit_v2(fd, op->fmtpinfo, longlist,
+                                   need_hdr/* FMTDATA*/, op->cmplst,
+                                   0 /* DEFECT_LIST_FORMAT */, op->ffmt,
+                                   timeout, fmt_pl, fmt_pl_sz, true,
+                                   op->verbose);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format unit command: %s\n", b);

@@ -32,7 +32,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.28 20180107";    /* ses4r01 */
+static const char * version_str = "2.29 20180111";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1075,7 +1075,7 @@ parse_index(struct opts_t *op)
 static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
-    int c, j, ret;
+    int c, j, n, ret;
     const char * data_arg = NULL;
     uint64_t saddr;
     const char * cp;
@@ -1210,12 +1210,18 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->seid_given = true;
             break;
         case 'm':
-            op->maxlen = sg_get_num(optarg);
-            if ((op->maxlen < 0) || (op->maxlen > 65535)) {
-                pr2serr("bad argument to '--maxlen' (0 to 65535 "
-                        "inclusive expected)\n");
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 65535)) {
+                pr2serr("bad argument to '--maxlen' (0 to 65535 inclusive "
+			"expected)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if (0 == n)
+		op->maxlen = MX_ALLOC_LEN;
+            else if (n < 4)
+                pr2serr("Warning: --maxlen= less than 4 ignored\n");
+            else
+                op->maxlen = n;
             break;
         case 'M':
             op->mask_ign = true;
@@ -1313,8 +1319,6 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if (op->maxlen <= 0)
-        op->maxlen = MX_ALLOC_LEN;
     if (op->do_join && op->do_control) {
         pr2serr("cannot have '--join' and '--control'\n");
         goto err_help;
@@ -5223,6 +5227,7 @@ main(int argc, char * argv[])
     memset(op, 0, sizeof(*op));
     op->dev_slot_num = -1;
     op->ind_indiv_last = -1;
+    op->maxlen = MX_ALLOC_LEN;
     pg_sz = sg_get_page_size();
     res = parse_cmd_line(op, argc, argv);
     if (res)
@@ -5239,34 +5244,34 @@ main(int argc, char * argv[])
         enumerate_work(op);
         return 0;
     }
-    enc_stat_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_enc_stat_rsp,
+    enc_stat_rsp = sg_memalign(op->maxlen, pg_sz, &free_enc_stat_rsp,
                                op->verbose > 3);
     if (NULL == enc_stat_rsp) {
         pr2serr("Unable to get heap for enc_stat_rsp\n");
         goto err_out;
     }
-    enc_stat_rsp_sz = MX_ALLOC_LEN;
-    elem_desc_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_elem_desc_rsp,
+    enc_stat_rsp_sz = op->maxlen;
+    elem_desc_rsp = sg_memalign(op->maxlen, pg_sz, &free_elem_desc_rsp,
                                op->verbose > 3);
     if (NULL == elem_desc_rsp) {
         pr2serr("Unable to get heap for elem_desc_rsp\n");
         goto err_out;
     }
-    elem_desc_rsp_sz = MX_ALLOC_LEN;
-    add_elem_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_add_elem_rsp,
+    elem_desc_rsp_sz = op->maxlen;
+    add_elem_rsp = sg_memalign(op->maxlen, pg_sz, &free_add_elem_rsp,
                                op->verbose > 3);
     if (NULL == add_elem_rsp) {
         pr2serr("Unable to get heap for add_elem_rsp\n");
         goto err_out;
     }
-    add_elem_rsp_sz = MX_ALLOC_LEN;
-    threshold_rsp = sg_memalign(MX_ALLOC_LEN, pg_sz, &free_threshold_rsp,
+    add_elem_rsp_sz = op->maxlen;
+    threshold_rsp = sg_memalign(op->maxlen, pg_sz, &free_threshold_rsp,
                                op->verbose > 3);
     if (NULL == threshold_rsp) {
         pr2serr("Unable to get heap for threshold_rsp\n");
         goto err_out;
     }
-    threshold_rsp_sz = MX_ALLOC_LEN;
+    threshold_rsp_sz = op->maxlen;
 
     if (op->num_cgs) {
         have_cgs = true;

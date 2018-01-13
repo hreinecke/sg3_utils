@@ -42,11 +42,11 @@
 #include "sg_pt.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
-#ifdef HAVE_NVME
+#if (HAVE_NVME && (! IGNORE_NVME))
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.81 20180106";    /* SPC-5 rev 18 */
+static const char * version_str = "1.83 20180112";    /* SPC-5 rev 18 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -139,6 +139,8 @@ static void decode_dev_ids(const char * leadin, unsigned char * buff,
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int verbose);
+struct opts_t;
+static void prepare_ata_identify(const struct opts_t * op, int inhex_len);
 #endif
 
 /* This structure is a duplicate of one of the same name in sg_vpd_vendor.c .
@@ -235,14 +237,15 @@ static struct option long_options[] = {
 
 struct opts_t {
     bool do_ata;
+    bool do_decode;
     bool do_descriptors;
     bool do_export;
     bool do_force;
-    bool do_version;
-    bool do_decode;
-    bool do_vpd;
-    bool p_given;
     bool do_only;  /* --only  after standard inq don't fetch VPD page 0x80 */
+    bool do_version;
+    bool do_vpd;
+    bool page_given;
+    bool possible_nvme;
     int do_block;
     int do_cmddt;
     int do_help;
@@ -487,6 +490,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_decode = true;
             op->do_vpd = true;
             op->page_num = VPD_EXT_INQ;
+            op->page_given = true;
             break;
         case 'f':
             op->do_force = true;
@@ -508,6 +512,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_decode = true;
             op->do_vpd = true;
             op->page_num = VPD_DEVICE_ID;
+            op->page_given = true;
             break;
         case 'I':
             op->inhex_fn = optarg;
@@ -534,7 +539,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 #endif
         case 'p':
             op->page_arg = optarg;
-            op->p_given = true;
+            op->page_given = true;
             break;
         case 'r':
             ++op->do_raw;
@@ -603,6 +608,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'a':
                     op->page_num = VPD_ATA_INFO;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
 #ifdef SG_LIB_LINUX
@@ -613,6 +619,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'b':
                     op->page_num = VPD_BLOCK_LIMITS;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
                 case 'c':
@@ -640,6 +647,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'i':
                     op->page_num = VPD_DEVICE_ID;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
                 case 'L':
@@ -649,10 +657,12 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->page_num = VPD_MAN_NET_ADDR;
                     op->do_vpd = true;
                     ++op->num_pages;
+                    op->page_given = true;
                     break;
                 case 'M':
                     op->page_num = VPD_MODE_PG_POLICY;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
                 case 'N':
@@ -666,6 +676,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'P':
                     op->page_num = VPD_UPR_EMC;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
                 case 'r':
@@ -674,6 +685,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 's':
                     op->page_num = VPD_SCSI_PORTS;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
                 case 'u':
@@ -688,6 +700,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'x':
                     op->page_num = VPD_EXT_INQ;
                     op->do_vpd = true;
+                    op->page_given = true;
                     ++op->num_pages;
                     break;
                 case '?':
@@ -726,7 +739,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 op->resp_len = n;
             } else if (0 == strncmp("p=", cp, 2)) {
                 op->page_arg = cp + 2;
-                op->p_given = true;
+                op->page_given = true;
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
@@ -3805,11 +3818,10 @@ out:
     return res;
 }
 
-#ifdef HAVE_NVME
+#if (HAVE_NVME && (! IGNORE_NVME))
 
 static void
-do_nvme_identify_hex_raw(const unsigned char * b, int b_len,
-                         const struct opts_t * op)
+nvme_hex_raw(const unsigned char * b, int b_len, const struct opts_t * op)
 {
     if (op->do_raw)
         dStrRaw((const char *)b, b_len);
@@ -3826,9 +3838,9 @@ const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
 
 /* Send Identify(CNS=0, nsid) and decode the Identify namespace response */
 static int
-do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
-              struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_dinp,
-              int id_din_len, const struct opts_t * op)
+nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
+                  struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_dinp,
+                  int id_din_len, const struct opts_t * op)
 {
     bool got_eui_128 = false;
     int ret = 0;
@@ -3851,7 +3863,7 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     num_lbaf = id_dinp[25] + 1;  /* spec says this is "0's based value" */
     flbas = id_dinp[26] & 0xf;   /* index of active LBA format (for this ns) */
     if (op->do_hex || op->do_raw) {
-        do_nvme_identify_hex_raw(id_dinp, id_din_len, op);
+        nvme_hex_raw(id_dinp, id_din_len, op);
         return 0;
     }
     ns_sz = sg_get_unaligned_le64(id_dinp + 0);
@@ -3904,10 +3916,14 @@ do_nvme_id_ns(struct sg_pt_base * ptvp, uint32_t nsid,
     return ret;
 }
 
-/* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. For each
- * namespace found call do_nvme_id_ns(). CNS (Controller or Namespace
- * Structure) field is CDW10 7:0, was only bit 0 in NVMe 1.0 and bits 1:0 in
- * NVMe 1.1, thereafter 8 bits. */
+/* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. If the
+ * device name includes a namespace indication (e.g. /dev/nvme0ns1) then
+ * an Identify namespace command is sent to that namespace (e.g. 1). If the
+ * device name does not contain a namespace indication (e.g. /dev/nvme0)
+ * and --only is not given then nvme_id_namespace() is sent for each
+ * namespace in the controller. Namespaces number sequentially starting at
+ * 1 . The CNS (Controller or Namespace Structure) field is CDW10 7:0, was
+ * only bit 0 in NVMe 1.0 and bits 1:0 in NVMe 1.1, thereafter 8 bits. */
 static int
 do_nvme_identify(int pt_fd, const struct opts_t * op)
 {
@@ -3955,8 +3971,8 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     max_nsid = sg_get_unaligned_le32(id_dinp + 516); /* NN */
     if (op->do_raw || op->do_hex) {
         if (op->do_only || (SG_NVME_CTL_NSID == nsid ) ||
-	    (SG_NVME_BROADCAST_NSID == nsid)) {
-            do_nvme_identify_hex_raw(id_dinp, pg_sz, op);
+            (SG_NVME_BROADCAST_NSID == nsid)) {
+            nvme_hex_raw(id_dinp, pg_sz, op);
             goto fini;
         }
         goto skip1;
@@ -4103,7 +4119,7 @@ skip1:
                 pr2serr("NSID from device (%u) should not exceed number of "
                         "namespaces (%u)\n", nsid, max_nsid);
         }
-        ret = do_nvme_id_ns(ptvp, nsid, id_cmdp, id_dinp, pg_sz, op);
+        ret = nvme_id_namespace(ptvp, nsid, id_cmdp, id_dinp, pg_sz, op);
         if (ret)
             goto err_out;
 
@@ -4111,7 +4127,7 @@ skip1:
         for (k = 1; k <= max_nsid; ++k) {
             if ((! op->do_raw) || (op->do_hex < 3))
                 printf("  Namespace %u (of %u):\n", k, max_nsid);
-            ret = do_nvme_id_ns(ptvp, k, id_cmdp, id_dinp, pg_sz, op);
+            ret = nvme_id_namespace(ptvp, k, id_cmdp, id_dinp, pg_sz, op);
             if (ret)
                 goto err_out;
             if (op->do_raw || op->do_hex)
@@ -4125,7 +4141,7 @@ err_out:
     free(free_id_dinp);
     return ret;
 }
-#endif          /* HAVE_NVME */
+#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
 
 
 int
@@ -4300,7 +4316,7 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((0 == op->do_cmddt) && (op->page_num >= 0) && op->p_given)
+    if ((0 == op->do_cmddt) && (op->page_num >= 0) && op->page_given)
         op->do_vpd = true;
 
     if (op->do_raw && op->do_hex) {
@@ -4355,7 +4371,14 @@ main(int argc, char * argv[])
                 return vpd_decode(-1, op, inhex_len);
             else
                 return vpd_mainly_hex(-1, op, inhex_len);
-        } else
+        }
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+        else if (op->do_ata) {
+            prepare_ata_identify(op, inhex_len);
+            return 0;
+        }
+#endif
+        else
             return std_inq_process(-1, op, inhex_len);
     }
 
@@ -4387,11 +4410,17 @@ main(int argc, char * argv[])
 #endif
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
-#ifdef HAVE_NVME
+#if (HAVE_NVME && (! IGNORE_NVME))
     n = check_pt_file_handle(sg_fd, op->device_name, op->do_verbose);
+    if (op->do_verbose > 1)
+        pr2serr("check_pt_file_handle()-->%d, page_given=%d\n", n,
+                op->page_given);
     if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
-        ret = do_nvme_identify(sg_fd, op);
-        goto fini2;
+        op->possible_nvme = true;
+        if (! op->page_given) {
+            ret = do_nvme_identify(sg_fd, op);
+            goto fini2;
+        }
     }
 #endif
 
@@ -4432,7 +4461,7 @@ main(int argc, char * argv[])
         }
     }
 
-#ifdef HAVE_NVME
+#if (HAVE_NVME && (! IGNORE_NVME))
 fini2:
 #endif
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
@@ -4563,15 +4592,63 @@ ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
     return 0;
 }
 
+static void
+show_ata_identify(const struct ata_identify_device * aidp, bool atapi,
+                  int vb)
+{
+    int res;
+    char model[64];
+    char serial[64];
+    char firm[64];
+
+    printf("%s device: model, serial number and firmware revision:\n",
+           (atapi ? "ATAPI" : "ATA"));
+    res = sg_ata_get_chars((const unsigned short *)aidp->model,
+                           0, 20, sg_is_big_endian(), model);
+    model[res] = '\0';
+    res = sg_ata_get_chars((const unsigned short *)aidp->serial_no,
+                           0, 10, sg_is_big_endian(), serial);
+    serial[res] = '\0';
+    res = sg_ata_get_chars((const unsigned short *)aidp->fw_rev,
+                           0, 4, sg_is_big_endian(), firm);
+    firm[res] = '\0';
+    printf("  %s %s %s\n", model, serial, firm);
+    if (vb) {
+        if (atapi)
+            printf("ATA IDENTIFY PACKET DEVICE response "
+                   "(256 words):\n");
+        else
+            printf("ATA IDENTIFY DEVICE response (256 words):\n");
+        dWordHex((const unsigned short *)aidp, 256, 0,
+                 sg_is_big_endian());
+    }
+}
+
+static void
+prepare_ata_identify(const struct opts_t * op, int inhex_len)
+{
+    int n = inhex_len;
+    struct ata_identify_device ata_ident;
+
+    if (n < 16) {
+        pr2serr("%s: got only %d bytes, give up\n", __func__, n);
+        return;
+    } else if (n < 512)
+        pr2serr("%s: expect 512 bytes or more, got %d, continue\n", __func__,
+                n);
+    else if (n > 512)
+        n = 512;
+    memset(&ata_ident, 0, sizeof(ata_ident));
+    memcpy(&ata_ident, rsp_buff, n);
+    show_ata_identify(&ata_ident, false, op->do_verbose);
+}
+
 /* Returns 0 if successful, else errno of error */
 static int
 try_ata_identify(int ata_fd, int do_hex, int do_raw, int verbose)
 {
     bool atapi;
     int res;
-    char model[64];
-    char serial[64];
-    char firm[64];
     struct ata_identify_device ata_ident;
 
     memset(&ata_ident, 0, sizeof(ata_ident));
@@ -4597,29 +4674,8 @@ try_ata_identify(int ata_fd, int do_hex, int do_raw, int verbose)
                 dWordHex((const unsigned short *)&ata_ident, 256, 0,
                          sg_is_big_endian());
             }
-        } else {
-            printf("%s device: model, serial number and firmware revision:\n",
-                   (atapi ? "ATAPI" : "ATA"));
-            res = sg_ata_get_chars((const unsigned short *)ata_ident.model,
-                                   0, 20, sg_is_big_endian(), model);
-            model[res] = '\0';
-            res = sg_ata_get_chars((const unsigned short *)ata_ident.serial_no,
-                                   0, 10, sg_is_big_endian(), serial);
-            serial[res] = '\0';
-            res = sg_ata_get_chars((const unsigned short *)ata_ident.fw_rev,
-                                   0, 4, sg_is_big_endian(), firm);
-            firm[res] = '\0';
-            printf("  %s %s %s\n", model, serial, firm);
-            if (verbose) {
-                if (atapi)
-                    printf("ATA IDENTIFY PACKET DEVICE response "
-                           "(256 words):\n");
-                else
-                    printf("ATA IDENTIFY DEVICE response (256 words):\n");
-                dWordHex((const unsigned short *)&ata_ident, 256, 0,
-                         sg_is_big_endian());
-            }
-        }
+        } else
+            show_ata_identify(&ata_ident, atapi, verbose);
     }
     return 0;
 }

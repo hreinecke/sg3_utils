@@ -452,7 +452,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
  * value is taken as the timeout value in seconds. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_send_diag(int sg_fd, int sf_code, bool pf_bit, bool sf_bit,
+sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
                 bool devofl_bit, bool unitofl_bit, int long_duration,
                 void * paramp, int param_len, bool noisy, int verbose)
 {
@@ -463,10 +463,10 @@ sg_ll_send_diag(int sg_fd, int sf_code, bool pf_bit, bool sf_bit,
     unsigned char sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    senddiag_cdb[1] = (unsigned char)(sf_code << 5);
+    senddiag_cdb[1] = (unsigned char)(st_code << 5);
     if (pf_bit)
         senddiag_cdb[1] |= 0x10;
-    if (sf_bit)
+    if (st_bit)
         senddiag_cdb[1] |= 0x4;
     if (devofl_bit)
         senddiag_cdb[1] |= 0x2;
@@ -851,18 +851,31 @@ sg_ll_format_unit(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
                   bool cmplst, int dlist_format, int timeout_secs,
                   void * paramp, int param_len, bool noisy, int verbose)
 {
-    return sg_ll_format_unit2(sg_fd, fmtpinfo, longlist, fmtdata, cmplst,
-                              dlist_format, 0, timeout_secs, paramp,
-                              param_len, noisy, verbose);
+    return sg_ll_format_unit_v2(sg_fd, fmtpinfo, longlist, fmtdata, cmplst,
+                                dlist_format, 0, timeout_secs, paramp,
+                                param_len, noisy, verbose);
+}
+
+/* Invokes a FORMAT UNIT (SBC-3) command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
+int
+sg_ll_format_unit2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                   bool cmplst, int dlist_format, int ffmt, int timeout_secs,
+                   void * paramp, int param_len, bool noisy, int verbose)
+{
+    return sg_ll_format_unit_v2(sg_fd, fmtpinfo, longlist, fmtdata, cmplst,
+                                dlist_format, ffmt, timeout_secs, paramp,
+                                param_len, noisy, verbose);
 }
 
 /* Invokes a FORMAT UNIT (SBC-4) command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors.
  * FFMT field added in sbc4r10 [20160121] */
 int
-sg_ll_format_unit2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
-                   bool cmplst, int dlist_format, int ffmt, int timeout_secs,
-                   void * paramp, int param_len, bool noisy, int verbose)
+sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                     bool cmplst, int dlist_format, int ffmt,
+                     int timeout_secs, void * paramp, int param_len,
+                     bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "format unit";
     int k, res, ret, sense_cat, tmout;

@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_PERSIST "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -237,7 +237,7 @@ The \fITIDS\fR argument can take one of several forms. It can be a
 comma (or single space) separated list of ASCII hex bytes representing
 a single TransportID as defined in SPC\-4. They are usually 24 bytes
 long apart from in iSCSI. The \fITIDS\fR argument may be a transport
-specific form (e.g. "sas,5000c50005b32001" is clearer than and equivalent
+specific form (e.g. "sas,5000c50005b32001" is clearer than an equivalent
 to the hex byte form: "6,0,0,0,5,0,c5,0,5,b3,20,1"). The \fITIDS\fR argument
 may be "\-" in which case one or more TransportIDs can be read from stdin.
 The \fITIDS\fR argument may be of the form "file=<name>" in which case
@@ -305,7 +305,7 @@ command line invocation of sg_persist with "LANG=en_US.utf\-8" for example.
 Alternatively the \fITIDS\fR argument may specify a file (or pipe) from which
 one or more TransportIDs may be read. If the \fITIDS\fR argument is "\-"
 then stdin (standard input) is read. If the \fITIDS\fR argument is of the
-form "file=<name>" than a file called <name> is read.
+form "file=<name>" then a file called <name> is read.
 A valid SPC\-4 TransportID is built from the transport specific string
 outlined in the previous paragraphs. The parsing of the data read is
 relatively simple. Empty lines are ignored. Everything from and including
@@ -423,7 +423,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2017 Douglas Gilbert
+Copyright \(co 2004\-2018 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

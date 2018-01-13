@@ -27,13 +27,14 @@
  *
  */
 
+#define _POSIX_C_SOURCE 200809L		/* for posix_memalign() */
+#define __STDC_FORMAT_MACROS 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
-#define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
@@ -3265,6 +3266,8 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
     size_t psz;
     uint8_t * res;
 
+    if (buff_to_free)   /* make sure buff_to_free is NULL if alloc fails */
+        *buff_to_free = NULL;
     psz = (align_to > 0) ? align_to : sg_get_page_size();
     if (0 == num_bytes)
         num_bytes = psz;        /* ugly to handle otherwise */

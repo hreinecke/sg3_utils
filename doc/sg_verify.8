@@ -1,4 +1,4 @@
-.TH SG_VERIFY "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_VERIFY "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
@@ -64,7 +64,7 @@ field in the block limits VPD page.
 \fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
 where \fICOUNT\fR specifies the number of blocks to verify. The default value
 is 1 . If \fICOUNT\fR is greater than \fIBPC\fR (or its default value of 128)
-and \fINDO\fR is not given, 0 or less then multiple SCSI VERIFY commands are
+and \fINDO\fR is not given, 0 or less than multiple SCSI VERIFY commands are
 sent to the device. Otherwise \fICOUNT\fR becomes the contents of the
 verification length field of the SCSI VERIFY command issued. The
 .B sg_readcap
@@ -198,7 +198,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2017 Douglas Gilbert
+Copyright \(co 2004\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

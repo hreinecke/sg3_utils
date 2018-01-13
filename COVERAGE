@@ -126,11 +126,13 @@ SET FEATURES        sg_sat_set_features
 SMART READ DATA     examples/sg_sat_smart_rd_data
 
 
-NVMe command        sg3_utild utilities that use this NVMe command
+NVMe command        sg3_utils utilities that use this NVMe command
 ------------        ------------------------------------------------
 IDENTIFY            sg_inq
 SES READ            sg_senddiag, sg_ses (NVME-MI command)
 SES WRITE           sg_senddiag, sg_ses (NVME-MI command)
+Device self-test    [SNTL of SEND DIAGNOSTIC] sg_senddiag  
+Get features(power management) [SNTL of REQUEST SENSE] sg_requests
 
 
 ++  command wrapper found in sg_cmds_basic.c, sg_cmds_mmc.c  or
@@ -149,4 +151,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-30th November 2017
+8th January 2018

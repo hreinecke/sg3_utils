@@ -1,4 +1,4 @@
-.TH SG_TEST_RWBUF "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_TEST_RWBUF "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_test_rwbuf \- test a SCSI host adapter by issuing dummy writes
 and reads
@@ -26,12 +26,13 @@ read \fIAR\fR additional bytes.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-r\fR, \fB\-\-addrd\fR=\fIAR\fR
-Read an additional \fIAR\fR bytes (than indicated by \fISZ\fR) from the data
-buffer. Checksum is performed over the first \fISZ\fR bytes.
+Read an additional \fIAR\fR bytes (more than indicated by \fISZ\fR) from the
+data buffer. Checksum is performed over the first \fISZ\fR bytes.
 .TP
 \fB\-w\fR, \fB\-\-addwr\fR=\fIAW\fR
-Write an additional \fIAW\fR bytes (than indicated by \fISZ\fR) of zeros
-into the data buffer. Checksum is generated over the first \fISZ\fR bytes.
+Write an additional \fIAW\fR bytes (more than indicated by \fISZ\fR) of
+zeros into the data buffer. Checksum is generated over the first \fISZ\fR
+bytes.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print out a usage message the exit.
@@ -70,16 +71,16 @@ standard does state in its WRITE BUFFER command: "This command shall not
 alter any medium of the logical unit when data mode ... is specified". This
 implies that it _is_ safe to use this utility with devices that have mounted
 file systems on them.
-Following this theme further, a disk with active mounted file systems may cause
-the data read back to be different (due to caching activity) to what was written
-and hence a checksum error.
+Following this theme further, a disk with active mounted file systems may
+cause the data read back to be different (due to caching activity) to what
+was written and hence a checksum error.
 .SH EXIT STATUS
 The exit status of sg_test_rwbuf is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH AUTHORS
 Written by D. Gilbert and K. Garloff
 .SH COPYRIGHT
-Copyright \(co 2000\-2012 Douglas Gilbert, Kurt Garloff
+Copyright \(co 2000\-2018 Douglas Gilbert, Kurt Garloff
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

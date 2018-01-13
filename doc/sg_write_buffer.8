@@ -1,12 +1,13 @@
-.TH SG_WRITE_BUFFER "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WRITE_BUFFER "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_buffer \- send SCSI WRITE BUFFER commands
 .SH SYNOPSIS
 .B sg_write_buffer
-[\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
-[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
-[\fI\-\-read\-stdin\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-specific=MS\fR]
-[\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-bpw=CS\fR] [\fI\-\-dry\-run\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR]
+[\fI\-\-in=FILE\fR] [\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR]
+[\fI\-\-offset=OFF\fR] [\fI\-\-read\-stdin\fR] [\fI\-\-skip=SKIP\fR]
+[\fI\-\-specific=MS\fR] [\fI\-\-timeout=TO\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -39,6 +40,14 @@ The number in \fICS\fR can optionally be followed by ",act" or ",activate".
 In this case after WRITE BUFFER commands have been sent until the
 effective length is exhausted another WRITE BUFFER command with its mode
 set to "Activate deferred microcode mode" [mode 0xf] is sent.
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+Do all the command line processing and sanity checks including reading
+the input file. However at the point where a WRITE BUFFER SCSI command(s)
+would be sent, step over that call and assume it completed without errors
+and continue. \fIDEVICE\fR is still opened but can be /dev/null (in Unix).
+It is recommended to use \fI\-\-verbose\fR with this option to get an
+overview of what would have happened.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit. If used multiple times also prints
@@ -75,7 +84,7 @@ between 0 (default) and 2**24\-1 . It is a byte offset.
 \fB\-r\fR, \fB\-\-read\-stdin\fR
 read data from stdin until an EOF is detected. This data is sent with
 the WRITE BUFFER command to \fIDEVICE\fR. The action of this option is the
-same as using '\-\-in=\-'. Previousy this option's long name was
+same as using '\-\-in=\-'. Previously this option's long name was
 \fI\-\-raw\fR and it may still be used for backward compatibility.
 .TP
 \fB\-s\fR, \fB\-\-skip\fR=\fISKIP\fR
@@ -210,7 +219,7 @@ Written by Luben Tuikov and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2017 Luben Tuikov and Douglas Gilbert
+Copyright \(co 2006\-2018 Luben Tuikov and Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
