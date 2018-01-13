@@ -1,12 +1,13 @@
-.TH SG_SES_MICROCODE "8" "October 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH SG_SES_MICROCODE "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ses_microcode \- send microcode to a SCSI enclosure
 .SH SYNOPSIS
 .B sg_ses_microcode
-[\fI\-\-bpw=CS\fR] [\fI\-\-help\fR] [\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR]
-[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-non\fR]
-[\fI\-\-offset=OFF\fR] [\fI\-\-skip=SKIP\fR] [\fI\-\-subenc=MS\fR]
-[\fI\-\-tlength=TLEN\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-bpw=CS\fR] [\fI\-\-dry\-run\fR] [\fI\-\-ealsd\fR] [\fI\-\-help\fR]
+[\fI\-\-id=ID\fR] [\fI\-\-in=FILE\fR] [\fI\-\-length=LEN\fR]
+[\fI\-\-mode=MO\fR] [\fI\-\-non\fR] [\fI\-\-offset=OFF\fR]
+[\fI\-\-skip=SKIP\fR] [\fI\-\-subenc=MS\fR] [\fI\-\-tlength=TLEN\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -53,6 +54,33 @@ In this case after the microcode has been successfully sent to the
 \fIDEVICE\fR, an additional Download microcode control dpage with its mode
 set to "Activate deferred microcode" [0xf] is sent.
 .TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+the actual calls to perform SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
+commands are skipped when this option is given. No SCSI commands are sent
+to the \fIDEVICE\fR but it is still opened and is required to be given.
+A dummy device such as /dev/null (in Unix) can be used.
+.br
+This utility expects a "sensible" response to the RECEIVE DIAGNOSTIC RESULTS
+command it sends (and will abort if it doesn't receive one). So this option
+supplies dummy responses with one primary enclosure and three
+sub\-enclosures. The dummy responses include good status values.
+.TP
+\fB\-e\fR, \fB\-\-ealsd\fR
+exit after last SEND DIAGNOSTIC command. A SES device should not start its
+firmware update immediately after the last received "chunk" of its firmware.
+Rather it should wait till at least one RECEIVE DIAGNOSTIC RESULTS command
+is sent to give the device a chance to report any error. However some
+devices do start the firmware update immediately which causes the trailing
+RECEIVE DIAGNOSTIC RESULTS command to be held up and often be aborted with
+a "target reset" error.
+.br
+This option causes the trailing RECEIVE DIAGNOSTIC RESULTS command to be
+skipped. This option would be typically used with the \fI\-\-bpw=CS\fR
+option.
+.br
+Prior to version 1.10 of this utility [20180112] this (i.e. skipping
+the last RECEIVE DIAGNOSTIC RESULTS command) was the default action.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit. If used multiple times also prints
 the mode names and their acronyms.
@@ -91,7 +119,8 @@ dpage combination is avoided unless an error has already occurred.
 \fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
 this option sets the BUFFER OFFSET field in the Download microcode control
 dpage. \fIOFF\fR is a value between 0 (default) and 2**32\-1 . It is a
-byte offset.
+byte offset. This option is ignored (and a warning sent to stderr) if the
+\fI\-\-bpw=CS\fR option is also given.
 .TP
 \fB\-s\fR, \fB\-\-skip\fR=\fISKIP\fR
 this option is only active when \fI\-\-in=FILE\fR is given and \fIFILE\fR is
@@ -100,14 +129,18 @@ a regular file, rather than stdin. Data is read starting at byte offset
 If not given the byte offset defaults to 0 (i.e. the start of the file).
 .TP
 \fB\-S\fR, \fB\-\-subenc\fR=\fISEID\fR
-\fISEID\fR is the subenclosure identify. It defaults to 0 which is the
+\fISEID\fR is the sub\-enclosure identify. It defaults to 0 which is the
 primary enclosure identifier.
 .TP
 \fB\-t\fR, \fB\-\-tlength\fR=\fITLEN\fR
 \fITLEN\fR is the total length in bytes of the microcode to be (or being)
-downloaded. It defaults to 0 which is okay in most cases. This option is
-only needed when sections of microcode and being sent in separate invocations
-of this utility.
+downloaded. It defaults to 0 which is okay in most cases. This option only
+comes into play when \fITLEN\fR is greater than \fILEN\fR. In this case
+\fITLEN\fR is sent to the SES \fIDEVICE\fR so that it knows when it only
+receives \fILEN\fR bytes from this invocation, that it should expect more
+to be sent in the near future (e.g. by another invocation). This option
+is only needed when sections of microcode are being sent in separate
+invocations of this utility (e.g. the microcode is spread across two files).
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
@@ -139,7 +172,7 @@ resetting.
 .PP
 Apart from dmc_status, these are placed in the Download microcode mode
 field in the Download microcode control dpage. In the case of dmc_status
-the Download microcode status dpage is fetch with the RECEIVE DIAGNOSTIC
+the Download microcode status dpage is fetched with the RECEIVE DIAGNOSTIC
 RESULTS command and decoded.
 .SH WHEN THE DOWNLOAD FAILS
 Firstly, if it succeeds, this utility should stay silent and return.
@@ -154,7 +187,7 @@ be needed.
 If something goes wrong, there will typically be messages printed out
 by this utility. The first thing to check is the microcode (firmware)
 file itself. Is it designed for the device model; has it been corrupted,
-and if downgrading (i.e. trying to re-instate older firmware), does
+and if downgrading (i.e. trying to reinstate older firmware), does
 the vendor allow that?
 .PP
 Getting new firmware on a device is a delicate operation that is not
@@ -204,11 +237,11 @@ happening, fetching the status page should not cause any problems:
 .br
 Download microcode status diagnostic page:
 .br
-  number of secondary subenclosures: 0
+  number of secondary sub\-enclosures: 0
 .br
   generation code: 0x0
 .br
-   subenclosure identifier: 0 [primary]
+   sub\-enclosure identifier: 0 [primary]
 .br
      download microcode status: No download microcode operation in progress [0x0]
 .br
@@ -238,9 +271,9 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014 Douglas Gilbert
+Copyright \(co 2014\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_ses, sg_write_buffer(sg3_utils)
+.B sg_ses, sg_write_buffer, sg_inq(sg3_utils)

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180108] [svn: r743]
+Changelog for sg3_utils-1.43 [20180112] [svn: r744]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_x: where x can be normal, atomic, orwrite,
     same, scattered, or stream writes with 16 or 32 byte
@@ -27,8 +27,10 @@ Changelog for sg3_utils-1.43 [20180108] [svn: r743]
       Receive SES commands
     - decode array status diagnostic page (obsolete)
     - sync to ses4r01
+  - sg_ses_microcode: add --dry-run and -ealsd options
   - sg_ses, sg_ses_microcode, sg_senddiag: make all access
     buffer page size aligned (typically page_size=4096)
+  - sg_write_buffer: add --dry-run option
   - sg_luns: resync with drafts (sam6r02+spc5r10)
     - remove undocumented test "W" format
     - accept and output on request "quad dashed" format
@@ -104,6 +106,7 @@ Changelog for sg3_utils-1.43 [20180108] [svn: r743]
     - add sg_get_llnum_nomult()
     - add sg_ll_get_lba_status16()
     - add sg_ll_get_lba_status32()
+    - add sg_ll_format_unit_v2()
     - add sg_get_sfs_name() for spc5r11 (Feature sets)
     - add sg_decode_transportid_str()
     - add sg_msense_calc_length()

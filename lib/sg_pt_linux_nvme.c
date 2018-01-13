@@ -112,7 +112,7 @@
 
 static inline bool is_aligned(const void * pointer, size_t byte_count)
 {
-       return (sg_uintptr_t)pointer % byte_count == 0;
+    return ((sg_uintptr_t)pointer % byte_count) == 0;
 }
 
 
@@ -135,6 +135,8 @@ pr2ws(const char * fmt, ...)
     va_end(args);
     return n;
 }
+
+#if (HAVE_NVME && (! IGNORE_NVME))
 
 /* This trims given NVMe block device name in Linux (e.g. /dev/nvme0n1p5)
  * to the name of its associated char device (e.g. /dev/nvme0). If this
@@ -283,9 +285,10 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
 
 /* Returns 0 for success. Returns SG_LIB_NVME_STATUS if there is non-zero
  * NVMe status (from the completion queue) with the value placed in
- * ptp->nvme_status. If Unix error from ioctl add equivalent errno value to
- * SG_LIB_OS_BASE_ERR. Should not return negative values. CDW0 from
- * the completion queue is placed in ptp->nvme_result on success. */
+ * ptp->nvme_status. If Unix error from ioctl then return negated value
+ * (equivalent -errno from basic Unix system functions like open()).
+ * CDW0 from the completion queue is placed in ptp->nvme_result in the
+ * absence of a Unix error. */
 static int
 do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
                   struct sg_nvme_passthru_cmd *cmdp, const void * dp,
@@ -318,14 +321,14 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     res = ioctl(ptp->dev_fd, NVME_IOCTL_ADMIN_CMD, cmdp);
     if (0 != res) {
         if (res < 0) {  /* OS error (errno negated) */
-            res = (-res & 0x3ff);       /* clear DNR and More, if present */
-            ptp->os_err = res;
+            ptp->os_err = -res;
             if (vb > 3) {
                 pr2ws("%s: ioctl opcode=0x%x failed: %s "
-                      "(errno=%d)\n", __func__, *up, strerror(res), res);
+                      "(errno=%d)\n", __func__, *up, strerror(-res), -res);
             }
-            return SG_LIB_OS_BASE_ERR + res;
+            return res;
         } else {        /* NVMe errors are positive return values */
+            res &= 0x3ff; /* clear DNR and More bits */
             ptp->nvme_status = res;
             if (vb > 2) {
                 char b[80];
@@ -364,20 +367,20 @@ sntl_cache_identity(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
 {
     struct sg_nvme_passthru_cmd cmd;
     uint32_t pg_sz = sg_get_page_size();
-    void * vp;
+    uint8_t * up;
 
-    vp = sg_memalign(pg_sz, pg_sz, &ptp->free_nvme_id_ctlp, vb > 3);
-    ptp->nvme_id_ctlp = vp;
-    if (NULL == vp) {
+    up = sg_memalign(pg_sz, pg_sz, &ptp->free_nvme_id_ctlp, vb > 3);
+    ptp->nvme_id_ctlp = up;
+    if (NULL == up) {
         pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
-        return SG_LIB_OS_BASE_ERR + ENOMEM;
+        return -ENOMEM;
     }
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = 0x6;   /* Identify */
     cmd.cdw10 = 0x1;    /* CNS=0x1 Identify controller */
     cmd.addr = (uint64_t)(sg_uintptr_t)ptp->nvme_id_ctlp;
     cmd.data_len = pg_sz;
-    return do_nvme_admin_cmd(ptp, &cmd, vp, true, time_secs, vb);
+    return do_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
 }
 
 static const char * nvme_scsi_vendor_str = "NVMe    ";
@@ -543,7 +546,7 @@ sntl_rluns(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     rl_doutp = (uint8_t *)calloc(num + 1, 8);
     if (NULL == rl_doutp) {
         pr2ws("%s: calloc() failed to get memory\n", __func__);
-        return SG_LIB_OS_BASE_ERR + ENOMEM;
+        return -ENOMEM;
     }
     for (k = 0, up = rl_doutp + 8; k < num; ++k, up += 8)
         sg_put_unaligned_be16(k, up);
@@ -710,7 +713,8 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             break;
         default:
             pr2ws("%s: bad self-test code [0x%x]\n", __func__, st_cd);
-            return SG_LIB_SYNTAX_ERROR;
+            mk_sense_invalid_fld(ptp, true, 1, 7, vb);
+            return 0;
         }
         sg_put_unaligned_le32(nvme_dst, cmd_up + SG_NVME_PT_CDW10);
         res = do_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
@@ -928,3 +932,18 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
     }
     return do_nvme_admin_cmd(ptp, &cmd, dp, is_read, time_secs, vb);
 }
+
+#else           /* (HAVE_NVME && (! IGNORE_NVME)) */
+
+int
+sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
+{
+    if (vb)
+        pr2ws("%s: not supported\n", __func__);
+    if (vp) { ; }               /* suppress warning */
+    if (fd) { ; }               /* suppress warning */
+    if (time_secs) { ; }        /* suppress warning */
+    return -ENOTTY;             /* inappropriate ioctl error */
+}
+
+#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */

@@ -2,7 +2,7 @@
 #define SG_CMDS_EXTRA_H
 
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -52,7 +52,8 @@ int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
  * SG_LIB_CAT_INVALID_OP -> Format unit not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other failure */
+ * -1 -> other failure. Note that sg_ll_format_unit2() and
+ * sg_ll_format_unit_v2() are the same, both add the ffmt argument. */
 int sg_ll_format_unit(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
                       bool cmplist, int dlist_format, int timeout_secs,
                       void * paramp, int param_len, bool noisy, int verbose);
@@ -60,6 +61,10 @@ int sg_ll_format_unit2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
                        bool cmplist, int dlist_format, int ffmt,
                        int timeout_secs, void * paramp, int param_len,
                        bool noisy, int verbose);
+int sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
+                         bool cmplist, int dlist_format, int ffmt,
+                         int timeout_secs, void * paramp, int param_len,
+                         bool noisy, int verbose);
 
 /* Invokes a SCSI GET LBA STATUS(16) or GET LBA STATUS(32) command (SBC).
  * Returns 0 -> success,
@@ -217,7 +222,7 @@ int sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
-int sg_ll_send_diag(int sg_fd, int sf_code, bool pf_bit, bool sf_bit,
+int sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
                     bool devofl_bit, bool unitofl_bit, int long_duration,
                     void * paramp, int param_len, bool noisy, int verbose);
 
