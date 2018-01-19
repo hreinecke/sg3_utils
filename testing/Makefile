@@ -27,22 +27,22 @@ MAN_PREF = man8
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 # For C++/clang testing
-# ## CC = gcc
-# ## CC = g++
-# ## CC = clang
-# ## CC = clang++
+## CC = gcc
+CC = g++
+## CC = clang
+## CC = clang++
 
-CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+##CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -iquote ../include -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
 # CFLAGS = -g -O2 -Wall -pedantic -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c11 --analyze
-# CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c++14
+CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c++14 -fPIC
 
 LDFLAGS =
 
 LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
-LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o \
-	../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o ../lib/sg_pt_linux_nvme.o
+LIBFILESNEW = ../lib/sg_pt_linux_nvme.o ../lib/sg_lib.o ../lib/sg_lib_data.o \
+		../lib/sg_pt_linux.o ../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o
 
 all: $(EXECS)
 

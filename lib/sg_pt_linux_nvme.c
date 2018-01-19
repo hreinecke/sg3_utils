@@ -305,7 +305,7 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     ptp->os_err = 0;
     if (vb > 2) {
         pr2ws("NVMe command:\n");
-        hex2stderr(cmdp, cmd_len, 1);
+        hex2stderr((const uint8_t *)cmdp, cmd_len, 1);
         if ((vb > 3) && (! is_read) && dp) {
             uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
 
@@ -317,7 +317,7 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
                     pr2ws("\nData-out buffer (first 512 of %u bytes):\n", n);
                     n = 512;
                 }
-                hex2stderr(dp, n, 0);
+                hex2stderr((const uint8_t *)dp, n, 0);
             }
         }
     }
@@ -372,7 +372,7 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
                 pr2ws("\nData-in buffer (first 1024 of %u bytes):\n", n);
                 n = 1024;
             }
-            hex2stderr(dp, n, 0);
+            hex2stderr((const uint8_t *)dp, n, 0);
         }
     }
     return 0;

@@ -4,7 +4,7 @@ needs to be executed in the parent directory followed by changing
 directory to the lib directory and calling 'make' there.
 Another way is to do a top level 'make' after the ./configure which
 will make the libraries followed by all the utilities in the src/
-directory.
+directory. To make them in FreeBSD use 'make -f Makefile.freebsd' .
 
 There is an brief explanation of each example in the README file in
 the main (i.e. this directory's parent) directory. There are also
@@ -22,7 +22,8 @@ to get more information.
 
 Those files with the extension "cpp" are C++ examples that use facilities
 in C++11. They can be built by calling 'make -f Makefile.cplus'. A
-gcc/g++ compiler of 4.7.3 vintage or later will be required.
+gcc/g++ compiler of 4.7.3 vintage or later (or a recent clang compiler)
+will be required.
 
 Douglas Gilbert
-4th November 2017
+19th January 2018

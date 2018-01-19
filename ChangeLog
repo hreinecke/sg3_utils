@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180119] [svn: r745]
+Changelog for sg3_utils-1.43 [20180119] [svn: r746]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_x: where x can be normal, atomic, orwrite,
     same, scattered, or stream writes with 16 or 32 byte
@@ -157,6 +157,8 @@ Changelog for sg3_utils-1.43 [20180119] [svn: r745]
     - add SG_LIB_ANDROID build 'define'. If defined then
       SG_LIB_LINUX is also defined, so test for Android
       before Linux if need to differentiate
+  - update BSD license from 3 to 2 clause aka FreeBSD
+    license (without reference to FreeBSD project)
 
 Changelog for sg3_utils-1.42 [20160217] [svn: r663]
   - sg_timestamp: new, to report or set timestamp

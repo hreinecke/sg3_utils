@@ -236,7 +236,7 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
             *act_resp_lenp = ret;
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("%s response:\n", rsoc_s);
-            hex2stderr(resp, ret, 1);
+            hex2stderr((const uint8_t *)resp, ret, 1);
         }
         ret = 0;
     }
@@ -298,7 +298,7 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
             *act_resp_lenp = ret;
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("%s response:\n", rstmf_s);
-            hex2stderr(resp, ret, 1);
+            hex2stderr((const uint8_t *)resp, ret, 1);
         }
         ret = 0;
     }

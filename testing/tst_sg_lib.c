@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 Douglas Gilbert.
+ * Copyright (c) 2013-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,15 +25,15 @@
  *
  */
 
-static char * version_str = "1.04 20160503";
+static const char * version_str = "1.05 20180119";
 
 
 #define MAX_LINE_LEN 1024
 
 
 static struct option long_options[] = {
-        {"dstrhex",  no_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
+        {"hex2",  no_argument, 0, 'H'},
         {"leadin",  required_argument, 0, 'l'},
         {"printf", no_argument, 0, 'p'},
         {"sense", no_argument, 0, 's'},
@@ -58,7 +58,7 @@ static const unsigned char desc_sense_data1[] = {
     0xa, 0x6, 0x2, 0x1, 0x2, 0x0, 0x32, 0x01,
    /* incorrect length indicator (ILI) */
     0x5, 0x2, 0x0, 0x20,
-   /* user data degment referral */
+   /* user data segment referral */
     0xb, 26, 0x1, 0x0,
         0,0,0,1, 0x1,0x2,0x3,0x4,0x5,0x6,0x7,0x8,
                  0x1,0x2,0x3,0x4,0x55,0x6,0x7,0x8,
@@ -136,12 +136,12 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage: tst_sg_lib [--dstrhex] [--help] [--leadin=STR] "
+            "Usage: tst_sg_lib [--help] [--hex2] [--leadin=STR] "
             "[--printf]\n"
             "                  [--sense] [--unaligned] [--verbose] "
             "[--version]\n"
-            "  where: --dstrhex|-d       test dStrHex* variants\n"
-            "         --help|-h          print out usage message\n"
+            "  where; --help|-h          print out usage message\n"
+            "         --hex2|-H          test hex2* variants\n"
             "         --leadin=STR|-l STR    every line output by --sense "
             "should\n"
             "                                be prefixed by STR\n"
@@ -180,7 +180,7 @@ int
 main(int argc, char * argv[])
 {
     int k, c, n, len;
-    int do_dstrhex = 0;
+    int do_hex2 = 0;
     int do_printf = 0;
     int do_sense = 0;
     int do_unaligned = 0;
@@ -193,19 +193,19 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhl:psuvV", long_options,
+        c = getopt_long(argc, argv, "hHl:psuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
-        case 'd':
-            ++do_dstrhex;
-            break;
         case 'h':
         case '?':
             usage();
             return 0;
+        case 'H':
+            ++do_hex2;
+            break;
         case 'l':
             leadin = optarg;
             break;
@@ -360,21 +360,21 @@ main(int argc, char * argv[])
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
     }
-    if (do_dstrhex) {
-        char b[] = {0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
-                    0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50,
-                    0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58};
+    if (do_hex2) {
+        uint8_t b[] = {0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+                       0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50,
+                       0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58};
 
         ++did_something;
         for (k = 0; k < 18; ++k) {
             printf("k=%d:\n", k);
-            dStrHex(b, k, 0);
-            dStrHexStr(b, k, "dSHS_0: ", 0, sizeof(bb), bb);
+            hex2stdout(b, k, 0);
+            hex2str(b, k, "h2str0: ", 0, sizeof(bb), bb);
             printf("%s", bb);
-            dStrHex(b, k, 1);
-            dStrHexStr(b, k, "dSHS_1: ", 1, sizeof(bb), bb);
+            hex2stdout(b, k, 1);
+            hex2str(b, k, "h2str1: ", 1, sizeof(bb), bb);
             printf("%s", bb);
-            dStrHex(b, k, -1);
+            hex2stdout(b, k, -1);
             printf("\n");
         }
     }
@@ -397,64 +397,64 @@ main(int argc, char * argv[])
         printf("u16=0x%" PRIx16 "\n", u16);
         sg_put_unaligned_le16(u16, u8);
         printf("  le16:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 2, -1);
+        hex2stdout(u8, verbose ? 10 : 2, -1);
         u16r = sg_get_unaligned_le16(u8);
         printf("  u16r=0x%" PRIx16 "\n", u16r);
         sg_put_unaligned_be16(u16, u8);
         printf("  be16:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 2, -1);
+        hex2stdout(u8, verbose ? 10 : 2, -1);
         u16r = sg_get_unaligned_be16(u8);
         printf("  u16r=0x%" PRIx16 "\n\n", u16r);
 
         printf("u24=0x%" PRIx32 "\n", u24);
         sg_put_unaligned_le24(u24, u8);
         printf("  le24:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 3, -1);
+        hex2stdout(u8, verbose ? 10 : 3, -1);
         u24r = sg_get_unaligned_le24(u8);
         printf("  u24r=0x%" PRIx32 "\n", u24r);
         sg_put_unaligned_be24(u24, u8);
         printf("  be24:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 3, -1);
+        hex2stdout(u8, verbose ? 10 : 3, -1);
         u24r = sg_get_unaligned_be24(u8);
         printf("  u24r=0x%" PRIx32 "\n\n", u24r);
 
         printf("u32=0x%" PRIx32 "\n", u32);
         sg_put_unaligned_le32(u32, u8);
         printf("  le32:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 4, -1);
+        hex2stdout(u8, verbose ? 10 : 4, -1);
         u32r = sg_get_unaligned_le32(u8);
         printf("  u32r=0x%" PRIx32 "\n", u32r);
         sg_put_unaligned_be32(u32, u8);
         printf("  be32:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 4, -1);
+        hex2stdout(u8, verbose ? 10 : 4, -1);
         u32r = sg_get_unaligned_be32(u8);
         printf("  u32r=0x%" PRIx32 "\n\n", u32r);
 
         printf("u48=0x%" PRIx64 "\n", u48);
         sg_put_unaligned_le48(u48, u8);
         printf("  le48:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 6, -1);
+        hex2stdout(u8, verbose ? 10 : 6, -1);
         u48r = sg_get_unaligned_le48(u8);
         printf("  u48r=0x%" PRIx64 "\n", u48r);
         sg_put_unaligned_be48(u48, u8);
         printf("  be48:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 6, -1);
+        hex2stdout(u8, verbose ? 10 : 6, -1);
         u48r = sg_get_unaligned_be48(u8);
         printf("  u48r=0x%" PRIx64 "\n\n", u48r);
 
         printf("u64=0x%" PRIx64 "\n", u64);
         sg_put_unaligned_le64(u64, u8);
         printf("  le64:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 8, -1);
+        hex2stdout(u8, verbose ? 10 : 8, -1);
         u64r = sg_get_unaligned_le64(u8);
         printf("  u64r=0x%" PRIx64 "\n", u64r);
         sg_put_unaligned_be64(u64, u8);
         printf("  be64:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 8, -1);
+        hex2stdout(u8, verbose ? 10 : 8, -1);
         u64r = sg_get_unaligned_be64(u8);
         printf("  u64r=0x%" PRIx64 "\n\n", u64r);
         printf("  be[8]:\n");
-        dStrHex((const char *)u8, verbose ? 10 : 8, -1);
+        hex2stdout(u8, verbose ? 10 : 8, -1);
         u64r = sg_get_unaligned_be(8, u8);
         printf("  u64r[8]=0x%" PRIx64 "\n\n", u64r);
         printf("  le[8]:\n");

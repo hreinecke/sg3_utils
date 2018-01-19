@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2015 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -25,7 +25,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static char * version_str = "1.05 20150105";
+static const char * version_str = "1.06 20180119";
 
 
 #define MAX_LINE_LEN 1024
@@ -59,7 +59,8 @@ static void usage()
 
 int main(int argc, char * argv[])
 {
-    int k, j, res, c, num, len, asc, ascq;
+    int k, j, res, c, num, len;
+    unsigned int asc, ascq;
     FILE * fp;
     int offset = 24;
     int verbose = 0;
@@ -138,7 +139,7 @@ int main(int argc, char * argv[])
             continue;
         num = sscanf(line, "%xh/%xh", &asc, &ascq);
         if (1 == num)
-            ascq = -1;
+            ascq = 999;
         if (num < 1) {
             if (verbose)
                 fprintf(stderr, "Badly formed line number %d (num=%d)\n",
@@ -169,7 +170,7 @@ printf("\"%s\",\n", b);
             b[j] = toupper(b[j]);
 
         bb[0] = '\0';
-        if (ascq >= 0) {
+        if (ascq < 999) {
             cp = sg_get_asc_ascq_str(asc, ascq, sizeof(bb) - 1, bb);
             if (NULL == cp) {
                 fprintf(stderr, "no entry for %x,%x : %s\n", asc, ascq, b);

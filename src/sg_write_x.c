@@ -1265,12 +1265,12 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
         if ((dout_len > 1024) && (vb < 7)) {
             pr2serr("    Data-out buffer contents (first 1024 of %u "
                     "bytes):\n", dout_len);
-            hex2stdout(dataoutp, 1024, 1);
+            hex2stdout((const uint8_t *)dataoutp, 1024, 1);
             pr2serr("    Above: dout's first 1024 of %u bytes [%s]\n",
                     dout_len, op->cdb_name);
         } else {
             pr2serr("    Data-out buffer contents (length=%u):\n", dout_len);
-            hex2stderr(dataoutp, (int)dout_len, 1);
+            hex2stderr((const uint8_t *)dataoutp, (int)dout_len, 1);
         }
     }
     if (op->dry_run) {

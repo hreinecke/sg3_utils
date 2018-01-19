@@ -242,7 +242,7 @@ main(int argc, char * argv[])
         goto err_out;
 
     if ('\0' == out_fname[0])
-        hex2stdout(rawp, xfer_len, 0);
+        hex2stdout((const uint8_t *)rawp, xfer_len, 0);
     else {
         got_stdout = (0 == strcmp(out_fname, "-"));
         if (got_stdout)
