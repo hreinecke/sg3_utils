@@ -96,7 +96,8 @@ struct sg_pt_linux_scsi {
     /* Leave io_hdr in first place of this structure */
     bool is_sg;
     bool is_bsg;
-    bool is_nvme;
+    bool is_nvme;	/* OS device type, if false ignore nvme_direct */
+    bool nvme_direct;	/* false: our SNTL; true: received NVMe command */
     bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
     bool scsi_dsense;   /* SCSI descriptor sense active when true */
     int dev_fd;                 /* -1 if not given (yet) */

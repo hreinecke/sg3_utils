@@ -1,7 +1,7 @@
 /*
  * (c) 2000 Kurt Garloff <garloff at suse dot de>
  * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2017 Douglas Gilbert
+ * (c) 1999-2018 Douglas Gilbert
  *
  * Program to test the SCSI host adapter by issuing
  * write and read operations on a device's buffer
@@ -43,7 +43,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.13 20171107";
+static const char * version_str = "1.14 20180116";
 
 #define BPI (signed)(sizeof(int))
 
@@ -223,11 +223,11 @@ void do_fill_buffer (int *buf, int len)
 }
 
 
-int read_buffer (int sg_fd, unsigned size)
+int read_buffer (int sg_fd, unsigned ssize)
 {
         int res, k;
         unsigned char rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        int bufSize = size + addread;
+        int bufSize = ssize + addread;
         unsigned char * rbBuff = (unsigned char *)malloc(bufSize);
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
@@ -278,15 +278,15 @@ int read_buffer (int sg_fd, unsigned size)
                 return res;
         }
 
-        res = do_checksum((int*)rbBuff, size, false);
+        res = do_checksum((int*)rbBuff, ssize, false);
         free(rbBuff);
         return res;
 }
 
-int write_buffer (int sg_fd, unsigned size)
+int write_buffer (int sg_fd, unsigned ssize)
 {
         unsigned char wb_cdb[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        int bufSize = size + addwrite;
+        int bufSize = ssize + addwrite;
         unsigned char * wbBuff = (unsigned char *)malloc(bufSize);
         unsigned char sense_buffer[32];
         struct sg_io_hdr io_hdr;
@@ -295,7 +295,7 @@ int write_buffer (int sg_fd, unsigned size)
         if (NULL == wbBuff)
                 return -1;
         memset(wbBuff, 0, bufSize);
-        do_fill_buffer ((int*)wbBuff, size);
+        do_fill_buffer ((int*)wbBuff, ssize);
         wb_cdb[1] = RWB_MODE_DATA;
         sg_put_unaligned_be24((uint32_t)bufSize, wb_cdb + 6);
         memset(&io_hdr, 0, sizeof(struct sg_io_hdr));

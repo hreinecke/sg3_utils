@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2017 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -140,11 +140,11 @@ find_phy_desc(int id)
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k =0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -347,9 +347,9 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
 
     if (ok) { /* output result if ok and --hex or --raw given */
         if (do_raw)
-            dStrRaw((const char *)resp, mx_resp_len);
+            dStrRaw(resp, mx_resp_len);
         else if (1 == do_hex)
-            dStrHex((const char *)resp, mx_resp_len, 0);
+            hex2stdout(resp, mx_resp_len, 0);
         else if (do_hex > 1)
             dWordHex((const unsigned short *)resp, mx_resp_len / 2, 0,
                      sg_is_big_endian());

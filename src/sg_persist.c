@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2017 D. Gilbert
+ *  Copyright (C) 2004-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -24,13 +24,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.57 20171012";
+static const char * version_str = "0.58 20180118";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -275,11 +276,11 @@ prin_work(int sg_fd, const struct opts_t * op)
         if (8 != pr_buff[1]) {
             pr2serr("Unexpected response for PRIN Report Capabilities\n");
             if (op->hex)
-                dStrHex((const char *)pr_buff, pr_buff[1], 1);
+                hex2stdout(pr_buff, pr_buff[1], 1);
             return SG_LIB_CAT_MALFORMED;
         }
         if (op->hex)
-            dStrHex((const char *)pr_buff, 8, 1);
+            hex2stdout(pr_buff, 8, 1);
         else {
             printf("Report capabilities response:\n");
             printf("  Compatible Reservation Handling(CRH): %d\n",
@@ -315,8 +316,7 @@ prin_work(int sg_fd, const struct opts_t * op)
         add_len = sg_get_unaligned_be32(pr_buff + 4);
         if (op->hex) {
             if (op->hex > 1)
-                dStrHex((const char *)pr_buff, add_len + 8,
-                        ((2 == op->hex) ? 1 : -1));
+                hex2stdout(pr_buff, add_len + 8, ((2 == op->hex) ? 1 : -1));
             else {
                 printf("  PR generation=0x%x, ", pr_gen);
                 if (add_len <= 0)
@@ -324,11 +324,10 @@ prin_work(int sg_fd, const struct opts_t * op)
                 if (add_len > ((int)sizeof(pr_buff) - 8)) {
                     printf("Additional length too large=%d, truncate\n",
                            add_len);
-                    dStrHex((const char *)(pr_buff + 8), sizeof(pr_buff) - 8,
-                            1);
+                    hex2stdout((pr_buff + 8), sizeof(pr_buff) - 8, 1);
                 } else {
                     printf("Additional length=%d\n", add_len);
-                    dStrHex((const char *)(pr_buff + 8), add_len, 1);
+                    hex2stdout((pr_buff + 8), add_len, 1);
                 }
             }
         } else if (PRIN_RKEY_SA == op->prin_sa) {

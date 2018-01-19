@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
@@ -29,7 +30,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.20 20171030";
+static const char * version_str = "1.21 20180119";
 
 #define ME "sg_wr_mode: "
 
@@ -555,14 +556,14 @@ int main(int argc, char * argv[])
     } else {
         printf(">>> No contents given, so show current mode page data:\n");
         printf("  header:\n");
-        dStrHex((const char *)ref_md, hdr_len, -1);
+        hex2stdout(ref_md, hdr_len, -1);
         if (bd_len) {
             printf("  block descriptor(s):\n");
-            dStrHex((const char *)(ref_md + hdr_len), bd_len, -1);
+            hex2stdout(ref_md + hdr_len, bd_len, -1);
         } else
             printf("  << no block descriptors >>\n");
         printf("  mode page:\n");
-        dStrHex((const char *)(ref_md + off), md_len - off, -1);
+        hex2stdout(ref_md + off, md_len - off, -1);
     }
 err_out:
     res = sg_cmds_close_device(sg_fd);

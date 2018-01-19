@@ -4,11 +4,17 @@ PREFIX=/usr/local
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
+# In Linux the default C compiler is GCC while in FreeBSD (since release 10 ?)
+# the default C compiler is clang. Swap the comment marks (lines starting
+# with '#') on the next 4 (non-blank) lines.
 CC = gcc
+# CC = clang
+
 LD = gcc
+# LD = clang
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
-	tst_sg_lib
+	sg_tst_nvme tst_sg_lib
 	
 EXTRAS =
 
@@ -35,7 +41,8 @@ CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 LDFLAGS =
 
 LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
-LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o
+LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o \
+	../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o ../lib/sg_pt_linux_nvme.o
 
 all: $(EXECS)
 
@@ -67,6 +74,9 @@ bsg_queue_tst: bsg_queue_tst.o $(LIBFILESOLD)
 sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
+sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) $^ 
+
 tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
@@ -90,6 +100,11 @@ uninstall:
 	 rm -f $(MANDIR)/$(MAN_PREF)/$$mp.gz; \
 	done
 
+# Linux uses GNU make and FreeBSD uses Berkely make. The following lines
+# only work in Linux. Possible solutions in FreeBSD:
+#    a) use 'gmake'; b) comment out the next 3 lines, starting with 'ifeq'
+#        c) build with 'make -f Makefile.freebsd'
+# In Linux one can install bmake (but that won't help here).
 ifeq (.depend,$(wildcard .depend))
 include .depend
 endif

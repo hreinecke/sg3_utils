@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2004-2017 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
+* Copyright (c) 2004-2018 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -129,11 +129,11 @@ usage()
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -166,7 +166,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 pr2serr("      << expected binary code_set, target port "
                         "association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             *d_id = sg_get_unaligned_be16(ip + 2);
@@ -175,7 +175,7 @@ decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 pr2serr("      << expected binary code_set, target port "
                         "association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             *d_tpg = sg_get_unaligned_be16(ip + 2);
@@ -575,7 +575,7 @@ main(int argc, char * argv[])
                         "response\n");
                 if (verbose) {
                     pr2serr("First 32 bytes of bad response\n");
-                    dStrHexErr((const char *)rsp_buff, 32, 0);
+                    hex2stderr(rsp_buff, 32, 0);
                 }
                 return SG_LIB_CAT_MALFORMED;
             }
@@ -610,7 +610,7 @@ main(int argc, char * argv[])
                 report_len = (int)sizeof(reportTgtGrpBuff);
             }
             if (raw) {
-                dStrRaw((const char *)reportTgtGrpBuff, report_len);
+                dStrRaw(reportTgtGrpBuff, report_len);
                 goto err_out;
             }
             if (verbose)
@@ -618,7 +618,7 @@ main(int argc, char * argv[])
             if (hex) {
                 if (verbose)
                     printf("\nOutput response in hex:\n");
-                dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
+                hex2stdout(reportTgtGrpBuff, report_len, 1);
                 goto err_out;
             }
             memset(tgtGrpState, 0, sizeof(struct tgtgrp) * 256);

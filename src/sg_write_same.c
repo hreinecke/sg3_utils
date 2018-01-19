@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2017 Douglas Gilbert.
+ * Copyright (c) 2009-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.18 20171025";
+static const char * version_str = "1.19 20180118";
 
 
 #define ME "sg_write_same: "
@@ -253,7 +253,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
     if ((op->verbose > 3) && (op->xfer_len > 0)) {
         pr2serr("    Data-out buffer contents:\n");
-        dStrHexErr((const char *)dataoutp, op->xfer_len, 1);
+        hex2stderr(dataoutp, op->xfer_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -507,7 +507,7 @@ main(int argc, char * argv[])
             }
             if (0 == res) {
                 if (vb > 3)
-                    dStrHexErr((const char *)resp_buff, RCAP16_RESP_LEN, 1);
+                    hex2stderr(resp_buff, RCAP16_RESP_LEN, 1);
                 block_size = sg_get_unaligned_be32(resp_buff + 8);
                 prot_en = !!(resp_buff[12] & 0x1);
                 op->xfer_len = block_size;
@@ -523,8 +523,7 @@ main(int argc, char * argv[])
                                        (vb ? (vb - 1): 0));
                 if (0 == res) {
                     if (vb > 3)
-                        dStrHexErr((const char *)resp_buff, RCAP10_RESP_LEN,
-                                   1);
+                        hex2stderr(resp_buff, RCAP10_RESP_LEN, 1);
                     block_size = sg_get_unaligned_be32(resp_buff + 4);
                     op->xfer_len = block_size;
                 } else {

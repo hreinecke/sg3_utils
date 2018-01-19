@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Douglas Gilbert.
+ * Copyright (c) 2017-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.10 20171229";
+static const char * version_str = "1.12 20180118";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1265,12 +1265,12 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
         if ((dout_len > 1024) && (vb < 7)) {
             pr2serr("    Data-out buffer contents (first 1024 of %u "
                     "bytes):\n", dout_len);
-            dStrHexErr((const char *)dataoutp, 1024, 1);
+            hex2stdout(dataoutp, 1024, 1);
             pr2serr("    Above: dout's first 1024 of %u bytes [%s]\n",
                     dout_len, op->cdb_name);
         } else {
             pr2serr("    Data-out buffer contents (length=%u):\n", dout_len);
-            dStrHexErr((const char *)dataoutp, (int)dout_len, 1);
+            hex2stderr(dataoutp, (int)dout_len, 1);
         }
     }
     if (op->dry_run) {
@@ -1389,7 +1389,7 @@ do_read_capacity(int sg_fd, struct opts_t *op)
 
         if (vb > 3) {
             pr2serr("Read capacity(16) response:\n");
-            dStrHexErr((const char *)resp_buff, RCAP16_RESP_LEN, 1);
+            hex2stderr(resp_buff, RCAP16_RESP_LEN, 1);
         }
         op->bs = sg_get_unaligned_be32(resp_buff + 8);
         op->tot_lbs = sg_get_unaligned_be64(resp_buff + 0) + 1;
@@ -1448,7 +1448,7 @@ do_read_capacity(int sg_fd, struct opts_t *op)
         if (0 == res) {
             if (vb > 3) {
                 pr2serr("Read capacity(10) response:\n");
-                dStrHexErr((const char *)resp_buff, RCAP10_RESP_LEN, 1);
+                hex2stderr(resp_buff, RCAP10_RESP_LEN, 1);
             }
             op->tot_lbs = sg_get_unaligned_be32(resp_buff + 0) + 1;
             op->bs = sg_get_unaligned_be32(resp_buff + 4);
@@ -2493,9 +2493,9 @@ main(int argc, char * argv[])
             pr2serr("warning: %d LBA,number_of_blocks pairs found, only "
                     "taking first\n", addr_arr_len);
     } else if (op->scat_filename && (! op->do_scat_raw)) {
-        uint32_t sum_num = 0;
         uint8_t upp[96];
 
+        sum_num = 0;
         ret = build_t10_scat(op->scat_filename, op->do_16,
                              true /* parse one */, upp, &num_lbard,
                              &sum_num, sizeof(upp));

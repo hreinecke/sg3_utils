@@ -3,7 +3,7 @@
  * data transfer (and no REQUEST SENSE command iff the unit is ready)
  * then this can be used for timing per SCSI command overheads.
  *
- * Copyright (C) 2000-2017 D. Gilbert
+ * Copyright (C) 2000-2018 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.36 20171011";
+static const char * version_str = "3.37 20180116";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -369,7 +369,7 @@ main(int argc, char * argv[])
 #ifndef SG_LIB_MINGW
         if ((op->do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
             struct timeval res_tm;
-            double a, b;
+            double den, num;
 
             gettimeofday(&end_tm, NULL);
             res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
@@ -378,13 +378,13 @@ main(int argc, char * argv[])
                 --res_tm.tv_sec;
                 res_tm.tv_usec += 1000000;
             }
-            a = res_tm.tv_sec;
-            a += (0.000001 * res_tm.tv_usec);
-            b = (double)op->do_number;
+            den = res_tm.tv_sec;
+            den += (0.000001 * res_tm.tv_usec);
+            num = (double)op->do_number;
             printf("time to perform commands was %d.%06d secs",
                    (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-            if (a > 0.00001)
-                printf("; %.2f operations/sec\n", b / a);
+            if (den > 0.00001)
+                printf("; %.2f operations/sec\n", num / den);
             else
                 printf("\n");
         }

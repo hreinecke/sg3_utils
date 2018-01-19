@@ -28,11 +28,13 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#ifdef SG_LIB_WIN32
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#endif
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.59 20180102";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.60 20180119";    /* spc5r17 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1311,11 +1313,11 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -1569,7 +1571,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
         calc_len = sg_get_unaligned_be16(resp + 2) + 4;
         if ((! op->do_raw) && (vb > 1)) {
             pr2serr("  Log sense (find length) response:\n");
-            dStrHexErr((const char *)resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
+            hex2stderr(resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
             pr2serr("  hence calculated response length=%d\n", calc_len);
         }
         if (op->pg_code != (0x3f & resp[0])) {
@@ -1607,7 +1609,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
     }
     if ((! op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense response:\n");
-        dStrHexErr((const char *)resp, request_len, 1);
+        hex2stderr(resp, request_len, 1);
     }
     return 0;
 resid_err:
@@ -1616,7 +1618,7 @@ resid_err:
     request_len -= resid;
     if ((request_len > 0) && (! op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense (resid_err) response:\n");
-        dStrHexErr((const char *)resp, request_len, 1);
+        hex2stderr(resp, request_len, 1);
     }
     return res;
 }
@@ -1748,7 +1750,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1889,7 +1891,7 @@ show_error_counter_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1941,7 +1943,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -1992,7 +1994,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2080,7 +2082,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2172,7 +2174,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2257,8 +2259,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2322,7 +2323,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                    "hex:\n", pc);
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
             break;
         }
         printf("\n");
@@ -2362,8 +2363,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2386,7 +2386,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                     "hex:\n", pc);
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
             break;
         }
         printf("\n");
@@ -2434,15 +2434,14 @@ show_data_compression_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         if ((0 == pl) || (pl > 8)) {
             printf("badly formed data compression log parameter\n");
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
             goto skip_para;
         }
         /* variable length integer, max length 8 bytes */
@@ -2488,7 +2487,7 @@ show_data_compression_page(const uint8_t * resp, int len,
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                     "hex:\n", pc);
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
             break;
         }
 skip_para:
@@ -2532,7 +2531,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2540,12 +2539,12 @@ show_last_n_error_page(const uint8_t * resp, int len,
         if (pl > 4) {
             if ((bp[2] & 0x1) && (bp[2] & 0x2)) {
                 printf("    [binary]:\n");
-                dStrHex((const char *)bp + 4, pl - 4, 1);
+                hex2stdout(bp + 4, pl - 4, 1);
             } else if (bp[2] & 0x1)
                 printf("    %.*s\n", pl - 4, (const char *)(bp + 4));
             else {
                 printf("    [data counter?? (LP bit should be set)]:\n");
-                dStrHex((const char *)bp + 4, pl - 4, 1);
+                hex2stdout(bp + 4, pl - 4, 1);
             }
         }
         if (op->do_pcb)
@@ -2587,12 +2586,12 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         printf("  Deferred error %d:\n", pc);
-        dStrHex((const char *)bp + 4, pl - 4, 1);
+        hex2stdout(bp + 4, pl - 4, 1);
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -2624,7 +2623,7 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2683,7 +2682,7 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2767,7 +2766,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2837,8 +2836,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2865,7 +2863,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (! op->do_temperature) {
                 printf("  unknown parameter code = 0x%x, contents in "
                        "hex:\n", pc);
-                dStrHex((const char *)bp, extra, 1);
+                hex2stdout(bp, extra, 1);
             } else
                 continue;
             break;
@@ -2908,8 +2906,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -2921,7 +2918,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             else if (op->verbose) {
                 pr2serr("  Date of manufacture parameter length strange: "
                         "%d\n", extra - 4);
-                dStrHexErr((const char *)bp, extra, 1);
+                hex2stderr(bp, extra, 1);
             }
             break;
         case 2:
@@ -2931,7 +2928,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             else if (op->verbose) {
                 pr2serr("  Accounting date parameter length strange: %d\n",
                         extra - 4);
-                dStrHexErr((const char *)bp, extra, 1);
+                hex2stderr(bp, extra, 1);
             }
             break;
         case 3:
@@ -2975,7 +2972,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                    "hex:\n", pc);
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
             break;
         }
         printf("\n");
@@ -3005,12 +3002,12 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         printf("Application client page  [0xf]\n");
     if (0 == op->filter_given) {
         if ((len > 128) && (0 == op->do_hex)) {
-            dStrHex((const char *)resp, 64, 1);
+            hex2stdout(resp, 64, 1);
             printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
         }
         else
-            dStrHex((const char *)resp, len, 1);
+            hex2stdout(resp, len, 1);
         return true;
     }
     /* only here if filter_given set */
@@ -3026,11 +3023,11 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->do_raw)
             dStrRaw((const char *)bp, extra);
         else if (0 == op->do_hex)
-            dStrHex((const char *)bp, extra, 0);
+            hex2stdout(bp, extra, 0);
         else if (1 == op->do_hex)
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
         else
-            dStrHex((const char *)bp, extra, -1);
+            hex2stdout(bp, extra, -1);
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -3078,8 +3075,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -3190,7 +3186,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             /* decoded = true; */
         } else if ((! decoded) && full) {
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
-            dStrHex((const char *)bp, extra, 1);
+            hex2stdout(bp, extra, 1);
         }
         printf("\n");
         if (op->do_pcb)
@@ -3557,7 +3553,7 @@ show_protocol_specific_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -3630,8 +3626,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     dStrRaw((const char *)bp, extra);
                     break;
                 } else if (op->do_hex) {
-                    dStrHex((const char *)bp, extra,
-                            ((1 == op->do_hex) ? 1 : -1));
+                    hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                     break;
                 }
             }
@@ -3750,7 +3745,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     pr2serr("show_performance...  unknown parameter code "
                             "%d\n", param_code);
                 if (op->verbose)
-                    dStrHexErr((const char *)bp, extra, 1);
+                    hex2stderr(bp, extra, 1);
                 break;
             }
             if ((op->do_pcb) && (! op->do_name))
@@ -3774,8 +3769,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     dStrRaw((const char *)bp, extra);
                     break;
                 } else if (op->do_hex) {
-                    dStrHex((const char *)bp, extra,
-                            ((1 == op->do_hex) ? 1 : -1));
+                    hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                     break;
                 }
             }
@@ -3856,7 +3850,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                     pr2serr("show_performance...  unknown parameter code "
                             "%d\n", param_code);
                 if (op->verbose)
-                    dStrHexErr((const char *)bp, extra, 1);
+                    hex2stderr(bp, extra, 1);
                 break;
             }
             if ((op->do_pcb) && (! op->do_name))
@@ -3918,8 +3912,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, extra);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, extra,
-                        ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -3990,7 +3983,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 pr2serr("show_performance...  unknown parameter code %d\n",
                         pc);
             if (op->verbose)
-                dStrHexErr((const char *)bp, extra, 1);
+                hex2stderr(bp, extra, 1);
             break;
         }
         if ((op->do_pcb) && (! op->do_name))
@@ -4027,7 +4020,7 @@ show_format_status_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4041,7 +4034,7 @@ show_format_status_page(const uint8_t * resp, int len,
                     printf("  Format data out: <not available>\n");
                 else {
                     printf("  Format data out:\n");
-                    dStrHex((const char *)bp + 4, pl - 4, 0);
+                    hex2stdout(bp + 4, pl - 4, 0);
                 }
             }
             is_count = false;
@@ -4061,7 +4054,7 @@ show_format_status_page(const uint8_t * resp, int len,
         default:
             printf("  Unknown Format parameter code = 0x%x\n", pc);
             is_count = false;
-            dStrHex((const char *)bp, pl, 0);
+            hex2stdout(bp, pl, 0);
             break;
         }
         if (is_count) {
@@ -4112,7 +4105,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4161,7 +4154,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Unknown parameter code = 0x%x\n", pc);
-            dStrHex((const char *)bp, pl, 0);
+            hex2stdout(bp, pl, 0);
             break;
         }
         if (op->do_pcb)
@@ -4199,7 +4192,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4252,10 +4245,10 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
             printf("  Vendor specific [0x%x]:", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
         } else {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -4290,7 +4283,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4324,7 +4317,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb)
@@ -4361,7 +4354,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4381,7 +4374,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb)
@@ -4439,7 +4432,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4502,7 +4495,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            dStrHex((const char *)bp + 4, 8, 1);
+            hex2stdout(bp + 4, 8, 1);
             break;
         case 0x3:
             printf("   Key management error data (hex only now):\n");
@@ -4515,7 +4508,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            dStrHex((const char *)bp + 4, 12, 1);
+            hex2stdout(bp + 4, 12, 1);
             break;
         default:
             if ((pc >= 0x101) && (pc <= 0x1ff)) {
@@ -4532,15 +4525,14 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             sg_get_unaligned_be64(bp + 8));
                 } else {
                     printf("    non-SAS transport, in hex:\n");
-                    dStrHex((const char *)bp + 4,
-                            ((pl < num) ? pl : num) - 4, 0);
+                    hex2stdout(bp + 4, ((pl < num) ? pl : num) - 4, 0);
                 }
             } else if (pc >= 0x8000) {
                 printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
             } else {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
             }
             break;
         }
@@ -4578,7 +4570,7 @@ show_tapealert_response_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4603,10 +4595,10 @@ show_tapealert_response_page(const uint8_t * resp, int len,
         default:
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
             } else {
                 printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
             }
             break;
         }
@@ -4667,7 +4659,7 @@ show_requested_recovery_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4687,10 +4679,10 @@ show_requested_recovery_page(const uint8_t * resp, int len,
         default:
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
             } else {
                 printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
             }
             break;
         }
@@ -4729,7 +4721,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4751,11 +4743,11 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             printf("    device=0x%x  status=0x%x\n", dp[12], dp[13]);
         } else if (pl > 17) {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
         } else {
             printf("  short parameter length: %d [parameter_code=0x%x]:\n",
                    pl, pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -4818,7 +4810,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -4869,7 +4861,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 else
                     printf("  Medium scan parameter # %d [0x%x], "
                            "reserved\n", pc, pc);
-                dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+                hex2stdout(bp, ((pl < num) ? pl : num), 0);
                 break;
             } else
                 printf("  Medium scan parameter # %d [0x%x]\n", pc, pc);
@@ -4947,7 +4939,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5097,7 +5089,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb)
@@ -5135,7 +5127,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5210,7 +5202,7 @@ show_background_op_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5230,7 +5222,7 @@ show_background_op_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            dStrHex((const char *)bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), 0);
             break;
         }
         if (op->do_pcb)
@@ -5268,7 +5260,7 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5292,7 +5284,7 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
                            pc, bp[4]);
             } else {
                 printf("<unexpected pc=0x%x>\n", pc);
-                dStrHex((const char *)bp, pl, 0);
+                hex2stdout(bp, pl, 0);
             }
             break;
         }
@@ -5330,7 +5322,7 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5345,11 +5337,11 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
         } else if (pc < 0x8000) {
             printf("  parameter_code=0x%x, Reserved, parameter in hex:\n",
                    pc);
-            dStrHex((const char *)bp + 4, pl - 4, 0);
+            hex2stdout(bp + 4, pl - 4, 0);
         } else {
             printf("  parameter_code=0x%x, Vendor-specific, parameter in "
                    "hex:\n", pc);
-            dStrHex((const char *)bp + 4, pl - 4, 0);
+            hex2stdout(bp + 4, pl - 4, 0);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -5387,7 +5379,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5499,7 +5491,7 @@ show_device_stats_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5615,7 +5607,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             default:
                 vl_num = false;
                 printf("  Reserved parameter code [0x%x] data in hex:\n", pc);
-                dStrHex((const char *)bp + 4, pl - 4, 0);
+                hex2stdout(bp + 4, pl - 4, 0);
                 break;
             }
             if (vl_num)
@@ -5640,7 +5632,7 @@ show_device_stats_page(const uint8_t * resp, int len,
                            "hex:\n", pc);
                 else
                     printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
-                dStrHex((const char *)bp + 4, pl - 4, 0);
+                hex2stdout(bp + 4, pl - 4, 0);
                 break;
             }
         }
@@ -5678,7 +5670,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5814,7 +5806,7 @@ show_element_stats_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5867,7 +5859,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -5903,7 +5895,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
             printf("    Medium id number is 32 bytes of zero\n");
         else {
             printf("    Medium id number (in hex):\n");
-            dStrHex((const char *)(bp + 32), 32, 0);
+            hex2stdout(bp + 32, 32, 0);
         }
         printf("    Timestamp origin: 0x%x\n", bp[64] & 0xf);
         // Check Timestamp for all zeros
@@ -5915,11 +5907,11 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
             printf("    Timestamp is all zeros:\n");
         else {
             printf("    Timestamp:\n");
-            dStrHex((const char *)(bp + 66), 6, 1);
+            hex2stdout(bp + 66, 6, 1);
         }
         if (pl > 72) {
             printf("    Vendor specific:\n");
-            dStrHex((const char *)(bp + 72), pl - 72, 0);
+            hex2stdout(bp + 72, pl - 72, 0);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -5957,7 +5949,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6006,12 +5998,12 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         printf("    Destination address: 0x%x\n", v);
         if (pl > 91) {
             printf("    Volume tag information:\n");
-            dStrHex((const char *)(bp + 56), 36, 0);
+            hex2stdout((bp + 56), 36, 0);
         }
         if (pl > 99) {
             printf("    Timestamp origin: 0x%x\n", bp[92] & 0xf);
             printf("    Timestamp:\n");
-            dStrHex((const char *)(bp + 94), 6, 1);
+            hex2stdout((bp + 94), 6, 1);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -6129,7 +6121,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6307,7 +6299,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             else
                 printf("  Reserved parameter code (0x%x), payload in hex\n",
                        pc);
-            dStrHex((const char *)(bp + 4), pl - 4, 0);
+            hex2stdout(bp + 4, pl - 4, 0);
             break;
         }
         if (op->do_pcb)
@@ -6409,7 +6401,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6458,7 +6450,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6515,7 +6507,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
                 dStrRaw((const char *)bp, pl);
                 break;
             } else if (op->do_hex) {
-                dStrHex((const char *)bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
@@ -6580,12 +6572,12 @@ decode_page_contents(const uint8_t * resp, int len, const struct opts_t * op)
         else
             printf("Unable to decode page = 0x%x, here is hex:\n", pg_code);
         if (len > 128) {
-            dStrHex((const char *)resp, 64, 1);
+            hex2stdout(resp, 64, 1);
             printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
         }
         else
-            dStrHex((const char *)resp, len, 1);
+            hex2stdout(resp, len, 1);
     }
 }
 
@@ -6603,7 +6595,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
         if (op->do_raw)
             dStrRaw((const char *)resp, len);
         else if (op->do_hex)
-            dStrHex((const char *)resp, len, (1 == op->do_hex));
+            hex2stdout(resp, len, (1 == op->do_hex));
         else
             show_temperature_page(resp, len, op);
     } else if (SG_LIB_CAT_NOT_READY == res)
@@ -6616,7 +6608,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
             if (op->do_raw)
                 dStrRaw((const char *)resp, len);
             else if (op->do_hex)
-                dStrHex((const char *)resp, len, (1 == op->do_hex));
+                hex2stdout(resp, len, (1 == op->do_hex));
             else
                 show_ie_page(resp, len, op);
         } else
@@ -6951,15 +6943,13 @@ main(int argc, char * argv[])
     if (0 == op->do_all) {
         if (op->filter_given) {
             if (op->do_hex > 2)
-                dStrHex((const char *)rsp_buff, pg_len + 4,
-                        (op->do_hex < 4));
+                hex2stdout(rsp_buff, pg_len + 4, (op->do_hex < 4));
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op);
         } else if (op->do_raw)
             dStrRaw((const char *)rsp_buff, pg_len + 4);
         else if (op->do_hex > 1)
-            dStrHex((const char *)rsp_buff, pg_len + 4,
-                    (2 == op->do_hex) ? 0 : -1);
+            hex2stdout(rsp_buff, pg_len + 4, (2 == op->do_hex) ? 0 : -1);
         else if (pg_len > 1) {
             if (op->do_hex) {
                 if (rsp_buff[0] & 0x40)
@@ -6969,7 +6959,7 @@ main(int argc, char * argv[])
                 else
                     printf("Log page code=0x%x, DS=%d, SPF=0, page_len=0x%x\n",
                            rsp_buff[0] & 0x3f, !!(rsp_buff[0] & 0x80), pg_len);
-                dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+                hex2stdout(rsp_buff, pg_len + 4, 1);
             }
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op);
@@ -7009,8 +6999,8 @@ main(int argc, char * argv[])
                 if (op->do_raw)
                     dStrRaw((const char *)rsp_buff, pg_len + 4);
                 else if (op->do_hex > 1)
-                    dStrHex((const char *)rsp_buff, pg_len + 4,
-                            (2 == op->do_hex) ? 0 : -1);
+                    hex2stdout(rsp_buff, pg_len + 4,
+                               (2 == op->do_hex) ? 0 : -1);
                 else if (op->do_hex) {
                     if (rsp_buff[0] & 0x40)
                         printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
@@ -7020,7 +7010,7 @@ main(int argc, char * argv[])
                         printf("Log page code=0x%x, DS=%d, SPF=0, page_len="
                                "0x%x\n", rsp_buff[0] & 0x3f,
                                !!(rsp_buff[0] & 0x80), pg_len);
-                    dStrHex((const char *)rsp_buff, pg_len + 4, 1);
+                    hex2stdout(rsp_buff, pg_len + 4, 1);
                 }
                 else
                     decode_page_contents(rsp_buff, pg_len + 4, op);

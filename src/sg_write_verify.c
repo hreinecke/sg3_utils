@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Douglas Gilbert
+ * Copyright (c) 2014-2018 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.11 20171008";
+static const char * version_str = "1.11 20180118";
 
 
 #define ME "sg_write_verify: "
@@ -137,7 +137,7 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
        pr2serr("\n");
        if ((verbose > 2) && dop && do_len) {
             pr2serr("    Data out buffer [%d bytes]:\n", do_len);
-            dStrHexErr((const char *)dop, do_len, -1);
+            hex2stderr(dop, do_len, -1);
         }
     }
     ptvp = construct_scsi_pt_obj();

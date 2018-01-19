@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2017 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2018 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.20 (2017-12-29)"
+#define SG_RAW_VERSION "0.4.21 (2018-01-18)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -543,7 +543,7 @@ main(int argc, char *argv[])
         } else {
             if (op->datain_file == NULL && !op->datain_binary) {
                 pr2serr("Received %d bytes of data:\n", data_len);
-                dStrHexErr((const char *)dxfer_buffer_in, data_len, 0);
+                hex2stderr(dxfer_buffer_in, data_len, 0);
             } else {
                 const char * cp = "stdout";
 

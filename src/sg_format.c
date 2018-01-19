@@ -376,8 +376,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         resp_len = reqSense[7] + 8;
                         if (verb) {
                                 pr2serr("Parameter data in hex:\n");
-                                dStrHexErr((const char *)reqSense, resp_len,
-                                           1);
+                                hex2stderr(reqSense, resp_len, 1);
                         }
                         progress = -1;
                         sg_get_sense_progress_fld(reqSense, resp_len,
@@ -409,8 +408,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 resp_len = requestSenseBuff[7] + 8;
                 if (op->verbose > 1) {
                         pr2serr("Parameter data in hex\n");
-                        dStrHexErr((const char *)requestSenseBuff, resp_len,
-                                   1);
+                        hex2stderr(requestSenseBuff, resp_len, 1);
                 }
                 progress = -1;
                 sg_get_sense_progress_fld(requestSenseBuff, resp_len,
@@ -495,8 +493,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         resp_len = reqSense[7] + 8;
                         if (verb) {
                                 pr2serr("Parameter data in hex:\n");
-                                dStrHexErr((const char *)reqSense, resp_len,
-                                           1);
+                                hex2stderr(reqSense, resp_len, 1);
                         }
                         progress = -1;
                         sg_get_sense_progress_fld(reqSense, resp_len,

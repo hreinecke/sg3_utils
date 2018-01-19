@@ -175,10 +175,10 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
             pr2ws("    %s: response\n", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -250,10 +250,10 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
             pr2ws("    %s: response\n", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -319,10 +319,10 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -353,7 +353,7 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_name_s);
-            dStrHexErr((const char *)paramp, param_len, -1);
+            hex2stderr(paramp, param_len, -1);
         }
     }
 
@@ -434,10 +434,10 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -486,7 +486,7 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
         if (verbose > 1) {
             if (paramp && param_len) {
                 pr2ws("    %s parameter list:\n", cdb_name_s);
-                dStrHexErr((const char *)paramp, param_len, -1);
+                hex2stderr(paramp, param_len, -1);
             }
             pr2ws("    %s timeout: %d seconds\n", cdb_name_s, tmout);
         }
@@ -589,10 +589,10 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -656,10 +656,10 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
             pr2ws("    %s: response\n", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -715,10 +715,10 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -777,10 +777,10 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -813,7 +813,7 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_name_s);
-            dStrHexErr((const char *)paramp, param_len, -1);
+            hex2stderr(paramp, param_len, -1);
         }
     }
 
@@ -905,7 +905,7 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
         if (verbose > 1) {
             if (param_len > 0) {
                 pr2ws("    %s parameter list:\n", cdb_name_s);
-                dStrHexErr((const char *)paramp, param_len, -1);
+                hex2stderr(paramp, param_len, -1);
             }
             pr2ws("    %s timeout: %d seconds\n", cdb_name_s, tmout);
         }
@@ -963,7 +963,7 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
     }
     if (verbose > 1) {
         pr2ws("    %s parameter list\n", cdb_name_s);
-        dStrHexErr((const char *)paramp, param_len, -1);
+        hex2stderr(paramp, param_len, -1);
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
@@ -1043,10 +1043,10 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -1082,7 +1082,7 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
         pr2ws("\n");
         if (verbose > 1) {
             pr2ws("    %s parameters:\n", cdb_name_s);
-            dStrHexErr((const char *)paramp, param_len, 0);
+            hex2stderr(paramp, param_len, 0);
         }
     }
 
@@ -1207,10 +1207,10 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -1296,10 +1296,10 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -1500,7 +1500,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
             k = data_out_len > 4104 ? 4104 : data_out_len;
             pr2ws("    data_out buffer%s\n",
                   (data_out_len > 4104 ? ", first 4104 bytes" : ""));
-            dStrHexErr((const char *)data_out, k, verbose < 5);
+            hex2stderr(data_out, k, verbose < 5);
         }
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
@@ -1578,7 +1578,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
             k = data_out_len > 4104 ? 4104 : data_out_len;
             pr2ws("    data_out buffer%s\n",
                   (data_out_len > 4104 ? ", first 4104 bytes" : ""));
-            dStrHexErr((const char *)data_out, k, verbose < 5);
+            hex2stderr(data_out, k, verbose < 5);
         }
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
@@ -1707,7 +1707,7 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
             pr2ws("\n");
         } else {
             pr2ws("\n");
-            dStrHexErr((const char *)apt_cdb, cdb_len, -1);
+            hex2stderr(apt_cdb, cdb_len, -1);
         }
     }
     if (NULL == ((ptvp = create_pt_obj(cnamep))))
@@ -1847,10 +1847,10 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -1885,11 +1885,10 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
             pr2ws("    %s parameter list", cdb_name_s);
             if (2 == verbose) {
                 pr2ws("%s:\n", (param_len > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)paramp,
-                           (param_len > 256 ? 256 : param_len), -1);
+                hex2stderr(paramp, (param_len > 256 ? 256 : param_len), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)paramp, param_len, 0);
+                hex2stderr(paramp, param_len, 0);
             }
         }
     }
@@ -1961,8 +1960,7 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    Write buffer parameter list%s:\n",
                   ((param_len > 256) ? " (first 256 bytes)" : ""));
-            dStrHexErr((const char *)paramp,
-                       ((param_len > 256) ? 256 : param_len), -1);
+            hex2stderr(paramp, ((param_len > 256) ? 256 : param_len), -1);
         }
     }
     if (timeout_secs <= 0)
@@ -2033,7 +2031,7 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_name_s);
-            dStrHexErr((const char *)paramp, param_len, -1);
+            hex2stderr(paramp, param_len, -1);
         }
     }
 
@@ -2108,10 +2106,10 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
             } else {
                 pr2ws(":\n");
-                dStrHexErr((const char *)resp, ret, 0);
+                hex2stderr(resp, ret, 0);
             }
         }
         ret = 0;
@@ -2204,7 +2202,7 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", opcode_name);
-            dStrHexErr((const char *)paramp, param_len, -1);
+            hex2stderr(paramp, param_len, -1);
         }
     }
 
@@ -2281,7 +2279,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cname);
-            dStrHexErr((const char *)paramp, param_len, -1);
+            hex2stderr(paramp, param_len, -1);
         }
     }
 

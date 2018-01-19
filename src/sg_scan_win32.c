@@ -40,7 +40,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.19 (win32) 20180104";
+static const char * version_str = "1.19 (win32) 20180118";
 
 #define MAX_SCSI_ELEMS 2048
 #define MAX_ADAPTER_NUM 128
@@ -693,12 +693,12 @@ sg_do_wscan(char letter, bool show_bt, int scsi_scan)
                     printf("%s", sp->qp_descriptor.raw + j);
                 printf("\n");
                 if (verbose > 2)
-                    dStrHexErr(sp->qp_descriptor.raw, 144, 0);
+                    hex2stderr(sp->qp_descriptor.raw, 144, 0);
             } else
                 printf("\n");
             if ((verbose > 3) && sp->qp_uid_valid) {
                 printf("  UID valid, in hex:\n");
-                dStrHexErr(sp->qp_uid.raw, sizeof(sp->qp_uid.raw), 1);
+                hex2stderr(sp->qp_uid.raw, sizeof(sp->qp_uid.raw), 1);
             }
         }
     }

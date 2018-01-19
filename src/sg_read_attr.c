@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Douglas Gilbert.
+ * Copyright (c) 2016-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,6 +21,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_pt.h"
@@ -35,7 +36,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.05 20171010";
+static const char * version_str = "1.06 20180118";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -297,11 +298,11 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -611,7 +612,7 @@ decode_attr_list(const unsigned char * alp, int len, bool supported,
     else if (0 == op->quiet)
         printf("%sttribute list:\n", leadin);
     if (op->do_hex) {
-        dStrHex((const char *)alp, len, 0);
+        hex2stdout(alp, len, 0);
         return;
     }
     for ( ; len > 0; alp += 2, len -= 2) {
@@ -658,7 +659,7 @@ helper_full_attr(const unsigned char * alp, int len, int id,
                 printf("%" PRIx64, sg_get_unaligned_be(len - 5, alp + 5));
             else {
                 printf("\n");
-                dStrHex((const char *)(alp + 5), len - 5, 0);
+                hex2stdout((alp + 5), len - 5, 0);
             }
         }
         break;
@@ -674,7 +675,7 @@ helper_full_attr(const unsigned char * alp, int len, int id,
                 printf("%" PRIx64, sg_get_unaligned_be(len - 5, alp + 5));
             else {
                 printf("\n");
-                dStrHex((const char *)(alp + 5), len - 5, 0);
+                hex2stdout(alp + 5, len - 5, 0);
             }
         }
         break;
@@ -757,7 +758,7 @@ helper_full_attr(const unsigned char * alp, int len, int id,
     default:
         pr2serr("%s: unknown attribute id: 0x%x\n", __func__, id);
         printf("  In hex:\n");
-        dStrHex((const char *)alp, len, 0);
+        hex2stdout(alp, len, 0);
         break;
     }
 }
@@ -778,7 +779,7 @@ decode_attr_vals(const unsigned char * alp, int len, const struct opts_t * op)
         if (0 == op->quiet)
             printf("Attribute values:\n");
         if (op->do_hex) {       /* only expect -HH to get through here */
-            dStrHex((const char *)alp, len, 0);
+            hex2stdout(alp, len, 0);
             return;
         }
     }
@@ -823,7 +824,7 @@ decode_attr_vals(const unsigned char * alp, int len, const struct opts_t * op)
                     helper_full_attr(alp, bump, id, anip, op);
                 else {
                     printf("\n");
-                    dStrHex((const char *)(alp + 5), alen, 0);
+                    hex2stdout(alp + 5, alen, 0);
                 }
            } else {
                 if (2 == anip->process)
@@ -843,7 +844,7 @@ decode_attr_vals(const unsigned char * alp, int len, const struct opts_t * op)
                 printf("Attribute id lookup failed, in hex:\n");
             else
                 printf("\n");
-            dStrHex((const char *)(alp + 5), alen, 0);
+            hex2stdout(alp + 5, alen, 0);
         }
     }
     if (op->verbose && (len > 0) && (len <= 4))
@@ -855,7 +856,7 @@ static void
 decode_all_sa_s(const unsigned char * rabp, int len, const struct opts_t * op)
 {
     if (op->do_hex && (2 != op->do_hex)) {
-        dStrHex((const char *)rabp, len, ((1 == op->do_hex) ? 1 : -1));
+        hex2stdout(rabp, len, ((1 == op->do_hex) ? 1 : -1));
         return;
     }
     switch (op->sa) {
@@ -889,7 +890,7 @@ decode_all_sa_s(const unsigned char * rabp, int len, const struct opts_t * op)
         break;
     case RA_SMC2_SA:
         printf("Used by SMC-2, not information, output in hex:\n");
-        dStrHex((const char *)rabp, len, 0);
+        hex2stdout(rabp, len, 0);
         break;
     case RA_SUP_ATTR_SA:
         decode_attr_list(rabp + 4, len - 4, true, op);
@@ -897,7 +898,7 @@ decode_all_sa_s(const unsigned char * rabp, int len, const struct opts_t * op)
     default:
         printf("Unrecognized service action [0x%x], response in hex:\n",
                op->sa);
-        dStrHex((const char *)rabp, len, 0);
+        hex2stdout(rabp, len, 0);
         break;
     }
 }

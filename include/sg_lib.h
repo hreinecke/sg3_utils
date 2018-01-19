@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -335,9 +335,9 @@ bool sg_is_scsi_cdb(const uint8_t * cdbp, int clen);
  * Returns 'buff'. Does nothing if buff_len<=0 or if buff is NULL.*/
 char * sg_get_nvme_cmd_status_str(uint16_t sct_sc, int buff_len, char * buff);
 
-/* Attempts to map NVMe status value (SCT and SC) to SCSI status, sense_key,
- * asc and ascq tuple. If successful returns true and writes to non-NULL
- * pointer arguments; otherwise returns false. */
+/* Attempts to map NVMe status value ((SCT << 8) | SC) n sct_sc to a SCSI
+ * status, sense_key, asc and ascq tuple. If successful returns true and
+ * writes to non-NULL pointer arguments; otherwise returns false. */
 bool sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
                          uint8_t * asc_p, uint8_t * ascq_p);
 
@@ -482,6 +482,15 @@ void dStrHexErr(const char * str, int len, int no_ascii);
  * number of bytes written to 'b' excluding the trailing '\0'. */
 int dStrHexStr(const char * str, int len, const char * leadin, int format,
                int b_len, char * b);
+
+/* The following 3 functions are equivalent to dStrHex(), dStrHexErr() and
+ * dStrHexStr() respectively. The difference is the type of the first of
+ * argument: uint8_t instead of char. The name of the argument is changed
+ * to b_str to stress it is a pointer to the start of a binary string. */
+void hex2stdout(const uint8_t * b_str, int len, int no_ascii);
+void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
+int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
+            int b_len, char * b);
 
 /* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a

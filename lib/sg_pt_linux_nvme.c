@@ -39,7 +39,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.03 20171219 */
+/* sg_pt_linux_nvme version 1.04 20180115 */
 
 
 #include <stdio.h>
@@ -288,21 +288,24 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
  * ptp->nvme_status. If Unix error from ioctl then return negated value
  * (equivalent -errno from basic Unix system functions like open()).
  * CDW0 from the completion queue is placed in ptp->nvme_result in the
- * absence of a Unix error. */
+ * absence of a Unix error. If time_secs is negative it is treated as
+ * a timeout in milliseconds (of abs(time_secs) ). */
 static int
 do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
-                  struct sg_nvme_passthru_cmd *cmdp, const void * dp,
-                  bool is_read, int time_secs, int vb)
+                  struct sg_nvme_passthru_cmd *cmdp, void * dp, bool is_read,
+                  int time_secs, int vb)
 {
     const uint32_t cmd_len = sizeof(struct sg_nvme_passthru_cmd);
     int res;
     uint32_t n;
+    uint16_t sct_sc;
     const uint8_t * up = ((const uint8_t *)cmdp) + SG_NVME_PT_OPCODE;
 
-    cmdp->timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
+    cmdp->timeout_ms = (time_secs < 0) ? (-time_secs) : (1000 * time_secs);
+    ptp->os_err = 0;
     if (vb > 2) {
         pr2ws("NVMe command:\n");
-        dStrHexErr((const char *)cmdp, cmd_len, 1);
+        hex2stderr(cmdp, cmd_len, 1);
         if ((vb > 3) && (! is_read) && dp) {
             uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
 
@@ -314,50 +317,64 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
                     pr2ws("\nData-out buffer (first 512 of %u bytes):\n", n);
                     n = 512;
                 }
-                dStrHexErr((const char *)dp, n, 0);
+                hex2stderr(dp, n, 0);
             }
         }
     }
     res = ioctl(ptp->dev_fd, NVME_IOCTL_ADMIN_CMD, cmdp);
-    if (0 != res) {
-        if (res < 0) {  /* OS error (errno negated) */
-            ptp->os_err = -res;
-            if (vb > 3) {
-                pr2ws("%s: ioctl opcode=0x%x failed: %s "
-                      "(errno=%d)\n", __func__, *up, strerror(-res), -res);
-            }
-            return res;
-        } else {        /* NVMe errors are positive return values */
-            res &= 0x3ff; /* clear DNR and More bits */
-            ptp->nvme_status = res;
-            if (vb > 2) {
-                char b[80];
-
-                pr2ws("%s: ioctl opcode=0x%x failed: NVMe status: %s "
-                      "[0x%x]\n", __func__, *up,
-                      sg_get_nvme_cmd_status_str(res, sizeof(b), b), res);
-            }
-            return SG_LIB_NVME_STATUS;
+    if (res < 0) {  /* OS error (errno negated) */
+        ptp->os_err = -res;
+        if (vb > 1) {
+            pr2ws("%s: ioctl opcode=0x%x failed: %s "
+                  "(errno=%d)\n", __func__, *up, strerror(-res), -res);
         }
-    } else {
-        ptp->os_err = 0;
-        ptp->nvme_status = 0;
-        if ((vb > 3) && is_read && dp) {
-            uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
+        return res;
+    }
 
-            if (len > 0) {
-                n = len;
-                if ((len < 1024) || (vb > 5))
-                    pr2ws("\nData-in buffer (%u bytes):\n", n);
-                else {
-                    pr2ws("\nData-in buffer (first 1024 of %u bytes):\n", n);
-                    n = 1024;
-                }
-                dStrHexErr((const char *)dp, n, 0);
+    /* Now res contains NVMe completion queue CDW3 31:17 (15 bits) */
+    ptp->nvme_result = cmdp->result;
+    if (ptp->nvme_direct && ptp->io_hdr.response &&
+        (ptp->io_hdr.max_response_len > 3)) {
+        /* build 16 byte "sense" buffer */
+        uint8_t * sbp = (uint8_t *)ptp->io_hdr.response;
+        uint16_t st = (uint16_t)res;
+
+        n = ptp->io_hdr.max_response_len;
+        n = (n < 16) ? n : 16;
+        memset(sbp, 0 , n);
+        ptp->io_hdr.response_len = n;
+        sg_put_unaligned_le32(cmdp->result,
+                              sbp + SG_NVME_PT_CQ_RESULT);
+        if (n > 15) /* LSBit will be 0 (Phase bit) after (st << 1) */
+            sg_put_unaligned_le16(st << 1, sbp + SG_NVME_PT_CQ_STATUS_P);
+    }
+    /* clear upper bits (DNR and More) leaving ((SCT << 8) | SC) */
+    sct_sc = 0x3ff & res;
+    ptp->nvme_status = sct_sc;
+    if (sct_sc) {  /* when non-zero, treat as command error */
+        if (vb > 1) {
+            char b[80];
+
+            pr2ws("%s: ioctl opcode=0x%x failed: NVMe status: %s [0x%x]\n",
+                   __func__, *up,
+                  sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b), sct_sc);
+        }
+        return SG_LIB_NVME_STATUS;      /* == SCSI_PT_DO_NVME_STATUS */
+    }
+    if ((vb > 3) && is_read && dp) {
+        uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
+
+        if (len > 0) {
+            n = len;
+            if ((len < 1024) || (vb > 5))
+                pr2ws("\nData-in buffer (%u bytes):\n", n);
+            else {
+                pr2ws("\nData-in buffer (first 1024 of %u bytes):\n", n);
+                n = 1024;
             }
+            hex2stderr(dp, n, 0);
         }
     }
-    ptp->nvme_result = cmdp->result;
     return 0;
 }
 
@@ -391,6 +408,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
          int vb)
 {
     bool evpd;
+    bool cp_id_ctl = false;
     int res;
     uint16_t n, alloc_len, pg_cd;
     uint32_t pg_sz = sg_get_page_size();
@@ -401,7 +419,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     if (vb > 3)
         pr2ws("%s: time_secs=%d\n", __func__, time_secs);
 
-    if (0x2 & cdbp[1]) {
+    if (0x2 & cdbp[1]) {        /* Reject CmdDt=1 */
         mk_sense_invalid_fld(ptp, true, 1, 1, vb);
         return 0;
     }
@@ -410,7 +428,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
             return 0;
-        } else if (res)
+        } else if (res) /* should be negative errno */
             return res;
     }
     memset(inq_dout, 0, sizeof(inq_dout));
@@ -422,11 +440,12 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         case 0:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
-            sg_put_unaligned_be16(3, inq_dout + 2);
+            n = 8;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
             inq_dout[4] = 0x0;
             inq_dout[5] = 0x80;
             inq_dout[6] = 0x83;
-            n = 7;
+            inq_dout[n - 1] = 0xde;     /* last VPD number */
             break;
         case 0x80:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -469,6 +488,12 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
                 nvme_id_ns = NULL;
             }
             break;
+        case 0xde:
+            inq_dout[1] = pg_cd;
+            sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
+            n = 16 + 4096;
+            cp_id_ctl = true;
+            break;
         default:        /* Point to page_code field in cdb */
             mk_sense_invalid_fld(ptp, true, 2, 7, vb);
             return 0;
@@ -476,8 +501,17 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         if (alloc_len > 0) {
             n = (alloc_len < n) ? alloc_len : n;
             n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
-            if (n > 0)
-                memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout, n);
+            ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
+            if (n > 0) {
+                if (cp_id_ctl) {
+                    memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout,
+                           (n < 16 ? n : 16));
+                    if (n > 16)
+                        memcpy((uint8_t *)ptp->io_hdr.din_xferp + 16,
+                               ptp->nvme_id_ctlp, n - 16);
+                } else
+                    memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout, n);
+            }
         }
     } else {            /* Standard INQUIRY response */
         /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); pdt=0 --> SBC; 0xd --> SES */
@@ -492,6 +526,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         if (alloc_len > 0) {
             n = (alloc_len < inq_resp_len) ? alloc_len : inq_resp_len;
             n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
+            ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
             if (n > 0)
                 memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout, n);
         }
@@ -556,10 +591,9 @@ sntl_rluns(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     if (alloc_len > 0) {
         n = (alloc_len < n) ? alloc_len : n;
         n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
-        if (n > 0) {
+        ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
+        if (n > 0)
             memcpy((uint8_t *)ptp->io_hdr.din_xferp, rl_doutp, n);
-            ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
-        }
     }
     res = 0;
     free(rl_doutp);
@@ -683,7 +717,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     uint8_t st_cd, dpg_cd;
     uint32_t alloc_len, n, dout_len, dpg_len, nvme_dst;
     uint32_t pg_sz = sg_get_page_size();
-    const uint8_t * dop;
+    uint8_t * dop;
     struct sg_nvme_passthru_cmd cmd;
     uint8_t * cmd_up = (uint8_t *)&cmd;
 
@@ -757,7 +791,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     }
     n = dout_len;
     n = (n < alloc_len) ? n : alloc_len;
-    dop = (const uint8_t *)ptp->io_hdr.dout_xferp;
+    dop = (uint8_t *)ptp->io_hdr.dout_xferp;
     if (! is_aligned(dop, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
         if (vb)
             pr2ws("%s: dout [0x%" PRIx64 "] not page aligned\n", __func__,
@@ -804,7 +838,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     uint8_t dpg_cd;
     uint32_t alloc_len, n, din_len;
     uint32_t pg_sz = sg_get_page_size();
-    const uint8_t * dip;
+    uint8_t * dip;
     struct sg_nvme_passthru_cmd cmd;
 
     pcv = !! (0x1 & cdbp[1]);
@@ -816,7 +850,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     din_len = ptp->io_hdr.din_xfer_len;
     n = din_len;
     n = (n < alloc_len) ? n : alloc_len;
-    dip = (const uint8_t *)ptp->io_hdr.din_xferp;
+    dip = (uint8_t *)ptp->io_hdr.din_xferp;
     if (! is_aligned(dip, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
         if (vb)
             pr2ws("%s: din [0x%" PRIx64 "] not page aligned\n", __func__,
@@ -856,7 +890,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
 int
 sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 {
-    bool scsi_cmd;
+    bool scsi_cdb;
     bool is_read = false;
     int n, len;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
@@ -887,8 +921,10 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
     if (vb > 3)
         pr2ws("%s: opcode=0x%x, fd=%d, time_secs=%d\n", __func__, cdbp[0],
               fd, time_secs);
-    scsi_cmd = sg_is_scsi_cdb(cdbp, n);
-    if (scsi_cmd) {
+    scsi_cdb = sg_is_scsi_cdb(cdbp, n);
+    /* direct NVMe command (i.e. 64 bytes long) or SNTL */
+    ptp->nvme_direct = ! scsi_cdb;
+    if (scsi_cdb) {
         switch (cdbp[0]) {
         case SCSI_INQUIRY_OPC:
             return sntl_inq(ptp, cdbp, time_secs, vb);
@@ -903,6 +939,13 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
         case SCSI_RECEIVE_DIAGNOSTIC_OPC:
             return sntl_recvdiag(ptp, cdbp, time_secs, vb);
         default:
+            if (vb > 2) {
+                char b[64];
+
+                sg_get_command_name(cdbp, -1, sizeof(b), b);
+                pr2ws("%s: no translation to NVMe for SCSI %s command\n",
+                      __func__, b);
+            }
             mk_sense_asc_ascq(ptp, SPC_SK_ILLEGAL_REQUEST, INVALID_OPCODE,
                               0, vb);
             return 0;

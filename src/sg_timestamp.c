@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2017 Douglas Gilbert.
+ * Copyright (c) 2015-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.04 20171008";
+static const char * version_str = "1.05 20180118";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -168,8 +168,7 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
         *residp = k;
     if ((verbose > 2) && ((mx_resp_len - k) > 0)) {
         pr2serr("Parameter data returned:\n");
-        dStrHexErr((const char *)resp, mx_resp_len - k,
-                   ((verbose > 3) ? -1 : 1));
+        hex2stderr(resp, mx_resp_len - k, ((verbose > 3) ? -1 : 1));
     }
     destruct_scsi_pt_obj(ptvp);
     return ret;
@@ -197,7 +196,7 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
         pr2serr("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2serr("    set timestamp parameter list:\n");
-            dStrHexErr((const char *)paramp, param_len, -1);
+            hex2stderr(paramp, param_len, -1);
         }
     }
 
@@ -231,11 +230,11 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -357,7 +356,7 @@ main(int argc, char * argv[])
         res = sg_ll_rep_timestamp(sg_fd, d_buff, 12, NULL, true, verbose);
         if (0 == res) {
             if (do_raw)
-                dStrRaw((const char *)d_buff, 12);
+                dStrRaw(d_buff, 12);
             else {
                 int len = sg_get_unaligned_be16(d_buff + 0);
                 if (len < 8)

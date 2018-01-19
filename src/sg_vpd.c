@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.33 20180105";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.34 20180118";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -517,7 +517,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         n = (rlen < 32) ? rlen : 32;
         if (vb) {
             pr2serr("First %d bytes of bad response\n", n);
-            dStrHexErr((const char *)rp, n, 0);
+            hex2stderr(rp, n, 0);
         }
         return SG_LIB_CAT_MALFORMED;
     } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
@@ -632,11 +632,11 @@ count_standard_vpds(int vpd_pn)
 }
 
 static void
-dStrRaw(const char * str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -780,7 +780,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * bp;
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 4) {
@@ -804,7 +804,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         if (na_len > 0) {
             if (do_hex > 1) {
                 printf("    Network address:\n");
-                dStrHex((const char *)(bp + 4), na_len, 0);
+                hex2stdout((bp + 4), na_len, 0);
             } else
                 printf("    %s\n", bp + 4);
         }
@@ -827,7 +827,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * bp;
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -844,7 +844,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
             return;
         }
         if (do_hex > 1)
-            dStrHex((const char *)bp, 4, 1);
+            hex2stdout(bp, 4, 1);
         else {
             printf("  Policy page code: 0x%x", (bp[0] & 0x3f));
             if (bp[1])
@@ -865,7 +865,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, const struct opts_t * op)
     unsigned char * bp;
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -887,7 +887,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, const struct opts_t * op)
         if (ip_tid_len > 0) {
             if (op->do_hex > 1) {
                 printf("    Initiator port transport id:\n");
-                dStrHex((const char *)(bp + 8), ip_tid_len, 1);
+                hex2stdout((bp + 8), ip_tid_len, 1);
             } else {
                 char b[1024];
 
@@ -904,7 +904,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, const struct opts_t * op)
         if (tpd_len > 0) {
             if (op->do_hex > 1) {
                 printf("    Target port descriptor(s):\n");
-                dStrHex((const char *)(bp + bump + 4), tpd_len, 1);
+                hex2stdout(bp + bump + 4, tpd_len, 1);
             } else {
                 if ((0 == op->do_quiet) || (ip_tid_len > 0))
                     printf("    Target port descriptor(s):\n");
@@ -980,7 +980,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
             if (1 != c_set) {
                 pr2serr("      << expected binary code_set (1), got %d for "
                         "NAA=%d>>\n", c_set, naa);
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             switch (naa) {
@@ -988,7 +988,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 2 identifier "
                             "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                     break;
                 }
                 printf("  0x");
@@ -1001,7 +1001,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 3 or 5 "
                             "identifier length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                     break;
                 }
                 if ((0 == is_sas) || (1 != assoc)) {
@@ -1029,7 +1029,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                 if (16 != i_len) {
                     pr2serr("      << unexpected NAA 6 identifier length: "
                             "0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                     break;
                 }
                 printf("  0x");
@@ -1040,7 +1040,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
             default:
                 pr2serr("      << bad NAA nibble, expected 2, 3, 5 or 6, got "
                         "%d>>\n", naa);
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             break;
@@ -1066,7 +1066,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
         case 8: /* SCSI name string */
             if (c_set < 2) {    /* quietly accept ASCII for UTF-8 */
                 pr2serr("      << expected UTF-8 code_set>>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             if (! (strncmp((const char *)ip, "eui.", 4) ||
@@ -1075,7 +1075,7 @@ decode_dev_ids_quiet(unsigned char * buff, int len, int m_assoc,
                    strncmp((const char *)ip, "NAA.", 4) ||
                    strncmp((const char *)ip, "iqn.", 4))) {
                 pr2serr("      << expected name string prefix>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             /* does %s print out UTF-8 ok??
@@ -1176,7 +1176,7 @@ decode_x_inq_vpd(unsigned char * b, int len, int do_hex, bool do_long,
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (do_long) {
@@ -1299,7 +1299,7 @@ static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     len -= 4;
@@ -1325,7 +1325,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
         return;
     }
     if (do_hex && (2 != do_hex)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     memcpy(b, buff + 8, 8);
@@ -1342,7 +1342,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
     ata_transp = (0x34 == buff[36]) ? "SATA" : "PATA";
     if (do_long) {
         printf("  Device signature [%s] (in hex):\n", ata_transp);
-        dStrHex((const char *)buff + 36, 20, 0);
+        hex2stdout(buff + 36, 20, 0);
     } else
         printf("  Device signature indicates %s transport\n", ata_transp);
     cc = buff[56];      /* 0xec for IDENTIFY DEVICE and 0xa1 for IDENTIFY
@@ -1379,7 +1379,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_long, int do_hex)
     if (len < 572)
         return;
     if (2 == do_hex)
-        dStrHex((const char *)(buff + 60), 512, 0);
+        hex2stdout((buff + 60), 512, 0);
     else if (do_long)
         dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
 }
@@ -1394,7 +1394,7 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     printf("  Standby_y=%d Standby_z=%d Idle_c=%d Idle_b=%d Idle_a=%d\n",
@@ -1423,7 +1423,7 @@ decode_dev_const_vpd(unsigned char * buff, int len, int do_hex)
     const char * dcp = "Device constituents VPD page";
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 4) {
@@ -1433,8 +1433,6 @@ decode_dev_const_vpd(unsigned char * buff, int len, int do_hex)
     len -= 4;
     bp = buff + 4;
     for (k = 0, j = 0; k < len; k += bump, bp += bump, ++j) {
-
-
         printf("  Constituent descriptor %d:\n", j + 1);
         if ((k + 36) > len) {
             pr2serr("%s, short descriptor length=36, left=%d\n", dcp,
@@ -1456,7 +1454,7 @@ decode_dev_const_vpd(unsigned char * buff, int len, int do_hex)
         }
         if (cd_len > 0) {
             printf("   Constituent specific descriptor list (in hex):\n");
-            dStrHex((const char *)(bp + 36), cd_len, 1);
+            hex2stdout(bp + 36, cd_len, 1);
         }
     }
 }
@@ -1483,7 +1481,7 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
     const char * pcp = "Power consumption VPD page";
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -1500,7 +1498,7 @@ decode_power_consumption_vpd(unsigned char * buff, int len, int do_hex)
             return;
         }
         if (do_hex > 1)
-            dStrHex((const char *)bp, 4, 1);
+            hex2stdout(bp, 4, 1);
         else {
             value = sg_get_unaligned_be16(bp + 2);
             printf("  Power consumption identifier: 0x%x", bp[0]);
@@ -1694,7 +1692,7 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
         return;
     }
     if (3 == do_hex) {
-        dStrHex((const char *)buff, len, -1);
+        hex2stdout(buff, len, -1);
         return;
     }
     len -= 4;
@@ -1714,9 +1712,9 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
         if (0 == desc_len)
             continue;
         if (2 == do_hex)
-            dStrHex((const char *)bp + 4, desc_len, 1);
+            hex2stdout(bp + 4, desc_len, 1);
         else if (do_hex > 2)
-            dStrHex((const char *)bp, bump, 1);
+            hex2stdout(bp, bump, 1);
         else {
             int csll;
 
@@ -1872,7 +1870,7 @@ decode_3party_copy_vpd(unsigned char * buff, int len, int do_hex, int pdt,
                 break;
             default:
                 pr2serr("Unexpected type=%d\n", desc_type);
-                dStrHexErr((const char *)bp, bump, 1);
+                hex2stderr(bp, bump, 1);
                 break;
             }
         }
@@ -1887,7 +1885,7 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * bp;
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -1911,9 +1909,9 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
         if (0 == desc_len)
             continue;
         if (2 == do_hex)
-            dStrHex((const char *)bp + 8, desc_len, 1);
+            hex2stdout(bp + 8, desc_len, 1);
         else if (do_hex > 2)
-            dStrHex((const char *)bp, bump, 1);
+            hex2stdout(bp, bump, 1);
         else {
             switch (proto) {
             case TPROTO_SAS:
@@ -1922,7 +1920,7 @@ decode_proto_lu_vpd(unsigned char * buff, int len, int do_hex)
                 break;
             default:
                 pr2serr("Unexpected proto=%d\n", proto);
-                dStrHexErr((const char *)bp, bump, 1);
+                hex2stderr(bp, bump, 1);
                 break;
             }
         }
@@ -1938,7 +1936,7 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * pidp;
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -1962,9 +1960,9 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
         if (0 == desc_len)
             continue;
         if (2 == do_hex)
-            dStrHex((const char *)bp + 8, desc_len, 1);
+            hex2stdout(bp + 8, desc_len, 1);
         else if (do_hex > 2)
-            dStrHex((const char *)bp, bump, 1);
+            hex2stdout(bp, bump, 1);
         else {
             switch (proto) {
             case TPROTO_SAS:    /* page added in spl3r02 */
@@ -1977,7 +1975,7 @@ decode_proto_port_vpd(unsigned char * buff, int len, int do_hex)
                 break;
             default:
                 pr2serr("Unexpected proto=%d\n", proto);
-                dStrHexErr((const char *)bp, bump, 1);
+                hex2stderr(bp, bump, 1);
                 break;
             }
         }
@@ -1996,7 +1994,7 @@ decode_feature_sets_vpd(unsigned char * buff, int len,
     char b[64];
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -2014,9 +2012,9 @@ decode_feature_sets_vpd(unsigned char * buff, int len,
             return;
         }
         if (2 == op->do_hex)
-            dStrHex((const char *)bp + 8, 2, 1);
+            hex2stdout(bp + 8, 2, 1);
         else if (op->do_hex > 2)
-            dStrHex((const char *)bp, 2, 1);
+            hex2stdout(bp, 2, 1);
         else {
             printf("    %s", sg_get_sfs_str(sf_code, -2, sizeof(b), b,
                    &found, op->verbose));
@@ -2043,7 +2041,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     bool ugavalid;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2168,7 +2166,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     case PDT_OSD:
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)buff, len, 0);
+        hex2stderr(buff, len, 0);
         break;
     }
 }
@@ -2195,7 +2193,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     unsigned int u, k;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2279,7 +2277,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)buff, len, 0);
+        hex2stderr(buff, len, 0);
         break;
     }
 }
@@ -2457,7 +2455,7 @@ decode_lb_protection_vpd(unsigned char * buff, int len, int do_hex)
     unsigned char * bp;
 
     if ((1 == do_hex) || (do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 8) {
@@ -2511,7 +2509,7 @@ decode_b2_vpd(unsigned char * buff, int len, int pdt,
               const struct opts_t * op)
 {
     if (op->do_hex) {
-        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2523,7 +2521,7 @@ decode_b2_vpd(unsigned char * buff, int len, int pdt,
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)buff, len, 0);
+        hex2stderr(buff, len, 0);
         break;
     }
 }
@@ -2537,7 +2535,7 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
     unsigned int u;
 
     if (do_hex) {
-        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2565,7 +2563,7 @@ decode_b3_vpd(unsigned char * b, int len, int do_hex, int pdt)
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)b, len, 0);
+        hex2stderr(b, len, 0);
         break;
     }
 }
@@ -2578,7 +2576,7 @@ decode_b4_vpd(unsigned char * b, int len, int do_hex, int pdt)
     int k;
 
     if (do_hex) {
-        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2593,7 +2591,7 @@ decode_b4_vpd(unsigned char * b, int len, int do_hex, int pdt)
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)b, len, 0);
+        hex2stderr(b, len, 0);
         break;
     }
 }
@@ -2603,7 +2601,7 @@ static void
 decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
 {
     if (do_hex) {
-        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2615,7 +2613,7 @@ decode_b5_vpd(unsigned char * b, int len, int do_hex, int pdt)
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)b, len, 0);
+        hex2stderr(b, len, 0);
         break;
     }
 }
@@ -2627,7 +2625,7 @@ decode_zbdc_vpd(unsigned char * b, int len, int do_hex)
     uint32_t u;
 
     if (do_hex) {
-        dStrHex((const char *)b, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(b, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 64) {
@@ -2664,7 +2662,7 @@ decode_b7_vpd(unsigned char * buff, int len, int do_hex, int pdt)
     unsigned int u;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
@@ -2707,7 +2705,7 @@ decode_b7_vpd(unsigned char * buff, int len, int do_hex, int pdt)
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-        dStrHexErr((const char *)buff, len, 0);
+        hex2stderr(buff, len, 0);
         break;
     }
 }
@@ -2736,14 +2734,16 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
                                   op->verbose, &len);
     if (0 == res) {
         if (op->do_raw)
-            dStrRaw((const char *)rp, len);
+            dStrRaw(rp, len);
         else {
-            if (op->do_hex > 1)
-                dStrHex((const char *)rp, len, -1);
+            if ((2 == op->do_hex) || (3 == op->do_hex))
+                hex2stdout(rp, len, -1);
             else if (VPD_ASCII_OP_DEF == op->vpd_pn)
-                dStrHex((const char *)rp, len, 0);
+                hex2stdout(rp, len, 0);
+            else if (1 == op->do_hex)
+                hex2stdout(rp, len, (op->do_long ? 0 : 1));
             else
-                dStrHex((const char *)rp, len, (op->do_long ? 0 : 1));
+                hex2stdout(rp, len, 0);
         }
         return 0;
     } else {
@@ -2756,7 +2756,7 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
 }
 
 /* Returns 0 if successful. If don't know how to decode, returns
- * SG_LIB_SYNTAX_ERROR else see sg_ll_inquiry(). */
+ * SG_LIB_CAT_OTHER else see sg_ll_inquiry(). */
 static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
@@ -2817,12 +2817,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         if (0 == res) {
             alloc_len -= resid;
             if (op->do_raw)
-                dStrRaw((const char *)rp, alloc_len);
+                dStrRaw(rp, alloc_len);
             else if (op->do_hex) {
                 if (! op->do_quiet && (op->do_hex < 3))
                     printf("Standard Inquiry reponse:\n");
-                dStrHex((const char *)rp, alloc_len,
-                        (1 == op->do_hex) ? 0 : -1);
+                hex2stdout(rp, alloc_len, (1 == op->do_hex) ? 0 : -1);
             } else
                 decode_std_inq(rp, alloc_len, vb);
             return 0;
@@ -2834,9 +2833,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else if (op->do_hex)
-                dStrHex((const char *)rp, len, (1 == op->do_hex) ? 0 : -1);
+                hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -2878,9 +2877,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else if (op->do_hex)
-                dStrHex((const char *)rp, len, (1 == op->do_hex) ? 0 : -1);
+                hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -2903,9 +2902,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else if (op->do_hex)
-                dStrHex((const char *)rp, len, (1 == op->do_hex) ? 0 : -1);
+                hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -2923,7 +2922,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -2941,7 +2940,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else
                 decode_net_man_vpd(rp, len, op->do_hex);
             return 0;
@@ -2953,7 +2952,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 bool protect = false;
                 struct sg_simple_inquiry_resp sir;
@@ -2983,7 +2982,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3001,7 +3000,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3028,7 +3027,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                              sg_is_big_endian());
             }
             else if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3046,7 +3045,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3064,7 +3063,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else
                 decode_dev_const_vpd(rp, len, op->do_hex);
             return 0;
@@ -3076,7 +3075,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3094,9 +3093,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else if (1 == op->do_hex)
-                dStrHex((const char *)rp, len, 0);
+                hex2stdout(rp, len, 0);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3114,7 +3113,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rsp_buff[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3132,7 +3131,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3150,7 +3149,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3184,7 +3183,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3223,7 +3222,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -3253,7 +3252,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -3284,7 +3283,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -3315,7 +3314,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -3346,7 +3345,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -3374,7 +3373,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
@@ -3401,7 +3400,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             }
             if (op->do_raw)
-                dStrRaw((const char *)rp, len);
+                dStrRaw(rp, len);
             else {
                 pdt = rp[0] & 0x1f;
                 if (vb || long_notquiet)
@@ -3415,7 +3414,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb7\n");
         break;
     default:
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CAT_OTHER;
     }
     return res;
 }
@@ -3461,9 +3460,9 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
                 printf("[0x%x] ", pn);
 
             res = svpd_decode_t10(sg_fd, op, 0, 0);
-            if (SG_LIB_SYNTAX_ERROR == res) {
+            if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(sg_fd, op, 0);
-                if (SG_LIB_SYNTAX_ERROR == res)
+                if (SG_LIB_CAT_OTHER == res)
                     res = svpd_unable_to_decode(sg_fd, op, 0, 0);
             }
             if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -3510,9 +3509,9 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
                 printf("[0x%x] ", pn);
 
             res = svpd_decode_t10(-1, op, 0, off);
-            if (SG_LIB_SYNTAX_ERROR == res) {
+            if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(-1, op, off);
-                if (SG_LIB_SYNTAX_ERROR == res)
+                if (SG_LIB_CAT_OTHER == res)
                     res = svpd_unable_to_decode(-1, op, 0, off);
             }
         }
@@ -3765,7 +3764,7 @@ main(int argc, char * argv[])
         if (op->verbose > 2)
             pr2serr("Read %d bytes of user supplied data\n", inhex_len);
         if (op->verbose > 3)
-            dStrHexErr((const char *)rsp_buff, inhex_len, 0);
+            hex2stderr(rsp_buff, inhex_len, 0);
         op->do_raw = 0;         /* don't want raw on output with --inhex= */
         if ((NULL == op->page_str) && (! op->do_all)) {
             /* may be able to deduce VPD page */
@@ -3825,9 +3824,9 @@ main(int argc, char * argv[])
             res = svpd_decode_all(-1, op);
         else {
             res = svpd_decode_t10(-1, op, subvalue, 0);
-            if (SG_LIB_SYNTAX_ERROR == res) {
+            if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(-1, op, 0);
-                if (SG_LIB_SYNTAX_ERROR == res)
+                if (SG_LIB_CAT_OTHER == res)
                     res = svpd_unable_to_decode(-1, op, subvalue, 0);
             }
         }
@@ -3847,10 +3846,10 @@ main(int argc, char * argv[])
         memset(rsp_buff, 0, sizeof(rsp_buff));
 
         res = svpd_decode_t10(sg_fd, op, subvalue, 0);
-        if (SG_LIB_SYNTAX_ERROR == res) {
+        if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, 0);
-                if (SG_LIB_SYNTAX_ERROR == res)
-            res = svpd_unable_to_decode(sg_fd, op, subvalue, 0);
+            if (SG_LIB_CAT_OTHER == res)
+                res = svpd_unable_to_decode(sg_fd, op, subvalue, 0);
         }
         if (SG_LIB_CAT_ABORTED_COMMAND == res)
             pr2serr("fetching VPD page failed, aborted command\n");

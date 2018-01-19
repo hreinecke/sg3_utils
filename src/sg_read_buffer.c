@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2017 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2018 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,10 +20,13 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#ifdef SG_LIB_WIN32
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#endif
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
@@ -32,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.20 20171103";
+static const char * version_str = "1.21 20180118";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -193,7 +196,7 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("    Read buffer(10): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -257,7 +260,7 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("    Read buffer(16): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            dStrHexErr((const char *)resp, (ret > 256 ? 256 : ret), -1);
+            hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -268,11 +271,11 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -479,9 +482,9 @@ main(int argc, char * argv[])
         rb_len -= resid;        /* got back less than requested */
     if (rb_len > 0) {
         if (do_raw)
-            dStrRaw((const char *)resp, rb_len);
+            dStrRaw(resp, rb_len);
         else if (do_hex || (rb_len < 4))
-            dStrHex((const char *)resp, rb_len, ((do_hex > 1) ? 0 : 1));
+            hex2stdout(resp, rb_len, ((do_hex > 1) ? 0 : 1));
         else {
             switch (rb_mode) {
             case MODE_DESCRIPTOR:
@@ -496,7 +499,7 @@ main(int argc, char * argv[])
                 printf("Echo buffer capacity: %d (0x%x)\n", k, k);
                 break;
             default:
-                dStrHex((const char *)resp, rb_len, (verbose > 1 ? 0 : 1));
+                hex2stdout(resp, rb_len, (verbose > 1 ? 0 : 1));
                 break;
             }
         }

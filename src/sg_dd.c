@@ -1,29 +1,29 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2017 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2018 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
-
-   This program is a specialisation of the Unix "dd" command in which
-   either the input or the output file is a scsi generic device, raw
-   device, a block device or a normal file. The block size ('bs') is
-   assumed to be 512 if not given. This program complains if 'ibs' or
-   'obs' are given with a value that differs from 'bs' (or the default 512).
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed.
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) is transferred to or from the sg device in a single SCSI
-   command. The actual size of the SCSI READ or WRITE command block can be
-   selected with the "cdbsz" argument.
-
-   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
-*/
+ *
+ * This program is a specialisation of the Unix "dd" command in which
+ * either the input or the output file is a scsi generic device, raw
+ * device, a block device or a normal file. The block size ('bs') is
+ * assumed to be 512 if not given. This program complains if 'ibs' or
+ * 'obs' are given with a value that differs from 'bs' (or the default 512).
+ * If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
+ * not given or 'of=-' then stdout assumed.
+ *
+ * A non-standard argument "bpt" (blocks per transfer) is added to control
+ * the maximum number of blocks in each transfer. The default value is 128.
+ * For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
+ * in this case) is transferred to or from the sg device in a single SCSI
+ * command. The actual size of the SCSI READ or WRITE command block can be
+ * selected with the "cdbsz" argument.
+ *
+ * This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+ */
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.93 20171206";
+static const char * version_str = "5.94 20180116";
 
 
 #define ME "sg_dd: "
@@ -1215,15 +1215,14 @@ process_conv(const char * arg, struct flags_t * ifp, struct flags_t * ofp)
  */
 static int
 open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
-        int * in_typep, int verbose)
+        int * in_typep, int vb)
 {
-    int infd, flags, fl, t, verb, res;
+    int infd, flags, fl, t, res;
     char ebuff[EBUFF_SZ];
     struct sg_simple_inquiry_resp sir;
 
-    verb = (verbose ? verbose - 1: 0);
     *in_typep = dd_filetype(inf);
-    if (verbose)
+    if (vb)
         pr2serr(" >> Input file type: %s\n",
                 dd_filetype_str(*in_typep, ebuff));
     if (FT_ERROR & *in_typep) {
@@ -1253,14 +1252,14 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
                 goto file_err;
             }
         }
-        if (verbose)
+        if (vb)
             pr2serr("        open input(sg_io), flags=0x%x\n", fl | flags);
-        if (sg_simple_inquiry(infd, &sir, 0, verb)) {
+        if (sg_simple_inquiry(infd, &sir, 0, (vb ? (vb - 1) : 0))) {
             pr2serr("INQUIRY failed on %s\n", inf);
             goto other_err;
         }
         ifp->pdt = sir.peripheral_type;
-        if (verbose)
+        if (vb)
             pr2serr("    %s: %.8s  %.16s  %.4s  [pdt=%d]\n", inf, sir.vendor,
                     sir.product, sir.revision, ifp->pdt);
         if (! (FT_BLOCK & *in_typep)) {
@@ -1292,7 +1291,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
             perror(ebuff);
             goto file_err;
         } else {
-            if (verbose)
+            if (vb)
                 pr2serr("        open input, flags=0x%x\n", flags);
             if (skip > 0) {
                 off64_t offset = skip;
@@ -1304,7 +1303,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
                     perror(ebuff);
                     goto file_err;
                 }
-                if (verbose)
+                if (vb)
                     pr2serr("  >> skip: lseek64 SEEK_SET, byte offset=0x%"
                             PRIx64 "\n", (uint64_t)offset);
             }
@@ -1344,15 +1343,14 @@ other_err:
  */
 static int
 open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
-        int * out_typep, int verbose)
+        int * out_typep, int vb)
 {
-    int outfd, flags, t, verb, res;
+    int outfd, flags, t, res;
     char ebuff[EBUFF_SZ];
     struct sg_simple_inquiry_resp sir;
 
-    verb = (verbose ? verbose - 1: 0);
     *out_typep = dd_filetype(outf);
-    if (verbose)
+    if (vb)
         pr2serr(" >> Output file type: %s\n",
                 dd_filetype_str(*out_typep, ebuff));
 
@@ -1376,14 +1374,14 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
             perror(ebuff);
             goto file_err;
         }
-        if (verbose)
+        if (vb)
             pr2serr("        open output(sg_io), flags=0x%x\n", flags);
-        if (sg_simple_inquiry(outfd, &sir, 0, verb)) {
+        if (sg_simple_inquiry(outfd, &sir, 0, (vb ? (vb - 1) : 0))) {
             pr2serr("INQUIRY failed on %s\n", outf);
             goto other_err;
         }
         ofp->pdt = sir.peripheral_type;
-        if (verbose)
+        if (vb)
             pr2serr("    %s: %.8s  %.16s  %.4s  [pdt=%d]\n", outf, sir.vendor,
                     sir.product, sir.revision, ofp->pdt);
         if (! (FT_BLOCK & *out_typep)) {
@@ -1431,7 +1429,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                 goto file_err;
             }
         }
-        if (verbose)
+        if (vb)
             pr2serr("        %s output, flags=0x%x\n",
                     ((O_CREAT & flags) ? "create" : "open"), flags);
         if (seek > 0) {
@@ -1444,7 +1442,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                 perror(ebuff);
                 goto file_err;
             }
-            if (verbose)
+            if (vb)
                 pr2serr("   >> seek: lseek64 SEEK_SET, byte offset=0x%" PRIx64
                         "\n", (uint64_t)offset);
         }

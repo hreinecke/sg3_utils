@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Hannes Reinecke, SUSE Linux GmbH.
+ * Copyright (c) 2014-2018 Hannes Reinecke, SUSE Linux GmbH.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -51,7 +52,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.16 20171107";
+static const char * version_str = "1.17 20180119";
 
 struct opts_t {
     bool ck_cond;
@@ -212,12 +213,12 @@ do_read_gplog(int sg_fd, int ata_cmd, unsigned char *inbuff,
             dWordHex((const unsigned short *)inbuff, op->count * 256, 0,
                      sg_is_big_endian());
         else if (1 == op->hex)
-            dStrHex((const char *)inbuff, 512, 0);
+            hex2stdout(inbuff, 512, 0);
         else if (3 == op->hex)  /* '-HHH' suitable for "hdparm --Istdin" */
             dWordHex((const unsigned short *)inbuff, 256, -2,
                      sg_is_big_endian());
         else    /* '-HHHH' hex bytes only */
-            dStrHex((const char *)inbuff, 512, -1);
+            hex2stdout(inbuff, 512, -1);
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
         if (op->verbose > 1) {
             pr2serr("ATA pass through:\n");

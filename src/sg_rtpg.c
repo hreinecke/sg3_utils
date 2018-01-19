@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2018 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,6 +17,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -30,7 +31,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.23 20171010";
+static const char * version_str = "1.24 20180118";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -77,11 +78,11 @@ static void usage()
 
 }
 
-static void dStrRaw(const char* str, int len)
+static void dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -236,7 +237,7 @@ int main(int argc, char * argv[])
             report_len = (int)sizeof(reportTgtGrpBuff);
         }
         if (raw) {
-            dStrRaw((const char *)reportTgtGrpBuff, report_len);
+            dStrRaw(reportTgtGrpBuff, report_len);
             goto err_out;
         }
         if (verbose)
@@ -244,7 +245,7 @@ int main(int argc, char * argv[])
         if (hex) {
             if (verbose)
                 printf("\nOutput response in hex:\n");
-            dStrHex((const char *)reportTgtGrpBuff, report_len, 1);
+            hex2stdout(reportTgtGrpBuff, report_len, 1);
             goto err_out;
         }
         printf("Report target port groups:\n");

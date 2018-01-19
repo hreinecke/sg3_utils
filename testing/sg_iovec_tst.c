@@ -9,13 +9,14 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
 /* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
    device driver.
-*  Copyright (C) 2003-2017 D. Gilbert
+*  Copyright (C) 2003-2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)

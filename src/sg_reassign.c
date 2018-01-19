@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2017 Douglas Gilbert.
+ * Copyright (c) 2005-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,6 +21,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -36,7 +37,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.22 20171008";
+static const char * version_str = "1.23 20180118";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -404,7 +405,7 @@ main(int argc, char * argv[])
             goto err_out;
         }
         if (do_hex) {
-            dStrHex((const char *)param_arr, param_len, 1);
+            hex2stdout(param_arr, param_len, 1);
             goto err_out;       /* ret is zero */
         }
         got_grown = !!(param_arr[1] & 0x8);

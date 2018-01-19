@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2018 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -18,6 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -30,7 +32,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.28 20171006";
+static const char * version_str = "0.30 20180118";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -61,11 +63,11 @@ struct safte_cfg_t safte_cfg;
 static unsigned int buf_capacity = 64;
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -143,11 +145,11 @@ do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
         return res;
 
     if (do_raw > 1) {
-        dStrRaw((const char *)rb_buff, buf_capacity);
+        dStrRaw(rb_buff, buf_capacity);
         return 0;
     }
     if (do_hex > 1) {
-        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        hex2stdout(rb_buff, buf_capacity, 1);
         return 0;
     }
     printf("Enclosure Status:\n");
@@ -292,11 +294,11 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
     }
 
     if (do_raw > 1) {
-        dStrRaw((const char *)rb_buff, buf_capacity);
+        dStrRaw(rb_buff, buf_capacity);
         return 0;
     }
     if (do_hex > 1) {
-        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        hex2stdout(rb_buff, buf_capacity, 1);
         return 0;
     }
     printf("Usage Statistics:\n");
@@ -337,11 +339,11 @@ do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
     }
 
     if (do_raw > 1) {
-        dStrRaw((const char *)rb_buff, buf_capacity);
+        dStrRaw(rb_buff, buf_capacity);
         return 0;
     }
     if (do_hex > 1) {
-        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        hex2stdout(rb_buff, buf_capacity, 1);
         return 0;
     }
     printf("Slot insertions:\n");
@@ -375,11 +377,11 @@ do_safte_slot_status(int sg_fd, int do_hex, int do_raw, int verbose)
     }
 
     if (do_raw > 1) {
-        dStrRaw((const char *)rb_buff, buf_capacity);
+        dStrRaw(rb_buff, buf_capacity);
         return 0;
     }
     if (do_hex > 1) {
-        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        hex2stdout(rb_buff, buf_capacity, 1);
         return 0;
     }
     printf("Slot status:\n");
@@ -430,11 +432,11 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
     }
 
     if (do_raw > 1) {
-        dStrRaw((const char *)rb_buff, buf_capacity);
+        dStrRaw(rb_buff, buf_capacity);
         return 0;
     }
     if (do_hex > 1) {
-        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        hex2stdout(rb_buff, buf_capacity, 1);
         return 0;
     }
     printf("Global Flags:\n");
@@ -647,11 +649,11 @@ main(int argc, char * argv[])
         goto err_out;
     }
     if (1 == do_raw) {
-        dStrRaw((const char *)rb_buff, buf_capacity);
+        dStrRaw(rb_buff, buf_capacity);
         goto finish;
     }
     if (1 == do_hex) {
-        dStrHex((const char *)rb_buff, buf_capacity, 1);
+        hex2stdout(rb_buff, buf_capacity, 1);
         goto finish;
     }
 
