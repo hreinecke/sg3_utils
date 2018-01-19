@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2017 Douglas Gilbert.
+ * Copyright (c) 2009-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,6 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -32,7 +33,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.06 20171006";
+static const char * version_str = "1.07 20180118";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
@@ -70,11 +71,11 @@ usage()
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -155,7 +156,7 @@ main(int argc, char * argv[])
     ret = res;
     if (0 == res) {
       if (do_hex) {
-        dStrHex((const char *)readBlkLmtBuff, sizeof(readBlkLmtBuff), 1);
+        hex2stdout(readBlkLmtBuff, sizeof(readBlkLmtBuff), 1);
         goto the_end;
       } else if (do_raw) {
         dStrRaw((const char *)readBlkLmtBuff, sizeof(readBlkLmtBuff));

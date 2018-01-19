@@ -366,7 +366,7 @@ sg_ll_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         }
         if ((verbose > 2) && (xfer_len > 0)) {
                 pr2serr("    Data-out buffer contents:\n");
-                dStrHexErr((const char *)buff, xfer_len, 1);
+                hex2stderr(buff, xfer_len, 1);
         }
         res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
         ret = sg_cmds_process_resp(ptvp, "COMPARE AND WRITE", res,

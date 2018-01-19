@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2017 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -99,11 +99,11 @@ static void usage()
             "support the SCSI ATA\nPASS-THROUGH(32) command.\n");
 }
 
-static void dStrRaw(const char* str, int len)
+static void dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -352,7 +352,7 @@ static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
 
     if (ok) { /* output result if it is available */
         if (do_raw)
-            dStrRaw((const char *)inBuff, 512);
+            dStrRaw(inBuff, 512);
         else if (0 == do_hex) {
             if (do_ident) {
                 usp = (const unsigned short *)inBuff;
@@ -370,7 +370,7 @@ static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
                          sg_is_big_endian());
             }
         } else if (1 == do_hex)
-            dStrHex((const char *)inBuff, 512, 0);
+            hex2stdout(inBuff, 512, 0);
         else if (2 == do_hex)
             dWordHex((const unsigned short *)inBuff, 256, 0,
                      sg_is_big_endian());
@@ -378,7 +378,7 @@ static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
             dWordHex((const unsigned short *)inBuff, 256, -2,
                      sg_is_big_endian());
         else     /* '-HHHH' hex bytes only */
-            dStrHex((const char *)inBuff, 512, -1);
+            hex2stdout(inBuff, 512, -1);
     }
     return 0;
 }

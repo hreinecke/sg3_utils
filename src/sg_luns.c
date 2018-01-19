@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.35 20171011";
+static const char * version_str = "1.36 20180118";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -344,11 +344,11 @@ t10_2linux_lun(const unsigned char t10_lun[])
 
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -613,7 +613,7 @@ main(int argc, char * argv[])
             goto the_end;
         }
         if (1 == do_hex) {
-            dStrHex((const char *)reportLunsBuff, len_cap, 1);
+            hex2stdout(reportLunsBuff, len_cap, 1);
             goto the_end;
         }
         luns = (list_len / 8);
@@ -628,8 +628,7 @@ main(int argc, char * argv[])
         }
         if (verbose > 1) {
             pr2serr("\nOutput response in hex\n");
-            dStrHexErr((const char *)reportLunsBuff,
-                       (trunc ? maxlen : list_len + 8), 1);
+            hex2stderr(reportLunsBuff, (trunc ? maxlen : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k, off += 8) {
             if (! do_quiet) {

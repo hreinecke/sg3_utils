@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2018 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.16 20171010";
+static const char * version_str = "1.17 20180118";
 
 
 #define MAX_XFER_LEN 10000
@@ -434,7 +434,7 @@ main(int argc, char * argv[])
         goto finish;
     }
     if (do_hex) {
-        dStrHex((const char *)cpResultBuff, xfer_len, 1);
+        hex2stdout(cpResultBuff, xfer_len, 1);
         goto finish;
     }
     switch (sa) {
@@ -448,7 +448,7 @@ main(int argc, char * argv[])
         scsi_copy_status(cpResultBuff, xfer_len);
         break;
     default:
-        dStrHex((const char *)cpResultBuff, xfer_len, 1);
+        hex2stdout(cpResultBuff, xfer_len, 1);
         break;
     }
 

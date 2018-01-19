@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180112] [svn: r744]
+Changelog for sg3_utils-1.43 [20180119] [svn: r745]
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_write_x: where x can be normal, atomic, orwrite,
     same, scattered, or stream writes with 16 or 32 byte
@@ -116,6 +116,7 @@ Changelog for sg3_utils-1.43 [20180112] [svn: r744]
     - add sg_get_nvme_cmd_status_str()
     - add sg_nvme_status2scsi()
     - add sg_memalign() and sg_get_page_size()
+    - add hex2stdout(), hex2stderr() and hex2str()
     - implement 'format' argument in dStrHexStr()
     - add read buffer(16) command mode names
     - add Microcode activation sense descriptor spc5r10
@@ -142,6 +143,8 @@ Changelog for sg3_utils-1.43 [20180112] [svn: r744]
   - move some testing utilities out of the
     'examples' and 'utils' directories into the new
     'testing' directory
+  - add testing/sg_tst_nvme utility
+  - clean Makefile.freebsd in examples/ and testing/
   - gcc 7.2 cleanups (sysmacros.h etc)
   - clang --analyze static checker clean ups
   - shellcheck cleanup on scripts

@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -20,11 +21,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
+#ifdef SG_LIB_WIN32
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#endif
 #include "sg_pr2serr.h"
 
 /*
@@ -32,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.29 20180111";    /* ses4r01 */
+static const char * version_str = "2.30 20180118";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1213,11 +1217,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 65535)) {
                 pr2serr("bad argument to '--maxlen' (0 to 65535 inclusive "
-			"expected)\n");
+                        "expected)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (0 == n)
-		op->maxlen = MX_ALLOC_LEN;
+                op->maxlen = MX_ALLOC_LEN;
             else if (n < 4)
                 pr2serr("Warning: --maxlen= less than 4 ignored\n");
             else
@@ -1760,14 +1764,14 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
             if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
                 pr2serr("Enclosure busy, try again later\n");
                 if (op->do_hex)
-                    dStrHexErr((const char *)rsp_buff, rsp_len, 0);
+                    hex2stderr(rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
                 pr2serr("Enclosure only supports Short Enclosure Status: "
                         "0x%x\n", rsp_buff[1]);
             } else {
                 pr2serr("Invalid response, wanted page code: 0x%x but got "
                         "0x%x\n", page_code, rsp_buff[0]);
-                dStrHexErr((const char *)rsp_buff, rsp_len, 0);
+                hex2stderr(rsp_buff, rsp_len, 0);
             }
             return -2;
         }
@@ -1784,14 +1788,35 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
     return res;
 }
 
+#if 1
+
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
+
+#else
+
+static void
+dStrRaw(const uint8_t * str, int len)
+{
+    int res, err;
+
+    if (len > 0) {
+        res = write(fileno(stdout), str, len);
+        if (res < 0) {
+            err = errno;
+            pr2serr("%s: write to stdout failed: %s [%d]\n", __func__,
+                    strerror(err), err);
+        }
+    }
+}
+
+#endif
 
 /* CONFIGURATION_DPC [0x1]
  * Display Configuration diagnostic page. */
@@ -1840,8 +1865,7 @@ configuration_sdg(const uint8_t * resp, int resp_len)
             char bb[1024];
 
             printf("      vendor-specific data:\n");
-            dStrHexStr((const char *)(bp + 40), el - 40, "        ", 0,
-                       sizeof(bb), bb);
+            hex2str(bp + 40, el - 40, "        ", 0, sizeof(bb), bb);
             printf("%s\n", bb);
         }
     }
@@ -3290,7 +3314,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             printf("%sTransport protocol: PCIe subprotocol=0x%x not "
                    "decoded\n", pad, pcie_pt);
             if (op->verbose)
-                dStrHex((const char *)ae_bp, len, 0);
+                hex2stdout(ae_bp, len, 0);
             break;
         }
         phys = ae_bp[4];
@@ -3327,7 +3351,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         printf("%sTransport protocol: %s not decoded\n", pad,
                sg_get_trans_proto_str((0xf & ae_bp[0]), sizeof(b), b));
         if (op->verbose)
-            dStrHex((const char *)ae_bp, len, 0);
+            hex2stdout(ae_bp, len, 0);
         break;
     }
 }
@@ -3518,8 +3542,7 @@ subenc_string_sdg(const uint8_t * resp, int resp_len)
         if (el > 4) {
             char bb[1024];
 
-            dStrHexStr((const char *)(bp + 40), el - 40, "    ", 0,
-                       sizeof(bb), bb);
+            hex2str(bp + 40, el - 40, "    ", 0, sizeof(bb), bb);
             printf("%s\n", bb);
         } else
             printf("    <empty>\n");
@@ -3812,7 +3835,7 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
         *arr_len = k + 1;
     }
     if (verb > 3)
-        dStrHex((const char *)arr, *arr_len, 0);
+        hex2stdout(arr, *arr_len, 0);
     if (fp && (fp != stdin))
         fclose(fp);
     return 0;
@@ -3854,22 +3877,22 @@ process_status_page(int sg_fd, struct opts_t * op)
         goto fini;
     if (op->do_raw) {
         if (1 == op->do_raw)
-            dStrHex((const char *)resp + 4, resp_len - 4, -1);
+            hex2stdout(resp + 4, resp_len - 4, -1);
         else {
             if (sg_set_binary_mode(STDOUT_FILENO) < 0)
                 perror("sg_set_binary_mode");
-            dStrRaw((const char *)resp, resp_len);
+            dStrRaw(resp, resp_len);
         }
     } else if (op->do_hex) {
         if (op->do_hex > 2)
-            dStrHex((const char *)resp, resp_len, -1);
+            hex2stdout(resp, resp_len, -1);
          else {
             if (cp)
                 printf("Response in hex from diagnostic page: %s\n", cp);
             else
                 printf("Response in hex from unknown diagnostic page "
                        "[0x%x]\n", op->page_code);
-            dStrHex((const char *)resp, resp_len, (2 == op->do_hex));
+            hex2stdout(resp, resp_len, (2 == op->do_hex));
         }
     } else {
         memset(&primary_info, 0, sizeof(primary_info));
@@ -3928,7 +3951,7 @@ process_status_page(int sg_fd, struct opts_t * op)
             printf("String In diagnostic page (for primary "
                    "subenclosure):\n");
             if (resp_len > 4)
-                dStrHex((const char *)(resp + 4), resp_len - 4, 0);
+                hex2stdout(resp + 4, resp_len - 4, 0);
             else
                 printf("  <empty>\n");
             break;
@@ -4014,7 +4037,7 @@ process_status_page(int sg_fd, struct opts_t * op)
         default:
             printf("Cannot decode response from diagnostic "
                    "page: %s\n", (cp ? cp : "<unknown>"));
-            dStrHex((const char *)resp, resp_len, 0);
+            hex2stdout(resp, resp_len, 0);
         }
     }
     ret = 0;

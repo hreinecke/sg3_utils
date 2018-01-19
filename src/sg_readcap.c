@@ -1,17 +1,16 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
-   and outputs the result.
-
-*  Copyright (C) 1999 - 2017 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program was originally written with Linux 2.4 kernel series.
-   It now builds for the Linux 2.6 and 3 kernel series and various other
-   operating systems.
-
-*/
+ * and outputs the result.
+ *
+ * Copyright (C) 1999 - 2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * This program was originally written with Linux 2.4 kernel series.
+ * It now builds for the Linux 2.6, 3 and 4 kernel series and various other
+ * operating systems.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,13 +26,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.97 20171007";
+static const char * version_str = "3.98 20180118";
 
 #define ME "sg_readcap: "
 
@@ -368,11 +368,11 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -463,11 +463,11 @@ main(int argc, char * argv[])
         if (0 == res) {
             if (op->do_hex || op->do_raw) {
                 if (op->do_raw)
-                    dStrRaw((const char *)resp_buff, RCAP_REPLY_LEN);
+                    dStrRaw(resp_buff, RCAP_REPLY_LEN);
                 else if (op->do_hex > 2)
-                    dStrHex((const char *)resp_buff, RCAP_REPLY_LEN, -1);
+                    hex2stdout(resp_buff, RCAP_REPLY_LEN, -1);
                 else
-                    dStrHex((const char *)resp_buff, RCAP_REPLY_LEN, 1);
+                    hex2stdout(resp_buff, RCAP_REPLY_LEN, 1);
                 goto good;
             }
             last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
@@ -536,11 +536,11 @@ main(int argc, char * argv[])
         if (0 == res) {
             if (op->do_hex || op->do_raw) {
                 if (op->do_raw)
-                    dStrRaw((const char *)resp_buff, RCAP16_REPLY_LEN);
+                    dStrRaw(resp_buff, RCAP16_REPLY_LEN);
                 else if (op->do_hex > 2)
-                    dStrHex((const char *)resp_buff, RCAP16_REPLY_LEN, -1);
+                    hex2stdout(resp_buff, RCAP16_REPLY_LEN, -1);
                 else
-                    dStrHex((const char *)resp_buff, RCAP16_REPLY_LEN, 1);
+                    hex2stdout(resp_buff, RCAP16_REPLY_LEN, 1);
                 goto good;
             }
             llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Douglas Gilbert.
+ * Copyright (c) 2011-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.04 20171008";
+static const char * version_str = "1.05 20180118";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -212,7 +212,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         if (op->verbose > 2) {
             if (param_lst_len > 0) {
                 pr2serr("    Parameter list contents:\n");
-                dStrHexErr((const char *)param_lstp, param_lst_len, 1);
+                hex2stderr(param_lstp, param_lst_len, 1);
             }
             pr2serr("    Sanitize command timeout: %d seconds\n", timeout);
         }
@@ -690,7 +690,7 @@ main(int argc, char * argv[])
     }
 
     if ((0 == ret) && (! op->early) && (! op->wait)) {
-        for (k = 0 ;; ++k) {
+        for (k = 0; ;++k) {     /* unbounded, exits via break */
             sleep_for(POLL_DURATION_SECS);
             memset(rsBuff, 0x0, sizeof(rsBuff));
             res = sg_ll_request_sense(sg_fd, op->desc, rsBuff, sizeof(rsBuff),
@@ -720,7 +720,7 @@ main(int argc, char * argv[])
             resp_len = rsBuff[7] + 8;
             if (vb > 2) {
                 pr2serr("Parameter data in hex\n");
-                dStrHexErr((const char *)rsBuff, resp_len, 1);
+                hex2stderr(rsBuff, resp_len, 1);
             }
             progress = -1;
             sg_get_sense_progress_fld(rsBuff, resp_len, &progress);

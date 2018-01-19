@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2017 Douglas Gilbert.
+ * Copyright (c) 2009-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -114,11 +114,11 @@ usage()
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -327,7 +327,7 @@ main(int argc, char * argv[])
             goto the_end;
         }
         if (do_hex) {
-            dStrHex((const char *)glbasBuffp, k, 1);
+            hex2stdout(glbasBuffp, k, 1);
             goto the_end;
         }
         if (maxlen < 4) {

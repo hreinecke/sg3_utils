@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2017 Hannes Reinecke.
+ * Copyright (c) 2010-2018 Hannes Reinecke.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,6 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -33,7 +34,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.08 20171006";    /* sbc4r10 */
+static const char * version_str = "1.09 20180118";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -119,11 +120,11 @@ usage()
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -292,11 +293,11 @@ main(int argc, char * argv[])
             rlen = maxlen;
         k = (rlen > maxlen) ? maxlen : rlen;
         if (do_raw) {
-            dStrRaw((const char *)referralBuffp, k);
+            dStrRaw(referralBuffp, k);
             goto the_end;
         }
         if (do_hex) {
-            dStrHex((const char *)referralBuffp, k, 1);
+            hex2stdout(referralBuffp, k, 1);
             goto the_end;
         }
         if (maxlen < 4) {

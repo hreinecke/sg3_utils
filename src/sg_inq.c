@@ -1,19 +1,19 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2018 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program outputs information provided by a SCSI INQUIRY command.
-   It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
-
-   Acknowledgment:
-      - Martin Schwenke <martin at meltin dot net> added the raw switch and
-        other improvements [20020814]
-      - Lars Marowsky-Bree <lmb at suse dot de> contributed Unit Path Report
-        VPD page decoding for EMC CLARiiON devices [20041016]
-*/
+ * Copyright (C) 2000-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * This program outputs information provided by a SCSI INQUIRY command.
+ * It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
+ *
+ * Acknowledgment:
+ *    - Martin Schwenke <martin at meltin dot net> added the raw switch and
+ *      other improvements [20020814]
+ *    - Lars Marowsky-Bree <lmb at suse dot de> contributed Unit Path Report
+ *      VPD page decoding for EMC CLARiiON devices [20041016]
+ */
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.83 20180112";    /* SPC-5 rev 18 */
+static const char * version_str = "1.84 20180118";    /* SPC-5 rev 18 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1002,11 +1002,11 @@ enumerate_vpds()
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -1205,7 +1205,7 @@ decode_supported_vpd(unsigned char * buff, int len, int do_hex)
     const char * cp;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 4) {
@@ -1267,7 +1267,7 @@ decode_ascii_inf(unsigned char * buff, int len, int do_hex)
     unsigned char * p;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     if (len < 4) {
@@ -1291,7 +1291,7 @@ decode_ascii_inf(unsigned char * buff, int len, int do_hex)
     bp = buff + 5 + al;
     if (bp < (buff + len)) {
         printf("Vendor specific information in hex:\n");
-        dStrHex((const char *)bp, len - (al + 5), 0);
+        hex2stdout(bp, len - (al + 5), 0);
     }
 }
 
@@ -1344,7 +1344,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex > 2) {
-        dStrHex((const char *)buff, len, -1);
+        hex2stdout(buff, len, -1);
         return;
     }
     len -= 4;
@@ -1363,7 +1363,7 @@ decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
         if (na_len > 0) {
             if (do_hex) {
                 printf("    Network address:\n");
-                dStrHex((const char *)(bp + 4), na_len, 0);
+                hex2stdout(bp + 4, na_len, 0);
             } else
                 printf("    %s\n", bp + 4);
         }
@@ -1390,7 +1390,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex > 2) {
-        dStrHex((const char *)buff, len, -1);
+        hex2stdout(buff, len, -1);
         return;
     }
     len -= 4;
@@ -1403,7 +1403,7 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
             return;
         }
         if (do_hex)
-            dStrHex((const char *)bp, 4, (1 == do_hex) ? 1 : -1);
+            hex2stdout(bp, 4, (1 == do_hex) ? 1 : -1);
         else {
             printf("  Policy page code: 0x%x", (bp[0] & 0x3f));
             if (bp[1])
@@ -1428,7 +1428,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         return;
     }
     if (do_hex > 2) {
-        dStrHex((const char *)buff, len, -1);
+        hex2stdout(buff, len, -1);
         return;
     }
     len -= 4;
@@ -1446,8 +1446,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         if (ip_tid_len > 0) {
             if (do_hex) {
                 printf(" Initiator port transport id:\n");
-                dStrHex((const char *)(bp + 8), ip_tid_len,
-                        (1 == do_hex) ? 1 : -1);
+                hex2stdout((bp + 8), ip_tid_len, (1 == do_hex) ? 1 : -1);
             } else {
                 char b[1024];
 
@@ -1464,8 +1463,7 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
         if (tpd_len > 0) {
             printf(" Target port descriptor(s):\n");
             if (do_hex)
-                dStrHex((const char *)(bp + bump + 4), tpd_len,
-                        (1 == do_hex) ? 1 : -1);
+                hex2stdout(bp + bump + 4, tpd_len, (1 == do_hex) ? 1 : -1);
             else
                 decode_dev_ids("SCSI Ports", bp + bump + 4, tpd_len,
                                do_hex, verbose);
@@ -1546,7 +1544,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             printf("    designator header(hex): %.2x %.2x %.2x %.2x\n",
                    bp[0], bp[1], bp[2], bp[3]);
             printf("    designator:\n");
-            dStrHex((const char *)ip, i_len, 0);
+            hex2stdout(ip, i_len, 0);
             continue;
         }
         switch (desig_type) {
@@ -1562,7 +1560,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                 printf("      vendor specific: %.*s\n", i_len, ip);
             else {
                 printf("      vendor specific:\n");
-                dStrHex((const char *)ip, i_len, -1);
+                hex2stdout(ip, i_len, -1);
             }
             break;
         case 1: /* T10 vendor identification */
@@ -1582,7 +1580,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             printf("      EUI-64 based %d byte identifier\n", i_len);
             if (1 != c_set) {
                 pr2serr("      << expected binary code_set (1)>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             ci_off = 0;
@@ -1593,7 +1591,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             } else if ((8 != i_len) && (12 != i_len)) {
                 pr2serr("      << can only decode 8, 12 and 16 "
                         "byte ids>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             c_id = sg_get_unaligned_be24(ip + ci_off);
@@ -1615,7 +1613,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             if (1 != c_set) {
                 pr2serr("      << expected binary code_set (1), got %d for "
                         "NAA=%d>>\n", c_set, naa);
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             switch (naa) {
@@ -1623,7 +1621,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 2 identifier "
                             "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, -1);
+                    hex2stderr(ip, i_len, -1);
                     break;
                 }
                 d_id = (((ip[0] & 0xf) << 8) | ip[1]);
@@ -1642,7 +1640,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 3 identifier "
                             "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, -1);
+                    hex2stderr(ip, i_len, -1);
                     break;
                 }
                 printf("      NAA 3, Locally assigned:\n");
@@ -1655,7 +1653,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                 if (8 != i_len) {
                     pr2serr("      << unexpected NAA 5 identifier "
                             "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, -1);
+                    hex2stderr(ip, i_len, -1);
                     break;
                 }
                 c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
@@ -1677,7 +1675,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                 if (16 != i_len) {
                     pr2serr("      << unexpected NAA 6 identifier "
                             "length: 0x%x>>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                     break;
                 }
                 c_id = (((ip[0] & 0xf) << 20) | (ip[1] << 12) |
@@ -1701,7 +1699,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             default:
                 pr2serr("      << bad NAA nibble , expect 2, 3, 5 or 6, "
                         "got %d>>\n", naa);
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             break;
@@ -1709,7 +1707,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 pr2serr("      << expected binary code_set, target "
                         "port association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             d_id = sg_get_unaligned_be16(ip + 2);
@@ -1719,7 +1717,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             if ((1 != c_set) || (1 != assoc) || (4 != i_len)) {
                 pr2serr("      << expected binary code_set, target "
                         "port association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             d_id = sg_get_unaligned_be16(ip + 2);
@@ -1729,7 +1727,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             if ((1 != c_set) || (0 != assoc) || (4 != i_len)) {
                 pr2serr("      << expected binary code_set, logical "
                         "unit association, length 4>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             d_id = sg_get_unaligned_be16(ip + 2);
@@ -1739,11 +1737,11 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             if ((1 != c_set) || (0 != assoc)) {
                 pr2serr("      << expected binary code_set, logical "
                         "unit association>>\n");
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
                 break;
             }
             printf("      MD5 logical unit identifier:\n");
-            dStrHex((const char *)ip, i_len, -1);
+            hex2stdout(ip, i_len, -1);
             break;
         case 8: /* SCSI name string */
             if (3 != c_set) {
@@ -1752,7 +1750,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
                         pr2serr("      << expected UTF-8, use ASCII>>\n");
                 } else {
                     pr2serr("      << expected UTF-8 code_set>>\n");
-                    dStrHexErr((const char *)ip, i_len, -1);
+                    hex2stderr(ip, i_len, -1);
                     break;
                 }
             }
@@ -1787,13 +1785,13 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
         case 0xa: /* UUID identifier [spc5r08] RFC 4122 */
             if (1 != c_set) {
                 pr2serr("      << expected binary code_set >>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != i_len)) {
                 pr2serr("      << expected locally assigned UUID, 16 bytes "
                         "long >>\n");
-                dStrHexErr((const char *)ip, i_len, 0);
+                hex2stderr(ip, i_len, 0);
                 break;
             }
             printf("      Locally assigned UUID: ");
@@ -1806,7 +1804,7 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
             break;
         default: /* reserved */
             pr2serr("      reserved designator=0x%x\n", desig_type);
-            dStrHexErr((const char *)ip, i_len, -1);
+            hex2stderr(ip, i_len, -1);
             break;
         }
     }
@@ -1929,7 +1927,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
             if (1 != c_set) {
                 if (verbose) {
                     pr2serr("      << expected binary code_set (1)>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -1942,7 +1940,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
             if (1 != c_set) {
                 if (verbose) {
                     pr2serr("      << expected binary code_set (1)>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -1977,7 +1975,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 if (verbose) {
                     pr2serr("      << expected binary code_set, target "
                             "port association, length 4>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -1989,7 +1987,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 if (verbose) {
                     pr2serr("      << expected binary code_set, target "
                             "port association, length 4>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -2001,7 +1999,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 if (verbose) {
                     pr2serr("      << expected binary code_set, logical "
                             "unit association, length 4>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -2013,18 +2011,18 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 if (verbose) {
                     pr2serr("      << expected binary code_set, logical "
                             "unit association>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
             printf("SCSI_IDENT_%s_MD5=", assoc_str);
-            dStrHex((const char *)ip, i_len, -1);
+            hex2stdout(ip, i_len, -1);
             break;
         case 8: /* SCSI name string */
             if (3 != c_set) {
                 if (verbose) {
                     pr2serr("      << expected UTF-8 code_set>>\n");
-                    dStrHexErr((const char *)ip, i_len, -1);
+                    hex2stderr(ip, i_len, -1);
                 }
                 break;
             }
@@ -2035,7 +2033,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                    strncmp((const char *)ip, "iqn.", 4))) {
                 if (verbose) {
                     pr2serr("      << expected name string prefix>>\n");
-                    dStrHexErr((const char *)ip, i_len, -1);
+                    hex2stderr(ip, i_len, -1);
                 }
                 break;
             }
@@ -2049,7 +2047,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                     if (verbose) {
                         pr2serr("      << UAS (USB) expected target "
                                 "port association>>\n");
-                        dStrHexErr((const char *)ip, i_len, 0);
+                        hex2stderr(ip, i_len, 0);
                     }
                     break;
                 }
@@ -2062,7 +2060,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                     if (verbose) {
                         pr2serr("      << SOP (PCIe) descriptor "
                                 "length=%d >>\n", i_len);
-                        dStrHexErr((const char *)ip, i_len, 0);
+                        hex2stderr(ip, i_len, 0);
                     }
                     break;
                 }
@@ -2077,7 +2075,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
             if (1 != c_set) {
                 if (verbose) {
                     pr2serr("      << expected binary code_set (1)>>\n");
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -2085,7 +2083,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
                 if (verbose) {
                     pr2serr("      << short UUID field expected 18 or more, "
                             "got %d >>\n", i_len);
-                    dStrHexErr((const char *)ip, i_len, 0);
+                    hex2stderr(ip, i_len, 0);
                 }
                 break;
             }
@@ -2101,7 +2099,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
         default: /* reserved */
             if (verbose) {
                 pr2serr("      reserved designator=0x%x\n", desig_type);
-                dStrHexErr((const char *)ip, i_len, -1);
+                hex2stderr(ip, i_len, -1);
             }
             break;
         }
@@ -2120,7 +2118,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
@@ -2164,7 +2162,7 @@ static void
 decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 {
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     len -= 4;
@@ -2187,7 +2185,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex && (2 != do_hex)) {
-        dStrHex((const char *)buff, len, (3 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (3 == do_hex) ? 0 : -1);
         return;
     }
     memcpy(b, buff + 8, 8);
@@ -2202,7 +2200,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
     if (len < 56)
         return;
     printf("  Signature (Device to host FIS):\n");
-    dStrHex((const char *)buff + 36, 20, 1);
+    hex2stdout(buff + 36, 20, 1);
     if (len < 60)
         return;
     is_be = sg_is_big_endian();
@@ -2228,7 +2226,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
     if (len < 572)
         return;
     if (2 == do_hex)
-        dStrHex((const char *)(buff + 60), 512, 0);
+        hex2stdout(buff + 60, 512, 0);
     else
         dWordHex((const unsigned short *)(buff + 60), 256, 0,
                  sg_is_big_endian());
@@ -2243,7 +2241,7 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     printf("  Standby_y=%d Standby_z=%d Idle_c=%d Idle_b=%d Idle_a=%d\n",
@@ -2275,7 +2273,7 @@ decode_feature_sets_vpd(unsigned char * buff, int len,
     char b[64];
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        dStrHex((const char *)buff, len, (1 == op->do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
         return;
     }
     if (len < 4) {
@@ -2293,9 +2291,9 @@ decode_feature_sets_vpd(unsigned char * buff, int len,
             return;
         }
         if (2 == op->do_hex)
-            dStrHex((const char *)bp + 8, 2, 1);
+            hex2stdout(bp + 8, 2, 1);
         else if (op->do_hex > 2)
-            dStrHex((const char *)bp, 2, 1);
+            hex2stdout(bp, 2, 1);
         else {
             printf("    %s", sg_get_sfs_str(sf_code, -2, sizeof(b), b,
                    &found, op->do_verbose));
@@ -2322,7 +2320,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
     bool ugavalid;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     pdt = 0x1f & buff[0];
@@ -2447,7 +2445,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
         case PDT_OSD:
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-            dStrHex((const char *)buff, len, 0);
+            hex2stdout(buff, len, 0);
             break;
     }
 }
@@ -2462,7 +2460,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
     unsigned int u;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     pdt = 0x1f & buff[0];
@@ -2524,7 +2522,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
             /* fall through */
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-            dStrHex((const char *)buff, len, 0);
+            hex2stdout(buff, len, 0);
             break;
     }
 }
@@ -2537,7 +2535,7 @@ decode_b3_vpd(unsigned char * buff, int len, int do_hex)
     unsigned int s, m;
 
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 0 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
     pdt = 0x1f & buff[0];
@@ -2559,7 +2557,7 @@ decode_b3_vpd(unsigned char * buff, int len, int do_hex)
             break;
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
-            dStrHex((const char *)buff, len, 0);
+            hex2stdout(buff, len, 0);
             break;
     }
 }
@@ -2621,7 +2619,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (buff[9] != 0x00) {
@@ -2697,7 +2695,7 @@ decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
@@ -2795,7 +2793,7 @@ decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
         return;
     }
     if (do_hex) {
-        dStrHex((const char *)buff, len, (1 == do_hex) ? 1 : -1);
+        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
         return;
     }
     if (buff[4] != 'v' && buff[5] != 'a' && buff[6] != 'c') {
@@ -2923,7 +2921,7 @@ std_inq_response(const struct opts_t * op, int act_len)
         return 0;
     } else if (op->do_hex) {
         /* with -H, print with address, -HH without */
-        dStrHex((const char *)rp, act_len, ((1 == op->do_hex) ? 0 : -1));
+        hex2stdout(rp, act_len, ((1 == op->do_hex) ? 0 : -1));
         return 0;
     }
     pqual = (rp[0] & 0xe0) >> 5;
@@ -3234,7 +3232,7 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
     if (0 == res) {
         if ((verb > 4) && ((rlen - resid) > 0)) {
             pr2serr("Safe (36 byte) Inquiry response:\n");
-            dStrHex((const char *)rsp_buff, rlen - resid, 0);
+            hex2stdout(rsp_buff, rlen - resid, 0);
         }
         len = rsp_buff[4] + 5;
         if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
@@ -3356,8 +3354,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
             len = rsp_buff[5] + 6;
             reserved_cmddt = rsp_buff[4];
             if (op->do_hex)
-                dStrHex((const char *)rsp_buff, len,
-                        (1 == op->do_hex) ? 0 : -1);
+                hex2stdout(rsp_buff, len, (1 == op->do_hex) ? 0 : -1);
             else if (op->do_raw)
                 dStrRaw((const char *)rsp_buff, len);
             else {
@@ -3459,7 +3456,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5, cp);
                 }
-                dStrHex((const char *)rp, len, ((1 == op->do_hex) ? 0 : -1));
+                hex2stdout(rp, len, ((1 == op->do_hex) ? 0 : -1));
             }
         }
     } else {
@@ -3509,8 +3506,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else if (op->do_hex)
-            dStrHex((const char *)rp, len,
-                    (1 == op->do_hex) ? 0 : -1);
+            hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
         else
             decode_supported_vpd(rp, len, 0x1f & rp[0]);
         break;
@@ -3523,8 +3519,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else if (op->do_hex)
-            dStrHex((const char *)rp, len,
-                    (1 == op->do_hex) ? 0 : -1);
+            hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
         else {
             char obuff[DEF_ALLOC_LEN];
             int k, m;
@@ -3566,7 +3561,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else if (op->do_hex > 2)
-            dStrHex((const char *)rp, len, -1);
+            hex2stdout(rp, len, -1);
         else if (op->do_export)
             export_dev_ids(rp + 4, len - 4, op->do_verbose);
         else
@@ -3828,58 +3823,37 @@ nvme_hex_raw(const unsigned char * b, int b_len, const struct opts_t * op)
     else if (op->do_hex) {
         if (op->do_hex < 3) {
             printf("data_in buffer:\n");
-            dStrHex((const char *)b, b_len, (2 == op->do_hex));
+            hex2stdout(b, b_len, (2 == op->do_hex));
         } else
-            dStrHex((const char *)b, b_len, -1);
+            hex2stdout(b, b_len, -1);
     }
 }
 
-const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
+static const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
 
-/* Send Identify(CNS=0, nsid) and decode the Identify namespace response */
-static int
-nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
-                  struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_dinp,
-                  int id_din_len, const struct opts_t * op)
+static void
+show_nvme_id_ns(const uint8_t * dinp, int do_long)
 {
     bool got_eui_128 = false;
-    int ret = 0;
-    int vb = op->do_verbose;
     uint32_t u, k, off, num_lbaf, flbas, flba_info, md_size, lb_size;
     uint64_t ns_sz, eui_64;
-    struct sg_nvme_passthru_cmd cmd_back;
 
-    clear_scsi_pt_obj(ptvp);
-    id_cmdp->nsid = nsid;
-    id_cmdp->cdw10 = 0x0;       /* CNS=0x0 Identify NS */
-    set_scsi_pt_data_in(ptvp, id_dinp, id_din_len);
-    set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
-    set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
-    ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
-    if (vb > 2)
-        pr2serr("%s: do_scsi_pt() result is %d\n", __func__, ret);
-    if (ret)
-        return ret;
-    num_lbaf = id_dinp[25] + 1;  /* spec says this is "0's based value" */
-    flbas = id_dinp[26] & 0xf;   /* index of active LBA format (for this ns) */
-    if (op->do_hex || op->do_raw) {
-        nvme_hex_raw(id_dinp, id_din_len, op);
-        return 0;
-    }
-    ns_sz = sg_get_unaligned_le64(id_dinp + 0);
-    eui_64 = sg_get_unaligned_be64(id_dinp + 120);  /* N.B. big endian */
-    if (! sg_all_zeros(id_dinp + 104, 16))
+    num_lbaf = dinp[25] + 1;  /* spec says this is "0's based value" */
+    flbas = dinp[26] & 0xf;   /* index of active LBA format (for this ns) */
+    ns_sz = sg_get_unaligned_le64(dinp + 0);
+    eui_64 = sg_get_unaligned_be64(dinp + 120);  /* N.B. big endian */
+    if (! sg_all_zeros(dinp + 104, 16))
         got_eui_128 = true;
     printf("    Namespace size/capacity: %" PRIu64 "/%" PRIu64
-           " blocks\n", ns_sz, sg_get_unaligned_le64(id_dinp + 8));
+           " blocks\n", ns_sz, sg_get_unaligned_le64(dinp + 8));
     printf("    Namespace utilization: %" PRIu64 " blocks\n",
-           sg_get_unaligned_le64(id_dinp + 16));
+           sg_get_unaligned_le64(dinp + 16));
     if (got_eui_128) {          /* N.B. big endian */
-        printf("    NGUID: 0x%02x", id_dinp[104]);
+        printf("    NGUID: 0x%02x", dinp[104]);
         for (k = 1; k < 16; ++k)
-            printf("%02x", id_dinp[104 + k]);
+            printf("%02x", dinp[104 + k]);
         printf("\n");
-    } else if (op->do_long)
+    } else if (do_long)
         printf("    NGUID: 0x0\n");
     if (eui_64)
         printf("    EUI-64: 0x%" PRIx64 "\n", eui_64); /* N.B. big endian */
@@ -3891,7 +3865,7 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
             printf(" <-- active\n");
         else
             printf("\n");
-        flba_info = sg_get_unaligned_le32(id_dinp + off);
+        flba_info = sg_get_unaligned_le32(dinp + off);
         md_size = flba_info & 0xffff;
         lb_size = flba_info >> 16 & 0xff;
         if (lb_size > 31) {
@@ -3913,75 +3887,53 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
         printf("      Metadata size: %u bytes\n", md_size);
         printf("      Relative performance: %s [0x%x]\n", rperf[u], u);
     }
-    return ret;
 }
 
-/* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. If the
- * device name includes a namespace indication (e.g. /dev/nvme0ns1) then
- * an Identify namespace command is sent to that namespace (e.g. 1). If the
- * device name does not contain a namespace indication (e.g. /dev/nvme0)
- * and --only is not given then nvme_id_namespace() is sent for each
- * namespace in the controller. Namespaces number sequentially starting at
- * 1 . The CNS (Controller or Namespace Structure) field is CDW10 7:0, was
- * only bit 0 in NVMe 1.0 and bits 1:0 in NVMe 1.1, thereafter 8 bits. */
+/* Send Identify(CNS=0, nsid) and decode the Identify namespace response */
 static int
-do_nvme_identify(int pt_fd, const struct opts_t * op)
+nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
+                  struct sg_nvme_passthru_cmd * id_cmdp, uint8_t * id_dinp,
+                  int id_din_len, const struct opts_t * op)
 {
-    bool got_fguid;
     int ret = 0;
     int vb = op->do_verbose;
-    uint8_t ver_min, ver_ter, mtds;
-    uint16_t ver_maj, oacs, oncs;
-    uint32_t k, ver, nsid, max_nsid, npss, j, n, m;
-    uint64_t sz1, sz2;
-    uint8_t * up;
-    struct sg_pt_base * ptvp;
-    struct sg_nvme_passthru_cmd identify_cmd;
-    struct sg_nvme_passthru_cmd cmd_back;
-    struct sg_nvme_passthru_cmd * id_cmdp = &identify_cmd;
-    uint8_t * id_dinp = NULL;
-    uint8_t * free_id_dinp = NULL;
-    const uint32_t pg_sz = sg_get_page_size();
+    uint8_t resp[16];
 
-    if (op->do_raw) {
-        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
-            perror("sg_set_binary_mode");
-            return SG_LIB_FILE_ERROR;
-        }
-    }
-    ptvp = construct_scsi_pt_obj_with_fd(pt_fd, vb);
-    if (NULL == ptvp) {
-        pr2serr("%s: memory problem\n", __func__);
-        return SG_LIB_CAT_OTHER;
-    }
-    memset(id_cmdp, 0, sizeof(*id_cmdp));
-    id_cmdp->opcode = 0x6;
-    nsid = get_pt_nvme_nsid(ptvp);
-    /* leave id_cmdp->nsid at 0 */
-    id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
-    id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, vb > 3);
-    set_scsi_pt_data_in(ptvp, id_dinp, pg_sz);
+    clear_scsi_pt_obj(ptvp);
+    id_cmdp->nsid = nsid;
+    id_cmdp->cdw10 = 0x0;       /* CNS=0x0 Identify NS */
+    set_scsi_pt_data_in(ptvp, id_dinp, id_din_len);
+    set_scsi_pt_sense(ptvp, resp, sizeof(resp));
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
-    set_scsi_pt_sense(ptvp, (unsigned char *)&cmd_back, sizeof(cmd_back));
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
     if (vb > 2)
-        pr2serr("%s: do_scsi_pt result is %d\n", __func__, ret);
+        pr2serr("%s: do_scsi_pt() result is %d\n", __func__, ret);
     if (ret)
-        goto err_out;
-    max_nsid = sg_get_unaligned_le32(id_dinp + 516); /* NN */
-    if (op->do_raw || op->do_hex) {
-        if (op->do_only || (SG_NVME_CTL_NSID == nsid ) ||
-            (SG_NVME_BROADCAST_NSID == nsid)) {
-            nvme_hex_raw(id_dinp, pg_sz, op);
-            goto fini;
-        }
-        goto skip1;
+        return ret;
+    if (op->do_hex || op->do_raw) {
+        nvme_hex_raw(id_dinp, id_din_len, op);
+        return 0;
     }
-    printf("Identify controller for %s:\n", op->device_name);
-    printf("  Model number: %.40s\n", (const char *)(id_dinp + 24));
-    printf("  Serial number: %.20s\n", (const char *)(id_dinp + 4));
-    printf("  Firmware revision: %.8s\n", (const char *)(id_dinp + 64));
-    ver = sg_get_unaligned_le32(id_dinp + 80);
+    show_nvme_id_ns(id_dinp, op->do_long);
+    return 0;
+}
+
+static void
+show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
+{
+    bool got_fguid;
+    uint8_t ver_min, ver_ter, mtds;
+    uint16_t ver_maj, oacs, oncs;
+    uint32_t k, ver, max_nsid, npss, j, n, m;
+    uint64_t sz1, sz2;
+    const uint8_t * up;
+
+    max_nsid = sg_get_unaligned_le32(dinp + 516); /* NN */
+    printf("Identify controller for %s:\n", dev_name);
+    printf("  Model number: %.40s\n", (const char *)(dinp + 24));
+    printf("  Serial number: %.20s\n", (const char *)(dinp + 4));
+    printf("  Firmware revision: %.8s\n", (const char *)(dinp + 64));
+    ver = sg_get_unaligned_le32(dinp + 80);
     ver_maj = (ver >> 16);
     ver_min = (ver >> 8) & 0xff;
     ver_ter = (ver & 0xff);
@@ -3991,7 +3943,7 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         printf(".%u\n", ver_ter);
     else
         printf("\n");
-    oacs = sg_get_unaligned_le16(id_dinp + 256);
+    oacs = sg_get_unaligned_le16(dinp + 256);
     if (0x1ff & oacs) {
         printf("  Optional admin command support:\n");
         if (0x100 & oacs)
@@ -4014,7 +3966,7 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
             printf("    Security send and receive\n");
     } else
         printf("  No optional admin command support\n");
-    oncs = sg_get_unaligned_le16(id_dinp + 256);
+    oncs = sg_get_unaligned_le16(dinp + 256);
     if (0x7f & oncs) {
         printf("  Optional NVM command support:\n");
         if (0x40 & oncs)
@@ -4034,47 +3986,47 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     } else
         printf("  No optional NVM command support\n");
     printf("  PCI vendor ID VID/SSVID: 0x%x/0x%x\n",
-           sg_get_unaligned_le16(id_dinp + 0),
-           sg_get_unaligned_le16(id_dinp + 2));
+           sg_get_unaligned_le16(dinp + 0),
+           sg_get_unaligned_le16(dinp + 2));
     printf("  IEEE OUI Identifier: 0x%x\n",
-           sg_get_unaligned_le24(id_dinp + 73));
-    got_fguid = ! sg_all_zeros(id_dinp + 112, 16);
+           sg_get_unaligned_le24(dinp + 73));
+    got_fguid = ! sg_all_zeros(dinp + 112, 16);
     if (got_fguid) {
-        printf("  FGUID: 0x%02x", id_dinp[112]);
+        printf("  FGUID: 0x%02x", dinp[112]);
         for (k = 1; k < 16; ++k)
-            printf("%02x", id_dinp[112 + k]);
+            printf("%02x", dinp[112 + k]);
         printf("\n");
-    } else if (op->do_long)
+    } else if (do_long)
         printf("  FGUID: 0x0\n");
-    printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(id_dinp + 78));
-    if (op->do_long) {
+    printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(dinp + 78));
+    if (do_long) {
         printf("  Management endpoint capabilities, over a PCIe port: %d\n",
-               !! (0x2 & id_dinp[255]));
+               !! (0x2 & dinp[255]));
         printf("  Management endpoint capabilities, over a SMBus/I2C port: "
-               "%d\n", !! (0x1 & id_dinp[255]));
+               "%d\n", !! (0x1 & dinp[255]));
     }
     printf("  Number of namespaces: %u\n", max_nsid);
-    sz1 = sg_get_unaligned_le64(id_dinp + 280);  /* lower 64 bits */
-    sz2 = sg_get_unaligned_le64(id_dinp + 288);  /* upper 64 bits */
+    sz1 = sg_get_unaligned_le64(dinp + 280);  /* lower 64 bits */
+    sz2 = sg_get_unaligned_le64(dinp + 288);  /* upper 64 bits */
     if (sz2)
         printf("  Total NVM capacity: huge ...\n");
     else if (sz1)
         printf("  Total NVM capacity: %" PRIu64 " bytes\n", sz1);
-    mtds = id_dinp[77];
+    mtds = dinp[77];
     printf("  Maximum data transfer size: ");
     if (mtds)
         printf("%u pages\n", 1U << mtds);
     else
         printf("<unlimited>\n");
 
-    if (op->do_long) {
+    if (do_long) {
         const char * const non_op = "does not process I/O";
         const char * const operat = "processes I/O";
         const char * cp;
 
         printf("  Total NVM capacity: 0 bytes\n");
-        npss = id_dinp[263] + 1;
-        up = id_dinp + 2048;
+        npss = dinp[263] + 1;
+        up = dinp + 2048;
         for (k = 0; k < npss; ++k, up += 32) {
             n = sg_get_unaligned_le16(up + 0);
             n *= (0x1 & up[3]) ? 1 : 100;    /* unit: 100 microWatts */
@@ -4109,6 +4061,65 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
             printf("RWL=%u\n", n);
         }
     }
+}
+
+/* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. If the
+ * device name includes a namespace indication (e.g. /dev/nvme0ns1) then
+ * an Identify namespace command is sent to that namespace (e.g. 1). If the
+ * device name does not contain a namespace indication (e.g. /dev/nvme0)
+ * and --only is not given then nvme_id_namespace() is sent for each
+ * namespace in the controller. Namespaces number sequentially starting at
+ * 1 . The CNS (Controller or Namespace Structure) field is CDW10 7:0, was
+ * only bit 0 in NVMe 1.0 and bits 1:0 in NVMe 1.1, thereafter 8 bits. */
+static int
+do_nvme_identify(int pt_fd, const struct opts_t * op)
+{
+    int ret = 0;
+    int vb = op->do_verbose;
+    uint32_t k, nsid, max_nsid;
+    struct sg_pt_base * ptvp;
+    struct sg_nvme_passthru_cmd identify_cmd;
+    struct sg_nvme_passthru_cmd * id_cmdp = &identify_cmd;
+    uint8_t * id_dinp = NULL;
+    uint8_t * free_id_dinp = NULL;
+    const uint32_t pg_sz = sg_get_page_size();
+    uint8_t resp[16];
+
+    if (op->do_raw) {
+        if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
+            perror("sg_set_binary_mode");
+            return SG_LIB_FILE_ERROR;
+        }
+    }
+    ptvp = construct_scsi_pt_obj_with_fd(pt_fd, vb);
+    if (NULL == ptvp) {
+        pr2serr("%s: memory problem\n", __func__);
+        return SG_LIB_CAT_OTHER;
+    }
+    memset(id_cmdp, 0, sizeof(*id_cmdp));
+    id_cmdp->opcode = 0x6;
+    nsid = get_pt_nvme_nsid(ptvp);
+    /* leave id_cmdp->nsid at 0 */
+    id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
+    id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, vb > 3);
+    set_scsi_pt_data_in(ptvp, id_dinp, pg_sz);
+    set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
+    set_scsi_pt_sense(ptvp, resp, sizeof(resp));
+    ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
+    if (vb > 2)
+        pr2serr("%s: do_scsi_pt result is %d\n", __func__, ret);
+    if (ret)
+        goto err_out;
+    max_nsid = sg_get_unaligned_le32(id_dinp + 516); /* NN */
+    if (op->do_raw || op->do_hex) {
+        if (op->do_only || (SG_NVME_CTL_NSID == nsid ) ||
+            (SG_NVME_BROADCAST_NSID == nsid)) {
+            nvme_hex_raw(id_dinp, pg_sz, op);
+            goto fini;
+        }
+        goto skip1;
+    }
+    show_nvme_id_ctl(id_dinp, op->device_name, op->do_long);
 skip1:
     if (op->do_only)
         goto fini;
@@ -4668,7 +4679,7 @@ try_ata_identify(int ata_fd, int do_hex, int do_raw, int verbose)
                 printf("ATA IDENTIFY DEVICE response ");
             if (do_hex > 1) {
                 printf("(512 bytes):\n");
-                dStrHex((const char *)&ata_ident, 512, 0);
+                hex2stdout((const uint8_t *)&ata_ident, 512, 0);
             } else {
                 printf("(256 words):\n");
                 dWordHex((const unsigned short *)&ata_ident, 256, 0,

@@ -4,8 +4,15 @@ PREFIX=/usr/local
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
+# In Linux the default C compiler is GCC while in FreeBSD (since release 10 ?)
+# the default C compiler is clang. Swap the comment marks (lines starting
+# with '#') on the next 4 (non-blank) lines.
 CC = gcc
+# CC = clang
+
 LD = gcc
+# LD = clang
+
 
 EXECS = sg_simple1 sg_simple2 sg_simple3 sg_simple4 sg_simple16 \
 	scsi_inquiry sg_excl sg_simple5 sg__sat_identify \
@@ -107,6 +114,11 @@ uninstall:
 	 rm -f $(MANDIR)/$(MAN_PREF)/$$mp.gz; \
 	done
 
+# Linux uses GNU make and FreeBSD uses Berkely make. The following lines
+# only work in Linux. Possible solutions in FreeBSD:
+#    a) use 'gmake'; b) comment out the next 3 lines, starting with 'ifeq'
+#        c) build with 'make -f Makefile.freebsd'
+# In Linux one can install bmake (but that won't help here).
 ifeq (.depend,$(wildcard .depend))
 include .depend
 endif

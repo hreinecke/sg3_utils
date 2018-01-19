@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017 Douglas Gilbert.
+ * Copyright (c) 2016-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.02 20171008";
+static const char * version_str = "1.03 20180118";
 
 #define BACKGROUND_CONTROL_SA 0x15
 

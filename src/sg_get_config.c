@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -238,7 +238,7 @@ dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -876,7 +876,7 @@ decode_feature(int feature, unsigned char * bp, int len)
         pr2serr("    Unknown feature [0x%x], version=%d persist=%d, "
                 "current=%d\n", feature, ((bp[2] >> 2) & 0xf),
                 !!(bp[2] & 0x2), !!(bp[2] & 0x1));
-        dStrHexErr((const char *)bp, len, 1);
+        hex2stderr(bp, len, 1);
         break;
     }
 }
@@ -913,7 +913,7 @@ decode_config(unsigned char * resp, int max_resp_len, int len, bool brief,
         if (brief)
             continue;
         if (inner_hex) {
-            dStrHex((const char *)bp, extra_len, 1);
+            hex2stdout(bp, extra_len, 1);
             continue;
         }
         if (0 != (extra_len % 4))
@@ -1090,7 +1090,7 @@ main(int argc, char * argv[])
         if (do_hex) {
             if (len > (int)sizeof(resp_buffer))
                 len = sizeof(resp_buffer);
-            dStrHex((const char *)resp_buffer, len, 0);
+            hex2stdout(resp_buffer, len, 0);
         } else if (do_raw)
             dStrRaw((const char *)resp_buffer, len);
         else

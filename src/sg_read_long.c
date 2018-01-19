@@ -1,16 +1,16 @@
 /* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2017 D. Gilbert
-   *  This program is free software; you can redistribute it and/or modify
-   *  it under the terms of the GNU General Public License as published by
-   *  the Free Software Foundation; either version 2, or (at your option)
-   *  any later version.
-
-   This program issues the SCSI command READ LONG to a given SCSI device.
-   It sends the command with the logical block address passed as the lba
-   argument, and the transfer length set to the xfer_len argument. the
-   buffer to be written to the device filled with 0xff, this buffer includes
-   the sector data and the ECC bytes.
-*/
+ *  Copyright (C) 2004-2018 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ * This program issues the SCSI command READ LONG to a given SCSI device.
+ * It sends the command with the logical block address passed as the lba
+ * argument, and the transfer length set to the xfer_len argument. the
+ * buffer to be written to the device filled with 0xff, this buffer includes
+ * the sector data and the ECC bytes.
+ */
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -27,12 +27,13 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.23 20171006";
+static const char * version_str = "1.24 20180118";
 
 #define MAX_XFER_LEN 10000
 
@@ -241,7 +242,7 @@ main(int argc, char * argv[])
         goto err_out;
 
     if ('\0' == out_fname[0])
-        dStrHex((const char *)rawp, xfer_len, 0);
+        hex2stdout(rawp, xfer_len, 0);
     else {
         got_stdout = (0 == strcmp(out_fname, "-"));
         if (got_stdout)

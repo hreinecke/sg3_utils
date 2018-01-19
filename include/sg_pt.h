@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2017 Douglas Gilbert.
+ * Copyright (c) 2005-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -121,6 +121,7 @@ void set_scsi_pt_flags(struct sg_pt_base * objp, int flags);
 #define SCSI_PT_DO_START_OK 0
 #define SCSI_PT_DO_BAD_PARAMS 1
 #define SCSI_PT_DO_TIMEOUT 2
+#define SCSI_PT_DO_NVME_STATUS 48       /* == SG_LIB_NVME_STATUS */
 /* If OS error prior to or during command submission then returns negated
  * error value (e.g. Unix '-errno'). This includes interrupted system calls
  * (e.g. by a signal) in which case -EINTR would be returned. Note that
@@ -145,12 +146,14 @@ int get_scsi_pt_result_category(const struct sg_pt_base * objp);
  * the device is 'dxfer_ilen - get_scsi_pt_len()' bytes.  */
 int get_scsi_pt_resid(const struct sg_pt_base * objp);
 
-/* Returns SCSI status value (from device that received the
-   command). */
+/* Returns SCSI status value (from device that received the command). If an
+ * NVMe command was issued directly (i.e. through do_scsi_pt() then return
+ * NVMe status (i.e. ((SCT << 8) | SC)) */
 int get_scsi_pt_status_response(const struct sg_pt_base * objp);
 
-/* Returns SCSI status value or NVMe result (from device that received the
-   command). */
+/* Returns SCSI status value or, if NVMe command given to do_scsi_pt(),
+ * then returns NVMe result (i.e. DWord(0) from completion queue). If
+ * 'objp' is NULL then returns 0xffffffff. */
 uint32_t get_pt_result(const struct sg_pt_base * objp);
 
 /* Actual sense length returned. If sense data is present but

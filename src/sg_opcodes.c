@@ -1,13 +1,13 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2017 D. Gilbert
+ *  Copyright (C) 2004-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
-
-    This program outputs information provided by a SCSI REPORT SUPPORTED
-    OPERATION CODES [0xa3/0xc] and REPORT SUPPORTED TASK MANAGEMENT
-    FUNCTIONS [0xa3/0xd] commands.
+ *
+ *  This program outputs information provided by a SCSI REPORT SUPPORTED
+ *  OPERATION CODES [0xa3/0xc] and REPORT SUPPORTED TASK MANAGEMENT
+ *  FUNCTIONS [0xa3/0xd] commands.
  */
 
 #include <unistd.h>
@@ -236,7 +236,7 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
             *act_resp_lenp = ret;
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("%s response:\n", rsoc_s);
-            dStrHexErr((const char *)resp, ret, 1);
+            hex2stderr(resp, ret, 1);
         }
         ret = 0;
     }
@@ -298,7 +298,7 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
             *act_resp_lenp = ret;
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("%s response:\n", rstmf_s);
-            dStrHexErr((const char *)resp, ret, 1);
+            hex2stderr(resp, ret, 1);
         }
         ret = 0;
     }
@@ -584,11 +584,11 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -1051,7 +1051,7 @@ main(int argc, char * argv[])
         }
         printf("\nTask Management Functions supported by device:\n");
         if (op->do_hex) {
-            dStrHex((const char *)rsoc_buff, act_len, 1);
+            hex2stdout(rsoc_buff, act_len, 1);
             goto err_out;
         }
         if (rsoc_buff[0] & 0x80)
@@ -1107,7 +1107,7 @@ main(int argc, char * argv[])
             goto err_out;
         }
         if (op->do_hex) {
-            dStrHex((const char *)rsoc_buff, len, 1);
+            hex2stdout(rsoc_buff, len, 1);
             goto err_out;
         }
         list_all_codes(rsoc_buff, len, op, sg_fd);
@@ -1121,7 +1121,7 @@ main(int argc, char * argv[])
             goto err_out;
         }
         if (op->do_hex) {
-            dStrHex((const char *)rsoc_buff, len, 1);
+            hex2stdout(rsoc_buff, len, 1);
             goto err_out;
         }
         list_one(rsoc_buff, cd_len, rep_opts, op);

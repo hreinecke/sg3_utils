@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2017 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2018 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -10,23 +10,23 @@
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
-
-   This program is a specialisation of the Unix "dd" command in which
-   either the input or the output file is a scsi generic device, raw
-   device, a block device or a normal file. The block size ('bs') is
-   assumed to be 512 if not given. This program complains if 'ibs' or
-   'obs' are given with a value that differs from 'bs' (or the default 512).
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed.
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
-   in this case) is transferred to or from the sg device in a single SCSI
-   command.
-
-   This version is designed for the linux kernel 2.4, 2.6 and 3 series.
-*/
+ *
+ * This program is a specialisation of the Unix "dd" command in which
+ * either the input or the output file is a scsi generic device, raw
+ * device, a block device or a normal file. The block size ('bs') is
+ * assumed to be 512 if not given. This program complains if 'ibs' or
+ * 'obs' are given with a value that differs from 'bs' (or the default 512).
+ * If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
+ * not given or 'of=-' then stdout assumed.
+ *
+ * A non-standard argument "bpt" (blocks per transfer) is added to control
+ * the maximum number of blocks in each transfer. The default value is 128.
+ * For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16 KiB
+ * in this case) is transferred to or from the sg device in a single SCSI
+ * command.
+ *
+ * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
+ */
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.60 20171025";
+static const char * version_str = "0.61 20180116";
 
 #define ME "sg_xcopy: "
 
@@ -298,7 +298,7 @@ find_bsg_major(void)
 /* Returns a file descriptor on success (0 or greater), -1 for an open
  * error, -2 for a standard INQUIRY problem. */
 static int
-open_sg(struct xcopy_fp_t * fp, int verbose)
+open_sg(struct xcopy_fp_t * fp, int vb)
 {
     int devmajor, devminor, offset;
     struct sg_simple_inquiry_resp sir;
@@ -330,7 +330,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
     } else {
         snprintf(ebuff, EBUFF_SZ, "/dev/char/%d:%d", devmajor, devminor);
     }
-    fp->sg_fd = sg_cmds_open_device(ebuff, false /* rw mode */, verbose);
+    fp->sg_fd = sg_cmds_open_device(ebuff, false /* rw mode */, vb);
     if (fp->sg_fd < 0) {
         snprintf(ebuff, EBUFF_SZ,
                  ME "could not open %s device %d:%d for sg",
@@ -339,7 +339,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
         perror(ebuff);
         return -1;
     }
-    if (sg_simple_inquiry(fp->sg_fd, &sir, 0, verbose)) {
+    if (sg_simple_inquiry(fp->sg_fd, &sir, 0, vb)) {
         pr2serr("INQUIRY failed on %s\n", ebuff);
         sg_cmds_close_device(fp->sg_fd);
         fp->sg_fd = -1;
@@ -347,7 +347,7 @@ open_sg(struct xcopy_fp_t * fp, int verbose)
     }
 
     fp->pdt = sir.peripheral_type;
-    if (verbose)
+    if (vb)
         pr2serr("    %s: %.8s  %.16s  %.4s  [pdt=%d, 3pc=%d]\n", fp->fname,
                 sir.vendor, sir.product, sir.revision, fp->pdt,
                 !! (0x8 & sir.byte_5));
@@ -726,7 +726,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     }
     if (verbose > 2) {
         pr2serr("\nOutput response in hex:\n");
-        dStrHexErr((const char *)rcBuff, len, 1);
+        hex2stderr(rcBuff, len, 1);
     }
     snlid = rcBuff[4] & 0x1;
     max_target_num = sg_get_unaligned_be16(rcBuff + 8);
@@ -1051,7 +1051,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
     }
     if (verbose > 2) {
         pr2serr("Output response in hex:\n");
-        dStrHexErr((const char *)rcBuff, len, 1);
+        hex2stderr(rcBuff, len, 1);
     }
 
     while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) ==
@@ -1110,7 +1110,7 @@ desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
             sg_put_unaligned_be24((uint32_t)block_size, desc + 29);
             if (verbose > 3) {
                 pr2serr("Descriptor in hex (bs %d):\n", block_size);
-                dStrHexErr((const char *)desc, 32, 1);
+                hex2stderr(desc, 32, 1);
             }
             return 32;
         }
@@ -1193,14 +1193,14 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
  * (-SG_LIB_FILE_ERROR or -SG_LIB_CAT_OTHER) if error.
  */
 static int
-open_if(struct xcopy_fp_t * ifp, int verbose)
+open_if(struct xcopy_fp_t * ifp, int vb)
 {
     int infd = -1, flags, fl, res;
     char ebuff[EBUFF_SZ];
 
     ifp->sg_type = dd_filetype(ifp);
 
-    if (verbose)
+    if (vb)
         pr2serr(" >> Input file type: %s, devno %d:%d\n",
                 dd_filetype_str(ifp->sg_type, ebuff),
                 major(ifp->devno), minor(ifp->devno));
@@ -1221,7 +1221,7 @@ open_if(struct xcopy_fp_t * ifp, int verbose)
             return -SG_LIB_FILE_ERROR;
         }
     }
-    if (verbose)
+    if (vb)
         pr2serr("        open input(sg_io), flags=0x%x\n", fl | flags);
 
     if (ifp->flock) {
@@ -1242,13 +1242,13 @@ open_if(struct xcopy_fp_t * ifp, int verbose)
  * (-SG_LIB_FILE_ERROR or -SG_LIB_CAT_OTHER) if error.
  */
 static int
-open_of(struct xcopy_fp_t * ofp, int verbose)
+open_of(struct xcopy_fp_t * ofp, int vb)
 {
     int outfd, flags, res;
     char ebuff[EBUFF_SZ];
 
     ofp->sg_type = dd_filetype(ofp);
-    if (verbose)
+    if (vb)
         pr2serr(" >> Output file type: %s, devno %d:%d\n",
                 dd_filetype_str(ofp->sg_type, ebuff),
                 major(ofp->devno), minor(ofp->devno));
@@ -1263,7 +1263,7 @@ open_of(struct xcopy_fp_t * ofp, int verbose)
             perror(ebuff);
             return -SG_LIB_FILE_ERROR;
         }
-        if (verbose)
+        if (vb)
             pr2serr("        open output(sg_io), flags=0x%x\n", flags);
     } else
         outfd = -1; /* don't bother opening */

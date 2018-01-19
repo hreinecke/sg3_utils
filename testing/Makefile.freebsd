@@ -13,16 +13,21 @@ CC = clang
 # LD = gcc
 LD = clang
 
-
-EXECS = sg_simple5
-
-# EXTRAS = sgq_dd
+EXECS = sg_sense_test sg_chk_asc sg_tst_nvme tst_sg_lib
+	
+EXTRAS =
 
 MAN_PGS = 
 MAN_PREF = man8
 
 OS_FLAGS = -DSG_LIB_FREEBSD
 EXTRA_FLAGS = $(OS_FLAGS)
+
+# For C++/clang testing
+## CC = gcc
+## CC = g++
+## CC = clang
+## CC = clang++
 
 # CFLAGS = -O2 -Wall -W $(EXTRA_FLAGS) -I ../include
 CFLAGS = -g -O2 -Wall -W $(EXTRA_FLAGS) -I ../include
@@ -48,9 +53,18 @@ depend dep:
 clean:
 	/bin/rm -f *.o $(EXECS) $(EXTRAS) core .depend
 
-sg_simple5: sg_simple5.o $(D_FILES)
+sg_sense_test: sg_sense_test.o $(D_FILES)
 	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
+# building sg_chk_asc depends on a prior successful make in ../lib
+sg_chk_asc: sg_chk_asc.o $(D_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
+
+sg_tst_nvme: sg_tst_nvme.o $(D_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
+
+tst_sg_lib: tst_sg_lib.o $(D_FILES)
+	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
 install: $(EXECS)
 	install -d $(INSTDIR)

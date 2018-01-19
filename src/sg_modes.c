@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2017 D. Gilbert
+ *  Copyright (C) 2000-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.54 20171030";
+static const char * version_str = "1.55 20180118";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -504,11 +504,11 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const char * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -936,7 +936,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
                 continue;
             }
             if (op->do_hex > 2) {
-                dStrHex((const char *)rbuf, len, -1);
+                hex2stdout(rbuf, len, -1);
                 continue;
             }
             if (! header_printed) {
@@ -949,7 +949,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
             else
                 printf("    [0x%x]\n", k);
             if (op->do_hex)
-                dStrHex((const char *)rbuf, len, 1);
+                hex2stdout(rbuf, len, 1);
         } else if (op->do_verbose) {
             char b[80];
 
@@ -1241,14 +1241,14 @@ main(int argc, char * argv[])
                 for (k = 0; k < len; ++k)
                     printf("%02x\n", bp[k]);
             } else
-                dStrHex((const char *)rsp_buff, md_len, -1);
+                hex2stdout(rsp_buff, md_len, -1);
             goto finish;
         }
         if (1 == op->do_hex) {
-            dStrHex((const char *)rsp_buff, md_len, 1);
+            hex2stdout(rsp_buff, md_len, 1);
             goto finish;
         } else if (op->do_hex > 1)
-            dStrHex((const char *)rsp_buff, headerlen, 1);
+            hex2stdout(rsp_buff, headerlen, 1);
         if (0 == inq_pdt)
             printf("  Mode data length=%d, medium type=0x%.2x, WP=%d,"
                    " DpoFua=%d, longlba=%d\n", md_len, medium_type,
@@ -1287,7 +1287,7 @@ main(int argc, char * argv[])
                 while (num > 0) {
                     printf("   Density code=0x%x\n",
                            *(bp + density_code_off));
-                    dStrHex((const char *)bp, len, 1);
+                    hex2stdout(bp, len, 1);
                     bp += len;
                     num -= len;
                 }
@@ -1354,7 +1354,7 @@ main(int argc, char * argv[])
                 pr2serr(">>> page length (%d) > 256 bytes, unlikely trim\n"
                         "    Try '-f' option\n", len);
             }
-            dStrHex((const char *)bp, num , 1);
+            hex2stdout(bp, num , 1);
             bp += len;
             md_len -= len;
         }

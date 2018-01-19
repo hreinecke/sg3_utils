@@ -12530,7 +12530,8 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_MINGW 1
 _ACEOF
-;;
+
+                CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)
 
 cat >>confdefs.h <<_ACEOF

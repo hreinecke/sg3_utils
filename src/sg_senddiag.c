@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2017 D. Gilbert
+*  Copyright (C) 2003-2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -20,15 +20,18 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
+#if SG_LIB_WIN32
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
+#endif
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.55 20171208";
+static const char * version_str = "0.56 20180119";
 
 #define ME "sg_senddiag: "
 
@@ -848,12 +851,12 @@ main(int argc, char * argv[])
                 rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
                 rsp_len= (rsp_len < rsp_buff_size) ? rsp_len : rsp_buff_size;
                 if (op->do_hex > 1)
-                    dStrHex((const char *)rsp_buff, rsp_len,
+                    hex2stdout(rsp_buff, rsp_len,
                             (2 == op->do_hex) ? 0 : -1);
                 else if (pg < 0x1) {
                     printf("Supported diagnostic pages response:\n");
                     if (op->do_hex)
-                        dStrHex((const char *)rsp_buff, rsp_len, 1);
+                        hex2stdout(rsp_buff, rsp_len, 1);
                     else {
                         for (k = 0; k < (rsp_len - 4); ++k) {
                             cp = find_page_code_desc(rsp_buff[k + 4]);
@@ -868,7 +871,7 @@ main(int argc, char * argv[])
                                "hex:\n", cp, pg);
                     else
                         printf("diagnostic page 0x%x response in hex:\n", pg);
-                    dStrHex((const char *)rsp_buff, rsp_len, 1);
+                    hex2stdout(rsp_buff, rsp_len, 1);
                 }
             } else {
                 ret = res;

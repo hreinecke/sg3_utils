@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.34 20180104 */
+/* sg_pt_linux version 1.35 20180115 */
 
 
 #include <stdio.h>
@@ -468,6 +468,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
         ptp->is_sg = is_sg;
         ptp->is_bsg = is_bsg;
         ptp->is_nvme = is_nvme;
+        ptp->nvme_direct = false;
         ptp->nvme_nsid = nvme_nsid;
     }
 }
@@ -495,6 +496,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
         ptp->is_sg = false;
         ptp->is_bsg = false;
         ptp->is_nvme = false;
+        ptp->nvme_direct = false;
         ptp->nvme_nsid = 0;
         ptp->os_err = 0;
     }
@@ -655,7 +657,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return ptp->is_nvme ? 0 : ptp->io_hdr.din_resid;
+    return ptp->nvme_direct ? 0 : ptp->io_hdr.din_resid;
 }
 
 int
@@ -665,9 +667,8 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return (int)(ptp->is_nvme ? ptp->nvme_status :
-                                ptp->io_hdr.device_status);
-    return ptp->io_hdr.device_status;
+    return (int)(ptp->nvme_direct ? ptp->nvme_status :
+                                    ptp->io_hdr.device_status);
 }
 
 uint32_t
@@ -677,8 +678,8 @@ get_pt_result(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return ptp->is_nvme ? ptp->nvme_status :
-                          ptp->io_hdr.device_status;
+    return ptp->nvme_direct ? ptp->nvme_result :
+                              ptp->io_hdr.device_status;
 }
 
 int

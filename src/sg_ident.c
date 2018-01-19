@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2017 Douglas Gilbert.
+ * Copyright (c) 2005-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.17 20171008";
+static const char * version_str = "1.18 20180118";
 
 #define ME "sg_ident: "
 
@@ -83,7 +83,7 @@ decode_ii(const unsigned char * iip, int ii_len, int itype, bool ascii,
             if (ascii)
                 printf("%.*s\n", ii_len, (const char *)iip);
             else
-                dStrHex((const char *)iip, ii_len, 0);
+                hex2stdout(iip, ii_len, 0);
         }
     }
 }

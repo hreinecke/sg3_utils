@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Douglas Gilbert.
+ * Copyright (c) 2014-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -20,6 +20,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_pt.h"
@@ -34,7 +35,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.12 20171103";
+static const char * version_str = "1.13 20180118";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -173,11 +174,11 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -414,11 +415,11 @@ main(int argc, char * argv[])
         } else
             len = zl_len;
         if (do_raw) {
-            dStrRaw((const char *)reportZonesBuff, len);
+            dStrRaw(reportZonesBuff, len);
             goto the_end;
         }
         if (do_hex && (2 != do_hex)) {
-            dStrHex((const char *)reportZonesBuff, len,
+            hex2stdout(reportZonesBuff, len,
                     ((1 == do_hex) ? 1 : -1));
             goto the_end;
         }
@@ -437,7 +438,7 @@ main(int argc, char * argv[])
         for (k = 0, bp = reportZonesBuff + 64; k < zones; ++k, bp += 64) {
             printf(" Zone descriptor: %d\n", k);
             if (do_hex) {
-                dStrHex((const char *)bp, len, -1);
+                hex2stdout(bp, len, -1);
                 continue;
             }
             zt = bp[0] & 0xf;

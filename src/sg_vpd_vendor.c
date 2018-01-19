@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2017 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -150,21 +150,21 @@ static struct svpd_vp_name_t vp_arr[] = {
 static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_ACI_LTO, VPD_VP_HP_LTO, 1, "aci", "ACI revision level (HP LTO)"},
     {VPD_V_DATC_SEA, VPD_VP_SEAGATE, 0, "datc", "Date code (Seagate)"},
-    {VPD_V_DCRL_LTO, VPD_VP_IBM_LTO, 1, "dcrl" , "Drive component revision "
+    {VPD_V_DCRL_LTO, VPD_VP_IBM_LTO, 1, "dcrl", "Drive component revision "
      "levels (IBM LTO)"},
     {VPD_V_FVER_DDS, VPD_VP_DDS, 1, "ddsver", "Firmware revision (DDS)"},
     {VPD_V_DEV_BEH_SEA, VPD_VP_SEAGATE, 0, "devb", "Device behavior "
      "(Seagate)"},
-    {VPD_V_DSN_LTO, VPD_VP_IBM_LTO, 1, "dsn" , "Drive serial numbers (IBM "
+    {VPD_V_DSN_LTO, VPD_VP_IBM_LTO, 1, "dsn", "Drive serial numbers (IBM "
      "LTO)"},
-    {VPD_V_DUCD_LTO, VPD_VP_IBM_LTO, 1, "ducd" , "Device unique "
+    {VPD_V_DUCD_LTO, VPD_VP_IBM_LTO, 1, "ducd", "Device unique "
      "configuration data (IBM LTO)"},
     {VPD_V_EDID_RDAC, VPD_VP_RDAC, 0, "edid", "Extended device "
      "identification (RDAC)"},
     {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "prm4", "Feature Parameters (RDAC)"},
     {VPD_V_FIRM_SEA, VPD_VP_SEAGATE, 0, "firm", "Firmware numbers "
      "(Seagate)"},
-    {VPD_V_FVER_LTO, VPD_VP_HP_LTO, 0, "frl" , "Firmware revision level "
+    {VPD_V_FVER_LTO, VPD_VP_HP_LTO, 0, "frl", "Firmware revision level "
      "(HP LTO)"},
     {VPD_V_FVER_RDAC, VPD_VP_RDAC, 0, "fwr4", "Firmware version (RDAC)"},
     {VPD_V_HEAD_LTO, VPD_VP_HP_LTO, 1, "head", "Head Assy revision level "
@@ -177,7 +177,7 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_JUMP_SEA, VPD_VP_SEAGATE, 0, "jump", "Jump setting (Seagate)"},
     {VPD_V_MECH_LTO, VPD_VP_HP_LTO, 1, "mech", "Mechanism revision level "
      "(HP LTO)"},
-    {VPD_V_MPDS_LTO, VPD_VP_IBM_LTO, 1, "mpds" , "Mode parameter default "
+    {VPD_V_MPDS_LTO, VPD_VP_IBM_LTO, 1, "mpds", "Mode parameter default "
      "settings (IBM LTO)"},
     {VPD_V_PCA_LTO, VPD_VP_HP_LTO, 1, "pca", "PCA revision level (HP LTO)"},
     {VPD_V_RVSI_RDAC, VPD_VP_RDAC, 0, "rvsi", "Replicated volume source "
@@ -358,11 +358,11 @@ svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num)
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -554,7 +554,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len)
         printf("%02x", buff[10 + k]);
     printf("\n");
     printf("  Array Serial Number: ");
-    dStrRaw((const char *)&buff[50], buff[49]);
+    dStrRaw(&buff[50], buff[49]);
     printf("\n");
 
     printf("  LUN State: ");
@@ -1297,7 +1297,7 @@ decode_ibm_lto_dsn(unsigned char * buff, int len)
     printf("  Reported serial number: %.12s\n", buff + 16);
 }
 
-/* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_SYNTAX_ERROR for
+/* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_CAT_OTHER for
    unsupported page */
 int
 svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
@@ -1321,7 +1321,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
     case 0xd0:
         break;
     default:    /* not known so return prior to fetching page */
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CAT_OTHER;
     }
     rp = rsp_buff + off;
     if (sg_fd >= 0) {
@@ -1340,10 +1340,9 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
         if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 2))
             printf("%s VPD Page:\n", name);
         if (op->do_raw)
-            dStrRaw((const char *)rp, len);
+            dStrRaw(rp, len);
         else if (op->do_hex)
-            dStrHex((const char *)rp, len,
-                    ((1 == op->do_hex) ? 0 : -1));
+            hex2stdout(rp, len, ((1 == op->do_hex) ? 0 : -1));
         else {
             switch(op->vpd_pn) {
                 case 0xc0:
@@ -1362,7 +1361,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
                         decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc1:
                     if (VPD_VP_SEAGATE == op->vend_prod_num)
@@ -1374,7 +1373,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
                         decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc2:
                     if (VPD_VP_RDAC == op->vend_prod_num)
@@ -1382,7 +1381,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
                         decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc3:
                     if (VPD_VP_SEAGATE == op->vend_prod_num)
@@ -1392,7 +1391,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
                         decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc4:
                     if (VPD_VP_RDAC == op->vend_prod_num)
@@ -1400,42 +1399,42 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                     else if (VPD_VP_HP_LTO == op->vend_prod_num)
                         decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc5:
                     if (VPD_VP_HP_LTO == op->vend_prod_num)
                         decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc8:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c8(rp, len);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xc9:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_c9(rp, len);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xca:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_ca(rp, len);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 case 0xd0:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_d0(rp, len);
                     else
-                        dStrHex((const char *)rp, len, 0);
+                        hex2stdout(rp, len, 0);
                     break;
                 default:
                     pr2serr("%s: logic error, should know can't decode "
                             "pn=0x%x\n", __func__, op->vpd_pn);
-                    return SG_LIB_SYNTAX_ERROR;
+                    return SG_LIB_CAT_OTHER;
             }
             return 0;
         }

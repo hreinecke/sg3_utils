@@ -10,7 +10,7 @@ AC_PROG_INSTALL
 
 # AM_PROG_AR is supported and needed since automake v1.12+
 ifdef([AM_PROG_AR], [AM_PROG_AR], []) 
-
+		
 # Adding libtools to the build seems to bring in C++ environment
 AC_PROG_LIBTOOL
 
@@ -66,7 +66,8 @@ case "${host}" in
                 CFLAGS="$CFLAGS -Wno-char-subscripts";;
         *-*-mingw*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
-		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment]);;
+		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
+                CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)
                 AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
                 check_for_linux_nvme_headers;;

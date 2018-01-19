@@ -36,7 +36,7 @@
 #endif
 
 
-static const char * const version_str = "1.79 20180112";
+static const char * const version_str = "1.80 20180117";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -351,7 +351,7 @@ sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
     if (evpd)
         inq_cdb[1] |= 1;
     inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
+    /* 16 bit allocation length (was 8, increased in spc3r09, September 2002) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
         pr2ws("    %s cdb: ", inquiry_s);
@@ -502,7 +502,7 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
     if (evpd)
         inq_cdb[1] |= 1;
     inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8) is a recent SPC-3 addition */
+    /* 16 bit allocation length (was 8, increased in spc3r09, September 2002) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
         pr2ws("    inquiry cdb: ");

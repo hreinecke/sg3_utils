@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -98,11 +98,11 @@ usage()
 }
 
 static void
-dStrRaw(const char* str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
-    for (k = 0 ; k < len; ++k)
+    for (k = 0; k < len; ++k)
         printf("%c", str[k]);
 }
 
@@ -244,7 +244,7 @@ main(int argc, char * argv[])
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
                 pr2serr("Parameter data in hex\n");
-                dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
+                hex2stderr(requestSenseBuff, resp_len, 1);
             }
             progress = -1;
             sg_get_sense_progress_fld(requestSenseBuff, resp_len,
@@ -282,15 +282,15 @@ main(int argc, char * argv[])
         if (0 == res) {
             resp_len = requestSenseBuff[7] + 8;
             if (do_raw)
-                dStrRaw((const char *)requestSenseBuff, resp_len);
+                dStrRaw(requestSenseBuff, resp_len);
             else if (do_hex)
-                dStrHex((const char *)requestSenseBuff, resp_len, 1);
+                hex2stdout(requestSenseBuff, resp_len, 1);
             else if (1 == num_rs) {
                 pr2serr("Decode parameter data as sense data:\n");
                 sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
                 if (verbose > 1) {
                     pr2serr("\nParameter data in hex\n");
-                    dStrHexErr((const char *)requestSenseBuff, resp_len, 1);
+                    hex2stderr(requestSenseBuff, resp_len, 1);
                 }
             }
             continue;
@@ -321,7 +321,7 @@ main(int argc, char * argv[])
 #ifndef SG_LIB_MINGW
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
-        double a, b;
+        double den, num;
 
         gettimeofday(&end_tm, NULL);
         res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
@@ -330,13 +330,13 @@ main(int argc, char * argv[])
             --res_tm.tv_sec;
             res_tm.tv_usec += 1000000;
         }
-        a = res_tm.tv_sec;
-        a += (0.000001 * res_tm.tv_usec);
-        b = (double)num_rs;
+        den = res_tm.tv_sec;
+        den += (0.000001 * res_tm.tv_usec);
+        num = (double)num_rs;
         printf("time to perform commands was %d.%06d secs",
                (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-        if (a > 0.00001)
-            printf("; %.2f operations/sec\n", b / a);
+        if (den > 0.00001)
+            printf("; %.2f operations/sec\n", num / den);
         else
             printf("\n");
     }

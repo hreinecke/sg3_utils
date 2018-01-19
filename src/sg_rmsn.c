@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2017 Douglas Gilbert.
+ * Copyright (c) 2005-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,6 +17,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -30,7 +31,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.14 20171006";
+static const char * version_str = "1.15 20180118";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -168,7 +169,7 @@ int main(int argc, char * argv[])
             } else {
                 printf("Serial number:\n");
                 if (sn_len > 0)
-                    dStrHex((const char *)bp + 4, sn_len, 0);
+                    hex2stdout(bp + 4, sn_len, 0);
             }
         }
     }

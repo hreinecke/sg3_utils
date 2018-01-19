@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.22 20180112 */
+/* sg_pt_freebsd version 1.23 20180115 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,7 +54,8 @@
 
 struct freebsd_dev_channel {
     int unitnum;                  // the SCSI unit number
-    bool is_nvme;
+    bool is_nvme;       /* OS device type, if false ignore nvme_direct */
+    bool nvme_direct;   /* false: our SNTL; true: received NVMe command */
     bool is_char;
     uint32_t nsid;
     uint32_t nv_ctrlid;
@@ -65,6 +66,7 @@ struct freebsd_dev_channel {
     struct cam_device* cam_dev;
     uint8_t * nvme_id_ctlp;
     uint8_t * free_nvme_id_ctlp;
+    uint8_t cq_dw0_3[16];
 };
 
 // Private table of open devices: guaranteed zero on startup since
@@ -102,6 +104,7 @@ struct sg_pt_freebsd_scsi {
                                 // (dev_han - FREEBSD_FDOFFSET) is the
                                 // index into devicetable[]
     bool is_nvme;               // copy of same field in fdc object
+    bool nvme_direct;           // copy of same field in fdc object
 };
 
 struct sg_pt_base {
@@ -248,6 +251,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int verbose)
             goto scsi_ata_try;
         }
         fdc_p->is_nvme = true;
+        fdc_p->nvme_direct = false;
         fdc_p->is_char = is_char;
         fdc_p->nsid = (broadcast_nsid == nsid) ? 0 : nsid;
         fdc_p->nv_ctrlid = nv_ctrlid;
@@ -732,7 +736,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
-    return ptp->is_nvme ? 0 : ptp->resid;
+    return ptp->nvme_direct ? 0 : ptp->resid;
 }
 
 int
@@ -741,7 +745,7 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp) {
-        if (ptp->is_nvme) {
+        if (ptp->nvme_direct) {
             const struct freebsd_dev_channel *fdc_p;
 
             fdc_p = get_fdc_cp(ptp);
@@ -754,14 +758,14 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
     return -1;
 }
 
-/* For NVMe, CDW0 from completion (32 bits), for SCSI the status */
+/* For NVMe command: CDW0 from completion (32 bits); for SCSI: the status */
 uint32_t
 get_pt_result(const struct sg_pt_base * vp)
 {
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp) {
-        if (ptp->is_nvme) {
+        if (ptp->nvme_direct) {
             const struct freebsd_dev_channel *fdc_p;
 
             fdc_p = get_fdc_cp(ptp);
@@ -771,7 +775,7 @@ get_pt_result(const struct sg_pt_base * vp)
         } else
             return (uint32_t)ptp->scsi_status;
     }
-    return -1;
+    return 0xffffffff;
 }
 
 int
@@ -1052,12 +1056,14 @@ mk_sense_invalid_fld(struct sg_pt_freebsd_scsi * ptp, bool in_cdb,
 }
 
 /* Does actual ioctl(NVME_PASSTHROUGH_CMD). Returns 0 on success; negative
- * values are Unix negated errno values; positive values are NVMe status. */
+ * values are Unix negated errno values; positive values are NVMe status
+ * (i.e. ((SCT << 8) | SC) ). */
 static int
 nvme_pt_low(struct freebsd_dev_channel *fdc_p, void * dxferp, uint32_t len,
             bool is_read, struct nvme_pt_command * npcp, int vb)
 {
-    int err, status;
+    int err;
+    uint16_t sct_sc;
     uint8_t opcode;
     char b[80];
 
@@ -1074,11 +1080,20 @@ nvme_pt_low(struct freebsd_dev_channel *fdc_p, void * dxferp, uint32_t len,
     err = ioctl(fdc_p->dev_fd, NVME_PASSTHROUGH_CMD, npcp);
     if (err < 0)
         return -errno;  /* Assume Unix error in normal place */
-    status = ((npcp->cpl.status.sct << 8) | npcp->cpl.status.sc);
-    if (status && vb)
+    sct_sc = ((npcp->cpl.status.sct << 8) | npcp->cpl.status.sc);
+    fdc_p->nvme_result = npcp->cpl.cdw0;
+    sg_put_unaligned_le32(npcp->cpl.cdw0,
+                          fdc_p->cq_dw0_3 + SG_NVME_PT_CQ_RESULT);
+    sg_put_unaligned_le32(npcp->cpl.rsvd1, fdc_p->cq_dw0_3 + 4);
+    sg_put_unaligned_le16(npcp->cpl.sqhd, fdc_p->cq_dw0_3 + 8);
+    sg_put_unaligned_le16(npcp->cpl.sqid, fdc_p->cq_dw0_3 + 10);
+    sg_put_unaligned_le16(npcp->cpl.cid, fdc_p->cq_dw0_3 + 12);
+    sg_put_unaligned_le16(*((const uint16_t *)&(npcp->cpl.status)),
+                          fdc_p->cq_dw0_3 + SG_NVME_PT_CQ_STATUS_P);
+    if (sct_sc && (vb > 1))
         pr2ws("%s: opcode=0x%x, status: %s\n", __func__, opcode,
-              sg_get_nvme_cmd_status_str(status, sizeof(b), b));
-    return status;
+              sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b));
+    return sct_sc;
 }
 
 static int
@@ -1125,6 +1140,7 @@ static int
 sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
 {
     bool evpd;
+    bool cp_id_ctl = false;
     int res;
     uint16_t n, alloc_len, pg_cd;
     uint32_t pg_sz = sg_get_page_size();
@@ -1136,7 +1152,7 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
     if (vb > 3)
         pr2ws("%s: starting\n", __func__);
 
-    if (0x2 & cdbp[1]) {
+    if (0x2 & cdbp[1]) {        /* Reject CmdDt=1 */
         mk_sense_invalid_fld(ptp, true, 1, 1, vb);
         return 0;
     }
@@ -1150,7 +1166,7 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, fdc_p->nvme_status, vb);
             return 0;
-        } else if (res)
+        } else if (res)         /* should be negative errno */
             return res;
     }
     memset(inq_dout, 0, sizeof(inq_dout));
@@ -1162,11 +1178,12 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
         case 0:         /* Supported VPD pages VPD page */
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
-            sg_put_unaligned_be16(3, inq_dout + 2);
+            n = 8;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
             inq_dout[4] = 0x0;
             inq_dout[5] = 0x80;
             inq_dout[6] = 0x83;
-            n = 7;
+            inq_dout[n - 1] = 0xde;
             break;
         case 0x80:      /* Serial number VPD page */
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -1212,6 +1229,12 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
                 nvme_id_ns = NULL;
             }
             break;
+        case 0xde:
+            inq_dout[1] = pg_cd;
+            sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
+            n = 16;
+            cp_id_ctl = true;
+            break;
         default:        /* Point to page_code field in cdb */
             mk_sense_invalid_fld(ptp, true, 2, 7, vb);
             return 0;
@@ -1219,8 +1242,17 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
         if (alloc_len > 0) {
             n = (alloc_len < n) ? alloc_len : n;
             n = (n < ptp->dxfer_len) ? n : ptp->dxfer_len;
-            if (n > 0)
-                memcpy((uint8_t *)ptp->dxferp, inq_dout, n);
+            ptp->resid = ptp->dxfer_len - n;
+            if (n > 0) {
+                if (cp_id_ctl) {
+                    memcpy((uint8_t *)ptp->dxferp, inq_dout,
+                           (n < 16 ? n : 16));
+                    if (n > 16)
+                        memcpy((uint8_t *)ptp->dxferp + 16,
+                               fdc_p->nvme_id_ctlp, n - 16);
+                } else
+                    memcpy((uint8_t *)ptp->dxferp, inq_dout, n);
+            }
         }
     } else {            /* Standard INQUIRY response */
         /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); pdt=0 --> SBC; 0xd --> SES */
@@ -1667,15 +1699,17 @@ sntl_recvdiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
 static int
 sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
 {
-    bool scsi_cmd, in_xfer;
+    bool scsi_cdb, in_xfer;
     int n, err, len, io_len;
-    struct nvme_pt_command npc;
+    uint16_t sct_sc;
     uint8_t * dxferp;
-    uint8_t * npc_up = (uint8_t *)&npc;
+    uint8_t * npc_up;
     struct freebsd_dev_channel * fdc_p;
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
     const uint8_t * cdbp;
+    struct nvme_pt_command npc;
 
+    npc_up = (uint8_t *)&npc;
     if (vb > 3)
         pr2ws("%s: fd=%d\n", __func__, fd);
     if (! ptp->cdb) {
@@ -1716,8 +1750,11 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
     cdbp = (const uint8_t *)ptp->cdb;
     if (vb > 3)
         pr2ws("%s: opcode=0x%x, fd=%d\n", __func__, cdbp[0], fd);
-    scsi_cmd = sg_is_scsi_cdb(cdbp, n);
-    if (scsi_cmd) {
+    scsi_cdb = sg_is_scsi_cdb(cdbp, n);
+    /* nvme_direct is true when NVMe command (64 byte) has been given */
+    ptp->nvme_direct = ! scsi_cdb;
+    fdc_p->nvme_direct = ptp->nvme_direct;
+    if (scsi_cdb) {
         switch (cdbp[0]) {
         case SCSI_INQUIRY_OPC:
             return sntl_inq(ptp, cdbp, vb);
@@ -1732,11 +1769,19 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
         case SCSI_RECEIVE_DIAGNOSTIC_OPC:
             return sntl_recvdiag(ptp, cdbp, vb);
         default:
+            if (vb > 2) {
+                char b[64];
+
+                sg_get_command_name(cdbp, -1, sizeof(b), b);
+                pr2ws("%s: no translation to NVMe for SCSI %s command\n",
+                      __func__, b);
+            }
             mk_sense_asc_ascq(ptp, SPC_SK_ILLEGAL_REQUEST, INVALID_OPCODE,
                               0, vb);
             return 0;
         }
     }
+    /* NVMe command given to pass-through */
     len = (int)sizeof(npc.cmd);
     n = (n < len) ? n : len;
     if (n < 64) {
@@ -1767,21 +1812,28 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
                               npc_up + SG_NVME_PT_ADDR);
     }
     err = nvme_pt_low(fdc_p, dxferp, io_len, in_xfer, &npc, vb);
-    if (err) {
-        if (err < 0) {
-            if (vb > 1)
-                pr2ws("%s: do_nvme_pt() failed: %s (errno=%d)\n",
-                      __func__, strerror(-err), -err);
-            return err;
-        } else {
-            fdc_p->nvme_status = err;
-            mk_sense_from_nvme_status(ptp, err, vb);
-            return 0;
+    if (err < 0) {
+        if (vb > 1)
+            pr2ws("%s: do_nvme_pt() failed: %s (errno=%d)\n",
+                  __func__, strerror(-err), -err);
+        return err;
+    }
+    sct_sc = err;       /* ((SCT << 8) | SC) which may be 0 */
+    fdc_p->nvme_status = sct_sc;
+    if (ptp->sense && (ptp->sense_len > 0)) {
+        uint32_t k = sizeof(fdc_p->cq_dw0_3);
+
+        if ((int)k < ptp->sense_len)
+            ptp->sense_resid = ptp->sense_len - (int)k;
+        else {
+            k = ptp->sense_len;
+            ptp->sense_resid = 0;
         }
+        memcpy(ptp->sense, fdc_p->cq_dw0_3, k);
     }
     if (in_xfer)
         ptp->resid = 0; /* Just hoping ... */
-    return 0;
+    return sct_sc ? SG_LIB_NVME_STATUS : 0;
 }
 
 #else           /* if not(HAVE_NVME && (! IGNORE_NVME)) */
