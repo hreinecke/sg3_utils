@@ -347,9 +347,9 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
 
     if (ok) { /* output result if ok and --hex or --raw given */
         if (do_raw)
-            dStrRaw(resp, mx_resp_len);
+            dStrRaw((const uint8_t *)resp, mx_resp_len);
         else if (1 == do_hex)
-            hex2stdout(resp, mx_resp_len, 0);
+            hex2stdout((const uint8_t *)resp, mx_resp_len, 0);
         else if (do_hex > 1)
             dWordHex((const unsigned short *)resp, mx_resp_len / 2, 0,
                      sg_is_big_endian());

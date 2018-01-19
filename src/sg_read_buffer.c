@@ -24,9 +24,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
-#ifdef SG_LIB_WIN32
-#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
-#endif
+#include "sg_pt.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
@@ -196,7 +194,7 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("    Read buffer(10): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
+            hex2stderr((const uint8_t *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -260,7 +258,7 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
         if ((verbose > 2) && (ret > 0)) {
             pr2serr("    Read buffer(16): response%s\n",
                     (ret > 256 ? ", first 256 bytes" : ""));
-            hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
+            hex2stderr((const uint8_t *)resp, (ret > 256 ? 256 : ret), -1);
         }
         ret = 0;
     }
@@ -484,7 +482,7 @@ main(int argc, char * argv[])
         if (do_raw)
             dStrRaw(resp, rb_len);
         else if (do_hex || (rb_len < 4))
-            hex2stdout(resp, rb_len, ((do_hex > 1) ? 0 : 1));
+            hex2stdout((const uint8_t *)resp, rb_len, ((do_hex > 1) ? 0 : 1));
         else {
             switch (rb_mode) {
             case MODE_DESCRIPTOR:
@@ -499,7 +497,8 @@ main(int argc, char * argv[])
                 printf("Echo buffer capacity: %d (0x%x)\n", k, k);
                 break;
             default:
-                hex2stdout(resp, rb_len, (verbose > 1 ? 0 : 1));
+                hex2stdout((const uint8_t *)resp, rb_len,
+                           (verbose > 1 ? 0 : 1));
                 break;
             }
         }

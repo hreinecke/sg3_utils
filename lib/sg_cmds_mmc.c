@@ -202,10 +202,11 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
             pr2ws("    %s: response:\n", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (len > 256 ? ", first 256 bytes" : ""));
-                hex2stderr(resp, (len > 256 ? 256 : len), -1);
+                hex2stderr((const uint8_t *)resp, (len > 256 ? 256 : len),
+                           -1);
             } else {
                 pr2ws(":\n");
-                hex2stderr(resp, len, 0);
+                hex2stderr((const uint8_t *)resp, len, 0);
             }
         }
         ret = 0;
@@ -293,10 +294,11 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (len > 256 ? ", first 256 bytes" : ""));
-                hex2stderr(resp, (len > 256 ? 256 : len), -1);
+                hex2stderr((const uint8_t *)resp, (len > 256 ? 256 : len),
+                           -1);
             } else {
                 pr2ws(":\n");
-                hex2stderr(resp, len, 0);
+                hex2stderr((const uint8_t *)resp, len, 0);
             }
         }
         ret = 0;
@@ -330,7 +332,7 @@ sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
         pr2ws("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_name_s);
-            hex2stderr(paramp, param_len, -1);
+            hex2stderr((const uint8_t *)paramp, param_len, -1);
         }
     }
 

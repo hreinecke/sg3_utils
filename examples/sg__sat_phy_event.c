@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -64,7 +64,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.01 20160528";
+static const char * version_str = "1.02 20180119";
 
 static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -135,7 +135,7 @@ static const char * find_phy_desc(int id)
     return NULL;
 }
 
-static void dStrRaw(const char* str, int len)
+static void dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
@@ -304,12 +304,12 @@ int main(int argc, char * argv[])
 
     if (ok) { /* output result if it is available */
         if (raw > 0)
-            dStrRaw((const char *)inBuff, 512);
+            dStrRaw(inBuff, 512);
         else {
             if (verbose && hex)
                 fprintf(stderr, "Response to READ LOG EXT (page=11h):\n");
             if (1 == hex)
-                dStrHex((const char *)inBuff, 512, 0);
+                hex2stdout(inBuff, 512, 0);
             else if (hex > 1)
                 dWordHex((const unsigned short *)inBuff, 256, 0,
                          sg_is_big_endian());

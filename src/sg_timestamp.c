@@ -168,7 +168,8 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
         *residp = k;
     if ((verbose > 2) && ((mx_resp_len - k) > 0)) {
         pr2serr("Parameter data returned:\n");
-        hex2stderr(resp, mx_resp_len - k, ((verbose > 3) ? -1 : 1));
+        hex2stderr((const uint8_t *)resp, mx_resp_len - k,
+                   ((verbose > 3) ? -1 : 1));
     }
     destruct_scsi_pt_obj(ptvp);
     return ret;
@@ -196,7 +197,7 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
         pr2serr("\n");
         if ((verbose > 1) && paramp && param_len) {
             pr2serr("    set timestamp parameter list:\n");
-            hex2stderr(paramp, param_len, -1);
+            hex2stderr((const uint8_t *)paramp, param_len, -1);
         }
     }
 

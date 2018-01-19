@@ -313,10 +313,11 @@ sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code, int sub_pg_code,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr((const uint8_t *)resp, (ret > 256 ? 256 : ret),
+                           -1);
             } else {
                 pr2ws(":\n");
-                hex2stderr(resp, ret, 0);
+                hex2stderr((const uint8_t *)resp, ret, 0);
             }
         }
         ret = 0;
@@ -412,10 +413,11 @@ sg_ll_mode_sense10_v2(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
             pr2ws("    %s: response", cdb_name_s);
             if (3 == verbose) {
                 pr2ws("%s:\n", (ret > 256 ? ", first 256 bytes" : ""));
-                hex2stderr(resp, (ret > 256 ? 256 : ret), -1);
+                hex2stderr((const uint8_t *)resp, (ret > 256 ? 256 : ret),
+                           -1);
             } else {
                 pr2ws(":\n");
-                hex2stderr(resp, ret, 0);
+                hex2stderr((const uint8_t *)resp, ret, 0);
             }
         }
         ret = 0;
@@ -464,7 +466,7 @@ sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
     }
     if (verbose > 1) {
         pr2ws("    %s parameter list\n", cdb_name_s);
-        hex2stderr(paramp, param_len, -1);
+        hex2stderr((const uint8_t *)paramp, param_len, -1);
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
@@ -521,7 +523,7 @@ sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
     }
     if (verbose > 1) {
         pr2ws("    %s parameter list\n", cdb_name_s);
-        hex2stderr(paramp, param_len, -1);
+        hex2stderr((const uint8_t *)paramp, param_len, -1);
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))

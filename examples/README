@@ -4,7 +4,7 @@ needs to be executed in the parent directory followed by changing
 directory to the lib directory and calling 'make' there.
 Another way is to do a top level 'make' after the ./configure which
 will make the libraries followed by all the utilities in the src/
-directory.
+directory. To make them in FreeBSD use 'make -f Makefile.freebsd' .
 
 There is an brief explanation of each example in the README file in
 the main (i.e. this directory's parent) directory. There are also
@@ -14,4 +14,4 @@ Some files that were previously in this directory have been moved to
 the 'testing' directory.
 
 Douglas Gilbert
-4th November 2017
+19th January 2018

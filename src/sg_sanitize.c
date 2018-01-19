@@ -212,7 +212,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         if (op->verbose > 2) {
             if (param_lst_len > 0) {
                 pr2serr("    Parameter list contents:\n");
-                hex2stderr(param_lstp, param_lst_len, 1);
+                hex2stderr((const uint8_t *)param_lstp, param_lst_len, 1);
             }
             pr2serr("    Sanitize command timeout: %d seconds\n", timeout);
         }

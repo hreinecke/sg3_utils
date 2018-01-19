@@ -253,7 +253,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
     if ((op->verbose > 3) && (op->xfer_len > 0)) {
         pr2serr("    Data-out buffer contents:\n");
-        hex2stderr(dataoutp, op->xfer_len, 1);
+        hex2stderr((const uint8_t *)dataoutp, op->xfer_len, 1);
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {

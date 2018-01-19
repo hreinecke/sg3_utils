@@ -36,7 +36,7 @@ CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 LDFLAGS =
 
 LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
-LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o
+LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_common.o ../lib/sg_pt_linux.o ../lib/sg_pt_linux_nvme.o
 
 all: $(EXECS)
 

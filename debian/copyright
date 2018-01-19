@@ -1,33 +1,24 @@
-This package was debianized by Eric Schwartz <emschwar@debian.org> on
-Wed, 14 Nov 2001 17:05:56 -0700.
 
-It was downloaded from <URL:http://sg.danny.cz/sg/>
+Copyright (c) 1999-2018, Douglas Gilbert
+All rights reserved.
 
-Upstream Authors: Douglas Gilbert <dgilbert at interlog dot com>, 
-		  Bruce Allen  <ballen at gravity dot phys dot uwm dot edu>,
-		  Peter Allworth <linsol at zeta dot org dot au>,
-		  James Bottomley  <jejb at parisc-linux dot org>,
-		  Lars Marowsky-Bree <lmb at suse dot de>,
-		  Kurt Garloff <garloff at suse dot de>,
-		  Grant Grundler  <grundler at parisc-linux dot org>,
-		  Christophe Varoqui <christophe dot varoqui at free dot fr>,
-		  Michael Weller <eowmob at exp-math dot uni-essen dot de>,
-		  Eric Youngdale <eric at andante dot org>,
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
 
-Copyright:
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
 
-This software is copyright(c) 1994-2009 by the authors
-
-You are free to distribute this software under the terms of
-the GNU General Public License.
-On Debian systems, the complete text of the GNU General Public
-License can be found in /usr/share/common-licenses/GPL file.
-
-Many parts of this package are covered by the BSD license.
-These include central error processing code and common command
-code found in the lib subdirectory. Most newer utilities also
-use the BSD license. The author's intention is that this code can
-be used freely by others. On Debian systems and those derived from
-Debian, the complete text of the BSD License can be found in
-/usr/share/common-licenses/BSD.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 

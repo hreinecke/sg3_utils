@@ -35,6 +35,20 @@ other Operating Systems. A new utility called ddpt (in a package of the same
 name) is more generic while still allowing a copy to be done in terms of
 SCSI READ and WRITE commands. ddpt has been ported to other OSes.
 
+License
+=======
+All utilities and libraries have either a "2 clause" BSD license or are
+"GPL-2ed". The "2 clause" BSD license is taken from the FreeBSD project but
+drops the last paragraph that directly refers to the "FreeBSD project".
+That BSD license was updated from the "3 clause" to the newer "2 clause"
+version on 20180119. To save space various source code files refer to a
+file called "BSD_LICENSE" in the main, src and lib directories. The author's
+intention is that users may incorporate all or part of the code in their work
+as they please. Attribution is encouraged. Please check the code as other
+contributors (apart from the author) may also have copyright notices. For a
+list of contributors see the CREDITS file.
+
+
 Description
 ===========
 A web site supporting the sg3_utils package can be found at
@@ -84,12 +98,6 @@ original xml can be found in the same directory with the ".xml" extension.
 Postscript and pdf renderings are also in that directory. Older documentation
 for the sg version 3 driver can be found at:
 http://sg.danny.cz/sg/p/scsi_generic_v3.txt .
-
-All utilities are either "GPL"-ed or have a FreeBSD license. The author's
-intention is that users may incorporate all or part of the code in their work
-as they please. Attribution is encouraged. Please check the code as other
-contributors (apart from the author) may also have copyright notices. For a
-list of contributors see the CREDITS file.
 
 To save the repetition of common code (e.g. SCSI error processing) and
 reduce the size of the executable files, a shared library called
@@ -151,15 +159,26 @@ Darwin is not supported because the Apple folks do not want to give their
 users a pass-through SCSI interface. The author has read about creative
 hackers using a VM containing a real OS to circumvent the Apple restriction.
 
-C standard is C99
+C standard is C11
 ==================
 The C code in this package is written for portability rather than speed.
-It assumes a level of C99 compliance and favours POSIX system and library
-calls over OS specific calls.
+It assumes a level of C99 compliance (the C standard prior to C11) and
+favours POSIX system and library calls over OS specific calls.
 
 The C code is written in a C++ friendly way and is checked from time to
 time that it compiles clean with C++. To accommodate C++ certain C99
 constructs such as designated initializers cannot be used.
+
+The author has not seriously attempted to build this code on MSVC (aka
+Visual Studio). There are a few roadblocks (that may be overcome in the
+future) that include MSVC being basically a C++ compiler, not a C/C++
+compiler. For some reason MSVC only claims C89 compliance (i.e. the first
+C standard from 1989). MSVC 2013 and 2015 are moving closer to C99
+compliance and may be sufficient to compile this package. Another problem
+is the assumption of te availability of basic Unix system calls such as
+open(). Nearly 20 years ago Microsoft indicated (promised ?) that it
+would move in the direction of POSIX compliance, but very little ever
+happened. "Talk is cheap, there should be a tax on it."
 
 Building
 ========
@@ -476,4 +495,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-9th December 2017
+19th January 2018
