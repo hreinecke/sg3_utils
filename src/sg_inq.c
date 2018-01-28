@@ -46,7 +46,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.84 20180118";    /* SPC-5 rev 18 */
+static const char * version_str = "1.85 20180127";    /* SPC-5 rev 18 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -104,6 +104,7 @@ static const char * version_str = "1.84 20180118";    /* SPC-5 rev 18 */
 #define VPD_BLOCK_DEV_C_EXTENS 0xb5     /* sbc4r02 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
+#define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
 /* Vendor specific VPD pages (typically >= 0xc0) */
 #define VPD_UPR_EMC 0xc0
@@ -155,6 +156,7 @@ struct svpd_values_name_t {
     const char * name;
 };
 
+/* Note that this table is sorted by acronym */
 static struct svpd_values_name_t vpd_pg[] = {
     {VPD_ATA_INFO, 0, -1, 0, "ai", "ATA information (SAT)"},
     {VPD_BLOCK_DEV_CHARS, 0, 0, 0, "bdc",
@@ -191,6 +193,7 @@ static struct svpd_values_name_t vpd_pg[] = {
      "protection types (SBC)"},
     {VPD_SCSI_FEATURE_SETS, 0, -1, 0, "sfs", "SCSI Feature sets"},
     {VPD_SOFTW_INF_ID, 0, -1, 0, "sii", "Software interface identification"},
+    {VPD_NOPE_WANT_STD_INQ, 0, -1, 0, "sinq", "Standard inquiry response"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, 0, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
@@ -995,9 +998,13 @@ enumerate_vpds()
     const struct svpd_values_name_t * vnp;
 
     for (vnp = vpd_pg; vnp->acron; ++vnp) {
-        if (vnp->name)
-            printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
-                   vnp->name);
+        if (vnp->name) {
+            if (vnp->value < 0)
+                printf("  %-10s   -1      %s\n", vnp->acron, vnp->name);
+            else
+                printf("  %-10s 0x%02x      %s\n", vnp->acron, vnp->value,
+                       vnp->name);
+        }
     }
 }
 
@@ -4213,9 +4220,9 @@ main(int argc, char * argv[])
                 op->do_decode = true;
             op->page_num = vnp->value;
             op->page_pdt = vnp->pdt;
-        } else if ('-' == op->page_arg[0]) {
-            op->page_num = -2;  /* request standard INQUIRY response */
-        } else {
+        } else if ('-' == op->page_arg[0])
+            op->page_num = VPD_NOPE_WANT_STD_INQ;
+        else {
 #ifdef SG_SCSI_STRINGS
             if (op->opt_new) {
                 n = sg_get_num(op->page_arg);
@@ -4310,7 +4317,7 @@ main(int argc, char * argv[])
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (-2 == op->page_num) /* from --page=-<num> to force standard INQUIRY */
+    if (VPD_NOPE_WANT_STD_INQ == op->page_num)
         op->page_num = -1;  /* now past guessing, set to normal indication */
 
     if (op->do_export) {

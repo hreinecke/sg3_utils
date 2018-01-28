@@ -23,6 +23,7 @@ AC_CHECK_FUNCS(getopt_long,
 	       GETOPT_O_FILES='getopt_long.o')
 AC_CHECK_FUNCS(posix_fadvise)
 AC_CHECK_FUNCS(posix_memalign)
+AC_CHECK_FUNCS(gettimeofday)
 AC_CHECK_FUNCS(sysconf)
 AC_CHECK_FUNCS(lseek64)
 SAVED_LIBS=$LIBS
@@ -33,7 +34,16 @@ pthread_lib=${LIBS%${SAVED_LIBS}}
 AC_CHECK_FUNCS([pthread_cancel pthread_kill])
 LIBS=$SAVED_LIBS
 AC_SUBST(PTHREAD_LIB, [$pthread_lib])
+
+SAVED_LIBS=$LIBS
+AC_SEARCH_LIBS([clock_gettime], [rt])
+rt_lib=${LIBS%${SAVED_LIBS}}
+AC_CHECK_FUNCS(clock_gettime)
+LIBS=$SAVED_LIBS
+AC_SUBST(RT_LIB, [$rt_lib])
+
 AC_SUBST(GETOPT_O_FILES)
+
 
 AC_CANONICAL_HOST
 

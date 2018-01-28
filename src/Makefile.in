@@ -102,14 +102,14 @@ bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
 	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) sg_sanitize$(EXEEXT) \
 	sg_sat_identify$(EXEEXT) sg_sat_phy_event$(EXEEXT) \
 	sg_sat_read_gplog$(EXEEXT) sg_sat_set_features$(EXEEXT) \
-	sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) sg_ses_microcode$(EXEEXT) \
-	sg_start$(EXEEXT) sg_stpg$(EXEEXT) sg_sync$(EXEEXT) \
-	sg_timestamp$(EXEEXT) sg_turs$(EXEEXT) sg_unmap$(EXEEXT) \
-	sg_verify$(EXEEXT) sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) \
-	sg_write_buffer$(EXEEXT) sg_write_long$(EXEEXT) \
-	sg_write_same$(EXEEXT) sg_write_verify$(EXEEXT) \
-	sg_write_x$(EXEEXT) sg_zone$(EXEEXT) $(am__EXEEXT_1) \
-	$(am__EXEEXT_2) $(am__EXEEXT_3)
+	sg_seek$(EXEEXT) sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
+	sg_ses_microcode$(EXEEXT) sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
+	sg_stream_ctl$(EXEEXT) sg_sync$(EXEEXT) sg_timestamp$(EXEEXT) \
+	sg_turs$(EXEEXT) sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
+	sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) sg_write_buffer$(EXEEXT) \
+	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
+	sg_write_verify$(EXEEXT) sg_write_x$(EXEEXT) sg_zone$(EXEEXT) \
+	$(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
 @OS_LINUX_TRUE@am__append_1 = \
 @OS_LINUX_TRUE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
 @OS_LINUX_TRUE@	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
@@ -278,6 +278,9 @@ am_sg_scan_OBJECTS = $(am__objects_1) $(am__objects_2) \
 	$(am__objects_3)
 sg_scan_OBJECTS = $(am_sg_scan_OBJECTS)
 sg_scan_DEPENDENCIES = ../lib/libsgutils2.la
+sg_seek_SOURCES = sg_seek.c
+sg_seek_OBJECTS = sg_seek.$(OBJEXT)
+sg_seek_DEPENDENCIES = ../lib/libsgutils2.la
 sg_senddiag_SOURCES = sg_senddiag.c
 sg_senddiag_OBJECTS = sg_senddiag.$(OBJEXT)
 sg_senddiag_DEPENDENCIES = ../lib/libsgutils2.la
@@ -293,6 +296,9 @@ sg_start_DEPENDENCIES = ../lib/libsgutils2.la
 sg_stpg_SOURCES = sg_stpg.c
 sg_stpg_OBJECTS = sg_stpg.$(OBJEXT)
 sg_stpg_DEPENDENCIES = ../lib/libsgutils2.la
+sg_stream_ctl_SOURCES = sg_stream_ctl.c
+sg_stream_ctl_OBJECTS = sg_stream_ctl.$(OBJEXT)
+sg_stream_ctl_DEPENDENCIES = ../lib/libsgutils2.la
 sg_sync_SOURCES = sg_sync.c
 sg_sync_OBJECTS = sg_sync.$(OBJEXT)
 sg_sync_DEPENDENCIES = ../lib/libsgutils2.la
@@ -392,9 +398,10 @@ SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
 	sg_safte.c sg_sanitize.c sg_sat_identify.c sg_sat_phy_event.c \
 	sg_sat_read_gplog.c sg_sat_set_features.c $(sg_scan_SOURCES) \
-	sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c sg_stpg.c \
-	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
-	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_seek.c sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c \
+	sg_stpg.c sg_stream_ctl.c sg_sync.c sg_test_rwbuf.c \
+	sg_timestamp.c sg_turs.c sg_unmap.c sg_verify.c \
+	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
 	sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
@@ -408,9 +415,9 @@ DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
 	sg_safte.c sg_sanitize.c sg_sat_identify.c sg_sat_phy_event.c \
 	sg_sat_read_gplog.c sg_sat_set_features.c \
-	$(am__sg_scan_SOURCES_DIST) sg_senddiag.c sg_ses.c \
-	sg_ses_microcode.c sg_start.c sg_stpg.c sg_sync.c \
-	sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
+	$(am__sg_scan_SOURCES_DIST) sg_seek.c sg_senddiag.c sg_ses.c \
+	sg_ses_microcode.c sg_start.c sg_stpg.c sg_stream_ctl.c \
+	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
 	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
 	sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
@@ -501,6 +508,7 @@ PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PTHREAD_LIB = @PTHREAD_LIB@
 RANLIB = @RANLIB@
+RT_LIB = @RT_LIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
@@ -618,11 +626,13 @@ sg_sat_set_features_LDADD = ../lib/libsgutils2.la
 
 # sg_scan_SOURCES list is already set above in the platform-specific sections
 sg_scan_LDADD = ../lib/libsgutils2.la
+sg_seek_LDADD = ../lib/libsgutils2.la @RT_LIB@
 sg_senddiag_LDADD = ../lib/libsgutils2.la
 sg_ses_LDADD = ../lib/libsgutils2.la
 sg_ses_microcode_LDADD = ../lib/libsgutils2.la
 sg_start_LDADD = ../lib/libsgutils2.la
 sg_stpg_LDADD = ../lib/libsgutils2.la
+sg_stream_ctl_LDADD = ../lib/libsgutils2.la
 sg_sync_LDADD = ../lib/libsgutils2.la
 sg_test_rwbuf_LDADD = ../lib/libsgutils2.la
 sg_timestamp_LDADD = ../lib/libsgutils2.la
@@ -894,6 +904,10 @@ sg_scan$(EXEEXT): $(sg_scan_OBJECTS) $(sg_scan_DEPENDENCIES) $(EXTRA_sg_scan_DEP
 	@rm -f sg_scan$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_scan_OBJECTS) $(sg_scan_LDADD) $(LIBS)
 
+sg_seek$(EXEEXT): $(sg_seek_OBJECTS) $(sg_seek_DEPENDENCIES) $(EXTRA_sg_seek_DEPENDENCIES) 
+	@rm -f sg_seek$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_seek_OBJECTS) $(sg_seek_LDADD) $(LIBS)
+
 sg_senddiag$(EXEEXT): $(sg_senddiag_OBJECTS) $(sg_senddiag_DEPENDENCIES) $(EXTRA_sg_senddiag_DEPENDENCIES) 
 	@rm -f sg_senddiag$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_senddiag_OBJECTS) $(sg_senddiag_LDADD) $(LIBS)
@@ -913,6 +927,10 @@ sg_start$(EXEEXT): $(sg_start_OBJECTS) $(sg_start_DEPENDENCIES) $(EXTRA_sg_start
 sg_stpg$(EXEEXT): $(sg_stpg_OBJECTS) $(sg_stpg_DEPENDENCIES) $(EXTRA_sg_stpg_DEPENDENCIES) 
 	@rm -f sg_stpg$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_stpg_OBJECTS) $(sg_stpg_LDADD) $(LIBS)
+
+sg_stream_ctl$(EXEEXT): $(sg_stream_ctl_OBJECTS) $(sg_stream_ctl_DEPENDENCIES) $(EXTRA_sg_stream_ctl_DEPENDENCIES) 
+	@rm -f sg_stream_ctl$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_stream_ctl_OBJECTS) $(sg_stream_ctl_LDADD) $(LIBS)
 
 sg_sync$(EXEEXT): $(sg_sync_OBJECTS) $(sg_sync_DEPENDENCIES) $(EXTRA_sg_sync_DEPENDENCIES) 
 	@rm -f sg_sync$(EXEEXT)
@@ -1037,11 +1055,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sat_set_features.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan_linux.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_scan_win32.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_seek.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_senddiag.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ses_microcode.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_start.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_stpg.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_stream_ctl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_sync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_test_rwbuf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_timestamp.Po@am__quote@

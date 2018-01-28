@@ -40,7 +40,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.19 (win32) 20180118";
+static const char * version_str = "1.20 (win32) 20180119";
 
 #define MAX_SCSI_ELEMS 2048
 #define MAX_ADAPTER_NUM 128
@@ -79,9 +79,37 @@ typedef enum _STORAGE_BUS_TYPE {
     BusTypeMmc          = 0x0D,
     BusTypeVirtual             = 0xE,
     BusTypeFileBackedVirtual   = 0xF,
-    BusTypeMax,
+    BusTypeSpaces       = 0x10,
+    BusTypeMax          = 0x11,
     BusTypeMaxReserved  = 0x7F
 } STORAGE_BUS_TYPE, *PSTORAGE_BUS_TYPE;
+
+typedef enum _STORAGE_PROTOCOL_TYPE {
+    ProtocolTypeUnknown = 0,
+    ProtocolTypeScsi,
+    ProtocolTypeAta,
+    ProtocolTypeNvme,
+    ProtocolTypeSd
+} STORAGE_PROTOCOL_TYPE;
+
+typedef enum _STORAGE_PROTOCOL_NVME_DATA_TYPE {
+    NVMeDataTypeUnknown = 0,
+    NVMeDataTypeIdentify,
+    NVMeDataTypeLogPage,
+    NVMeDataTypeFeature
+} STORAGE_PROTOCOL_NVME_DATA_TYPE;
+
+typedef struct _STORAGE_PROTOCOL_SPECIFIC_DATA {
+    STORAGE_PROTOCOL_TYPE ProtocolType;
+    ULONG DataType;
+    ULONG ProtocolDataRequestValue;
+    ULONG ProtocolDataRequestSubValue;
+    ULONG ProtocolDataOffset;
+    ULONG ProtocolDataLength;
+    ULONG FixedProtocolReturnData;
+    ULONG Reserved[3];
+} STORAGE_PROTOCOL_SPECIFIC_DATA;
+
 
 typedef struct _STORAGE_DEVICE_DESCRIPTOR {
     ULONG Version;
@@ -262,6 +290,8 @@ get_bus_type(int bt)
         return "Virt ";
     case BusTypeFileBackedVirtual:
         return "FBVir";
+    case BusTypeSpaces:
+        return "Spaces";
     case BusTypeMax:
         return "Max  ";
     default:
@@ -527,7 +557,8 @@ enum_pds(void)
         } else {
             err = GetLastError();
             if ((0 == k) && (ERROR_ACCESS_DENIED == err))
-                pr2serr("Access denied on %s, may need Administrator\n");
+                pr2serr("Access denied on %s, may need Administrator\n",
+                        adapter_name);
             if (ERROR_SHARING_VIOLATION == err)
                 pr2serr("%s: in use by other process (sharing violation "
                         "[34])\n", adapter_name);
@@ -693,12 +724,13 @@ sg_do_wscan(char letter, bool show_bt, int scsi_scan)
                     printf("%s", sp->qp_descriptor.raw + j);
                 printf("\n");
                 if (verbose > 2)
-                    hex2stderr(sp->qp_descriptor.raw, 144, 0);
+                    hex2stderr((const uint8_t *)sp->qp_descriptor.raw, 144, 0);
             } else
                 printf("\n");
             if ((verbose > 3) && sp->qp_uid_valid) {
                 printf("  UID valid, in hex:\n");
-                hex2stderr(sp->qp_uid.raw, sizeof(sp->qp_uid.raw), 1);
+                hex2stderr((const uint8_t *)sp->qp_uid.raw,
+                           sizeof(sp->qp_uid.raw), 1);
             }
         }
     }

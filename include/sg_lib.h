@@ -481,7 +481,7 @@ void dStrHexErr(const char * str, int len, int no_ascii);
  * right of each line; 1 don't (so just output ASCII hex). Returns
  * number of bytes written to 'b' excluding the trailing '\0'. */
 int dStrHexStr(const char * str, int len, const char * leadin, int format,
-               int b_len, char * b);
+               int cb_len, char * cbp);
 
 /* The following 3 functions are equivalent to dStrHex(), dStrHexErr() and
  * dStrHexStr() respectively. The difference is the type of the first of
@@ -490,12 +490,11 @@ int dStrHexStr(const char * str, int len, const char * leadin, int format,
 void hex2stdout(const uint8_t * b_str, int len, int no_ascii);
 void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
 int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
-            int b_len, char * b);
+            int cb_len, char * cbp);
 
 /* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a
- * big endian machine).
-*/
+ * big endian machine). */
 bool sg_is_big_endian();
 
 /* Returns true if byte sequence starting at bp with a length of b_len is

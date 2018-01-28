@@ -349,6 +349,19 @@ int sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id,
                           int group_num, int timeout_secs, void * paramp,
                           int param_len, bool noisy, int verbose);
 
+/* Invokes a SCSI PRE-FETCH(10), PRE-FETCH(16) or SEEK(10) command (SBC).
+ * Returns 0 -> success, 25 (SG_LIB_CAT_CONDITION_MET), various SG_LIB_CAT_*
+ * positive values or -1 -> other errors. Note that CONDITION MET status
+ * is returned when immed=true and num_blocks can fit in device's cache,
+ * somewaht strangely, GOOD status (return 0) is returned if num_blocks
+ * cannot fit in device's cache. If do_seek10==true then does a SEEK(10)
+ * command with given lba, if that LBA is < 2**32 . Unclear what SEEK(10)
+ * does, assume it is like PRE-FETCH. If timeout_secs is 0 (or less) then
+ * use DEF_PT_TIMEOUT (60 seconds) as command timeout. */
+int sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
+                      uint64_t lba, uint32_t num_blocks, int group_num,
+                      int timeout_secs, bool noisy, int verbose);
+
 #ifdef __cplusplus
 }
 #endif

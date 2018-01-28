@@ -33,7 +33,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.03 20180118";
+static const char * version_str = "1.04 20180126";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -115,9 +115,12 @@ sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cmd_name, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

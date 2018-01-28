@@ -32,7 +32,7 @@ A good overview of various SCSI standards can be seen in
 http://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
 of the diagram. The highest level (i.e. most abstract) document is the SCSI
 Architecture Model (SAM) with SAM\-5 being the most recent standard (ANSI
-INCITS 447-2008) although SAM\-5 should be released soon. SCSI commands in
+INCITS 447\-2008) although SAM\-5 should be released soon. SCSI commands in
 common with all device types can be found in SPC of which SPC\-5 is the
 latest major version. Block device specific commands (e.g. as used by disks)
 are in SBC, those for tape drives in SSC and those for CD/DVD/BD drives in
@@ -199,6 +199,44 @@ the 'format' command" advice works but seems a very dangerous way to list
 devices. [It does prompt again before doing any damage.] 'devfsadm \-Cv'
 cleans out the clutter in the /dev/rdsk directory, only leaving what
 is "live". The "cfgadm \-v" command looks promising.
+.SH NVME SUPPORT
+NVMe (or NVM Express) is a relatively new storage transport and command
+set. The level of abstraction of the NVMe command set is somewhat lower
+the SCSI command sets, closer to the level of abstraction of ATA (and SATA)
+command sets. NVMe claims to be designed with flash and modern "solid
+state" storage in mind, something unheard of when SCSI was originally
+developed in the 1980s.
+.PP
+The SCSI command sets' advantage is the length of time they have been in
+place and the existing tools (like these) to support it. Plus SCSI command
+sets level of abstraction is both and advantage and disadvantage. Recently
+the NVME\-MI (Management Interface) designers decide to use the SCSI
+Enclosure Services (SES\-3) standard "as is" with the addition of two
+tunnelling NVME\-MI commands: SES Send and SES Receive. This means after the
+OS interface differences are taken into account, the sg_ses, sg_ses_microcode
+and sg_senddiag utilities can be used on a NVMe device that supports a newer
+version of NVME\-MI.
+.PP
+The NVME\-MI SES Send and SES Receive commands correspond to the SCSI
+SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS commands respectively.
+There are however a few other commands that need to be translated, the
+most important of which is the SCSI INQUIRY command to the NVMe Identify
+controller/namespace. Version 1.43 of these utilities contain a small
+SNTL (SCSI to NVMe Translation Layer) to take care of these details.
+.PP
+As a side effect of this "juggling" if the sg_inq utility is used (without
+the \-\-page= option) on a NVMe \fIDEVICE\fR then the actual NVMe
+Identifier (controller and possibly namespace) responses are decoded and
+output. However if 'sg_inq \-\-page=sinq <device>' is given for the
+same \fIDEVICE\fR then parts of the NVMe Identify controller and namespace
+response are translated to a SCSI standard INQUIRY response which is then
+decoded and output.
+.PP
+Apart from the special case with the sg_inq, all other utilities in the
+package assume they are talking to a SCSI device and decode any response
+accordingly. One easy way for users to see the underlying device is a
+NVMe device is the standard INQUIRY response Vendor Identification field
+of "NVMe    " (an 8 character long string with 4 spaces to the right).
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
@@ -321,7 +359,7 @@ Work in this area is currently experimental.
 .TP
 .B 49
 low level driver reports a residual count (i.e. number of bytes actually
-received by HBA is 'requested_bytes - residual_count') that is high enough
+received by HBA is 'requested_bytes \- residual_count') that is high enough
 to indicate that no useful processing can be done on that response.
 .TP
 .B 50 + <os_error_number>
@@ -334,7 +372,7 @@ package reports 50+ENOMEM when it can't allocate memory, not necessarily
 from an OS system call. In recent versions of Linux the file showing the
 mapping between symbolic constants (e.g. ENOMEM) and the corresponding
 integer is in the kernel source code file:
-include/uapi/asm-generic/errno-base.h
+include/uapi/asm\-generic/errno\-base.h
 .TP
 .B 97
 a SCSI command response failed sanity checks.

@@ -1,14 +1,17 @@
-/* This program sends a user specified number of TEST UNIT READY commands
- * to the given sg device. Since TUR is a simple command involing no
- * data transfer (and no REQUEST SENSE command iff the unit is ready)
- * then this can be used for timing per SCSI command overheads.
- *
+/*
  * Copyright (C) 2000-2018 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
+ */
+
+/*
+ * This program sends a user specified number of TEST UNIT READY commands
+ * to the given sg device. Since TUR is a simple command involing no
+ * data transfer (and no REQUEST SENSE command iff the unit is ready)
+ * then this can be used for timing per SCSI command overheads.
  */
 
 #include <unistd.h>
@@ -33,7 +36,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.37 20180116";
+static const char * version_str = "3.38 20180123";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -83,12 +86,12 @@ usage()
            "    --number=NUM|-n NUM    number of test_unit_ready commands "
            "(def: 1)\n"
            "    --num=NUM|-n NUM       same action as '--number=NUM'\n"
+           "    --old|-O         use old interface (use as first option)\n"
            "    --progress|-p    outputs progress indication (percentage) "
            "if available\n"
            "    --time|-t        outputs total duration and commands per "
            "second\n"
            "    --verbose|-v     increase verbosity\n"
-           "    --old|-O        use old interface (use as first option)\n"
            "    --version|-V     print version string then exit\n\n"
            "Performs a SCSI TEST UNIT READY command (or many of them).\n");
 }
@@ -367,7 +370,7 @@ main(int argc, char * argv[])
             }
         }
 #ifndef SG_LIB_MINGW
-        if ((op->do_time) && (start_tm.tv_sec || start_tm.tv_usec)) {
+        if (op->do_time && (start_tm.tv_sec || start_tm.tv_usec)) {
             struct timeval res_tm;
             double den, num;
 

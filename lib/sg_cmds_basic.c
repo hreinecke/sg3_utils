@@ -36,7 +36,7 @@
 #endif
 
 
-static const char * const version_str = "1.80 20180117";
+static const char * const version_str = "1.82 20180126";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -351,7 +351,7 @@ sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
     if (evpd)
         inq_cdb[1] |= 1;
     inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8, increased in spc3r09, September 2002) */
+    /* 16 bit allocation length (was 8, increased in spc3r09, 200209) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
         pr2ws("    %s cdb: ", inquiry_s);
@@ -374,10 +374,12 @@ sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
     ret = sg_cmds_process_resp(ptvp, inquiry_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
-    destruct_scsi_pt_obj(ptvp);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -393,6 +395,7 @@ sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
         ret = SG_LIB_CAT_MALFORMED;
     } else
         ret = 0;
+    destruct_scsi_pt_obj(ptvp);
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
@@ -441,9 +444,12 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, inquiry_s, res, sizeof(inq_resp),
                                sense_b, noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -502,7 +508,7 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
     if (evpd)
         inq_cdb[1] |= 1;
     inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8, increased in spc3r09, September 2002) */
+    /* 16 bit allocation length (was 8, increased in spc3r09, 200209) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
         pr2ws("    inquiry cdb: ");
@@ -534,10 +540,12 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
     resid = get_scsi_pt_resid(ptvp);
     if (residp)
         *residp = resid;
-    destruct_scsi_pt_obj(ptvp);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -553,6 +561,7 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
         ret = SG_LIB_CAT_MALFORMED;
     } else
         ret = 0;
+    destruct_scsi_pt_obj(ptvp);
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
@@ -597,9 +606,12 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, tur_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         if (progress) {
             int slen = get_scsi_pt_sense_len(ptvp);
 
@@ -668,9 +680,12 @@ sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, rq_s, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -723,9 +738,12 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, report_luns_s, res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
