@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.36 20180119 */
+/* sg_pt_linux version 1.37 20180126 */
 
 
 #include <stdio.h>
@@ -909,7 +909,8 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
         if (verbose)
             pr2ws("%s: invalid file descriptors\n", __func__);
         return SCSI_PT_DO_BAD_PARAMS;
-    }
+    } else
+        fd = ptp->dev_fd;
     if (! have_checked_for_type) {
         err = set_pt_file_handle(vp, ptp->dev_fd, verbose);
         if (err)

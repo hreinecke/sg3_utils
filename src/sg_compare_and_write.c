@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2017, Kaminario Technologies LTD
+*  Copyright (c) 2012-2018, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.19 20171020";
+static const char * version_str = "1.20 20180123";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -73,6 +73,7 @@ static struct option long_options[] = {
         {"fua", no_argument, 0, 'f'},
         {"fua_nv", no_argument, 0, 'F'},
         {"group", required_argument, 0, 'g'},
+        {"grpnum", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'i'},
         {"inc", required_argument, 0, 'C'},
@@ -115,7 +116,7 @@ static void
 usage()
 {
         pr2serr("Usage: sg_compare_and_write [--dpo] [--fua] [--fua_nv] "
-                "[--group=GN] [--help]\n"
+                "[--grpnum=GN] [--help]\n"
                 "                            --in=IF|--inc=IF [--inw=WF] "
                 "--lba=LBA "
                 "[--num=NUM]\n"
@@ -130,7 +131,7 @@ usage()
                 "clear)\n"
                 "    --fua_nv|-F         set the fua_nv bit in cdb (def: "
                 "clear)\n"
-                "    --group=GN|-g GN    GN is GROUP NUMBER to set in "
+                "    --grpnum=GN|-g GN    GN is GROUP NUMBER to set in "
                 "cdb (def: 0)\n"
                 "    --help|-h           print out usage message\n"
                 "    --in=IF|-i IF       IF is a file containing a compare "
@@ -207,7 +208,7 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                         op->flags.group = sg_get_num(optarg);
                         if ((op->flags.group < 0) ||
                             (op->flags.group > 63))  {
-                                pr2serr("argument to '--group' expected to "
+                                pr2serr("argument to '--grpnum=' expected to "
                                         "be 0 to 63\n");
                                 goto out_err_no_usage;
                         }

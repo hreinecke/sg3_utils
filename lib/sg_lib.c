@@ -1606,22 +1606,23 @@ sg_get_sense_sat_pt_fixed_str(const char * lip, const unsigned char * sp,
 /* Fetch sense information */
 int
 sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
-                 bool raw_sinfo, int buff_len, char * buff)
+                 bool raw_sinfo, int cblen, char * cbp)
 {
-    int len, progress, n, r, pr, rem, blen;
-    unsigned int info;
     bool descriptor_format = false;
     bool sdat_ovfl = false;
     bool valid;
+    int len, progress, n, r, pr, rem, blen;
+    unsigned int info;
+    uint8_t resp_code;
     const char * ebp = NULL;
-    char error_buff[64];
+    char ebuff[64];
     char b[256];
     struct sg_scsi_sense_hdr ssh;
 
-    if ((NULL == buff) || (buff_len <= 0))
+    if ((NULL == cbp) || (cblen <= 0))
         return 0;
-    else if (1 == buff_len) {
-        buff[0] = '\0';
+    else if (1 == cblen) {
+        cbp[0] = '\0';
         return 0;
     }
     blen = sizeof(b);
@@ -1629,9 +1630,11 @@ sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
     if (NULL == lip)
         lip = "";
     if ((NULL == sbp) || (sb_len < 1)) {
-            n += scnpr(buff, buff_len, "%s >>> sense buffer empty\n", lip);
+            n += scnpr(cbp, cblen, "%s >>> sense buffer empty\n", lip);
             return n;
     }
+    resp_code = 0x7f & sbp[0];
+    valid = !!(sbp[0] & 0x80);
     len = sb_len;
     if (sg_scsi_normalize_sense(sbp, sb_len, &ssh)) {
         switch (ssh.response_code) {
@@ -1662,36 +1665,33 @@ sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
             ebp = "Response code: 0x0 (?)";
             break;
         default:
-            scnpr(error_buff, sizeof(error_buff), "Unknown response code: "
-                  "0x%x", ssh.response_code);
-            ebp = error_buff;
+            scnpr(ebuff, sizeof(ebuff), "Unknown response code: 0x%x",
+                  ssh.response_code);
+            ebp = ebuff;
             break;
         }
-        n += scnpr(buff + n, buff_len - n, "%s%s; Sense key: %s\n", lip, ebp,
+        n += scnpr(cbp + n, cblen - n, "%s%s; Sense key: %s\n", lip, ebp,
                    sg_lib_sense_key_desc[ssh.sense_key]);
         if (sdat_ovfl)
-            n += scnpr(buff + n, buff_len - n, "%s<<<Sense data "
-                       "overflow>>>\n", lip);
+            n += scnpr(cbp + n, cblen - n, "%s<<<Sense data overflow>>>\n",
+                       lip);
         if (descriptor_format) {
-            n += scnpr(buff + n, buff_len - n, "%s%s\n", lip,
-                       sg_get_asc_ascq_str(ssh.asc, ssh.ascq, sizeof(b), b));
+            n += scnpr(cbp + n, cblen - n, "%s%s\n", lip,
+                       sg_get_asc_ascq_str(ssh.asc, ssh.ascq, blen, b));
             n += sg_get_sense_descriptors_str(lip, sbp, len,
-                                              buff_len - n, buff + n);
+                                              cblen - n, cbp + n);
         } else if ((len > 12) && (0 == ssh.asc) &&
                    (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
             /* SAT ATA PASS-THROUGH fixed format */
-            n += scnpr(buff + n, buff_len - n, "%s%s\n", lip,
-                       sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
-                             sizeof(b), b));
+            n += scnpr(cbp + n, cblen - n, "%s%s\n", lip,
+                       sg_get_asc_ascq_str(ssh.asc, ssh.ascq, blen, b));
             n += sg_get_sense_sat_pt_fixed_str(lip, sbp, len,
-                                               buff_len - n, buff + n);
+                                               cblen - n, cbp + n);
         } else if (len > 2) {   /* fixed format */
             if (len > 12)
-                n += scnpr(buff + n, buff_len - n, "%s%s\n", lip,
-                           sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
-                                                     sizeof(b), b));
+                n += scnpr(cbp + n, cblen - n, "%s%s\n", lip,
+                           sg_get_asc_ascq_str(ssh.asc, ssh.ascq, blen, b));
             r = 0;
-            valid = !!(sbp[0] & 0x80);
             if (strlen(lip) > 0)
                 r += scnpr(b + r, blen - r, "%s", lip);
             if (len > 6) {
@@ -1774,41 +1774,49 @@ sg_get_sense_str(const char * lip, const unsigned char * sbp, int sb_len,
                 }
             }
             if (r > 0)
-                n += scnpr(buff + n, buff_len - n, "%s", b);
+                n += scnpr(cbp + n, cblen - n, "%s", b);
         } else
-            n += scnpr(buff + n, buff_len - n, "%s fixed descriptor length "
+            n += scnpr(cbp + n, cblen - n, "%s fixed descriptor length "
                        "too short, len=%d\n", lip, len);
-    } else {    /* non-extended SCSI-1 sense data ?? */
-        if (sb_len < 4) {
-            n += scnpr(buff + n, buff_len - n, "%ssense buffer too short (4 "
+    } else {    /* unable to normalise sense buffer, something irregular */
+        if (sb_len < 4) {       /* Too short */
+            n += scnpr(cbp + n, cblen - n, "%ssense buffer too short (4 "
                        "byte minimum)\n", lip);
-            return n;
+            goto check_raw;
         }
+        if (0x7f == resp_code) {        /* Vendor specific */
+            n += scnpr(cbp + n, cblen - n, "%sVendor specific sense buffer, "
+                       "in hex:\n", lip);
+            n += hex2str(sbp, sb_len, lip, -1, cblen - n, cbp + n);
+            return n;   /* no need to check raw, just output in hex */
+        }
+        /* non-extended SCSI-1 sense data ?? */
         r = 0;
         if (strlen(lip) > 0)
             r += scnpr(b + r, blen - r, "%s", lip);
         r += scnpr(b + r, blen - r, "Probably uninitialized data.\n%s  Try "
                    "to view as SCSI-1 non-extended sense:\n", lip);
         r += scnpr(b + r, blen - r, "  AdValid=%d  Error class=%d  Error "
-                   "code=%d\n", !!(sbp[0] & 0x80), ((sbp[0] >> 4) & 0x7),
+                   "code=%d\n", valid, ((sbp[0] >> 4) & 0x7),
                    (sbp[0] & 0xf));
-        if (sbp[0] & 0x80)
+        if (valid)
             scnpr(b + r, blen - r, "%s  lba=0x%x\n", lip,
                   sg_get_unaligned_be24(sbp + 1) & 0x1fffff);
-        n += scnpr(buff + n, buff_len - n, "%s\n", b);
+        n += scnpr(cbp + n, cblen - n, "%s\n", b);
         len = sb_len;
         if (len > 32)
             len = 32;   /* trim in case there is a lot of rubbish */
     }
+check_raw:
     if (raw_sinfo) {
         char z[64];
 
-        n += scnpr(buff + n, buff_len - n, "%s Raw sense data (in hex):\n",
+        n += scnpr(cbp + n, cblen - n, "%s Raw sense data (in hex):\n",
                    lip);
-        if (n >= (buff_len - 1))
+        if (n >= (cblen - 1))
             return n;
         scnpr(z, sizeof(z), "%.50s        ", lip);
-        n += hex2str(sbp, len, z,  1, buff_len - n, buff + n);
+        n += hex2str(sbp, len, z,  -1, cblen - n, cbp + n);
     }
     return n;
 }
@@ -1818,10 +1826,16 @@ void
 sg_print_sense(const char * leadin, const unsigned char * sbp, int sb_len,
                bool raw_sinfo)
 {
-    char b[2048];
+    uint32_t pg_sz = sg_get_page_size();
+    char *cp;
+    uint8_t *free_cp;
 
-    sg_get_sense_str(leadin, sbp, sb_len, raw_sinfo, sizeof(b), b);
-    pr2ws("%s", b);
+    cp = (char *)sg_memalign(pg_sz, pg_sz, &free_cp, 0);
+    if (NULL == cp)
+        return;
+    sg_get_sense_str(leadin, sbp, sb_len, raw_sinfo, pg_sz, cp);
+    pr2ws("%s", cp);
+    free(free_cp);
 }
 
 /* See description in sg_lib.h header file */
@@ -1829,12 +1843,16 @@ bool
 sg_scsi_normalize_sense(const unsigned char * sbp, int sb_len,
                         struct sg_scsi_sense_hdr * sshp)
 {
+    uint8_t resp_code;
     if (sshp)
         memset(sshp, 0, sizeof(struct sg_scsi_sense_hdr));
-    if ((NULL == sbp) || (0 == sb_len) || (0x70 != (0x70 & sbp[0])))
+    if ((NULL == sbp) || (sb_len < 1))
+        return false;
+    resp_code = 0x7f & sbp[0];
+    if ((resp_code < 0x70) || (resp_code > 0x73))
         return false;
     if (sshp) {
-        sshp->response_code = (0x7f & sbp[0]);
+        sshp->response_code = resp_code;
         if (sshp->response_code >= 0x72) {  /* descriptor format */
             if (sb_len > 1)
                 sshp->sense_key = (0xf & sbp[1]);
@@ -2258,10 +2276,18 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
                      "issue");
         break;
     default:
-        n = scnpr(buff, buff_len, "Sense category: %d", sense_cat);
-        if ((0 == verbose) && (n < (buff_len - 1)))
-            scnpr(buff + n, buff_len - n, ", try '-v' option for more "
-                     "information");
+        if ((sense_cat > SG_LIB_OS_BASE_ERR) &&
+            (sense_cat < (SG_LIB_OS_BASE_ERR + 47))) {
+            int k = sense_cat - SG_LIB_OS_BASE_ERR;
+
+            n = scnpr(buff, buff_len, "OS error: %s [%d]", safe_strerror(k),
+                      k);
+        } else {
+            n = scnpr(buff, buff_len, "Sense category: %d", sense_cat);
+            if ((0 == verbose) && (n < (buff_len - 1)))
+                scnpr(buff + n, buff_len - n, ", try '-v' option for more "
+                      "information");
+        }
         break;
     }
     return buff;

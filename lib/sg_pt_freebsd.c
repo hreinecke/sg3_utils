@@ -612,6 +612,7 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
                 pr2ws("%s: No device file handle given\n", __func__);
             return SCSI_PT_DO_BAD_PARAMS;
         }
+        dev_han = ptp->dev_han;
     } else {
         if (ptp->dev_han >= 0) {
             if (dev_han != ptp->dev_han) {

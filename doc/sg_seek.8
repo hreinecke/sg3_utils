@@ -1,0 +1,135 @@
+.TH SG_SEEK "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.SH NAME
+sg_seek \- send SCSI SEEK, PRE-FETCH(10) or PRE-FETCH(16) command
+.SH SYNOPSIS
+.B sg_seek
+[\fI\-\-10\fR] [\fI\-\-count=NC\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR]
+[\fI\-\-immed\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-num\-blocks=NUM\fR]
+[\fI\-\-pre\-fetch\fR] [\fI\-\-readonly\fR] [\fI\-\-skip=SB\fR]
+[\fI\-\-time\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-wrap\-offset=WO\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI SEEK(10), PRE\-FETCH(10) or PRE\-FETCH(16) command to the
+\fIDEVICE\fR. The SEEK command has been obsolete since SBC\-2 (2005) but
+still is supported on some hard disks and even some SSDs (solid state
+disks). The PRE\-FETCH command can be viewed as SEEK's modern replacement.
+Instead of talking about moving the disk heads to the track containing
+the sort after LBA, it talks about bringing the sort after LBA (and a
+given number of blocks) into the disk's cache. Also the PRE\-FETCH commands
+have an IMMED field.
+.PP
+The PRE\-FETCH commands can report "real" errors but usually they will report
+one of two "good" statuses. To do this they return the rarely used CONDITION
+MET status. If the number of blocks does actually fit in the cache (when
+IMMED=0) or there is enough room in the cache when the command arrives (when
+IMMED=1) then a CONDITION MET status is returned. If the requested number of
+blocks did not fit (IMMED=0) or would not fit (IMMED=1) then status GOOD
+is returned. So if a disk has a large cache and PRE\-FETCH is used sparingly
+then the command is more likely to return CONDITION MET than GOOD. This
+presents some SCSI sub-systems with problems as due to its rareness they
+mishandle CONDITION MET and treat it as an error.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-T\fR, \fB\-\-10\fR
+use a 10 byte cdb command, either SEEK(10) or PRE\-FETCH(10) command. In
+the absence of the \fI\-\-pre\-fetch\fR option, the SEEK(10) command is
+used. If the \fI\-\-pre\-fetch\fR option is given without this option
+then a PRE\-FETCH(16) command is used.
+.TP
+\fB\-c\fR, \fB\-\-count\fR=\fINC\fR
+\fINC\fR is the number of commands (one of SEEK(10), PRE\-FETCH(10) or
+PRE\-FETCH(16)) that will be executed. The default value is 1. If an error
+occurs it is noted and the program continues until \fINC\fR is exhausted.
+If \fINC\fR is 0 then options are checked and the \fIDEVICE\fR is opened
+but no commands are sent.
+.TP
+\fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
+\fIGN\fR is the group number, a value between 0 and 63 (in hex: 0x3f). The
+default value is 0. This option is ignored if the selected command is
+SEEK(10).
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-i\fR, \fB\-\-immed\fR
+this option only applies to PRE\-FETCH(10) and PRE\-FETCH(16), setting
+the IMMED bit. Without this option, the \fIDEVICE\fR returns after it has
+completed transferring all, or part of, the requested blocks into the
+cache. If this option is given the \fIDEVICE\fR returns after it has done
+sanity checks on the cdb (e.g. making sure the \fILBA\fR is greater than
+the number of available blocks) and before it does the transfer into the
+cache.
+.br
+Note that even when this option is given, the return status from the
+PRE\-FETCH commands is still either CONDITION MET status (if the cache seems
+to have enough free space for the transfer) or a GOOD status (if the cache
+does not seem to have enough free space).
+.TP
+\fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
+\fILBA\fR is the starting logical block address that is placed in the
+command descriptor block (cdb) of the selected command. Note that the
+\fILBA\fR field in SEEK(10) and PRE\-FETCH(10) is a 32 bit quantity,
+while with PRE\-FETCH(16) it is a 64 bit quantity. The default value is
+0 .
+.TP
+\fB\-n\fR, \fB\-\-num\-blocks\fR=\fINUM\fR
+\fINUM\fR is the number of blocks, starting at and including \fILBA\fR,
+to place in the \fIDEVICE\fR's cache. The SEEK(10) command does not use
+the \fINUM\fR value. For PRE\-FETCH(10) \fINUM\fR is a 16 bit quantity,
+while for PRE\-FETCH(16) it is a 32 bit quantity. The default value is
+1 . If \fINUM\fR is 0 then the \fIDEVICE\fR will attempt to transfer all
+blocks from the given \fILBA\fR to the end of the medium.
+.TP
+\fB\-p\fR, \fB\-\-pre\-fetch\fR
+this option selects either PRE\-FETCH(10) or PRE\-FETCH(16) commands. With
+the \fI\-\-10\fR also given, the PRE\-FETCH(10) command is selected; without
+that option PRE\-FETCH(16) is selected. The default (in the absence of this
+and other 'selecting' options) the SEEK(10) command is selected.
+.TP
+\fB\-r\fR, \fB\-\-readonly\fR
+this option sets a 'read\-only' flag when the underlying operating system
+opens the given \fIDEVICE\fR. This may not work since operating systems can
+not easily determine whether a pass\-through is a logical read or write
+operation so they take a risk averse stance and require read\-write type
+\fIDEVICE\fR opens irrespective of what is performed by the pass\-through.
+.TP
+\fB\-s\fR, \fB\-\-skip\fR=\fISB\fR
+\fISB\fR is the number of logical block addresses to skip, between repeated
+commands when \fINC\fR is greater than 1. The default value of \fISB\fR is
+1 . \fISB\fR may be set to 0 so that all \fINC\fR PRE\-FETCH commands use
+the same \fILBA\fR.
+.TP
+\fB\-t\fR, \fB\-\-time\fR
+if given the elapsed time to execute \fINC\fR commands is recorded. This is
+printed out before this utility exits. If \fINC\fR is greater than 1 then
+the the "per command" time is also printed.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.TP
+\fB\-w\fR, \fB\-\-wrap\-offset\fR=\fIWO\fR
+\fIWO\fR is the number of blocks, relative to \fILBA\fR, that when exceeded,
+set the next command's logical block address back to \fILBA\fR. Whether
+this "reset-to-LBA" action occurs depends on the values \fINC\fR and \fISB\fR.
+.SH NOTES
+As of Linux kernel 4.15 the CONDITION MET status is logged as an error.
+.SH EXIT STATUS
+The exit status of sg_stream_ctl is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2018 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_vpd(sg3_utils); sdparm(sdparm)

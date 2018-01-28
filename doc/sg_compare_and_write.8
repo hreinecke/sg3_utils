@@ -1,10 +1,10 @@
-.TH "COMPARE AND WRITE" "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH "COMPARE AND WRITE" "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
 .B sg_compare_and_write
 [\fI\-\-dpo\fR] [\fI\-\-fua\fR] [\fI\-\-fua_nv\fR] [\fI\-\-help\fR]
-[\fI\-\-group=GN\fR] \fI\-\-in=IF\fR [\fI\-\-inw=WF\fR] \fI\-\-lba=LBA\fR
+[\fI\-\-grpnum=GN\fR] \fI\-\-in=IF\fR [\fI\-\-inw=WF\fR] \fI\-\-lba=LBA\fR
 [\fI\-\-num=NUM\fR] [\fI\-\-quiet\fR] [\fI\-\-timeout=TO\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wrprotect=WP\fR]
 [\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
@@ -67,7 +67,7 @@ Set the FUA bit in the COMPARE AND WRITE CDB
 Set the FUA_NV bit in the COMPARE AND WRITE CDB. This bit was removed in
 SBC\-3 revision 35d and its position marked as "reserved".
 .TP
-\fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
+\fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
 where \fIGN\fR is the value to be placed in the group number field in the
 COMPARE AND WRITE CDB.
 .TP
@@ -144,7 +144,7 @@ Eric Seppanen.
 .SH "REPORTING BUGS"
 Report bugs to shahar.salzman@kaminario.com or dgilbert@interlog.com
 .SH COPYRIGHT
-Copyright \(co 2012\-2017 Kaminario Technologies LTD
+Copyright \(co 2012\-2018 Kaminario Technologies LTD
 .br
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:

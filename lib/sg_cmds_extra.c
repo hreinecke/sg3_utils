@@ -81,6 +81,12 @@
 #define WRITE_LONG10_CMDLEN 10
 #define WRITE_BUFFER_CMD 0x3b
 #define WRITE_BUFFER_CMDLEN 10
+#define PRE_FETCH10_CMD 0x34
+#define PRE_FETCH10_CMDLEN 10
+#define PRE_FETCH16_CMD 0x90
+#define PRE_FETCH16_CMDLEN 16
+#define SEEK10_CMD 0x2b
+#define SEEK10_CMDLEN 10
 
 #define GET_LBA_STATUS16_SA 0x12
 #define GET_LBA_STATUS32_SA 0x12
@@ -158,9 +164,12 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, alloc_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -234,9 +243,12 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, alloc_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -278,7 +290,7 @@ int
 sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
                           bool extended, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "report target port groups";
+    static const char * const cdb_name_s = "Report target port groups";
     int k, res, ret, sense_cat;
     unsigned char rtpg_cdb[MAINTENANCE_IN_CMDLEN] =
                          {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
@@ -304,9 +316,12 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -340,7 +355,7 @@ int
 sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
                       int verbose)
 {
-    static const char * const cdb_name_s = "set target port groups";
+    static const char * const cdb_name_s = "Set target port groups";
     int k, res, ret, sense_cat;
     unsigned char stpg_cdb[MAINTENANCE_OUT_CMDLEN] =
                          {MAINTENANCE_OUT_CMD, SET_TGT_PRT_GRP_SA,
@@ -368,9 +383,12 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -393,7 +411,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
                        void * resp, int mx_resp_len, bool noisy,
                        int verbose)
 {
-    static const char * const cdb_name_s = "report referrals";
+    static const char * const cdb_name_s = "Report referrals";
     int k, res, ret, sense_cat;
     unsigned char repRef_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                          {SERVICE_ACTION_IN_16_CMD, REPORT_REFERRALS_SA,
@@ -420,9 +438,12 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -460,7 +481,7 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
                 bool devofl_bit, bool unitofl_bit, int long_duration,
                 void * paramp, int param_len, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "send diagnostic";
+    static const char * const cdb_name_s = "Send diagnostic";
     int k, res, ret, sense_cat, tmout;
     unsigned char senddiag_cdb[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
@@ -504,9 +525,12 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -542,7 +566,7 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
 {
     int resid = 0;
     int k, res, ret, sense_cat;
-    static const char * const cdb_name_s = "receive diagnostic results";
+    static const char * const cdb_name_s = "Receive diagnostic results";
     struct sg_pt_base * ptvp;
     unsigned char rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
@@ -576,9 +600,12 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
     resid = get_scsi_pt_resid(ptvp);
     if (residp)
         *residp = resid;
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -612,7 +639,7 @@ int
 sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
                     void * resp, int mx_resp_len, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "read defect(10)";
+    static const char * const cdb_name_s = "Read defect(10)";
     int res, k, ret, sense_cat;
     unsigned char rdef_cdb[READ_DEFECT10_CMDLEN] =
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -644,9 +671,12 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -680,7 +710,7 @@ int
 sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
                             bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "read media serial number";
+    static const char * const cdb_name_s = "Read media serial number";
     int k, res, ret, sense_cat;
     unsigned char rmsn_cdb[SERVICE_ACTION_IN_12_CMDLEN] =
                          {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
@@ -704,9 +734,12 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -741,7 +774,7 @@ int
 sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
                      bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "report identifying information";
+    static const char * const cdb_name_s = "Report identifying information";
     int k, res, ret, sense_cat;
     unsigned char rii_cdb[MAINTENANCE_IN_CMDLEN] = {MAINTENANCE_IN_CMD,
                         REPORT_IDENTIFYING_INFORMATION_SA,
@@ -767,9 +800,12 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, max_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -804,7 +840,7 @@ int
 sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
                   bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "set identifying information";
+    static const char * const cdb_name_s = "Set identifying information";
     int k, res, ret, sense_cat;
     unsigned char sii_cdb[MAINTENANCE_OUT_CMDLEN] = {MAINTENANCE_OUT_CMD,
                          SET_IDENTIFYING_INFORMATION_SA,
@@ -833,9 +869,12 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -885,7 +924,7 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
                      int timeout_secs, void * paramp, int param_len,
                      bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "format unit";
+    static const char * const cdb_name_s = "Format unit";
     int k, res, ret, sense_cat, tmout;
     unsigned char fu_cdb[FORMAT_UNIT_CMDLEN] =
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
@@ -927,9 +966,12 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -952,7 +994,7 @@ int
 sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
                       int param_len, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "reassign blocks";
+    static const char * const cdb_name_s = "Reassign blocks";
     int res, k, ret, sense_cat;
     unsigned char reass_cdb[REASSIGN_BLKS_CMDLEN] =
         {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
@@ -982,9 +1024,12 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1008,7 +1053,7 @@ int
 sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
                             int mx_resp_len, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "persistent reservation in";
+    static const char * const cdb_name_s = "Persistent reservation in";
     int res, k, ret, sense_cat;
     unsigned char prin_cdb[PERSISTENT_RESERVE_IN_CMDLEN] =
                  {PERSISTENT_RESERVE_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -1034,9 +1079,12 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1072,7 +1120,7 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
                              unsigned int rq_type, void * paramp,
                              int param_len, bool noisy, int verbose)
 {
-    static const char * const cdb_name_s = "persistent reservation out";
+    static const char * const cdb_name_s = "Persistent reservation out";
     int res, k, ret, sense_cat;
     unsigned char prout_cdb[PERSISTENT_RESERVE_OUT_CMDLEN] =
                  {PERSISTENT_RESERVE_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -1103,9 +1151,12 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1178,9 +1229,12 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, xfer_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1268,9 +1322,12 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, xfer_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1439,9 +1496,12 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1481,8 +1541,8 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
 
 /* Invokes a SCSI VERIFY (10) command (SBC and MMC).
  * Note that 'veri_len' is in blocks while 'data_out_len' is in bytes.
- * Returns of 0 -> success,
- * various SG_LIB_CAT_* positive values or -1 -> other errors */
+ * Returns of 0 -> success, * various SG_LIB_CAT_* positive values or
+ * -1 -> other errors */
 int
 sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
                unsigned int lba, int veri_len, void * data_out,
@@ -1523,9 +1583,12 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1601,9 +1664,12 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1841,9 +1907,12 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1914,9 +1983,12 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -1991,9 +2063,12 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
     res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, "Write buffer", res, SG_NO_DATA_IN,
                                sense_b, noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -2057,9 +2132,12 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -2103,9 +2181,12 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -2170,9 +2251,12 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, b, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -2229,9 +2313,12 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, opcode_name, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -2282,7 +2369,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
         sg_put_unaligned_be32((uint32_t)list_id, xcopy_cdb + 2);
         break;
     default:
-        pr2ws("sg_ll_3party_copy_out: unknown service action 0x%x\n", sa);
+        pr2ws("%s: unknown service action 0x%x\n", __func__, sa);
         return -1;
     }
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
@@ -2306,9 +2393,12 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cname, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ;
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -2320,6 +2410,115 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
         }
     } else
         ret = 0;
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+/* Invokes a SCSI PRE-FETCH(10), PRE-FETCH(16) or SEEK(10) command (SBC).
+ * Returns 0 -> success, 25 (SG_LIB_CAT_CONDITION_MET), various SG_LIB_CAT_*
+ * positive values or -1 -> other errors. Note that CONDITION MET status
+ * is returned when immed=true and num_blocks can fit in device's cache,
+ * somewaht strangely, GOOD status (return 0) is returned if num_blocks
+ * cannot fit in device's cache. If do_seek10==true then does a SEEK(10)
+ * command with given lba, if that LBA is < 2**32 . Unclear what SEEK(10)
+ * does, assume it is like PRE-FETCH. If timeout_secs is 0 (or less) then
+ * use DEF_PT_TIMEOUT (60 seconds) as command timeout. */
+int
+sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
+                  uint64_t lba, uint32_t num_blocks, int group_num,
+                  int timeout_secs, bool noisy, int verbose)
+{
+    static const char * const cdb10_name_s = "Pre-fetch(10)";
+    static const char * const cdb16_name_s = "Pre-fetch(16)";
+    static const char * const cdb_seek_name_s = "Seek(10)";
+    int k, res, sense_cat, ret, cdb_len, tmout;
+    const char *cdb_name_s;
+    unsigned char preFetchCdb[PRE_FETCH16_CMDLEN]; /* all use longest cdb */
+    unsigned char sense_b[SENSE_BUFF_LEN];
+    struct sg_pt_base * ptvp;
+
+    memset(preFetchCdb, 0, sizeof(preFetchCdb));
+    if (do_seek10) {
+        if (lba > UINT32_MAX) {
+            if (verbose)
+                pr2ws("%s: LBA exceeds 2**32 in %s\n", __func__,
+                      cdb_seek_name_s);
+            return -1;
+        }
+        preFetchCdb[0] = SEEK10_CMD;
+        cdb_len = SEEK10_CMDLEN;
+        cdb_name_s = cdb_seek_name_s;
+        sg_put_unaligned_be32((uint32_t)lba, preFetchCdb + 2);
+    } else {
+        if ((! cdb16) &&
+            ((lba > UINT32_MAX) || (num_blocks > UINT16_MAX))) {
+            cdb16 = true;
+            if (noisy || verbose)
+                pr2ws("%s: do %s due to %s size\n", __func__, cdb16_name_s,
+                      (lba > UINT32_MAX) ? "LBA" : "NUM_BLOCKS");
+        }
+        if (cdb16) {
+            preFetchCdb[0] = PRE_FETCH16_CMD;
+            cdb_len = PRE_FETCH16_CMDLEN;
+            cdb_name_s = cdb16_name_s;
+            if (immed)
+                preFetchCdb[1] = 0x2;
+            sg_put_unaligned_be64(lba, preFetchCdb + 2);
+            sg_put_unaligned_be32(num_blocks, preFetchCdb + 10);
+            preFetchCdb[14] = 0x3f & group_num;
+        } else {
+            preFetchCdb[0] = PRE_FETCH10_CMD;
+            cdb_len = PRE_FETCH10_CMDLEN;
+            cdb_name_s = cdb10_name_s;
+            if (immed)
+                preFetchCdb[1] = 0x2;
+            sg_put_unaligned_be32((uint32_t)lba, preFetchCdb + 2);
+            preFetchCdb[6] = 0x3f & group_num;
+            sg_put_unaligned_be16((uint16_t)num_blocks, preFetchCdb + 7);
+        }
+    }
+    tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
+    if (verbose) {
+        pr2ws("    %s cdb: ", cdb_name_s);
+        for (k = 0; k < cdb_len; ++k)
+            pr2ws("%02x ", preFetchCdb[k]);
+        pr2ws("\n");
+    }
+    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
+        return -1;
+    set_scsi_pt_cdb(ptvp, preFetchCdb, cdb_len);
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
+    if (0 == res) {
+        int sstat = get_scsi_pt_status_response(ptvp);
+
+        if (SG_LIB_CAT_CONDITION_MET == sstat) {
+            ret = SG_LIB_CAT_CONDITION_MET;
+            if (verbose > 2)
+                pr2ws("%s: returns SG_LIB_CAT_CONDITION_MET\n", __func__);
+            goto fini;
+        }
+    }
+    ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
+                               noisy, verbose, &sense_cat);
+    if (-1 == ret) {
+        int os_err = get_scsi_pt_os_err(ptvp);
+
+        if ((os_err > 0) && (os_err < 47))
+            ret = SG_LIB_OS_BASE_ERR + os_err;
+    } else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = sense_cat;
+            break;
+        }
+    } else
+        ret = 0;
+fini:
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

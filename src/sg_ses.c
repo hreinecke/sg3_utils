@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.30 20180118";    /* ses4r01 */
+static const char * version_str = "2.31 20180127";    /* ses4r01 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -160,7 +160,8 @@ struct opts_t {
     int num_cgs;        /* number of --clear-, --get= and --set= options */
     int arr_len;
     uint8_t sas_addr[8];
-    uint8_t data_arr[MX_DATA_IN + 16];
+    uint8_t * data_arr;
+    uint8_t * free_data_arr;
     const char * desc_name;
     const char * dev_name;
     const char * index_str;
@@ -1317,7 +1318,6 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         }
     }
     if (data_arg) {
-        memset(op->data_arr, 0, sizeof(op->data_arr));
         if (read_hex(data_arg, op->data_arr + 4, &op->arr_len, op->verbose)) {
             pr2serr("bad argument to '--data'\n");
             return SG_LIB_SYNTAX_ERROR;
@@ -5252,20 +5252,28 @@ main(int argc, char * argv[])
     op->ind_indiv_last = -1;
     op->maxlen = MX_ALLOC_LEN;
     pg_sz = sg_get_page_size();
+    op->data_arr = sg_memalign(MX_DATA_IN + 16, pg_sz, &op->free_data_arr,
+                               false);
+    if (NULL == op->data_arr) {
+        pr2serr("unable to allocate %u bytes on heap\n", MX_DATA_IN + 16);
+        return SG_LIB_OS_BASE_ERR + ENOMEM;
+    }
     res = parse_cmd_line(op, argc, argv);
-    if (res)
-        return SG_LIB_SYNTAX_ERROR;
+    if (res) {
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto early_out;
+    }
     if (op->do_version) {
         pr2serr("version: %s\n", version_str);
-        return 0;
+        goto early_out;
     }
     if (op->do_help) {
         usage(op->do_help);
-        return 0;
+        goto early_out;
     }
     if (op->enumerate || op->do_list) {
         enumerate_work(op);
-        return 0;
+        goto early_out;
     }
     enc_stat_rsp = sg_memalign(op->maxlen, pg_sz, &free_enc_stat_rsp,
                                op->verbose > 3);
@@ -5305,20 +5313,23 @@ main(int argc, char * argv[])
             pr2serr("--clear, --get or --set options only supported for the "
                     "Enclosure\nControl/Status, Threshold In/Out and "
                     "Additional Element Status pages\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         if (! (op->ind_given || op->desc_name || (op->dev_slot_num >= 0) ||
                saddr_non_zero(op->sas_addr))) {
             pr2serr("with --clear, --get or --set option need either\n   "
                     "--index, --descriptor, --dev-slot-num or --sas-addr\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         for (k = 0, cgs_clp = op->cgs_cl_arr, tavp = tav_arr; k < op->num_cgs;
              ++k, ++cgs_clp, ++tavp) {
             if (parse_cgs_str(cgs_clp->cgs_str, tavp)) {
                 pr2serr("unable to decode STR argument to: %s\n",
                         cgs_clp->cgs_str);
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto err_out;
             }
             if ((GET_OPT == cgs_clp->cgs_sel) && tavp->val_str)
                 pr2serr("--get option ignoring =<val> at the end of STR "
@@ -5369,7 +5380,8 @@ main(int argc, char * argv[])
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = SG_LIB_FILE_ERROR;
+        goto err_out;
     }
     if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
         if (sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
@@ -5514,7 +5526,10 @@ err_out:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
     }
+early_out:
+    if (op->free_data_arr)
+        free(op->free_data_arr);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

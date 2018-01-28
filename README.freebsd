@@ -44,10 +44,12 @@ Here is a list of utilities that have been ported:
     sg_sat_identify
     sg_sat_phy_event
     sg_sat_set_features
+    sg_seek
     sg_senddiag
     sg_ses
     sg_start
     sg_stpg
+    sg_stream_ctl
     sg_sync
     sg_turs
     sg_verify
@@ -140,4 +142,4 @@ utilities.
 
 
 Douglas Gilbert
-15th November 2017
+27th January 2018

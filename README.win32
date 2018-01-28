@@ -68,11 +68,13 @@ Here is a list of utilities that have been ported:
     sg_sat_read_gplog
     sg_sat_set_features
     sg_scan         [this is Windows specific]
+    sg_seek
     sg_senddiag
     sg_ses
     sg_ses_microcode
     sg_start
     sg_stpg
+    sg_stream_ctl
     sg_sync
     sg_timestamp
     sg_turs
@@ -240,4 +242,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-21st September 2017
+27th January 2018

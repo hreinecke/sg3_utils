@@ -351,7 +351,7 @@ pages follow the same pattern as the Enclosure Status page.
 .PP
 The numeric index corresponding to the overall element is "\-1". If the
 Configuration page indicates a particular element type has "n" elements
-and n is greater than 0 then its indexes range from 0 to n-\1 .
+and n is greater than 0 then its indexes range from 0 to n\-1 .
 .PP
 The Additional Element Status page is a bit more complicated. It has
 entries for "Number of possible elements" of certain Element types. It
@@ -382,7 +382,7 @@ individual index then the option is equivalent to \fI\-\-index=0,II\fR. When
 \fI\-\-index=A,\-1\fR.
 .PP
 Wherever an individual index is applicable, it can be replaced by an
-individual index range. It has the form: <first_ii>-<last_ii>. For
+individual index range. It has the form: <first_ii>\-<last_ii>. For
 example: '3\-5' will select individual indexes 3, 4 and 5 .
 .PP
 To cope with vendor specific Element types (which should be in the range 128
@@ -506,6 +506,15 @@ Subenclosure Identifier (\fISEID\fR) are written to the Subenclosure Nickname
 Control page.
 .PP
 There is an example of changing a nickname in the EXAMPLES section below.
+.SH NVME ENCLOSURES
+Support has been added to sg_ses (actually, its underlying library) for
+NVMe (also known as NVM Express) Enclosures. It can be considered
+experimental in sg3_utils package version 1.43 and sg_ses version 2.31 .
+.PP
+This support is based on a decision by NVME-MI (Management Interface)
+developers to support the SES\-3 standard. This was done using the newly
+added SES Send and SES Receive commands that tunnel diagnostic page
+contents as used by SES.
 .SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
 pages (using the SCSI READ DIAGNOSTIC command). To this end the

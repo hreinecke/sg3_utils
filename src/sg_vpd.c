@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.34 20180118";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.35 20180127";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -77,7 +77,7 @@ static const char * version_str = "1.34 20180118";  /* spc5r18 + sbc4r14 */
 #define VPD_LB_PROTECTION 0xb5          /* SSC-5 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
-#define VPD_NO_RATHER_STD_INQ -2        /* request for standard inquiry */
+#define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
 /* Device identification VPD page associations */
 #define VPD_ASSOC_LU 0
@@ -222,7 +222,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
      "protection types (SBC)"},
     {VPD_SCSI_FEATURE_SETS, 0, -1, "sfs", "SCSI feature sets"},
     {VPD_SOFTW_INF_ID, 0, -1, "sii", "Software interface identification"},
-    {VPD_NO_RATHER_STD_INQ, 0, -1, "sinq", "Standard inquiry response"},
+    {VPD_NOPE_WANT_STD_INQ, 0, -1, "sinq", "Standard inquiry response"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, "sp", "SCSI ports"},
     {VPD_SECURITY_TOKEN, 0, 0x11, "st", "Security token (OSD)"},
@@ -2779,7 +2779,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         allow_name = true;
     rp = rsp_buff + off;
     if (sg_fd != -1 && !op->do_force &&
-        pn != VPD_NO_RATHER_STD_INQ &&
+        pn != VPD_NOPE_WANT_STD_INQ &&
         pn != VPD_SUPPORTED_VPDS) {
         res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_SUPPORTED_VPDS,
                                       op->maxlen, vb, &len);
@@ -2799,7 +2799,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             return SG_LIB_CAT_ILLEGAL_REQ;
     }
     switch(pn) {
-    case VPD_NO_RATHER_STD_INQ:    /* -2 (want standard inquiry response) */
+    case VPD_NOPE_WANT_STD_INQ:    /* -2 (want standard inquiry response) */
         if (sg_fd >= 0) {
             if (op->maxlen > 0)
                 alloc_len = op->maxlen;
@@ -3655,7 +3655,7 @@ main(int argc, char * argv[])
         if (op->page_str) {
             if ((0 == strcmp("-1", op->page_str)) ||
                 (0 == strcmp("-2", op->page_str)))
-                op->vpd_pn = VPD_NO_RATHER_STD_INQ;
+                op->vpd_pn = VPD_NOPE_WANT_STD_INQ;
             else if (isdigit(op->page_str[0])) {
                 op->vpd_pn = sg_get_num_nomult(op->page_str);
                 if ((op->vpd_pn < 0) || (op->vpd_pn > 255)) {
@@ -3683,7 +3683,7 @@ main(int argc, char * argv[])
     if (op->page_str) {
         if ((0 == strcmp("-1", op->page_str)) ||
             (0 == strcmp("-2", op->page_str)))
-            op->vpd_pn = VPD_NO_RATHER_STD_INQ;
+            op->vpd_pn = VPD_NOPE_WANT_STD_INQ;
         else if (isalpha(op->page_str[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_str);
             if (NULL == vnp) {
@@ -3784,7 +3784,7 @@ main(int argc, char * argv[])
                         pr2serr("Guessing from --inhex this is VPD page "
                                 "0x%x\n", rsp_buff[1]);
                 } else {
-                    op->vpd_pn = VPD_NO_RATHER_STD_INQ;
+                    op->vpd_pn = VPD_NOPE_WANT_STD_INQ;
                     if (op->verbose)
                         pr2serr("page number unclear from --inhex, hope "
                                 "it's a standard INQUIRY response\n");
