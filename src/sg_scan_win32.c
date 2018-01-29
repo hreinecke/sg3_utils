@@ -80,7 +80,10 @@ typedef enum _STORAGE_BUS_TYPE {
     BusTypeVirtual             = 0xE,
     BusTypeFileBackedVirtual   = 0xF,
     BusTypeSpaces       = 0x10,
-    BusTypeMax          = 0x11,
+    BusTypeNvme         = 0x11,
+    BusTypeSCM          = 0x12,
+    BusTypeUfs          = 0x13,
+    BusTypeMax          = 0x14,
     BusTypeMaxReserved  = 0x7F
 } STORAGE_BUS_TYPE, *PSTORAGE_BUS_TYPE;
 
@@ -290,10 +293,34 @@ get_bus_type(int bt)
         return "Virt ";
     case BusTypeFileBackedVirtual:
         return "FBVir";
+#ifdef BusTypeSpaces
     case BusTypeSpaces:
+#else
+    case 0x10:
+#endif
         return "Spaces";
-    case BusTypeMax:
-        return "Max  ";
+#ifdef BusTypeNvme
+    case BusTypeNvme:
+#else
+    case 0x11:
+#endif
+        return "NVMe ";
+#ifdef BusTypeSCM
+    case BusTypeSCM:
+#else
+    case 0x12:
+#endif
+        return "SCM  ";
+#ifdef BusTypeUfs
+    case BusTypeUfs:
+#else
+    case 0x13:
+#endif
+        return "Ufs ";
+    case 0x14:
+        return "Max ";
+    case 0x7f:
+        return "Max Reserved";
     default:
         return "_unkn";
     }
