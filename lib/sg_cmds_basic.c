@@ -36,7 +36,7 @@
 #endif
 
 
-static const char * const version_str = "1.82 20180126";
+static const char * const version_str = "1.83 20180204";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -333,12 +333,10 @@ create_pt_obj(const char * cname)
 
 static const char * const inquiry_s = "inquiry";
 
-/* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
- * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
- * The CMDDT field is obsolete in the INQUIRY cdb. */
-int
-sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
-              int mx_resp_len, bool noisy, int verbose)
+static int
+sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
+                  int mx_resp_len, int timeout_secs, int * residp,
+                  bool noisy, int verbose)
 {
     int res, ret, k, sense_cat, resid;
     unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
@@ -347,171 +345,14 @@ sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
     struct sg_pt_base * ptvp;
 
     if (cmddt)
-        inq_cdb[1] |= 2;
+        inq_cdb[1] |= 0x2;
     if (evpd)
-        inq_cdb[1] |= 1;
+        inq_cdb[1] |= 0x1;
     inq_cdb[2] = (unsigned char)pg_op;
     /* 16 bit allocation length (was 8, increased in spc3r09, 200209) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
         pr2ws("    %s cdb: ", inquiry_s);
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            pr2ws("%02x ", inq_cdb[k]);
-        pr2ws("\n");
-    }
-    if (resp && (mx_resp_len > 0)) {
-        up = (unsigned char *)resp;
-        up[0] = 0x7f;   /* defensive prefill */
-        if (mx_resp_len > 4)
-            up[4] = 0;
-    }
-    if (NULL == (ptvp = create_pt_obj(inquiry_s)))
-        return -1;
-    set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
-    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, inquiry_s, res, mx_resp_len, sense_b,
-                               noisy, verbose, &sense_cat);
-    resid = get_scsi_pt_resid(ptvp);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
-        switch (sense_cat) {
-        case SG_LIB_CAT_RECOVERED:
-        case SG_LIB_CAT_NO_SENSE:
-            ret = 0;
-            break;
-        default:
-            ret = sense_cat;
-            break;
-        }
-    } else if (ret < 4) {
-        if (verbose)
-            pr2ws("%s: got too few bytes (%d)\n", inquiry_s, ret);
-        ret = SG_LIB_CAT_MALFORMED;
-    } else
-        ret = 0;
-    destruct_scsi_pt_obj(ptvp);
-
-    if (resid > 0) {
-        if (resid > mx_resp_len) {
-            pr2ws("%s: resid (%d) should never exceed requested len=%d\n",
-                  inquiry_s, resid, mx_resp_len);
-            return ret ? ret : SG_LIB_CAT_MALFORMED;
-        }
-        /* zero unfilled section of response buffer */
-        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
-    }
-    return ret;
-}
-
-/* Yields most of first 36 bytes of a standard INQUIRY (evpd==0) response.
- * Returns 0 when successful, various SG_LIB_CAT_* positive values or
- * -1 -> other errors */
-int
-sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
-                  bool noisy, int verbose)
-{
-    int res, ret, k, sense_cat;
-    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
-    struct sg_pt_base * ptvp;
-
-    if (inq_data) {
-        memset(inq_data, 0, sizeof(* inq_data));
-        inq_data->peripheral_qualifier = 0x3;
-        inq_data->peripheral_type = 0x1f;
-    }
-    inq_cdb[4] = (unsigned char)sizeof(inq_resp);
-    if (verbose) {
-        pr2ws("    %s cdb: ", inquiry_s);
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            pr2ws("%02x ", inq_cdb[k]);
-        pr2ws("\n");
-    }
-    memset(inq_resp, 0, sizeof(inq_resp));
-    inq_resp[0] = 0x7f; /* defensive prefill */
-    if (NULL == ((ptvp = create_pt_obj(inquiry_s))))
-        return -1;
-    set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
-    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, inq_resp, sizeof(inq_resp));
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, inquiry_s, res, sizeof(inq_resp),
-                               sense_b, noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
-        switch (sense_cat) {
-        case SG_LIB_CAT_RECOVERED:
-        case SG_LIB_CAT_NO_SENSE:
-            ret = 0;
-            break;
-        default:
-            ret = sense_cat;
-            break;
-        }
-    } else if (ret < 4) {
-        if (verbose)
-            pr2ws("%s: got too few bytes (%d)\n", inquiry_s, ret);
-        ret = SG_LIB_CAT_MALFORMED;
-    } else
-        ret = 0;
-
-    if (inq_data && (0 == ret)) {
-        inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
-        inq_data->peripheral_type = inq_resp[0] & 0x1f;
-        inq_data->byte_1 = inq_resp[1];
-        inq_data->version = inq_resp[2];
-        inq_data->byte_3 = inq_resp[3];
-        inq_data->byte_5 = inq_resp[5];
-        inq_data->byte_6 = inq_resp[6];
-        inq_data->byte_7 = inq_resp[7];
-        memcpy(inq_data->vendor, inq_resp + 8, 8);
-        memcpy(inq_data->product, inq_resp + 16, 16);
-        memcpy(inq_data->revision, inq_resp + 32, 4);
-    }
-    destruct_scsi_pt_obj(ptvp);
-    return ret;
-}
-
-/* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
- * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
- * The CMDDT field is obsolete in the INQUIRY cdb (since spc3r16 in 2003) so
- * an argument to set it has been removed (use the REPORT SUPPORTED OPERATION
- * CODES command instead). Adds the ability to set the command abort timeout
- * and the ability to report the residual count. If timeout_secs is zero
- * or less the default command abort timeout (60 seconds) is used.
- * If residp is non-NULL then the residual value is written where residp
- * points. A residual value of 0 implies mx_resp_len bytes have be written
- * where resp points. If the residual value equals mx_resp_len then no
- * bytes have been written. */
-int
-sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
-                 int mx_resp_len, int timeout_secs, int * residp,
-                 bool noisy, int verbose)
-{
-    int res, ret, k, sense_cat, resid;
-    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char * up;
-    struct sg_pt_base * ptvp;
-
-    if (evpd)
-        inq_cdb[1] |= 1;
-    inq_cdb[2] = (unsigned char)pg_op;
-    /* 16 bit allocation length (was 8, increased in spc3r09, 200209) */
-    sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
-    if (verbose) {
-        pr2ws("    inquiry cdb: ");
         for (k = 0; k < INQUIRY_CMDLEN; ++k)
             pr2ws("%02x ", inq_cdb[k]);
         pr2ws("\n");
@@ -535,17 +376,14 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
-    ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
+    ret = sg_cmds_process_resp(ptvp, inquiry_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
     if (residp)
         *residp = resid;
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -565,14 +403,79 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
 
     if (resid > 0) {
         if (resid > mx_resp_len) {
-            pr2ws("INQUIRY resid (%d) should never exceed requested "
-                    "len=%d\n", resid, mx_resp_len);
+            pr2ws("%s resid (%d) should never exceed requested "
+                    "len=%d\n", inquiry_s, resid, mx_resp_len);
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
-        /* zero unfilled section of response buffer */
+        /* zero unfilled section of response buffer, based on resid */
         memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
     }
     return ret;
+}
+
+/* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
+ * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * The CMDDT field is obsolete in the INQUIRY cdb. */
+int
+sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
+              int mx_resp_len, bool noisy, int verbose)
+{
+    return sg_ll_inquiry_com(sg_fd, cmddt, evpd, pg_op, resp, mx_resp_len,
+                             0 /* timeout_sec */, NULL, noisy, verbose);
+}
+
+/* Yields most of first 36 bytes of a standard INQUIRY (evpd==0) response.
+ * Returns 0 when successful, various SG_LIB_CAT_* positive values or
+ * -1 -> other errors */
+int
+sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
+                  bool noisy, int verbose)
+{
+    int ret;
+    unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
+
+    if (inq_data) {
+        memset(inq_data, 0, sizeof(* inq_data));
+        inq_data->peripheral_qualifier = 0x3;
+        inq_data->peripheral_type = 0x1f;
+    }
+    ret = sg_ll_inquiry_com(sg_fd, false, false, 0, inq_resp,
+                            sizeof(inq_resp), 0, NULL, noisy, verbose);
+
+    if (inq_data && (0 == ret)) {
+        inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
+        inq_data->peripheral_type = inq_resp[0] & 0x1f;
+        inq_data->byte_1 = inq_resp[1];
+        inq_data->version = inq_resp[2];
+        inq_data->byte_3 = inq_resp[3];
+        inq_data->byte_5 = inq_resp[5];
+        inq_data->byte_6 = inq_resp[6];
+        inq_data->byte_7 = inq_resp[7];
+        memcpy(inq_data->vendor, inq_resp + 8, 8);
+        memcpy(inq_data->product, inq_resp + 16, 16);
+        memcpy(inq_data->revision, inq_resp + 32, 4);
+    }
+    return ret;
+}
+
+/* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
+ * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * The CMDDT field is obsolete in the INQUIRY cdb (since spc3r16 in 2003) so
+ * an argument to set it has been removed (use the REPORT SUPPORTED OPERATION
+ * CODES command instead). Adds the ability to set the command abort timeout
+ * and the ability to report the residual count. If timeout_secs is zero
+ * or less the default command abort timeout (60 seconds) is used.
+ * If residp is non-NULL then the residual value is written where residp
+ * points. A residual value of 0 implies mx_resp_len bytes have be written
+ * where resp points. If the residual value equals mx_resp_len then no
+ * bytes have been written. */
+int
+sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
+                 int mx_resp_len, int timeout_secs, int * residp,
+                 bool noisy, int verbose)
+{
+    return sg_ll_inquiry_com(sg_fd, false, evpd, pg_op, resp, mx_resp_len,
+                             timeout_secs, residp, noisy, verbose);
 }
 
 /* Invokes a SCSI TEST UNIT READY command.

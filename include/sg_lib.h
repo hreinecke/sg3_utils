@@ -357,6 +357,14 @@ void sg_print_scsi_status(int scsi_status);
 void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
                     int sb_len, bool raw_info);
 
+/* Following examines exit_status and outputs a clear error message to
+ * warnings_strm (usually stderr) if one is known and returns true.
+ * Otherwise it doesn't print anything and returns false. Note that if
+ * exit_status==0 then returns true but prints nothing and if
+ * exit_status<0 ("some error occurred") false is returned. If leadin is
+ * non-NULL is will be printed before error message. */
+bool sg_if_can2stderr(const char * leadin, int exit_status);
+
 /* Utilities can use these exit status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */
 #define SG_LIB_SYNTAX_ERROR 1   /* command line syntax problem */
@@ -569,6 +577,11 @@ uint8_t * sg_memalign(uint32_t num_bytes, uint32_t align_to,
 
 /* Returns OS page size in bytes. If uncertain returns 4096. */
 uint32_t sg_get_page_size(void);
+
+/* If os_err_num is within bounds then the returned value is 'os_err_num +
+ * SG_LIB_OS_BASE_ERR' otherwise -1 is returned. If os_err_num is 0 then 0
+ * is returned. */
+int sg_convert_errno(int os_err_num);
 
 
 /* <<< Architectural support functions [is there a better place?] >>> */

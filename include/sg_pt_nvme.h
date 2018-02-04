@@ -143,6 +143,10 @@ __packed;
 
 /* Byte offset of Result and Status (plus phase bit) in CQ */
 #define SG_NVME_PT_CQ_RESULT 0          /* CDW0, length: 4 bytes */
+#define SG_NVME_PT_CQ_DW0 0             /* CDW0, length: 4 bytes */
+#define SG_NVME_PT_CQ_DW1 4             /* CDW1, length: 4 bytes */
+#define SG_NVME_PT_CQ_DW2 8             /* CDW2, length: 4 bytes */
+#define SG_NVME_PT_CQ_DW3 12            /* CDW3, length: 4 bytes */
 #define SG_NVME_PT_CQ_STATUS_P 14       /* CDW3 31:16, length: 2 bytes */
 
 

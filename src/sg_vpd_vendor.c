@@ -116,8 +116,8 @@ struct svpd_values_name_t {
     const char * name;
 };
 
-int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
-                            int mxlen, int vb, int * rlenp);
+int vpd_fetch_page(int sg_fd, unsigned char * rp, int page, int mxlen,
+                   bool qt, int vb, int * rlenp);
 
 /* sharing large global buffer, defined in sg_vpd.c */
 extern unsigned char rsp_buff[];
@@ -1328,7 +1328,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
         if (0 == alloc_len)
             alloc_len = DEF_ALLOC_LEN;
     }
-    res = vpd_fetch_page_from_dev(sg_fd, rp, op->vpd_pn, alloc_len,
+    res = vpd_fetch_page(sg_fd, rp, op->vpd_pn, alloc_len, op->do_quiet,
                                   op->verbose, &len);
     if (0 == res) {
         vnp = svpd_get_v_detail(op->vpd_pn, op->vend_prod_num, 0xf & rp[0]);

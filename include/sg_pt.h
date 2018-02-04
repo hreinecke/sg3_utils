@@ -167,6 +167,7 @@ char * get_scsi_pt_os_err_str(const struct sg_pt_base * objp, int max_b_len,
 
 /* If not available return 0 (for success) */
 int get_scsi_pt_transport_err(const struct sg_pt_base * objp);
+void set_scsi_pt_transport_err(struct sg_pt_base * objp, int err);
 char * get_scsi_pt_transport_err_str(const struct sg_pt_base * objp,
                                      int max_b_len, char * b);
 

@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.08 20180104 */
+/* sg_pt_solaris version 1.09 20180202 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -365,8 +365,17 @@ get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {
     // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
-    vp = vp;            /* ignore and suppress warning */
+    if (vp) { ; }            /* ignore and suppress warning */
     return 0;
+}
+
+void
+set_scsi_pt_transport_err(struct sg_pt_base * vp, int err)
+{
+    // const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+
+    if (vp) { ; }            /* ignore and suppress warning */
+    if (err) { ; }           /* ignore and suppress warning */
 }
 
 int

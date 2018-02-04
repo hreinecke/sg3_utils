@@ -79,6 +79,9 @@
 #define SCSI_REQUEST_SENSE_OPC  0x3
 #define SCSI_SEND_DIAGNOSTIC_OPC  0x1d
 #define SCSI_RECEIVE_DIAGNOSTIC_OPC  0x1c
+#define SCSI_MAINT_IN_OPC  0xa3
+#define SCSI_REP_SUP_OPCS_OPC  0xc
+#define SCSI_REP_SUP_TMFS_OPC  0xd
 
 /* Additional Sense Code (ASC) */
 #define NO_ADDITIONAL_SENSE 0x0
@@ -142,7 +145,7 @@ pr2ws(const char * fmt, ...)
  * to the name of its associated char device (e.g. /dev/nvme0). If this
  * occurs true is returned and the char device name is placed in 'b' (as
  * long as b_len is sufficient). Otherwise false is returned. */
- bool
+bool
 sg_get_nvme_char_devname(const char * nvme_block_devname, uint32_t b_len,
                          char * b)
 {
@@ -197,16 +200,17 @@ mk_sense_asc_ascq(struct sg_pt_linux_scsi * ptp, int sk, int asc, int ascq,
     ptp->io_hdr.device_status = SAM_STAT_CHECK_CONDITION;
     n = ptp->io_hdr.max_response_len;
     if ((n < 8) || ((! dsense) && (n < 14))) {
-        pr2ws("%s: max_response_len=%d too short, want 14 or more\n",
-              __func__, n);
+        if (vb)
+            pr2ws("%s: max_response_len=%d too short, want 14 or more\n",
+                  __func__, n);
         return;
     } else
         ptp->io_hdr.response_len = dsense ? 8 : ((n < 18) ? n : 18);
     memset(sbp, 0, n);
     build_sense_buffer(dsense, sbp, sk, asc, ascq);
     if (vb > 3)
-        pr2ws("%s:  [sense_key,asc,ascq]: [0x5,0x%x,0x%x]\n", __func__, asc,
-              ascq);
+        pr2ws("%s:  [sense_key,asc,ascq]: [0x%x,0x%x,0x%x]\n", __func__, sk,
+              asc, ascq);
 }
 
 static void
@@ -254,8 +258,9 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
     asc = in_cdb ? INVALID_FIELD_IN_CDB : INVALID_FIELD_IN_PARAM_LIST;
     n = ptp->io_hdr.max_response_len;
     if ((n < 8) || ((! dsense) && (n < 14))) {
-        pr2ws("%s: max_response_len=%d too short, want 14 or more\n",
-              __func__, n);
+        if (vb)
+            pr2ws("%s: max_response_len=%d too short, want 14 or more\n",
+                  __func__, n);
         return;
     } else
         ptp->io_hdr.response_len = dsense ? 8 : ((n < 18) ? n : 18);
@@ -696,10 +701,9 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     n = desc ? 8 : 18;
     n = (n < alloc_len) ? n : alloc_len;
     n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
-    if (n > 0) {
+    ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
+    if (n > 0)
         memcpy((uint8_t *)ptp->io_hdr.din_xferp, rs_dout, n);
-        ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
-    }
     return 0;
 }
 
@@ -882,6 +886,187 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     return res;
 }
 
+#define F_SA_LOW                0x80    /* cdb byte 1, bits 4 to 0 */
+#define F_SA_HIGH               0x100   /* as used by variable length cdbs */
+#define FF_SA (F_SA_HIGH | F_SA_LOW)
+#define F_INV_OP                0x200
+
+static struct opcode_info_t {
+        uint8_t opcode;
+        uint16_t sa;            /* service action, 0 for none */
+        uint32_t flags;         /* OR-ed set of F_* flags */
+        uint8_t len_mask[16];   /* len=len_mask[0], then mask for cdb[1]... */
+                                /* ignore cdb bytes after position 15 */
+    } opcode_info_arr[] = {
+    {0x0, 0, 0, {6,              /* TEST UNIT READY */
+      0, 0, 0, 0, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x3, 0, 0, {6,             /* REQUEST SENSE */
+      0xe1, 0, 0, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x12, 0, 0, {6,            /* INQUIRY */
+      0xe3, 0xff, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x1c, 0, 0, {6,            /* RECEIVE DIAGNOSTIC RESULTS */
+      0x1, 0xff, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x1d, 0, 0, {6,            /* SEND DIAGNOSTIC */
+      0xf7, 0x0, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0xa0, 0, 0, {12,           /* REPORT LUNS */
+      0xe3, 0xff, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0xc7, 0, 0, 0, 0} },
+    {0xa3, 0xc, F_SA_LOW, {12,  /* REPORT SUPPORTED OPERATION CODES */
+      0xc, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0xc7, 0, 0, 0,
+      0} },
+    {0xa3, 0xd, F_SA_LOW, {12,  /* REPORT SUPPORTED TASK MAN. FUNCTIONS */
+      0xd, 0x80, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0xc7, 0, 0, 0, 0} },
+
+    {0xff, 0xffff, 0xffff, {0,  /* Sentinel, keep as last element */
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+};
+
+static int
+sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
+                 int time_secs, int vb)
+{
+    bool rctd;
+    uint8_t reporting_opts, req_opcode, supp;
+    uint16_t req_sa, u;
+    uint32_t alloc_len, offset, a_len;
+    uint32_t pg_sz = sg_get_page_size();
+    int k, len, count, bump;
+    const struct opcode_info_t *oip;
+    uint8_t *arr;
+    uint8_t *free_arr;
+
+    if (vb > 3)
+        pr2ws("%s: time_secs=%d\n", __func__, time_secs);
+    rctd = !!(cdbp[2] & 0x80);      /* report command timeout desc. */
+    reporting_opts = cdbp[2] & 0x7;
+    req_opcode = cdbp[3];
+    req_sa = sg_get_unaligned_be16(cdbp + 4);
+    alloc_len = sg_get_unaligned_be32(cdbp + 6);
+    if (alloc_len < 4 || alloc_len > 0xffff) {
+        mk_sense_invalid_fld(ptp, true, 6, -1, vb);
+        return 0;
+    }
+    a_len = pg_sz - 72;
+    arr = sg_memalign(pg_sz, pg_sz, &free_arr, vb > 3);
+    if (NULL == arr) {
+        pr2ws("%s: calloc() failed to get memory\n", __func__);
+        return -ENOMEM;
+    }
+    switch (reporting_opts) {
+    case 0: /* all commands */
+        count = 0;
+        bump = rctd ? 20 : 8;
+        for (offset = 4, oip = opcode_info_arr;
+             (oip->flags != 0xffff) && (offset < a_len); ++oip) {
+            if (F_INV_OP & oip->flags)
+                continue;
+            ++count;
+            arr[offset] = oip->opcode;
+            sg_put_unaligned_be16(oip->sa, arr + offset + 2);
+            if (rctd)
+                arr[offset + 5] |= 0x2;
+            if (FF_SA & oip->flags)
+                arr[offset + 5] |= 0x1;
+            sg_put_unaligned_be16(oip->len_mask[0], arr + offset + 6);
+            if (rctd)
+                sg_put_unaligned_be16(0xa, arr + offset + 8);
+            offset += bump;
+        }
+        sg_put_unaligned_be32(count * bump, arr + 0);
+        break;
+    case 1: /* one command: opcode only */
+    case 2: /* one command: opcode plus service action */
+    case 3: /* one command: if sa==0 then opcode only else opcode+sa */
+        for (oip = opcode_info_arr; oip->flags != 0xffff; ++oip) {
+            if ((req_opcode == oip->opcode) && (req_sa == oip->sa))
+                break;
+        }
+        if ((0xffff == oip->flags) || (F_INV_OP & oip->flags)) {
+            supp = 1;
+            offset = 4;
+        } else {
+            if (1 == reporting_opts) {
+                if (FF_SA & oip->flags) {
+                    mk_sense_invalid_fld(ptp, true, 2, 2, vb);
+                    free(free_arr);
+                    return 0;
+                }
+                req_sa = 0;
+            } else if ((2 == reporting_opts) && 0 == (FF_SA & oip->flags)) {
+                mk_sense_invalid_fld(ptp, true, 4, -1, vb);
+                free(free_arr);
+                return 0;
+            }
+            if ((0 == (FF_SA & oip->flags)) && (req_opcode == oip->opcode))
+                supp = 3;
+            else if (0 == (FF_SA & oip->flags))
+                supp = 1;
+            else if (req_sa != oip->sa)
+                supp = 1;
+            else
+                supp = 3;
+            if (3 == supp) {
+                u = oip->len_mask[0];
+                sg_put_unaligned_be16(u, arr + 2);
+                arr[4] = oip->opcode;
+                for (k = 1; k < u; ++k)
+                    arr[4 + k] = (k < 16) ?
+                oip->len_mask[k] : 0xff;
+                offset = 4 + u;
+            } else
+                offset = 4;
+        }
+        arr[1] = (rctd ? 0x80 : 0) | supp;
+        if (rctd) {
+            sg_put_unaligned_be16(0xa, arr + offset);
+            offset += 12;
+        }
+        break;
+    default:
+        mk_sense_invalid_fld(ptp, true, 2, 2, vb);
+        free(free_arr);
+        return 0;
+    }
+    offset = (offset < a_len) ? offset : a_len;
+    len = (offset < alloc_len) ? offset : alloc_len;
+    ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - len;
+    if (len > 0)
+        memcpy((uint8_t *)ptp->io_hdr.din_xferp, arr, len);
+    free(free_arr);
+    return 0;
+}
+
+static int
+sntl_rep_tmfs(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
+              int time_secs, int vb)
+{
+    bool repd;
+    uint32_t alloc_len, len;
+    uint8_t arr[16];
+
+    if (vb > 3)
+        pr2ws("%s: time_secs=%d\n", __func__, time_secs);
+    memset(arr, 0, sizeof(arr));
+    repd = !!(cdbp[2] & 0x80);
+    alloc_len = sg_get_unaligned_be32(cdbp + 6);
+    if (alloc_len < 4) {
+        mk_sense_invalid_fld(ptp, true, 6, -1, vb);
+        return 0;
+    }
+    arr[0] = 0xc8;          /* ATS | ATSS | LURS */
+    arr[1] = 0x1;           /* ITNRS */
+    if (repd) {
+        arr[3] = 0xc;
+        len = 16;
+    } else
+        len = 4;
+
+    len = (len < alloc_len) ? len : alloc_len;
+    ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - len;
+    if (len > 0)
+        memcpy((uint8_t *)ptp->io_hdr.din_xferp, arr, len);
+    return 0;
+}
+
 /* Executes NVMe Admin command (or at least forwards it to lower layers).
  * Returns 0 for success, negative numbers are negated 'errno' values from
  * OS system calls. Positive return values are errors from this package.
@@ -893,6 +1078,7 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
     bool scsi_cdb;
     bool is_read = false;
     int n, len;
+    uint16_t sa;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     struct sg_nvme_passthru_cmd cmd;
     const uint8_t * cdbp;
@@ -938,6 +1124,13 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
             return sntl_senddiag(ptp, cdbp, time_secs, vb);
         case SCSI_RECEIVE_DIAGNOSTIC_OPC:
             return sntl_recvdiag(ptp, cdbp, time_secs, vb);
+        case SCSI_MAINT_IN_OPC:
+            sa = 0x1f & cdbp[1];        /* service action */
+            if (SCSI_REP_SUP_OPCS_OPC == sa)
+                return sntl_rep_opcodes(ptp, cdbp, time_secs, vb);
+            else if (SCSI_REP_SUP_TMFS_OPC == sa)
+                return sntl_rep_tmfs(ptp, cdbp, time_secs, vb);
+            /* fall through */
         default:
             if (vb > 2) {
                 char b[64];

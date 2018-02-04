@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180129] [svn: r748]
+Changelog for sg3_utils-1.43 [20180204] [svn: r749]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
      cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -119,6 +119,7 @@ Changelog for sg3_utils-1.43 [20180129] [svn: r748]
     - add sg_nvme_status2scsi()
     - add sg_memalign() and sg_get_page_size()
     - add hex2stdout(), hex2stderr() and hex2str()
+    - add sg_convert_errno() and sg_if_can2stderr()
     - implement 'format' argument in dStrHexStr()
     - add read buffer(16) command mode names
     - add Microcode activation sense descriptor spc5r10
