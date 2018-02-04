@@ -447,7 +447,8 @@ void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
     bool is_sg, is_bsg, is_nvme;
-    int fd, nvme_nsid;
+    int fd;
+    uint32_t nvme_nsid;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp) {
@@ -704,6 +705,14 @@ get_scsi_pt_transport_err(const struct sg_pt_base * vp)
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->io_hdr.transport_status;
+}
+
+void
+set_scsi_pt_transport_err(struct sg_pt_base * vp, int err)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    ptp->io_hdr.transport_status = err;
 }
 
 /* Returns b which will contain a null char terminated string (if

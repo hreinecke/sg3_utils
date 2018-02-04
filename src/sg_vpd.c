@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.35 20180127";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.36 20180201";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -140,8 +140,8 @@ const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 int svpd_find_vp_num_by_acron(const char * vp_ap);
 const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
                                                           int vend_prod_num);
-int vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
-                            int mxlen, int vb, int * rlenp);
+int vpd_fetch_page(int sg_fd, unsigned char * rp, int page, int mxlen,
+                   bool qt, int vb, int * rlenp);
 void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 
 
@@ -483,8 +483,8 @@ bad:
 /* mxlen is command line --maxlen=LEN option (def: 0) or -1 for a VPD page
  * with a short length (1 byte). Returns 0 for success. */
 int     /* global: use by sg_vpd_vendor.c */
-vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
-                        int mxlen, int vb, int * rlenp)
+vpd_fetch_page(int sg_fd, unsigned char * rp, int page, int mxlen, bool qt,
+               int vb, int * rlenp)
 {
     int res, resid, rlen, len, n;
 
@@ -503,7 +503,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
     }
     n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
     res = sg_ll_inquiry_v2(sg_fd, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
-                           true, vb);
+                           ! qt, vb);
     if (res)
         return res;
     rlen = n - resid;
@@ -546,7 +546,7 @@ vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
         return SG_LIB_CAT_MALFORMED;
     } else {
         res = sg_ll_inquiry_v2(sg_fd, true, page, rp, len, DEF_PT_TIMEOUT,
-                               &resid, true, vb);
+                               &resid, ! qt, vb);
         if (res)
             return res;
         rlen = len - resid;
@@ -2730,8 +2730,8 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page code=%d:\n", op->vpd_pn);
     }
 
-    res = vpd_fetch_page_from_dev(sg_fd, rp, op->vpd_pn, op->maxlen,
-                                  op->verbose, &len);
+    res = vpd_fetch_page(sg_fd, rp, op->vpd_pn, op->maxlen, op->do_quiet,
+                         op->verbose, &len);
     if (0 == res) {
         if (op->do_raw)
             dStrRaw(rp, len);
@@ -2745,14 +2745,13 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
             else
                 hex2stdout(rp, len, 0);
         }
-        return 0;
-    } else {
+    } else if (! op->do_quiet) {
         if (op->vpd_pn >= 0)
             pr2serr("fetching VPD page code=0x%.2x: failed\n", op->vpd_pn);
         else
             pr2serr("fetching VPD page code=%d: failed\n", op->vpd_pn);
-        return res;
     }
+    return res;
 }
 
 /* Returns 0 if successful. If don't know how to decode, returns
@@ -2760,7 +2759,7 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
 static int
 svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 {
-    bool allow_name, long_notquiet;
+    bool allow_name, long_notquiet, qt;
     bool vpd_supported = false;
     int len, pdt, num, k, resid, alloc_len, pn, vb;
     int res = 0;
@@ -2771,6 +2770,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
 
     pn = op->vpd_pn;
     vb = op->verbose;
+    qt = op->do_quiet;
     long_notquiet = op->do_long && (! op->do_quiet);
     if (op->do_raw || (op->do_quiet && (! op->do_long) && (! op->do_all)) ||
         (op->do_hex >= 3))
@@ -2781,8 +2781,8 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     if (sg_fd != -1 && !op->do_force &&
         pn != VPD_NOPE_WANT_STD_INQ &&
         pn != VPD_SUPPORTED_VPDS) {
-        res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_SUPPORTED_VPDS,
-                                      op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, VPD_SUPPORTED_VPDS, op->maxlen, qt,
+                             vb, &len);
         if (res)
             return res;
 
@@ -2808,7 +2808,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             else
                 alloc_len = 36;
             res = sg_ll_inquiry_v2(sg_fd, false, 0, rp, alloc_len,
-                                   DEF_PT_TIMEOUT, &resid, true, vb);
+                                   DEF_PT_TIMEOUT, &resid, ! op->do_quiet, vb);
         } else {
             alloc_len = op->maxlen;
             resid = 0;
@@ -2830,7 +2830,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_SUPPORTED_VPDS:    /* 0x0 */
         if (allow_name)
             printf("Supported VPD pages VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2874,7 +2874,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_UNIT_SERIAL_NUM:   /* 0x80 */
         if (allow_name)
             printf("Unit serial number VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2899,7 +2899,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_DEVICE_ID:         /* 0x83 */
         if (allow_name)
             printf("Device Identification VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2919,7 +2919,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_SOFTW_INF_ID:      /* 0x84 */
         if (allow_name)
             printf("Software interface identification VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2937,7 +2937,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_MAN_NET_ADDR:      /* 0x85 */
         if (allow_name)
             printf("Management network addresses VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2949,7 +2949,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_EXT_INQ:           /* 0x86 */
         if (allow_name)
             printf("extended INQUIRY data VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2979,7 +2979,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_MODE_PG_POLICY:    /* 0x87 */
         if (allow_name)
             printf("Mode page policy VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -2997,7 +2997,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_SCSI_PORTS:        /* 0x88 */
         if (allow_name)
             printf("SCSI Ports VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3016,7 +3016,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         if (allow_name)
             printf("ATA information VPD page:\n");
         alloc_len = op->maxlen ? op->maxlen : VPD_ATA_INFO_LEN;
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, alloc_len, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, alloc_len, qt, vb, &len);
         if (0 == res) {
             if ((2 == op->do_raw) || (3 == op->do_hex)) {  /* for hdparm */
                 if (len < (60 + 512))
@@ -3042,7 +3042,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_POWER_CONDITION:          /* 0x8a */
         if (allow_name)
             printf("Power condition VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3060,7 +3060,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_DEVICE_CONSTITUENTS:      /* 0x8b */
         if (allow_name)
             printf("Device constituents VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3072,7 +3072,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_POWER_CONSUMPTION:    /* 0x8d */
         if (allow_name)
             printf("Power consumption VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3090,7 +3090,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_3PARTY_COPY:   /* 0x8f */
         if (allow_name)
             printf("Third party copy VPD page:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3110,7 +3110,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_PROTO_LU:          /* 0x90 */
         if (allow_name)
             printf("Protocol-specific logical unit information:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3128,7 +3128,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_PROTO_PORT:        /* 0x91 */
         if (allow_name)
             printf("Protocol-specific port information:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3146,7 +3146,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
     case VPD_SCSI_FEATURE_SETS:         /* 0x92 */
         if (allow_name)
             printf("SCSI Feature sets:\n");
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (op->do_raw)
                 dStrRaw(rp, len);
@@ -3162,7 +3162,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         }
         break;
     case 0xb0:  /* depends on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3197,7 +3197,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb0\n");
         break;
     case 0xb1:  /* depends on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3235,7 +3235,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb1\n");
         break;
     case 0xb2:          /* VPD page depends on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3265,7 +3265,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb2\n");
         break;
     case 0xb3:          /* VPD page depends on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3296,7 +3296,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb3\n");
         break;
     case 0xb4:          /* VPD page depends on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3327,7 +3327,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb4\n");
         break;
     case 0xb5:          /* VPD page depends on pdt */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3358,7 +3358,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb5\n");
         break;
     case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3386,7 +3386,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             printf("VPD page=0xb5\n");
         break;
     case 0xb7:
-        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             pdt = rp[0] & 0x1f;
             if (allow_name) {
@@ -3431,16 +3431,19 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
     if (op->vpd_pn > 0)
         max_pn = op->vpd_pn;
     if (sg_fd >= 0) {
-        res = vpd_fetch_page_from_dev(sg_fd, rp, VPD_SUPPORTED_VPDS,
-                                      op->maxlen, op->verbose, &rlen);
+        res = vpd_fetch_page(sg_fd, rp, VPD_SUPPORTED_VPDS, op->maxlen,
+                             op->do_quiet, op->verbose, &rlen);
         if (res) {
-            if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                pr2serr("%s: VPD page 0, aborted command\n", __func__);
-            else if (res) {
-                char b[80];
+            if (! op->do_quiet) {
+                if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                    pr2serr("%s: VPD page 0, aborted command\n", __func__);
+                else if (res) {
+                    char b[80];
 
-                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
-                pr2serr("%s: fetching VPD page 0 failed: %s\n", __func__, b);
+                    sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+                    pr2serr("%s: fetching VPD page 0 failed: %s\n", __func__,
+                            b);
+                }
             }
             return res;
         }
@@ -3465,13 +3468,15 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
                 if (SG_LIB_CAT_OTHER == res)
                     res = svpd_unable_to_decode(sg_fd, op, 0, 0);
             }
-            if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                pr2serr("fetching VPD page failed, aborted command\n");
-            else if (res) {
-                char b[80];
+            if (! op->do_quiet) {
+                if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                    pr2serr("fetching VPD page failed, aborted command\n");
+                else if (res) {
+                    char b[80];
 
-                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
-                pr2serr("fetching VPD page failed: %s\n", b);
+                    sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+                    pr2serr("fetching VPD page failed: %s\n", b);
+                }
             }
             if (res)
                 any_err = res;
@@ -3523,7 +3528,8 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, res, matches;
+    int c, res, matches;
+    int sg_fd = -1;
     int inhex_len = 0;
     int ret = 0;
     int subvalue = 0;
@@ -3830,14 +3836,19 @@ main(int argc, char * argv[])
                     res = svpd_unable_to_decode(-1, op, subvalue, 0);
             }
         }
-        return res;
+        ret = res;
+        goto err_out;
     }
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                      op->verbose)) < 0) {
-        pr2serr("error opening file: %s: %s\n", op->device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (op->verbose > 0)
+            pr2serr("error opening file: %s: %s\n", op->device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        if (ret < 0)
+            ret = SG_LIB_FILE_ERROR;
+        goto err_out;
     }
 
     if (op->do_all)
@@ -3851,17 +3862,26 @@ main(int argc, char * argv[])
             if (SG_LIB_CAT_OTHER == res)
                 res = svpd_unable_to_decode(sg_fd, op, subvalue, 0);
         }
-        if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("fetching VPD page failed, aborted command\n");
-        else if (res) {
-            char b[80];
+        if (! op->do_quiet) {
+            if (SG_LIB_CAT_ABORTED_COMMAND == res)
+                pr2serr("fetching VPD page failed, aborted command\n");
+            else if (res) {
+                char b[80];
 
-            sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
-            pr2serr("fetching VPD page failed: %s\n", b);
+                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+                pr2serr("fetching VPD page failed: %s\n", b);
+            }
         }
         ret = res;
     }
-    res = sg_cmds_close_device(sg_fd);
+err_out:
+    if ((0 == op->verbose) && (! op->do_quiet)) {
+        if (! sg_if_can2stderr("sg_vpd failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
+    res = (sg_fd >= 0) ? sg_cmds_close_device(sg_fd) : 0;
+
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)

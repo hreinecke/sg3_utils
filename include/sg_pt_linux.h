@@ -108,9 +108,10 @@ struct sg_pt_linux_scsi {
                                  * (is_nvme=false) or it is a NVMe char
                                  * device (e.g. /dev/nvme0 ) */
     uint32_t nvme_result;       /* DW0 from completion queue */
-    uint32_t nvme_status;       /* SF: DW3 31:17 from completion queue, mask
-                                 * with 0x3ff for message lookup, may be
-                                 * OR-ed with 0x4000 for DNR (Do Not Retry) */
+    uint32_t nvme_status;       /* SCT|SC: DW3 27:17 from completion queue,
+                                 * note: the DNR+More bit are not there.
+                                 * The whole 16 byte completion q entry is
+                                 * sent back as sense data */
     uint32_t mdxfer_len;
     void * mdxferp;
     uint8_t * nvme_id_ctlp;     /* cached response to controller IDENTIFY */

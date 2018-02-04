@@ -12606,6 +12606,10 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_WIN32 1
 _ACEOF
 
+		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+
+$as_echo "#define HAVE_NVME 1" >>confdefs.h
+
                 CFLAGS="$CFLAGS -Wno-char-subscripts";;
         *-*-mingw*)
 
@@ -12617,6 +12621,10 @@ _ACEOF
 cat >>confdefs.h <<_ACEOF
 #define SG_LIB_MINGW 1
 _ACEOF
+
+		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+
+$as_echo "#define HAVE_NVME 1" >>confdefs.h
 
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)

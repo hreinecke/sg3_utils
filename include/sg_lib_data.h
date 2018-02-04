@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2017 Douglas Gilbert.
+ * Copyright (c) 2007-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -47,6 +47,11 @@ extern "C" {
 #define SG_ZONING_IN 0x95
 
 
+
+struct sg_lib_simple_value_name_t {
+    int value;
+    const char * name;
+};
 
 struct sg_lib_value_name_t {
     int value;

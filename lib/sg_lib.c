@@ -36,6 +36,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <errno.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -1838,6 +1839,108 @@ sg_print_sense(const char * leadin, const unsigned char * sbp, int sb_len,
     free(free_cp);
 }
 
+/* Following examines exit_status and outputs a clear error message to
+ * warnings_strm (usually stderr) if one is known and returns true.
+ * Otherwise it doesn't print anything and returns false. Note that
+ * if exit_status==0 then returns true but prints nothing and if
+ * exit_status<0 ("some error occurred") false is returned. If leadin is
+ * non-NULL then it is printed before the error message. */
+bool
+sg_if_can2stderr(const char * leadin, int exit_status)
+{
+    const char * s = leadin ? leadin : "";
+
+    if (exit_status < 0)
+        return false;
+    else if (0 == exit_status)
+        return true;
+
+    switch (exit_status) {
+    case SG_LIB_CAT_NOT_READY:          /* 2 */
+        pr2ws("%sDevice not ready\n", s);
+        return true;
+    case SG_LIB_CAT_MEDIUM_HARD:        /* 3 */
+        pr2ws("%sMedium or hardware error\n", s); /* 3 sense keys: Medium, */
+        return true;    /* hardware error or 'Blank check' for tapes */
+    case SG_LIB_CAT_UNIT_ATTENTION:     /* 6 */
+        pr2ws("%sDevice reported 'Unit attention'\n", s);
+        return true;
+    case SG_LIB_CAT_DATA_PROTECT:       /* 7 */
+        pr2ws("%sDevice reported 'Data protect', read-only?\n", s);
+        return true;
+    case SG_LIB_CAT_COPY_ABORTED:       /* 10 */
+        pr2ws("%sCopy aborted\n", s);
+        return true;
+    case SG_LIB_CAT_ABORTED_COMMAND:    /* 11 */
+        pr2ws("%sCommand aborted\n", s);
+        return true;
+    case SG_LIB_CAT_MISCOMPARE:         /* 14 */
+        pr2ws("%sMiscompare\n", s);
+        return true;
+    case SG_LIB_CAT_RES_CONFLICT:       /* 24 */
+        pr2ws("%sReservation conflict\n", s);
+        return true;
+    case SG_LIB_CAT_BUSY:               /* 26 */
+        pr2ws("%sDevice is busy, try again\n", s);
+        return true;
+    case SG_LIB_CAT_TASK_ABORTED:       /* 29 */
+        pr2ws("%sTask aborted\n", s);
+        return true;
+    case SG_LIB_CAT_TIMEOUT:            /* 33 */
+        pr2ws("%sTime out\n", s);
+        return true;
+    case SG_LIB_CAT_PROTECTION:         /* 40 */
+        pr2ws("%sProtection error\n", s);
+        return true;
+    case SG_LIB_NVME_STATUS:            /* 48 */
+        pr2ws("%sNVMe error (non-zero status)\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + EACCES:   /* 50 + */
+        pr2ws("%sPermission denied\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + ENOMEM:
+        pr2ws("%sUtility unable to allocate memory\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + ENOTTY:
+        pr2ws("%sInappropriate I/O control operation\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + EPERM:
+        pr2ws("%sNot permitted\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + EINTR:
+        pr2ws("%sInterrupted system call\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + EIO:
+        pr2ws("%sInput/output error\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + ENODEV:
+        pr2ws("%sNo such device\n", s);
+        return true;
+    case SG_LIB_OS_BASE_ERR + ENOENT:
+        pr2ws("%sNo such file or directory\n", s);
+        return true;
+    default:
+        return false;
+    }
+    return false;
+}
+
+/* If os_err_num is within bounds then the returned value is 'os_err_num +
+ * SG_LIB_OS_BASE_ERR' otherwise -1 is returned. If os_err_num is 0 then 0
+ * is returned. */
+int
+sg_convert_errno(int os_err_num)
+{
+    if (os_err_num <= 0) {
+        if (os_err_num < -1)
+            return -1;
+        return os_err_num;
+    }
+    if (os_err_num < (SG_LIB_CAT_MALFORMED - SG_LIB_OS_BASE_ERR))
+        return SG_LIB_OS_BASE_ERR + os_err_num;
+    return -1;
+}
+
 /* See description in sg_lib.h header file */
 bool
 sg_scsi_normalize_sense(const unsigned char * sbp, int sb_len,
@@ -3322,7 +3425,8 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
     }
 #else
     {
-        uint8_t * wrkBuff;
+        void * wrkBuff;
+        sg_uintptr_t align_1 = psz - 1;
 
         wrkBuff = (uint8_t *)calloc(num_bytes + psz, 1);
         if (NULL == wrkBuff) {
@@ -3330,13 +3434,14 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
                 *buff_to_free = NULL;
             return NULL;
         } else if (buff_to_free)
-            *buff_to_free = wrkBuff;
-        res = (uint8_t *)(((sg_uintptr_t)wrkBuff + psz - 1) & (~(psz - 1)));
+            *buff_to_free = (uint8_t *)wrkBuff;
+        res = (uint8_t *)(void *)
+            (((sg_uintptr_t)wrkBuff + align_1) & (~align_1));
         if (vb) {
             pr2ws("%s: hack, len=%d, ", __func__, num_bytes);
             if (buff_to_free)
-                pr2ws("buff_to_free=%p, ", (void *)buff_to_free);
-            pr2ws("psz=%u, rp=%p\n", (uint32_t)psz, (void *)res);
+                pr2ws("buff_to_free=%p, ", wrkBuff);
+            pr2ws("align_1=%lu, rp=%p\n", align_1, (void *)res);
         }
         return res;
     }

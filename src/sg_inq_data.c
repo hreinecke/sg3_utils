@@ -19,6 +19,8 @@
 #include "config.h"
 #endif
 
+#include "sg_lib.h"
+#include "sg_lib_data.h"
 
 /* Assume index is less than 16 */
 const char * sg_ansi_version_arr[16] =
@@ -41,19 +43,12 @@ const char * sg_ansi_version_arr[16] =
     "reserved [Fh]",
 };
 
-
-/* Copy of structure found in sg_inq.c */
-struct sg_version_descriptor {
-    int value;
-    const char * name;
-};
-
 /* table from SPC-5 revision 16 [sorted numerically (from Annex E.9)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt 20170114 */
-
+/* Corrected against spc5r18 on 20180201 */
 
 #ifdef SG_SCSI_STRINGS
-struct sg_version_descriptor sg_version_descriptor_arr[] = {
+struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
     {0x3b, "SAM T10/0994-D revision 18"},
@@ -76,8 +71,8 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xa0, "SAM-5 (no version claimed)"},
     {0xa2, "SAM-5 T10/2104-D revision 4"},
     {0xa4, "SAM-5 T10/2104-D revision 20"},
-    {0xa8, "SAM-5 ANSI INCITS 515-2016"},
     {0xa6, "SAM-5 T10/2104-D revision 21"},
+    {0xa8, "SAM-5 ANSI INCITS 515-2016"},
     {0xc0, "SAM-6 (no version claimed)"},
     {0x120, "SPC (no version claimed)"},
     {0x13b, "SPC T10/0995-D revision 11a"},
@@ -199,7 +194,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x46c, "SPC-4 ANSI INCITS 513-2015"},
     {0x480, "SMC-3 (no version claimed)"},
     {0x482, "SMC-3 T10/1730-D revision 15"},
-    {0x482, "SMC-3 T10/1730-D revision 16"},
+    {0x484, "SMC-3 T10/1730-D revision 16"},
     {0x486, "SMC-3 ANSI INCITS 484-2012"},
     {0x4a0, "ADC-2 (no version claimed)"},
     {0x4a7, "ADC-2 T10/1741-D revision 7"},
@@ -366,7 +361,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xc65, "SAS-3 T10/BSR INCITS 519 revision 06"},
     {0xc68, "SAS-3 ANSI INCITS 519-2014"},
     {0xc80, "SAS-4 (no version claimed)"},
-    {0xc82, "T10/BSR INCITS 534 revision 08a"},
+    {0xc82, "SAS-4 T10/BSR INCITS 534 revision 08a"},
     {0xd20, "FC-PH (no version claimed)"},
     {0xd3b, "FC-PH ANSI INCITS 230-1994"},
     {0xd3c, "FC-PH ANSI INCITS 230-1994 with Amnd 1 ANSI INCITS "
@@ -408,6 +403,7 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0xe6e, "FC-PI-3 ANSI INCITS 460-2011"},
     {0xe80, "FC-PI-4 (no version claimed)"},
     {0xe82, "FC-PI-4 T11/1647-D revision 8.0"},
+    {0xe88, "FC-PI-4 ANSI INCITS 450 -2009"},
     {0xea0, "FC 10GFC (no version claimed)"},
     {0xea2, "FC 10GFC ANSI INCITS 364-2003"},
     {0xea3, "FC 10GFC ISO/IEC 14165-116"},
@@ -478,9 +474,6 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
              "claimed)"},
     {0x1628, "ATA/ATAPI-8 ATA-AAM ANSI INCITS 451-2008"},
     {0x162a, "ATA/ATAPI-8 ATA8-ACS ANSI INCITS 452-2009 w/ Amendment 1"},
-    {0x1721, "ACS-2 (no version claimed)"},
-    {0x1722, "ACS-2 ANSI INCITS 482-2013"},
-    {0x1726, "ACS-3 (no version claimed)"},
     {0x1728, "Universal Serial Bus Specification, Revision 1.1"},
     {0x1729, "Universal Serial Bus Specification, Revision 2.0"},
     {0x1730, "USB Mass Storage Class Bulk-Only Transport, Revision 1.0"},
@@ -489,6 +482,9 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x1747, "UAS T10/2095-D revision 04"},
     {0x1748, "UAS ANSI INCITS 471-2010"},
     {0x1749, "UAS ISO/IEC 14776-251:2014"},
+    {0x1761, "ACS-2 (no version claimed)"},
+    {0x1762, "ACS-2 ANSI INCITS 482-2013"},
+    {0x1765, "ACS-3 (no version claimed)"},
     {0x1780, "UAS-2 (no version claimed)"},
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
@@ -534,15 +530,15 @@ struct sg_version_descriptor sg_version_descriptor_arr[] = {
     {0x2208, "PQI ANSI INCITS 490-2014"},
     {0x2220, "SOP-2 (no draft published)"},
     {0x2240, "PQI-2 (no version claimed)"},
-    {0x2244, "PQI-2 PQI-2 ANSI INCITS 507-2016"},
     {0x2242, "PQI-2 T10/BSR INCITS 507 revision 01"},
+    {0x2244, "PQI-2 PQI-2 ANSI INCITS 507-2016"},
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},
     {0xffc2, "IEEE 1667-2009"},
-    {0xffff, NULL},
+    {0xffff, NULL},	/* sentinel, leave at end */
 };
 #else
 struct sg_version_descriptor sg_version_descriptor_arr[] = {
-    {0xffff, NULL},
+    {0xffff, NULL},	/* sentinel, leave at end */
 };
 #endif

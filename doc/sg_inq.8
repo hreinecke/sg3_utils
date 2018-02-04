@@ -164,17 +164,19 @@ This is the (maximum) length of the response to be sent by the device.
 The default value of \fILEN\fR is 0 which is interpreted as: first request
 is for 36 bytes and if necessary execute another INQUIRY if the "additional
 length" field in the response indicates that more than 36 bytes is available.
+.br
 If \fILEN\fR is greater than 0 then only one INQUIRY command is performed.
-See paragraph below about "36 byte INQUIRYs".
+This means that the Serial Number (obtained from the Serial Number VPD
+pgae (0x80)) is not fetched and therefore not printed.
+See the NOTES section below about "36 byte INQUIRYs".
 .TP
 \fB\-L\fR, \fB\-\-long\fR
 this option causes more information to be decoded from the Identify command
 sent to a NVMe \fIDEVICE\fR.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
-this option has the same action as the \fI\-\-len=LEN\fR option. It has
-been added for compatibility with the sg_vpd, sg_modes and sg_logs
-utilities.
+this option has the same action as the \fI\-\-len=LEN\fR option above. It has
+been added for compatibility with the sg_vpd, sg_modes and sg_logs utilities.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 Switch to older style options. Please use as first option.
@@ -233,14 +235,13 @@ VPD page number to query. If the \fI\-\-page=PG\fR is not given then \fIPG\fR
 defaults to zero which is the "Supported VPD pages" VPD page. A more up to
 date decoding of VPD pages can be found in the sg_vpd(8) utility.
 .SH NOTES
-Some devices with weak SCSI command set implementations lock up when
-they receive commands they don't understand (or even response lengths
-that they don't expect). Such devices need to be treated carefully,
-use the '\-\-len=36' option. Without this option this utility will issue
-an initial standard INQUIRY requesting 36 bytes of response data. If
-the device indicates it could have supplied more data then a second
-INQUIRY is issued to fetch the longer response. That second command may
-lock up faulty devices.
+Some devices with weak SCSI command set implementations lock up when they
+receive commands they don't understand (or even response lengths that they
+don't expect). Such devices need to be treated carefully, use the '\-\-len=36'
+option. Without this option this utility will issue an initial standard
+INQUIRY requesting 36 bytes of response data. If the device indicates it
+could have supplied more data then a second INQUIRY is issued to fetch the
+longer response. That second command may lock up faulty devices.
 .PP
 ATA or ATAPI devices that use a SCSI to ATA Translation layer (see
 SAT at www.t10.org) may support the ATA Information VPD page. This
@@ -502,7 +503,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2017 Douglas Gilbert
+Copyright \(co 2001\-2018 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

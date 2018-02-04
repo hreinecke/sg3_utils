@@ -38,6 +38,7 @@
 #endif
 
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 #include "sg_unaligned.h"
@@ -46,7 +47,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.85 20180127";    /* SPC-5 rev 18 */
+static const char * version_str = "1.86 20180204";    /* SPC-5 rev 18 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -256,7 +257,7 @@ struct opts_t {
     int do_long;
     int do_raw;
     int do_vendor;
-    int do_verbose;
+    int verbose;
     int resp_len;
     int page_num;
     int page_pdt;
@@ -554,7 +555,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_export = true;
             break;
         case 'v':
-            ++op->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
             op->do_version = true;
@@ -695,7 +696,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_export = true;
                     break;
                 case 'v':
-                    ++op->do_verbose;
+                    ++op->verbose;
                     break;
                 case 'V':
                     op->do_version = true;
@@ -804,15 +805,15 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
  * stdin). If reading ASCII hex then there should be either one entry per
  * line or a comma, space or tab separated list of bytes. If no_space is
  * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
- * error. */
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or a
+ * negated errno or SG_LIB_SYNTAX_ERROR or SG_LIB_FILE_ERROR . */
 static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
           unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
 {
     bool has_stdin;
     bool split_line;
-    int fn_len, in_len, k, j, m, fd;
+    int fn_len, in_len, k, j, m, fd, err;
     int off = 0;
     unsigned int h;
     const char * lcp;
@@ -821,10 +822,10 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
     char carry_over[4];
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     fn_len = strlen(fname);
     if (0 == fn_len)
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
     if (as_binary) {
         if (has_stdin) {
@@ -834,9 +835,10 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         } else {
             fd = open(fname, O_RDONLY);
             if (fd < 0) {
+                err = errno;
                 pr2serr("unable to open binary file %s: %s\n", fname,
-                         safe_strerror(errno));
-                return 1;
+                         safe_strerror(err));
+                return -err;
             } else if (sg_set_binary_mode(fd) < 0)
                 perror("sg_set_binary_mode");
         }
@@ -849,7 +851,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                         safe_strerror(errno));
             if (! has_stdin)
                 close(fd);
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         *mp_arr_len = k;
         if (! has_stdin)
@@ -861,8 +863,9 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         else {
             fp = fopen(fname, "r");
             if (NULL == fp) {
+                err = errno;
                 pr2serr("Unable to open %s for reading\n", fname);
-                return 1;
+                return -err;
             }
         }
     }
@@ -971,13 +974,15 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         }
     }
     *mp_arr_len = off;
+    err = ferror(fp) ? SG_LIB_FILE_ERROR : 0;
     if (stdin != fp)
         fclose(fp);
-    return 0;
+    return err;
 bad:
+    err = SG_LIB_SYNTAX_ERROR;
     if (stdin != fp)
         fclose(fp);
-    return 1;
+    return err;
 }
 
 static const struct svpd_values_name_t *
@@ -2303,10 +2308,10 @@ decode_feature_sets_vpd(unsigned char * buff, int len,
             hex2stdout(bp, 2, 1);
         else {
             printf("    %s", sg_get_sfs_str(sf_code, -2, sizeof(b), b,
-                   &found, op->do_verbose));
-            if (op->do_verbose == 1)
+                   &found, op->verbose));
+            if (op->verbose == 1)
                 printf(" [0x%x]\n", (unsigned int)sf_code);
-            else if (op->do_verbose > 1)
+            else if (op->verbose > 1)
                 printf(" [0x%x] found=%s\n", (unsigned int)sf_code,
                        found ? "true" : "false");
             else
@@ -2912,8 +2917,8 @@ get_ansi_version_str(int version, char * buff, int buff_len)
     return buff;
 }
 
-static int
-std_inq_response(const struct opts_t * op, int act_len)
+static void
+std_inq_decode(const struct opts_t * op, int act_len)
 {
     int len, pqual, peri_type, ansi_version, k, j;
     const char * cp;
@@ -2925,11 +2930,11 @@ std_inq_response(const struct opts_t * op, int act_len)
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
     if (op->do_raw) {
         dStrRaw((const char *)rp, act_len);
-        return 0;
+        return;
     } else if (op->do_hex) {
         /* with -H, print with address, -HH without */
         hex2stdout(rp, act_len, ((1 == op->do_hex) ? 0 : -1));
-        return 0;
+        return;
     }
     pqual = (rp[0] & 0xe0) >> 5;
     if (! op->do_raw && ! op->do_export) {
@@ -3094,7 +3099,6 @@ std_inq_response(const struct opts_t * op, int act_len)
             }
         }
     }
-    return 0;
 }
 
 /* When sg_fd >= 0 fetch VPD page from device; mxlen is command line
@@ -3228,18 +3232,20 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
 {
     int res, len, rlen, act_len;
     char buff[48];
-    int verb, resid;
+    int vb, resid;
 
-    if (sg_fd < 0)
-        return std_inq_response(op, inhex_len);
+    if (sg_fd < 0) {    /* assume --inhex=FD usage */
+        std_inq_decode(op, inhex_len);
+        return 0;
+    }
     rlen = (op->resp_len > 0) ? op->resp_len : SAFE_STD_INQ_RESP_LEN;
-    verb = op->do_verbose;
+    vb = op->verbose;
     res = sg_ll_inquiry_v2(sg_fd, false, 0, rsp_buff, rlen, DEF_PT_TIMEOUT,
-                           &resid, false, verb);
+                           &resid, false, vb);
     if (0 == res) {
-        if ((verb > 4) && ((rlen - resid) > 0)) {
+        if ((vb > 4) && ((rlen - resid) > 0)) {
             pr2serr("Safe (36 byte) Inquiry response:\n");
-            hex2stdout(rsp_buff, rlen - resid, 0);
+            hex2stderr(rsp_buff, rlen - resid, 0);
         }
         len = rsp_buff[4] + 5;
         if ((len > SAFE_STD_INQ_RESP_LEN) && (len < 256) &&
@@ -3247,7 +3253,7 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
             rlen = len;
             memset(rsp_buff, 0, rlen);
             if (sg_ll_inquiry_v2(sg_fd, false, 0, rsp_buff, rlen,
-                                 DEF_PT_TIMEOUT, &resid, true, verb)) {
+                                 DEF_PT_TIMEOUT, &resid, true, vb)) {
                 pr2serr("second INQUIRY (%d byte) failed\n", len);
                 return SG_LIB_CAT_OTHER;
             }
@@ -3267,16 +3273,15 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
         if (act_len < SAFE_STD_INQ_RESP_LEN)
             rsp_buff[act_len] = '\0';
         if ((! op->do_only) && (! op->do_export) && (0 == op->resp_len)) {
-            if (fetch_unit_serial_num(sg_fd, usn_buff, sizeof(usn_buff),
-                                      op->do_verbose))
+            if (fetch_unit_serial_num(sg_fd, usn_buff, sizeof(usn_buff), vb))
                 usn_buff[0] = '\0';
         }
-        return std_inq_response(op, act_len);
+        std_inq_decode(op, act_len);
+        return 0;
     } else if (res < 0) { /* could be an ATA device */
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         /* Try an ATA Identify Device command */
-        res = try_ata_identify(sg_fd, op->do_hex, op->do_raw,
-                               op->do_verbose);
+        res = try_ata_identify(sg_fd, op->do_hex, op->do_raw, vb);
         if (0 != res) {
             pr2serr("SCSI INQUIRY, NVMe Identify and fetching ATA "
                     "information failed on %s\n", op->device_name);
@@ -3290,13 +3295,15 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
     } else {
         char b[80];
 
-        pr2serr("    inquiry: failed requesting %d byte response: ", rlen);
-        if (resid && verb)
-            snprintf(buff, sizeof(buff), " [resid=%d]", resid);
-        else
-            buff[0] = '\0';
-        sg_get_category_sense_str(res, sizeof(b), b, verb);
-        pr2serr("%s%s\n", b, buff);
+        if (vb > 0) {
+            pr2serr("    inquiry: failed requesting %d byte response: ", rlen);
+            if (resid && (vb > 1))
+                snprintf(buff, sizeof(buff), " [resid=%d]", resid);
+            else
+                buff[0] = '\0';
+            sg_get_category_sense_str(res, sizeof(b), b, vb);
+            pr2serr("%s%s\n", b, buff);
+        }
         return res;
     }
     return 0;
@@ -3315,7 +3322,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
         printf("Supported command list:\n");
         for (k = 0; k < 256; ++k) {
             res = sg_ll_inquiry(sg_fd, true /* cmddt */, false, k, rsp_buff,
-                                DEF_ALLOC_LEN, true, op->do_verbose);
+                                DEF_ALLOC_LEN, true, op->verbose);
             if (0 == res) {
                 peri_type = rsp_buff[0] & 0x1f;
                 support_num = rsp_buff[1] & 7;
@@ -3348,7 +3355,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
     }
     else {
         res = sg_ll_inquiry(sg_fd, true /* cmddt */, false, op->page_num,
-                            rsp_buff, DEF_ALLOC_LEN, true, op->do_verbose);
+                            rsp_buff, DEF_ALLOC_LEN, true, op->verbose);
         if (0 == res) {
             peri_type = rsp_buff[0] & 0x1f;
             if (! op->do_raw) {
@@ -3442,14 +3449,14 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
         printf("VPD INQUIRY, page code=0x%.2x:\n", op->page_num);
     if (sg_fd < 0) {
         len = sg_get_unaligned_be16(rp + 2) + 4;
-        if (op->do_verbose && (len > inhex_len))
+        if (op->verbose && (len > inhex_len))
             pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
                     "file (%d)\n",  len , inhex_len);
         res = 0;
     } else {
         memset(rp, 0, DEF_ALLOC_LEN);
         res = vpd_fetch_page_from_dev(sg_fd, rp, op->page_num, op->resp_len,
-                                      op->do_verbose, &len);
+                                      op->verbose, &len);
     }
     if (0 == res) {
         if (op->do_raw)
@@ -3458,7 +3465,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
             if (0 == op->page_num)
                 decode_supported_vpd(rp, len, op->do_hex);
             else {
-                if (op->do_verbose) {
+                if (op->verbose) {
                     cp = sg_get_pdt_str(rp[0] & 0x1f, sizeof(b), b);
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5, cp);
@@ -3471,7 +3478,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
             pr2serr("    inquiry: field in cdb illegal (page not "
                     "supported)\n");
         else {
-            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
             pr2serr("    inquiry: %s\n", b);
         }
     }
@@ -3488,7 +3495,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
 
     pn = op->page_num;
     rp = rsp_buff;
-    vb = op->do_verbose;
+    vb = op->verbose;
     if (sg_fd >= 0)
         mxlen = op->resp_len;
     else
@@ -3570,9 +3577,9 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         else if (op->do_hex > 2)
             hex2stdout(rp, len, -1);
         else if (op->do_export)
-            export_dev_ids(rp + 4, len - 4, op->do_verbose);
+            export_dev_ids(rp + 4, len - 4, op->verbose);
         else
-            decode_id_vpd(rp, len, op->do_hex, op->do_verbose);
+            decode_id_vpd(rp, len, op->do_hex, op->verbose);
         break;
     case VPD_SOFTW_INF_ID:
         if (! op->do_raw && (op->do_hex < 2))
@@ -3784,7 +3791,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else
-            decode_scsi_ports_vpd(rp, len, op->do_hex, op->do_verbose);
+            decode_scsi_ports_vpd(rp, len, op->do_hex, op->verbose);
         break;
     default:
         if ((pn > 0) && (pn < 0x80)) {
@@ -3903,7 +3910,7 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
                   int id_din_len, const struct opts_t * op)
 {
     int ret = 0;
-    int vb = op->do_verbose;
+    int vb = op->verbose;
     uint8_t resp[16];
 
     clear_scsi_pt_obj(ptvp);
@@ -3915,8 +3922,15 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
     if (vb > 2)
         pr2serr("%s: do_scsi_pt() result is %d\n", __func__, ret);
-    if (ret)
+    if (ret) {
+        if (SCSI_PT_DO_BAD_PARAMS == ret)
+            ret = SG_LIB_SYNTAX_ERROR;
+        else if (SCSI_PT_DO_TIMEOUT == ret)
+            ret = SG_LIB_CAT_TIMEOUT;
+        else if (ret < 0)
+            ret = sg_convert_errno(-ret);
         return ret;
+    }
     if (op->do_hex || op->do_raw) {
         nvme_hex_raw(id_dinp, id_din_len, op);
         return 0;
@@ -4082,7 +4096,7 @@ static int
 do_nvme_identify(int pt_fd, const struct opts_t * op)
 {
     int ret = 0;
-    int vb = op->do_verbose;
+    int vb = op->verbose;
     uint32_t k, nsid, max_nsid;
     struct sg_pt_base * ptvp;
     struct sg_nvme_passthru_cmd identify_cmd;
@@ -4115,8 +4129,15 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     ret = do_scsi_pt(ptvp, -1, 0 /* timeout (def: 1 min) */, vb);
     if (vb > 2)
         pr2serr("%s: do_scsi_pt result is %d\n", __func__, ret);
-    if (ret)
+    if (ret) {
+        if (SCSI_PT_DO_BAD_PARAMS == ret)
+            ret = SG_LIB_SYNTAX_ERROR;
+        else if (SCSI_PT_DO_TIMEOUT == ret)
+            ret = SG_LIB_CAT_TIMEOUT;
+        else if (ret < 0)
+            ret = sg_convert_errno(-ret);
         goto err_out;
+    }
     max_nsid = sg_get_unaligned_le32(id_dinp + 516); /* NN */
     if (op->do_raw || op->do_hex) {
         if (op->do_only || (SG_NVME_CTL_NSID == nsid ) ||
@@ -4165,7 +4186,8 @@ err_out:
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, n;
+    int res, n, err;
+    int sg_fd = -1;
     int ret = 0;
     int inhex_len = 0;
     const struct svpd_values_name_t * vnp;
@@ -4270,15 +4292,20 @@ main(int argc, char * argv[])
             pr2serr("Don't support --cmddt with --inhex= option\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff, &inhex_len,
-                      sizeof(rsp_buff)))
-            return SG_LIB_FILE_ERROR;
+        err = f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff, &inhex_len,
+                        sizeof(rsp_buff));
+        if (err) {
+            if (err < 0)
+                err = sg_convert_errno(-err);
+            ret = err;
+            goto err_out;
+        }
         op->do_raw = 0;         /* don't want raw on output with --inhex= */
         if (-1 == op->page_num) {       /* may be able to deduce VPD page */
             if (op->page_pdt < 0)
                 op->page_pdt = 0x1f & rsp_buff[0];
             if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
-                if (op->do_verbose)
+                if (op->verbose)
                     pr2serr("Guessing from --inhex= this is a standard "
                             "INQUIRY\n");
             } else if (rsp_buff[2] <= 2) {
@@ -4294,11 +4321,11 @@ main(int argc, char * argv[])
                     (rsp_buff[5] < 0x20 || rsp_buff[5] > 0x80 ||
                      rsp_buff[6] < 0x20 || rsp_buff[6] > 0x80 ||
                      rsp_buff[7] < 0x20 || rsp_buff[7] > 0x80)) {
-                    if (op->do_verbose)
+                    if (op->verbose)
                         pr2serr("Guessing from --inhex= this is a "
                                 "standard INQUIRY\n");
                 } else {
-                    if (op->do_verbose)
+                    if (op->verbose)
                         pr2serr("Guessing from --inhex= this is VPD "
                                 "page 0x%x\n", rsp_buff[1]);
                     op->page_num = rsp_buff[1];
@@ -4307,7 +4334,7 @@ main(int argc, char * argv[])
                         op->do_decode = true;
                 }
             } else {
-                if (op->do_verbose)
+                if (op->verbose)
                     pr2serr("page number unclear from --inhex, hope it's a "
                             "standard INQUIRY\n");
             }
@@ -4324,8 +4351,8 @@ main(int argc, char * argv[])
         if (op->page_num != -1) {
             if (op->page_num != VPD_DEVICE_ID &&
                 op->page_num != VPD_UNIT_SERIAL_NUM) {
-                pr2serr("Option '--export' only supported "
-                        "for VPD pages 0x80 and 0x83\n");
+                pr2serr("Option '--export' only supported for VPD pages 0x80 "
+                        "and 0x83\n");
                 usage_for(op);
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -4386,9 +4413,10 @@ main(int argc, char * argv[])
     if (op->inhex_fn) {
         if (op->do_vpd) {
             if (op->do_decode)
-                return vpd_decode(-1, op, inhex_len);
+                ret = vpd_decode(-1, op, inhex_len);
             else
-                return vpd_mainly_hex(-1, op, inhex_len);
+                ret = vpd_mainly_hex(-1, op, inhex_len);
+            goto err_out;
         }
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         else if (op->do_ata) {
@@ -4396,41 +4424,52 @@ main(int argc, char * argv[])
             return 0;
         }
 #endif
-        else
-            return std_inq_process(-1, op, inhex_len);
+        else {
+            ret = std_inq_process(-1, op, inhex_len);
+            goto err_out;
+        }
     }
 
 #if defined(O_NONBLOCK) && defined(O_RDONLY)
     if (op->do_block >= 0) {
         n = O_RDONLY | (op->do_block ? 0 : O_NONBLOCK);
         if ((sg_fd = sg_cmds_open_flags(op->device_name, n,
-                                        op->do_verbose)) < 0) {
+                                        op->verbose)) < 0) {
             pr2serr("sg_inq: error opening file: %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-sg_fd);
+            if (ret < 0)
+                ret = SG_LIB_FILE_ERROR;
+            goto err_out;
         }
 
     } else {
         if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
-                                         op->do_verbose)) < 0) {
+                                         op->verbose)) < 0) {
             pr2serr("sg_inq: error opening file: %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-sg_fd);
+            if (ret < 0)
+                ret = SG_LIB_FILE_ERROR;
+            goto err_out;
         }
     }
 #else
     if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
-                                     op->do_verbose)) < 0) {
+                                     op->verbose)) < 0) {
         pr2serr("sg_inq: error opening file: %s: %s\n",
                 op->device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = sg_convert_errno(-sg_fd);
+        if (ret < 0)
+            ret = SG_LIB_FILE_ERROR;
+        goto err_out;
     }
 #endif
     memset(rsp_buff, 0, sizeof(rsp_buff));
 
 #if (HAVE_NVME && (! IGNORE_NVME))
-    n = check_pt_file_handle(sg_fd, op->device_name, op->do_verbose);
-    if (op->do_verbose > 1)
+    n = check_pt_file_handle(sg_fd, op->device_name, op->verbose);
+    if (op->verbose > 1)
         pr2serr("check_pt_file_handle()-->%d, page_given=%d\n", n,
                 op->page_given);
     if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
@@ -4445,7 +4484,7 @@ main(int argc, char * argv[])
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
     if (op->do_ata) {
         res = try_ata_identify(sg_fd, op->do_hex, op->do_raw,
-                               op->do_verbose);
+                               op->verbose);
         if (0 != res) {
             pr2serr("fetching ATA information failed on %s\n",
                     op->device_name);
@@ -4487,7 +4526,12 @@ fini3:
 #endif
 
 err_out:
-    res = sg_cmds_close_device(sg_fd);
+    if ((0 == op->verbose) && (! op->do_export)) {
+        if (! sg_if_can2stderr("sg_inq failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
+    res = (sg_fd >= 0) ? sg_cmds_close_device(sg_fd) : 0;
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
@@ -4658,7 +4702,7 @@ prepare_ata_identify(const struct opts_t * op, int inhex_len)
         n = 512;
     memset(&ata_ident, 0, sizeof(ata_ident));
     memcpy(&ata_ident, rsp_buff, n);
-    show_ata_identify(&ata_ident, false, op->do_verbose);
+    show_ata_identify(&ata_ident, false, op->verbose);
 }
 
 /* Returns 0 if successful, else errno of error */
@@ -4699,22 +4743,15 @@ try_ata_identify(int ata_fd, int do_hex, int do_raw, int verbose)
 }
 #endif
 
-/* If this structure is changed then the structure of the same name in
- * sg_inq_data,c should also be changed
- */
-struct sg_version_descriptor {
-    int value;
-    const char * name;
-};
-
-extern struct sg_version_descriptor sg_version_descriptor_arr[];
+/* structure defined in sg_lib_data.h */
+extern struct sg_lib_simple_value_name_t sg_version_descriptor_arr[];
 
 
 static const char *
 find_version_descriptor_str(int value)
 {
     int k;
-    const struct sg_version_descriptor * vdp;
+    const struct sg_lib_simple_value_name_t * vdp;
 
     for (k = 0; ((vdp = sg_version_descriptor_arr + k) && vdp->name); ++k) {
         if (value == vdp->value)

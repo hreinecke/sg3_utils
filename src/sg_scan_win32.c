@@ -26,6 +26,7 @@
 #include <errno.h>
 
 #include "sg_lib.h"
+#include "sg_pt.h"
 #include "sg_pr2serr.h"
 
 #ifdef _WIN32_WINNT
@@ -40,7 +41,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.20 (win32) 20180119";
+static const char * version_str = "1.21 (win32) 20180202";
 
 #define MAX_SCSI_ELEMS 2048
 #define MAX_ADAPTER_NUM 128
@@ -49,126 +50,6 @@ static const char * version_str = "1.20 (win32) 20180119";
 #define MAX_TAPE_NUM 512
 #define MAX_HOLE_COUNT 16
 
-// IOCTL_STORAGE_QUERY_PROPERTY
-
-#define FILE_DEVICE_MASS_STORAGE    0x0000002d
-#define IOCTL_STORAGE_BASE          FILE_DEVICE_MASS_STORAGE
-#define FILE_ANY_ACCESS             0
-
-// #define METHOD_BUFFERED             0
-
-#define IOCTL_STORAGE_QUERY_PROPERTY \
-    CTL_CODE(IOCTL_STORAGE_BASE, 0x0500, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-
-#ifndef _DEVIOCTL_
-typedef enum _STORAGE_BUS_TYPE {
-    BusTypeUnknown      = 0x00,
-    BusTypeScsi         = 0x01,
-    BusTypeAtapi        = 0x02,
-    BusTypeAta          = 0x03,
-    BusType1394         = 0x04,
-    BusTypeSsa          = 0x05,
-    BusTypeFibre        = 0x06,
-    BusTypeUsb          = 0x07,
-    BusTypeRAID         = 0x08,
-    BusTypeiScsi        = 0x09,
-    BusTypeSas          = 0x0A,
-    BusTypeSata         = 0x0B,
-    BusTypeSd           = 0x0C,
-    BusTypeMmc          = 0x0D,
-    BusTypeVirtual             = 0xE,
-    BusTypeFileBackedVirtual   = 0xF,
-    BusTypeSpaces       = 0x10,
-    BusTypeNvme         = 0x11,
-    BusTypeSCM          = 0x12,
-    BusTypeUfs          = 0x13,
-    BusTypeMax          = 0x14,
-    BusTypeMaxReserved  = 0x7F
-} STORAGE_BUS_TYPE, *PSTORAGE_BUS_TYPE;
-
-typedef enum _STORAGE_PROTOCOL_TYPE {
-    ProtocolTypeUnknown = 0,
-    ProtocolTypeScsi,
-    ProtocolTypeAta,
-    ProtocolTypeNvme,
-    ProtocolTypeSd
-} STORAGE_PROTOCOL_TYPE;
-
-typedef enum _STORAGE_PROTOCOL_NVME_DATA_TYPE {
-    NVMeDataTypeUnknown = 0,
-    NVMeDataTypeIdentify,
-    NVMeDataTypeLogPage,
-    NVMeDataTypeFeature
-} STORAGE_PROTOCOL_NVME_DATA_TYPE;
-
-typedef struct _STORAGE_PROTOCOL_SPECIFIC_DATA {
-    STORAGE_PROTOCOL_TYPE ProtocolType;
-    ULONG DataType;
-    ULONG ProtocolDataRequestValue;
-    ULONG ProtocolDataRequestSubValue;
-    ULONG ProtocolDataOffset;
-    ULONG ProtocolDataLength;
-    ULONG FixedProtocolReturnData;
-    ULONG Reserved[3];
-} STORAGE_PROTOCOL_SPECIFIC_DATA;
-
-
-typedef struct _STORAGE_DEVICE_DESCRIPTOR {
-    ULONG Version;
-    ULONG Size;
-    UCHAR DeviceType;
-    UCHAR DeviceTypeModifier;
-    BOOLEAN RemovableMedia;
-    BOOLEAN CommandQueueing;
-    ULONG VendorIdOffset;       /* 0 if not available */
-    ULONG ProductIdOffset;      /* 0 if not available */
-    ULONG ProductRevisionOffset;/* 0 if not available */
-    ULONG SerialNumberOffset;   /* -1 if not available ?? */
-    STORAGE_BUS_TYPE BusType;
-    ULONG RawPropertiesLength;
-    UCHAR RawDeviceProperties[1];
-} STORAGE_DEVICE_DESCRIPTOR, *PSTORAGE_DEVICE_DESCRIPTOR;
-#endif
-
-typedef struct _STORAGE_DEVICE_UNIQUE_IDENTIFIER {
-    ULONG  Version;
-    ULONG  Size;
-    ULONG  StorageDeviceIdOffset;
-    ULONG  StorageDeviceOffset;
-    ULONG  DriveLayoutSignatureOffset;
-} STORAGE_DEVICE_UNIQUE_IDENTIFIER, *PSTORAGE_DEVICE_UNIQUE_IDENTIFIER;
-
-// Use CompareStorageDuids(PSTORAGE_DEVICE_UNIQUE_IDENTIFIER duid1, duid2)
-// to test for equality
-
-#ifndef _DEVIOCTL_
-typedef enum _STORAGE_QUERY_TYPE {
-    PropertyStandardQuery = 0,
-    PropertyExistsQuery,
-    PropertyMaskQuery,
-    PropertyQueryMaxDefined
-} STORAGE_QUERY_TYPE, *PSTORAGE_QUERY_TYPE;
-
-typedef enum _STORAGE_PROPERTY_ID {
-    StorageDeviceProperty = 0,
-    StorageAdapterProperty,
-    StorageDeviceIdProperty,
-    StorageDeviceUniqueIdProperty,
-    StorageDeviceWriteCacheProperty,
-    StorageMiniportProperty,
-    StorageAccessAlignmentProperty
-} STORAGE_PROPERTY_ID, *PSTORAGE_PROPERTY_ID;
-
-typedef struct _STORAGE_PROPERTY_QUERY {
-    STORAGE_PROPERTY_ID PropertyId;
-    STORAGE_QUERY_TYPE QueryType;
-    UCHAR AdditionalParameters[1];
-} STORAGE_PROPERTY_QUERY, *PSTORAGE_PROPERTY_QUERY;
-#endif
-
-
-/////////////////////////////////////////////////////////////////////////////
 
 union STORAGE_DEVICE_DESCRIPTOR_DATA {
     STORAGE_DEVICE_DESCRIPTOR desc;
@@ -183,8 +64,8 @@ union STORAGE_DEVICE_UID_DATA {
 struct storage_elem {
     char    name[32];
     char    volume_letters[32];
-    int qp_descriptor_valid;
-    int qp_uid_valid;
+    bool qp_descriptor_valid;
+    bool qp_uid_valid;
     union STORAGE_DEVICE_DESCRIPTOR_DATA qp_descriptor;
     union STORAGE_DEVICE_UID_DATA qp_uid;
 };
@@ -227,33 +108,24 @@ usage()
 static char *
 get_err_str(DWORD err, int max_b_len, char * b)
 {
-    LPVOID lpMsgBuf;
-    int k, num, ch;
+    char * cp;
+    struct sg_pt_base * tmp_p = construct_scsi_pt_obj();
 
-    if (max_b_len < 2) {
-        if (1 == max_b_len)
+    if ((NULL == b) || (max_b_len < 2)) {
+        if (b && (max_b_len > 0))
             b[0] = '\0';
         return b;
     }
-    memset(b, 0, max_b_len);
-    FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER |
-        FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL, err,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPTSTR) &lpMsgBuf, 0, NULL );
-    num = lstrlen((LPCTSTR)lpMsgBuf);
-    if (num < 1)
+    if (NULL == tmp_p) {
+        snprintf(b, max_b_len, "%s: construct_scsi_pt_obj() failed\n",
+                 __func__);
+
         return b;
-    num = (num < max_b_len) ? num : (max_b_len - 1);
-    for (k = 0; k < num; ++k) {
-        ch = *((LPCTSTR)lpMsgBuf + k);
-        if ((ch >= 0x0) && (ch < 0x7f))
-            b[k] = ch & 0x7f;
-        else
-            b[k] = '?';
     }
-    return b;
+    set_scsi_pt_transport_err(tmp_p, (int)err);
+    cp = get_scsi_pt_transport_err_str(tmp_p, max_b_len, b);
+    destruct_scsi_pt_obj(tmp_p);
+    return cp;
 }
 
 static const char *
@@ -533,12 +405,12 @@ enum_volumes(char letter)
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 pr2serr("%s: query_dev_property failed\n", __FUNCTION__ );
             else
-                tmp_se.qp_descriptor_valid = 1;
+                tmp_se.qp_descriptor_valid = true;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
                     pr2serr("%s: query_dev_uid failed\n", __FUNCTION__ );
             } else
-                tmp_se.qp_uid_valid = 1;
+                tmp_se.qp_uid_valid = true;
             if (('\0' == letter) || (letter == tmp_se.name[0]))
                 check_devices(&tmp_se);
             CloseHandle(fh);
@@ -572,12 +444,12 @@ enum_pds(void)
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 pr2serr("%s: query_dev_property failed\n", __FUNCTION__ );
             else
-                tmp_se.qp_descriptor_valid = 1;
+                tmp_se.qp_descriptor_valid = true;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
                     pr2serr("%s: query_dev_uid failed\n", __FUNCTION__ );
             } else
-                tmp_se.qp_uid_valid = 1;
+                tmp_se.qp_uid_valid = true;
             hole_count = 0;
             memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
@@ -623,12 +495,12 @@ enum_cdroms(void)
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 pr2serr("%s: query_dev_property failed\n", __FUNCTION__ );
             else
-                tmp_se.qp_descriptor_valid = 1;
+                tmp_se.qp_descriptor_valid = true;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
                     pr2serr("%s: query_dev_uid failed\n", __FUNCTION__ );
             } else
-                tmp_se.qp_uid_valid = 1;
+                tmp_se.qp_uid_valid = true;
             hole_count = 0;
             memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
@@ -671,12 +543,12 @@ enum_tapes(void)
             if (query_dev_property(fh, &tmp_se.qp_descriptor) < 0)
                 pr2serr("%s: query_dev_property failed\n", __FUNCTION__ );
             else
-                tmp_se.qp_descriptor_valid = 1;
+                tmp_se.qp_descriptor_valid = true;
             if (query_dev_uid(fh, &tmp_se.qp_uid) < 0) {
                 if (verbose > 2)
                     pr2serr("%s: query_dev_uid failed\n", __FUNCTION__ );
             } else
-                tmp_se.qp_uid_valid = 1;
+                tmp_se.qp_uid_valid = true;
             hole_count = 0;
             memcpy(&storage_arr[next_unused_elem++], &tmp_se, sizeof(tmp_se));
             CloseHandle(fh);
@@ -757,7 +629,7 @@ sg_do_wscan(char letter, bool show_bt, int scsi_scan)
             if ((verbose > 3) && sp->qp_uid_valid) {
                 printf("  UID valid, in hex:\n");
                 hex2stderr((const uint8_t *)sp->qp_uid.raw,
-                           sizeof(sp->qp_uid.raw), 1);
+                           sizeof(sp->qp_uid.raw), 0);
             }
         }
     }
