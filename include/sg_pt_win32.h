@@ -207,7 +207,32 @@ typedef struct _STORAGE_DEVICE_DESCRIPTOR {
     ULONG RawPropertiesLength;
     UCHAR RawDeviceProperties[1];
 } STORAGE_DEVICE_DESCRIPTOR, *PSTORAGE_DEVICE_DESCRIPTOR;
-#endif		/* _DEVIOCTL_ */
+
+#define STORAGE_PROTOCOL_STRUCTURE_VERSION 0x1
+
+typedef struct _STORAGE_PROTOCOL_COMMAND {
+  DWORD         Version;        /* STORAGE_PROTOCOL_STRUCTURE_VERSION */
+  DWORD         Length;
+  STORAGE_PROTOCOL_TYPE   ProtocolType;
+  DWORD         Flags;
+  DWORD         ReturnStatus;
+  DWORD         ErrorCode;
+  DWORD         CommandLength;
+  DWORD         ErrorInfoLength;
+  DWORD         DataToDeviceTransferLength;
+  DWORD         DataFromDeviceTransferLength;
+  DWORD         TimeOutValue;
+  DWORD         ErrorInfoOffset;
+  DWORD         DataToDeviceBufferOffset;
+  DWORD         DataFromDeviceBufferOffset;
+  DWORD         CommandSpecific;
+  DWORD         Reserved0;
+  DWORD         FixedProtocolReturnData;
+  DWORD         Reserved1[3];
+  BYTE          Command[1];     /* has CommandLength elements */
+} STORAGE_PROTOCOL_COMMAND, *PSTORAGE_PROTOCOL_COMMAND;
+
+#endif          /* _DEVIOCTL_ */
 
 typedef struct _STORAGE_DEVICE_UNIQUE_IDENTIFIER {
     ULONG  Version;
@@ -243,7 +268,7 @@ typedef struct _STORAGE_PROPERTY_QUERY {
     STORAGE_QUERY_TYPE QueryType;
     UCHAR AdditionalParameters[1];
 } STORAGE_PROPERTY_QUERY, *PSTORAGE_PROPERTY_QUERY;
-#endif		/* _DEVIOCTL_ */
+#endif          /* _DEVIOCTL_ */
 
 
 // NVME_PASS_THROUGH

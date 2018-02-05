@@ -630,7 +630,8 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int vb)
             psp->swb_i.spt.TimeOutValue = DEF_TIMEOUT;
         }
         psp->dev_fd = (dev_fd < 0) ? -1 : dev_fd;
-        vp = malloc(sizeof(struct sg_pt_win32_scsi *)); // yes a pointer
+        vp = (struct sg_pt_base *)malloc(sizeof(struct sg_pt_win32_scsi *));
+       	/* yes, allocating the size of a pointer (8 bytes) */
         if (vp)
             vp->implp = psp;
         else
@@ -1371,7 +1372,8 @@ do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
         dp = psp->dxferp;
     }
     if (vb > 2) {
-        pr2ws("NVMe command:\n");
+        pr2ws("NVMe is_read=%s, dlen=%u, command:\n",
+       	      (is_read ? "true" : "false"), dlen);
         hex2stderr((const uint8_t *)cmdp, cmd_len, 1);
         if ((vb > 3) && (! is_read) && dp) {
             if (dlen > 0) {
@@ -1429,7 +1431,6 @@ do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
 
             pr2ws("%s: IOCTL_SCSI_MINIPORT failed: %s [%u]\n", __func__,
                   get_err_str(n, sizeof(b), b), n);
-pr2ws("handle=%u, alloc_len=%u, num_out=%u\n", shp->fh, alloc_len, (uint32_t)num_out);
         }
     }
     /* nvme_status is SCT|SC, therefor it excludes DNR+More */
@@ -2241,8 +2242,8 @@ do_nvme_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (vb > 3)
-        pr2ws("%s: opcode=0x%x, cmd_len=%u, fdev_name: %s\n", __func__,
-              cdbp[0], cmd_len, shp->dname);
+        pr2ws("%s: opcode=0x%x, cmd_len=%u, fdev_name: %s, dlen=%u\n",
+	      __func__, cdbp[0], cmd_len, shp->dname, psp->dxfer_len);
     /* direct NVMe command (i.e. 64 bytes long) or SNTL */
     if (scsi_cdb) {
         switch (cdbp[0]) {
@@ -2279,7 +2280,17 @@ do_nvme_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
             return 0;
         }
     }
-    return do_nvme_admin_cmd(psp, shp, NULL, NULL, 0, false, time_secs, vb);
+    if(psp->dxfer_len > 0) {
+	uint8_t * cmdp = psp->nvme_cmd;
+
+	sg_put_unaligned_le32(psp->dxfer_len, cmdp + SG_NVME_PT_DATA_LEN);
+	sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)psp->dxferp, 
+			      cmdp + SG_NVME_PT_ADDR);
+	if (vb > 2)
+	    pr2ws("%s: NVMe command, dlen=%u, dxferp=0x%p\n", __func__,
+		  psp->dxfer_len, psp->dxferp);
+    }
+    return do_nvme_admin_cmd(psp, shp, NULL, NULL, 0, true, time_secs, vb);
 }
 
 #else           /* (HAVE_NVME && (! IGNORE_NVME)) */

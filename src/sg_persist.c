@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.58 20180118";
+static const char * version_str = "0.59 20180205";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -78,35 +78,55 @@ struct opts_t {
 
 static struct option long_options[] = {
     {"alloc-length", required_argument, 0, 'l'},
+    {"alloc_length", required_argument, 0, 'l'},
     {"clear", no_argument, 0, 'C'},
     {"device", required_argument, 0, 'd'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
     {"in", no_argument, 0, 'i'},
+    {"maxlen", required_argument, 0, 'm'},
     {"no-inquiry", no_argument, 0, 'n'},
+    {"no_inquiry", no_argument, 0, 'n'},
     {"out", no_argument, 0, 'o'},
     {"param-alltgpt", no_argument, 0, 'Y'},
+    {"param_alltgpt", no_argument, 0, 'Y'},
     {"param-aptpl", no_argument, 0, 'Z'},
+    {"param_aptpl", no_argument, 0, 'Z'},
     {"param-rk", required_argument, 0, 'K'},
+    {"param_rk", required_argument, 0, 'K'},
     {"param-sark", required_argument, 0, 'S'},
+    {"param_sark", required_argument, 0, 'S'},
     {"param-unreg", no_argument, 0, 'U'},
+    {"param_unreg", no_argument, 0, 'U'},
     {"preempt", no_argument, 0, 'P'},
     {"preempt-abort", no_argument, 0, 'A'},
+    {"preempt_abort", no_argument, 0, 'A'},
     {"prout-type", required_argument, 0, 'T'},
+    {"prout_type", required_argument, 0, 'T'},
     {"read-full-status", no_argument, 0, 's'},
+    {"read_full_status", no_argument, 0, 's'},
     {"read-keys", no_argument, 0, 'k'},
+    {"read_keys", no_argument, 0, 'k'},
     {"readonly", no_argument, 0, 'y'},
     {"read-reservation", no_argument, 0, 'r'},
+    {"read_reservation", no_argument, 0, 'r'},
     {"read-status", no_argument, 0, 's'},
+    {"read_status", no_argument, 0, 's'},
     {"register", no_argument, 0, 'G'},
     {"register-ignore", no_argument, 0, 'I'},
+    {"register_ignore", no_argument, 0, 'I'},
     {"register-move", no_argument, 0, 'M'},
+    {"register_move", no_argument, 0, 'M'},
     {"release", no_argument, 0, 'L'},
     {"relative-target-port", required_argument, 0, 'Q'},
+    {"relative_target_port", required_argument, 0, 'Q'},
     {"replace-lost", no_argument, 0, 'z'},
+    {"replace_lost", no_argument, 0, 'z'},
     {"report-capabilities", no_argument, 0, 'c'},
+    {"report_capabilities", no_argument, 0, 'c'},
     {"reserve", no_argument, 0, 'R'},
     {"transport-id", required_argument, 0, 'X'},
+    {"transport_id", required_argument, 0, 'X'},
     {"unreg", no_argument, 0, 'U'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
@@ -210,6 +230,10 @@ usage(int help)
                 "                                 an argument\n"
                 "    --hex|-H                   output response in hex (for "
                 "PR In commands)\n"
+                "    --maxlen=LEN|-m LEN        allocation length in "
+                "decimal, by default.\n"
+                "                               like --alloc-len= "
+                "(def: 8192, 8k, 2000h)\n"
                 "    --no-inquiry|-n            skip INQUIRY (default: do "
                 "INQUIRY)\n"
                 "    --param-alltgpt|-Y         PR Out parameter "
@@ -873,6 +897,7 @@ my_cont_b:
 int
 main(int argc, char * argv[])
 {
+    bool got_maxlen, ok;
     bool want_prin = false;
     bool want_prout = false;
     int sg_fd, c, k, res;
@@ -900,7 +925,8 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "AcCd:GHhiIkK:l:LMnoPQ:rRsS:T:UvVX:yYzZ",
+        c = getopt_long(argc, argv,
+                        "AcCd:GHhiIkK:l:Lm:MnoPQ:rRsS:T:UvVX:yYzZ",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -949,13 +975,22 @@ main(int argc, char * argv[])
             }
             ++num_prout_param;
             break;
+        case 'm':       /* --maxlen= and --alloc_length= are similar */
         case 'l':
-            if (1 != sscanf(optarg, "%x", &op->alloc_len)) {
-                pr2serr("bad argument to '--alloc-length'\n");
+            got_maxlen = ('m' == c);
+            cp =  (got_maxlen ? "maxlen" : "alloc-length");
+            if (got_maxlen) {
+                k = sg_get_num(optarg);
+                ok = (-1 != k);
+                op->alloc_len = (unsigned int)k;
+            } else 
+                ok = (1 == sscanf(optarg, "%x", &op->alloc_len));
+            if (! ok) {
+                pr2serr("bad argument to '--%s'\n", cp);
                 return SG_LIB_SYNTAX_ERROR;
             } else if (MX_ALLOC_LEN < op->alloc_len) {
-                pr2serr("'--alloc-length' argument exceeds maximum value "
-                        "(%d)\n", MX_ALLOC_LEN);
+                pr2serr("'--%s' argument exceeds maximum value (%d)\n", cp,
+                        MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
