@@ -115,3 +115,41 @@ AC_ARG_ENABLE([nvme-supp],
   [AC_DEFINE_UNQUOTED(IGNORE_NVME, 1, [compile out NVMe support], )], [])
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile scripts/Makefile)
+
+
+# Borrowed from smartmontools configure.ac
+# Note: Use `...` here as some shells do not properly parse '$(... case $x in X) ...)'
+info=`
+  echo "-----------------------------------------------------------------------------"
+  echo "${PACKAGE}-${VERSION} configuration:"
+  echo "host operating system:  $host"
+  echo "C++ compiler:           $CXX"
+  echo "C compiler:             $CC"
+  echo "preprocessor flags:     $CPPFLAGS"
+  echo "C++ compiler flags:     $CXXFLAGS"
+  echo "C compiler flags:       $CFLAGS"
+  echo "linker flags:           $LDFLAGS"
+  echo "OS specific modules:    $os_deps $os_libs $LIBS"
+
+  case "$host_os" in
+    mingw*)
+      echo "application manifest:   ${os_win32_manifest:-built-in}"
+      echo "resource compiler:      $WINDRES"
+      echo "message compiler:       $WINDMC"
+      echo "NSIS compiler:          $MAKENSIS"
+      ;;
+
+    *)
+      echo "binary install path:    \`eval eval eval echo $bindir\`"
+      echo "man page install path:  \`eval eval eval echo $mandir\`"
+      echo "doc file install path:  \`eval eval eval echo $docdir\`"
+      echo "examples install path:  \`eval eval eval echo $exampledir\`"
+      ;;
+  esac
+  echo "-----------------------------------------------------------------------------"
+`
+
+AC_MSG_NOTICE([
+$info
+])
+

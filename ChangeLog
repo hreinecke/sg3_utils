@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180204] [svn: r749]
+Changelog for sg3_utils-1.43 [20180205] [svn: r750]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
      cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -77,12 +77,15 @@ Changelog for sg3_utils-1.43 [20180204] [svn: r749]
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility
   - sg_zone: fix debug cdb naming
+  - sg_persist: add --maxlen-LEN option, LEN defaults to
+    decimal, similar to --alloc-length= which takes hex
   - sgp_dd: pthread_cancel() has issues in C++ (and
     the Android multi-threaded library doesn't supply it)
     so use pthread_kill() in its place [Linux only]
   - sg_opcode: add '--enumerate' and '--pdt=' options
     - support CDLP (command duration limit page)
     - check resid and trim response if necessary
+    - report when --no-inquiry is ignored
   - sg_raw: add '--enumerate' option
   - sg_get_lba_status: add --report-type= option (sbc4r12)
     - add support for 32 byte cdb variant (sbc4r14)
@@ -162,6 +165,7 @@ Changelog for sg3_utils-1.43 [20180204] [svn: r749]
     - add SG_LIB_ANDROID build 'define'. If defined then
       SG_LIB_LINUX is also defined, so test for Android
       before Linux if need to differentiate
+    - Info section now printed at end of ./configure
   - update BSD license from 3 to 2 clause aka FreeBSD
     license (without reference to FreeBSD project)
 

@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.53 20171102";    /* spc5r14 */
+static const char * version_str = "0.54 20180205";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -56,6 +56,7 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"mask", no_argument, 0, 'm'},
         {"no-inquiry", no_argument, 0, 'n'},
+        {"no_inquiry", no_argument, 0, 'n'},
         {"new", no_argument, 0, 'N'},
         {"opcode", required_argument, 0, 'o'},
         {"old", no_argument, 0, 'O'},
@@ -995,6 +996,8 @@ main(int argc, char * argv[])
                     op->device_name, safe_strerror(-sg_fd));
             return SG_LIB_FILE_ERROR;
         }
+        if (op->no_inquiry && (peri_dtype < 0))
+            pr2serr("--no-inquiry ignored because --pdt= not given\n");
         if (op->no_inquiry && (peri_dtype >= 0))
             ;
         else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {

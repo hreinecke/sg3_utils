@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_PERSIST "8" "February 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -35,9 +35,9 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing. The relevant sections of the SCSI
-Primary Commands document (i.e. SPC\-4 whose most recent draft is revision
-37 dated 17 May 2014) are sections 5.12 (titled "Reservations"),
-6.15 (for the PRIN command) and 6.16 (for the PROUT command). To safeguard
+Primary Commands document (i.e. SPC\-5 whose most recent draft is revision
+18 dated 4 January 2018) are sections 5.14 (titled "Reservations"),
+6.16 (for the PRIN command) and 6.17 (for the PROUT command). To safeguard
 against accidental use, the \fI\-\-out\fR option must be given when a
 PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
 .PP
@@ -94,6 +94,16 @@ once for more hex and less text.
 \fB\-i\fR, \fB\-\-in\fR
 specify that a SCSI PERSISTENT RESERVE IN command is required. This
 is the default.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+\fILEN\fR is used as the ALLOCATION LENGTH field of the PRIN command.
+\fILEN\fR is by default a decimal value. To give a hex value use a '0x'
+or '0X' prefix, or use a 'h' (or 'H') suffix. Can also take multipliers,
+see \fI\-\-maxlen=LEN\fR option in the sg3_utils manual page.
+.br
+This option is the same as \fI\-\-alloc\-length=LEN\fR option apart from
+the representation of \fILEN\fR. The option defaults to decimal while
+\fI\-\-alloc\-length=LEN\fR only takes hex.
 .TP
 \fB\-n\fR, \fB\-\-no\-inquiry\fR
 the default action is to do a standard SCSI INQUIRY command and output

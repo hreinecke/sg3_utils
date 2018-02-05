@@ -700,7 +700,8 @@ main(int argc, char * argv[])
         }
     }
 
-    storage_arr = calloc(sizeof(struct storage_elem) * MAX_SCSI_ELEMS, 1);
+    storage_arr = (struct storage_elem *)calloc(sizeof(struct storage_elem) *
+		   			        MAX_SCSI_ELEMS, 1);
     if (storage_arr) {
         ret = sg_do_wscan(vol_letter, show_bt, scsi_scan);
         free(storage_arr);

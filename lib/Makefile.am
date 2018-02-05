@@ -36,18 +36,18 @@ endif
 
 # For C++/clang testing
 ## CC = gcc
-## CC = g++
+CC = g++
 ## CC = clang
 ## CC = clang++
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11 for C code
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
 AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
-AM_CFLAGS = -Wall -W
+##AM_CFLAGS = -Wall -W
 # AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
-# AM_CFLAGS = -Wall -W -pedantic -std=c++14
+AM_CFLAGS = -Wall -W -pedantic -std=c++14
 
 lib_LTLIBRARIES = libsgutils2.la
 
