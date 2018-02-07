@@ -41,6 +41,13 @@ KERNEL!="sd*[!0-9]|sr*", GOTO="sg3_utils_id_end"
 # back to calling sg_vpd directly.
 LABEL="scsi_inquiry"
 ENV{ID_SCSI_INQUIRY}=="0", GOTO="sg_inquiry"
+
+# As of 2018/4.15, the kernel doesn't provide VPD pages for "SPC" devices
+# (SCSI version 0x03, ANSI INCITS 301-1997) in sysfs.
+# It's usually safe to try though (no counter-example is known),
+# and for scsi_id compatibility, we have to try.
+SUBSYSTEMS=="scsi", ATTRS{scsi_level}=="4", GOTO="sg_inquiry"
+
 # "inquiry" is an attribute of the scsi_device in sysfs,
 # we obtain it by using $id after an ATTRS match.
 SUBSYSTEMS=="scsi", ATTRS{inquiry}=="*", KERNELS=="[0-9]*:*[0-9]", \
