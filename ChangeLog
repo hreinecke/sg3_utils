@@ -2,13 +2,13 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180205] [svn: r750]
+Changelog for sg3_utils-1.43 [20180208] [svn: r751]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
      cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_seek: new SEEK(10) or PRE-FETCH(10 or 16)
-  - sg_stream_ctl: new, STREAM CONTROL or GET STREAM STATUS 
+  - sg_stream_ctl: new, STREAM CONTROL or GET STREAM STATUS
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option

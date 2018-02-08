@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.21 20180203 */
+/* sg_pt_win32 version 1.21 20180207 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,6 +118,7 @@ struct sg_pt_handle {
     bool checked_handle;
     bool bus_type_failed;
     bool is_nvme;
+    bool got_physical_drive;
     HANDLE fh;
     char adapter[32];
     int bus;
@@ -379,7 +380,6 @@ int
 scsi_pt_open_flags(const char * device_name, int flags, int vb)
 {
     bool got_scsi_name = false;
-    bool got_pd_name = false;
     int len, k, adapter_num, bus, target, lun, off, index, num, pd_num;
     int share_mode;
     struct sg_pt_handle * shp;
@@ -422,9 +422,9 @@ scsi_pt_open_flags(const char * device_name, int flags, int vb)
         if (0 == strncmp("PD", buff, 2)) {
             num = sscanf(device_name + off + 2, "%d", &pd_num);
             if (1 == num)
-                got_pd_name = true;
+                shp->got_physical_drive = true;
         }
-        if (! got_pd_name) {
+        if (! shp->got_physical_drive) {
             buff[2] = toupper((int)device_name[off + 2]);
             buff[3] = toupper((int)device_name[off + 3]);
             if (0 == strncmp("SCSI", buff, 4)) {
@@ -447,7 +447,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int vb)
     shp->verbose = vb;
     memset(shp->adapter, 0, sizeof(shp->adapter));
     strncpy(shp->adapter, "\\\\.\\", 4);
-    if (got_pd_name)
+    if (shp->got_physical_drive)
         snprintf(shp->adapter + 4, sizeof(shp->adapter) - 5,
                  "PhysicalDrive%d", pd_num);
     else if (got_scsi_name)
@@ -511,8 +511,8 @@ scsi_pt_close_device(int device_fd)
 
 /* Returns 0 on success, negated errno if error */
 static int
-get_bus_type(struct sg_pt_handle *shp, const char *dname, STORAGE_BUS_TYPE * btp,
-             int vb)
+get_bus_type(struct sg_pt_handle *shp, const char *dname,
+             STORAGE_BUS_TYPE * btp, int vb)
 {
     DWORD num_out, err;
     STORAGE_BUS_TYPE bt;
@@ -631,7 +631,7 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int vb)
         }
         psp->dev_fd = (dev_fd < 0) ? -1 : dev_fd;
         vp = (struct sg_pt_base *)malloc(sizeof(struct sg_pt_win32_scsi *));
-       	/* yes, allocating the size of a pointer (8 bytes) */
+        /* yes, allocating the size of a pointer (8 bytes) */
         if (vp)
             vp->implp = psp;
         else
@@ -1335,6 +1335,459 @@ mk_sense_invalid_fld(struct sg_pt_win32_scsi * psp, bool in_cdb, int in_byte,
               __func__, asc, in_cdb ? 'C' : 'D', in_byte, in_bit);
 }
 
+#if 1
+
+#ifndef NVME_MAX_LOG_SIZE
+#define NVME_MAX_LOG_SIZE 4096
+#endif
+
+static int
+nvme_identify(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
+              const uint8_t * cmdp, uint8_t * dp, uint32_t dlen, int vb)
+{
+    bool id_ctrl;
+    int res = 0;
+    const uint32_t pg_sz = sg_get_page_size();
+    uint32_t cdw10, nsid, n;
+    const uint8_t * bp;
+    BOOL    result;
+    PVOID   buffer = NULL;
+    uint8_t * free_buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
+    STORAGE_PROPERTY_QUERY * query = NULL;
+    STORAGE_PROTOCOL_SPECIFIC_DATA * protocolData = NULL;
+    STORAGE_PROTOCOL_DATA_DESCRIPTOR * protocolDataDescr = NULL;
+
+    nsid = sg_get_unaligned_le32(cmdp + SG_NVME_PT_NSID);
+    cdw10 = sg_get_unaligned_le32(cmdp + SG_NVME_PT_CDW10);
+    id_ctrl = (0x1 == cdw10);
+    n = dlen < NVME_MAX_LOG_SIZE ? NVME_MAX_LOG_SIZE : dlen;
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+                   sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + n;
+    buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, vb > 3);
+    if (buffer == NULL) {
+        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        if (vb > 1)
+            pr2ws("%s: unable to allocate memory\n", __func__);
+        psp->os_err = res;
+        return -res;
+    }
+    query = (STORAGE_PROPERTY_QUERY *)buffer;
+
+    query->PropertyId = id_ctrl ? StorageAdapterProtocolSpecificProperty :
+                                  StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+    protocolDataDescr = (STORAGE_PROTOCOL_DATA_DESCRIPTOR *)buffer;
+    protocolData = (STORAGE_PROTOCOL_SPECIFIC_DATA *)
+                        query->AdditionalParameters;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeIdentify;
+    protocolData->ProtocolDataRequestValue = cdw10;
+    if (! id_ctrl)
+        protocolData->ProtocolDataRequestSubValue = nsid;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = dlen;
+
+    result = DeviceIoControl(shp->fh, IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer, bufferLength, buffer, bufferLength,
+                             &returnedLength, (OVERLAPPED*)0);
+    if ((! result) || (0 == returnedLength)) {
+        n = (uint32_t)GetLastError();
+        psp->transport_err = n;
+        psp->os_err = EIO;      /* simulate Unix error,  */
+        if (vb > 2) {
+            char b[128];
+
+            pr2ws("%s: IOCTL_STORAGE_QUERY_PROPERTY(id_%s) failed: %s "
+                  "[%u]\n", __func__, (id_ctrl ? "ctrl" : "ns"),
+                  get_err_str(n, sizeof(b), b), n);
+        }
+        res = -psp->os_err;
+        goto err_out;
+    }
+    if (dlen > 0) {
+        protocolData = &protocolDataDescr->ProtocolSpecificData;
+        bp = (const uint8_t *)protocolData + protocolData->ProtocolDataOffset;
+        memcpy(dp, bp, dlen);
+        if (0 == psp->nvme_nsid) {
+            uint32_t nn = sg_get_unaligned_le32(bp + 516);
+
+            if (1 == nn)        /* if physical drive has only 1 namespace */
+                psp->nvme_nsid = 1; /* then its nsid must be 1 */
+            /* N.B. Need better get_nsid_from _handle technique when 2 or
+             * more namespaces. Suggestions? */
+        }
+    }
+    psp->nvme_status = 0;
+    psp->nvme_result =
+         protocolDataDescr->ProtocolSpecificData.FixedProtocolReturnData;
+    if (vb > 3)
+        pr2ws("%s: IOCTL_STORAGE_QUERY_PROPERTY(id_ctrl) success, "
+              "returnedLength=%u\n", __func__, (uint32_t)returnedLength);
+    res = 0;
+err_out:
+    if (free_buffer)
+        free(free_buffer);
+    return res;
+}
+
+static int
+nvme_get_features(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
+                  const uint8_t * cmdp, uint8_t * dp, uint32_t dlen, int vb)
+{
+    int res = 0;
+    const uint32_t pg_sz = sg_get_page_size();
+    uint32_t cdw10, nsid, n;
+    const uint8_t * bp;
+    BOOL    result;
+    PVOID   buffer = NULL;
+    uint8_t * free_buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
+    STORAGE_PROPERTY_QUERY * query = NULL;
+    STORAGE_PROTOCOL_SPECIFIC_DATA * protocolData = NULL;
+    STORAGE_PROTOCOL_DATA_DESCRIPTOR * protocolDataDescr = NULL;
+
+    nsid = sg_get_unaligned_le32(cmdp + SG_NVME_PT_NSID);
+    cdw10 = sg_get_unaligned_le32(cmdp + SG_NVME_PT_CDW10);
+    n = dlen < NVME_MAX_LOG_SIZE ? NVME_MAX_LOG_SIZE : dlen;
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+                   sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + n;
+    buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, vb > 3);
+    if (buffer == NULL) {
+        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        if (vb > 1)
+            pr2ws("%s: unable to allocate memory\n", __func__);
+        psp->os_err = res;
+        return -res;
+    }
+    query = (STORAGE_PROPERTY_QUERY *)buffer;
+
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+    protocolDataDescr = (STORAGE_PROTOCOL_DATA_DESCRIPTOR *)buffer;
+    protocolData = (STORAGE_PROTOCOL_SPECIFIC_DATA *)
+                        query->AdditionalParameters;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeFeature;       /* Get Features */
+    protocolData->ProtocolDataRequestValue = cdw10;
+    protocolData->ProtocolDataRequestSubValue = nsid;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = dlen;
+
+    result = DeviceIoControl(shp->fh, IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer, bufferLength, buffer, bufferLength,
+                             &returnedLength, (OVERLAPPED*)0);
+    if ((! result) || (0 == returnedLength)) {
+        n = (uint32_t)GetLastError();
+        psp->transport_err = n;
+        psp->os_err = EIO;      /* simulate Unix error,  */
+        if (vb > 2) {
+            char b[128];
+
+            pr2ws("%s: IOCTL_STORAGE_QUERY_PROPERTY(id_ctrl) failed: %s "
+                  "[%u]\n", __func__, get_err_str(n, sizeof(b), b), n);
+        }
+        res = -psp->os_err;
+        goto err_out;
+    }
+    if (dlen > 0) {
+        protocolData = &protocolDataDescr->ProtocolSpecificData;
+        bp = (const uint8_t *)protocolData + protocolData->ProtocolDataOffset;
+        memcpy(dp, bp, dlen);
+    }
+    psp->nvme_status = 0;
+    psp->nvme_result =
+         protocolDataDescr->ProtocolSpecificData.FixedProtocolReturnData;
+    if (vb > 3)
+        pr2ws("%s: IOCTL_STORAGE_QUERY_PROPERTY(id_ctrl) success, "
+              "returnedLength=%u\n", __func__, (uint32_t)returnedLength);
+    res = 0;
+err_out:
+    if (free_buffer)
+        free(free_buffer);
+    return res;
+}
+
+static int
+nvme_get_log_page(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
+                  const uint8_t * cmdp, uint8_t * dp, uint32_t dlen, int vb)
+{
+    int res = 0;
+    const uint32_t pg_sz = sg_get_page_size();
+    uint32_t cdw10, nsid, n;
+    const uint8_t * bp;
+    BOOL    result;
+    PVOID   buffer = NULL;
+    uint8_t * free_buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnedLength = 0;
+    STORAGE_PROPERTY_QUERY * query = NULL;
+    STORAGE_PROTOCOL_SPECIFIC_DATA * protocolData = NULL;
+    STORAGE_PROTOCOL_DATA_DESCRIPTOR * protocolDataDescr = NULL;
+
+    nsid = sg_get_unaligned_le32(cmdp + SG_NVME_PT_NSID);
+    cdw10 = sg_get_unaligned_le32(cmdp + SG_NVME_PT_CDW10);
+    n = dlen < NVME_MAX_LOG_SIZE ? NVME_MAX_LOG_SIZE : dlen;
+    bufferLength = offsetof(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+                   sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + n;
+    buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, vb > 3);
+    if (buffer == NULL) {
+        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        if (vb > 1)
+            pr2ws("%s: unable to allocate memory\n", __func__);
+        psp->os_err = res;
+        return -res;
+    }
+    query = (STORAGE_PROPERTY_QUERY *)buffer;
+
+    query->PropertyId = StorageDeviceProtocolSpecificProperty;
+    query->QueryType = PropertyStandardQuery;
+    protocolDataDescr = (STORAGE_PROTOCOL_DATA_DESCRIPTOR *)buffer;
+    protocolData = (STORAGE_PROTOCOL_SPECIFIC_DATA *)
+                        query->AdditionalParameters;
+
+    protocolData->ProtocolType = ProtocolTypeNvme;
+    protocolData->DataType = NVMeDataTypeLogPage;       /* Get Log Page */
+    protocolData->ProtocolDataRequestValue = cdw10;
+    protocolData->ProtocolDataRequestSubValue = nsid;
+    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+    protocolData->ProtocolDataLength = dlen;
+
+    result = DeviceIoControl(shp->fh, IOCTL_STORAGE_QUERY_PROPERTY,
+                             buffer, bufferLength, buffer, bufferLength,
+                             &returnedLength, (OVERLAPPED*)0);
+    if ((! result) || (0 == returnedLength)) {
+        n = (uint32_t)GetLastError();
+        psp->transport_err = n;
+        psp->os_err = EIO;      /* simulate Unix error,  */
+        if (vb > 2) {
+            char b[128];
+
+            pr2ws("%s: IOCTL_STORAGE_QUERY_PROPERTY(id_ctrl) failed: %s "
+                  "[%u]\n", __func__, get_err_str(n, sizeof(b), b), n);
+        }
+        res = -psp->os_err;
+        goto err_out;
+    }
+    if (dlen > 0) {
+        protocolData = &protocolDataDescr->ProtocolSpecificData;
+        bp = (const uint8_t *)protocolData + protocolData->ProtocolDataOffset;
+        memcpy(dp, bp, dlen);
+    }
+    psp->nvme_status = 0;
+    psp->nvme_result =
+         protocolDataDescr->ProtocolSpecificData.FixedProtocolReturnData;
+    if (vb > 3)
+        pr2ws("%s: IOCTL_STORAGE_QUERY_PROPERTY(id_ctrl) success, "
+              "returnedLength=%u\n", __func__, (uint32_t)returnedLength);
+    res = 0;
+err_out:
+    if (free_buffer)
+        free(free_buffer);
+    return res;
+}
+
+static int
+nvme_real_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
+             const uint8_t * cmdp, uint8_t * dp, uint32_t dlen, bool is_read,
+             int time_secs, int vb)
+{
+    int res = 0;
+    const uint32_t cmd_len = 64;
+    const uint32_t pg_sz = sg_get_page_size();
+    uint32_t n, k;
+    uint32_t rd_off = 0;
+    uint32_t slen = psp->sense_len;
+    uint8_t * bp;
+    uint8_t * sbp = psp->sensep;
+    BOOL    ok;
+    PVOID   buffer = NULL;
+    uint8_t * free_buffer = NULL;
+    ULONG   bufferLength = 0;
+    ULONG   returnLength = 0;
+    STORAGE_PROTOCOL_COMMAND * protoCmdp;
+    const NVME_ERROR_INFO_LOG * neilp;
+
+    n = dlen < NVME_MAX_LOG_SIZE ? NVME_MAX_LOG_SIZE : dlen;
+    bufferLength = offsetof(STORAGE_PROTOCOL_COMMAND, Command) +
+                   cmd_len +
+                   sizeof(NVME_ERROR_INFO_LOG) + n;
+    buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, vb > 3);
+    if (buffer == NULL) {
+        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        if (vb > 1)
+            pr2ws("%s: unable to allocate memory\n", __func__);
+        psp->os_err = res;
+        return -res;
+    }
+    protoCmdp = (STORAGE_PROTOCOL_COMMAND *)buffer;
+    protoCmdp->Version = STORAGE_PROTOCOL_STRUCTURE_VERSION;
+    protoCmdp->Length = sizeof(STORAGE_PROTOCOL_COMMAND);
+    protoCmdp->ProtocolType = ProtocolTypeNvme;
+    /* without *_ADAPTER_REQUEST flag, goes to device */
+    protoCmdp->Flags = STORAGE_PROTOCOL_COMMAND_FLAG_ADAPTER_REQUEST;
+    /* protoCmdp->Flags = 0; */
+    protoCmdp->CommandLength = cmd_len;
+    protoCmdp->ErrorInfoLength = sizeof(NVME_ERROR_INFO_LOG);
+    if (dlen > 0) {
+        if (is_read)
+            protoCmdp->DataFromDeviceTransferLength = dlen;
+        else
+            protoCmdp->DataToDeviceTransferLength = dlen;
+    }
+    protoCmdp->TimeOutValue = (time_secs > 0) ? time_secs : DEF_TIMEOUT;
+    protoCmdp->ErrorInfoOffset =
+                 offsetof(STORAGE_PROTOCOL_COMMAND, Command) + cmd_len;
+    n = protoCmdp->ErrorInfoOffset + protoCmdp->ErrorInfoLength;
+    if (is_read) {
+        protoCmdp->DataFromDeviceBufferOffset = n;
+        rd_off = n;
+    } else
+        protoCmdp->DataToDeviceBufferOffset = n;
+    protoCmdp->CommandSpecific =
+                 STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND;
+    memcpy(protoCmdp->Command, cmdp, cmd_len);
+    if ((dlen > 0) && (! is_read)) {
+        bp = (uint8_t *)protoCmdp + n;
+        memcpy(bp, dp, dlen);
+    }
+
+    ok = DeviceIoControl(shp->fh, IOCTL_STORAGE_PROTOCOL_COMMAND,
+                         buffer, bufferLength, buffer, bufferLength,
+                         &returnLength, (OVERLAPPED*)0);
+    if (! ok) {
+        n = (uint32_t)GetLastError();
+        psp->transport_err = n;
+        psp->os_err = EIO;      /* simulate Unix error,  */
+        if (vb > 2) {
+            char b[128];
+
+            pr2ws("%s: IOCTL_STORAGE_PROTOCOL_COMMAND failed: %s "
+                  "[%u]\n", __func__, get_err_str(n, sizeof(b), b), n);
+            pr2ws("    ... ReturnStatus=0x%x, ReturnLength=%u\n",
+                  (uint32_t)protoCmdp->ReturnStatus, (uint32_t)returnLength);
+        }
+        res = -psp->os_err;
+        goto err_out;
+    }
+    bp = (uint8_t *)protoCmdp + protoCmdp->ErrorInfoOffset;
+    neilp = (const NVME_ERROR_INFO_LOG *)bp;
+    /* Shift over top of Phase tag bit */
+    psp->nvme_status = 0x3ff & (neilp->Status.AsUshort >> 1);
+    if ((dlen > 0) && is_read) {
+        bp = (uint8_t *)protoCmdp + rd_off;
+        memcpy(dp, bp, dlen);
+    }
+    psp->nvme_result = protoCmdp->FixedProtocolReturnData;
+    if (psp->nvme_direct && sbp && (slen > 3)) {
+        /* build 16 byte "sense" buffer from completion queue entry */
+        n = (slen < 16) ? slen : 16;
+        memset(sbp, 0 , n);
+        psp->sense_resid = (slen > 16) ? (slen - 16) : 0;
+        sg_put_unaligned_le32(psp->nvme_result, sbp + SG_NVME_PT_CQ_DW0);
+        if (n > 11) {
+            k = neilp->SQID;
+            sg_put_unaligned_le32((k << 16), sbp + SG_NVME_PT_CQ_DW2);
+            if (n > 15) {
+                k = ((uint32_t)neilp->Status.AsUshort << 16) | neilp->CMDID;
+                sg_put_unaligned_le32(k, sbp + SG_NVME_PT_CQ_DW3);
+            }
+        }
+    }
+    if (vb > 3)
+        pr2ws("%s: opcode=0x%x, status=0x%x, result=0x%x\n",
+              __func__, cmdp[0], psp->nvme_status, psp->nvme_result);
+    res = psp->nvme_status ? SG_LIB_NVME_STATUS : 0;
+err_out:
+    if (free_buffer)
+        free(free_buffer);
+    return res;
+}
+
+static int
+do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
+                  const uint8_t * cmdp, uint8_t * dp, uint32_t dlen,
+                  bool is_read, int time_secs, int vb)
+{
+    const uint32_t cmd_len = 64;
+    int res;
+    uint32_t n;
+    uint8_t opcode;
+
+    psp->os_err = 0;
+    psp->transport_err = 0;
+    if (NULL == cmdp) {
+        if (! psp->have_nvme_cmd)
+            return SCSI_PT_DO_BAD_PARAMS;
+        cmdp = psp->nvme_cmd;
+        is_read = psp->is_read;
+        dlen = psp->dxfer_len;
+        dp = psp->dxferp;
+    }
+    if (vb > 2) {
+        pr2ws("NVMe is_read=%s, dlen=%u, command:\n",
+              (is_read ? "true" : "false"), dlen);
+        hex2stderr((const uint8_t *)cmdp, cmd_len, 1);
+        if ((vb > 3) && (! is_read) && dp) {
+            if (dlen > 0) {
+                n = dlen;
+                if ((dlen < 512) || (vb > 5))
+                    pr2ws("\nData-out buffer (%u bytes):\n", n);
+                else {
+                    pr2ws("\nData-out buffer (first 512 of %u bytes):\n", n);
+                    n = 512;
+                }
+                hex2stderr((const uint8_t *)dp, n, 0);
+            }
+        }
+    }
+    opcode = cmdp[0];
+    switch (opcode) {   /* The matches below are cached by W10 */
+    case 0x6:           /* Identify (controller + namespace */
+        res = nvme_identify(psp, shp, cmdp, dp, dlen, vb);
+        if (res)
+            goto err_out;
+        break;
+    case 0xa:           /* Get features */
+        res = nvme_get_features(psp, shp, cmdp, dp, dlen, vb);
+        if (res)
+            goto err_out;
+        break;
+    case 0x2:           /* Get Log Page */
+        res = nvme_get_log_page(psp, shp, cmdp, dp, dlen, vb);
+        if (res)
+            goto err_out;
+        break;
+    default:
+        res = nvme_real_pt(psp, shp, cmdp, dp, dlen, is_read, time_secs, vb);
+        if (res)
+            goto err_out;
+        break;
+        /* IOCTL_STORAGE_PROTOCOL_COMMAND base pass-through goes here */
+        res = -EINVAL;
+        goto err_out;
+    }
+
+    if ((vb > 3) && is_read && dp && (dlen > 0)) {
+        n = dlen;
+        if ((dlen < 1024) || (vb > 5))
+            pr2ws("\nData-in buffer (%u bytes):\n", n);
+        else {
+            pr2ws("\nData-in buffer (first 1024 of %u bytes):\n", n);
+            n = 1024;
+        }
+        hex2stderr((const uint8_t *)dp, n, 0);
+    }
+err_out:
+    return res;
+}
+
+#else
+
 /* If cmdp is NULL then dp, dlen and is_read are ignored, those values are
  * obtained from psp. Returns 0 for success. Returns SG_LIB_NVME_STATUS if
  * there is non-zero NVMe status (SCT|SC from the completion queue) with the
@@ -1353,7 +1806,7 @@ do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     const uint32_t cmd_len = 64;
     int res;
     uint32_t n, alloc_len;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     uint32_t slen = psp->sense_len;
     uint8_t * sbp = psp->sensep;
     NVME_PASS_THROUGH_IOCTL * pthru;
@@ -1373,7 +1826,7 @@ do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     }
     if (vb > 2) {
         pr2ws("NVMe is_read=%s, dlen=%u, command:\n",
-       	      (is_read ? "true" : "false"), dlen);
+              (is_read ? "true" : "false"), dlen);
         hex2stderr((const uint8_t *)cmdp, cmd_len, 1);
         if ((vb > 3) && (! is_read) && dp) {
             if (dlen > 0) {
@@ -1491,6 +1944,8 @@ err_out:
     return res;
 }
 
+#endif
+
 
 /* Returns 0 on success; otherwise a positive value is returned */
 static int
@@ -1498,7 +1953,7 @@ sntl_cache_identity(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                     int time_secs, int vb)
 {
     static bool is_read = true;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * up;
     uint8_t * cmdp;
 
@@ -1532,7 +1987,7 @@ sntl_inq(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     bool cp_id_ctl = false;
     int res;
     uint16_t n, alloc_len, pg_cd;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * nvme_id_ns = NULL;
     uint8_t * free_nvme_id_ns = NULL;
     uint8_t inq_dout[256];
@@ -1742,7 +2197,7 @@ sntl_tur(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     }
     cmdp = psp->nvme_cmd;
     memset(cmdp, 0, sizeof(psp->nvme_cmd));
-    cmdp[SG_NVME_PT_OPCODE] =  0xa; /* Get feature */
+    cmdp[SG_NVME_PT_OPCODE] =  0xa; /* Get features */
     sg_put_unaligned_le32(SG_NVME_BROADCAST_NSID, cmdp + SG_NVME_PT_NSID);
     /* SEL=0 (current), Feature=2 Power Management */
     sg_put_unaligned_le32(0x2, cmdp + SG_NVME_PT_CDW10);
@@ -1792,7 +2247,7 @@ sntl_req_sense(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     alloc_len = cdbp[4];
     cmdp = psp->nvme_cmd;
     memset(cmdp, 0, sizeof(psp->nvme_cmd));
-    cmdp[SG_NVME_PT_OPCODE] =  0xa; /* Get feature */
+    cmdp[SG_NVME_PT_OPCODE] =  0xa; /* Get features */
     sg_put_unaligned_le32(SG_NVME_BROADCAST_NSID, cmdp + SG_NVME_PT_NSID);
     /* SEL=0 (current), Feature=2 Power Management */
     sg_put_unaligned_le32(0x2, cmdp + SG_NVME_PT_CDW10);
@@ -1840,7 +2295,7 @@ sntl_senddiag(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     int res;
     uint8_t st_cd, dpg_cd;
     uint32_t alloc_len, n, dout_len, dpg_len, nvme_dst;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * dop;
     uint8_t * cmdp;
 
@@ -1968,7 +2423,7 @@ sntl_recvdiag(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     int res;
     uint8_t dpg_cd;
     uint32_t alloc_len, n, din_len;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * dip;
     uint8_t * cmdp;
 
@@ -2061,7 +2516,7 @@ sntl_rep_opcodes(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     uint8_t reporting_opts, req_opcode, supp;
     uint16_t req_sa, u;
     uint32_t alloc_len, offset, a_len;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     int k, len, count, bump;
     const struct opcode_info_t *oip;
     uint8_t *arr;
@@ -2243,7 +2698,7 @@ do_nvme_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     }
     if (vb > 3)
         pr2ws("%s: opcode=0x%x, cmd_len=%u, fdev_name: %s, dlen=%u\n",
-	      __func__, cdbp[0], cmd_len, shp->dname, psp->dxfer_len);
+              __func__, cdbp[0], cmd_len, shp->dname, psp->dxfer_len);
     /* direct NVMe command (i.e. 64 bytes long) or SNTL */
     if (scsi_cdb) {
         switch (cdbp[0]) {
@@ -2281,14 +2736,14 @@ do_nvme_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
         }
     }
     if(psp->dxfer_len > 0) {
-	uint8_t * cmdp = psp->nvme_cmd;
+        uint8_t * cmdp = psp->nvme_cmd;
 
-	sg_put_unaligned_le32(psp->dxfer_len, cmdp + SG_NVME_PT_DATA_LEN);
-	sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)psp->dxferp, 
-			      cmdp + SG_NVME_PT_ADDR);
-	if (vb > 2)
-	    pr2ws("%s: NVMe command, dlen=%u, dxferp=0x%p\n", __func__,
-		  psp->dxfer_len, psp->dxferp);
+        sg_put_unaligned_le32(psp->dxfer_len, cmdp + SG_NVME_PT_DATA_LEN);
+        sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)psp->dxferp,
+                              cmdp + SG_NVME_PT_ADDR);
+        if (vb > 2)
+            pr2ws("%s: NVMe command, dlen=%u, dxferp=0x%p\n", __func__,
+                  psp->dxfer_len, psp->dxferp);
     }
     return do_nvme_admin_cmd(psp, shp, NULL, NULL, 0, true, time_secs, vb);
 }

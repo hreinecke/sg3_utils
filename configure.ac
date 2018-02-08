@@ -114,6 +114,7 @@ AC_ARG_ENABLE([nvme-supp],
   AC_HELP_STRING([--disable-nvme-supp], [remove all or most NVMe code]),
   [AC_DEFINE_UNQUOTED(IGNORE_NVME, 1, [compile out NVMe support], )], [])
 
+
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile scripts/Makefile)
 
 
@@ -123,13 +124,7 @@ info=`
   echo "-----------------------------------------------------------------------------"
   echo "${PACKAGE}-${VERSION} configuration:"
   echo "host operating system:  $host"
-  echo "C++ compiler:           $CXX"
-  echo "C compiler:             $CC"
-  echo "preprocessor flags:     $CPPFLAGS"
-  echo "C++ compiler flags:     $CXXFLAGS"
-  echo "C compiler flags:       $CFLAGS"
-  echo "linker flags:           $LDFLAGS"
-  echo "OS specific modules:    $os_deps $os_libs $LIBS"
+  echo "default C compiler:     $CC"
 
   case "$host_os" in
     mingw*)
@@ -141,9 +136,8 @@ info=`
 
     *)
       echo "binary install path:    \`eval eval eval echo $bindir\`"
+      echo "scripts install path:   \`eval eval eval echo $bindir\`"
       echo "man page install path:  \`eval eval eval echo $mandir\`"
-      echo "doc file install path:  \`eval eval eval echo $docdir\`"
-      echo "examples install path:  \`eval eval eval echo $exampledir\`"
       ;;
   esac
   echo "-----------------------------------------------------------------------------"

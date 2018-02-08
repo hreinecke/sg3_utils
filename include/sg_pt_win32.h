@@ -24,86 +24,86 @@ extern "C" {
 #define SCSI_MAX_INDIRECT_DATA 16384
 
 typedef struct {
-        USHORT          Length;
-        UCHAR           ScsiStatus;
-        UCHAR           PathId;
-        UCHAR           TargetId;
-        UCHAR           Lun;
-        UCHAR           CdbLength;
-        UCHAR           SenseInfoLength;
-        UCHAR           DataIn;
-        ULONG           DataTransferLength;
-        ULONG           TimeOutValue;
-        ULONG_PTR       DataBufferOffset;  /* was ULONG; problem in 64 bit */
-        ULONG           SenseInfoOffset;
-        UCHAR           Cdb[SCSI_MAX_CDB_LEN];
+    USHORT          Length;
+    UCHAR           ScsiStatus;
+    UCHAR           PathId;
+    UCHAR           TargetId;
+    UCHAR           Lun;
+    UCHAR           CdbLength;
+    UCHAR           SenseInfoLength;
+    UCHAR           DataIn;
+    ULONG           DataTransferLength;
+    ULONG           TimeOutValue;
+    ULONG_PTR       DataBufferOffset;  /* was ULONG; problem in 64 bit */
+    ULONG           SenseInfoOffset;
+    UCHAR           Cdb[SCSI_MAX_CDB_LEN];
 } SCSI_PASS_THROUGH, *PSCSI_PASS_THROUGH;
 
 
 typedef struct {
-        USHORT          Length;
-        UCHAR           ScsiStatus;
-        UCHAR           PathId;
-        UCHAR           TargetId;
-        UCHAR           Lun;
-        UCHAR           CdbLength;
-        UCHAR           SenseInfoLength;
-        UCHAR           DataIn;
-        ULONG           DataTransferLength;
-        ULONG           TimeOutValue;
-        PVOID           DataBuffer;
-        ULONG           SenseInfoOffset;
-        UCHAR           Cdb[SCSI_MAX_CDB_LEN];
+    USHORT          Length;
+    UCHAR           ScsiStatus;
+    UCHAR           PathId;
+    UCHAR           TargetId;
+    UCHAR           Lun;
+    UCHAR           CdbLength;
+    UCHAR           SenseInfoLength;
+    UCHAR           DataIn;
+    ULONG           DataTransferLength;
+    ULONG           TimeOutValue;
+    PVOID           DataBuffer;
+    ULONG           SenseInfoOffset;
+    UCHAR           Cdb[SCSI_MAX_CDB_LEN];
 } SCSI_PASS_THROUGH_DIRECT, *PSCSI_PASS_THROUGH_DIRECT;
 
 
 typedef struct {
-        SCSI_PASS_THROUGH spt;
-        /* plscsi shows a follow on 16 bytes allowing 32 byte cdb */
-        ULONG           Filler;
-        UCHAR           ucSenseBuf[SCSI_MAX_SENSE_LEN];
-        UCHAR           ucDataBuf[SCSI_MAX_INDIRECT_DATA];
+    SCSI_PASS_THROUGH spt;
+    /* plscsi shows a follow on 16 bytes allowing 32 byte cdb */
+    ULONG           Filler;
+    UCHAR           ucSenseBuf[SCSI_MAX_SENSE_LEN];
+    UCHAR           ucDataBuf[SCSI_MAX_INDIRECT_DATA];
 } SCSI_PASS_THROUGH_WITH_BUFFERS, *PSCSI_PASS_THROUGH_WITH_BUFFERS;
 
 
 typedef struct {
-        SCSI_PASS_THROUGH_DIRECT spt;
-        ULONG           Filler;
-        UCHAR           ucSenseBuf[SCSI_MAX_SENSE_LEN];
+    SCSI_PASS_THROUGH_DIRECT spt;
+    ULONG           Filler;
+    UCHAR           ucSenseBuf[SCSI_MAX_SENSE_LEN];
 } SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER, *PSCSI_PASS_THROUGH_DIRECT_WITH_BUFFER;
 
 
 
 typedef struct {
-        UCHAR           NumberOfLogicalUnits;
-        UCHAR           InitiatorBusId;
-        ULONG           InquiryDataOffset;
+    UCHAR           NumberOfLogicalUnits;
+    UCHAR           InitiatorBusId;
+    ULONG           InquiryDataOffset;
 } SCSI_BUS_DATA, *PSCSI_BUS_DATA;
 
 
 typedef struct {
-        UCHAR           NumberOfBusses;
-        SCSI_BUS_DATA   BusData[1];
+    UCHAR           NumberOfBusses;
+    SCSI_BUS_DATA   BusData[1];
 } SCSI_ADAPTER_BUS_INFO, *PSCSI_ADAPTER_BUS_INFO;
 
 
 typedef struct {
-        UCHAR           PathId;
-        UCHAR           TargetId;
-        UCHAR           Lun;
-        BOOLEAN         DeviceClaimed;
-        ULONG           InquiryDataLength;
-        ULONG           NextInquiryDataOffset;
-        UCHAR           InquiryData[1];
+    UCHAR           PathId;
+    UCHAR           TargetId;
+    UCHAR           Lun;
+    BOOLEAN         DeviceClaimed;
+    ULONG           InquiryDataLength;
+    ULONG           NextInquiryDataOffset;
+    UCHAR           InquiryData[1];
 } SCSI_INQUIRY_DATA, *PSCSI_INQUIRY_DATA;
 
 
 typedef struct {
-        ULONG           Length;
-        UCHAR           PortNumber;
-        UCHAR           PathId;
-        UCHAR           TargetId;
-        UCHAR           Lun;
+    ULONG           Length;
+    UCHAR           PortNumber;
+    UCHAR           PathId;
+    UCHAR           TargetId;
+    UCHAR           Lun;
 } SCSI_ADDRESS, *PSCSI_ADDRESS;
 
 /*
@@ -210,26 +210,30 @@ typedef struct _STORAGE_DEVICE_DESCRIPTOR {
 
 #define STORAGE_PROTOCOL_STRUCTURE_VERSION 0x1
 
+#define IOCTL_STORAGE_PROTOCOL_COMMAND \
+        CTL_CODE(IOCTL_STORAGE_BASE, 0x04F0, METHOD_BUFFERED, \
+                FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
 typedef struct _STORAGE_PROTOCOL_COMMAND {
-  DWORD         Version;        /* STORAGE_PROTOCOL_STRUCTURE_VERSION */
-  DWORD         Length;
-  STORAGE_PROTOCOL_TYPE   ProtocolType;
-  DWORD         Flags;
-  DWORD         ReturnStatus;
-  DWORD         ErrorCode;
-  DWORD         CommandLength;
-  DWORD         ErrorInfoLength;
-  DWORD         DataToDeviceTransferLength;
-  DWORD         DataFromDeviceTransferLength;
-  DWORD         TimeOutValue;
-  DWORD         ErrorInfoOffset;
-  DWORD         DataToDeviceBufferOffset;
-  DWORD         DataFromDeviceBufferOffset;
-  DWORD         CommandSpecific;
-  DWORD         Reserved0;
-  DWORD         FixedProtocolReturnData;
-  DWORD         Reserved1[3];
-  BYTE          Command[1];     /* has CommandLength elements */
+    DWORD         Version;        /* STORAGE_PROTOCOL_STRUCTURE_VERSION */
+    DWORD         Length;
+    STORAGE_PROTOCOL_TYPE   ProtocolType;
+    DWORD         Flags;
+    DWORD         ReturnStatus;
+    DWORD         ErrorCode;
+    DWORD         CommandLength;
+    DWORD         ErrorInfoLength;
+    DWORD         DataToDeviceTransferLength;
+    DWORD         DataFromDeviceTransferLength;
+    DWORD         TimeOutValue;
+    DWORD         ErrorInfoOffset;
+    DWORD         DataToDeviceBufferOffset;
+    DWORD         DataFromDeviceBufferOffset;
+    DWORD         CommandSpecific;
+    DWORD         Reserved0;
+    DWORD         FixedProtocolReturnData;
+    DWORD         Reserved1[3];
+    BYTE          Command[1];     /* has CommandLength elements */
 } STORAGE_PROTOCOL_COMMAND, *PSTORAGE_PROTOCOL_COMMAND;
 
 #endif          /* _DEVIOCTL_ */
@@ -260,7 +264,10 @@ typedef enum _STORAGE_PROPERTY_ID {
     StorageDeviceUniqueIdProperty,
     StorageDeviceWriteCacheProperty,
     StorageMiniportProperty,
-    StorageAccessAlignmentProperty
+    StorageAccessAlignmentProperty,
+    /* Identify controller goes to adapter; Identify namespace to device */
+    StorageAdapterProtocolSpecificProperty = 49,
+    StorageDeviceProtocolSpecificProperty = 50
 } STORAGE_PROPERTY_ID, *PSTORAGE_PROPERTY_ID;
 
 typedef struct _STORAGE_PROPERTY_QUERY {
@@ -268,6 +275,117 @@ typedef struct _STORAGE_PROPERTY_QUERY {
     STORAGE_QUERY_TYPE QueryType;
     UCHAR AdditionalParameters[1];
 } STORAGE_PROPERTY_QUERY, *PSTORAGE_PROPERTY_QUERY;
+
+typedef struct _STORAGE_PROTOCOL_DATA_DESCRIPTOR {
+    DWORD  Version;
+    DWORD  Size;
+    STORAGE_PROTOCOL_SPECIFIC_DATA ProtocolSpecificData;
+} STORAGE_PROTOCOL_DATA_DESCRIPTOR, *PSTORAGE_PROTOCOL_DATA_DESCRIPTOR;
+
+// Command completion status
+// The "Phase Tag" field and "Status Field" are separated in spec. We define
+// them in the same data structure to ease the memory access from software.
+//
+typedef union {
+    struct {
+        USHORT  P           : 1;        // Phase Tag (P)
+
+        USHORT  SC          : 8;        // Status Code (SC)
+        USHORT  SCT         : 3;        // Status Code Type (SCT)
+        USHORT  Reserved    : 2;
+        USHORT  M           : 1;        // More (M)
+        USHORT  DNR         : 1;        // Do Not Retry (DNR)
+    } DUMMYSTRUCTNAME;
+    USHORT AsUshort;
+} NVME_COMMAND_STATUS, *PNVME_COMMAND_STATUS;
+
+// Information of log: NVME_LOG_PAGE_ERROR_INFO. Size: 64 bytes
+//
+typedef struct {
+    ULONGLONG  ErrorCount;
+    USHORT     SQID;           // Submission Queue ID
+    USHORT     CMDID;          // Command ID
+    NVME_COMMAND_STATUS Status; // Status Field: This field indicates the
+                                // Status Field for the command that
+                                // completed. The Status Field is located in
+                                // bits 15:01, bit 00 corresponds to the Phase
+                                // Tag posted for the command.
+    struct {
+        USHORT  Byte        : 8;   // Byte in command that contained error
+        USHORT  Bit         : 3;   // Bit in command that contained error
+        USHORT  Reserved    : 5;
+    } ParameterErrorLocation;
+
+    ULONGLONG  Lba;            // LBA: This field indicates the first LBA
+                               // that experienced the error condition, if
+                               // applicable.
+    ULONG      NameSpace;      // Namespace: This field indicates the nsid
+                               // that the error is associated with, if
+                               // applicable.
+    UCHAR      VendorInfoAvailable;    // Vendor Specific Information Available
+    UCHAR      Reserved0[3];
+    ULONGLONG  CommandSpecificInfo;    // This field contains command specific
+                                       // information. If used, the command
+                                       // definition specifies the information
+                                       // returned.
+    UCHAR      Reserved1[24];
+} NVME_ERROR_INFO_LOG, *PNVME_ERROR_INFO_LOG;
+
+typedef struct {
+
+    ULONG   DW0;
+    ULONG   Reserved;
+
+    union {
+        struct {
+            USHORT  SQHD;               // SQ Head Pointer (SQHD)
+            USHORT  SQID;               // SQ Identifier (SQID)
+        } DUMMYSTRUCTNAME;
+
+        ULONG   AsUlong;
+    } DW2;
+
+    union {
+        struct {
+            USHORT              CID;    // Command Identifier (CID)
+            NVME_COMMAND_STATUS Status;
+        } DUMMYSTRUCTNAME;
+
+        ULONG   AsUlong;
+    } DW3;
+
+} NVME_COMPLETION_ENTRY, *PNVME_COMPLETION_ENTRY;
+
+
+// Bit-mask values for STORAGE_PROTOCOL_COMMAND - "Flags" field.
+//
+// Flag indicates the request targeting to adapter instead of device.
+#define STORAGE_PROTOCOL_COMMAND_FLAG_ADAPTER_REQUEST    0x80000000
+
+//
+// Status values for STORAGE_PROTOCOL_COMMAND - "ReturnStatus" field.
+//
+#define STORAGE_PROTOCOL_STATUS_PENDING                 0x0
+#define STORAGE_PROTOCOL_STATUS_SUCCESS                 0x1
+#define STORAGE_PROTOCOL_STATUS_ERROR                   0x2
+#define STORAGE_PROTOCOL_STATUS_INVALID_REQUEST         0x3
+#define STORAGE_PROTOCOL_STATUS_NO_DEVICE               0x4
+#define STORAGE_PROTOCOL_STATUS_BUSY                    0x5
+#define STORAGE_PROTOCOL_STATUS_DATA_OVERRUN            0x6
+#define STORAGE_PROTOCOL_STATUS_INSUFFICIENT_RESOURCES  0x7
+
+#define STORAGE_PROTOCOL_STATUS_NOT_SUPPORTED           0xFF
+
+// Command Length for Storage Protocols.
+//
+// NVMe commands are always 64 bytes.
+#define STORAGE_PROTOCOL_COMMAND_LENGTH_NVME            0x40
+
+// Command Specific Information for Storage Protocols - CommandSpecific field
+//
+#define STORAGE_PROTOCOL_SPECIFIC_NVME_ADMIN_COMMAND    0x01
+#define STORAGE_PROTOCOL_SPECIFIC_NVME_NVM_COMMAND 0x02
+
 #endif          /* _DEVIOCTL_ */
 
 
@@ -275,12 +393,12 @@ typedef struct _STORAGE_PROPERTY_QUERY {
 
 #ifndef STB_IO_CONTROL
 typedef struct _SRB_IO_CONTROL {
-        ULONG HeaderLength;
-        UCHAR Signature[8];
-        ULONG Timeout;
-        ULONG ControlCode;
-        ULONG ReturnCode;
-        ULONG Length;
+    ULONG HeaderLength;
+    UCHAR Signature[8];
+    ULONG Timeout;
+    ULONG ControlCode;
+    ULONG ReturnCode;
+    ULONG Length;
 } SRB_IO_CONTROL, *PSRB_IO_CONTROL;
 #endif
 
@@ -293,19 +411,24 @@ typedef struct _SRB_IO_CONTROL {
   CTL_CODE(NVME_STORPORT_DRIVER, 0x0800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 #pragma pack(1)
+
+/* Following is pre-Win10; used with DeviceIoControl(IOCTL_SCSI_MINIPORT),
+ * in Win10 need DeviceIoControl(IOCTL_STORAGE_PROTOCOL_COMMAND) for pure
+ * pass-through. Win10 also has "Protocol specific queries" for things like
+ * Identify and Get feature. */
 typedef struct _NVME_PASS_THROUGH_IOCTL
 {
-        SRB_IO_CONTROL SrbIoCtrl;
-        ULONG VendorSpecific[6];
-        ULONG NVMeCmd[16];      /* Command DW[0...15] */
-        ULONG CplEntry[4];      /* Completion DW[0...3] */
-        ULONG Direction;        /* 0=None, 1=Out, 2=In, 3=I/O */
-        ULONG QueueId;          /* 0=AdminQ */
-        ULONG DataBufferLen;    /* sizeof(DataBuffer) if Data In */
-        ULONG MetaDataLen;
-        ULONG ReturnBufferLen;  /* offsetof(DataBuffer), plus
-                                 * sizeof(DataBuffer) if Data Out */
-        UCHAR DataBuffer[1];
+    SRB_IO_CONTROL SrbIoCtrl;
+    ULONG VendorSpecific[6];
+    ULONG NVMeCmd[16];      /* Command DW[0...15] */
+    ULONG CplEntry[4];      /* Completion DW[0...3] */
+    ULONG Direction;        /* 0=None, 1=Out, 2=In, 3=I/O */
+    ULONG QueueId;          /* 0=AdminQ */
+    ULONG DataBufferLen;    /* sizeof(DataBuffer) if Data In */
+    ULONG MetaDataLen;
+    ULONG ReturnBufferLen;  /* offsetof(DataBuffer), plus
+                             * sizeof(DataBuffer) if Data Out */
+    UCHAR DataBuffer[1];
 } NVME_PASS_THROUGH_IOCTL;
 #pragma pack()
 
