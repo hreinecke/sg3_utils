@@ -8,6 +8,7 @@
 *~
 .deps
 .libs
+TAGS
 aclocal.m4
 ar-lib
 autom4te.cache/
