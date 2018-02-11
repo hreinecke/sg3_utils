@@ -36,7 +36,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.06 20180118";
+static const char * version_str = "1.07 20180210";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -278,7 +278,7 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
     ret = sg_cmds_process_resp(ptvp, "read attribute", res, op->maxlen,
                                sense_b, noisy, op->verbose, &sense_cat);
     if (-1 == ret)
-        ;
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

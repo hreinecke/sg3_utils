@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20180123";
+static const char * version_str = "1.21 20180210";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -374,7 +374,7 @@ sg_ll_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
                                    SG_NO_DATA_IN, sense_b, noisy, verbose,
                                    &sense_cat);
         if (-1 == ret)
-                ;
+                ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
         else if (-2 == ret) {
                 switch (sense_cat) {
                 case SG_LIB_CAT_RECOVERED:

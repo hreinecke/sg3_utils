@@ -99,12 +99,9 @@ sg_ll_set_cd_speed(int sg_fd, int rot_control, int drv_read_speed,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -174,12 +171,9 @@ sg_ll_get_config(int sg_fd, int rt, int starting, void * resp,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
@@ -269,12 +263,9 @@ sg_ll_get_performance(int sg_fd, int data_type, unsigned int starting_lba,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_INVALID_OP:
         case SG_LIB_CAT_ILLEGAL_REQ:
@@ -353,12 +344,9 @@ sg_ll_set_streaming(int sg_fd, int type, void * paramp, int param_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_NOT_READY:
         case SG_LIB_CAT_INVALID_OP:

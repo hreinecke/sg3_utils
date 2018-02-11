@@ -1317,7 +1317,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     ret = sg_cmds_process_resp(ptvp, op->cdb_name, res, SG_NO_DATA_IN,
                                sense_b, true /*noisy */, vb, &sense_cat);
     if (-1 == ret)
-        ;       /* general (OS) error like ioctl not recognized */
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

@@ -1895,6 +1895,9 @@ sg_if_can2stderr(const char * leadin, int exit_status)
     case SG_LIB_NVME_STATUS:            /* 48 */
         pr2ws("%sNVMe error (non-zero status)\n", s);
         return true;
+    case SG_LIB_OS_BASE_ERR:            /* 50 */
+        pr2ws("%sAn OS error occurred\n", s);
+        return true;
     case SG_LIB_OS_BASE_ERR + EACCES:   /* 50 + */
         pr2ws("%sPermission denied\n", s);
         return true;
@@ -1926,19 +1929,19 @@ sg_if_can2stderr(const char * leadin, int exit_status)
 }
 
 /* If os_err_num is within bounds then the returned value is 'os_err_num +
- * SG_LIB_OS_BASE_ERR' otherwise -1 is returned. If os_err_num is 0 then 0
- * is returned. */
+ * SG_LIB_OS_BASE_ERR' otherwise SG_LIB_OS_BASE_ERR is returned. If
+ * os_err_num is 0 then 0 is returned. */
 int
 sg_convert_errno(int os_err_num)
 {
     if (os_err_num <= 0) {
-        if (os_err_num < -1)
-            return -1;
+        if (os_err_num < 0)
+            return SG_LIB_OS_BASE_ERR;
         return os_err_num;
     }
     if (os_err_num < (SG_LIB_CAT_MALFORMED - SG_LIB_OS_BASE_ERR))
         return SG_LIB_OS_BASE_ERR + os_err_num;
-    return -1;
+    return SG_LIB_OS_BASE_ERR;
 }
 
 /* See description in sg_lib.h header file */
@@ -2379,12 +2382,15 @@ sg_get_category_sense_str(int sense_cat, int buff_len, char * buff,
                      "issue");
         break;
     default:
-        if ((sense_cat > SG_LIB_OS_BASE_ERR) &&
+        if ((sense_cat >= SG_LIB_OS_BASE_ERR) &&
             (sense_cat < (SG_LIB_OS_BASE_ERR + 47))) {
             int k = sense_cat - SG_LIB_OS_BASE_ERR;
 
-            n = scnpr(buff, buff_len, "OS error: %s [%d]", safe_strerror(k),
-                      k);
+            if (k > 0)
+                n = scnpr(buff, buff_len, "OS error: %s [%d]",
+                          safe_strerror(k), k);
+            else
+                n = scnpr(buff, buff_len, "OS error occurred");
         } else {
             n = scnpr(buff, buff_len, "Sense category: %d", sense_cat);
             if ((0 == verbose) && (n < (buff_len - 1)))

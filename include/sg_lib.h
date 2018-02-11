@@ -579,8 +579,8 @@ uint8_t * sg_memalign(uint32_t num_bytes, uint32_t align_to,
 uint32_t sg_get_page_size(void);
 
 /* If os_err_num is within bounds then the returned value is 'os_err_num +
- * SG_LIB_OS_BASE_ERR' otherwise -1 is returned. If os_err_num is 0 then 0
- * is returned. */
+ * SG_LIB_OS_BASE_ERR' otherwise SG_LIB_OS_BASE_ERR is returned. If
+ * os_err_num is 0 then 0 is returned. */
 int sg_convert_errno(int os_err_num);
 
 

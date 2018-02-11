@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.42 20180112";
+static const char * version_str = "1.43 20180210";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -264,7 +264,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         ret = sg_cmds_process_resp(ptvp, "format medium", res, transfer_len,
                                    sense_b, noisy, verbose, &sense_cat);
         if (-1 == ret)
-                ;
+                ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
         else if (-2 == ret) {
                 switch (sense_cat) {
                 case SG_LIB_CAT_RECOVERED:

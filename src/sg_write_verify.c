@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.11 20180118";
+static const char * version_str = "1.12 20180210";
 
 
 #define ME "sg_write_verify: "
@@ -152,7 +152,7 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
     ret = sg_cmds_process_resp(ptvp, b, res, SG_NO_DATA_IN, sense_b, noisy,
                                verbose, &sense_cat);
     if (-1 == ret)
-        ;
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
