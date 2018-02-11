@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.05 20180118";
+static const char * version_str = "1.06 20180210";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -229,7 +229,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     ret = sg_cmds_process_resp(ptvp, "Sanitize", res, SG_NO_DATA_IN, sense_b,
                                true /*noisy */, op->verbose, &sense_cat);
     if (-1 == ret)
-        ;
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

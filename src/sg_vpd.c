@@ -25,7 +25,6 @@
 #endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
-#include "sg_pt.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
@@ -38,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.36 20180201";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.37 20180210";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0

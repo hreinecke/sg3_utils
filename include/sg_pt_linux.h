@@ -2,7 +2,7 @@
 #define SG_PT_LINUX_H
 
 /*
- * Copyright (c) 2017 Douglas Gilbert.
+ * Copyright (c) 2017-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -96,8 +96,8 @@ struct sg_pt_linux_scsi {
     /* Leave io_hdr in first place of this structure */
     bool is_sg;
     bool is_bsg;
-    bool is_nvme;	/* OS device type, if false ignore nvme_direct */
-    bool nvme_direct;	/* false: our SNTL; true: received NVMe command */
+    bool is_nvme;       /* OS device type, if false ignore nvme_direct */
+    bool nvme_direct;   /* false: our SNTL; true: received NVMe command */
     bool mdxfer_out;    /* direction of metadata xfer, true->data-out */
     bool scsi_dsense;   /* SCSI descriptor sense active when true */
     int dev_fd;                 /* -1 if not given (yet) */

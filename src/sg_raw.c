@@ -18,11 +18,15 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -32,15 +36,16 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.21 (2018-01-18)"
+#define SG_RAW_VERSION "0.4.22 (2018-02-10)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
-#define MAX_SCSI_CDBSZ 256
+#define MAX_SCSI_CDBSZ 260
 #define MAX_SCSI_DXLEN (64 * 1024)
 
 static struct option long_options[] = {
     { "binary",  no_argument,       NULL, 'b' },
+    { "cmdfile", required_argument, NULL, 'c' },
     { "enumerate", no_argument,     NULL, 'e' },
     { "help",    no_argument,       NULL, 'h' },
     { "infile",  required_argument, NULL, 'i' },
@@ -57,6 +62,7 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
+    bool cmdfile_given;
     bool do_datain;
     bool datain_binary;
     bool do_dataout;
@@ -71,7 +77,8 @@ struct opts_t {
     int readonly;
     int verbose;
     off_t dataout_offset;
-    unsigned char cdb[MAX_SCSI_CDBSZ];
+    uint8_t cdb[MAX_SCSI_CDBSZ];        /* might be NVMe command (64 byte) */
+    const char *cmd_file;
     const char *datain_file;
     const char *dataout_file;
     char *device_name;
@@ -82,7 +89,7 @@ static void
 pr_version()
 {
     pr2serr("sg_raw " SG_RAW_VERSION "\n"
-            "Copyright (C) 2007-2012 Ingo van Lil <inguin@gmx.de>\n"
+            "Copyright (C) 2007-2018 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
@@ -93,12 +100,14 @@ pr_version()
 static void
 usage()
 {
-    pr2serr("Usage: sg_raw [OPTION]* DEVICE CDB0 CDB1 ...\n"
+    pr2serr("Usage: sg_raw [OPTION]* DEVICE [CDB0 CDB1 ...]\n"
             "\n"
             "Options:\n"
             "  --binary|-b            Dump data in binary form, even when "
             "writing to\n"
             "                         stdout\n"
+            "  --cmdfile=CF|-c CF     CF is file containing command in hex "
+            "bytes\n"
             "  --enumerate|-e         Decodes cdb name then exits; requires "
             "DEVICE but\n"
             "                         ignores it\n"
@@ -122,11 +131,204 @@ usage()
             "  --verbose|-v           Increase verbosity\n"
             "  --version|-V           Show version information and exit\n"
             "\n"
-            "Between 6 and 256 command bytes (two hex digits each) can be "
+            "Between 6 and 260 command bytes (two hex digits each) can be "
             "specified\nand will be sent to DEVICE. Lengths RLEN and SLEN "
             "are decimal by\ndefault. Bidirectional commands accepted.\n\n"
             "Simple example: Perform INQUIRY on /dev/sg0:\n"
             "  sg_raw -r 1k /dev/sg0 12 00 00 00 60 00\n");
+}
+
+/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
+ * stdin). If reading ASCII hex then there should be either one entry per
+ * line or a comma, space or tab separated list of bytes. If no_space is
+ * true then a string of ACSII hex digits is expected, 2 per byte. Everything
+ * from and including a '#' on a line is ignored. Returns true if ok, or
+ * false if error. */
+static bool
+f2hex_arr(const char * fname, bool as_binary, bool no_space,
+          uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
+{
+    int fn_len, in_len, k, j, m, fd;
+    bool has_stdin, split_line;
+    unsigned int h;
+    const char * lcp;
+    FILE * fp;
+    char line[512];
+    char carry_over[4];
+    int off = 0;
+    struct stat a_stat;
+
+    if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
+        return false;
+    fn_len = strlen(fname);
+    if (0 == fn_len)
+        return false;
+    has_stdin = ((1 == fn_len) && ('-' == fname[0]));   /* read from stdin */
+    if (as_binary) {
+        if (has_stdin)
+            fd = STDIN_FILENO;
+        else {
+            fd = open(fname, O_RDONLY);
+            if (fd < 0) {
+                pr2serr("unable to open binary file %s: %s\n", fname,
+                         safe_strerror(errno));
+                return false;
+            }
+        }
+        k = read(fd, mp_arr, max_arr_len);
+        if (k <= 0) {
+            if (0 == k)
+                pr2serr("read 0 bytes from binary file %s\n", fname);
+            else
+                pr2serr("read from binary file %s: %s\n", fname,
+                        safe_strerror(errno));
+            if (! has_stdin)
+                close(fd);
+            return false;
+        }
+        if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
+            /* pipe; keep reading till error or 0 read */
+            while (k < max_arr_len) {
+                m = read(fd, mp_arr + k, max_arr_len - k);
+                if (0 == m)
+                   break;
+                if (m < 0) {
+                    pr2serr("read from binary pipe %s: %s\n", fname,
+                            safe_strerror(errno));
+                    if (! has_stdin)
+                        close(fd);
+                    return false;
+                }
+                k += m;
+            }
+        }
+        *mp_arr_len = k;
+        if (! has_stdin)
+            close(fd);
+        return true;
+    } else {    /* So read the file as ASCII hex */
+        if (has_stdin)
+            fp = stdin;
+        else {
+            fp = fopen(fname, "r");
+            if (NULL == fp) {
+                pr2serr("Unable to open %s for reading\n", fname);
+                return false;
+            }
+        }
+    }
+
+    carry_over[0] = 0;
+    for (j = 0; j < 512; ++j) {
+        if (NULL == fgets(line, sizeof(line), fp))
+            break;
+        in_len = strlen(line);
+        if (in_len > 0) {
+            if ('\n' == line[in_len - 1]) {
+                --in_len;
+                line[in_len] = '\0';
+                split_line = false;
+            } else
+                split_line = true;
+        }
+        if (in_len < 1) {
+            carry_over[0] = 0;
+            continue;
+        }
+        if (carry_over[0]) {
+            if (isxdigit(line[0])) {
+                carry_over[1] = line[0];
+                carry_over[2] = '\0';
+                if (1 == sscanf(carry_over, "%4x", &h))
+                    mp_arr[off - 1] = h;       /* back up and overwrite */
+                else {
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
+                    goto bad;
+                }
+                lcp = line + 1;
+                --in_len;
+            } else
+                lcp = line;
+            carry_over[0] = 0;
+        } else
+            lcp = line;
+
+        m = strspn(lcp, " \t");
+        if (m == in_len)
+            continue;
+        lcp += m;
+        in_len -= m;
+        if ('#' == *lcp)
+            continue;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
+                    j + 1, m + k + 1);
+            goto bad;
+        }
+        if (no_space) {
+            for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
+                 ++k, lcp += 2) {
+                if (1 != sscanf(lcp, "%2x", &h)) {
+                    pr2serr("%s: bad hex number in line %d, pos %d\n",
+                            __func__, j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+                if ((off + k) >= max_arr_len) {
+                    pr2serr("%s: array length exceeded\n", __func__);
+                    goto bad;
+                }
+                mp_arr[off + k] = h;
+            }
+            if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
+                carry_over[0] = *lcp;
+            off += k;
+        } else {
+            for (k = 0; k < 1024; ++k) {
+                if (1 == sscanf(lcp, "%10x", &h)) {
+                    if (h > 0xff) {
+                        pr2serr("%s: hex number larger than 0xff in line "
+                                "%d, pos %d\n", __func__, j + 1,
+                                (int)(lcp - line + 1));
+                        goto bad;
+                    }
+                    if (split_line && (1 == strlen(lcp))) {
+                        /* single trailing hex digit might be a split pair */
+                        carry_over[0] = *lcp;
+                    }
+                    if ((off + k) >= max_arr_len) {
+                        pr2serr("%s: array length exceeded\n", __func__);
+                        goto bad;
+                    }
+                    mp_arr[off + k] = h;
+                    lcp = strpbrk(lcp, " ,\t");
+                    if (NULL == lcp)
+                        break;
+                    lcp += strspn(lcp, " ,\t");
+                    if ('\0' == *lcp)
+                        break;
+                } else {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
+                        --k;
+                        break;
+                    }
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+            }
+            off += (k + 1);
+        }
+    }
+    *mp_arr_len = off;
+    if (stdin != fp)
+        fclose(fp);
+    return true;
+bad:
+    if (stdin != fp)
+        fclose(fp);
+    return false;
 }
 
 static int
@@ -135,13 +337,18 @@ process_cl(struct opts_t * op, int argc, char *argv[])
     while (1) {
         int c, n;
 
-        c = getopt_long(argc, argv, "behi:k:no:r:Rs:t:vV", long_options, NULL);
+        c = getopt_long(argc, argv, "bc:ehi:k:no:r:Rs:t:vV", long_options,
+                        NULL);
         if (c == -1)
             break;
 
         switch (c) {
         case 'b':
             op->datain_binary = true;
+            break;
+        case 'c':
+            op->cmd_file = optarg;
+            op->cmdfile_given = true;
             break;
         case 'e':
             op->do_enumerate = true;
@@ -239,23 +446,36 @@ process_cl(struct opts_t * op, int argc, char *argv[])
         ++op->cdb_length;
     }
 
+    if (op->cmdfile_given) {
+        bool ok;
+
+        ok = f2hex_arr(op->cmd_file, false /* as_binary */,
+                       false /* no_space */, op->cdb, &op->cdb_length,
+                       MAX_SCSI_CDBSZ);
+        if (! ok)
+            return SG_LIB_SYNTAX_ERROR;
+    }
     if (op->cdb_length < MIN_SCSI_CDBSZ) {
         pr2serr("CDB too short (min. %d bytes)\n", MIN_SCSI_CDBSZ);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_enumerate || (op->verbose > 1)) {
+        bool probable_scsi = sg_is_scsi_cdb(op->cdb, op->cdb_length);
         int sa;
         char b[80];
 
-        if (op->cdb_length > 16) {
-            sa = sg_get_unaligned_be16(op->cdb + 8);
-            if ((0x7f != op->cdb[0]) && (0x7e != op->cdb[0]))
-                printf(">>> Unlikely to be SCSI CDB since all over 16 "
-                       "bytes long should\n>>> start with 0x7f or 0x7e\n");
-        } else
-            sa = op->cdb[1] & 0x1f;
-        sg_get_opcode_sa_name(op->cdb[0], sa, 0, sizeof(b), b);
-        printf("Attempt to decode cdb name: %s\n", b);
+        if (probable_scsi) {
+            if (op->cdb_length > 16) {
+                sa = sg_get_unaligned_be16(op->cdb + 8);
+                if ((0x7f != op->cdb[0]) && (0x7e != op->cdb[0]))
+                    printf(">>> Unlikely to be SCSI CDB since all over 16 "
+                           "bytes long should\n>>> start with 0x7f or "
+                           "0x7e\n");
+            } else
+                sa = op->cdb[1] & 0x1f;
+            sg_get_opcode_sa_name(op->cdb[0], sa, 0, sizeof(b), b);
+            printf("Attempt to decode cdb name: %s\n", b);
+        }
     }
     return 0;
 }
@@ -263,12 +483,12 @@ process_cl(struct opts_t * op, int argc, char *argv[])
 static int
 skip(int fd, off_t offset)
 {
+    int err;
     off_t remain;
     char buffer[512];
 
-    if (lseek(fd, offset, SEEK_SET) >= 0) {
+    if (lseek(fd, offset, SEEK_SET) >= 0)
         return 0;
-    }
 
     // lseek failed; fall back to reading and discarding data
     remain = offset;
@@ -278,79 +498,96 @@ skip(int fd, off_t offset)
                                          : (off_t)sizeof(buffer);
         done = read(fd, buffer, amount);
         if (done < 0) {
-            perror("Error reading input data");
-            return SG_LIB_FILE_ERROR;
+            err = errno;
+            perror("Error reading input data to skip");
+            return sg_convert_errno(err);
         } else if (done == 0) {
             pr2serr("EOF on input file/stream\n");
             return SG_LIB_FILE_ERROR;
-        } else {
+        } else
             remain -= done;
-        }
     }
-
     return 0;
 }
 
-static unsigned char *
-fetch_dataout(struct opts_t * op)
+static uint8_t *
+fetch_dataout(struct opts_t * op, uint8_t ** free_buf, int * errp)
 {
     bool ok = false;
-    int fd, len;
-    unsigned char *buf = NULL;
-    unsigned char *wrkBuf = NULL;
+    int fd, len, err;
+    uint8_t *buf = NULL;
 
+    *free_buf = NULL;
+    if (errp)
+        *errp = 0;
     if (op->dataout_file) {
         fd = open(op->dataout_file, O_RDONLY);
         if (fd < 0) {
+            err = errno;
+            if (errp)
+                *errp = sg_convert_errno(err);
             perror(op->dataout_file);
             goto bail;
         }
-
-    } else {
+    } else
         fd = STDIN_FILENO;
-    }
     if (sg_set_binary_mode(fd) < 0) {
+        err = errno;
+        if (errp)
+            *errp = err;
         perror("sg_set_binary_mode");
         goto bail;
     }
 
     if (op->dataout_offset > 0) {
-        if (skip(fd, op->dataout_offset) != 0) {
+        err = skip(fd, op->dataout_offset);
+        if (err != 0) {
+            if (errp)
+                *errp = err;
             goto bail;
         }
     }
 
-    buf = sg_memalign(op->dataout_len, 0 /* page_size */, &wrkBuf,
+    buf = sg_memalign(op->dataout_len, 0 /* page_size */, free_buf,
                       op->verbose > 3);
     if (buf == NULL) {
-        perror("malloc");
+        pr2serr("sg_memalign: failed to get %d bytes of memory\n",
+                op->dataout_len);
+        if (errp)
+            *errp = SG_LIB_OS_BASE_ERR + ENOMEM;
         goto bail;
     }
 
     len = read(fd, buf, op->dataout_len);
     if (len < 0) {
+        err = errno;
+        if (errp)
+            *errp = sg_convert_errno(err);
         perror("Failed to read input data");
         goto bail;
     } else if (len < op->dataout_len) {
+        if (errp)
+            *errp = SG_LIB_FILE_ERROR;
         pr2serr("EOF on input file/stream\n");
         goto bail;
     }
-
     ok = true;
 
 bail:
     if (fd >= 0 && fd != STDIN_FILENO)
         close(fd);
     if (! ok) {
-        if (wrkBuf)
-            free(wrkBuf);
+        if (*free_buf) {
+            free(*free_buf);
+            *free_buf = NULL;
+        }
         return NULL;
     }
     return buf;
 }
 
 static int
-write_dataout(const char *filename, unsigned char *buf, int len)
+write_dataout(const char *filename, uint8_t *buf, int len)
 {
     int ret = SG_LIB_FILE_ERROR;
     int fd;
@@ -383,17 +620,20 @@ bail:
     return ret;
 }
 
+
 int
 main(int argc, char *argv[])
 {
     int ret = 0;
+    int err = 0;
     int res_cat, status, slen, k, ret2;
     int sg_fd = -1;
     struct sg_pt_base *ptvp = NULL;
-    unsigned char sense_buffer[32];
-    unsigned char * dxfer_buffer_in = NULL;
-    unsigned char * dxfer_buffer_out = NULL;
-    unsigned char * wrkBuf = NULL;
+    uint8_t sense_buffer[32];
+    uint8_t * dxfer_buffer_in = NULL;
+    uint8_t * dxfer_buffer_out = NULL;
+    uint8_t * free_buf_out = NULL;
+    uint8_t * wrkBuf = NULL;
     struct opts_t opts;
     struct opts_t * op;
     char b[128];
@@ -446,9 +686,9 @@ main(int argc, char *argv[])
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
     if (op->do_dataout) {
-        dxfer_buffer_out = fetch_dataout(op);
+        dxfer_buffer_out = fetch_dataout(op, &free_buf_out, &err);
         if (dxfer_buffer_out == NULL) {
-            ret = SG_LIB_CAT_OTHER;
+            ret = err;
             goto done;
         }
         if (op->verbose > 2)
@@ -460,8 +700,9 @@ main(int argc, char *argv[])
         dxfer_buffer_in = sg_memalign(op->datain_len, 0 /* page_size */,
                                       &wrkBuf, op->verbose > 3);
         if (dxfer_buffer_in == NULL) {
-            perror("malloc");
-            ret = SG_LIB_CAT_OTHER;
+            pr2serr("sg_memalign: failed to get %d bytes of memory\n",
+                    op->datain_len);
+            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
             goto done;
         }
         if (op->verbose > 2)
@@ -482,8 +723,14 @@ main(int argc, char *argv[])
             ret = SG_LIB_CAT_OTHER;
         goto done;
     } else if (ret < 0) {
-        pr2serr("do_scsi_pt: %s\n", safe_strerror(-ret));
-        ret = SG_LIB_CAT_OTHER;
+        int err;
+
+        k = -ret;
+        pr2serr("do_scsi_pt: %s\n", safe_strerror(k));
+        err = get_scsi_pt_os_err(ptvp);
+        if (err != k)
+            pr2serr("    ... or perhaps: %s\n", safe_strerror(err));
+        ret = sg_convert_errno(err);
         goto done;
     }
 
@@ -570,6 +817,8 @@ done:
     }
     if (wrkBuf)
         free(wrkBuf);
+    if (free_buf_out)
+        free(free_buf_out);
     if (ptvp)
         destruct_scsi_pt_obj(ptvp);
     if (sg_fd >= 0)

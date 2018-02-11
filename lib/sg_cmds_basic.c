@@ -509,12 +509,9 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, tur_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+	ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         if (progress) {
             int slen = get_scsi_pt_sense_len(ptvp);
 
@@ -583,12 +580,9 @@ sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, rq_s, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+	ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -641,12 +635,9 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, report_luns_s, res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+	ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.00 20180126";
+static const char * version_str = "1.01 20180210";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -139,12 +139,9 @@ sg_ll_get_stream_status(int sg_fd, uint16_t s_str_id, uint8_t * resp,
     res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cmd_name, res, alloc_len, sense_b,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret) {
-        int os_err = get_scsi_pt_os_err(ptvp);
-
-        if ((os_err > 0) && (os_err < 47))
-            ret = SG_LIB_OS_BASE_ERR + os_err;
-    } else if (-2 == ret) {
+    if (-1 == ret)
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

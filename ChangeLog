@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180208] [svn: r751]
+Changelog for sg3_utils-1.43 [20180210] [svn: r752]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
      cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -86,7 +86,9 @@ Changelog for sg3_utils-1.43 [20180208] [svn: r751]
     - support CDLP (command duration limit page)
     - check resid and trim response if necessary
     - report when --no-inquiry is ignored
-  - sg_raw: add '--enumerate' option
+  - sg_raw: add --enumerate option
+    - add --cmdfile=CF option
+    - page align input and output buffers
   - sg_get_lba_status: add --report-type= option (sbc4r12)
     - add support for 32 byte cdb variant (sbc4r14)
     - add support for --element-id= and --scan-len=

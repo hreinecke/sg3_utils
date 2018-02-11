@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.21 20180207 */
+/* sg_pt_win32 version 1.22 20180210 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2757,7 +2757,7 @@ do_nvme_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     if (vb)
         pr2ws("%s: not supported [time_secs=%d]\n", __func__, time_secs);
     if (psp) { ; }              /* suppress warning */
-    if (dhp) { ; }              /* suppress warning */
+    if (shp) { ; }              /* suppress warning */
     return -ENOTTY;             /* inappropriate ioctl error */
 }
 

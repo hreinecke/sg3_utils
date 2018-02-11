@@ -221,7 +221,7 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
     ret = sg_cmds_process_resp(ptvp, rsoc_s, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
     if (-1 == ret)
-        ;
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
@@ -283,7 +283,7 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
     ret = sg_cmds_process_resp(ptvp, rstmf_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
-        ;
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

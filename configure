@@ -12540,7 +12540,9 @@ if test "x$ac_cv_header_linux_nvme_ioctl_h" = xyes; then :
 #define HAVE_LINUX_NVME_IOCTL_H 1
 _ACEOF
 
-$as_echo "#define HAVE_NVME 1" >>confdefs.h
+cat >>confdefs.h <<_ACEOF
+#define HAVE_NVME 1
+_ACEOF
 
 fi
 
@@ -12585,7 +12587,9 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
-$as_echo "#define HAVE_NVME 1" >>confdefs.h
+cat >>confdefs.h <<_ACEOF
+#define HAVE_NVME 1
+_ACEOF
 
                 LIBS="$LIBS -lcam";;
         *-*-solaris*)
@@ -12606,9 +12610,11 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_WIN32 1
 _ACEOF
 
-		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])
 
-$as_echo "#define HAVE_NVME 1" >>confdefs.h
+cat >>confdefs.h <<_ACEOF
+#define HAVE_NVME 1
+_ACEOF
 
                 CFLAGS="$CFLAGS -Wno-char-subscripts";;
         *-*-mingw*)
@@ -12622,9 +12628,11 @@ cat >>confdefs.h <<_ACEOF
 #define SG_LIB_MINGW 1
 _ACEOF
 
-		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE(HAVE_NVME, 1, [Found NVMe])], [], [])
+		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])
 
-$as_echo "#define HAVE_NVME 1" >>confdefs.h
+cat >>confdefs.h <<_ACEOF
+#define HAVE_NVME 1
+_ACEOF
 
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)
@@ -14491,6 +14499,7 @@ $as_echo X"$file" |
     cat <<_LT_EOF >> "$cfgfile"
 #! $SHELL
 # Generated automatically by $as_me ($PACKAGE) $VERSION
+# Libtool was configured on host `(hostname || uname -n) 2>/dev/null | sed 1q`:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 
 # Provide generalized library-building support services.

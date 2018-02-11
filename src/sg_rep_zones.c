@@ -35,7 +35,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.13 20180118";
+static const char * version_str = "1.14 20180210";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -154,7 +154,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
     ret = sg_cmds_process_resp(ptvp, "report zones", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
     if (-1 == ret)
-        ;
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

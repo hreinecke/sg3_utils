@@ -373,6 +373,9 @@ from an OS system call. In recent versions of Linux the file showing the
 mapping between symbolic constants (e.g. ENOMEM) and the corresponding
 integer is in the kernel source code file:
 include/uapi/asm\-generic/errno\-base.h
+.br
+Note that error number greater than or equal to 47 cannot be mapped, instead
+50 is used (i.e. as if the os_error_number was 0).
 .TP
 .B 97
 a SCSI command response failed sanity checks.
