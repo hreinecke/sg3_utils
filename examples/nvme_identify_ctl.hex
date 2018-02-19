@@ -1,0 +1,27 @@
+# 64 byte NVMe Identify controller command (an Admin command) that is
+# suitable for:
+#       sg_raw --cmdfile=<this_file_name> --request=4096 <nvme_device>
+#
+# The address field (at byte offset 24, 8 bytes and little endian) gives
+# special meaning to the highest address pointers:
+#    ffffffff fffffffe         use address of data-in buffer
+#    ffffffff fffffffd         use address of data-out buffer
+#
+# The data length field (at byte offset 36, 4 bytes and little endian)
+# gives special meaning to the highest block counts:
+#    fffffffe                  use byte length of data-in buffer
+#    fffffffd                  use byte length of data-out buffer
+#
+# Since The Identify command reads data "in" from the device, then the
+# data-in buffer is appropriate.
+
+06 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  fe ff ff ff ff ff ff ff
+00 00 00 00 fe ff ff ff  01 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+
+# A typical invocation in Linux and FreeBSD would look like this:
+#    sg_raw --cmdfile=nvme_identify_ctl.hex -r 4k /dev/nvme0
+#
+# NVMe likes "4k" (4096 bytes) buffer size, preferably aligned to
+# a 4096 byte (or "page") boundary.

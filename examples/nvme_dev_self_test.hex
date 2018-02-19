@@ -1,0 +1,20 @@
+# 64 byte NVMe Device Self Test command (an Admin command) that is suitable
+# for:
+#       sg_raw --cmdfile=<this_file_name> <nvme_device>
+#
+# There is no data-in or data-out associated with this command. This command
+# is optional so check the Identify controller command response to see if
+# it is supported.
+#
+# The following invocation will self test the controller and all its
+# namespaces (since nsid=0xffffffff) and does a "short" self test on each
+# one (since CDW10 is 0x1).
+
+14 00 00 00 ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  01 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+
+# A typical invocation in Linux and FreeBSD would look like this:
+#    sg_raw --cmdfile=nvme_dev_self_test.hex /dev/nvme0
+#

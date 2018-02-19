@@ -24,13 +24,19 @@
 #include "sg_pt_nvme.h"
 
 
-static const char * scsi_pt_version_str = "3.03 20180115";
+static const char * scsi_pt_version_str = "3.04 20180213";
 
 static const char * nvme_scsi_vendor_str = "NVMe    ";
 
 
 const char *
 scsi_pt_version()
+{
+    return scsi_pt_version_str;
+}
+
+const char *
+sg_pt_version()
 {
     return scsi_pt_version_str;
 }

@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.12 20180118";
+static const char * version_str = "1.13 20180217";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1827,7 +1827,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
                     "unknown length\nthen give up\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        up = (uint8_t *)sg_memalign(d, sg_get_page_size(), &free_up, vb > 4);
+        up = sg_memalign(d, 0, &free_up, vb > 4);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -1894,8 +1894,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
                         goto file_err_outt;
                 }
             }
-            u2p = (uint8_t *)sg_memalign(dd, sg_get_page_size(), &free_u2p,
-                                         vb > 4);
+            u2p = sg_memalign(dd, 0, &free_u2p, vb > 4);
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
@@ -1930,8 +1929,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         d = sum_num * op->bs_pi_do;
         do_len = dd + d;
         /* zeroed data-out buffer for SL+DATA */
-        up = (uint8_t *)sg_memalign(do_len, sg_get_page_size(), &free_up,
-                                    vb > 4);
+        up = sg_memalign(do_len, 0, &free_up, vb > 4);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -2020,7 +2018,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             d = op->bs_pi_do;      /* guess one LB */
         /* zero data-out buffer for SL+DATA */
         nn = dd + d;
-        up = (uint8_t *)sg_memalign(nn, sg_get_page_size(), &free_up, vb > 4);
+        up = sg_memalign(nn, 0, &free_up, vb > 4);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -2042,8 +2040,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
 
             d = sum_num * op->bs_pi_do;
             nn = dd + d;
-            u2p = (uint8_t *)sg_memalign(nn, sg_get_page_size(), &free_u2p,
-                                         vb > 4);
+            u2p = sg_memalign(nn, 0, &free_u2p, vb > 4);
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
@@ -2085,8 +2082,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         for (sum_num = 0, k = 0; k < (int)addr_arr_len; ++k)
             sum_num += num_arr[k];
         do_len = ((op->scat_lbdof + sum_num) * op->bs_pi_do);
-        up = (uint8_t *)sg_memalign(do_len, sg_get_page_size(), &free_up,
-                                    vb > 4);
+        up = sg_memalign(do_len, 0, &free_up, vb > 4);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -2553,8 +2549,7 @@ main(int argc, char * argv[])
 
     if (do_len > 0) {
         /* fill allocated buffer with zeros */
-        up = (uint8_t *)sg_memalign(do_len, sg_get_page_size(), &free_up,
-                                    vb > 4);
+        up = sg_memalign(do_len, 0, &free_up, vb > 4);
         if (NULL == up) {
             pr2serr("unable to allocate %u bytes of memory\n", do_len);
             ret = SG_LIB_OS_BASE_ERR + ENOMEM;

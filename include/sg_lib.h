@@ -129,6 +129,9 @@ extern "C" {
     typedef unsigned long sg_uintptr_t;
 #endif
 
+/* Borrowed from Linux kernel; no check that 'arr' actually is one */
+#define SG_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 
 /* The format of the version string is like this: "2.26 20170906" */
 const char * sg_lib_version();
@@ -153,6 +156,13 @@ void sg_get_opcode_name(unsigned char cdb_byte0, int peri_type, int buff_len,
  * If no service action give 0, if unknown peripheral type give 0 or -1 . */
 void sg_get_opcode_sa_name(unsigned char cdb_byte0, int service_action,
                            int peri_type, int buff_len, char * buff);
+
+/* Fetch NVMe command name given first byte (byte offset 0 in 64 byte
+ * command) of command. Gets Admin NVMe command name if 'admin' is true
+ * (e.g. opcode=0x6 -> Identify), otherwise gets NVM command set name
+ * (e.g. opcode=0 -> Flush). Returns 'buff'. */
+char * sg_get_nvme_opcode_name(uint8_t cmd_byte0, bool admin, int buff_len,
+                               char * buff);
 
 /* Fetch scsi status string. */
 void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff);
@@ -577,6 +587,11 @@ uint8_t * sg_memalign(uint32_t num_bytes, uint32_t align_to,
 
 /* Returns OS page size in bytes. If uncertain returns 4096. */
 uint32_t sg_get_page_size(void);
+
+/* If byte_count is 0 or less then the OS page size is used. Returns true
+ * if the remainder of ((unsigned)pointer % byte_count) is 0, else returns
+ * false. */
+bool sg_is_aligned(const void * pointer, int byte_count);
 
 /* If os_err_num is within bounds then the returned value is 'os_err_num +
  * SG_LIB_OS_BASE_ERR' otherwise SG_LIB_OS_BASE_ERR is returned. If

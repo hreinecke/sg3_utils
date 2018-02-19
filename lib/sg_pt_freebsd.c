@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.24 20180131 */
+/* sg_pt_freebsd version 1.25 20180217 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,8 +121,6 @@ static int pr2ws(const char * fmt, ...);
 #endif
 
 static int sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb);
-static struct freebsd_dev_channel *
-                get_fdc_p(struct sg_pt_freebsd_scsi * ptp);
 
 
 static int
@@ -137,21 +135,34 @@ pr2ws(const char * fmt, ...)
     return n;
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
-static inline bool is_aligned(const void * pointer, size_t byte_count)
+static struct freebsd_dev_channel *
+get_fdc_p(struct sg_pt_freebsd_scsi * ptp)
 {
-    return ((sg_uintptr_t)pointer % byte_count) == 0;
+    int han = ptp->dev_han - FREEBSD_FDOFFSET;
+
+    if ((han < 0) || (han >= FREEBSD_MAXDEV))
+        return NULL;
+    return devicetable[han];
 }
-#endif
+
+static const struct freebsd_dev_channel *
+get_fdc_cp(const struct sg_pt_freebsd_scsi * ptp)
+{
+    int han = ptp->dev_han - FREEBSD_FDOFFSET;
+
+    if ((han < 0) || (han >= FREEBSD_MAXDEV))
+        return NULL;
+    return devicetable[han];
+}
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
-scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
+scsi_pt_open_device(const char * device_name, bool read_only, int vb)
 {
     int oflags = 0 /* O_NONBLOCK*/ ;
 
     oflags |= (read_only ? O_RDONLY : O_RDWR);
-    return scsi_pt_open_flags(device_name, oflags, verbose);
+    return scsi_pt_open_flags(device_name, oflags, vb);
 }
 
 /* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
@@ -159,7 +170,7 @@ scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
  * SCSI and ATA devices in FreeBSD.
  * Returns >= 0 if successful, otherwise returns negated errno. */
 int
-scsi_pt_open_flags(const char * device_name, int oflags, int verbose)
+scsi_pt_open_flags(const char * device_name, int oflags, int vb)
 {
     bool is_char, is_block, possible_nvme;
     char tmp;
@@ -180,7 +191,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int verbose)
     // If no free entry found, return error.  We have max allowed number
     // of "file descriptors" already allocated.
     if (k == FREEBSD_MAXDEV) {
-        if (verbose)
+        if (vb)
             pr2ws("too many open file descriptors (%d)\n", FREEBSD_MAXDEV);
         ret = -EMFILE;
         goto err_out;
@@ -195,7 +206,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int verbose)
     is_block = S_ISBLK(a_stat.st_mode);
     is_char = S_ISCHR(a_stat.st_mode);
     if (! (is_block || is_char)) {
-        if (verbose)
+        if (vb)
             pr2ws("%s: %s is not char nor block device\n", __func__,
                             device_name);
         ret = -ENODEV;
@@ -212,10 +223,10 @@ scsi_pt_open_flags(const char * device_name, int oflags, int verbose)
     nv_ctrlid = broadcast_nsid;
     possible_nvme = false;
     while (true) {      /* dummy loop, so can 'break' out */
-        if(sscanf(b, NVME_CTRLR_PREFIX"%u%c", &nv_ctrlid, &tmp) == 1) {
+        if(sscanf(b, NVME_CTRLR_PREFIX "%u%c", &nv_ctrlid, &tmp) == 1) {
             if(nv_ctrlid == broadcast_nsid)
                 break;
-        } else if (sscanf(b, NVME_CTRLR_PREFIX"%d"NVME_NS_PREFIX"%d%c",
+        } else if (sscanf(b, NVME_CTRLR_PREFIX "%d" NVME_NS_PREFIX "%d%c",
                           &nv_ctrlid, &nsid, &tmp) == 2) {
             if((nv_ctrlid == broadcast_nsid) || (nsid == broadcast_nsid))
                 break;
@@ -245,7 +256,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int verbose)
         dev_fd = open(fdc_p->devname, oflags);
         if (dev_fd < 0) {
             err = errno;
-            if (verbose)
+            if (vb)
                 pr2ws("%s: open(%s) failed: %s (errno=%d), try SCSI/ATA\n",
                       __func__, full_path, strerror(err), err);
             goto scsi_ata_try;
@@ -264,19 +275,19 @@ scsi_ata_try:
     fdc_p->is_char = is_char;
     if (cam_get_device(device_name, fdc_p->devname, DEV_IDLEN,
                        &(fdc_p->unitnum)) == -1) {
-        if (verbose)
+        if (vb)
             pr2ws("bad device name structure\n");
         errno = EINVAL;
         ret = -errno;
         goto err_out;
     }
-    if (verbose > 4)
+    if (vb > 4)
         pr2ws("%s: cam_get_device, f->devname: %s, f->unitnum=%d\n", __func__,
               fdc_p->devname, fdc_p->unitnum);
 
     if (! (cam_dev = cam_open_spec_device(fdc_p->devname,
                                           fdc_p->unitnum, O_RDWR, NULL))) {
-        if (verbose)
+        if (vb)
             pr2ws("cam_open_spec_device: %s\n", cam_errbuf);
         errno = EPERM; /* permissions or not CAM device (NVMe ?) */
         ret = -errno;
@@ -339,7 +350,7 @@ scsi_pt_close_device(int device_han)
  * NSID), or 0 if something else (e.g. ATA block device) or dev_fd < 0.
  * If error, returns negated errno (operating system) value. */
 int
-check_pt_file_handle(int device_han, const char * device_name, int verbose)
+check_pt_file_handle(int device_han, const char * device_name, int vb)
 {
     struct freebsd_dev_channel *fdc_p;
     int han = device_han - FREEBSD_FDOFFSET;
@@ -358,14 +369,15 @@ check_pt_file_handle(int device_han, const char * device_name, int verbose)
     else if (fdc_p->cam_dev)
         return 2 - (int)fdc_p->is_char;
     else {
-        if (device_name) { }
-        if (verbose) { }
+        if (vb)
+            pr2ws("%s: neither SCSI nor NVMe ... hmm, dvice name: %s\n",
+                  __func__, device_name);
         return 0;
     }
 }
 
 struct sg_pt_base *
-construct_scsi_pt_obj_with_fd(int dev_han, int verbose)
+construct_scsi_pt_obj_with_fd(int dev_han, int vb)
 {
     struct sg_pt_freebsd_scsi * ptp;
 
@@ -378,15 +390,19 @@ construct_scsi_pt_obj_with_fd(int dev_han, int verbose)
     ptp = (struct sg_pt_freebsd_scsi *)
                 calloc(1, sizeof(struct sg_pt_freebsd_scsi));
     if (ptp) {
-        struct freebsd_dev_channel *fdc_p;
-
-        memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
-        fdc_p = get_fdc_p(ptp);
-        if (fdc_p)
-            ptp->is_nvme = fdc_p->is_nvme;
         ptp->dxfer_dir = CAM_DIR_NONE;
         ptp->dev_han = (dev_han < 0) ? -1 : dev_han;
-    } else if (verbose)
+        if (ptp->dev_han >= 0) {
+            struct freebsd_dev_channel *fdc_p;
+
+            fdc_p = get_fdc_p(ptp);
+            if (fdc_p) {
+                ptp->is_nvme = fdc_p->is_nvme;
+                ptp->cam_dev = fdc_p->cam_dev;
+            } else if (vb)
+                pr2ws("%s: bad dev_han=%d\n", __func__, dev_han);
+        }
+    } else if (vb)
         pr2ws("%s: calloc() out of memory\n", __func__);
     return (struct sg_pt_base *)ptp;
 }
@@ -401,33 +417,17 @@ construct_scsi_pt_obj()
 void
 destruct_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+    struct sg_pt_freebsd_scsi * ptp;
 
-    if (ptp) {
+    if (NULL == vp) {
+        pr2ws(">>>> %s: given NULL pointer\n", __func__);
+        return;
+    }
+    if ((ptp = &vp->impl)) {
         if (ptp->ccb)
             cam_freeccb(ptp->ccb);
         free(ptp);
     }
-}
-
-static struct freebsd_dev_channel *
-get_fdc_p(struct sg_pt_freebsd_scsi * ptp)
-{
-    int han = ptp->dev_han - FREEBSD_FDOFFSET;
-
-    if ((han < 0) || (han >= FREEBSD_MAXDEV))
-        return NULL;
-    return devicetable[han];
-}
-
-static const struct freebsd_dev_channel *
-get_fdc_cp(const struct sg_pt_freebsd_scsi * ptp)
-{
-    int han = ptp->dev_han - FREEBSD_FDOFFSET;
-
-    if ((han < 0) || (han >= FREEBSD_MAXDEV))
-        return NULL;
-    return devicetable[han];
 }
 
 
@@ -436,17 +436,24 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
     bool is_nvme;
     int dev_han;
-    struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+    struct sg_pt_freebsd_scsi * ptp;
+    struct cam_device* cam_dev;
 
-    if (ptp) {
+    if (NULL == vp) {
+        pr2ws(">>>>> %s: NULL pointer given\n", __func__);
+        return;
+    }
+    if ((ptp = &vp->impl)) {
         if (ptp->ccb)
             cam_freeccb(ptp->ccb);
         is_nvme = ptp->is_nvme;
         dev_han = ptp->dev_han;
+        cam_dev = ptp->cam_dev;
         memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
         ptp->dxfer_dir = CAM_DIR_NONE;
         ptp->dev_han = dev_han;
         ptp->is_nvme = is_nvme;
+        ptp->cam_dev = cam_dev;
     }
 }
 
@@ -454,16 +461,42 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
  * find file type (e.g. if pass-though) from OS so there could be an error.
  * Returns 0 for success or the same value as get_scsi_pt_os_err()
  * will return. dev_han should be >= 0 for a valid file handle or -1 . */
-int set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int verbose)
+int set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
 {
-    struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+    struct sg_pt_freebsd_scsi * ptp;
 
-    if (ptp)
+    if (NULL == vp) {
+        if (vb)
+            pr2ws(">>>> %s: pointer to object is NULL\n", __func__);
+        return EINVAL;
+    }
+    if ((ptp = &vp->impl)) {
+        struct freebsd_dev_channel *fdc_p;
+
+        if (dev_han < 0) {
+            ptp->dev_han = -1;
+            ptp->dxfer_dir = CAM_DIR_NONE;
+            ptp->is_nvme = false;
+            ptp->cam_dev = NULL;
+            return 0;
+        }
+        fdc_p = get_fdc_p(ptp);
+        if (NULL == fdc_p) {
+            if (vb)
+                pr2ws("%s: dev_han (%d) is invalid\n", __func__, dev_han);
+            ptp->os_err = EINVAL;
+            return ptp->os_err;
+        }
+        ptp->os_err = 0;
+        ptp->transport_err = 0;
+        ptp->in_err = 0;
+        ptp->scsi_status = 0;
         ptp->dev_han = dev_han;
-    ptp->os_err = 0;
-    if (verbose) { }
+        ptp->dxfer_dir = CAM_DIR_NONE;
+        ptp->is_nvme = fdc_p->is_nvme;
+        ptp->cam_dev = fdc_p->cam_dev;
+    }
     return 0;
-
 }
 
 /* Valid file handles (which is the return value) are >= 0 . Returns -1
@@ -593,7 +626,7 @@ set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
  * Clears os_err field prior to active call (whose result may set it
  * again). */
 int
-do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
+do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int vb)
 {
     int len;
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
@@ -602,13 +635,13 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
 
     ptp->os_err = 0;
     if (ptp->in_err) {
-        if (verbose)
+        if (vb)
             pr2ws("Replicated or unused set_scsi_pt...\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (dev_han < 0) {
         if (ptp->dev_han < 0) {
-            if (verbose)
+            if (vb)
                 pr2ws("%s: No device file handle given\n", __func__);
             return SCSI_PT_DO_BAD_PARAMS;
         }
@@ -616,7 +649,7 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
     } else {
         if (ptp->dev_han >= 0) {
             if (dev_han != ptp->dev_han) {
-                if (verbose)
+                if (vb)
                     pr2ws("%s: file handle given to create and this "
                           "differ\n", __func__);
                 return SCSI_PT_DO_BAD_PARAMS;
@@ -626,33 +659,33 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
     }
 
     if (NULL == ptp->cdb) {
-        if (verbose)
+        if (vb)
             pr2ws("No command (cdb) given\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (ptp->is_nvme)
-        return sg_do_nvme_pt(vp, -1, verbose);
+        return sg_do_nvme_pt(vp, -1, vb);
 
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        if (verbose)
+        if (vb)
             pr2ws("File descriptor bad or closed??\n");
         ptp->os_err = ENODEV;
         return -ptp->os_err;
     }
     ptp->is_nvme = fdc_p->is_nvme;
     if (fdc_p->is_nvme)
-        return sg_do_nvme_pt(vp, -1, verbose);
+        return sg_do_nvme_pt(vp, -1, vb);
 
     if (NULL == fdc_p->cam_dev) {
-        if (verbose)
+        if (vb)
             pr2ws("No open CAM device\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
 
     if (NULL == ptp->ccb) {     /* re-use if we have one already */
         if (! (ccb = cam_getccb(fdc_p->cam_dev))) {
-            if (verbose)
+            if (vb)
                 pr2ws("cam_getccb: failed\n");
             ptp->os_err = ENOMEM;
             return -ptp->os_err;
@@ -679,7 +712,7 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int verbose)
     memcpy(ccb->csio.cdb_io.cdb_bytes, ptp->cdb, ptp->cdb_len);
 
     if (cam_send_ccb(fdc_p->cam_dev, ccb) < 0) {
-        if (verbose) {
+        if (vb) {
             warn("error sending SCSI ccb");
  #if __FreeBSD_version > 500000
             cam_error_print(fdc_p->cam_dev, ccb, CAM_ESF_ALL,
@@ -790,6 +823,7 @@ get_scsi_pt_sense_len(const struct sg_pt_base * vp)
         return ptp->sense_len - ptp->sense_resid;
 }
 
+/* Not impemented so return -1 . */
 int
 get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))
 {
@@ -867,7 +901,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
             return false;
         }
         /* if unequal, cast away const and drive fdc_p value into ptp */
-        if (ptp->is_nvme != fdc_p->is_nvme)
+        if (ptp->is_nvme != fdc_p->is_nvme)     /* indicates logic error */
             ((struct sg_pt_freebsd_scsi *)ptp)->is_nvme = fdc_p->is_nvme;
         return fdc_p->is_nvme;
     }
@@ -1244,7 +1278,7 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
         case 0xde:
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
-            n = 16;
+            n = 16 + 4096;
             cp_id_ctl = true;
             break;
         default:        /* Point to page_code field in cdb */
@@ -1486,7 +1520,6 @@ sntl_senddiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
     int err;
     uint8_t st_cd, dpg_cd;
     uint32_t alloc_len, n, dout_len, dpg_len, nvme_dst;
-    uint32_t pg_sz = sg_get_page_size();
     const uint8_t * dop;
     struct nvme_pt_command npc;
     uint8_t * npc_up = (uint8_t *)&npc;
@@ -1562,7 +1595,7 @@ sntl_senddiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
     n = dout_len;
     n = (n < alloc_len) ? n : alloc_len;
     dop = (const uint8_t *)ptp->dxferp;
-    if (! is_aligned(dop, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
+    if (! sg_is_aligned(dop, 0)) {
         if (vb)
             pr2ws("%s: dout [0x%" PRIx64 "] not page aligned\n", __func__,
                   (uint64_t)ptp->dxferp);
@@ -1618,7 +1651,6 @@ sntl_recvdiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
     int err;
     uint8_t dpg_cd;
     uint32_t alloc_len, n, din_len;
-    uint32_t pg_sz = sg_get_page_size();
     const uint8_t * dip;
     struct nvme_pt_command npc;
     uint8_t * npc_up = (uint8_t *)&npc;
@@ -1661,7 +1693,7 @@ sntl_recvdiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int vb)
     n = din_len;
     n = (n < alloc_len) ? n : alloc_len;
     dip = (const uint8_t *)ptp->dxferp;
-    if (! is_aligned(dip, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
+    if (! sg_is_aligned(dip, 0)) {
         if (vb)
             pr2ws("%s: din [0x%" PRIx64 "] not page aligned\n", __func__,
                   (uint64_t)ptp->dxferp);
@@ -2038,10 +2070,23 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
 static int
 sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
 {
-    if (vb)
-        pr2ws("%s: not supported\n", __func__);
-    if (vp) { ; }               /* suppress warning */
-    if (fd) { ; }               /* suppress warning */
+    if (vb) {
+        pr2ws("%s: not supported, ", __func__);
+#ifdef HAVE_NVME
+        pr2ws("HAVE_NVME, ");
+#else
+        pr2ws("don't HAVE_NVME, ");
+#endif
+
+#ifdef IGNORE_NVME
+        pr2ws("IGNORE_NVME");
+#else
+        pr2ws("don't IGNORE_NVME");
+#endif
+        pr2ws("\n");
+        if (NULL == vp)
+            pr2ws("%s: object pointer NULL; fd=%d\n", __func__, fd);
+    }
     return -ENOTTY;             /* inappropriate ioctl error */
 }
 

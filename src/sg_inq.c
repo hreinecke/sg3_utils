@@ -47,7 +47,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.86 20180204";    /* SPC-5 rev 18 */
+static const char * version_str = "1.88 20180218";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -130,12 +130,15 @@ static const char * version_str = "1.86 20180204";    /* SPC-5 rev 18 */
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
-static unsigned char rsp_buff[MX_ALLOC_LEN + 1];
+static uint8_t * rsp_buff;
+static uint8_t * free_rsp_buff;
+static const int rsp_buff_sz = MX_ALLOC_LEN + 1;
+
 static char xtra_buff[MX_ALLOC_LEN + 1];
 static char usn_buff[MX_ALLOC_LEN + 1];
 
 static const char * find_version_descriptor_str(int value);
-static void decode_dev_ids(const char * leadin, unsigned char * buff,
+static void decode_dev_ids(const char * leadin, uint8_t * buff,
                            int len, int do_hex, int verbose);
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
@@ -809,7 +812,7 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
  * negated errno or SG_LIB_SYNTAX_ERROR or SG_LIB_FILE_ERROR . */
 static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
-          unsigned char * mp_arr, int * mp_arr_len, int max_arr_len)
+          uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
     bool has_stdin;
     bool split_line;
@@ -1031,7 +1034,7 @@ dStrRaw(const char * str, int len)
  * consecutive zeroes indicate a string termination.
  */
 static int
-encode_whitespaces(unsigned char *str, int inlen)
+encode_whitespaces(uint8_t *str, int inlen)
 {
     int k, res;
     int j;
@@ -1084,7 +1087,7 @@ encode_whitespaces(unsigned char *str, int inlen)
 }
 
 static int
-encode_unicode(unsigned char *str, int inlen)
+encode_unicode(uint8_t *str, int inlen)
 {
     int k = 0, res;
     int zeroes = 0;
@@ -1109,7 +1112,7 @@ encode_unicode(unsigned char *str, int inlen)
 }
 
 static int
-encode_string(char *out, const unsigned char *in, int inlen)
+encode_string(char *out, const uint8_t *in, int inlen)
 {
     int i, j = 0;
 
@@ -1176,8 +1179,7 @@ static const char *
 get_vpd_page_str(int vpd_page_num, int scsi_ptype)
 {
     int k;
-    int vpd_name_arr_sz =
-        (int)(sizeof(vpd_name_arr) / sizeof(vpd_name_arr[0]));
+    int vpd_name_arr_sz = (int)SG_ARRAY_SIZE(vpd_name_arr);
 
     if ((vpd_page_num >= 0xb0) && (vpd_page_num < 0xc0)) {
         /* peripheral device type relevant for 0xb0..0xbf range */
@@ -1211,7 +1213,7 @@ get_vpd_page_str(int vpd_page_num, int scsi_ptype)
 }
 
 static void
-decode_supported_vpd(unsigned char * buff, int len, int do_hex)
+decode_supported_vpd(uint8_t * buff, int len, int do_hex)
 {
     int vpd, k, rlen, pdt;
     const char * cp;
@@ -1243,7 +1245,7 @@ decode_supported_vpd(unsigned char * buff, int len, int do_hex)
 }
 
 static bool
-vpd_page_is_supported(unsigned char * vpd_pg0, int v0_len, int pg_num)
+vpd_page_is_supported(uint8_t * vpd_pg0, int v0_len, int pg_num)
 {
     int k, rlen;
 
@@ -1265,18 +1267,18 @@ vpd_page_is_supported(unsigned char * vpd_pg0, int v0_len, int pg_num)
 }
 
 static bool
-vpd_page_not_supported(unsigned char * vpd_pg0, int v0_len, int pg_num)
+vpd_page_not_supported(uint8_t * vpd_pg0, int v0_len, int pg_num)
 {
     return ! vpd_page_is_supported(vpd_pg0, v0_len, pg_num);
 }
 
 /* ASCII Information VPD pages (page numbers: 0x1 to 0x7f) */
 static void
-decode_ascii_inf(unsigned char * buff, int len, int do_hex)
+decode_ascii_inf(uint8_t * buff, int len, int do_hex)
 {
     int al, k, bump;
-    unsigned char * bp;
-    unsigned char * p;
+    uint8_t * bp;
+    uint8_t * p;
 
     if (do_hex) {
         hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
@@ -1292,7 +1294,7 @@ decode_ascii_inf(unsigned char * buff, int len, int do_hex)
     if ((al + 5) > len)
         al = len - 5;
     for (k = 0, bp = buff + 5; k < al; k += bump, bp += bump) {
-        p = (unsigned char *)memchr(bp, 0, al - k);
+        p = (uint8_t *)memchr(bp, 0, al - k);
         if (! p) {
             printf("  %.*s\n", al - k, (const char *)bp);
             break;
@@ -1308,7 +1310,7 @@ decode_ascii_inf(unsigned char * buff, int len, int do_hex)
 }
 
 static void
-decode_id_vpd(unsigned char * buff, int len, int do_hex, int verbose)
+decode_id_vpd(uint8_t * buff, int len, int do_hex, int verbose)
 {
     if (len < 4) {
         pr2serr("Device identification VPD page length too "
@@ -1345,10 +1347,10 @@ static const char * network_service_type_arr[] =
 
 /* VPD_MAN_NET_ADDR */
 static void
-decode_net_man_vpd(unsigned char * buff, int len, int do_hex)
+decode_net_man_vpd(uint8_t * buff, int len, int do_hex)
 {
     int k, bump, na_len;
-    unsigned char * bp;
+    uint8_t * bp;
 
     if (len < 4) {
         pr2serr("Management network addresses VPD page length too short=%d\n",
@@ -1392,10 +1394,10 @@ static const char * mode_page_policy_arr[] =
 
 /* VPD_MODE_PG_POLICY */
 static void
-decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
+decode_mode_policy_vpd(uint8_t * buff, int len, int do_hex)
 {
     int k, bump;
-    unsigned char * bp;
+    uint8_t * bp;
 
     if (len < 4) {
         pr2serr("Mode page policy VPD page length too short=%d\n", len);
@@ -1430,10 +1432,10 @@ decode_mode_policy_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_SCSI_PORTS */
 static void
-decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
+decode_scsi_ports_vpd(uint8_t * buff, int len, int do_hex, int verbose)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
-    unsigned char * bp;
+    uint8_t * bp;
 
     if (len < 4) {
         pr2serr("SCSI Ports VPD page length too short=%d\n", len);
@@ -1486,15 +1488,15 @@ decode_scsi_ports_vpd(unsigned char * buff, int len, int do_hex, int verbose)
 
 /* These are target port, device server (i.e. target) and LU identifiers */
 static void
-decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
+decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
                int verbose)
 {
     int u, j, m, id_len, p_id, c_set, piv, assoc, desig_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi, k;
     uint64_t vsei;
     uint64_t id_ext;
-    const unsigned char * bp;
-    const unsigned char * ip;
+    const uint8_t * bp;
+    const uint8_t * ip;
     char b[64];
     const char * cp;
 
@@ -1825,12 +1827,12 @@ decode_dev_ids(const char * leadin, unsigned char * buff, int len, int do_hex,
 }
 
 static void
-export_dev_ids(unsigned char * buff, int len, int verbose)
+export_dev_ids(uint8_t * buff, int len, int verbose)
 {
     int u, j, m, id_len, c_set, assoc, desig_type, i_len;
     int off, d_id, naa, k, p_id;
-    unsigned char * bp;
-    unsigned char * ip;
+    uint8_t * bp;
+    uint8_t * ip;
     const char * assoc_str;
     const char * suffix;
 
@@ -2123,7 +2125,7 @@ export_dev_ids(unsigned char * buff, int len, int verbose)
 
 /* VPD_EXT_INQ   Extended Inquiry [0x86] */
 static void
-decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
+decode_x_inq_vpd(uint8_t * buff, int len, int do_hex)
 {
     if (len < 7) {
         pr2serr("Extended INQUIRY data VPD page length too short=%d\n", len);
@@ -2171,7 +2173,7 @@ decode_x_inq_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_SOFTW_INF_ID [0x84] */
 static void
-decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
+decode_softw_inf_id(uint8_t * buff, int len, int do_hex)
 {
     if (do_hex) {
         hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
@@ -2187,7 +2189,7 @@ decode_softw_inf_id(unsigned char * buff, int len, int do_hex)
 
 /* VPD_ATA_INFO [0x89] */
 static void
-decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
+decode_ata_info_vpd(uint8_t * buff, int len, int do_hex)
 {
     char b[80];
     int is_be, num;
@@ -2246,7 +2248,7 @@ decode_ata_info_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_POWER_CONDITION [0x8a] */
 static void
-decode_power_condition(unsigned char * buff, int len, int do_hex)
+decode_power_condition(uint8_t * buff, int len, int do_hex)
 {
     if (len < 18) {
         pr2serr("Power condition VPD page length too short=%d\n", len);
@@ -2275,13 +2277,13 @@ decode_power_condition(unsigned char * buff, int len, int do_hex)
 
 /* VPD_SCSI_FEATURE_SETS [0x92] (sfs) */
 static void
-decode_feature_sets_vpd(unsigned char * buff, int len,
+decode_feature_sets_vpd(uint8_t * buff, int len,
                         const struct opts_t * op)
 {
     int k, bump;
     uint16_t sf_code;
     bool found;
-    unsigned char * bp;
+    uint8_t * bp;
     char b[64];
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
@@ -2324,7 +2326,7 @@ decode_feature_sets_vpd(unsigned char * buff, int len,
 /* Sequential access device characteristics,  ssc+smc */
 /* OSD information, osd */
 static void
-decode_b0_vpd(unsigned char * buff, int len, int do_hex)
+decode_b0_vpd(uint8_t * buff, int len, int do_hex)
 {
     int pdt;
     unsigned int u;
@@ -2466,7 +2468,7 @@ decode_b0_vpd(unsigned char * buff, int len, int do_hex)
 /* VPD_MAN_ASS_SN ssc */
 /* VPD_ES_DEV_CHARS ses-4 */
 static void
-decode_b1_vpd(unsigned char * buff, int len, int do_hex)
+decode_b1_vpd(uint8_t * buff, int len, int do_hex)
 {
     int pdt;
     unsigned int u;
@@ -2541,7 +2543,7 @@ decode_b1_vpd(unsigned char * buff, int len, int do_hex)
 
 /* VPD_REFERRALS sbc */
 static void
-decode_b3_vpd(unsigned char * buff, int len, int do_hex)
+decode_b3_vpd(uint8_t * buff, int len, int do_hex)
 {
     int pdt;
     unsigned int s, m;
@@ -2622,7 +2624,7 @@ static const char * failover_mode_arr[] =
 };
 
 static void
-decode_upr_vpd_c0_emc(unsigned char * buff, int len, int do_hex)
+decode_upr_vpd_c0_emc(uint8_t * buff, int len, int do_hex)
 {
     int k, ip_mgmt, vpp80, lun_z;
 
@@ -2700,7 +2702,7 @@ decode_upr_vpd_c0_emc(unsigned char * buff, int len, int do_hex)
 }
 
 static void
-decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
+decode_rdac_vpd_c2(uint8_t * buff, int len, int do_hex)
 {
     if (len < 3) {
         pr2serr("Software Version VPD page length too short=%d\n", len);
@@ -2734,7 +2736,7 @@ decode_rdac_vpd_c2(unsigned char * buff, int len, int do_hex)
 }
 
 static void
-decode_rdac_vpd_c9_rtpg_data(unsigned char aas, unsigned char vendor)
+decode_rdac_vpd_c9_rtpg_data(uint8_t aas, uint8_t vendor)
 {
     printf("  Asymmetric Access State:");
     switch(aas & 0x0F) {
@@ -2798,7 +2800,7 @@ decode_rdac_vpd_c9_rtpg_data(unsigned char aas, unsigned char vendor)
 }
 
 static void
-decode_rdac_vpd_c9(unsigned char * buff, int len, int do_hex)
+decode_rdac_vpd_c9(uint8_t * buff, int len, int do_hex)
 {
     if (len < 3) {
         pr2serr("Volume Access Control VPD page length too short=%d\n", len);
@@ -2924,7 +2926,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
     const char * cp;
     int vdesc_arr[8];
     char buff[48];
-    const unsigned char * rp;
+    const uint8_t * rp;
 
     rp = rsp_buff;
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
@@ -3014,7 +3016,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
             if (xtra_buff[i] == 0x09)
                 xtra_buff[i] = ' ';
         if (op->do_export) {
-            len = encode_whitespaces((unsigned char *)xtra_buff, 8);
+            len = encode_whitespaces((uint8_t *)xtra_buff, 8);
             if (len > 0) {
                 printf("SCSI_VENDOR=%s\n", xtra_buff);
                 encode_string(xtra_buff, &rp[8], 8);
@@ -3029,7 +3031,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
             memcpy(xtra_buff, &rp[16], 16);
             xtra_buff[16] = '\0';
             if (op->do_export) {
-                len = encode_whitespaces((unsigned char *)xtra_buff, 16);
+                len = encode_whitespaces((uint8_t *)xtra_buff, 16);
                 if (len > 0) {
                     printf("SCSI_MODEL=%s\n", xtra_buff);
                     encode_string(xtra_buff, &rp[16], 16);
@@ -3045,7 +3047,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
             memcpy(xtra_buff, &rp[32], 4);
             xtra_buff[4] = '\0';
             if (op->do_export) {
-                len = encode_whitespaces((unsigned char *)xtra_buff, 4);
+                len = encode_whitespaces((uint8_t *)xtra_buff, 4);
                 if (len > 0)
                     printf("SCSI_REVISION=%s\n", xtra_buff);
             } else
@@ -3056,7 +3058,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
             memcpy(xtra_buff, &rp[36], act_len < 56 ? act_len - 36 :
                    20);
             if (op->do_export) {
-                len = encode_whitespaces((unsigned char *)xtra_buff, 20);
+                len = encode_whitespaces((uint8_t *)xtra_buff, 20);
                 if (len > 0)
                     printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
@@ -3070,7 +3072,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
         if ((op->do_vendor > 1) && (act_len > 96)) {
             memcpy(xtra_buff, &rp[96], act_len - 96);
             if (op->do_export) {
-                len = encode_whitespaces((unsigned char *)xtra_buff,
+                len = encode_whitespaces((uint8_t *)xtra_buff,
                                          act_len - 96);
                 if (len > 0)
                     printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
@@ -3106,7 +3108,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
  * (1 byte). When sg_fd < 0 then mxlen bytes have been read from
  * --inhex=FN file. Returns 0 for success. */
 static int
-vpd_fetch_page_from_dev(int sg_fd, unsigned char * rp, int page,
+vpd_fetch_page_from_dev(int sg_fd, uint8_t * rp, int page,
                         int mxlen, int vb, int * rlenp)
 {
     int res, resid, rlen, len, n;
@@ -3183,7 +3185,7 @@ static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
     int len, k, res, c;
-    unsigned char b[DEF_ALLOC_LEN];
+    uint8_t b[DEF_ALLOC_LEN];
 
     res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS,
                                   -1,verbose, &len);
@@ -3317,7 +3319,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
     int k, j, num, len, peri_type, reserved_cmddt, support_num, res;
     char op_name[128];
 
-    memset(rsp_buff, 0, DEF_ALLOC_LEN);
+    memset(rsp_buff, 0, rsp_buff_sz);
     if (op->do_cmddt > 1) {
         printf("Supported command list:\n");
         for (k = 0; k < 256; ++k) {
@@ -3333,7 +3335,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                         printf(" %.2x", (int)rsp_buff[6 + j]);
                     if (5 == support_num)
                         printf("  [vendor specific manner (5)]");
-                    sg_get_opcode_name((unsigned char)k, peri_type,
+                    sg_get_opcode_name((uint8_t)k, peri_type,
                                        sizeof(op_name) - 1, op_name);
                     op_name[sizeof(op_name) - 1] = '\0';
                     printf("  %s\n", op_name);
@@ -3360,7 +3362,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
             peri_type = rsp_buff[0] & 0x1f;
             if (! op->do_raw) {
                 printf("CmdDt INQUIRY, opcode=0x%.2x:  [", op->page_num);
-                sg_get_opcode_name((unsigned char)op->page_num, peri_type,
+                sg_get_opcode_name((uint8_t)op->page_num, peri_type,
                                    sizeof(op_name) - 1, op_name);
                 op_name[sizeof(op_name) - 1] = '\0';
                 printf("%s]\n", op_name);
@@ -3409,7 +3411,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
         } else if (SG_LIB_CAT_ILLEGAL_REQ != res) {
             if (! op->do_raw) {
                 printf("CmdDt INQUIRY, opcode=0x%.2x:  [", op->page_num);
-                sg_get_opcode_name((unsigned char)op->page_num, 0,
+                sg_get_opcode_name((uint8_t)op->page_num, 0,
                                    sizeof(op_name) - 1, op_name);
                 op_name[sizeof(op_name) - 1] = '\0';
                 printf("%s]\n", op_name);
@@ -3442,7 +3444,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
     int res, len;
     char b[128];
     const char * cp;
-    unsigned char * rp;
+    uint8_t * rp;
 
     rp = rsp_buff;
     if ((! op->do_raw) && (op->do_hex < 2))
@@ -3491,7 +3493,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
 {
     int len, pdt, pn, vb, mxlen;
     int res = 0;
-    unsigned char * rp;
+    uint8_t * rp;
 
     pn = op->page_num;
     rp = rsp_buff;
@@ -3544,7 +3546,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                 len = sizeof(obuff) - 1;
             memcpy(obuff, rp + 4, len);
             if (op->do_export) {
-                k = encode_whitespaces((unsigned char *)obuff, len);
+                k = encode_whitespaces((uint8_t *)obuff, len);
                 if (k > 0) {
                     printf("SCSI_IDENT_SERIAL=");
                     /* udev-conformant character encoding */
@@ -3560,7 +3562,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                     printf("\n");
                 }
             } else {
-                k = encode_unicode((unsigned char *)obuff, len);
+                k = encode_unicode((uint8_t *)obuff, len);
                 if (k > 0)
                     printf("  Unit serial number: %s\n", obuff);
             }
@@ -3830,7 +3832,7 @@ out:
 #if (HAVE_NVME && (! IGNORE_NVME))
 
 static void
-nvme_hex_raw(const unsigned char * b, int b_len, const struct opts_t * op)
+nvme_hex_raw(const uint8_t * b, int b_len, const struct opts_t * op)
 {
     if (op->do_raw)
         dStrRaw((const char *)b, b_len);
@@ -4283,17 +4285,25 @@ main(int argc, char * argv[])
             op->page_num = n;
         }
     }
+    rsp_buff = sg_memalign(rsp_buff_sz, 0 /* page align */, &free_rsp_buff,
+                           false);
+    if (NULL == rsp_buff) {
+        pr2serr("Unable to allocate %d bytes on heap\n", rsp_buff_sz);
+        return sg_convert_errno(ENOMEM);
+    }
     if (op->inhex_fn) {
         if (op->device_name) {
             pr2serr("Cannot have both a DEVICE and --inhex= option\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         if (op->do_cmddt) {
             pr2serr("Don't support --cmddt with --inhex= option\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         err = f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff, &inhex_len,
-                        sizeof(rsp_buff));
+                        rsp_buff_sz);
         if (err) {
             if (err < 0)
                 err = sg_convert_errno(-err);
@@ -4342,7 +4352,8 @@ main(int argc, char * argv[])
     } else if (0 == op->device_name) {
         pr2serr("No DEVICE argument given\n");
         usage_for(op);
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
     if (VPD_NOPE_WANT_STD_INQ == op->page_num)
         op->page_num = -1;  /* now past guessing, set to normal indication */
@@ -4354,7 +4365,8 @@ main(int argc, char * argv[])
                 pr2serr("Option '--export' only supported for VPD pages 0x80 "
                         "and 0x83\n");
                 usage_for(op);
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto err_out;
             }
             op->do_decode = true;
             op->do_vpd = true;
@@ -4367,7 +4379,8 @@ main(int argc, char * argv[])
     if (op->do_raw && op->do_hex) {
         pr2serr("Can't do hex and raw at the same time\n");
         usage_for(op);
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
     if (op->do_vpd && op->do_cmddt) {
 #ifdef SG_SCSI_STRINGS
@@ -4379,35 +4392,41 @@ main(int argc, char * argv[])
         pr2serr("Can't use '--cmddt' with VPD pages\n");
 #endif
         usage_for(op);
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
     if (((op->do_vpd || op->do_cmddt)) && (op->page_num < 0))
         op->page_num = 0;
     if (op->num_pages > 1) {
         pr2serr("Can only fetch one page (VPD or Cmd) at a time\n");
         usage_for(op);
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
     if (op->do_descriptors) {
         if ((op->resp_len > 0) && (op->resp_len < 60)) {
             pr2serr("version descriptors need INQUIRY response "
                     "length >= 60 bytes\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         if (op->do_vpd || op->do_cmddt) {
             pr2serr("version descriptors require standard INQUIRY\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
     }
     if (op->num_pages && op->do_ata) {
         pr2serr("Can't use '-A' with an explicit decode VPD page option\n");
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
 
     if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+            goto err_out;
         }
     }
     if (op->inhex_fn) {
@@ -4421,7 +4440,8 @@ main(int argc, char * argv[])
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
         else if (op->do_ata) {
             prepare_ata_identify(op, inhex_len);
-            return 0;
+            ret = 0;
+            goto err_out;
         }
 #endif
         else {
@@ -4465,7 +4485,7 @@ main(int argc, char * argv[])
         goto err_out;
     }
 #endif
-    memset(rsp_buff, 0, sizeof(rsp_buff));
+    memset(rsp_buff, 0, rsp_buff_sz);
 
 #if (HAVE_NVME && (! IGNORE_NVME))
     n = check_pt_file_handle(sg_fd, op->device_name, op->verbose);
@@ -4526,6 +4546,8 @@ fini3:
 #endif
 
 err_out:
+    if (free_rsp_buff)
+        free(free_rsp_buff);
     if ((0 == op->verbose) && (! op->do_export)) {
         if (! sg_if_can2stderr("sg_inq failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
@@ -4561,10 +4583,10 @@ err_out:
  */
 struct ata_identify_device {
   unsigned short words000_009[10];
-  unsigned char  serial_no[20];
+  uint8_t  serial_no[20];
   unsigned short words020_022[3];
-  unsigned char  fw_rev[8];
-  unsigned char  model[40];
+  uint8_t  fw_rev[8];
+  uint8_t  model[40];
   unsigned short words047_079[33];
   unsigned short major_rev_num;
   unsigned short minor_rev_num;
@@ -4583,7 +4605,7 @@ struct ata_identify_device {
 static int
 ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
 {
-    unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
+    uint8_t buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     unsigned short get_ident[256];
 
     if (atapi_flag)

@@ -21,7 +21,7 @@
 #include "sg_io_linux.h"
 
 
-/* Version 1.07 20160405 */
+/* Version 1.08 20180218 */
 
 #if defined(__GNUC__) || defined(__clang__)
 static int pr2ws(const char * fmt, ...)
@@ -52,6 +52,8 @@ sg_print_masked_status(int masked_status)
     sg_print_scsi_status(scsi_status);
 }
 
+/* host_bytes: DID_* are Linux SCSI result (a 32 bit variable) bits 16:23 */
+
 static const char * linux_host_bytes[] = {
     "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
     "DID_BAD_TARGET", "DID_ABORT", "DID_PARITY", "DID_ERROR",
@@ -61,18 +63,18 @@ static const char * linux_host_bytes[] = {
     "DID_ALLOC_FAILURE", "DID_MEDIUM_ERROR",
 };
 
-#define LINUX_HOST_BYTES_SZ \
-        (int)(sizeof(linux_host_bytes) / sizeof(linux_host_bytes[0]))
-
 void
 sg_print_host_status(int host_status)
 {
     pr2ws("Host_status=0x%02x ", host_status);
-    if ((host_status < 0) || (host_status >= LINUX_HOST_BYTES_SZ))
+    if ((host_status < 0) ||
+        (host_status >= (int)SG_ARRAY_SIZE(linux_host_bytes)))
         pr2ws("is invalid ");
     else
         pr2ws("[%s] ", linux_host_bytes[host_status]);
 }
+
+/* DRIVER_* are Linux SCSI result (a 32 bit variable) bits 24:27 */
 
 static const char * linux_driver_bytes[] = {
     "DRIVER_OK", "DRIVER_BUSY", "DRIVER_SOFT", "DRIVER_MEDIA",
@@ -80,18 +82,15 @@ static const char * linux_driver_bytes[] = {
     "DRIVER_SENSE"
 };
 
-#define LINUX_DRIVER_BYTES_SZ \
-    (int)(sizeof(linux_driver_bytes) / sizeof(linux_driver_bytes[0]))
-
 #if 0
+
+/* SUGGEST_* are Linux SCSI result (a 32 bit variable) bits 28:31 */
+
 static const char * linux_driver_suggests[] = {
     "SUGGEST_OK", "SUGGEST_RETRY", "SUGGEST_ABORT", "SUGGEST_REMAP",
     "SUGGEST_DIE", "UNKNOWN","UNKNOWN","UNKNOWN",
     "SUGGEST_SENSE"
 };
-
-#define LINUX_DRIVER_SUGGESTS_SZ \
-    (int)(sizeof(linux_driver_suggests) / sizeof(linux_driver_suggests[0]))
 #endif
 
 
@@ -102,11 +101,11 @@ sg_print_driver_status(int driver_status)
     const char * driv_cp = "invalid";
 
     driv = driver_status & SG_LIB_DRIVER_MASK;
-    if (driv < LINUX_DRIVER_BYTES_SZ)
+    if (driv < (int)SG_ARRAY_SIZE(linux_driver_bytes))
         driv_cp = linux_driver_bytes[driv];
 #if 0
     sugg = (driver_status & SG_LIB_SUGGEST_MASK) >> 4;
-    if (sugg < LINUX_DRIVER_SUGGESTS_SZ)
+    if (sugg < (int)SG_ARRAY_SIZE(linux_driver_suggests))
         sugg_cp = linux_driver_suggests[sugg];
 #endif
     pr2ws("Driver_status=0x%02x", driver_status);

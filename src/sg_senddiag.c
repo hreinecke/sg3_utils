@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.56 20180119";
+static const char * version_str = "0.57 20180217";
 
 #define ME "sg_senddiag: "
 
@@ -670,7 +670,7 @@ list_page_codes()
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg, bd_len, resid;
+    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg, bd_len, resid, vb;
     int read_in_len = 0;
     int ret = 0;
     struct opts_t opts;
@@ -713,9 +713,9 @@ main(int argc, char * argv[])
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
+    vb = op->do_verbose;
     if (op->do_raw) {
-        read_in = (unsigned char *)sg_memalign(op->maxlen, sg_get_page_size(),
-                                       &free_read_in, op->do_verbose > 3);
+        read_in = sg_memalign(op->maxlen, 0, &free_read_in, vb > 3);
         if (NULL == read_in) {
             pr2serr("unable to allocate %d bytes\n", op->maxlen);
             return SG_LIB_CAT_OTHER;
@@ -781,7 +781,7 @@ main(int argc, char * argv[])
     }
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
-    if (op->do_verbose > 4)
+    if (vb > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
                 scsi_pt_win32_spt_state() ? "direct" : "indirect");
     if (op->maxlen >= 16384)
@@ -789,15 +789,14 @@ main(int argc, char * argv[])
 #endif
 #endif
 
-    if ((sg_fd = sg_cmds_open_device(op->device_name, false /* rw */,
-                                     op->do_verbose)) < 0) {
+    if ((sg_fd = sg_cmds_open_device(op->device_name, false /* rw */, vb)) <
+         0) {
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
-        ret = SG_LIB_FILE_ERROR;
+        ret = sg_convert_errno(-sg_fd);
         goto fini;
     }
-    rsp_buff = (unsigned char *)sg_memalign(op->maxlen, sg_get_page_size(),
-                                    &free_rsp_buff, op->do_verbose > 3);
+    rsp_buff = sg_memalign(op->maxlen, 0, &free_rsp_buff, vb > 3);
     if (NULL == rsp_buff) {
         pr2serr("unable to allocate %d bytes (2)\n", op->maxlen);
         ret = SG_LIB_CAT_OTHER;
@@ -806,7 +805,7 @@ main(int argc, char * argv[])
     if (op->do_extdur) {  /* fetch Extended self-test time from Control
                            * mode page with Mode Sense(10) command*/
         res = do_modes_0a(sg_fd, rsp_buff, 32, false /* mode6 */,
-                          true /* noisy */, op->do_verbose);
+                          true /* noisy */, vb);
         if (0 == res) {
             /* Mode sense(10) response, step over any block descriptors */
             num = sg_msense_calc_length(rsp_buff, 32, false, &bd_len);
@@ -833,7 +832,7 @@ main(int argc, char * argv[])
         pg = op->page_code;
         if (pg < 0)
             res = do_senddiag(sg_fd, 0, true /* pf */, false, false, false,
-                              rsp_buff, 4, op->timeout, 1, op->do_verbose);
+                              rsp_buff, 4, op->timeout, 1, vb);
         else
             res = 0;
         if (0 == res) {
@@ -841,7 +840,7 @@ main(int argc, char * argv[])
             if (0 == sg_ll_receive_diag_v2(sg_fd, (pg >= 0x0),
                                            ((pg >= 0x0) ? pg : 0), rsp_buff,
                                            rsp_buff_size, 0, &resid,
-                                           true, op->do_verbose)) {
+                                           true, vb)) {
                 rsp_buff_size -= resid;
                 if (rsp_buff_size < 4) {
                     pr2serr("RD resid (%d) indicates response too small "
@@ -884,7 +883,7 @@ main(int argc, char * argv[])
         }
     } else if (op->do_raw) {
         res = do_senddiag(sg_fd, 0, op->do_pf, false, false, false, read_in,
-                          read_in_len, op->timeout, 1, op->do_verbose);
+                          read_in_len, op->timeout, 1, vb);
         if (res) {
             ret = res;
             goto err_out;
@@ -892,7 +891,7 @@ main(int argc, char * argv[])
     } else {
         res = do_senddiag(sg_fd, op->do_selftest, op->do_pf, op->do_deftest,
                           op->do_doff, op->do_uoff, NULL, 0, op->timeout, 1,
-                          op->do_verbose);
+                          vb);
         if (0 == res) {
             if ((5 == op->do_selftest) || (6 == op->do_selftest))
                 printf("Foreground self-test returned GOOD status\n");
@@ -915,7 +914,7 @@ err_out:
     else
         pr2serr("SEND DIAGNOSTIC command, failed\n");
 err_out9:
-    if (op->do_verbose < 2)
+    if (vb < 2)
         pr2serr("  try again with '-vv' for more information\n");
 close_fini:
     res = sg_cmds_close_device(sg_fd);

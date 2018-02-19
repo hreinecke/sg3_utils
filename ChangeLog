@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180210] [svn: r752]
+Changelog for sg3_utils-1.43 [20180218] [svn: r753]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
      cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -71,6 +71,7 @@ Changelog for sg3_utils-1.43 [20180210] [svn: r752]
     - add maximum inquiry|mode_page change logs fields
       to extended inquiry vpd page (spc5r17)
   - sg_vpd: 3 party copy VPD page improvements
+    - fully implement Device constituents VPD page
     - improve handling of unknown pages
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_rdac: add sanity checks for -f=lun value
@@ -88,6 +89,7 @@ Changelog for sg3_utils-1.43 [20180210] [svn: r752]
     - report when --no-inquiry is ignored
   - sg_raw: add --enumerate option
     - add --cmdfile=CF option
+    - add --raw option (for CF in binary)
     - page align input and output buffers
   - sg_get_lba_status: add --report-type= option (sbc4r12)
     - add support for 32 byte cdb variant (sbc4r14)
@@ -122,7 +124,9 @@ Changelog for sg3_utils-1.43 [20180210] [svn: r752]
     - add sg_is_scsi_cdb()
     - add sg_get_nvme_cmd_status_str()
     - add sg_nvme_status2scsi()
+    - add sg_get_nvme_opcode_name()
     - add sg_memalign() and sg_get_page_size()
+    - add sg_is_aligned()
     - add hex2stdout(), hex2stderr() and hex2str()
     - add sg_convert_errno() and sg_if_can2stderr()
     - implement 'format' argument in dStrHexStr()

@@ -24,6 +24,12 @@ command can be given either on the command line or via the
 .PP
 The commands pass through a generic SCSI interface which is implemented
 for several operating systems including Linux, FreeBSD and Windows.
+.PP
+Experimental support has been added to send NVMe Admin commands to the
+\fIDEVICE\fR. Since all NVMe commands are 64 bytes long it is more
+convenient to use the \fI\-\-cmdfile=CF\fR option rather than type the
+64 bytes of the NVMe command on the command line. See the section on
+NVME below.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -118,6 +124,45 @@ The CDB command name defined by T10 for the given CDB is shown if
 the '\-vv' option is given. The command line syntax still needs to be
 correct, so /dev/null may be used for the \fIDEVICE\fR since the CDB
 command name decoding is done before the \fIDEVICE\fR is checked.
+.SH NVME SUPPORT
+Support for NVMe (a.k.a. NVM Express) is currently experimental. NVMe
+concepts map reasonably well to the SCSI architecture. A SCSI logical
+unit (LU) is similar to a NVMe namespace (although LUN 0 is very common
+in SCSI while namespace IDs start at 1). A SCSI target device is similar
+to a NVMe controller. SCSI commands vary from 6 to 260 bytes long (although
+SCSI command descriptor blocks (cdb_s) longer than 32 bytes are uncommon)
+while all NVMe commands are currently 64 bytes long. The SCSI architecture
+makes a clear distinction between an initiator (often called a HBA) and
+a target (device) while (at least on the PCIe transport) the NVMe
+controller plays both roles. At this time this utility only
+supports "Admin" commands (i.e. it does not support the I/O (or "NVM")
+command set). Admin commands are sent to submission queue 0 while non-admin
+commands are sent to submissions greater than 0.
+.PP
+One significant difference is that SCSI uses a big endian representation
+for integers that are longer than 8 bits (i.e. longer than 1 byte) while
+NVMe uses a little endian representation (like most things that have
+originated from the Intel organisation). NVMe specifications talk about
+Words (16 bits), Double Words (32 bits) and sometimes Quad Words (64
+bits) and has tighter alignment requirements than SCSI.
+.PP
+One difference that impacts this utility is that NVMe places pointers to
+host memory in its commands while SCSI leaves this detail to whichever
+transport it is using (e.g. SAS, iSCSI, SRP). Since this utility takes
+the command from the user (either on the command line or in a file named
+\fICF\fR) but this utility allocates a data\-in or data\-out buffer as
+required, the user does not know in advance what the address of that
+buffer will be. Some special addresses have been introduced to help with
+this problem: the address 0xfffffffffffffffe is interpreted as "use the
+data\-in buffer's address" while 0xfffffffffffffffd is interpreted as "use
+the data\-out buffer's address". Since NVMe uses little endian notation
+then that first address appears in the NVMe command byte stream as "fe"
+followed by seven "ff"s. A similar arrangement is made for the length
+of that buffer, but since that is a 32 byte quantity, the first 4
+bytes (all "ff"s) are removed.
+.PP
+Two command file examples can be found in the examples directory of this
+package's source tarball: nvme_identify_ctl.hex and nvme_dev_self_test.hex .
 .SH EXAMPLES
 These examples, apart from the last one, use Linux device names. For
 suitable device names in other supported Operating Systems see the

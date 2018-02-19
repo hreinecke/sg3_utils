@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.31 20180127";    /* ses4r01 */
+static const char * version_str = "2.32 20180217";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1911,8 +1911,7 @@ build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
     const uint8_t * bp;
     const uint8_t * last_bp;
 
-    resp = (uint8_t *)sg_memalign(op->maxlen, sg_get_page_size(), &free_resp,
-                                  op->verbose > 3);
+    resp = sg_memalign(op->maxlen, 0, &free_resp, op->verbose > 3);
     if (NULL == resp) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
                 op->maxlen);
@@ -3861,8 +3860,7 @@ process_status_page(int sg_fd, struct opts_t * op)
     struct th_es_t tes;
     struct th_es_t * tesp;
 
-    resp = (uint8_t *)sg_memalign(op->maxlen, sg_get_page_size(), &free_resp,
-                                  op->verbose > 3);
+    resp = sg_memalign(op->maxlen, 0, &free_resp, op->verbose > 3);
     if (NULL == resp) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
                 op->maxlen);
@@ -5227,7 +5225,8 @@ int
 main(int argc, char * argv[])
 {
     bool have_cgs = false;
-    int k, res;
+    bool vb3;
+    int k, res, vb;
     int sg_fd = -1;
     int pd_type = 0;
     int ret = 0;
@@ -5256,7 +5255,7 @@ main(int argc, char * argv[])
                                false);
     if (NULL == op->data_arr) {
         pr2serr("unable to allocate %u bytes on heap\n", MX_DATA_IN + 16);
-        return SG_LIB_OS_BASE_ERR + ENOMEM;
+        return sg_convert_errno(ENOMEM);
     }
     res = parse_cmd_line(op, argc, argv);
     if (res) {
@@ -5275,29 +5274,27 @@ main(int argc, char * argv[])
         enumerate_work(op);
         goto early_out;
     }
-    enc_stat_rsp = sg_memalign(op->maxlen, pg_sz, &free_enc_stat_rsp,
-                               op->verbose > 3);
+    vb = op->verbose;
+    vb3 = (vb > 3);
+    enc_stat_rsp = sg_memalign(op->maxlen, pg_sz, &free_enc_stat_rsp, vb3);
     if (NULL == enc_stat_rsp) {
         pr2serr("Unable to get heap for enc_stat_rsp\n");
         goto err_out;
     }
     enc_stat_rsp_sz = op->maxlen;
-    elem_desc_rsp = sg_memalign(op->maxlen, pg_sz, &free_elem_desc_rsp,
-                               op->verbose > 3);
+    elem_desc_rsp = sg_memalign(op->maxlen, pg_sz, &free_elem_desc_rsp, vb3);
     if (NULL == elem_desc_rsp) {
         pr2serr("Unable to get heap for elem_desc_rsp\n");
         goto err_out;
     }
     elem_desc_rsp_sz = op->maxlen;
-    add_elem_rsp = sg_memalign(op->maxlen, pg_sz, &free_add_elem_rsp,
-                               op->verbose > 3);
+    add_elem_rsp = sg_memalign(op->maxlen, pg_sz, &free_add_elem_rsp, vb3);
     if (NULL == add_elem_rsp) {
         pr2serr("Unable to get heap for add_elem_rsp\n");
         goto err_out;
     }
     add_elem_rsp_sz = op->maxlen;
-    threshold_rsp = sg_memalign(op->maxlen, pg_sz, &free_threshold_rsp,
-                               op->verbose > 3);
+    threshold_rsp = sg_memalign(op->maxlen, pg_sz, &free_threshold_rsp, vb3);
     if (NULL == threshold_rsp) {
         pr2serr("Unable to get heap for threshold_rsp\n");
         goto err_out;
@@ -5354,7 +5351,7 @@ main(int argc, char * argv[])
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
-    if (op->verbose > 4)
+    if (vb > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
                 scsi_pt_win32_spt_state() ? "direct" : "indirect");
     if (op->maxlen >= 16384)
@@ -5376,7 +5373,7 @@ main(int argc, char * argv[])
     }
 #endif
 
-    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, op->verbose);
+    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, vb);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", op->dev_name,
                 safe_strerror(-sg_fd));
@@ -5384,7 +5381,7 @@ main(int argc, char * argv[])
         goto err_out;
     }
     if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
-        if (sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
+        if (sg_simple_inquiry(sg_fd, &inq_resp, 1, vb)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->dev_name);
             ret = SG_LIB_CAT_OTHER;
             goto err_out;
@@ -5394,7 +5391,7 @@ main(int argc, char * argv[])
             pd_type = inq_resp.peripheral_type;
             cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
             if (0xd == pd_type) {
-                if (op->verbose)
+                if (vb)
                     printf("    enclosure services device\n");
             } else if (0x40 & inq_resp.byte_6)
                 printf("    %s device has EncServ bit set\n", cp);
@@ -5425,7 +5422,7 @@ main(int argc, char * argv[])
             printf("Sending Enclosure Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
                 goto err_out;
@@ -5435,7 +5432,7 @@ main(int argc, char * argv[])
             printf("Sending String Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send String Out page\n");
                 goto err_out;
@@ -5445,7 +5442,7 @@ main(int argc, char * argv[])
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
                 goto err_out;
@@ -5455,7 +5452,7 @@ main(int argc, char * argv[])
             printf("Sending Array Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send Array Control page\n");
                 goto err_out;
@@ -5465,7 +5462,7 @@ main(int argc, char * argv[])
             printf("Sending Subenclosure String Out [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure String Out page\n");
                 goto err_out;
@@ -5477,7 +5474,7 @@ main(int argc, char * argv[])
             printf("  Perhaps it would be better to use the sg_ses_microcode "
                    "utility\n");
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send Download Microcode Control page\n");
                 goto err_out;
@@ -5487,7 +5484,7 @@ main(int argc, char * argv[])
             printf("Sending Subenclosure Nickname Control [0x%x] page, with "
                    "page length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, op->verbose);
+                              true, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure Nickname Control page\n");
                 goto err_out;
@@ -5505,10 +5502,10 @@ main(int argc, char * argv[])
 
 err_out:
     if (! op->do_status) {
-        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose);
+        sg_get_category_sense_str(ret, sizeof(b), b, vb);
         pr2serr("    %s\n", b);
     }
-    if (ret && (0 == op->verbose))
+    if (ret && (0 == vb))
         pr2serr("Problem detected, try again with --verbose option for more "
                 "information\n");
     if (sg_fd >= 0)

@@ -33,15 +33,21 @@
 #endif
 #include "sg_lib.h"
 #include "sg_pt.h"
+#include "sg_pt_nvme.h"
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.22 (2018-02-10)"
+#define SG_RAW_VERSION "0.4.23 (2018-02-16)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
 #define MAX_SCSI_CDBSZ 260
 #define MAX_SCSI_DXLEN (64 * 1024)
+
+#define NVME_ADDR_DATA_IN  0xfffffffffffffffe
+#define NVME_ADDR_DATA_OUT 0xfffffffffffffffd
+#define NVME_DATA_LEN_DATA_IN  0xfffffffe
+#define NVME_DATA_LEN_DATA_OUT 0xfffffffd
 
 static struct option long_options[] = {
     { "binary",  no_argument,       NULL, 'b' },
@@ -52,6 +58,7 @@ static struct option long_options[] = {
     { "skip",    required_argument, NULL, 'k' },
     { "nosense", no_argument,       NULL, 'n' },
     { "outfile", required_argument, NULL, 'o' },
+    { "raw",     no_argument,       NULL, 'w' },
     { "request", required_argument, NULL, 'r' },
     { "readonly", no_argument,      NULL, 'R' },
     { "send",    required_argument, NULL, 's' },
@@ -74,6 +81,7 @@ struct opts_t {
     int datain_len;
     int dataout_len;
     int timeout;
+    int raw;
     int readonly;
     int verbose;
     off_t dataout_offset;
@@ -119,6 +127,9 @@ usage()
             "  --outfile=OFILE|-o OFILE    Write binary data to OFILE (def: "
             "hexdump\n"
             "                              to stdout)\n"
+            "  --raw|-w               interpret CF (command file) as "
+            "binary (def:\n"
+            "                         interpret as ASCII hex)\n"
             "  --readonly|-R          Open DEVICE read-only (default: "
             "read-write)\n"
             "  --request=RLEN|-r RLEN    Request up to RLEN bytes of data "
@@ -132,9 +143,9 @@ usage()
             "  --version|-V           Show version information and exit\n"
             "\n"
             "Between 6 and 260 command bytes (two hex digits each) can be "
-            "specified\nand will be sent to DEVICE. Lengths RLEN and SLEN "
-            "are decimal by\ndefault. Bidirectional commands accepted.\n\n"
-            "Simple example: Perform INQUIRY on /dev/sg0:\n"
+            "specified\nand will be sent to DEVICE. Lengths RLEN, SLEN and "
+            "KLEN are decimal by\ndefault. Bidirectional commands "
+            "accepted.\n\nSimple example: Perform INQUIRY on /dev/sg0:\n"
             "  sg_raw -r 1k /dev/sg0 12 00 00 00 60 00\n");
 }
 
@@ -337,7 +348,7 @@ process_cl(struct opts_t * op, int argc, char *argv[])
     while (1) {
         int c, n;
 
-        c = getopt_long(argc, argv, "bc:ehi:k:no:r:Rs:t:vV", long_options,
+        c = getopt_long(argc, argv, "bc:ehi:k:no:r:Rs:t:vVw", long_options,
                         NULL);
         if (c == -1)
             break;
@@ -417,6 +428,9 @@ process_cl(struct opts_t * op, int argc, char *argv[])
         case 'V':
             op->do_version = true;
             break;
+        case 'w':       /* -r and -R already in use, this is --raw */
+            ++op->raw;
+            break;
         default:
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -449,22 +463,27 @@ process_cl(struct opts_t * op, int argc, char *argv[])
     if (op->cmdfile_given) {
         bool ok;
 
-        ok = f2hex_arr(op->cmd_file, false /* as_binary */,
+        ok = f2hex_arr(op->cmd_file, (op->raw > 0) /* as_binary */,
                        false /* no_space */, op->cdb, &op->cdb_length,
                        MAX_SCSI_CDBSZ);
         if (! ok)
             return SG_LIB_SYNTAX_ERROR;
+        if (op->verbose > 2) {
+            pr2serr("Read %d from %s . They are in hex:\n", op->cdb_length,
+                    op->cmd_file);
+            hex2stderr(op->cdb, op->cdb_length, -1);
+        }
     }
     if (op->cdb_length < MIN_SCSI_CDBSZ) {
         pr2serr("CDB too short (min. %d bytes)\n", MIN_SCSI_CDBSZ);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (op->do_enumerate || (op->verbose > 1)) {
-        bool probable_scsi = sg_is_scsi_cdb(op->cdb, op->cdb_length);
+        bool is_scsi_cdb = sg_is_scsi_cdb(op->cdb, op->cdb_length);
         int sa;
         char b[80];
 
-        if (probable_scsi) {
+        if (is_scsi_cdb) {
             if (op->cdb_length > 16) {
                 sa = sg_get_unaligned_be16(op->cdb + 8);
                 if ((0x7f != op->cdb[0]) && (0x7e != op->cdb[0]))
@@ -475,7 +494,10 @@ process_cl(struct opts_t * op, int argc, char *argv[])
                 sa = op->cdb[1] & 0x1f;
             sg_get_opcode_sa_name(op->cdb[0], sa, 0, sizeof(b), b);
             printf("Attempt to decode cdb name: %s\n", b);
-        }
+        } else
+            printf(">>> Seems to be NVMe %s command\n",
+                   sg_get_nvme_opcode_name(op->cdb[0], true /* admin */,
+                                           sizeof(b), b));
     }
     return 0;
 }
@@ -624,19 +646,23 @@ bail:
 int
 main(int argc, char *argv[])
 {
+    bool is_scsi_cdb = true;
     int ret = 0;
     int err = 0;
-    int res_cat, status, slen, k, ret2;
+    int res_cat, status, s_len, k, ret2;
     int sg_fd = -1;
+    uint16_t sct_sc;
+    uint32_t result;
     struct sg_pt_base *ptvp = NULL;
     uint8_t sense_buffer[32];
-    uint8_t * dxfer_buffer_in = NULL;
-    uint8_t * dxfer_buffer_out = NULL;
+    uint8_t * dinp = NULL;
+    uint8_t * doutp = NULL;
     uint8_t * free_buf_out = NULL;
     uint8_t * wrkBuf = NULL;
     struct opts_t opts;
     struct opts_t * op;
     char b[128];
+    const int b_len = sizeof(b);
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -668,15 +694,75 @@ main(int argc, char *argv[])
         ret = SG_LIB_CAT_OTHER;
         goto done;
     }
+
+    is_scsi_cdb = sg_is_scsi_cdb(op->cdb, op->cdb_length);
+    if (op->do_dataout) {
+        uint32_t dout_len;
+
+        doutp = fetch_dataout(op, &free_buf_out, &err);
+        if (doutp == NULL) {
+            ret = err;
+            goto done;
+        }
+        dout_len = op->dataout_len;
+        if (op->verbose > 2)
+            pr2serr("dxfer_buffer_out=%p, length=%d\n",
+                    (void *)doutp, dout_len);
+        set_scsi_pt_data_out(ptvp, doutp, dout_len);
+        if (op->cmdfile_given) {
+            if (NVME_ADDR_DATA_OUT ==
+                sg_get_unaligned_le64(op->cdb + SG_NVME_PT_ADDR))
+                sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)doutp,
+                                      op->cdb + SG_NVME_PT_ADDR);
+            if (NVME_DATA_LEN_DATA_OUT ==
+                sg_get_unaligned_le32(op->cdb + SG_NVME_PT_DATA_LEN))
+                sg_put_unaligned_le32(dout_len,
+                                      op->cdb + SG_NVME_PT_DATA_LEN);
+        }
+    }
+    if (op->do_datain) {
+        uint32_t din_len = op->datain_len;
+
+        dinp = sg_memalign(din_len, 0 /* page_size */, &wrkBuf,
+                           op->verbose > 3);
+        if (dinp == NULL) {
+            pr2serr("sg_memalign: failed to get %d bytes of memory\n",
+                    din_len);
+            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+            goto done;
+        }
+        if (op->verbose > 2)
+            pr2serr("dxfer_buffer_in=%p, length=%d\n", (void *)dinp, din_len);
+        set_scsi_pt_data_in(ptvp, dinp, din_len);
+        if (op->cmdfile_given) {
+            if (NVME_ADDR_DATA_IN ==
+                sg_get_unaligned_le64(op->cdb + SG_NVME_PT_ADDR))
+                sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)dinp,
+                                      op->cdb + SG_NVME_PT_ADDR);
+            if (NVME_DATA_LEN_DATA_IN ==
+                sg_get_unaligned_le32(op->cdb + SG_NVME_PT_DATA_LEN))
+                sg_put_unaligned_le32(din_len,
+                                      op->cdb + SG_NVME_PT_DATA_LEN);
+        }
+    }
     if (op->verbose) {
-        pr2serr("    cdb to send: ");
-        for (k = 0; k < op->cdb_length; ++k)
-            pr2serr("%02x ", op->cdb[k]);
-        pr2serr("\n");
-        if (op->verbose > 1) {
-            sg_get_command_name(op->cdb, 0, sizeof(b) - 1, b);
-            b[sizeof(b) - 1] = '\0';
-            pr2serr("    Command name: %s\n", b);
+        pr2serr("    %s to send: ", is_scsi_cdb ? "cdb" : "cmd");
+        if (is_scsi_cdb) {
+            for (k = 0; k < op->cdb_length; ++k)
+                pr2serr("%02x ", op->cdb[k]);
+            pr2serr("\n");
+            if (op->verbose > 1) {
+                sg_get_command_name(op->cdb, 0, b_len - 1, b);
+                b[b_len - 1] = '\0';
+                pr2serr("    Command name: %s\n", b);
+            }
+        } else {        /* If not SCSI cdb then treat as NVMe command */
+            pr2serr("\n");
+            hex2stderr(op->cdb, op->cdb_length, -1);
+            if (op->verbose > 1)
+                pr2serr("  Command name: %s\n",
+                        sg_get_nvme_opcode_name(op->cdb[0], true /* admin */,
+                                                b_len, b));
         }
     }
     set_scsi_pt_cdb(ptvp, op->cdb, op->cdb_length);
@@ -685,42 +771,37 @@ main(int argc, char *argv[])
                 (int)sizeof(sense_buffer));
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
-    if (op->do_dataout) {
-        dxfer_buffer_out = fetch_dataout(op, &free_buf_out, &err);
-        if (dxfer_buffer_out == NULL) {
-            ret = err;
-            goto done;
-        }
-        if (op->verbose > 2)
-            pr2serr("dxfer_buffer_out=%p, length=%d\n",
-                    (void *)dxfer_buffer_out, op->dataout_len);
-        set_scsi_pt_data_out(ptvp, dxfer_buffer_out, op->dataout_len);
-    }
-    if (op->do_datain) {
-        dxfer_buffer_in = sg_memalign(op->datain_len, 0 /* page_size */,
-                                      &wrkBuf, op->verbose > 3);
-        if (dxfer_buffer_in == NULL) {
-            pr2serr("sg_memalign: failed to get %d bytes of memory\n",
-                    op->datain_len);
-            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
-            goto done;
-        }
-        if (op->verbose > 2)
-            pr2serr("dxfer_buffer_in=%p, length=%d\n",
-                    (void *)dxfer_buffer_in, op->datain_len);
-        set_scsi_pt_data_in(ptvp, dxfer_buffer_in, op->datain_len);
-    }
-
     ret = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
     if (ret > 0) {
-        if (SCSI_PT_DO_BAD_PARAMS == ret) {
+        switch (ret) {
+        case SCSI_PT_DO_BAD_PARAMS:
             pr2serr("do_scsi_pt: bad pass through setup\n");
             ret = SG_LIB_CAT_OTHER;
-        } else if (SCSI_PT_DO_TIMEOUT == ret) {
+            break;
+        case SCSI_PT_DO_TIMEOUT:
             pr2serr("do_scsi_pt: timeout\n");
             ret = SG_LIB_CAT_TIMEOUT;
-        } else
+            break;
+        case SCSI_PT_DO_NVME_STATUS:
+            sct_sc = (uint16_t)get_scsi_pt_status_response(ptvp);
+            pr2serr("NVMe Status: %s [0x%x]\n",
+                    sg_get_nvme_cmd_status_str(sct_sc, b_len, b), sct_sc);
+            if (op->verbose) {
+                result = get_pt_result(ptvp);
+                pr2serr("NVMe Result=0x%x\n", result);
+                s_len = get_scsi_pt_sense_len(ptvp);
+                if ((op->verbose > 1) && (s_len > 0)) {
+                    pr2serr("NVMe completion queue 4 DWords (as byte "
+                            "string):\n");
+                    hex2stderr(sense_buffer, s_len, -1);
+                }
+            }
+            break;
+        default:
+            pr2serr("do_scsi_pt: unknown error: %d\n", ret);
             ret = SG_LIB_CAT_OTHER;
+            break;
+        }
         goto done;
     } else if (ret < 0) {
         int err;
@@ -734,50 +815,57 @@ main(int argc, char *argv[])
         goto done;
     }
 
-    slen = 0;
-    res_cat = get_scsi_pt_result_category(ptvp);
-    switch (res_cat) {
-    case SCSI_PT_RESULT_GOOD:
-        ret = 0;
-        break;
-    case SCSI_PT_RESULT_SENSE:
-        slen = get_scsi_pt_sense_len(ptvp);
-        ret = sg_err_category_sense(sense_buffer, slen);
-        break;
-    case SCSI_PT_RESULT_TRANSPORT_ERR:
-        get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
-        pr2serr(">>> transport error: %s\n", b);
-        ret = SG_LIB_CAT_OTHER;
-        break;
-    case SCSI_PT_RESULT_OS_ERR:
-        get_scsi_pt_os_err_str(ptvp, sizeof(b), b);
-        pr2serr(">>> os error: %s\n", b);
-        ret = SG_LIB_CAT_OTHER;
-        break;
-    default:
-        pr2serr(">>> unknown pass through result category (%d)\n", res_cat);
-        ret = SG_LIB_CAT_OTHER;
-        break;
-    }
+    s_len = get_scsi_pt_sense_len(ptvp);
+    if (is_scsi_cdb) {
+        res_cat = get_scsi_pt_result_category(ptvp);
+        switch (res_cat) {
+        case SCSI_PT_RESULT_GOOD:
+            ret = 0;
+            break;
+        case SCSI_PT_RESULT_SENSE:
+            ret = sg_err_category_sense(sense_buffer, s_len);
+            break;
+        case SCSI_PT_RESULT_TRANSPORT_ERR:
+            get_scsi_pt_transport_err_str(ptvp, b_len, b);
+            pr2serr(">>> transport error: %s\n", b);
+            ret = SG_LIB_CAT_OTHER;
+            break;
+        case SCSI_PT_RESULT_OS_ERR:
+            get_scsi_pt_os_err_str(ptvp, b_len, b);
+            pr2serr(">>> os error: %s\n", b);
+            ret = SG_LIB_CAT_OTHER;
+            break;
+        default:
+            pr2serr(">>> unknown pass through result category (%d)\n",
+                    res_cat);
+            ret = SG_LIB_CAT_OTHER;
+            break;
+        }
 
-    status = get_scsi_pt_status_response(ptvp);
-    pr2serr("SCSI Status: ");
-    sg_print_scsi_status(status);
-    pr2serr("\n\n");
-    if ((SAM_STAT_CHECK_CONDITION == status) && (! op->no_sense)) {
-        if (SCSI_PT_RESULT_SENSE != res_cat)
-            slen = get_scsi_pt_sense_len(ptvp);
-        if (0 == slen)
-            pr2serr(">>> Strange: status is CHECK CONDITION but no Sense "
-                    "Information\n");
-        else {
-            pr2serr("Sense Information:\n");
-            sg_print_sense(NULL, sense_buffer, slen, (op->verbose > 0));
-            pr2serr("\n");
+        status = get_scsi_pt_status_response(ptvp);
+        pr2serr("SCSI Status: ");
+        sg_print_scsi_status(status);
+        pr2serr("\n\n");
+        if ((SAM_STAT_CHECK_CONDITION == status) && (! op->no_sense)) {
+            if (0 == s_len)
+                pr2serr(">>> Strange: status is CHECK CONDITION but no Sense "
+                        "Information\n");
+            else {
+                pr2serr("Sense Information:\n");
+                sg_print_sense(NULL, sense_buffer, s_len, (op->verbose > 0));
+                pr2serr("\n");
+            }
+        }
+        if (SAM_STAT_RESERVATION_CONFLICT == status)
+            ret = SG_LIB_CAT_RES_CONFLICT;
+    } else {    /* NVMe command */
+        result = get_pt_result(ptvp);
+        pr2serr("NVMe Result=0x%x\n", result);
+        if (op->verbose && (s_len > 0)) {
+            pr2serr("NVMe completion queue 4 DWords (as byte string):\n");
+            hex2stderr(sense_buffer, s_len, -1);
         }
     }
-    if (SAM_STAT_RESERVATION_CONFLICT == status)
-        ret = SG_LIB_CAT_RES_CONFLICT;
 
     if (op->do_datain) {
         int data_len = op->datain_len - get_scsi_pt_resid(ptvp);
@@ -790,7 +878,7 @@ main(int argc, char *argv[])
         } else {
             if (op->datain_file == NULL && !op->datain_binary) {
                 pr2serr("Received %d bytes of data:\n", data_len);
-                hex2stderr(dxfer_buffer_in, data_len, 0);
+                hex2stderr(dinp, data_len, 0);
             } else {
                 const char * cp = "stdout";
 
@@ -799,7 +887,7 @@ main(int argc, char *argv[])
                        ('-' == op->datain_file[0])))
                     cp = op->datain_file;
                 pr2serr("Writing %d bytes of data to %s\n", data_len, cp);
-                ret2 = write_dataout(op->datain_file, dxfer_buffer_in,
+                ret2 = write_dataout(op->datain_file, dinp,
                                      data_len);
                 if (0 != ret2) {
                     if (0 == ret)
@@ -811,8 +899,8 @@ main(int argc, char *argv[])
     }
 
 done:
-    if (op->verbose) {
-        sg_get_category_sense_str(ret, sizeof(b), b, op->verbose - 1);
+    if (op->verbose && is_scsi_cdb) {
+        sg_get_category_sense_str(ret, b_len, b, op->verbose - 1);
         pr2serr("%s\n", b);
     }
     if (wrkBuf)
@@ -823,5 +911,5 @@ done:
         destruct_scsi_pt_obj(ptvp);
     if (sg_fd >= 0)
         scsi_pt_close_device(sg_fd);
-    return ret;
+    return ret >= 0 ? ret : SG_LIB_CAT_OTHER;
 }

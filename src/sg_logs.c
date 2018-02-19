@@ -34,7 +34,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.60 20180119";    /* spc5r17 + sbc4r11 */
+static const char * version_str = "1.61 20180218";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -107,7 +107,9 @@ static const char * version_str = "1.60 20180119";    /* spc5r17 + sbc4r11 */
 #define LOG_SENSE_PROBE_ALLOC_LEN 4
 #define LOG_SENSE_DEF_TIMEOUT 64        /* seconds */
 
-static uint8_t rsp_buff[MX_ALLOC_LEN + 4];
+static uint8_t * rsp_buff;
+static uint8_t * free_rsp_buff;
+static const int rsp_buff_sz = MX_ALLOC_LEN + 4;
 
 static struct option long_options[] = {
         {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
@@ -1313,7 +1315,7 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 }
 
 static void
-dStrRaw(const char * str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
@@ -1747,7 +1749,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -1888,7 +1890,7 @@ show_error_counter_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -1940,7 +1942,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -1991,7 +1993,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2079,7 +2081,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2171,7 +2173,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2256,7 +2258,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -2360,7 +2362,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -2431,7 +2433,7 @@ show_data_compression_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -2528,7 +2530,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2583,7 +2585,7 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2620,7 +2622,7 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2679,7 +2681,7 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2763,7 +2765,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -2833,7 +2835,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -2903,7 +2905,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -3021,7 +3023,7 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter != pc)
             continue;
         if (op->do_raw)
-            dStrRaw((const char *)bp, extra);
+            dStrRaw(bp, extra);
         else if (0 == op->do_hex)
             hex2stdout(bp, extra, 0);
         else if (1 == op->do_hex)
@@ -3072,7 +3074,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -3550,7 +3552,7 @@ show_protocol_specific_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -3623,7 +3625,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 if (param_code != op->filter)
                     continue;
                 if (op->do_raw) {
-                    dStrRaw((const char *)bp, extra);
+                    dStrRaw(bp, extra);
                     break;
                 } else if (op->do_hex) {
                     hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -3766,7 +3768,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 if (param_code != op->filter)
                     continue;
                 if (op->do_raw) {
-                    dStrRaw((const char *)bp, extra);
+                    dStrRaw(bp, extra);
                     break;
                 } else if (op->do_hex) {
                     hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -3909,7 +3911,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, extra);
+                dStrRaw(bp, extra);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
@@ -4017,7 +4019,7 @@ show_format_status_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4102,7 +4104,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4189,7 +4191,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4280,7 +4282,7 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4351,7 +4353,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4429,7 +4431,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4567,7 +4569,7 @@ show_tapealert_response_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4656,7 +4658,7 @@ show_requested_recovery_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4718,7 +4720,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4807,7 +4809,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -4936,7 +4938,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5124,7 +5126,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5199,7 +5201,7 @@ show_background_op_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5257,7 +5259,7 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5319,7 +5321,7 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5376,7 +5378,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5488,7 +5490,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5667,7 +5669,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5803,7 +5805,7 @@ show_element_stats_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5856,7 +5858,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -5887,11 +5889,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         printf("    Service action: 0x%x\n", bp[29] & 0xf);
         // Check Medium id number for all zeros
         // ssc4r03.pdf does not define this field, why? xxxxxx
-        for (k = 32; k < 64; ++k) {
-            if(bp[k])
-                break;
-        }
-        if (64 == k)
+        if (sg_all_zeros(bp + 32, 32))
             printf("    Medium id number is 32 bytes of zero\n");
         else {
             printf("    Medium id number (in hex):\n");
@@ -5946,7 +5944,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -6118,7 +6116,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -6398,7 +6396,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -6447,7 +6445,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -6504,7 +6502,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
             if (op->do_raw) {
-                dStrRaw((const char *)bp, pl);
+                dStrRaw(bp, pl);
                 break;
             } else if (op->do_hex) {
                 hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
@@ -6593,7 +6591,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
     if (0 == res) {
         len = sg_get_unaligned_be16(resp + 2) + 4;
         if (op->do_raw)
-            dStrRaw((const char *)resp, len);
+            dStrRaw(resp, len);
         else if (op->do_hex)
             hex2stdout(resp, len, (1 == op->do_hex));
         else
@@ -6606,7 +6604,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
         if (0 == res) {
             len = sg_get_unaligned_be16(resp + 2) + 4;
             if (op->do_raw)
-                dStrRaw((const char *)resp, len);
+                dStrRaw(resp, len);
             else if (op->do_hex)
                 hex2stdout(resp, len, (1 == op->do_hex));
             else
@@ -6685,8 +6683,9 @@ decode_pg_arg(struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, pg_len, res, resp_len;
+    int k, pg_len, res, resp_len, vb;
     int in_len = -1;
+    int sg_fd = -1;
     int ret = 0;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts;
@@ -6694,7 +6693,6 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(op, 0, sizeof(opts));
-    memset(rsp_buff, 0, sizeof(rsp_buff));
     /* N.B. some disks only give data for current cumulative */
     op->page_control = 1;
     op->dev_pdt = -1;
@@ -6711,6 +6709,7 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
+    vb = op->verbose;
     if (op->vend_prod) {
         if (isdigit(op->vend_prod[0]))
             k = sg_get_num_nomult(op->vend_prod);
@@ -6727,13 +6726,19 @@ main(int argc, char * argv[])
         }
     }
     if (op->do_enumerate > 0) {
-        if (op->device_name && op->verbose)
+        if (op->device_name && vb)
             pr2serr("Warning: device: %s is being ignored\n",
                     op->device_name);
         enumerate_pages(op);
         return 0;
     }
-
+    rsp_buff = sg_memalign(rsp_buff_sz, 0 /* page aligned */, &free_rsp_buff,
+                           false);
+    if (NULL == rsp_buff) {
+        pr2serr("Unable to allocate %d bytes on the heap\n", rsp_buff_sz);
+        ret = sg_convert_errno(ENOMEM);
+        goto err_out;
+    }
     if (NULL == op->device_name) {
         if (op->in_fn) {
             const struct log_elem * lep;
@@ -6742,14 +6747,20 @@ main(int argc, char * argv[])
             uint16_t u;
 
             if (f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
-                          sizeof(rsp_buff)))
-                return SG_LIB_FILE_ERROR;
+                          rsp_buff_sz)) {
+                ret = SG_LIB_FILE_ERROR;
+                goto err_out;
+            }
+            if (vb > 2)
+                pr2serr("Read %d [0x%x] bytes of user supplied data\n",
+                        in_len, in_len);
             if (op->do_raw)
                 op->do_raw = false;    /* can interfere on decode */
             if (in_len < 4) {
                 pr2serr("--in=%s only decoded %d bytes (needs 4 at least)\n",
                         op->in_fn, in_len);
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto err_out;
             }
             if (op->pg_arg && (0 == op->do_brief))
                 pr2serr(">>> --page=%s option is being ignored, using values "
@@ -6784,51 +6795,64 @@ main(int argc, char * argv[])
                         printf("\n");
                 }
             }
-            return 0;
+            ret = 0;
+            goto err_out;
         }
         if (op->pg_arg) {         /* do this for 'sg_logs -p xxx' */
-            res = decode_pg_arg(op);
-            if (res)
-                return res;
+            ret = decode_pg_arg(op);
+            if (ret)
+                goto err_out;
         }
         pr2serr("No DEVICE argument given\n");
         usage_for(1, op);
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
     if (op->do_select) {
         if (op->do_temperature) {
             pr2serr("--select cannot be used with --temperature\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         if (op->do_transport) {
             pr2serr("--select cannot be used with --transport\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
     } else if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+            goto err_out;
         }
     }
     if (op->do_all) {
         if (op->do_select) {
             pr2serr("--all conflicts with --select\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         if (op->filter) {
             pr2serr("--all conflicts with --filter\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
     }
     if (op->in_fn) {
         if (! op->do_select) {
             pr2serr("--in=FN can only be used with --select when DEVICE "
                     "given\n");
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
         }
         if (f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
-                      sizeof(rsp_buff)))
-            return SG_LIB_FILE_ERROR;
+                      rsp_buff_sz)) {
+            ret = SG_LIB_FILE_ERROR;
+            goto err_out;
+        }
+        if (vb > 2)
+            pr2serr("Read %d [0x%x] bytes of user supplied data\n", in_len,
+                    in_len);
     }
     if (op->pg_arg) {
         if (op->do_all) {
@@ -6836,29 +6860,28 @@ main(int argc, char * argv[])
                 pr2serr(">>> warning: --page=%s ignored when --all given\n",
                         op->pg_arg);
         } else {
-            res = decode_pg_arg(op);
-            if (res)
-                return res;
+            ret = decode_pg_arg(op);
+            if (ret)
+                goto err_out;
         }
     }
 
 #ifdef SG_LIB_WIN32
 #ifdef SG_LIB_WIN32_DIRECT
     win32_spt_init_state = !! scsi_pt_win32_spt_state();
-    if (op->verbose > 4)
+    if (vb > 4)
         pr2serr("Initial win32 SPT interface state: %s\n",
                 win32_spt_init_state ? "direct" : "indirect");
 #endif
 #endif
-    sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
-                                op->verbose);
+    sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly, vb);
     if ((sg_fd < 0) && (! op->o_readonly))
-        sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
-                                    op->verbose);
+        sg_fd = sg_cmds_open_device(op->device_name, true /* ro */, vb);
     if (sg_fd < 0) {
         pr2serr("error opening file: %s: %s \n", op->device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
     if (op->do_list || op->do_all) {
         op->pg_code = SUPP_PAGES_LPAGE;
@@ -6870,7 +6893,8 @@ main(int argc, char * argv[])
             op->do_temperature) {
             pr2serr("'-T' should not be mixed with options implying other "
                     "pages\n");
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+            goto err_out;
         }
         op->pg_code = PROTO_SPECIFIC_LPAGE;
     }
@@ -6878,11 +6902,11 @@ main(int argc, char * argv[])
 
     memset(&inq_out, 0, sizeof(inq_out));
     if (op->no_inq < 2) {
-        if (sg_simple_inquiry(sg_fd, &inq_out, 1, op->verbose)) {
+        if (sg_simple_inquiry(sg_fd, &inq_out, 1, vb)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                     op->device_name);
-            sg_cmds_close_device(sg_fd);
-            return SG_LIB_CAT_OTHER;
+            ret = SG_LIB_CAT_OTHER;
+            goto err_out;
         }
         op->dev_pdt = inq_out.peripheral_type;
         if ((! op->do_raw) && (0 == op->do_hex) && (! op->do_name) &&
@@ -6895,14 +6919,14 @@ main(int argc, char * argv[])
             op->deduced_vpn = find_vpn_by_inquiry();
     }
 
-    if (op->do_temperature)
-        return fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op);
-
+    if (op->do_temperature) {
+        ret = fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op);
+        goto err_out;
+    }
     if (op->do_select) {
         k = sg_ll_log_select(sg_fd, op->do_pcreset, op->do_sp,
                              op->page_control, op->pg_code, op->subpg_code,
-                             rsp_buff, ((in_len > 0) ? in_len : 0),
-                             true, op->verbose);
+                             rsp_buff, ((in_len > 0) ? in_len : 0), true, vb);
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
                 pr2serr("log_select: device not ready\n");
@@ -6918,7 +6942,8 @@ main(int argc, char * argv[])
                 pr2serr("log_select: failed (%d), try '-v' for more "
                         "information\n", k);
         }
-        return (k >= 0) ?  k : SG_LIB_CAT_OTHER;
+        ret = (k >= 0) ?  k : SG_LIB_CAT_OTHER;
+        goto err_out;
     }
     resp_len = (op->maxlen > 0) ? op->maxlen : MX_ALLOC_LEN;
     res = do_logs(sg_fd, rsp_buff, resp_len, op);
@@ -6947,7 +6972,7 @@ main(int argc, char * argv[])
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op);
         } else if (op->do_raw)
-            dStrRaw((const char *)rsp_buff, pg_len + 4);
+            dStrRaw(rsp_buff, pg_len + 4);
         else if (op->do_hex > 1)
             hex2stdout(rsp_buff, pg_len + 4, (2 == op->do_hex) ? 0 : -1);
         else if (pg_len > 1) {
@@ -6997,7 +7022,7 @@ main(int argc, char * argv[])
                     pg_len = resp_len - 4;
                 }
                 if (op->do_raw)
-                    dStrRaw((const char *)rsp_buff, pg_len + 4);
+                    dStrRaw(rsp_buff, pg_len + 4);
                 else if (op->do_hex > 1)
                     hex2stdout(rsp_buff, pg_len + 4,
                                (2 == op->do_hex) ? 0 : -1);
@@ -7030,6 +7055,10 @@ main(int argc, char * argv[])
                 pr2serr("log_sense: failed, try '-v' for more information\n");
         }
     }
-    sg_cmds_close_device(sg_fd);
+err_out:
+    if (free_rsp_buff)
+        free(free_rsp_buff);
+    if (sg_fd >= 0)
+        sg_cmds_close_device(sg_fd);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

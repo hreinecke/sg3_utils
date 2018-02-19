@@ -1519,8 +1519,7 @@ sg_get_sense_descriptors_str(const char * lip, const unsigned char * sbp,
             break;
         case 0xe:       /* Added in SPC-5 rev 6 (for Bind/Unbind) */
             n += scnpr(b + n, blen - n, "Device designation\n");
-            j = (int)(sizeof(dd_usage_reason_str_arr) /
-                      sizeof(dd_usage_reason_str_arr[0]));
+            j = (int)SG_ARRAY_SIZE(dd_usage_reason_str_arr);
             if (descp[3] < j)
                 n += scnpr(b + n, blen - n, "%s    Usage reason: %s\n", lip,
                            dd_usage_reason_str_arr[descp[3]]);
@@ -2188,6 +2187,48 @@ sg_get_opcode_name(unsigned char cmd_byte0, int peri_type, int buff_len,
         scnpr(buff, buff_len, "Opcode=0x%x", (int)cmd_byte0);
         break;
     }
+}
+
+/* Fetch NVMe command name given first byte (byte offset 0 in 64 byte
+ * command) of command. Gets Admin NVMe command name if 'admin' is true
+ * (e.g. opcode=0x6 -> Identify), otherwise gets NVM command set name
+ * (e.g. opcode=0 -> Flush). Returns 'buff'. */
+char *
+sg_get_nvme_opcode_name(uint8_t cmd_byte0, bool admin, int buff_len,
+                        char * buff)
+{
+    const struct sg_lib_simple_value_name_t * vnp = admin ?
+                        sg_lib_nvme_admin_cmd_arr : sg_lib_nvme_nvm_cmd_arr;
+
+    if ((NULL == buff) || (buff_len < 1))
+        return buff;
+    else if (1 == buff_len) {
+        buff[0] = '\0';
+        return buff;
+    }
+    for ( ; vnp->name; ++vnp) {
+        if (cmd_byte0 == (uint8_t)vnp->value) {
+            snprintf(buff, buff_len, "%s", vnp->name);
+            return buff;
+        }
+    }
+    if (admin) {
+        if (cmd_byte0 >= 0xc0)
+            snprintf(buff, buff_len, "Vendor specific opcode: 0x%x",
+                     cmd_byte0);
+        else if (cmd_byte0 >= 0x80)
+            snprintf(buff, buff_len, "Command set specific opcode: 0x%x",
+                     cmd_byte0);
+        else
+            snprintf(buff, buff_len, "Unknown opcode: 0x%x", cmd_byte0);
+    } else {    /* NVM (non-Admin) command set */
+        if (cmd_byte0 >= 0x80)
+            snprintf(buff, buff_len, "Vendor specific opcode: 0x%x",
+                     cmd_byte0);
+        else
+            snprintf(buff, buff_len, "Unknown opcode: 0x%x", cmd_byte0);
+    }
+    return buff;
 }
 
 /* Iterates to next designation descriptor in the device identification
@@ -3452,6 +3493,14 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
         return res;
     }
 #endif
+}
+
+bool
+sg_is_aligned(const void * pointer, int byte_count)
+{
+    return 0 == ((sg_uintptr_t)pointer %
+                 ((byte_count > 0) ? (uint32_t)byte_count :
+                                     sg_get_page_size()));
 }
 
 const char *
