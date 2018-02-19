@@ -2,7 +2,7 @@
 #define SG_UNALIGNED_H
 
 /*
- * Copyright (c) 2014-2017 Douglas Gilbert.
+ * Copyright (c) 2014-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -46,8 +46,8 @@ static inline uint64_t __get_unaligned_be64(const uint8_t *p)
 
 static inline void __put_unaligned_be16(uint16_t val, uint8_t *p)
 {
-        *p++ = val >> 8;
-        *p++ = val;
+        *p++ = (uint8_t)(val >> 8);
+        *p++ = (uint8_t)val;
 }
 
 static inline void __put_unaligned_be32(uint32_t val, uint8_t *p)

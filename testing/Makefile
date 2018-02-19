@@ -28,15 +28,16 @@ LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 # For C++/clang testing
 ## CC = gcc
-CC = g++
+## CC = g++
 ## CC = clang
 ## CC = clang++
 
-##CFLAGS = -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -iquote ../include -D_REENTRANT -DSG_KERNEL_INCLUDES $(LARGE_FILE_FLAGS)
-# CFLAGS = -g -O2 -Wall -pedantic -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
-# CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c11 --analyze
-CFLAGS = -Wall -W -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS) -pedantic -std=c++14 -fPIC
+CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
+CFLAGS = -g -O2 -W -Wall 
+# CFLAGS = -g -O2 -Wall -DSG_KERNEL_INCLUDES
+# CFLAGS = -g -O2 -Wall -pedantic 
+# CFLAGS = -Wall -W -pedantic -std=c11 --analyze
+# CFLAGS = -Wall -W -pedantic -std=c++14 -fPIC
 
 LDFLAGS =
 

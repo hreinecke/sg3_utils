@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -46,7 +47,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.00 20180127";
+static const char * version_str = "1.01 20180218";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -135,7 +136,7 @@ main(int argc, char * argv[])
     bool prefetch = false;
     bool readonly = false;
     bool start_tm_valid = false;
-    int sg_fd, res, c;
+    int sg_fd, res, c, err;
     int first_err = 0;
     int last_err = 0;
     int ret = 0;
@@ -291,6 +292,8 @@ main(int argc, char * argv[])
         start_tm.tv_nsec = 0;
         if (0 == clock_gettime(CLOCK_MONOTONIC, &start_tm))
             start_tm_valid = true;
+        else
+            perror("clock_gettime(CLOCK_MONOTONIC)\n");
     }
 #elif defined(HAVE_GETTIMEOFDAY)
     if (do_time) {
@@ -322,6 +325,12 @@ main(int argc, char * argv[])
     if ((count > 0) && start_tm_valid &&
         (start_tm.tv_sec || start_tm.tv_nsec)) {
         res = clock_gettime(CLOCK_MONOTONIC, &end_tm);
+        if (res < 0) {
+            err = errno;
+            perror("clock_gettime");
+            if (EINVAL == err)
+                pr2serr("clock_gettime(CLOCK_MONOTONIC) not supported\n");
+        }
         elapsed_usecs = (end_tm.tv_sec - start_tm.tv_sec) * 1000000;
         elapsed_usecs += (end_tm.tv_nsec - start_tm.tv_nsec) / 1000;
     }

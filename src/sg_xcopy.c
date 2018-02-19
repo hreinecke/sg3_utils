@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.61 20180116";
+static const char * version_str = "0.62 20180218";
 
 #define ME "sg_xcopy: "
 
@@ -588,7 +588,7 @@ scsi_encode_seg_desc(unsigned char *seg_desc, int seg_desc_type,
 {
     int seg_desc_len = 0;
 
-    seg_desc[0] = seg_desc_type;
+    seg_desc[0] = (unsigned char)seg_desc_type;
     seg_desc[1] = 0x0;
     if (xcopy_flag_cat)
         seg_desc[1] |= 0x1;

@@ -41,6 +41,10 @@
 
 /* sg_pt_linux_nvme version 1.04 20180115 */
 
+/* This file contains a small "SPC-only" SNTL to support the SES pass-through
+ * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
+ * SES Send and SES Receive. */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,12 +115,6 @@
 #define MISCOMPARE_VERIFY_ASC 0x1d
 #define MICROCODE_CHANGED_ASCQ 0x1      /* with TARGET_CHANGED_ASC */
 #define MICROCODE_CHANGED_WO_RESET_ASCQ 0x16
-
-
-static inline bool is_aligned(const void * pointer, size_t byte_count)
-{
-    return ((sg_uintptr_t)pointer % byte_count) == 0;
-}
 
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -720,7 +718,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     int res;
     uint8_t st_cd, dpg_cd;
     uint32_t alloc_len, n, dout_len, dpg_len, nvme_dst;
-    uint32_t pg_sz = sg_get_page_size();
+    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * dop;
     struct sg_nvme_passthru_cmd cmd;
     uint8_t * cmd_up = (uint8_t *)&cmd;
@@ -796,7 +794,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     n = dout_len;
     n = (n < alloc_len) ? n : alloc_len;
     dop = (uint8_t *)ptp->io_hdr.dout_xferp;
-    if (! is_aligned(dop, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
+    if (! sg_is_aligned(dop, pg_sz)) {  /* is dop page aligned ? */
         if (vb)
             pr2ws("%s: dout [0x%" PRIx64 "] not page aligned\n", __func__,
                   (uint64_t)ptp->io_hdr.dout_xferp);
@@ -855,7 +853,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     n = din_len;
     n = (n < alloc_len) ? n : alloc_len;
     dip = (uint8_t *)ptp->io_hdr.din_xferp;
-    if (! is_aligned(dip, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
+    if (! sg_is_aligned(dip, pg_sz)) {
         if (vb)
             pr2ws("%s: din [0x%" PRIx64 "] not page aligned\n", __func__,
                   (uint64_t)ptp->io_hdr.din_xferp);
@@ -1077,18 +1075,19 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 {
     bool scsi_cdb;
     bool is_read = false;
-    int n, len;
+    int n, len, hold_dev_fd;
     uint16_t sa;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     struct sg_nvme_passthru_cmd cmd;
     const uint8_t * cdbp;
     void * dp = NULL;
-
+;
     if (! ptp->io_hdr.request) {
         if (vb)
             pr2ws("No NVMe command given (set_scsi_pt_cdb())\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
+    hold_dev_fd = ptp->dev_fd;
     if (fd >= 0) {
         if ((ptp->dev_fd >= 0) && (fd != ptp->dev_fd)) {
             if (vb)
@@ -1105,8 +1104,8 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
     n = ptp->io_hdr.request_len;
     cdbp = (const uint8_t *)ptp->io_hdr.request;
     if (vb > 3)
-        pr2ws("%s: opcode=0x%x, fd=%d, time_secs=%d\n", __func__, cdbp[0],
-              fd, time_secs);
+        pr2ws("%s: opcode=0x%x, fd=%d (dev_fd=%d), time_secs=%d\n", __func__,
+              cdbp[0], fd, hold_dev_fd, time_secs);
     scsi_cdb = sg_is_scsi_cdb(cdbp, n);
     /* direct NVMe command (i.e. 64 bytes long) or SNTL */
     ptp->nvme_direct = ! scsi_cdb;
@@ -1174,8 +1173,21 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 int
 sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 {
-    if (vb)
-        pr2ws("%s: not supported\n", __func__);
+    if (vb) {
+        pr2ws("%s: not supported, ", __func__);
+#ifdef HAVE_NVME
+        pr2ws("HAVE_NVME, ");
+#else
+        pr2ws("don't HAVE_NVME, ");
+#endif
+
+#ifdef IGNORE_NVME
+        pr2ws("IGNORE_NVME");
+#else
+        pr2ws("don't IGNORE_NVME");
+#endif
+        pr2ws("\n");
+     }
     if (vp) { ; }               /* suppress warning */
     if (fd) { ; }               /* suppress warning */
     if (time_secs) { ; }        /* suppress warning */

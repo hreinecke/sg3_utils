@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999 - 2017 D. Gilbert
+ *  Copyright (C) 1999 - 2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.15 20171011";
+static const char * version_str = "4.16 20180218";
 
 #define ME "sg_scan: "
 
@@ -469,7 +469,7 @@ struct lscsi_ioctl_command {
 int scsi_inq(int sg_fd, unsigned char * inqBuff)
 {
     int res;
-    unsigned char buff[512];
+    unsigned char buff[1024];
     struct lscsi_ioctl_command * sicp = (struct lscsi_ioctl_command *)buff;
 
     memset(buff, 0, sizeof(buff));

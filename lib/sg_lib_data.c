@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.38 20180122";/* spc5r17, sbc4r15 */
+const char * sg_lib_version_str = "2.40 20180218";/* spc5r17, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -403,12 +403,15 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
 
 /* Third party copy in [0x83] service actions
  * Opcode 'Receive copy results' was renamed 'Third party copy in' in spc4r34
- * LID1 is an abbreviation of List Identifier length of 1 byte */
-struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {
+ * LID1 is an abbreviation of List Identifier length of 1 byte. In SPC-5
+ * LID1 discontinued (references back to SPC-4) and "(LID4)" suffix removed
+ * as there is no need to differentiate. */
+struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {    /* originating */
     {0x0, 0, "Extended copy(LID1)"},
-    {0x1, 0, "Extended copy(LID4)"},
+    {0x1, 0, "Extended copy"},          /* was 'Extended copy(LID4)' */
     {0x10, 0, "Populate token"},
     {0x11, 0, "Write using token"},
+    {0x16, 1, "Set tape stream mirroring"},     /* ADC-4 and SSC-5 */
     {0x1c, 0, "Copy operation abort"},
     {0xffff, 0, NULL},
 };
@@ -416,15 +419,16 @@ struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {
 /* Third party copy out [0x84] service actions
  * Opcode 'Extended copy' was renamed 'Third party copy out' in spc4r34
  * LID4 is an abbreviation of List Identifier length of 4 bytes */
-struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = {
+struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* retrieve */
     {0x0, 0, "Receive copy status(LID1)"},
     {0x1, 0, "Receive copy data(LID1)"},
     {0x3, 0, "Receive copy operating parameters"},
     {0x4, 0, "Receive copy failure details(LID1)"},
-    {0x5, 0, "Receive copy status(LID4)"},
-    {0x6, 0, "Receive copy data(LID4)"},
+    {0x5, 0, "Receive copy status"},    /* was 'Receive copy status(LID4)' */
+    {0x6, 0, "Receive copy data"},      /* was 'Receive copy data(LID4)' */
     {0x7, 0, "Receive ROD token information"},
     {0x8, 0, "Report all ROD tokens"},
+    {0x16, 1, "Report tape stream mirroring"},  /* SSC-5 */
     {0xffff, 0, NULL},
 };
 
@@ -543,6 +547,10 @@ struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
 };
 
 struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+    {0xffff, 0, NULL},
+};
+
+struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {  /* opcode 0x34 (SSC) */
     {0xffff, 0, NULL},
 };
 
@@ -1509,6 +1517,65 @@ struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
 
 #if (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME))
 
+/* Commands sent to the NVMe Admin Queue (queue id 0) have the following
+ * names in the NVM Express 1.3a document dated 20171024 */
+struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
+{
+    {0x0,  "Delete I/O Submission Queue"},      /* first mandatory command */
+    {0x1,  "Create I/O Submission Queue"},
+    {0x2,  "Get Log Page"},
+    {0x4,  "Delete I/O Completion Queue"},
+    {0x5,  "Create I/O Completion Queue"},
+    {0x6,  "Identify"},
+    {0x8,  "Abort"},
+    {0x9,  "Set Features"},
+    {0xa,  "Get Features"},
+    {0xc,  "Asynchronous Event Request"},       /* last mandatory command */
+    {0xd,  "Namespace Management"},             /* first optional command */
+    {0x10, "Firmware commit"},
+    {0x11, "Firmware image download"},
+    {0x14, "Device Self-test"},
+    {0x15, "Namespace Attachment"},
+    {0x18, "Keep Alive"},
+    {0x19, "Directive Send"},
+    {0x1a, "Directive Receive"},
+    {0x1c, "Virtualization Management"},
+    {0x1d, "NVMe-MI Send"},    /* SES SEND DIAGNOSTIC cmd passes thru here */
+    {0x1e, "NVMe-MI Receive"}, /* RECEIVE DIAGNOSTIC RESULTS thru here */
+    {0x7c, "Doorbell Buffer Config"},
+    {0x7f, "NVMe over Fabrics"},
+
+    /* I/O command set specific 0x80 to 0xbf */
+    {0x80, "Format NVM"},               /* first NVM specific */
+    {0x81, "Security Send"},
+    {0x82, "Security Receive"},
+    {0x84, "Sanitize"},                 /* last NVM specific in 1.3a */
+    /* Vendor specific 0xc0 to 0xff */
+    {0xffff, NULL},                     /* Sentinel */
+};
+
+/* Commands sent any NVMe non-Admin Queue (queue id >0) for the NVM command
+ * set have the following names in the NVM Express 1.3a document dated
+ * 20171024 */
+struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
+{
+    {0x0,  "Flush"},                    /* first mandatory command */
+    {0x1,  "Write"},
+    {0x2,  "Read"},                     /* last mandatory command */
+    {0x4,  "Write Uncorrectable"},      /* first optional command */
+    {0x5,  "Compare"},
+    {0x8,  "Write Zeroes"},
+    {0x9,  "Dataset Management"},
+    {0xd,  "Reservation Register"},
+    {0xe,  "Reservation Report"},
+    {0x11, "Reservation Acquire"},
+    {0x15, "Reservation Release"},      /* last optional command in 1.3a */
+
+    /* Vendor specific 0x80 to 0xff */
+    {0xffff, NULL},                     /* Sentinel */
+};
+
+
 /* .value is completion queue's DW3 as follows: ((DW3 >> 17) & 0x3ff)
  * .peri_dev_type is an index for the sg_lib_scsi_status_sense_arr[]
  * .name is taken from NVMe 1.3a document, section 4.6.1.2.1 with less
@@ -1667,6 +1734,21 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
 
 
 #else           /* (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME)) */
+
+struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
+{
+
+    /* Vendor specific 0x80 to 0xff */
+    {0xffff, NULL},                     /* Sentinel */
+};
+
+struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
+{
+
+    /* Vendor specific 0x80 to 0xff */
+    {0xffff, NULL},                     /* Sentinel */
+};
+
 struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
 {
 

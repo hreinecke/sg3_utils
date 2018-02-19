@@ -111,6 +111,8 @@ extern const char * sg_lib_pdt_strs[];
 extern const char * sg_lib_transport_proto_strs[];
 extern int sg_lib_pdt_decay_arr[];
 
+extern struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[];
+extern struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[];
 extern struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[];
 extern struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[];
 

@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.22 20180210 */
+/* sg_pt_win32 version 1.23 20180211 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,15 +115,17 @@ union STORAGE_DEVICE_UID_DATA {
 
 struct sg_pt_handle {
     bool in_use;
+    bool not_claimed;
     bool checked_handle;
     bool bus_type_failed;
     bool is_nvme;
     bool got_physical_drive;
     HANDLE fh;
-    char adapter[32];
-    int bus;
+    char adapter[32];   /* for example: '\\.\scsi3' */
+    int bus;            /* a.k.a. PathId in MS docs */
     int target;
     int lun;
+    int scsi_pid;       /* -1 if not known */
     int verbose;        /* tunnel verbose through to scsi_pt_close_device */
     char dname[20];
 };
@@ -204,14 +206,6 @@ pr2ws(const char * fmt, ...)
     return n;
 }
 
-#if (HAVE_NVME && (! IGNORE_NVME))
-static inline bool is_aligned(const void * pointer, size_t byte_count)
-{
-    return ((sg_uintptr_t)pointer % byte_count) == 0;
-}
-#endif
-
-
 /* Request SPT direct interface when state_direct is 1, state_direct set
  * to 0 for the SPT indirect interface. */
 void
@@ -228,7 +222,7 @@ scsi_pt_win32_spt_state(void)
 }
 
 static const char *
-get_bus_type_str(int bt)
+bus_type_str(int bt)
 {
     switch (bt)
     {
@@ -444,6 +438,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int vb)
     shp->bus = bus;
     shp->target = target;
     shp->lun = lun;
+    shp->scsi_pid = -1;
     shp->verbose = vb;
     memset(shp->adapter, 0, sizeof(shp->adapter));
     strncpy(shp->adapter, "\\\\.\\", 4);
@@ -457,7 +452,8 @@ scsi_pt_open_flags(const char * device_name, int flags, int vb)
         snprintf(shp->adapter + 4, sizeof(shp->adapter) - 5, "%s",
                  device_name + off);
     if (vb > 4)
-        pr2ws("%s: CreateFile('%s')\n", __func__, shp->adapter);
+        pr2ws("%s: CreateFile('%s'), bus=%d, target=%d, lun=%d\n", __func__,
+              shp->adapter, bus, target, lun);
 #if 1
     shp->fh = CreateFile(shp->adapter, GENERIC_READ | GENERIC_WRITE,
                          share_mode, NULL, OPEN_EXISTING, 0, NULL);
@@ -509,6 +505,79 @@ scsi_pt_close_device(int device_fd)
     return 0;
 }
 
+/* Attempt to return device's SCSI peripheral device type (pdt), a number
+ * between 0 (disks) and 31 (not given) by calling IOCTL_SCSI_GET_INQUIRY_DATA
+ * on the adapter. Returns -EIO on error and -999 if not found. */
+static int
+get_scsi_pdt(struct sg_pt_handle *shp, int vb)
+{
+    const int alloc_sz = 8192;
+    int j;
+    int ret = -999;
+    BOOL ok;
+    ULONG dummy;
+    DWORD err;
+    BYTE wbus;
+    uint8_t * inqBuf;
+    uint8_t * free_inqBuf;
+    char b[128];
+
+    if (vb > 2)
+        pr2ws("%s: enter, adapter: %s\n", __func__, shp->adapter);
+    inqBuf = sg_memalign(alloc_sz, 0 /* page size */, &free_inqBuf, (vb > 3));
+    if (NULL == inqBuf) {
+        pr2ws("%s: unable to allocate %d bytes\n", __func__, alloc_sz);
+        return -ENOMEM;
+    }
+    ok = DeviceIoControl(shp->fh, IOCTL_SCSI_GET_INQUIRY_DATA,
+                         NULL, 0, inqBuf, alloc_sz, &dummy, NULL);
+    if (ok) {
+        PSCSI_ADAPTER_BUS_INFO  ai;
+        PSCSI_BUS_DATA pbd;
+        PSCSI_INQUIRY_DATA pid;
+        int num_lus, off;
+
+        ai = (PSCSI_ADAPTER_BUS_INFO)inqBuf;
+        for (wbus = 0; wbus < ai->NumberOfBusses; ++wbus) {
+            pbd = ai->BusData + wbus;
+            num_lus = pbd->NumberOfLogicalUnits;
+            off = pbd->InquiryDataOffset;
+            for (j = 0; j < num_lus; ++j) {
+                if ((off < (int)sizeof(SCSI_ADAPTER_BUS_INFO)) ||
+                    (off > (alloc_sz - (int)sizeof(SCSI_INQUIRY_DATA))))
+                    break;
+                pid = (PSCSI_INQUIRY_DATA)(inqBuf + off);
+                if ((shp->bus == pid->PathId) &&
+                    (shp->target == pid->TargetId) &&
+                    (shp->lun == pid->Lun)) {   /* got match */
+                    shp->scsi_pid = pid->InquiryData[0] & 0x3f;
+                    shp->not_claimed = ! pid->DeviceClaimed;
+                    shp->checked_handle = true;
+                    shp->bus_type_failed = false;
+                    if (vb > 3)
+                        pr2ws("%s: found, scsi_pid=%d, claimed=%d, "
+                             "target=%d, lun=%d\n", __func__, shp->scsi_pid,
+                             pid->DeviceClaimed, shp->target, shp->lun);
+                    ret = shp->scsi_pid;
+                    goto fini;
+                }
+                off = pid->NextInquiryDataOffset;
+            }
+        }
+    } else {
+        err = GetLastError();
+        if (vb > 1)
+            pr2ws("%s: IOCTL_SCSI_GET_INQUIRY_DATA failed err=%u\n\t%s",
+                  shp->adapter, (unsigned int)err,
+                  get_err_str(err, sizeof(b), b));
+        ret = -EIO;
+    }
+fini:
+    if (free_inqBuf)
+        free(free_inqBuf);
+    return ret; /* no match after checking all PathIds, Targets and LUs */
+}
+
 /* Returns 0 on success, negated errno if error */
 static int
 get_bus_type(struct sg_pt_handle *shp, const char *dname,
@@ -536,7 +605,7 @@ get_bus_type(struct sg_pt_handle *shp, const char *dname,
     }
     bt = sddd.desc.BusType;
     if (vb > 2) {
-        pr2ws("%s: Bus type: %s\n", __func__, get_bus_type_str((int)bt));
+        pr2ws("%s: Bus type: %s\n", __func__, bus_type_str((int)bt));
         if (vb > 3) {
             pr2ws("Storage Device Descriptor Data:\n");
             hex2stderr((const uint8_t *)&sddd, num_out, 0);
@@ -544,6 +613,7 @@ get_bus_type(struct sg_pt_handle *shp, const char *dname,
     }
     if (shp) {
         shp->checked_handle = true;
+        shp->bus_type_failed = false;
         shp->is_nvme = (BusTypeNvme == bt);
     }
     if (btp)
@@ -582,8 +652,14 @@ check_pt_file_handle(int device_fd, const char * device_name, int vb)
     }
     dnp = dnp ? dnp : shp->dname;
     res = get_bus_type(shp, dnp, &bt, vb);
-    if (res < 0)
+    if (res < 0) {
+        if (! shp->got_physical_drive) {
+            res = get_scsi_pdt(shp, vb);
+            if (res >= 0)
+                return 1;
+        }
         return res;
+    }
     return (BusTypeNvme == bt) ? 3 : 1;
     /* NVMe "char" ?? device, could be enclosure: 3 */
     /* SCSI generic pass-though device: 1 */
@@ -606,9 +682,13 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int vb)
         }
         if (! (shp->bus_type_failed || shp->checked_handle)) {
             res = get_bus_type(shp, shp->dname, NULL, vb);
-            if (res < 0)
-                pr2ws("%s: get_bus_type() errno=%d, continue\n", __func__,
-                      -res);
+            if (res < 0) {
+                if (! shp->got_physical_drive)
+                    res = get_scsi_pdt(shp, vb);
+                if ((res < 0) && (vb > 1))
+                    pr2ws("%s: get_bus_type() errno=%d, continue\n", __func__,
+                          -res);
+            }
         }
     }
     psp = (struct sg_pt_win32_scsi *)calloc(sizeof(struct sg_pt_win32_scsi),
@@ -1055,9 +1135,12 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_fd, int time_secs, int vb)
     if (! (shp->bus_type_failed || shp->checked_handle)) {
         res = get_bus_type(shp, shp->dname, NULL, vb);
         if (res < 0) {
-            if (vb)
-                pr2ws("%s: get_bus_type() errno=%d\n", __func__, -res);
+            res = get_scsi_pdt(shp, vb);
+            if (res >= 0)   /* clears shp->bus_type_failed on success */
+                psp->os_err = 0;
         }
+        if ((res < 0) && (vb > 2))
+            pr2ws("%s: get_bus_type() errno=%d\n", __func__, -res);
     }
     if (shp->bus_type_failed)
         psp->os_err = EIO;
@@ -2295,7 +2378,6 @@ sntl_senddiag(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     int res;
     uint8_t st_cd, dpg_cd;
     uint32_t alloc_len, n, dout_len, dpg_len, nvme_dst;
-    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * dop;
     uint8_t * cmdp;
 
@@ -2372,7 +2454,7 @@ sntl_senddiag(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     n = dout_len;
     n = (n < alloc_len) ? n : alloc_len;
     dop = psp->dxferp;
-    if (! is_aligned(dop, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
+    if (! sg_is_aligned(dop, 0)) {      /* page aligned ? */
         if (vb)
             pr2ws("%s: dout [0x%" PRIx64 "] not page aligned\n", __func__,
                   (uint64_t)(sg_uintptr_t)psp->dxferp);
@@ -2423,7 +2505,6 @@ sntl_recvdiag(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     int res;
     uint8_t dpg_cd;
     uint32_t alloc_len, n, din_len;
-    const uint32_t pg_sz = sg_get_page_size();
     uint8_t * dip;
     uint8_t * cmdp;
 
@@ -2436,7 +2517,7 @@ sntl_recvdiag(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     din_len = psp->dxfer_len;
     n = (din_len < alloc_len) ? din_len : alloc_len;
     dip = psp->dxferp;
-    if (! is_aligned(dip, pg_sz)) {  /* caller best use sg_memalign(,pg_sz) */
+    if (! sg_is_aligned(dip, 0)) {      /* page aligned ? */
         if (vb)
             pr2ws("%s: din [0x%" PRIx64 "] not page aligned\n", __func__,
                   (uint64_t)(sg_uintptr_t)psp->dxferp);

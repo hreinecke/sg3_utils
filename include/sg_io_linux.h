@@ -25,7 +25,7 @@
 extern "C" {
 #endif
 
-/* The following are 'host_status' codes */
+/* host_bytes: DID_* are Linux SCSI result (a 32 bit variable) bits 16:23 */
 #ifndef DID_OK
 #define DID_OK 0x00
 #endif
@@ -82,7 +82,7 @@ extern "C" {
 #define SG_LIB_DID_TARGET_FAILURE       DID_TARGET_FAILURE
 #define SG_LIB_DID_NEXUS_FAILURE        DID_NEXUS_FAILURE
 
-/* The following are 'driver_status' codes */
+/* DRIVER_* are Linux SCSI result (a 32 bit variable) bits 24:27 */
 #ifndef DRIVER_OK
 #define DRIVER_OK 0x00
 #endif
@@ -96,6 +96,7 @@ extern "C" {
 #define DRIVER_HARD 0x07
 #define DRIVER_SENSE 0x08       /* Sense_buffer has been set */
 
+/* SUGGEST_* are Linux SCSI result (a 32 bit variable) bits 28:31 */
 /* N.B. the SUGGEST_* codes are no longer used in Linux and are only kept
  * to stop compilation breakages.
  * Following "suggests" are "or-ed" with one of previous 8 entries */

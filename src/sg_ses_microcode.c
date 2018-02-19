@@ -40,7 +40,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.11 20180119";    /* ses4r01 */
+static const char * version_str = "1.12 20180217";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -324,8 +324,7 @@ send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
     if (do_len > wp->dout_len) {
         if (wp->doutp)
             free(wp->doutp);
-        wp->doutp = (unsigned char *)sg_memalign(do_len, sg_get_page_size(),
-                                        &wp->free_doutp, op->verbose > 3);
+        wp->doutp = sg_memalign(do_len, 0, &wp->free_doutp, op->verbose > 3);
         if (! wp->doutp) {
             pr2serr("%s: unable to alloc %d bytes\n", __func__, do_len);
             return SG_LIB_CAT_OTHER;
@@ -797,8 +796,7 @@ main(int argc, char * argv[])
         goto fini;
     }
 
-    dip = (unsigned char *)sg_memalign(din_len, sg_get_page_size(),
-                                       &free_dip, op->verbose > 3);
+    dip = sg_memalign(din_len, 0, &free_dip, op->verbose > 3);
     if (NULL == dip) {
         pr2serr(ME "out of memory (data-in buffer)\n");
         ret = SG_LIB_CAT_OTHER;

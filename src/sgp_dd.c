@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.60 20180102";
+static const char * version_str = "5.61 20180217";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -520,7 +520,6 @@ read_write_thread(void * v_clp)
     Rq_coll * clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
-    size_t psz = 0;
     int sz;
     volatile bool stop_after_write = false;
     int64_t seek_skip;
@@ -530,16 +529,11 @@ read_write_thread(void * v_clp)
     sz = clp->bpt * clp->bs;
     seek_skip =  clp->seek - clp->skip;
     memset(rep, 0, sizeof(Rq_elem));
-#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
-    psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
-#else
-    psz = 4096;     /* give up, pick likely figure */
-#endif
-    if (NULL == (rep->alloc_bp = (unsigned char *)malloc(sz + psz)))
+    rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp, false);
+    if (NULL == rep->buffp)
         err_exit(ENOMEM, "out of memory creating user buffers\n");
-    rep->buffp = (unsigned char *)(((sg_uintptr_t)rep->alloc_bp + psz - 1) &
-                                   (~(psz - 1)));
-    /* Follow clp members are constant during lifetime of thread */
+
+    /* Following clp members are constant during lifetime of thread */
     rep->bs = clp->bs;
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
@@ -630,7 +624,8 @@ read_write_thread(void * v_clp)
             break;
         pthread_cond_broadcast(&clp->out_sync_cv);
     } /* end of while loop */
-    if (rep->alloc_bp) free(rep->alloc_bp);
+    if (rep->alloc_bp)
+        free(rep->alloc_bp);
     status = pthread_mutex_lock(&clp->in_mutex);
     if (0 != status) err_exit(status, "lock in_mutex");
     if (! clp->in_stop)

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
@@ -36,7 +37,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.24 20180111";    /* spc5r18 */
+static const char * version_str = "1.25 20180217";    /* spc5r19 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -206,7 +207,8 @@ main(int argc, char * argv[])
     int wb_mspec = 0;
     const char * device_name = NULL;
     const char * file_name = NULL;
-    unsigned char * dop = NULL;
+    uint8_t * dop = NULL;
+    uint8_t * free_dop = NULL;
     char * cp;
     const struct mode_s * mp;
     char ebuff[EBUFF_SZ];
@@ -374,7 +376,8 @@ main(int argc, char * argv[])
     if (file_name || (wb_len > 0)) {
         if (0 == wb_len)
             wb_len = DEF_XFER_LEN;
-        if (NULL == (dop = (unsigned char *)malloc(wb_len))) {
+        dop = sg_memalign(wb_len, 0, &free_dop, false);
+        if (NULL == dop) {
             pr2serr(ME "out of memory\n");
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
@@ -504,8 +507,8 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (dop)
-        free(dop);
+    if (free_dop)
+        free(free_dop);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));

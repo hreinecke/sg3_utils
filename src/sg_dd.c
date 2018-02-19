@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.94 20180116";
+static const char * version_str = "5.95 20180217";
 
 
 #define ME "sg_dd: "
@@ -146,7 +146,8 @@ static int coe_limit = 0;
 static int coe_count = 0;
 static struct timeval start_tm;
 
-static unsigned char * zeros_buff = NULL;
+static uint8_t * zeros_buff = NULL;
+static uint8_t * free_zeros_buff = NULL;
 static int read_long_blk_inc = READ_LONG_DEF_BLK_INC;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
@@ -871,9 +872,10 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
         } else if (io_addr < UINT_MAX) {
             bool corrct, ok;
             int offset, nl, r;
-            unsigned char * buffp;
+            uint8_t * buffp;
+            uint8_t * free_buffp;
 
-            buffp = (unsigned char*)malloc(bs * 2);
+            buffp = sg_memalign(bs * 2, 0, &free_buffp, false);
             if (NULL == buffp) {
                 pr2serr(">> heap problems\n");
                 return -1;
@@ -932,7 +934,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
                 memcpy(bp, buffp, bs);
             else
                 memset(bp, 0, bs);
-            free(buffp);
+            free(free_buffp);
         } else {
             pr2serr(">> read_long(10) cannot handle blk=%" PRId64 ", use "
                     "zeros\n", lba);
@@ -1837,26 +1839,18 @@ main(int argc, char * argv[])
 
     if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {  /* want heap buffer aligned to page_size */
-        size_t psz;
 
-#if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
-        psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
-#else
-        psz = 4096;     /* give up, pick likely figure */
-#endif
-
-        wrkPos = sg_memalign(blk_sz * bpt, psz, &wrkBuff, verbose > 3);
+        wrkPos = sg_memalign(blk_sz * bpt, 0, &wrkBuff, verbose > 3);
         if (NULL == wrkPos) {
             pr2serr("sg_memalign: error, out of memory?\n");
-            return SG_LIB_CAT_OTHER;
+            return sg_convert_errno(ENOMEM);
         }
     } else {
-        wrkBuff = (unsigned char*)malloc(blk_sz * bpt);
-        if (0 == wrkBuff) {
+        wrkPos = sg_memalign(blk_sz * bpt, 0, &wrkBuff, verbose > 3);
+        if (0 == wrkPos) {
             pr2serr("Not enough user memory\n");
-            return SG_LIB_CAT_OTHER;
+            return sg_convert_errno(ENOMEM);
         }
-        wrkPos = wrkBuff;
     }
 
     blocks_per = bpt;
@@ -1966,13 +1960,13 @@ main(int argc, char * argv[])
         if (oflag.sparse && (dd_count > blocks) &&
             (! (FT_DEV_NULL & out_type))) {
             if (NULL == zeros_buff) {
-                zeros_buff = (unsigned char *)malloc(blocks * blk_sz);
+                zeros_buff = sg_memalign(blocks * blk_sz, 0, &free_zeros_buff,
+                                         false);
                 if (NULL == zeros_buff) {
-                    pr2serr("zeros_buff malloc failed\n");
+                    pr2serr("zeros_buff sg_memalign failed\n");
                     ret = -1;
                     break;
                 }
-                memset(zeros_buff, 0, blocks * blk_sz);
             }
             if (0 == memcmp(wrkPos, zeros_buff, blocks * blk_sz))
                 sparse_skip = true;
@@ -2170,8 +2164,8 @@ main(int argc, char * argv[])
         }
     }
     free(wrkBuff);
-    if (zeros_buff)
-        free(zeros_buff);
+    if (free_zeros_buff)
+        free(free_zeros_buff);
     if (STDIN_FILENO != infd)
         close(infd);
     if (! ((STDOUT_FILENO == outfd) || (FT_DEV_NULL & out_type)))
