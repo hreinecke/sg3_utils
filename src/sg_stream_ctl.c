@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.01 20180210";
+static const char * version_str = "1.02 20180219";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -112,9 +112,9 @@ sg_ll_get_stream_status(int sg_fd, uint16_t s_str_id, uint8_t * resp,
                         int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char gssCdb[16] = {SG_SERVICE_ACTION_IN_16,
+    uint8_t gssCdb[16] = {SG_SERVICE_ACTION_IN_16,
            GET_STREAM_STATUS_SA, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Get stream status";
 
@@ -173,9 +173,9 @@ sg_ll_stream_control(int sg_fd, uint32_t str_ctl, uint16_t str_id,
                      bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char scCdb[16] = {SG_SERVICE_ACTION_IN_16,
+    uint8_t scCdb[16] = {SG_SERVICE_ACTION_IN_16,
            STREAM_CONTROL_SA, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Stream control";
 

@@ -14,6 +14,12 @@
 #include <string.h>
 #include <limits.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
@@ -29,7 +35,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.19 20180210";
+static const char * version_str = "1.20 20180219";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -90,10 +96,10 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
                     bool noisy, int verbose)
 {
     int res, ret, k, sense_cat;
-    unsigned char sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
+    uint8_t sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
                 {SYNCHRONIZE_CACHE16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (sync_nv)

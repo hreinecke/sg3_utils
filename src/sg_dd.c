@@ -22,7 +22,7 @@
  * command. The actual size of the SCSI READ or WRITE command block can be
  * selected with the "cdbsz" argument.
  *
- * This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+ * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
  */
 
 #define _XOPEN_SOURCE 600
@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.95 20180217";
+static const char * version_str = "5.96 20180219";
 
 
 #define ME "sg_dd: "
@@ -417,7 +417,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int res, verb;
     unsigned int ui;
-    unsigned char rcBuff[RCAP16_REPLY_LEN];
+    uint8_t rcBuff[RCAP16_REPLY_LEN];
 
     verb = (verbose ? verbose - 1: 0);
     res = sg_ll_readcap_10(sg_fd, false, 0, rcBuff, READ_CAP_REPLY_LEN, true,
@@ -496,7 +496,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 
 
 static int
-sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
                   int64_t start_block, bool write_true, bool fua, bool dpo)
 {
     int sz_ind;
@@ -511,10 +511,10 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
     switch (cdb_sz) {
     case 6:
         sz_ind = 0;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
-        cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
+        cdbp[4] = (256 == blocks) ? 0 : (uint8_t)blocks;
         if (blocks > 256) {
             pr2serr(ME "for 6 byte commands, maximum number of blocks is "
                     "256\n");
@@ -533,7 +533,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         break;
     case 10:
         sz_ind = 1;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be32(start_block, cdbp + 2);
         sg_put_unaligned_be16(blocks, cdbp + 7);
@@ -545,14 +545,14 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         break;
     case 12:
         sz_ind = 2;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be32(start_block, cdbp + 2);
         sg_put_unaligned_be32(blocks, cdbp + 6);
         break;
     case 16:
         sz_ind = 3;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be64(start_block, cdbp + 2);
         sg_put_unaligned_be32(blocks, cdbp + 10);
@@ -574,15 +574,15 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
    -2 -> ENOMEM
    -1 other errors */
 static int
-sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
             int bs, const struct flags_t * ifp, bool * diop,
             uint64_t * io_addrp)
 {
     bool info_valid;
     int res, k, slen;
-    const unsigned char * sbp;
-    unsigned char rdCmd[MAX_SCSI_CDBSZ];
-    unsigned char senseBuff[SENSE_BUFF_LEN];
+    const uint8_t * sbp;
+    uint8_t rdCmd[MAX_SCSI_CDBSZ];
+    uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, false,
@@ -714,7 +714,7 @@ sg_read_low(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
    SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ABORTED_COMMAND,
    -2 -> ENOMEM, -1 other errors */
 static int
-sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
+sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         int bs, struct flags_t * ifp, bool * diop, int * blks_readp)
 {
     bool may_coe = false;
@@ -724,7 +724,7 @@ sg_read(int sg_fd, unsigned char * buff, int blocks, int64_t from_block,
     int retries_tmp;
     uint64_t io_addr;
     int64_t lba;
-    unsigned char * bp;
+    uint8_t * bp;
 
     retries_tmp = ifp->retries;
     for (xferred = 0, blks = blocks, lba = from_block, bp = buff;
@@ -980,14 +980,14 @@ err_out:
    SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
    -1 -> unrecoverable error + others */
 static int
-sg_write(int sg_fd, unsigned char * buff, int blocks, int64_t to_block,
+sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
          int bs, const struct flags_t * ofp, bool * diop)
 {
     bool info_valid;
     int res, k;
     uint64_t io_addr = 0;
-    unsigned char wrCmd[MAX_SCSI_CDBSZ];
-    unsigned char senseBuff[SENSE_BUFF_LEN];
+    uint8_t wrCmd[MAX_SCSI_CDBSZ];
+    uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, true, ofp->fua,
@@ -1497,8 +1497,8 @@ main(int argc, char * argv[])
     int64_t out_num_sect = -1;
     char * key;
     char * buf;
-    unsigned char * wrkBuff;
-    unsigned char * wrkPos;
+    uint8_t * wrkBuff;
+    uint8_t * wrkPos;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
     char out2f[INOUTF_SZ];

@@ -6742,7 +6742,7 @@ main(int argc, char * argv[])
     if (NULL == op->device_name) {
         if (op->in_fn) {
             const struct log_elem * lep;
-            const unsigned char * bp;
+            const uint8_t * bp;
             int pg_code, subpg_code, pdt, n;
             uint16_t u;
 

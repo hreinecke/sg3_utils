@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.54 20180205";    /* spc5r14 */
+static const char * version_str = "0.55 20180219";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -186,9 +186,9 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
         int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
+    uint8_t rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (rctd)
@@ -216,7 +216,7 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
     }
     set_scsi_pt_cdb(ptvp, rsoc_cdb, sizeof(rsoc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, rsoc_s, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
@@ -254,9 +254,9 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
          int * act_resp_lenp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
+    uint8_t rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (repd)
@@ -278,7 +278,7 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
     }
     set_scsi_pt_cdb(ptvp, rstmf_cdb, sizeof(rstmf_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, rstmf_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -600,8 +600,8 @@ opcode_num_compare(const void * left, const void * right)
     int l_serv_act = 0;
     int r_serv_act = 0;
     int l_opc, r_opc;
-    const unsigned char * ll = *(unsigned char **)left;
-    const unsigned char * rr = *(unsigned char **)right;
+    const uint8_t * ll = *(uint8_t **)left;
+    const uint8_t * rr = *(uint8_t **)right;
 
     if (NULL == ll)
         return -1;
@@ -628,8 +628,8 @@ opcode_num_compare(const void * left, const void * right)
 static int
 opcode_alpha_compare(const void * left, const void * right)
 {
-    const unsigned char * ll = *(unsigned char **)left;
-    const unsigned char * rr = *(unsigned char **)right;
+    const uint8_t * ll = *(uint8_t **)left;
+    const uint8_t * rr = *(uint8_t **)right;
     int l_serv_act = 0;
     int r_serv_act = 0;
     char l_name_buff[NAME_BUFF_SZ];
@@ -656,14 +656,14 @@ opcode_alpha_compare(const void * left, const void * right)
 }
 
 static void
-list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
+list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                int sg_fd)
 {
     bool sa_v;
     int k, j, m, cd_len, serv_act, len, act_len, opcode, res;
     unsigned int timeout;
-    unsigned char * bp;
-    unsigned char ** sort_arr = NULL;
+    uint8_t * bp;
+    uint8_t ** sort_arr = NULL;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
 
@@ -702,19 +702,19 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
     }
     /* SPC-4 does _not_ require any ordering of opcodes in the response */
     if (! op->do_unsorted) {
-        sort_arr = (unsigned char **)malloc(cd_len * sizeof(unsigned char *));
+        sort_arr = (uint8_t **)malloc(cd_len * sizeof(uint8_t *));
         if (NULL == sort_arr) {
             printf("sg_opcodes: no memory to sort operation codes, "
                    "try '-u'\n");
             return;
         }
-        memset(sort_arr, 0, cd_len * sizeof(unsigned char *));
+        memset(sort_arr, 0, cd_len * sizeof(uint8_t *));
         bp = rsoc_buff + 4;
         for (k = 0, j = 0; k < cd_len; ++j, k += len, bp += len) {
             sort_arr[j] = bp;
             len = (bp[5] & 0x2) ? 20 : 8;
         }
-        qsort(sort_arr, j, sizeof(unsigned char *),
+        qsort(sort_arr, j, sizeof(uint8_t *),
               (op->do_alpha ? opcode_alpha_compare : opcode_num_compare));
     }
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
@@ -774,7 +774,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
         }
         if (op->do_mask) {
             int cdb_sz;
-            unsigned char b[64];
+            uint8_t b[64];
 
             memset(b, 0, sizeof(b));
             res = do_rsoc(sg_fd, false, (sa_v ? 2 : 1), opcode, serv_act,
@@ -799,7 +799,7 @@ list_all_codes(unsigned char * rsoc_buff, int rsoc_len, struct opts_t * op,
 }
 
 static void
-decode_cmd_timeout_desc(unsigned char * dp, int max_b_len, char * b)
+decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b)
 {
     int len;
     unsigned int timeout;
@@ -832,12 +832,12 @@ decode_cmd_timeout_desc(unsigned char * dp, int max_b_len, char * b)
 
 /* One command descriptor (includes cdb usage data) */
 static void
-list_one(unsigned char * rsoc_buff, int cd_len, int rep_opts,
+list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
          struct opts_t * op)
 {
     bool valid = false;
     int k;
-    unsigned char * bp;
+    uint8_t * bp;
     const char * cp;
     const char * dlp;
     char name_buff[NAME_BUFF_SZ];
@@ -911,7 +911,7 @@ main(int argc, char * argv[])
     const char * cp;
     struct opts_t * op;
     const char * op_name;
-    unsigned char rsoc_buff[MX_ALLOC_LEN];
+    uint8_t rsoc_buff[MX_ALLOC_LEN];
     char buff[48];
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;

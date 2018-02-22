@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.43 20180210";
+static const char * version_str = "1.44 20180219";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -98,7 +98,7 @@ struct opts_t {
 };
 
 #define MAX_BUFF_SZ     252
-static unsigned char dbuff[MAX_BUFF_SZ];
+static uint8_t dbuff[MAX_BUFF_SZ];
 
 
 static struct option long_options[] = {
@@ -232,9 +232,9 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
                     int verbose)
 {
         int k, ret, res, sense_cat;
-        unsigned char fm_cdb[SG_FORMAT_MEDIUM_CMDLEN] =
+        uint8_t fm_cdb[SG_FORMAT_MEDIUM_CMDLEN] =
                                   {SG_FORMAT_MEDIUM_CMD, 0, 0, 0, 0, 0};
-        unsigned char sense_b[SENSE_BUFF_LEN];
+        uint8_t sense_b[SENSE_BUFF_LEN];
         struct sg_pt_base * ptvp;
 
         if (verify)
@@ -259,7 +259,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         }
         set_scsi_pt_cdb(ptvp, fm_cdb, sizeof(fm_cdb));
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-        set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, transfer_len);
+        set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, transfer_len);
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
         ret = sg_cmds_process_resp(ptvp, "format medium", res, transfer_len,
                                    sense_b, noisy, verbose, &sense_cat);
@@ -293,8 +293,8 @@ scsi_format_unit(int fd, const struct opts_t * op)
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
         const char INIT_PATTERN_DESC_SZ = 4;
-        unsigned char fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
-        unsigned char reqSense[MAX_BUFF_SZ];
+        uint8_t fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
+        uint8_t reqSense[MAX_BUFF_SZ];
         char b[80];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
@@ -437,7 +437,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
 {
         int res, progress, pr, rem, verb, resp_len, timeout;
         bool immed = ! op->fwait;
-        unsigned char reqSense[MAX_BUFF_SZ];
+        uint8_t reqSense[MAX_BUFF_SZ];
         char b[80];
 
         timeout = (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT);
@@ -517,10 +517,10 @@ scsi_format_medium(int fd, const struct opts_t * op)
 #define TPROTO_ISCSI 5
 
 static char *
-get_lu_name(const unsigned char * bp, int u_len, char * b, int b_len)
+get_lu_name(const uint8_t * bp, int u_len, char * b, int b_len)
 {
         int len, off, sns_dlen, dlen, k;
-        unsigned char u_sns[512];
+        uint8_t u_sns[512];
         char * cp;
 
         len = u_len - 4;
@@ -577,11 +577,11 @@ get_lu_name(const unsigned char * bp, int u_len, char * b, int b_len)
 #define VPD_DEVICE_ID 0x83
 
 static int
-print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen,
+print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
              const struct opts_t * op)
 {
         int res, k, n, verb, pdt, has_sn, has_di;
-        unsigned char b[256];
+        uint8_t b[256];
         char a[256];
         char pdt_name[64];
 
@@ -693,7 +693,7 @@ static int
 print_read_cap(int fd, const struct opts_t * op)
 {
         int res;
-        unsigned char resp_buff[RCAP_REPLY_LEN];
+        uint8_t resp_buff[RCAP_REPLY_LEN];
         unsigned int last_blk_addr, block_size;
         uint64_t llast_blk_addr;
         char b[80];
@@ -761,7 +761,7 @@ main(int argc, char **argv)
         int ret = 0;
         uint64_t ull;
         struct opts_t * op;
-        unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
+        uint8_t inq_resp[SAFE_STD_INQ_RESP_LEN];
         struct opts_t opts;
         char b[80];
 

@@ -33,7 +33,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.05 20180210";
+static const char * version_str = "1.06 20180219";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -88,10 +88,10 @@ sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
                          bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char bcCDB[16] = {SG_SERVICE_ACTION_IN_16,
+    uint8_t bcCDB[16] = {SG_SERVICE_ACTION_IN_16,
            BACKGROUND_CONTROL_SA, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (bo_ctl)

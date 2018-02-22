@@ -36,7 +36,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.07 20180210";
+static const char * version_str = "1.08 20180219";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -241,10 +241,10 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
                 const struct opts_t * op)
 {
     int k, ret, res, sense_cat;
-    unsigned char ra_cdb[SG_READ_ATTRIBUTE_CMDLEN] =
+    uint8_t ra_cdb[SG_READ_ATTRIBUTE_CMDLEN] =
           {SG_READ_ATTRIBUTE_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     ra_cdb[1] = 0x1f & op->sa;
@@ -273,7 +273,7 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
     }
     set_scsi_pt_cdb(ptvp, ra_cdb, sizeof(ra_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, op->maxlen);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, op->maxlen);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, op->verbose);
     ret = sg_cmds_process_resp(ptvp, "read attribute", res, op->maxlen,
                                sense_b, noisy, op->verbose, &sense_cat);
@@ -550,7 +550,7 @@ bad:
 /* Returns 1 if 'bp' all 0xff bytes, returns 2 is all 0xff bytes apart
  * from last being 0xfe; otherwise returns 0. */
 static int
-all_ffs_or_last_fe(const unsigned char * bp, int len)
+all_ffs_or_last_fe(const uint8_t * bp, int len)
 {
     for ( ; len > 0; ++bp, --len) {
         if (*bp < 0xfe)
@@ -598,7 +598,7 @@ attr_id_lookup(unsigned int id, const struct attr_name_info_t ** anipp,
 }
 
 static void
-decode_attr_list(const unsigned char * alp, int len, bool supported,
+decode_attr_list(const uint8_t * alp, int len, bool supported,
                  const struct opts_t * op)
 {
     int id;
@@ -635,12 +635,12 @@ decode_attr_list(const unsigned char * alp, int len, bool supported,
 }
 
 static void
-helper_full_attr(const unsigned char * alp, int len, int id,
+helper_full_attr(const uint8_t * alp, int len, int id,
                  const struct attr_name_info_t * anip,
                  const struct opts_t * op)
 {
     int k;
-    const unsigned char * bp;
+    const uint8_t * bp;
 
     if (op->verbose)
         printf("[r%c] ", (0x80 & alp[2]) ? 'o' : 'w');
@@ -764,7 +764,7 @@ helper_full_attr(const unsigned char * alp, int len, int id,
 }
 
 static void
-decode_attr_vals(const unsigned char * alp, int len, const struct opts_t * op)
+decode_attr_vals(const uint8_t * alp, int len, const struct opts_t * op)
 {
     int bump, id, alen;
     uint64_t ull;
@@ -853,7 +853,7 @@ decode_attr_vals(const unsigned char * alp, int len, const struct opts_t * op)
 }
 
 static void
-decode_all_sa_s(const unsigned char * rabp, int len, const struct opts_t * op)
+decode_all_sa_s(const uint8_t * rabp, int len, const struct opts_t * op)
 {
     if (op->do_hex && (2 != op->do_hex)) {
         hex2stdout(rabp, len, ((1 == op->do_hex) ? 1 : -1));
@@ -911,7 +911,7 @@ main(int argc, char * argv[])
     int ret = 0;
     const char * device_name = NULL;
     const char * fname = NULL;
-    unsigned char * rabp = NULL;
+    uint8_t * rabp = NULL;
     struct opts_t opts;
     struct opts_t * op;
     char b[80];
@@ -1052,7 +1052,7 @@ main(int argc, char * argv[])
 
     if (0 == op->maxlen)
         op->maxlen = DEF_RATTR_BUFF_LEN;
-    rabp = (unsigned char *)calloc(1, op->maxlen);
+    rabp = (uint8_t *)calloc(1, op->maxlen);
     if (NULL == rabp) {
         pr2serr("unable to calloc %d bytes\n", op->maxlen);
         return SG_LIB_CAT_OTHER;

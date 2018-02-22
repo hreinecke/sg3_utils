@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -33,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.98 20180118";
+static const char * version_str = "3.99 20180219";
 
 #define ME "sg_readcap: "
 
@@ -398,11 +399,14 @@ int
 main(int argc, char * argv[])
 {
     bool rw_0_flag;
-    int sg_fd, res, prot_en, p_type, lbppbe;
+    int res, prot_en, p_type, lbppbe;
+    int sg_fd = -1;
     int ret = 0;
     uint32_t last_blk_addr, block_size;
     uint64_t llast_blk_addr;
-    unsigned char resp_buff[RCAP16_REPLY_LEN];
+    uint8_t * resp_buff;
+    uint8_t * free_resp_buff;
+    const int resp_buff_sz = RCAP16_REPLY_LEN;
     char b[80];
     struct opts_t opts;
     struct opts_t * op;
@@ -437,12 +441,16 @@ main(int argc, char * argv[])
             op->do_long = true;
     }
 
-    memset(resp_buff, 0, sizeof(resp_buff));
-
+    resp_buff = sg_memalign(resp_buff_sz, 0, &free_resp_buff, false);
+    if (NULL == resp_buff) {
+        pr2serr("Unable to allocate %d bytes on heap\n", resp_buff_sz);
+        return sg_convert_errno(ENOMEM);
+    }
     if ((! op->do_pmi) && (op->llba > 0)) {
         pr2serr(ME "lba can only be non-zero when '--pmi' is set\n");
         usage_for(op);
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto fini;
     }
     if (op->do_long)
         rw_0_flag = op->o_readonly;
@@ -452,7 +460,8 @@ main(int argc, char * argv[])
                                      op->do_verbose)) < 0) {
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     if (! op->do_long) {
@@ -468,7 +477,7 @@ main(int argc, char * argv[])
                     hex2stdout(resp_buff, RCAP_REPLY_LEN, -1);
                 else
                     hex2stdout(resp_buff, RCAP_REPLY_LEN, 1);
-                goto good;
+                goto fini;
             }
             last_blk_addr = sg_get_unaligned_be32(resp_buff + 0);
             if (0xffffffff != last_blk_addr) {
@@ -476,7 +485,7 @@ main(int argc, char * argv[])
                 if (op->do_brief) {
                     printf("0x%" PRIx32 " 0x%" PRIx32 "\n",
                            last_blk_addr + 1, block_size);
-                    goto good;
+                    goto fini;
                 }
                 printf("Read Capacity results:\n");
                 if (op->do_pmi)
@@ -506,7 +515,7 @@ main(int argc, char * argv[])
                            "%.2f GB\n", total_sz, sz_mb, sz_gb);
 #endif
                 }
-                goto good;
+                goto fini;
             } else {
                 printf("READ CAPACITY (10) indicates device capacity too "
                        "large\n  now trying 16 byte cdb variant\n");
@@ -519,7 +528,8 @@ main(int argc, char * argv[])
                                              op->do_verbose)) < 0) {
                 pr2serr(ME "error re-opening file: %s (rw): %s\n",
                         op->device_name, safe_strerror(-sg_fd));
-                return SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(-sg_fd);
+                goto fini;
             }
             if (op->do_verbose)
                 pr2serr("READ CAPACITY (10) not supported, trying READ "
@@ -541,14 +551,14 @@ main(int argc, char * argv[])
                     hex2stdout(resp_buff, RCAP16_REPLY_LEN, -1);
                 else
                     hex2stdout(resp_buff, RCAP16_REPLY_LEN, 1);
-                goto good;
+                goto fini;
             }
             llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);
             block_size = sg_get_unaligned_be32(resp_buff + 8);
             if (op->do_brief) {
                 printf("0x%" PRIx64 " 0x%" PRIx32 "\n", llast_blk_addr + 1,
                        block_size);
-                goto good;
+                goto fini;
             }
             prot_en = !!(resp_buff[12] & 0x1);
             p_type = ((resp_buff[12] >> 1) & 0x7);
@@ -604,7 +614,7 @@ main(int argc, char * argv[])
                        "GB\n", total_sz, sz_mb, sz_gb);
 #endif
             }
-            goto good;
+            goto fini;
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("bad field in READ CAPACITY (16) cdb including "
                     "unsupported service action\n");
@@ -615,13 +625,16 @@ main(int argc, char * argv[])
     }
     if (op->do_brief)
         printf("0x0 0x0\n");
-
-good:
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (free_resp_buff)
+        free(free_resp_buff);
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                return SG_LIB_FILE_ERROR;
+        }
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

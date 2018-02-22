@@ -38,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.17 20180118";
+static const char * version_str = "1.18 20180219";
 
 
 #define MAX_XFER_LEN 10000
@@ -104,7 +104,7 @@ struct descriptor_type segment_descriptor_codes [] = {
 
 
 static void
-scsi_failed_segment_details(unsigned char *rcBuff, unsigned int rcBuffLen)
+scsi_failed_segment_details(uint8_t *rcBuff, unsigned int rcBuffLen)
 {
     int senseLen;
     unsigned int len;
@@ -131,7 +131,7 @@ scsi_failed_segment_details(unsigned char *rcBuff, unsigned int rcBuffLen)
 }
 
 static void
-scsi_copy_status(unsigned char *rcBuff, unsigned int rcBuffLen)
+scsi_copy_status(uint8_t *rcBuff, unsigned int rcBuffLen)
 {
     unsigned int len;
 
@@ -167,7 +167,7 @@ scsi_copy_status(unsigned char *rcBuff, unsigned int rcBuffLen)
 }
 
 static void
-scsi_operating_parameters(unsigned char *rcBuff, unsigned int rcBuffLen)
+scsi_operating_parameters(uint8_t *rcBuff, unsigned int rcBuffLen)
 {
     unsigned int len, n;
 
@@ -313,7 +313,7 @@ main(int argc, char * argv[])
     int xfer_len = 520;
     uint32_t list_id = 0;
     const char * cp;
-    unsigned char * cpResultBuff = NULL;
+    uint8_t * cpResultBuff = NULL;
     const char * device_name = NULL;
     char file_name[256];
 
@@ -401,7 +401,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (NULL == (cpResultBuff = (unsigned char *)malloc(xfer_len))) {
+    if (NULL == (cpResultBuff = (uint8_t *)malloc(xfer_len))) {
             pr2serr(ME "out of memory\n");
             return SG_LIB_FILE_ERROR;
     }

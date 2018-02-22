@@ -35,7 +35,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.14 20180210";
+static const char * version_str = "1.15 20180219";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -124,10 +124,10 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
                    int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rz_cdb[SG_ZONING_IN_CMDLEN] =
+    uint8_t rz_cdb[SG_ZONING_IN_CMDLEN] =
           {SG_ZONING_IN, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(zs_lba, rz_cdb + 2);
@@ -149,7 +149,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
     }
     set_scsi_pt_cdb(ptvp, rz_cdb, sizeof(rz_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "report zones", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -286,8 +286,8 @@ main(int argc, char * argv[])
     uint64_t st_lba = 0;
     int64_t ll;
     const char * device_name = NULL;
-    unsigned char * reportZonesBuff = NULL;
-    unsigned char * bp;
+    uint8_t * reportZonesBuff = NULL;
+    uint8_t * bp;
     char b[80];
 
     while (1) {
@@ -390,7 +390,7 @@ main(int argc, char * argv[])
 
     if (0 == maxlen)
         maxlen = DEF_RZONES_BUFF_LEN;
-    reportZonesBuff = (unsigned char *)calloc(1, maxlen);
+    reportZonesBuff = (uint8_t *)calloc(1, maxlen);
     if (NULL == reportZonesBuff) {
         pr2serr("unable to malloc %d bytes\n", maxlen);
         return SG_LIB_CAT_OTHER;

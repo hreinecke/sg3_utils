@@ -2,7 +2,7 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -58,7 +58,7 @@ sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
  * SG_LIB_CAT_ABORTED_COMMAND, * SG_LIB_CAT_NOT_READY -> device not ready,
  * -1 -> other failure */
 int sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
-                     int subpg_code, unsigned char * paramp, int param_len,
+                     int subpg_code, uint8_t * paramp, int param_len,
                      bool noisy, int verbose);
 
 /* Invokes a SCSI LOG SENSE command. Return of 0 -> success,
@@ -67,13 +67,13 @@ int sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
  * SG_LIB_CAT_NOT_READY -> device not ready, SG_LIB_CAT_ABORTED_COMMAND,
  * -1 -> other failure */
 int sg_ll_log_sense(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
-                    int subpg_code, int paramp, unsigned char * resp,
+                    int subpg_code, int paramp, uint8_t * resp,
                     int mx_resp_len, bool noisy, int verbose);
 
 /* Same as sg_ll_log_sense() apart from timeout_secs and residp. See
  * sg_ll_inquiry_v2() for their description */
 int sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
-                       int subpg_code, int paramp, unsigned char * resp,
+                       int subpg_code, int paramp, uint8_t * resp,
                        int mx_resp_len, int timeout_secs, int * residp,
                        bool noisy, int verbose);
 
@@ -199,15 +199,15 @@ int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
 
 
 struct sg_simple_inquiry_resp {
-    unsigned char peripheral_qualifier;
-    unsigned char peripheral_type;
-    unsigned char byte_1;       /* was 'rmb' prior to version 1.39 */
+    uint8_t peripheral_qualifier;
+    uint8_t peripheral_type;
+    uint8_t byte_1;             /* was 'rmb' prior to version 1.39 */
                                 /* now rmb == !!(0x80 & byte_1) */
-    unsigned char version;      /* as per recent drafts: whole of byte 2 */
-    unsigned char byte_3;
-    unsigned char byte_5;
-    unsigned char byte_6;
-    unsigned char byte_7;
+    uint8_t version;            /* as per recent drafts: whole of byte 2 */
+    uint8_t byte_3;
+    uint8_t byte_5;
+    uint8_t byte_6;
+    uint8_t byte_7;
     char vendor[9];             /* T10 field is 8 bytes, NUL char appended */
     char product[17];
     char revision[5];
@@ -227,7 +227,7 @@ int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
  * MODE SENSE (6) and false for MODE SENSE (10). Returns >= 0 is successful
  * or -1 if failure. If there is a failure a message is written to err_buff
  * if it is non-NULL and err_buff_len > 0. */
-int sg_mode_page_offset(const unsigned char * resp, int resp_len,
+int sg_mode_page_offset(const uint8_t * resp, int resp_len,
                         bool mode_sense_6, char * err_buff, int err_buff_len);
 
 /* MODE SENSE commands yield a response that has header then zero or more
@@ -238,7 +238,7 @@ int sg_mode_page_offset(const unsigned char * resp, int resp_len,
  * successful the block descriptor length (in bytes) is written to *bd_lenp.
  * Set mode_sense_6 to true for MODE SENSE (6) and false for MODE SENSE (10)
  * responses. Returns -1 if there is an error (e.g. response too short). */
-int sg_msense_calc_length(const unsigned char * resp, int resp_len,
+int sg_msense_calc_length(const uint8_t * resp, int resp_len,
                           bool mode_sense_6, int * bd_lenp);
 
 /* Fetches current, changeable, default and/or saveable modes pages as
@@ -294,9 +294,8 @@ struct sg_pt_base;
  * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
  * categories also have data in bytes received; -2 is still returned. */
 int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
-                         int pt_res, int mx_di_len,
-                         const unsigned char * sense_b, bool noisy,
-                         int verbose, int * o_sense_cat);
+                         int pt_res, int mx_di_len, const uint8_t * sense_b,
+                         bool noisy, int verbose, int * o_sense_cat);
 
 /* NVMe devices use a different command set. This function will return true
  * if the device associated with 'pvtp' is a NVME device, else it will

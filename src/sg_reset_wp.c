@@ -20,6 +20,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_pt.h"
@@ -34,7 +35,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.08 20180210";
+static const char * version_str = "1.09 20180219";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -81,10 +82,9 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, bool all, bool noisy,
                           int verbose)
 {
     int k, ret, res, sense_cat;
-    unsigned char rwp_cdb[SG_ZONING_OUT_CMDLEN] =
-          {SG_ZONING_OUT, RESET_WRITE_POINTER_SA, 0, 0, 0, 0, 0, 0,
-           0, 0, 0, 0,  0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t rwp_cdb[SG_ZONING_OUT_CMDLEN] = {SG_ZONING_OUT,
+         RESET_WRITE_POINTER_SA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(zid, rwp_cdb + 2);

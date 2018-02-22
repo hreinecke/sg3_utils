@@ -47,7 +47,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.01 20180218";
+static const char * version_str = "1.02 20180222";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -147,6 +147,7 @@ main(int argc, char * argv[])
     uint32_t k;
     uint32_t num_cond_met = 0;
     uint32_t num_err = 0;
+    uint32_t num_good = 0;
     uint32_t numblocks = 1;
     uint32_t skip = 1;
     uint32_t wrap_offs = 0;
@@ -318,7 +319,8 @@ main(int argc, char * argv[])
             if (0 == first_err)
                 first_err = res;
             last_err = res;
-        }
+        } else
+            ++num_good;
     }
 
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
@@ -353,22 +355,21 @@ main(int argc, char * argv[])
                "%" PRId64 "\n", elapsed_usecs, b, elapsed_usecs / count);
     }
 
-    printf("Command count=%u  number condition mets=%u  number errors=%d\n",
-           count, num_cond_met, num_err);
+    printf("Command count=%u, number of condition_mets=%u, number of "
+           "goods=%u\n", count, num_cond_met, num_good);
     if (first_err) {
-        int err;
+        bool printed;
 
-        if ((first_err > SG_LIB_OS_BASE_ERR) && (first_err < 97)) {
-            err = first_err - SG_LIB_OS_BASE_ERR;
-            printf("    first error: %s [%d]\n", safe_strerror(err), err);
-        } else
-            printf("    first error=%d\n", first_err);
+        printf(" number of errors=%d\n", num_err);
+        printf("    first error");
+        printed = sg_if_can2stdout(": ", first_err);
+        if (! printed)
+            printf(" code: %d\n", first_err);
         if (num_err > 1) {
-            if ((last_err > SG_LIB_OS_BASE_ERR) && (last_err < 97)) {
-                err = last_err - SG_LIB_OS_BASE_ERR;
-                printf("    last error: %s [%d]\n", safe_strerror(err), err);
-            } else
-                printf("    last error=%d\n", last_err);
+            printf("    last error");
+            printed = sg_if_can2stdout(": ", last_err);
+            if (! printed)
+                printf(" code: %d\n", last_err);
         }
     }
     res = sg_cmds_close_device(sg_fd);

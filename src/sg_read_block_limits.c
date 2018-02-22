@@ -33,11 +33,11 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.07 20180118";
+static const char * version_str = "1.08 20180219";
 
 #define MAX_READ_BLOCK_LIMITS_LEN 6
 
-static unsigned char readBlkLmtBuff[MAX_READ_BLOCK_LIMITS_LEN];
+static uint8_t readBlkLmtBuff[MAX_READ_BLOCK_LIMITS_LEN];
 
 
 static struct option long_options[] = {

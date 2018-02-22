@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2017 Douglas Gilbert.
+ * Copyright (c) 2005-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -44,11 +44,11 @@ static int camfd;
 static int camopened = 0;
 
 struct sg_pt_osf1_scsi {
-    unsigned char * cdb;
+    uint8_t * cdb;
     int cdb_len;
-    unsigned char * sense;
+    uint8_t * sense;
     int sense_len;
-    unsigned char * dxferp;
+    uint8_t * dxferp;
     int dxfer_len;
     int dxfer_dir;
     int scsi_status;
@@ -225,19 +225,19 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 }
 
 void
-set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
+set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
                 int cdb_len)
 {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
 
     if (ptp->cdb)
         ++ptp->in_err;
-    ptp->cdb = (unsigned char *)cdb;
+    ptp->cdb = (uint8_t *)cdb;
     ptp->cdb_len = cdb_len;
 }
 
 void
-set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
+set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
                   int max_sense_len)
 {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
@@ -251,7 +251,7 @@ set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
 
 /* from device */
 void
-set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
+set_scsi_pt_data_in(struct sg_pt_base * vp, uint8_t * dxferp,
                     int dxfer_len)
 {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
@@ -267,7 +267,7 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
 
 /* to device */
 void
-set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
+set_scsi_pt_data_out(struct sg_pt_base * vp, const uint8_t * dxferp,
                      int dxfer_len)
 {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
@@ -275,7 +275,7 @@ set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
     if (ptp->dxferp)
         ++ptp->in_err;
     if (dxfer_len > 0) {
-        ptp->dxferp = (unsigned char *)dxferp;
+        ptp->dxferp = (uint8_t *)dxferp;
         ptp->dxfer_len = dxfer_len;
         ptp->dxfer_dir = CAM_DIR_OUT;
     }
@@ -355,7 +355,7 @@ do_scsi_pt(struct sg_pt_base * vp, int device_fd, int time_secs, int verbose)
     int len, retval;
     CCB_SCSIIO ccb;
     UAGT_CAM_CCB uagt;
-    unsigned char sensep[ADDL_SENSE_LENGTH];
+    uint8_t sensep[ADDL_SENSE_LENGTH];
 
 
     ptp->os_err = 0;

@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.39 [20171019]";
+static const char * version_str = "2.40 [20180219]";
 
 #include <stdio.h>
 #include <string.h>
@@ -162,9 +162,9 @@ static char *device_name;
 
 #define SIZEOF_BUFFER (16*1024)
 #define SIZEOF_BUFFER1 (16*1024)
-static unsigned char cbuffer[SIZEOF_BUFFER];
-static unsigned char cbuffer1[SIZEOF_BUFFER1];
-static unsigned char cbuffer2[SIZEOF_BUFFER1];
+static uint8_t cbuffer[SIZEOF_BUFFER];
+static uint8_t cbuffer1[SIZEOF_BUFFER1];
+static uint8_t cbuffer2[SIZEOF_BUFFER1];
 
 static char defect = 0;
 static char defectformat = 0x4;
@@ -364,11 +364,11 @@ static void dump(void *buffer, unsigned int length);
 
 struct scsi_cmnd_io
 {
-    unsigned char * cmnd;       /* ptr to SCSI command block (cdb) */
+    uint8_t * cmnd;       /* ptr to SCSI command block (cdb) */
     size_t  cmnd_len;           /* number of bytes in SCSI command */
     int dxfer_dir;              /* DXFER_NONE, DXFER_FROM_DEVICE, or
                                    DXFER_TO_DEVICE */
-    unsigned char * dxferp;     /* ptr to outgoing/incoming data */
+    uint8_t * dxferp;     /* ptr to outgoing/incoming data */
     size_t dxfer_len;           /* bytes to be transferred to/from dxferp */
 };
 
@@ -391,7 +391,7 @@ struct scsi_cmnd_io
 static int
 do_scsi_io(struct scsi_cmnd_io * sio)
 {
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
     struct sg_scsi_sense_hdr ssh;
     int res;
@@ -581,11 +581,11 @@ dump(void *buffer, unsigned int length)
     printf("    ");
     for (i = 0; i < length; i++) {
 #if 0
-        if (((unsigned char *) buffer)[i] > 0x20)
-            printf(" %c ", (unsigned int) ((unsigned char *) buffer)[i]);
+        if (((uint8_t *) buffer)[i] > 0x20)
+            printf(" %c ", (unsigned int) ((uint8_t *) buffer)[i]);
         else
 #endif
-            printf("%02x ", (unsigned int) ((unsigned char *) buffer)[i]);
+            printf("%02x ", (unsigned int) ((uint8_t *) buffer)[i]);
         if ((i % 16 == 15) && (i < (length - 1))) {
             printf("\n    ");
         }
@@ -595,7 +595,7 @@ dump(void *buffer, unsigned int length)
 }
 
 static int
-getnbyte(const unsigned char *pnt, int nbyte)
+getnbyte(const uint8_t *pnt, int nbyte)
 {
     unsigned int result;
     int i;
@@ -609,7 +609,7 @@ getnbyte(const unsigned char *pnt, int nbyte)
 }
 
 static int64_t
-getnbyte_ll(const unsigned char *pnt, int nbyte)
+getnbyte_ll(const uint8_t *pnt, int nbyte)
 {
     int64_t result;
     int i;
@@ -624,7 +624,7 @@ getnbyte_ll(const unsigned char *pnt, int nbyte)
 }
 
 static int
-putnbyte(unsigned char *pnt, unsigned int value,
+putnbyte(uint8_t *pnt, unsigned int value,
                     unsigned int nbyte)
 {
     int i;
@@ -658,7 +658,7 @@ check_parm_type(int i)
 }
 
 static void
-bitfield(unsigned char *pageaddr, const char * text, int mask, int shift)
+bitfield(uint8_t *pageaddr, const char * text, int mask, int shift)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -672,7 +672,7 @@ bitfield(unsigned char *pageaddr, const char * text, int mask, int shift)
 
 #if 0
 static void
-notbitfield(unsigned char *pageaddr, char * text, int mask,
+notbitfield(uint8_t *pageaddr, char * text, int mask,
                         int shift)
 {
     if (modifiable) {
@@ -691,7 +691,7 @@ notbitfield(unsigned char *pageaddr, char * text, int mask,
 #endif
 
 static void
-intfield(unsigned char * pageaddr, int nbytes, const char * text)
+intfield(uint8_t * pageaddr, int nbytes, const char * text)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -703,7 +703,7 @@ intfield(unsigned char * pageaddr, int nbytes, const char * text)
 }
 
 static void
-hexfield(unsigned char * pageaddr, int nbytes, const char * text)
+hexfield(uint8_t * pageaddr, int nbytes, const char * text)
 {
     if (x_interface && replace) {
         check_parm_type(0);
@@ -715,10 +715,10 @@ hexfield(unsigned char * pageaddr, int nbytes, const char * text)
 }
 
 static void
-hexdatafield(unsigned char * pageaddr, int nbytes, const char * text)
+hexdatafield(uint8_t * pageaddr, int nbytes, const char * text)
 {
     if (x_interface && replace) {
-        unsigned char *ptr;
+        uint8_t *ptr;
         unsigned tmp;
 
         /* Though in main we ensured that a @string has the right format,
@@ -726,7 +726,7 @@ hexdatafield(unsigned char * pageaddr, int nbytes, const char * text)
 
         check_parm_type(1);
 
-        ptr = (unsigned char *) (unsigned long)
+        ptr = (uint8_t *) (unsigned long)
               (replacement_values[next_parameter++]);
         ptr++;                  /* Skip @ */
 
@@ -770,7 +770,7 @@ hexdatafield(unsigned char * pageaddr, int nbytes, const char * text)
 /* Offset into mode sense (6 or 10 byte) response that actual mode page
  * starts at (relative to resp[0]). Returns -1 if problem */
 static int
-modePageOffset(const unsigned char * resp, int len, int modese_6)
+modePageOffset(const uint8_t * resp, int len, int modese_6)
 {
     int bd_len;
     int resp_len = 0;
@@ -802,11 +802,11 @@ modePageOffset(const unsigned char * resp, int len, int modese_6)
 
 /* Reads mode (sub-)page via 6 byte MODE SENSE, returns 0 if ok */
 static int
-get_mode_page6(struct mpage_info * mpi, int dbd, unsigned char * resp,
+get_mode_page6(struct mpage_info * mpi, int dbd, uint8_t * resp,
                int sngl_fetch)
 {
     int status, off;
-    unsigned char cmd[6];
+    uint8_t cmd[6];
     struct scsi_cmnd_io sci;
     int initial_len = (sngl_fetch ? MAX_RESP6_SIZE : 4);
 
@@ -874,10 +874,10 @@ get_mode_page6(struct mpage_info * mpi, int dbd, unsigned char * resp,
 /* Reads mode (sub-)page via 10 byte MODE SENSE, returns 0 if ok */
 static int
 get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
-                unsigned char * resp, int sngl_fetch)
+                uint8_t * resp, int sngl_fetch)
 {
     int status, off;
-    unsigned char cmd[10];
+    uint8_t cmd[10];
     struct scsi_cmnd_io sci;
     int initial_len = (sngl_fetch ? MAX_RESP10_SIZE : 4);
 
@@ -949,7 +949,7 @@ get_mode_page10(struct mpage_info * mpi, int llbaa, int dbd,
 }
 
 static int
-get_mode_page(struct mpage_info * mpi, int dbd, unsigned char * resp)
+get_mode_page(struct mpage_info * mpi, int dbd, uint8_t * resp)
 {
     int res;
 
@@ -975,12 +975,12 @@ get_mode_page(struct mpage_info * mpi, int dbd, unsigned char * resp)
    in a prior read operation.  This way we do not have to work out the
    format of the beast. Assume 0 or 1 block descriptors. */
 static int
-put_mode_page6(struct mpage_info * mpi, const unsigned char * msense6_resp,
+put_mode_page6(struct mpage_info * mpi, const uint8_t * msense6_resp,
                int sp_bit)
 {
     int status;
     int bdlen, resplen;
-    unsigned char cmd[6];
+    uint8_t cmd[6];
     struct scsi_cmnd_io sci;
 
     bdlen = msense6_resp[3];
@@ -1031,12 +1031,12 @@ put_mode_page6(struct mpage_info * mpi, const unsigned char * msense6_resp,
    in a prior read operation.  This way we do not have to work out the
    format of the beast. Assume 0 or 1 block descriptors. */
 static int
-put_mode_page10(struct mpage_info * mpi, const unsigned char * msense10_resp,
+put_mode_page10(struct mpage_info * mpi, const uint8_t * msense10_resp,
                 int sp_bit)
 {
     int status;
     int bdlen, resplen;
-    unsigned char cmd[10];
+    uint8_t cmd[10];
     struct scsi_cmnd_io sci;
 
     bdlen = (msense10_resp[6] << 8) + msense10_resp[7];
@@ -1087,7 +1087,7 @@ put_mode_page10(struct mpage_info * mpi, const unsigned char * msense10_resp,
 }
 
 static int
-put_mode_page(struct mpage_info * mpi, const unsigned char * msense_resp)
+put_mode_page(struct mpage_info * mpi, const uint8_t * msense_resp)
 {
     if (mode6byte)
         return put_mode_page6(mpi, msense_resp, ! negate_sp_bit);
@@ -1096,11 +1096,11 @@ put_mode_page(struct mpage_info * mpi, const unsigned char * msense_resp)
 }
 
 static int
-setup_mode_page(struct mpage_info * mpi, int nparam, unsigned char * buff,
-                unsigned char ** o_pagestart)
+setup_mode_page(struct mpage_info * mpi, int nparam, uint8_t * buff,
+                uint8_t ** o_pagestart)
 {
     int status, offset, rem_pglen;
-    unsigned char * pgp;
+    uint8_t * pgp;
 
     status = get_mode_page(mpi, 0, buff);
     if (status) {
@@ -1131,7 +1131,7 @@ setup_mode_page(struct mpage_info * mpi, int nparam, unsigned char * buff,
 }
 
 static int
-get_protocol_id(int port_not_lu, unsigned char * buff, int * proto_idp,
+get_protocol_id(int port_not_lu, uint8_t * buff, int * proto_idp,
                 int * offp)
 {
     int status, off, proto_id, spf;
@@ -1164,7 +1164,7 @@ static int
 disk_geometry(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 9, cbuffer, &pagestart);
     if (status)
@@ -1196,7 +1196,7 @@ common_disconnect_reconnect(struct mpage_info * mpi,
                                        const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 11, cbuffer, &pagestart);
     if (status)
@@ -1231,7 +1231,7 @@ static int
 common_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 21, cbuffer, &pagestart);
     if (status)
@@ -1275,7 +1275,7 @@ static int
 common_control_extension(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 4, cbuffer, &pagestart);
     if (status)
@@ -1304,7 +1304,7 @@ static int
 common_informational(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 10, cbuffer, &pagestart);
     if (status)
@@ -1337,7 +1337,7 @@ static int
 disk_error_recovery(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 14, cbuffer, &pagestart);
     if (status)
@@ -1374,7 +1374,7 @@ static int
 cdvd_error_recovery(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 10, cbuffer, &pagestart);
     if (status)
@@ -1407,7 +1407,7 @@ static int
 cdvd_mrw(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
@@ -1431,7 +1431,7 @@ static int
 disk_notch_parameters(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 6, cbuffer, &pagestart);
     if (status) {
@@ -1500,11 +1500,11 @@ read_defect_list(int grown_only)
     int status = 0;
     int header = 1;
     int sorthead = 0;
-    unsigned char cmd[10];
-    unsigned char cmd12[12];
-    unsigned char *df = NULL;
-    unsigned char *bp = NULL;
-    unsigned char *heapp = NULL;
+    uint8_t cmd[10];
+    uint8_t cmd12[12];
+    uint8_t *df = NULL;
+    uint8_t *bp = NULL;
+    uint8_t *heapp = NULL;
     unsigned int  *headsp = NULL;
     int trunc;
     struct scsi_cmnd_io sci;
@@ -1635,12 +1635,12 @@ read_defect_list(int grown_only)
         if (len > 0) {
             k = len + 8;              /* length of defect list + header */
             if (k > (int)sizeof(cbuffer)) {
-                heapp = (unsigned char *)malloc(k);
+                heapp = (uint8_t *)malloc(k);
 
                 if (len > 0x80000 && NULL == heapp) {
                     len = 0x80000;      /* go large: 512 KB */
                     k = len + 8;
-                    heapp = (unsigned char *)malloc(k);
+                    heapp = (uint8_t *)malloc(k);
                 }
                 if (heapp != NULL)
                     bp = heapp;
@@ -1677,7 +1677,7 @@ read_defect_list(int grown_only)
                 if (reallen > len) {
                     trunc = 1;
                 }
-                df = (unsigned char *) (bp + 8);
+                df = (uint8_t *) (bp + 8);
             }
             else {
 trytenbyte:
@@ -1687,7 +1687,7 @@ trytenbyte:
                 }
                 k = len + 4;            /* length of defect list + header */
                 if (k > (int)sizeof(cbuffer) && NULL == heapp) {
-                    heapp = (unsigned char *)malloc(k);
+                    heapp = (uint8_t *)malloc(k);
                     if (heapp != NULL)
                         bp = heapp;
                 }
@@ -1715,7 +1715,7 @@ trytenbyte:
                 sci.dxfer_len = k;
                 sci.dxferp = bp;
                 i = do_scsi_io(&sci);
-                df = (unsigned char *) (bp + 4);
+                df = (uint8_t *) (bp + 4);
             }
         }
         if (i) {
@@ -1832,7 +1832,7 @@ static int
 disk_cache(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 21, cbuffer, &pagestart);
     if (status)
@@ -1876,7 +1876,7 @@ static int
 disk_format(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 13, cbuffer, &pagestart);
     if (status)
@@ -1913,7 +1913,7 @@ static int
 disk_verify_error_recovery(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 7, cbuffer, &pagestart);
     if (status)
@@ -1954,7 +1954,7 @@ peripheral_device_page(struct mpage_info * mpi, const char * prefix)
     };
     int status;
     unsigned ident;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
     char *name;
 
     status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
@@ -2016,7 +2016,7 @@ static int
 common_power_condition(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 4, cbuffer, &pagestart);
     if (status)
@@ -2044,7 +2044,7 @@ static int
 disk_xor_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 5, cbuffer, &pagestart);
     if (status)
@@ -2073,7 +2073,7 @@ static int
 disk_background(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 4, cbuffer, &pagestart);
     if (status)
@@ -2102,7 +2102,7 @@ static int
 optical_memory(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
@@ -2127,7 +2127,7 @@ static int
 cdvd_write_param(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 20, cbuffer, &pagestart);
     if (status)
@@ -2171,7 +2171,7 @@ static int
 cdvd_audio_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 10, cbuffer, &pagestart);
     if (status)
@@ -2205,7 +2205,7 @@ static int
 cdvd_timeout(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 6, cbuffer, &pagestart);
     if (status)
@@ -2235,7 +2235,7 @@ static int
 cdvd_device_param(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 3, cbuffer, &pagestart);
     if (status)
@@ -2265,7 +2265,7 @@ static int
 cdvd_feature(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 12, cbuffer, &pagestart);
     if (status)
@@ -2301,7 +2301,7 @@ static int
 cdvd_mm_capab(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 49, cbuffer, &pagestart);
     if (status)
@@ -2374,7 +2374,7 @@ static int
 cdvd_cache(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
     if (status)
@@ -2399,7 +2399,7 @@ static int
 tape_data_compression(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 6, cbuffer, &pagestart);
     if (status)
@@ -2429,7 +2429,7 @@ static int
 tape_dev_config(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 25, cbuffer, &pagestart);
     if (status)
@@ -2478,7 +2478,7 @@ static int
 tape_medium_part1(struct mpage_info * mpi, const char * prefix)
 {
     int status, off, len;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     /* variable length mode page, need to know its response length */
     status = get_mode_page(mpi, 0, cbuffer);
@@ -2526,7 +2526,7 @@ static int
 tape_medium_part2_4(struct mpage_info * mpi, const char * prefix)
 {
     int status, off, len;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     /* variable length mode page, need to know its response length */
     status = get_mode_page(mpi, 0, cbuffer);
@@ -2563,7 +2563,7 @@ static int
 ses_services_manag(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 2, cbuffer, &pagestart);
     if (status)
@@ -2589,7 +2589,7 @@ static int
 fcp_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
@@ -2615,7 +2615,7 @@ static int
 sas_proto_spec_lu(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
@@ -2657,7 +2657,7 @@ static int
 fcp_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 10, cbuffer, &pagestart);
     if (status)
@@ -2692,7 +2692,7 @@ static int
 spi4_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
@@ -2718,7 +2718,7 @@ static int
 sas_proto_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 3, cbuffer, &pagestart);
     if (status)
@@ -2764,7 +2764,7 @@ static int
 spi4_margin_control(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 5, cbuffer, &pagestart);
     if (status)
@@ -2795,8 +2795,8 @@ static int
 sas_phy_control_discover(struct mpage_info * mpi, const char * prefix)
 {
     int status, off, num_phys, k;
-    unsigned char *pagestart;
-    unsigned char *p;
+    uint8_t *pagestart;
+    uint8_t *p;
 
    /* variable length mode page, need to know its response length */
     status = get_mode_page(mpi, 0, cbuffer);
@@ -2866,7 +2866,7 @@ static int
 spi4_training_config(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 27, cbuffer, &pagestart);
     if (status)
@@ -2919,7 +2919,7 @@ static int
 sas_shared_spec_port(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 1, cbuffer, &pagestart);
     if (status)
@@ -2962,7 +2962,7 @@ static int
 spi4_negotiated(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 7, cbuffer, &pagestart);
     if (status)
@@ -2994,7 +2994,7 @@ static int
 spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
 {
     int status;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
 
     status = setup_mode_page(mpi, 4, cbuffer, &pagestart);
     if (status)
@@ -3021,7 +3021,7 @@ spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
 
 static void
 print_hex_page(struct mpage_info * mpi, const char * prefix,
-               unsigned char *pagestart, int off, int len)
+               uint8_t *pagestart, int off, int len)
 {
     int k;
     const char * pg_name;
@@ -3063,7 +3063,7 @@ do_user_page(struct mpage_info * mpi, int decode_in_hex)
     int status = 0;
     int len, off, res, done;
     int offset = 0;
-    unsigned char *pagestart;
+    uint8_t *pagestart;
     char prefix[96];
     struct mpage_info local_mp_i;
     struct mpage_name_func * mpf;
@@ -3151,7 +3151,7 @@ do_user_page(struct mpage_info * mpi, int decode_in_hex)
 }
 
 static void
-inqfieldname(unsigned char *deststr, const unsigned char *srcbuf, int maxlen)
+inqfieldname(uint8_t *deststr, const uint8_t *srcbuf, int maxlen)
 {
         int i;
 
@@ -3165,9 +3165,9 @@ static int
 do_inquiry(int * peri_type, int * resp_byte6, int inquiry_verbosity)
 {
     int status;
-    unsigned char cmd[6];
-    unsigned char fieldname[MAX_INQFIELD_LEN];
-    unsigned char *pagestart;
+    uint8_t cmd[6];
+    uint8_t fieldname[MAX_INQFIELD_LEN];
+    uint8_t *pagestart;
     struct scsi_cmnd_io sci;
 
     memset(cbuffer, 0, INQUIRY_RESP_INITIAL_LEN);
@@ -3259,11 +3259,11 @@ static int
 do_serial_number(void)
 {
     int status, pagelen;
-    unsigned char cmd[6];
-    unsigned char *pagestart;
+    uint8_t cmd[6];
+    uint8_t *pagestart;
     struct scsi_cmnd_io sci;
-    const unsigned char serial_vpd = 0x80;
-    const unsigned char supported_vpd = 0x0;
+    const uint8_t serial_vpd = 0x80;
+    const uint8_t supported_vpd = 0x0;
 
     /* check supported VPD pages + unit serial number well formed */
     cmd[0] = 0x12;              /* INQUIRY */
@@ -3318,7 +3318,7 @@ do_serial_number(void)
     cmd[1] = 0x01;              /* evpd=1 */
     cmd[2] = serial_vpd;
     cmd[3] = 0x00;              /* (reserved) */
-    cmd[4] = (unsigned char)pagelen; /* allocation length */
+    cmd[4] = (uint8_t)pagelen; /* allocation length */
     cmd[5] = 0x00;              /* control */
 
     sci.cmnd = cmd;

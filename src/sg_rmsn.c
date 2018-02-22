@@ -31,7 +31,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.15 20180118";
+static const char * version_str = "1.16 20180219";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -68,8 +68,8 @@ int main(int argc, char * argv[])
     int sg_fd, res, c, sn_len, n;
     int ret = 0;
     int verbose = 0;
-    unsigned char rmsn_buff[4];
-    unsigned char * bp = NULL;
+    uint8_t rmsn_buff[4];
+    uint8_t * bp = NULL;
     const char * device_name = NULL;
 
     while (1) {
@@ -153,7 +153,7 @@ int main(int argc, char * argv[])
             goto err_out;
         }
         sn_len += 4;
-        bp = (unsigned char *)malloc(sn_len);
+        bp = (uint8_t *)malloc(sn_len);
         if (NULL == bp) {
             pr2serr("    Out of memory (ram)\n");
             goto err_out;

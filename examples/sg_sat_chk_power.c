@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -56,7 +57,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.05 20160528";
+static const char * version_str = "1.06 20180220";
 
 
 #if 0
@@ -64,7 +65,7 @@ static const char * version_str = "1.05 20160528";
  * command, else returns 0. If returns 0 (expected sense data not found)
  * then '\0' placed in first byte of bp. */
 static int
-sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
+sg_sat_decode_fixed_sense(const uint8_t * sp, int slen, char * bp,
                           int max_blen, int verbose)
 {
     int n;
@@ -98,13 +99,13 @@ sg_sat_decode_fixed_sense(const unsigned char * sp, int slen, char * bp,
 int main(int argc, char * argv[])
 {
     int sg_fd, k;
-    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
+    uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char sense_buffer[64];
+    uint8_t sense_buffer[64];
     int verbose = 0;
     int extend = 0;
     int chk_cond = 1;   /* set to 1 to read register(s) back */
@@ -112,7 +113,7 @@ int main(int argc, char * argv[])
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
-    const unsigned char * bp = NULL;
+    const uint8_t * bp = NULL;
 
     for (k = 1; k < argc; ++k) {
         if (0 == strcmp(argv[k], "-v"))

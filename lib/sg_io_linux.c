@@ -116,7 +116,7 @@ sg_print_driver_status(int driver_status)
    prints error/warning (prefix by 'leadin') and returns 0. */
 static int
 sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
-                     int driver_status, const unsigned char * sense_buffer,
+                     int driver_status, const uint8_t * sense_buffer,
                      int sb_len, bool raw_sinfo)
 {
     bool done_leadin = false;
@@ -196,7 +196,7 @@ sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
    returns 0. */
 int
 sg_chk_n_print(const char * leadin, int masked_status, int host_status,
-               int driver_status, const unsigned char * sense_buffer,
+               int driver_status, const uint8_t * sense_buffer,
                int sb_len, bool raw_sinfo)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
@@ -217,7 +217,7 @@ sg_err_category3(struct sg_io_hdr * hp)
 
 int
 sg_err_category(int masked_status, int host_status, int driver_status,
-                const unsigned char * sense_buffer, int sb_len)
+                const uint8_t * sense_buffer, int sb_len)
 {
     int scsi_status = (masked_status << 1) & 0x7e;
 
@@ -227,7 +227,7 @@ sg_err_category(int masked_status, int host_status, int driver_status,
 
 int
 sg_err_category_new(int scsi_status, int host_status, int driver_status,
-                    const unsigned char * sense_buffer, int sb_len)
+                    const uint8_t * sense_buffer, int sb_len)
 {
     int masked_driver_status = (SG_LIB_DRIVER_MASK & driver_status);
 

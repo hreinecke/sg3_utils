@@ -31,13 +31,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.12 20180210";
+static const char * version_str = "1.13 20180219";
 
 
 #define ME "sg_write_verify: "
@@ -120,13 +121,13 @@ usage()
 /* Invokes a SCSI WRITE AND VERIFY according with CDB. Returns 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
-                     unsigned char *dop, int do_len, int timeout,
+run_scsi_transaction(int sg_fd, const uint8_t *cdbp, int cdb_len,
+                     uint8_t *dop, int do_len, int timeout,
                      bool noisy, int verbose)
 {
     int res, k, sense_cat, ret;
     struct sg_pt_base * ptvp;
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     char b[32];
 
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);
@@ -191,11 +192,11 @@ run_scsi_transaction(int sg_fd, const unsigned char *cdbp, int cdb_len,
 static int
 sg_ll_write_verify10(int sg_fd, int wrprotect, bool dpo, int bytchk,
                      unsigned int lba, int num_lb, int group,
-                     unsigned char *dop, int do_len, int timeout,
+                     uint8_t *dop, int do_len, int timeout,
                      bool noisy, int verbose)
 {
     int ret;
-    unsigned char wv_cdb[WRITE_VERIFY10_CMDLEN];
+    uint8_t wv_cdb[WRITE_VERIFY10_CMDLEN];
 
     memset(wv_cdb, 0, WRITE_VERIFY10_CMDLEN);
     wv_cdb[0] = WRITE_VERIFY10_CMD;
@@ -217,11 +218,11 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, bool dpo, int bytchk,
 * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_write_verify16(int sg_fd, int wrprotect, bool dpo, int bytchk,
-                     uint64_t llba, int num_lb, int group, unsigned char *dop,
+                     uint64_t llba, int num_lb, int group, uint8_t *dop,
                      int do_len, int timeout, bool noisy, int verbose)
 {
     int ret;
-    unsigned char wv_cdb[WRITE_VERIFY16_CMDLEN];
+    uint8_t wv_cdb[WRITE_VERIFY16_CMDLEN];
 
 
     memset(wv_cdb, 0, sizeof(wv_cdb));
@@ -286,7 +287,7 @@ main(int argc, char * argv[])
     uint32_t snum_lb = 1;
     uint64_t llba = 0;
     int64_t ll;
-    unsigned char * wvb = NULL;
+    uint8_t * wvb = NULL;
     void * wrkBuff = NULL;
     const char * device_name = NULL;
     const char * ifnp;
@@ -501,7 +502,7 @@ main(int argc, char * argv[])
                     ret = SG_LIB_CAT_OTHER;
                     goto err_out;
                 }
-                wvb = (unsigned char *)wrkBuff;
+                wvb = (uint8_t *)wrkBuff;
                 res = read(ifd, wvb, ilen);
                 if (res < 0) {
                     pr2serr("Could not read from %s", ifnp);
@@ -527,7 +528,7 @@ main(int argc, char * argv[])
                     ret = SG_LIB_CAT_OTHER;
                     goto err_out;
                 }
-                wvb = (unsigned char *)wrkBuff;
+                wvb = (uint8_t *)wrkBuff;
                 /* Not sure about this: default contents to 0xff bytes */
                 memset(wrkBuff, 0xff, ilen);
             }

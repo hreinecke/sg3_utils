@@ -33,7 +33,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.24 20180118";
+static const char * version_str = "1.24 20180219";
 
 #define MAX_XFER_LEN 10000
 
@@ -132,7 +132,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     uint64_t llba = 0;
     int64_t ll;
-    unsigned char * readLongBuff = NULL;
+    uint8_t * readLongBuff = NULL;
     void * rawp = NULL;
     const char * device_name = NULL;
     char out_fname[256];
@@ -229,7 +229,7 @@ main(int argc, char * argv[])
         sg_cmds_close_device(sg_fd);
         return SG_LIB_SYNTAX_ERROR;
     }
-    readLongBuff = (unsigned char *)rawp;
+    readLongBuff = (uint8_t *)rawp;
     memset(rawp, 0x0, MAX_XFER_LEN);
 
     pr2serr(ME "issue read long (%s) to device %s\n    xfer_len=%d (0x%x), "

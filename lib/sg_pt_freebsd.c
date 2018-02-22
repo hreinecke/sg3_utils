@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.25 20180217 */
+/* sg_pt_freebsd version 1.26 20180219 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,16 +78,16 @@ static struct freebsd_dev_channel *devicetable[FREEBSD_MAXDEV];
 struct sg_pt_freebsd_scsi {
     struct cam_device* cam_dev; // copy held for error processing
     union ccb *ccb;
-    unsigned char * cdb;
+    uint8_t * cdb;
     int cdb_len;
-    unsigned char * sense;
+    uint8_t * sense;
     int sense_len;
-    unsigned char * dxferp;
+    uint8_t * dxferp;
     int dxfer_len;
     int dxfer_dir;
-    unsigned char * dxferip;
-    unsigned char * dxferop;
-    unsigned char * mdxferp;
+    uint8_t * dxferip;
+    uint8_t * dxferop;
+    uint8_t * mdxferp;
     uint32_t dxfer_ilen;
     uint32_t dxfer_olen;
     uint32_t mdxfer_len;
@@ -430,7 +430,6 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
     }
 }
 
-
 void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
@@ -461,7 +460,8 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
  * find file type (e.g. if pass-though) from OS so there could be an error.
  * Returns 0 for success or the same value as get_scsi_pt_os_err()
  * will return. dev_han should be >= 0 for a valid file handle or -1 . */
-int set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
+int
+set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
 {
     struct sg_pt_freebsd_scsi * ptp;
 
@@ -501,7 +501,8 @@ int set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
 
 /* Valid file handles (which is the return value) are >= 0 . Returns -1
  * if there is no valid file handle. */
-int get_pt_file_handle(const struct sg_pt_base * vp)
+int
+get_pt_file_handle(const struct sg_pt_base * vp)
 {
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
@@ -509,18 +510,18 @@ int get_pt_file_handle(const struct sg_pt_base * vp)
 }
 
 void
-set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb, int cdb_len)
+set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb, int cdb_len)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp->cdb)
         ++ptp->in_err;
-    ptp->cdb = (unsigned char *)cdb;
+    ptp->cdb = (uint8_t *)cdb;
     ptp->cdb_len = cdb_len;
 }
 
 void
-set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
+set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
                   int max_sense_len)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
@@ -534,7 +535,7 @@ set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
 
 /* Setup for data transfer from device */
 void
-set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
+set_scsi_pt_data_in(struct sg_pt_base * vp, uint8_t * dxferp,
                     int dxfer_len)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
@@ -552,24 +553,24 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
 
 /* Setup for data transfer toward device */
 void
-set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
+set_scsi_pt_data_out(struct sg_pt_base * vp, const uint8_t * dxferp,
                      int dxfer_len)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp->dxferop)
         ++ptp->in_err;
-    ptp->dxferop = (unsigned char *)dxferp;
+    ptp->dxferop = (uint8_t *)dxferp;
     ptp->dxfer_olen = dxfer_len;
     if (dxfer_len > 0) {
-        ptp->dxferp = (unsigned char *)dxferp;
+        ptp->dxferp = (uint8_t *)dxferp;
         ptp->dxfer_len = dxfer_len;
         ptp->dxfer_dir = CAM_DIR_OUT;
     }
 }
 
 void
-set_pt_metadata_xfer(struct sg_pt_base * vp, unsigned char * mdxferp,
+set_pt_metadata_xfer(struct sg_pt_base * vp, uint8_t * mdxferp,
                      uint32_t mdxfer_len, bool out_true)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;

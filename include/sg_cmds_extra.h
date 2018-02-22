@@ -42,11 +42,10 @@ extern "C" {
  * data may be placed in *sensep in which case sensep[0]==0x70, prior to
  * SAT-2 descriptor sense format was required (i.e. sensep[0]==0x72).
  */
-int sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
+int sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
                  int timeout_secs,  void * dinp, void * doutp, int dlen,
-                 unsigned char * sensep, int max_sense_len,
-                 unsigned char * ata_return_dp, int max_ata_return_len,
-                 int * residp, int verbose);
+                 uint8_t * sensep, int max_sense_len, uint8_t * ata_return_dp,
+                 int max_ata_return_len, int * residp, int verbose);
 
 /* Invokes a FORMAT UNIT (SBC-3) command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Format unit not supported,

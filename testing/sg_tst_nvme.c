@@ -37,17 +37,18 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.02 20180216";
+static const char * version_str = "1.04 20180220";
 
 
 #define ME "sg_tst_nvme: "
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, only need 16 bytes for NVME
                                  * (and SCSI at least 18) currently */
-
+#define SENSE_BUFF_NVME_LEN 16  /* 4 DWords, little endian, as byte string */
 
 #define INQUIRY_CMD     0x12    /* SCSI command to get VPD page 0x83 */
 #define INQUIRY_CMDLEN  6
+#define INQUIRY_MAX_RESP_LEN 252
 
 #define VPD_DEVICE_ID  0x83
 
@@ -64,7 +65,6 @@ static struct option long_options[] = {
     {"long", no_argument, 0, 'l'},
     {"maxlen", required_argument, 0, 'm'},
     {"nsid", required_argument, 0, 'n'},
-    {"second", required_argument, 0, 'S'},
     {"self-test", required_argument, 0, 's'},
     {"self_test", required_argument, 0, 's'},
     {"to-ms", required_argument, 0, 't'},
@@ -95,15 +95,30 @@ static const char * sg_ansi_version_arr[16] =
     "reserved [Fh]",
 };
 
+#define MAX_DEV_NAMES 8
+
+static const char * dev_name_arr[MAX_DEV_NAMES] = {
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+};
+
+static int next_dev_name_pos = 0;
+
 
 static void
 usage()
 {
     pr2serr("Usage: sg_tst_nvme [--ctl] [dev-id] [--help] [--long] "
             "[--maxlen=LEN]\n"
-            "                   [--nsid=ID] [--second=DEV] [--self-test=ST] "
-            "[--to-ms=TO]\n"
-            "                   [--verbose] [--version] DEVICE\n"
+            "                   [--nsid=ID] [--self-test=ST] [--to-ms=TO] "
+            "[--verbose]\n"
+            "                   [--version] DEVICE [DEVICE ...]\n"
             "  where:\n"
             "    --ctl|-c             only do Identify controller command\n"
             "    --dev-id|-d          do SCSI INQUIRY for device "
@@ -118,9 +133,6 @@ usage()
             "DEVICE.\n"
             "                         Can also be used with self-test (def: "
             "0)\n"
-            "    --second=DEV|-S DEV    if operation successful on DEVICE "
-            "then\n"
-            "                           repeat operation on DEV\n"
             "    --self-test=ST|-s ST    do (or abort) device self-test, ST "
             "can be:\n"
             "                              0:  do nothing\n"
@@ -139,7 +151,7 @@ usage()
             "    --verbose|-v         increase verbosity\n"
             "    --version|-V         print version string then exit\n\n"
             "Performs a NVME Identify or Device self-test Admin command on "
-            "DEVICE.\nCan also simulate a SCSI device identification VPD "
+            "each DEVICE.\nCan also simulate a SCSI device identification VPD "
             "page [0x83] via\na local SNTL. --nsid= accepts '-1' for "
             "0xffffffff which means all.\n"
          );
@@ -362,19 +374,19 @@ show_nvme_id_ns(const uint8_t * dinp, uint32_t nsid, const char *dev_name,
 static int
 nvme_din_admin_cmd(struct sg_pt_base * ptvp, const uint8_t *cmdp,
                    uint32_t cmd_len, const char *cmd_str, uint8_t *dip,
-                   int di_len, int timeout_ms, uint16_t *sct_scp, int verbose)
+                   int di_len, int timeout_ms, uint16_t *sct_scp, int vb)
 {
     int res, k;
     uint16_t sct_sc = 0;
     uint32_t result, clen;
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_NVME_LEN];
     uint8_t ucmd[128];
     char b[32];
 
     snprintf(b, sizeof(b), "%s", cmd_str);
     clen = (cmd_len > sizeof(ucmd)) ? sizeof(ucmd) : cmd_len;
     memcpy(ucmd, cmdp, clen);
-    if (verbose > 1) {
+    if (vb > 1) {
        pr2serr("    %s cdb:\n", b);
        hex2stderr(ucmd, clen, -1);
     }
@@ -382,11 +394,12 @@ nvme_din_admin_cmd(struct sg_pt_base * ptvp, const uint8_t *cmdp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (dip && (di_len > 0))
         set_scsi_pt_data_in(ptvp, dip, di_len);
-    res = do_scsi_pt(ptvp, -1, -timeout_ms, verbose);
+    res = do_scsi_pt(ptvp, -1, -timeout_ms, vb);
     if (res) {
-        if (res < 0)
+        if (res < 0) {
             res = sg_convert_errno(-res);
-        else {
+            goto err_out;
+        } else {
             if (SCSI_PT_DO_BAD_PARAMS == res)
                 pr2serr("%s: bad parameters to do_scsi_pt()\n", __func__);
             else if (SCSI_PT_DO_TIMEOUT == res)
@@ -400,21 +413,21 @@ nvme_din_admin_cmd(struct sg_pt_base * ptvp, const uint8_t *cmdp,
                         __func__, res);
         }
         res = SG_LIB_FILE_ERROR;
-        goto err_out;   /* OS error (Unix: negated errno) */
+        goto err_out;
     }
 
-    if ((verbose > 2) && dip && di_len) {
+    if ((vb > 2) && dip && di_len) {
         k = get_scsi_pt_resid(ptvp);
         pr2serr("    Data in buffer [%d bytes]:\n", di_len - k);
         if (di_len > k)
             hex2stderr(dip, di_len - k, -1);
-        if (verbose > 3)
+        if (vb > 3)
             pr2serr("    do_scsi_pt(nvme): res=%d resid=%d\n", res, k);
     }
     sct_sc = get_scsi_pt_status_response(ptvp);
     result = get_pt_result(ptvp);
     k = get_scsi_pt_sense_len(ptvp);
-    if (verbose) {
+    if (vb) {
         pr2serr("Status: 0x%x [SCT<<8 + SC], Result: 0x%x, Completion Q:\n",
                 sct_sc, result);
         if (k > 0)
@@ -428,7 +441,7 @@ err_out:
 }
 
 static void
-std_inq_decode(unsigned char * b, int len, int vb)
+std_inq_decode(const char * prefix, uint8_t * b, int len, int vb)
 {
     int pqual, n;
 
@@ -436,21 +449,20 @@ std_inq_decode(unsigned char * b, int len, int vb)
         return;
     pqual = (b[0] & 0xe0) >> 5;
     if (0 == pqual)
-        printf("standard INQUIRY:\n");
+        printf("%s:\n", prefix);
     else if (1 == pqual)
-        printf("standard INQUIRY: [qualifier indicates no connected "
-               "LU]\n");
+        printf("%s: [qualifier indicates no connected LU]\n", prefix);
     else if (3 == pqual)
-        printf("standard INQUIRY: [qualifier indicates not capable "
-               "of supporting LU]\n");
+        printf("%s: [qualifier indicates not capable of supporting LU]\n",
+               prefix);
     else
-        printf("standard INQUIRY: [reserved or vendor specific "
-                       "qualifier [%d]]\n", pqual);
-    printf("  PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  version=0x%02x ",
-           pqual, b[0] & 0x1f, !!(b[1] & 0x80), !!(b[1] & 0x40),
-           (unsigned int)b[2]);
+        printf("%s: [reserved or vendor specific qualifier [%d]]\n",
+               prefix, pqual);
+    printf("      PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  "
+           "version=0x%02x ", pqual, b[0] & 0x1f, !!(b[1] & 0x80),
+           !!(b[1] & 0x40), (unsigned int)b[2]);
     printf(" [%s]\n", sg_ansi_version_arr[b[2] & 0xf]);
-    printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
+    printf("      [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
            " Resp_data_format=%d\n",
            !!(b[3] & 0x80), !!(b[3] & 0x40), !!(b[3] & 0x20),
            !!(b[3] & 0x10), b[3] & 0x0f);
@@ -459,15 +471,16 @@ std_inq_decode(unsigned char * b, int len, int vb)
     n = b[4] + 5;
     if (vb)
         pr2serr(">> requested %d bytes, %d bytes available\n", len, n);
-    printf("  SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
+    printf("      SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
            !!(b[5] & 0x80), !!(b[5] & 0x40), ((b[5] & 0x30) >> 4),
            !!(b[5] & 0x08), !!(b[5] & 0x01));
-    printf(" [BQue=%d]\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
+    printf("     [BQue=%d]\n      EncServ=%d  ", !!(b[6] & 0x80),
+           !!(b[6] & 0x40));
     if (b[6] & 0x10)
         printf("MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
     else
         printf("MultiP=0  ");
-    printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
+    printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n      [RelAdr=%d]  ",
            !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01),
            !!(b[7] & 0x80));
     printf("WBus16=%d  Sync=%d  [Linked=%d]  [TranDis=%d]  ",
@@ -476,9 +489,9 @@ std_inq_decode(unsigned char * b, int len, int vb)
     printf("CmdQue=%d\n", !!(b[7] & 0x02));
     if (len < 36)
         return;
-    printf("  Vendor_identification: %.8s\n", b + 8);
-    printf("  Product_identification: %.16s\n", b + 16);
-    printf("  Product_revision_level: %.4s\n", b + 32);
+    printf("      Vendor_identification: %.8s\n", b + 8);
+    printf("      Product_identification: %.16s\n", b + 16);
+    printf("      Product_revision_level: %.4s\n", b + 32);
 }
 
 /* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
@@ -498,13 +511,13 @@ sg_scsi_inquiry(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
                 bool noisy, int vb)
 {
     int res, ret, k, sense_cat, resid;
-    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char * up;
+    uint8_t inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
+    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t * up;
 
     if (evpd)
         inq_cdb[1] |= 1;
-    inq_cdb[2] = (unsigned char)pg_op;
+    inq_cdb[2] = (uint8_t)pg_op;
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (vb > 1) {
         pr2serr("    INQUIRY cdb: ");
@@ -513,7 +526,7 @@ sg_scsi_inquiry(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
         pr2serr("\n");
     }
     if (resp && (mx_resp_len > 0)) {
-        up = (unsigned char *)resp;
+        up = (uint8_t *)resp;
         up[0] = 0x7f;   /* defensive prefill */
         if (mx_resp_len > 4)
             up[4] = 0;
@@ -522,7 +535,7 @@ sg_scsi_inquiry(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
         timeout_secs = DEF_TIMEOUT_SECS;
     set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, timeout_secs, vb);
     ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
                                noisy, vb, &sense_cat);
@@ -555,7 +568,7 @@ sg_scsi_inquiry(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer */
-        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+        memset((uint8_t *)resp + (mx_resp_len - resid), 0, resid);
     }
     return ret;
 }
@@ -569,13 +582,14 @@ main(int argc, char * argv[])
     bool do_id_ns = false;
     bool do_self_test = false;
     bool flagged = false;
-    bool doing_second = false;
     bool is_nvme = false;
-    int sg_fd, res, c, n, resid, off, len, ln, k, num;
+    int res, c, n, resid, off, len, ln, k, q, num;
+    int curr_dev_name_pos = 0;
     int do_long = 0;
-    int maxlen = 0;
+    int maxlen = INQUIRY_MAX_RESP_LEN;
     int self_test = 0;
-    int ret = 1;
+    int sg_fd = -1;
+    int ret = 0;
     int timeout_ms = DEF_TIMEOUT_SECS * 1000;
     int vb = 0;
     uint32_t nsid = 0;
@@ -586,7 +600,6 @@ main(int argc, char * argv[])
     uint8_t * free_al_buff = NULL;
     uint8_t * bp;
     const char * device_name = NULL;
-    const char * dev2_name = NULL;
     const char * cp;
     struct sg_pt_base * ptvp = NULL;
     char cmd_name[32];
@@ -595,7 +608,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cdhlm:n:s:S:t:vV", long_options,
+        c = getopt_long(argc, argv, "cdhlm:n:s:t:vV", long_options,
                        &option_index);
         if (c == -1)
             break;
@@ -647,9 +660,6 @@ main(int argc, char * argv[])
             strcpy(cmd_name, "Device self-test");
             do_self_test = true;
             break;
-        case 'S':
-            dev2_name = optarg;
-            break;
         case 't':
             timeout_ms = sg_get_num(optarg);
             if (timeout_ms < 0) {
@@ -670,20 +680,19 @@ main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if (NULL == device_name) {
-            device_name = argv[optind];
-            ++optind;
-        }
-        if (optind < argc) {
-            for (; optind < argc; ++optind)
-                pr2serr("Unexpected extra argument: %s\n", argv[optind]);
-            usage();
-            return SG_LIB_SYNTAX_ERROR;
+        for (; optind < argc; ++optind) {
+            if (next_dev_name_pos >= MAX_DEV_NAMES) {
+                pr2serr("Only accepts %d DEVICE names\n", MAX_DEV_NAMES);
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            dev_name_arr[next_dev_name_pos++] = argv[optind];
        }
     }
 
-    if (NULL == device_name) {
-        pr2serr("missing device name!\n\n");
+    if (next_dev_name_pos < 1) {
+        pr2serr("Need at least one DEVICE, can have up to %d\n\n",
+                MAX_DEV_NAMES);
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -702,7 +711,6 @@ main(int argc, char * argv[])
         strcpy(cmd_name, "Identify(ns)");
     }
 
-
     al_size = ((uint32_t)maxlen > pg_sz) ? (uint32_t)maxlen : pg_sz;
     al_buff = sg_memalign(al_size, pg_sz, &free_al_buff, vb > 3);
     if (NULL == al_buff) {
@@ -710,19 +718,20 @@ main(int argc, char * argv[])
                 al_size);
         return SG_LIB_OS_BASE_ERR + ENOMEM;
     }
+    device_name = dev_name_arr[curr_dev_name_pos++];
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         ret = SG_LIB_FILE_ERROR;
         flagged = true;
-        goto err_out;
+        goto fini;
     }
     n = check_pt_file_handle(sg_fd, device_name, vb);
     if (n < 0) {
         pr2serr("check_pt_file_handle error: %s: %s\n", device_name,
                 safe_strerror(-n));
         flagged = true;
-        goto err_out;
+        goto fini;
     }
     cp = NULL;
     switch (n) {
@@ -752,180 +761,196 @@ main(int argc, char * argv[])
     if (NULL == ptvp) {
         pr2serr("%s: out of memory\n", b);
         ret = sg_convert_errno(ENOMEM);
-        goto err_out;
+        goto fini;
     }
     k = get_scsi_pt_os_err(ptvp);
     if (k) {
         pr2serr("OS error from construct_scsi_pt_obj_with_fd(): %s\n",
                 safe_strerror(k));
-        ret = sg_convert_errno(ENOMEM);
-        goto err_out;
+        ret = sg_convert_errno(k);
+        goto fini;
     }
 
-one_more_time:
-    /* Ignore the above check and do what has been asked on command line */
-    is_nvme = pt_device_is_nvme(ptvp);
-    if (dev2_name && vb)
-        pr2serr("Device: %s seems to be %s\n", device_name,
-                is_nvme ? "NVMe" : "SCSI or ATA");
-    resid = 0;
-    if (do_dev_id_vpd || (! is_nvme)) {
-        if (do_dev_id_vpd)
-            ret = sg_scsi_inquiry(ptvp, true /* evpd */, VPD_DEVICE_ID,
-                                  al_buff, maxlen, timeout_ms / 1000, &resid,
-                                  true, vb);
-        else    /* do a standard INQUIRY */
-            ret = sg_scsi_inquiry(ptvp, false /* evpd */, 0, al_buff, maxlen,
-                                  timeout_ms / 1000, &resid, true, vb);
-        if (ret) {
-            pr2serr("SCSI INQUIRY to SNTL for device id vpage failed, "
-                    "try again with -vv option added\n");
-            goto err_out;
-        }
-        len = pg_sz - resid;
-        if (len < 4) {
-            pr2serr("Something wrong with data-in, len=%d (resid=%d)\n",
-                    len, resid);
-            goto err_out;
-        }
-        if (do_dev_id_vpd) {
-            for (off = -1, bp = al_buff + 4, ln = len - 4;
-                 0 == sg_vpd_dev_id_iter(bp, ln, &off, -1, -1, -1); ) {
-                n = sg_get_designation_descriptor_str("    ", bp + off,
-                        bp[off + 3] + 4, do_long, do_long > 1, sizeof(b), b);
-                if (n > 0)
-                    printf("%s", b);
+    /* Loop over all given DEVICEs */
+    for (q = 0; q < MAX_DEV_NAMES; ++q) {
+        is_nvme = pt_device_is_nvme(ptvp);
+        if ((curr_dev_name_pos > 1) && vb)
+            pr2serr("Device %d [%s] seems to be %s\n", q + 1, device_name,
+                    is_nvme ? "NVMe" : "SCSI or ATA");
+        resid = 0;
+        if (do_dev_id_vpd || (! is_nvme)) {
+            if (do_dev_id_vpd)
+                ret = sg_scsi_inquiry(ptvp, true /* evpd */, VPD_DEVICE_ID,
+                                      al_buff, maxlen, timeout_ms / 1000,
+                                      &resid, true, vb);
+            else    /* do a standard INQUIRY */
+                ret = sg_scsi_inquiry(ptvp, false /* evpd */, 0, al_buff,
+                                      maxlen, timeout_ms / 1000, &resid, true,
+                                      vb);
+            if (ret) {
+                pr2serr("SCSI INQUIRY(%s) failed\n",
+                        do_dev_id_vpd ? "dev_id" : "standard");
+                goto fini;
             }
-        } else
-            std_inq_decode(al_buff, len, vb);
-        clear_scsi_pt_obj(ptvp);
-    } else { /* NVME Identify or Device self-test */
-        bool this_ctl = false;
-        uint16_t sct_sc;
-        uint32_t max_nsid;
-        struct sg_nvme_passthru_cmd n_cmd;
-
-        if ((! do_self_test) && (NVME_NSID_ALL == nsid))
-            do_all = true;
-        num = 1;        /* preliminary, may alter */
-        for (k = 0; k < num; ++k) {
-            bp = (uint8_t *)&n_cmd;
-            memset(bp, 0, sizeof(n_cmd));
-            if (do_self_test) {
-                n_cmd.opcode = 0x14;   /* Device self-test */
-                n_cmd.nsid = nsid;
-                n_cmd.cdw10 = self_test;
-                if (0 == k) {
-                    if (0 == nsid)
-                        printf("Starting Device self-test for controller "
-                               "only\n");
-                    else if (do_all)
-                        printf("Starting Device self-test for controller and "
-                               "all namespaces\n");
-                    else
-                        printf("Starting Device self-test for controller and "
-                               "namespace %u\n", nsid);
+            len = maxlen - resid;
+            if (len < 4) {
+                pr2serr("Something wrong with data-in, len=%d (resid=%d)\n",
+                        len, resid);
+                goto fini;
+            }
+            if (do_dev_id_vpd) {
+                printf("    Device %d [%s] identification VPD:\n", q + 1,
+                       device_name);
+                for (off = -1, bp = al_buff + 4, ln = len - 4;
+                     0 == sg_vpd_dev_id_iter(bp, ln, &off, -1, -1, -1); ) {
+                    n = sg_get_designation_descriptor_str("    ", bp + off,
+                                                bp[off + 3] + 4, do_long,
+                                                do_long > 1, sizeof(b), b);
+                    if (n > 0)
+                        printf("%s", b);
                 }
-            } else {    /* one or more variants of Identify */
-                n_cmd.opcode = 0x6;   /* Identify */
-                dn_nsid = get_pt_nvme_nsid(ptvp);
-                if ((0 == k) && (do_id_ctl || (0 == nsid) || do_all)) {
-                    n_cmd.cdw10 = 0x1;      /* Controller */
-                    this_ctl = true;
-                } else {
-                    n_cmd.cdw10 = 0x0;      /* Namespace */
-                    if (do_all)
-                        n_cmd.nsid = k;
-                    else if (nsid > 0)
-                        n_cmd.nsid = nsid;
-                    else if (dn_nsid > 0)
-                        n_cmd.nsid = dn_nsid;
-                    else
-                        break;
-                    this_ctl = false;
-                }
-                sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)al_buff,
-                                      bp + SG_NVME_PT_ADDR);
-                sg_put_unaligned_le32(pg_sz, bp + SG_NVME_PT_DATA_LEN);
+            } else {
+                snprintf(b, sizeof(b), "    Device %d [%s] Standard INQUIRY:",
+                         q + 1, device_name);
+                std_inq_decode(b, al_buff, len, vb);
             }
-            ret = nvme_din_admin_cmd(ptvp, (const uint8_t *)&n_cmd,
-                                     sizeof(n_cmd), cmd_name, al_buff, pg_sz,
-                                     timeout_ms, &sct_sc, vb);
-            if (ret < 0)
-                goto err_out;
-            if (sct_sc > 0) {
-                sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b);
-                pr2serr("%s: %s\n", cmd_name, b);
-                flagged = true;
-                goto err_out;
-            }
-            if (0x6 == n_cmd.opcode) {
-                if (this_ctl) {
-                    show_nvme_id_ctl(al_buff, device_name, do_long,
-                                     &max_nsid);
-                    num = max_nsid + 1;
-                } else
-                    show_nvme_id_ns(al_buff, n_cmd.nsid, device_name,
-                                    do_long);
-            }
-
             clear_scsi_pt_obj(ptvp);
-            if (do_self_test)
-                break;
-            if (do_id_ctl)
-                break;
-        }       /* end of for loop */
-    }
-    ret = 0;
+        } else { /* NVME Identify or Device self-test */
+            bool this_ctl = false;
+            uint16_t sct_sc = 0;
+            uint32_t max_nsid;
+            struct sg_nvme_passthru_cmd n_cmd;
 
-err_out:
-    if ((0 == ret) && dev2_name && (! doing_second)) {
-        doing_second = true;
-        res = sg_cmds_close_device(sg_fd);
-        if (res < 0) {
-            pr2serr("close error: %s\n", safe_strerror(-res));
-            ret = sg_convert_errno(-res);
-            goto err_out;
+            if ((! do_self_test) && (NVME_NSID_ALL == nsid))
+                do_all = true;
+            num = 1;        /* preliminary, may alter */
+            for (k = 0; k < num; ++k) {
+                bp = (uint8_t *)&n_cmd;
+                memset(bp, 0, sizeof(n_cmd));
+                if (do_self_test) {
+                    n_cmd.opcode = 0x14;   /* Device self-test */
+                    n_cmd.nsid = nsid;
+                    n_cmd.cdw10 = self_test;
+                    if (0 == k) {
+                        if (0 == nsid)
+                            printf("Starting Device self-test for controller "
+                                   "only\n");
+                        else if (do_all)
+                            printf("Starting Device self-test for controller "
+                                   "and all namespaces\n");
+                        else
+                            printf("Starting Device self-test for controller "
+                                   "and namespace %u\n", nsid);
+                    }
+                } else {    /* one or more variants of Identify */
+                    n_cmd.opcode = 0x6;   /* Identify */
+                    dn_nsid = get_pt_nvme_nsid(ptvp);
+                    if ((0 == k) && (do_id_ctl || (0 == nsid) || do_all)) {
+                        n_cmd.cdw10 = 0x1;      /* Controller */
+                        this_ctl = true;
+                    } else {
+                        n_cmd.cdw10 = 0x0;      /* Namespace */
+                        if (do_all)
+                            n_cmd.nsid = k;
+                        else if (nsid > 0)
+                            n_cmd.nsid = nsid;
+                        else if (dn_nsid > 0)
+                            n_cmd.nsid = dn_nsid;
+                        else
+                            break;
+                        this_ctl = false;
+                    }
+                    sg_put_unaligned_le64((uint64_t)(sg_uintptr_t)al_buff,
+                                          bp + SG_NVME_PT_ADDR);
+                    sg_put_unaligned_le32(pg_sz, bp + SG_NVME_PT_DATA_LEN);
+                }
+                ret = nvme_din_admin_cmd(ptvp, (const uint8_t *)&n_cmd,
+                                         sizeof(n_cmd), cmd_name, al_buff,
+                                         pg_sz, timeout_ms, &sct_sc, vb);
+                if (sct_sc || (SG_LIB_NVME_STATUS == ret)) {
+                    sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b);
+                    pr2serr("%s: %s\n", cmd_name, b);
+                        flagged = true;
+                    goto fini;
+                }
+                if (ret)
+                    goto fini;
+                if (0x6 == n_cmd.opcode) {
+                    if (this_ctl) {
+                        show_nvme_id_ctl(al_buff, device_name, do_long,
+                                         &max_nsid);
+                        num = max_nsid + 1;
+                    } else
+                        show_nvme_id_ns(al_buff, n_cmd.nsid, device_name,
+                                        do_long);
+                }
+
+                clear_scsi_pt_obj(ptvp);
+                if (do_self_test)
+                    break;
+                if (do_id_ctl)
+                    break;
+            }       /* end of for loop */
         }
-        device_name = dev2_name;
+        ret = 0;
+
+        if (sg_fd >= 0) {
+            res = sg_cmds_close_device(sg_fd);
+            if (res < 0) {
+                pr2serr("close error: %s\n", safe_strerror(-res));
+                ret = sg_convert_errno(-res);
+                break;
+            }
+            sg_fd = -1;
+        }
+        if (ret)
+            break;
+        if (curr_dev_name_pos < next_dev_name_pos)
+            device_name = dev_name_arr[curr_dev_name_pos++];
+        else
+            break;
+        if (NULL == device_name) {
+            pr2serr("Unexpected NULL device name at pos=%d\n",
+                    curr_dev_name_pos - 1);
+            ret = sg_convert_errno(EINVAL);
+            flagged = true;
+            break;
+        }
         sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
         if (sg_fd < 0) {
             pr2serr(ME "open error: %s: %s\n", device_name,
                     safe_strerror(-sg_fd));
-            ret = SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-sg_fd);
             flagged = true;
-            goto err_out;
+            break;
         }
         k = set_pt_file_handle(ptvp, sg_fd, vb);
         if (k) {
             ret = sg_convert_errno(k);
             pr2serr("set_pt_file_handle() failed: %s\n", safe_strerror(k));
-            goto err_out;
+            flagged = true;
+            break;
         }
         printf("\n");
-        goto one_more_time;
-    }
+    }   /* end of "q" outer for loop */
+fini:
     if (ptvp) {
         destruct_scsi_pt_obj(ptvp);
         ptvp = NULL;
     }
     if (free_al_buff)
         free(free_al_buff);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                return SG_LIB_FILE_ERROR;
+        }
     }
     if (ret && (0 == vb) && (! flagged)) {
-        if (SG_LIB_CAT_INVALID_OP == ret)
-            pr2serr("%s command not supported\n", cmd_name);
-        else if (SG_LIB_NVME_STATUS == ret)
-            pr2serr("%s completed with a NVME non-zero status\n", cmd_name);
-        else if (ret > 0)
-            pr2serr("%s, exit status %d\n", cmd_name, ret);
-        else if (ret < 0)
-            pr2serr("Some error occurred\n");
+        if (! sg_if_can2stderr("", ret))
+            pr2serr("Some error occurred [%d]\n", ret);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

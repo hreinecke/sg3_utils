@@ -90,20 +90,20 @@ int get_pt_file_handle(const struct sg_pt_base * objp);
 void clear_scsi_pt_obj(struct sg_pt_base * objp);
 
 /* Set the CDB (command descriptor block) */
-void set_scsi_pt_cdb(struct sg_pt_base * objp, const unsigned char * cdb,
+void set_scsi_pt_cdb(struct sg_pt_base * objp, const uint8_t * cdb,
                      int cdb_len);
 /* Set the sense buffer and the maximum length that it can handle */
-void set_scsi_pt_sense(struct sg_pt_base * objp, unsigned char * sense,
+void set_scsi_pt_sense(struct sg_pt_base * objp, uint8_t * sense,
                        int max_sense_len);
 /* Set a pointer and length to be used for data transferred from device */
 void set_scsi_pt_data_in(struct sg_pt_base * objp,   /* from device */
-                         unsigned char * dxferp, int dxfer_ilen);
+                         uint8_t * dxferp, int dxfer_ilen);
 /* Set a pointer and length to be used for data transferred to device */
 void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
-                          const unsigned char * dxferp, int dxfer_olen);
+                          const uint8_t * dxferp, int dxfer_olen);
 /* Set a pointer and length to be used for metadata transferred to
  * (out_true=true) or from (out_true-false) device */
-void set_pt_metadata_xfer(struct sg_pt_base * objp, unsigned char * mdxferp,
+void set_pt_metadata_xfer(struct sg_pt_base * objp, uint8_t * mdxferp,
                           uint32_t mdxfer_len, bool out_true);
 /* The following "set_"s implementations may be dummies */
 void set_scsi_pt_packet_id(struct sg_pt_base * objp, int pack_id);

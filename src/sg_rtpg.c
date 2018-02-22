@@ -31,7 +31,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.24 20180118";
+static const char * version_str = "1.25 20180219";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -146,8 +146,8 @@ int main(int argc, char * argv[])
     int sg_fd, k, j, off, res, c, report_len, tgt_port_count;
     int ret = 0;
     int verbose = 0;
-    unsigned char reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
-    unsigned char * bp;
+    uint8_t reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
+    uint8_t * bp;
     const char * device_name = NULL;
 
     while (1) {

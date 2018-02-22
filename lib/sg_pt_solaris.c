@@ -147,7 +147,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 }
 
 void
-set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
+set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
                 int cdb_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
@@ -159,7 +159,7 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
 }
 
 void
-set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
+set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
                   int max_sense_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
@@ -174,7 +174,7 @@ set_scsi_pt_sense(struct sg_pt_base * vp, unsigned char * sense,
 
 /* from device */
 void
-set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
+set_scsi_pt_data_in(struct sg_pt_base * vp, uint8_t * dxferp,
                     int dxfer_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
@@ -190,7 +190,7 @@ set_scsi_pt_data_in(struct sg_pt_base * vp, unsigned char * dxferp,
 
 /* to device */
 void
-set_scsi_pt_data_out(struct sg_pt_base * vp, const unsigned char * dxferp,
+set_scsi_pt_data_out(struct sg_pt_base * vp, const uint8_t * dxferp,
                      int dxfer_len)
 {
     struct sg_pt_solaris_scsi * ptp = &vp->impl;

@@ -20,7 +20,7 @@
  * in this case) are transferred to or from the sg device in a single SCSI
  * command.
  *
- * This version is designed for the linux kernel 2.4, 2.6 and 3 series.
+ * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
  */
 
 #define _XOPEN_SOURCE 600
@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.61 20180217";
+static const char * version_str = "5.62 20180219";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -150,11 +150,11 @@ typedef struct request_element
     int outfd;
     int64_t blk;
     int num_blks;
-    unsigned char * buffp;
-    unsigned char * alloc_bp;
+    uint8_t * buffp;
+    uint8_t * alloc_bp;
     struct sg_io_hdr io_hdr;
-    unsigned char cmd[MAX_SCSI_CDBSZ];
-    unsigned char sb[SENSE_BUFF_LEN];
+    uint8_t cmd[MAX_SCSI_CDBSZ];
+    uint8_t sb[SENSE_BUFF_LEN];
     int bs;
     int dio_incomplete_count;
     int resid;
@@ -411,7 +411,7 @@ static int
 scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int res;
-    unsigned char rcBuff[RCAP16_REPLY_LEN];
+    uint8_t rcBuff[RCAP16_REPLY_LEN];
 
     res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, false, 0);
     if (0 != res)
@@ -720,7 +720,7 @@ normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 }
 
 static int
-sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
+sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
                   int64_t start_block, bool write_true, bool fua, bool dpo)
 {
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -735,10 +735,10 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
     switch (cdb_sz) {
     case 6:
         sz_ind = 0;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
-        cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
+        cdbp[4] = (256 == blocks) ? 0 : (uint8_t)blocks;
         if (blocks > 256) {
             pr2serr(ME "for 6 byte commands, maximum number of blocks is "
                     "256\n");
@@ -757,7 +757,7 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         break;
     case 10:
         sz_ind = 1;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
         sg_put_unaligned_be16((uint16_t)blocks, cdbp + 7);
@@ -769,14 +769,14 @@ sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz, unsigned int blocks,
         break;
     case 12:
         sz_ind = 2;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 6);
         break;
     case 16:
         sz_ind = 3;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be64((uint64_t)start_block, cdbp + 2);
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);

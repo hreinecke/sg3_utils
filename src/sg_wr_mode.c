@@ -30,7 +30,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.21 20180119";
+static const char * version_str = "1.22 20180219";
 
 #define ME "sg_wr_mode: "
 
@@ -98,7 +98,7 @@ static void usage()
  * quoted. For stdin (indicated by *inp=='-') there should be either
  * one entry per line, a comma separated list or space separated list.
  * Returns 0 if ok, or 1 if error. */
-static int build_mode_page(const char * inp, unsigned char * mp_arr,
+static int build_mode_page(const char * inp, uint8_t * mp_arr,
                            int * mp_arr_len, int max_arr_len)
 {
     int in_len, k, j, m;
@@ -245,7 +245,7 @@ static int build_mode_page(const char * inp, unsigned char * mp_arr,
 /* Read hex numbers from command line (comma separated list).
  * Can also be (single) space separated list but needs to be quoted on the
  * command line. Returns 0 if ok, or 1 if error. */
-static int build_mask(const char * inp, unsigned char * mask_arr,
+static int build_mask(const char * inp, uint8_t * mask_arr,
                       int * mask_arr_len, int max_arr_len)
 {
     int in_len, k;
@@ -319,9 +319,9 @@ int main(int argc, char * argv[])
     int read_in_len = 0;
     unsigned u, uu;
     const char * device_name = NULL;
-    unsigned char read_in[MX_ALLOC_LEN];
-    unsigned char mask_in[MX_ALLOC_LEN];
-    unsigned char ref_md[MX_ALLOC_LEN];
+    uint8_t read_in[MX_ALLOC_LEN];
+    uint8_t mask_in[MX_ALLOC_LEN];
+    uint8_t ref_md[MX_ALLOC_LEN];
     char ebuff[EBUFF_SZ];
     char errStr[128];
     char b[80];

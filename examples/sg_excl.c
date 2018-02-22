@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -14,7 +15,7 @@
    executing a SCSI INQUIRY command and a
    TEST UNIT READY command using the SCSI generic (sg) driver
 
-*  Copyright (C) 2003-2013 D. Gilbert
+*  Copyright (C) 2003-2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -22,7 +23,7 @@
 
    Invocation: sg_excl [-x] <sg_device>
 
-   Version 3.59 (20160528)
+   Version 3.60 (20180220)
 
 6 byte INQUIRY command:
 [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -43,15 +44,13 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok /*, sg_fd2 */;
-    unsigned char inq_cdb [INQ_CMD_LEN] =
-                                {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char tur_cdb [TUR_CMD_LEN] =
-                                {0x00, 0, 0, 0, 0, 0};
-    unsigned char inqBuff[INQ_REPLY_LEN];
+    uint8_t inq_cdb [INQ_CMD_LEN] = {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
+    uint8_t tur_cdb [TUR_CMD_LEN] = {0x00, 0, 0, 0, 0, 0};
+    uint8_t inqBuff[INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char sense_buffer[32];
+    uint8_t sense_buffer[32];
     int do_extra = 0;
 
     for (k = 1; k < argc; ++k) {

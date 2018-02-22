@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.39 20180218";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.40 20180219";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1428,7 +1428,7 @@ static const char * constituent_type_arr[] = {
 
 /* VPD_DEVICE_CONSTITUENTS 0x8b */
 static void
-decode_dev_const_vpd(const uint8_t * buff, int len, struct opts_t * op)
+decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op)
 {
     int k, j, res, bump, csd_len;
     uint16_t constit_type;
@@ -1447,6 +1447,8 @@ decode_dev_const_vpd(const uint8_t * buff, int len, struct opts_t * op)
     len -= 4;
     bp = buff + 4;
     for (k = 0, j = 0; k < len; k += bump, bp += bump, ++j) {
+        if (j > 0)
+            printf("\n");
         printf("  Constituent descriptor %d:\n", j + 1);
         if ((k + 36) > len) {
             pr2serr("%s, short descriptor length=36, left=%d\n", dcp,
@@ -1478,21 +1480,21 @@ decode_dev_const_vpd(const uint8_t * buff, int len, struct opts_t * op)
             return;
         }
         if (csd_len > 0) {
-            int m, cs_bump;
+            int m, q, cs_bump;
             uint8_t cs_type;
             uint8_t cs_len;
             const uint8_t * cs_bp;
 
             printf("    Constituent specific descriptors:\n");
-            for (m = 0, cs_bp = bp + 36; m < csd_len;
-                 m += cs_bump, cs_bp += cs_bump) {
+            for (m = 0, q = 0, cs_bp = bp + 36; m < csd_len;
+                 m += cs_bump, ++q, cs_bp += cs_bump) {
                 cs_type = cs_bp[0];
                 cs_len = sg_get_unaligned_be16(cs_bp + 2);
                 cs_bump = cs_len + 4;
                 if (1 == cs_type) {     /* VPD page */
                     int off = cs_bp + 4 - buff;
 
-                    printf("      Constituent VPD page:\n");
+                    printf("      Constituent VPD page %d:\n", q + 1);
                     /* SPC-5 says these shall _not_ themselves be Device
                      *  Constituent VPD pages. So no infinite recursion. */
                     res = svpd_decode_t10(-1, op, 0, off);
@@ -3118,7 +3120,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
             if (op->do_raw)
                 dStrRaw(rp, len);
             else
-                decode_dev_const_vpd(rp, len, op);
+                decode_dev_constit_vpd(rp, len, op);
             return 0;
         }
         break;

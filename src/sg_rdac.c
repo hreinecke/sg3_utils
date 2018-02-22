@@ -3,7 +3,7 @@
  *
  * Retrieve / set RDAC options.
  *
- * Copyright (C) 2006-2017 Hannes Reinecke <hare@suse.de>
+ * Copyright (C) 2006-2018 Hannes Reinecke <hare@suse.de>
  *
  * Based on sg_modes.c and sg_emc_trespass.c; credits from there apply.
  *
@@ -23,22 +23,23 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.15 20171030";
+static const char * version_str = "1.16 20180219";
 
-unsigned char mode6_hdr[] = {
+uint8_t mode6_hdr[] = {
     0x75, /* Length */
     0, /* medium */
     0, /* params */
     8, /* Block descriptor length */
 };
 
-unsigned char mode10_hdr[] = {
+uint8_t mode10_hdr[] = {
     0x01, 0x18, /* Length */
     0, /* medium */
     0, /* params */
@@ -46,7 +47,7 @@ unsigned char mode10_hdr[] = {
     0, 0, /* block descriptor length */
 };
 
-unsigned char block_descriptor[] = {
+uint8_t block_descriptor[] = {
     0, /* Density code */
     0, 0, 0, /* Number of blocks */
     0, /* Reserved */
@@ -54,37 +55,37 @@ unsigned char block_descriptor[] = {
 };
 
 struct rdac_page_common {
-    unsigned char  current_serial[16];
-    unsigned char  alternate_serial[16];
-    unsigned char  current_mode_msb;
-    unsigned char  current_mode_lsb;
-    unsigned char  alternate_mode_msb;
-    unsigned char  alternate_mode_lsb;
-    unsigned char  quiescence;
-    unsigned char  options;
+    uint8_t  current_serial[16];
+    uint8_t  alternate_serial[16];
+    uint8_t  current_mode_msb;
+    uint8_t  current_mode_lsb;
+    uint8_t  alternate_mode_msb;
+    uint8_t  alternate_mode_lsb;
+    uint8_t  quiescence;
+    uint8_t  options;
 };
 
 struct rdac_legacy_page {
-    unsigned char  page_code;
-    unsigned char  page_length;
+    uint8_t  page_code;
+    uint8_t  page_length;
     struct rdac_page_common attr;
-    unsigned char  lun_table[32];
-    unsigned char  lun_table_exp[32];
+    uint8_t  lun_table[32];
+    uint8_t  lun_table_exp[32];
     unsigned short reserved;
 };
 
 struct rdac_expanded_page {
-    unsigned char  page_code;
-    unsigned char  subpage_code;
-    unsigned char  page_length[2];
+    uint8_t  page_code;
+    uint8_t  subpage_code;
+    uint8_t  page_length[2];
     struct rdac_page_common attr;
-    unsigned char  lun_table[256];
-    unsigned char  reserved[2];
+    uint8_t  lun_table[256];
+    uint8_t  reserved[2];
 };
 
 static int do_verbose = 0;
 
-static void dump_mode_page( unsigned char *page, int len )
+static void dump_mode_page( uint8_t *page, int len )
 {
         int i, k;
 
@@ -119,7 +120,7 @@ static int fail_all_paths(int fd, bool use_6_byte)
         struct rdac_legacy_page *rdac_page;
         struct rdac_expanded_page *rdac_page_exp;
         struct rdac_page_common *rdac_common = NULL;
-        unsigned char fail_paths_pg[308];
+        uint8_t fail_paths_pg[308];
 
         int res;
         char b[80];
@@ -177,7 +178,7 @@ static int fail_this_path(int fd, int lun, bool use_6_byte)
         struct rdac_legacy_page *rdac_page;
         struct rdac_expanded_page *rdac_page_exp;
         struct rdac_page_common *rdac_common = NULL;
-        unsigned char fail_paths_pg[308];
+        uint8_t fail_paths_pg[308];
         char b[80];
 
         if (use_6_byte) {
@@ -243,10 +244,10 @@ static int fail_this_path(int fd, int lun, bool use_6_byte)
         return res;
 }
 
-static void print_rdac_mode(unsigned char *ptr, bool exp_subpg)
+static void print_rdac_mode(uint8_t *ptr, bool exp_subpg)
 {
         int i, k, bd_len, lun_table_len;
-        unsigned char * lun_table = NULL;
+        uint8_t * lun_table = NULL;
         struct rdac_legacy_page *legacy;
         struct rdac_expanded_page *expanded;
         struct rdac_page_common *rdac_ptr = NULL;
@@ -392,7 +393,7 @@ int main(int argc, char * argv[])
         int ret = 0;
         char **argptr;
         char * file_name = 0;
-        unsigned char rsp_buff[MX_ALLOC_LEN];
+        uint8_t rsp_buff[MX_ALLOC_LEN];
 
         if (argc < 2) {
                 usage ();

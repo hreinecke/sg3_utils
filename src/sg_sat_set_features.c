@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2017 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -18,6 +18,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -49,7 +50,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.15 20171107";
+static const char * version_str = "1.16 20180219";
 
 static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
@@ -121,12 +122,12 @@ do_set_features(int sg_fd, int feature, int count, uint64_t lba,
     int resid = 0;
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    unsigned char sense_buffer[64];
-    unsigned char ata_return_desc[16];
-    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
+    uint8_t sense_buffer[64];
+    uint8_t ata_return_desc[16];
+    uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
+    uint8_t apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
 

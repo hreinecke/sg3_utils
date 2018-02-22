@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.36 20180118";
+static const char * version_str = "1.37 20180219";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -125,7 +125,7 @@ usage()
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
-decode_lun(const char * leadin, const unsigned char * lunp, bool lu_cong,
+decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
            int do_hex, int verbose)
 {
     bool next_level, admin_lu_cong;
@@ -320,7 +320,7 @@ decode_lun(const char * leadin, const unsigned char * lunp, bool lu_cong,
 
 #ifdef SG_LIB_LINUX
 static void
-linux2t10_lun(uint64_t linux_lun, unsigned char t10_lun[])
+linux2t10_lun(uint64_t linux_lun, uint8_t t10_lun[])
 {
     int k;
 
@@ -329,10 +329,10 @@ linux2t10_lun(uint64_t linux_lun, unsigned char t10_lun[])
 }
 
 static uint64_t
-t10_2linux_lun(const unsigned char t10_lun[])
+t10_2linux_lun(const uint8_t t10_lun[])
 {
     int k;
-    const unsigned char * cp;
+    const uint8_t * cp;
     uint64_t res;
 
     res = sg_get_unaligned_be16(t10_lun + 6);
@@ -379,8 +379,8 @@ main(int argc, char * argv[])
     const char * test_arg = NULL;
     const char * device_name = NULL;
     const char * cp;
-    unsigned char * reportLunsBuff = NULL;
-    unsigned char lun_arr[8];
+    uint8_t * reportLunsBuff = NULL;
+    uint8_t lun_arr[8];
     struct sg_simple_inquiry_resp sir;
 
     while (1) {
@@ -593,7 +593,7 @@ main(int argc, char * argv[])
 
     if (0 == maxlen)
         maxlen = DEF_RLUNS_BUFF_LEN;
-    reportLunsBuff = (unsigned char *)calloc(1, maxlen);
+    reportLunsBuff = (uint8_t *)calloc(1, maxlen);
     if (NULL == reportLunsBuff) {
         pr2serr("unable to malloc %d bytes\n", maxlen);
         return SG_LIB_CAT_OTHER;

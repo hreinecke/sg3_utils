@@ -23,6 +23,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
@@ -30,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.06 20180210";
+static const char * version_str = "1.07 20180219";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -172,8 +173,8 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
 {
     bool immed;
     int k, ret, res, sense_cat, timeout;
-    unsigned char san_cdb[SANITIZE_OP_LEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t san_cdb[SANITIZE_OP_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (op->early || op->wait)
@@ -224,7 +225,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     }
     set_scsi_pt_cdb(ptvp, san_cdb, sizeof(san_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)param_lstp, param_lst_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)param_lstp, param_lst_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout, op->verbose);
     ret = sg_cmds_process_resp(ptvp, "Sanitize", res, SG_NO_DATA_IN, sense_b,
                                true /*noisy */, op->verbose, &sense_cat);
@@ -267,10 +268,10 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
 #define TPROTO_ISCSI 5
 
 static char *
-get_lu_name(const unsigned char * bp, int u_len, char * b, int b_len)
+get_lu_name(const uint8_t * bp, int u_len, char * b, int b_len)
 {
     int len, off, sns_dlen, dlen, k;
-    unsigned char u_sns[512];
+    uint8_t u_sns[512];
     char * cp;
 
     len = u_len - 4;
@@ -326,10 +327,10 @@ get_lu_name(const unsigned char * bp, int u_len, char * b, int b_len)
 #define VPD_DEVICE_ID 0x83
 
 static int
-print_dev_id(int fd, unsigned char * sinq_resp, int max_rlen, int verbose)
+print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen, int verbose)
 {
     int res, k, n, verb, pdt, has_sn, has_di;
-    unsigned char b[256];
+    uint8_t b[256];
     char a[256];
     char pdt_name[64];
 
@@ -437,12 +438,12 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
-    unsigned char rsBuff[DEF_REQS_RESP_LEN];
-    unsigned char * wBuff = NULL;
+    uint8_t rsBuff[DEF_REQS_RESP_LEN];
+    uint8_t * wBuff = NULL;
     struct opts_t opts;
     struct opts_t * op;
     struct stat a_stat;
-    unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
+    uint8_t inq_resp[SAFE_STD_INQ_RESP_LEN];
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -615,7 +616,7 @@ main(int argc, char * argv[])
 
     if (op->overwrite) {
         param_lst_len = op->ipl + 4;
-        wBuff = (unsigned char*)calloc(op->ipl + 4, 1);
+        wBuff = (uint8_t*)calloc(op->ipl + 4, 1);
         if (NULL == wBuff) {
             pr2serr("unable to allocate %d bytes of memory with calloc()\n",
                     op->ipl + 4);

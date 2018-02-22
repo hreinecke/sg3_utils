@@ -32,7 +32,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.30 20180118";
+static const char * version_str = "0.31 20180219";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -73,7 +73,7 @@ dStrRaw(const uint8_t * str, int len)
 
 /* Buffer ID 0x0: Read Enclosure Configuration (mandatory) */
 static int
-read_safte_configuration(int sg_fd, unsigned char *rb_buff,
+read_safte_configuration(int sg_fd, uint8_t *rb_buff,
                          unsigned int rb_len, int verbose)
 {
     int res;
@@ -129,11 +129,11 @@ do_safte_encl_status(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res, i, offset;
     unsigned int rb_len;
-    unsigned char *rb_buff;
+    uint8_t *rb_buff;
 
     rb_len = safte_cfg.fans + safte_cfg.psupplies + safte_cfg.slots +
         safte_cfg.temps + 5 + safte_cfg.vendor_specific;
-    rb_buff = (unsigned char *)malloc(rb_len);
+    rb_buff = (uint8_t *)malloc(rb_len);
 
 
     if (verbose > 1)
@@ -271,11 +271,11 @@ do_safte_usage_statistics(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res;
     unsigned int rb_len;
-    unsigned char *rb_buff;
+    uint8_t *rb_buff;
     unsigned int minutes;
 
     rb_len = 16 + safte_cfg.vendor_specific;
-    rb_buff = (unsigned char *)malloc(rb_len);
+    rb_buff = (uint8_t *)malloc(rb_len);
 
     if (verbose > 1)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=2 to read "
@@ -317,10 +317,10 @@ do_safte_slot_insertions(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res, i;
     unsigned int rb_len;
-    unsigned char *rb_buff, slot_status;
+    uint8_t *rb_buff, slot_status;
 
     rb_len = safte_cfg.slots * 2;
-    rb_buff = (unsigned char *)malloc(rb_len);
+    rb_buff = (uint8_t *)malloc(rb_len);
 
     if (verbose > 1)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=3 to read "
@@ -361,10 +361,10 @@ do_safte_slot_status(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res, i;
     unsigned int rb_len;
-    unsigned char *rb_buff, slot_status;
+    uint8_t *rb_buff, slot_status;
 
     rb_len = safte_cfg.slots * 4;
-    rb_buff = (unsigned char *)malloc(rb_len);
+    rb_buff = (uint8_t *)malloc(rb_len);
 
     if (verbose > 1)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=4 to read "
@@ -410,10 +410,10 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
 {
     int res;
     unsigned int rb_len;
-    unsigned char *rb_buff;
+    uint8_t *rb_buff;
 
     rb_len = 16;
-    rb_buff = (unsigned char *)malloc(rb_len);
+    rb_buff = (uint8_t *)malloc(rb_len);
 
     if (verbose > 1)
         pr2serr("Use READ BUFFER,mode=vendor_specific,buff_id=5 to read "
@@ -518,7 +518,7 @@ main(int argc, char * argv[])
     int res = SG_LIB_CAT_OTHER;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
-    unsigned char *rb_buff;
+    uint8_t *rb_buff;
     bool do_config = false;
     bool do_status = false;
     bool do_slots = false;
@@ -634,7 +634,7 @@ main(int argc, char * argv[])
         }
     }
 
-    rb_buff = (unsigned char *)malloc(buf_capacity);
+    rb_buff = (uint8_t *)malloc(buf_capacity);
     if (!rb_buff)
         goto err_out;
 
