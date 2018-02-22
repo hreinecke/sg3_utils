@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.21 20180210";
+static const char * version_str = "1.22 20180219";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -312,7 +312,7 @@ out_err_no_usage:
 #define WRPROTECT_SHIFT (5)
 
 static int
-sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
+sg_build_scsi_cdb(uint8_t * cdbp, unsigned int blocks,
                   int64_t start_block, struct caw_flags flags)
 {
         memset(cdbp, 0, COMPARE_AND_WRITE_CDB_SIZE);
@@ -326,15 +326,15 @@ sg_build_scsi_cdb(unsigned char * cdbp, unsigned int blocks,
                 cdbp[1] |= FLAG_FUA_NV;
         sg_put_unaligned_be64((uint64_t)start_block, cdbp + 2);
         /* cdbp[10-12] are reserved */
-        cdbp[13] = (unsigned char)(blocks & 0xff);
-        cdbp[14] = (unsigned char)(flags.group & 0x1f);
+        cdbp[13] = (uint8_t)(blocks & 0xff);
+        cdbp[14] = (uint8_t)(flags.group & 0x1f);
         return 0;
 }
 
 /* Returns 0 for success, SG_LIB_CAT_MISCOMPARE if compare fails,
  * various other SG_LIB_CAT_*, otherwise -1 . */
 static int
-sg_ll_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
+sg_ll_compare_and_write(int sg_fd, uint8_t * buff, int blocks,
                         int64_t lba, int xfer_len, struct caw_flags flags,
                         bool noisy, int verbose)
 {
@@ -342,8 +342,8 @@ sg_ll_compare_and_write(int sg_fd, unsigned char * buff, int blocks,
         int k, sense_cat, slen, res, ret;
         uint64_t ull = 0;
         struct sg_pt_base * ptvp;
-        unsigned char cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
-        unsigned char sense_b[SENSE_BUFF_LEN];
+        uint8_t cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
+        uint8_t sense_b[SENSE_BUFF_LEN];
 
         if (sg_build_scsi_cdb(cawCmd, blocks, lba, flags)) {
                 pr2serr(ME "bad cdb build, lba=0x%" PRIx64 ", blocks=%d\n",
@@ -461,7 +461,7 @@ main(int argc, char * argv[])
         int infd = -1;
         int wfd = -1;
         int devfd = -1;
-        unsigned char * wrkBuff = NULL;
+        uint8_t * wrkBuff = NULL;
         struct opts_t * op;
         struct opts_t opts;
 
@@ -507,7 +507,7 @@ main(int argc, char * argv[])
                 goto out;
         }
 
-        wrkBuff = (unsigned char *)malloc(op->xfer_len);
+        wrkBuff = (uint8_t *)malloc(op->xfer_len);
         if (0 == wrkBuff) {
                 pr2serr("Not enough user memory\n");
                 res = SG_LIB_CAT_OTHER;

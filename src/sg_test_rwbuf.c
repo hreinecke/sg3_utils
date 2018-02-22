@@ -37,13 +37,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.14 20180116";
+static const char * version_str = "1.15 20180219";
 
 #define BPI (signed)(sizeof(int))
 
@@ -62,7 +63,7 @@ static const char * version_str = "1.14 20180116";
 static int base = 0x12345678;
 static int buf_capacity = 0;
 static int buf_granul = 255;
-static unsigned char *cmpbuf = NULL;
+static uint8_t *cmpbuf = NULL;
 
 
 /* Options */
@@ -87,9 +88,9 @@ static struct option long_options[] = {
 static int
 find_out_about_buffer(int sg_fd)
 {
-        unsigned char rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        unsigned char rbBuff[RB_DESC_LEN];
-        unsigned char sense_buffer[32];
+        uint8_t rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        uint8_t rbBuff[RB_DESC_LEN];
+        uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
         int k, res;
 
@@ -137,7 +138,7 @@ find_out_about_buffer(int sg_fd)
         }
 
         buf_capacity = sg_get_unaligned_be24(rbBuff + 1);
-        buf_granul = (unsigned char)rbBuff[0];
+        buf_granul = (uint8_t)rbBuff[0];
 #if 0
         printf("READ BUFFER reports: %02x %02x %02x %02x\n",
                rbBuff[0], rbBuff[1], rbBuff[2], rbBuff[3]);
@@ -149,7 +150,7 @@ find_out_about_buffer(int sg_fd)
 }
 
 static int
-mymemcmp (unsigned char *bf1, unsigned char *bf2, int len)
+mymemcmp (uint8_t *bf1, uint8_t *bf2, int len)
 {
         int df;
         for (df = 0; df < len; df++)
@@ -170,7 +171,7 @@ do_checksum(int *buf, int len, bool quiet)
                 if (!quiet) printf ("sg_test_rwbuf: Checksum error (sz=%i):"
                                     " %08x\n", len, sum);
                 if (cmpbuf && !quiet) {
-                        int diff = mymemcmp (cmpbuf, (unsigned char*)buf,
+                        int diff = mymemcmp (cmpbuf, (uint8_t*)buf,
                                              len);
                         printf ("Differ at pos %i/%i:\n", diff, len);
                         for (i = 0; i < 24 && i+diff < len; i++)
@@ -178,7 +179,7 @@ do_checksum(int *buf, int len, bool quiet)
                         printf ("\n");
                         for (i = 0; i < 24 && i+diff < len; i++)
                                 printf (" %02x",
-                                        ((unsigned char*)buf)[i+diff]);
+                                        ((uint8_t*)buf)[i+diff]);
                         printf ("\n");
                 }
                 return 2222;
@@ -226,10 +227,10 @@ void do_fill_buffer (int *buf, int len)
 int read_buffer (int sg_fd, unsigned ssize)
 {
         int res, k;
-        unsigned char rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        uint8_t rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = ssize + addread;
-        unsigned char * rbBuff = (unsigned char *)malloc(bufSize);
-        unsigned char sense_buffer[32];
+        uint8_t * rbBuff = (uint8_t *)malloc(bufSize);
+        uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
 
         if (NULL == rbBuff)
@@ -285,10 +286,10 @@ int read_buffer (int sg_fd, unsigned ssize)
 
 int write_buffer (int sg_fd, unsigned ssize)
 {
-        unsigned char wb_cdb[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        uint8_t wb_cdb[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = ssize + addwrite;
-        unsigned char * wbBuff = (unsigned char *)malloc(bufSize);
-        unsigned char sense_buffer[32];
+        uint8_t * wbBuff = (uint8_t *)malloc(bufSize);
+        uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
         int k, res;
 
@@ -510,7 +511,7 @@ int main (int argc, char * argv[])
                 goto err_out;
         }
 
-        cmpbuf = (unsigned char *)malloc(size);
+        cmpbuf = (uint8_t *)malloc(size);
         for (k = 0; k < times; ++k) {
                 ret = write_buffer (sg_fd, size);
                 if (ret) {

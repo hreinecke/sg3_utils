@@ -34,7 +34,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.09 20180118";    /* sbc4r10 */
+static const char * version_str = "1.10 20180219";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -47,8 +47,8 @@ static const char * version_str = "1.09 20180118";    /* sbc4r10 */
 #define TPGS_STATE_OFFLINE 0xe          /* SPC-4 rev 9 */
 #define TPGS_STATE_TRANSITIONING 0xf
 
-static unsigned char referralBuff[DEF_REFER_BUFF_LEN];
-static unsigned char * referralBuffp = referralBuff;
+static uint8_t referralBuff[DEF_REFER_BUFF_LEN];
+static uint8_t * referralBuffp = referralBuff;
 
 static const char *decode_tpgs_state(const int st)
 {
@@ -133,7 +133,7 @@ dStrRaw(const uint8_t * str, int len)
  * -1 for error.
  */
 static int
-decode_referral_desc(const unsigned char * bp, int bytes)
+decode_referral_desc(const uint8_t * bp, int bytes)
 {
     int j, n;
     uint64_t first, last;
@@ -181,7 +181,7 @@ main(int argc, char * argv[])
     int64_t ll;
     uint64_t lba = 0;
     const char * device_name = NULL;
-    const unsigned char * bp;
+    const uint8_t * bp;
 
     while (1) {
         int option_index = 0;
@@ -255,7 +255,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_REFER_BUFF_LEN) {
-        referralBuffp = (unsigned char *)calloc(maxlen, 1);
+        referralBuffp = (uint8_t *)calloc(maxlen, 1);
         if (NULL == referralBuffp) {
             pr2serr("unable to allocate %d bytes on heap\n", maxlen);
             return SG_LIB_SYNTAX_ERROR;

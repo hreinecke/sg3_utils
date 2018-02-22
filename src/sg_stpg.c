@@ -32,7 +32,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.15 20171020";
+static const char * version_str = "1.16 20180219";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -48,14 +48,14 @@ static const char * version_str = "1.15 20171020";
 #ifdef __cplusplus
 
 // C++ does not support designated initializers
-static const unsigned char state_sup_mask[] = {
+static const uint8_t state_sup_mask[] = {
     0x1, 0x2, 0x4, 0x8, 0x0, 0x0, 0x0, 0x0,
     0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x40, 0x80,
 };
 
 #else
 
-static const unsigned char state_sup_mask[] = {
+static const uint8_t state_sup_mask[] = {
         [TPGS_STATE_OPTIMIZED]     = 0x01,
         [TPGS_STATE_NONOPTIMIZED]  = 0x02,
         [TPGS_STATE_STANDBY]       = 0x04,
@@ -138,12 +138,12 @@ dStrRaw(const uint8_t * str, int len)
 }
 
 static int
-decode_target_port(unsigned char * buff, int len, int *d_id, int *d_tpg)
+decode_target_port(uint8_t * buff, int len, int *d_id, int *d_tpg)
 {
     int c_set, assoc, desig_type, i_len;
     int off, u;
-    const unsigned char * bp;
-    const unsigned char * ip;
+    const uint8_t * bp;
+    const uint8_t * ip;
 
     *d_id = -1;
     *d_tpg = -1;
@@ -271,10 +271,10 @@ transition_tpgs_states(struct tgtgrp *tgtState, int numgrp, int portgroup,
 }
 
 static void
-encode_tpgs_states(unsigned char *buff, struct tgtgrp *tgtState, int numgrp)
+encode_tpgs_states(uint8_t *buff, struct tgtgrp *tgtState, int numgrp)
 {
      int i;
-     unsigned char *desc;
+     uint8_t *desc;
 
      for (i = 0, desc = buff + 4; i < numgrp; desc += 4, i++) {
           desc[0] = tgtState[i].current & 0x0f;
@@ -418,10 +418,10 @@ main(int argc, char * argv[])
     int sg_fd, k, off, res, c, report_len, tgt_port_count;
     int port_arr_len = 0;
     int verbose = 0;
-    unsigned char reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
-    unsigned char setTgtGrpBuff[TGT_GRP_BUFF_LEN];
-    unsigned char rsp_buff[MX_ALLOC_LEN + 2];
-    unsigned char * bp;
+    uint8_t reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
+    uint8_t setTgtGrpBuff[TGT_GRP_BUFF_LEN];
+    uint8_t rsp_buff[MX_ALLOC_LEN + 2];
+    uint8_t * bp;
     struct tgtgrp tgtGrpState[256], *tgtStatePtr;
     int state = -1;
     const char * state_arg = NULL;

@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 2001 - 2017 D. Gilbert
+*  Copyright (C) 2001 - 2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -46,13 +46,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.29 20171209";
+static const char * version_str = "1.30 20180219";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -202,7 +203,7 @@ static void usage()
             "block address\n");
 }
 
-static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
+static int sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz,
                              unsigned int blocks, int64_t start_block,
                              bool write_true, bool fua, bool dpo)
 {
@@ -218,10 +219,10 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
     switch (cdb_sz) {
     case 6:
         sz_ind = 0;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
-        cdbp[4] = (256 == blocks) ? 0 : (unsigned char)blocks;
+        cdbp[4] = (256 == blocks) ? 0 : (uint8_t)blocks;
         if (blocks > 256) {
             pr2serr(ME "for 6 byte commands, maximum number of blocks is "
                     "256\n");
@@ -240,7 +241,7 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         break;
     case 10:
         sz_ind = 1;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
         sg_put_unaligned_be16((uint16_t)blocks, cdbp + 7);
@@ -252,14 +253,14 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
         break;
     case 12:
         sz_ind = 2;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 6);
         break;
     case 16:
         sz_ind = 3;
-        cdbp[0] = (unsigned char)(write_true ? wr_opcode[sz_ind] :
+        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be64(start_block, cdbp + 2);
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);
@@ -275,14 +276,14 @@ static int sg_build_scsi_cdb(unsigned char * cdbp, int cdb_sz,
 /* -3 medium/hardware error, -2 -> not ready, 0 -> successful,
    1 -> recoverable (ENOMEM), 2 -> try again (e.g. unit attention),
    3 -> try again (e.g. aborted command), -1 -> other unrecoverable error */
-static int sg_bread(int sg_fd, unsigned char * buff, int blocks,
+static int sg_bread(int sg_fd, uint8_t * buff, int blocks,
                     int64_t from_block, int bs, int cdbsz,
                     bool fua, bool dpo, bool * diop, bool do_mmap,
                     bool no_dxfer)
 {
     int k;
-    unsigned char rdCmd[MAX_SCSI_CDBSZ];
-    unsigned char senseBuff[SENSE_BUFF_LEN];
+    uint8_t rdCmd[MAX_SCSI_CDBSZ];
+    uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,
@@ -393,8 +394,8 @@ int main(int argc, char * argv[])
     int64_t skip = 0;
     char * key;
     char * buf;
-    unsigned char * wrkBuff = NULL;
-    unsigned char * wrkPos = NULL;
+    uint8_t * wrkBuff = NULL;
+    uint8_t * wrkPos = NULL;
     char inf[INF_SZ];
     char outf[INF_SZ];
     char str[STR_SZ];
@@ -624,23 +625,23 @@ int main(int argc, char * argv[])
 
     if (dd_count > 0) {
         if (do_dio || do_odir || (FT_RAW & in_type)) {
-            wrkBuff = (unsigned char *)malloc(bs * bpt + psz);
+            wrkBuff = (uint8_t *)malloc(bs * bpt + psz);
             if (0 == wrkBuff) {
                 pr2serr("Not enough user memory for aligned storage\n");
                 return SG_LIB_CAT_OTHER;
             }
             /* perhaps use posix_memalign() instead */
-            wrkPos = (unsigned char *)(((sg_uintptr_t)wrkBuff + psz - 1) &
+            wrkPos = (uint8_t *)(((sg_uintptr_t)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
         } else if (do_mmap) {
-            wrkPos = (unsigned char *)mmap(NULL, bs * bpt,
+            wrkPos = (uint8_t *)mmap(NULL, bs * bpt,
                         PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
             if (MAP_FAILED == wrkPos) {
                 perror(ME "error from mmap()");
                 return SG_LIB_CAT_OTHER;
             }
         } else {
-            wrkBuff = (unsigned char *)malloc(bs * bpt);
+            wrkBuff = (uint8_t *)malloc(bs * bpt);
             if (0 == wrkBuff) {
                 pr2serr("Not enough user memory\n");
                 return SG_LIB_CAT_OTHER;

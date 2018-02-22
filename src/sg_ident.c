@@ -31,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.18 20180118";
+static const char * version_str = "1.19 20180219";
 
 #define ME "sg_ident: "
 
@@ -51,7 +51,7 @@ static struct option long_options[] = {
 };
 
 static void
-decode_ii(const unsigned char * iip, int ii_len, int itype, bool ascii,
+decode_ii(const uint8_t * iip, int ii_len, int itype, bool ascii,
           bool raw, int verbose)
 {
     int k;
@@ -116,9 +116,9 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, res, c, ii_len;
-    unsigned char rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
+    uint8_t rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
     char b[80];
-    unsigned char * bp = NULL;
+    uint8_t * bp = NULL;
     int itype = 0;
     int verbose = 0;
     bool ascii = false;

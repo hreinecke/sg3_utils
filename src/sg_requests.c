@@ -18,6 +18,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pr2serr.h"
@@ -28,7 +29,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.29 20171008";
+static const char * version_str = "1.30 20180219";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -110,7 +111,7 @@ int
 main(int argc, char * argv[])
 {
     int sg_fd, res, c, resp_len, k, progress;
-    unsigned char requestSenseBuff[MAX_REQS_RESP_LEN + 1];
+    uint8_t requestSenseBuff[MAX_REQS_RESP_LEN + 1];
     bool desc = false;
     bool do_progress = false;
     bool do_raw = false;

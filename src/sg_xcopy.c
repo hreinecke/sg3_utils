@@ -60,6 +60,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -67,7 +68,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.62 20180218";
+static const char * version_str = "0.63 20180219";
 
 #define ME "sg_xcopy: "
 
@@ -583,12 +584,12 @@ secondary_help:
 }
 
 static int
-scsi_encode_seg_desc(unsigned char *seg_desc, int seg_desc_type,
+scsi_encode_seg_desc(uint8_t *seg_desc, int seg_desc_type,
                      int64_t num_blk, uint64_t src_lba, uint64_t dst_lba)
 {
     int seg_desc_len = 0;
 
-    seg_desc[0] = (unsigned char)seg_desc_type;
+    seg_desc[0] = (uint8_t)seg_desc_type;
     seg_desc[1] = 0x0;
     if (xcopy_flag_cat)
         seg_desc[1] |= 0x1;
@@ -608,13 +609,13 @@ scsi_encode_seg_desc(unsigned char *seg_desc, int seg_desc_type,
 }
 
 static int
-scsi_extended_copy(int sg_fd, unsigned char list_id,
-                   unsigned char *src_desc, int src_desc_len,
-                   unsigned char *dst_desc, int dst_desc_len,
+scsi_extended_copy(int sg_fd, uint8_t list_id,
+                   uint8_t *src_desc, int src_desc_len,
+                   uint8_t *dst_desc, int dst_desc_len,
                    int seg_desc_type, int64_t num_blk,
                    uint64_t src_lba, uint64_t dst_lba)
 {
-    unsigned char xcopyBuff[256];
+    uint8_t xcopyBuff[256];
     int desc_offset = 16;
     int seg_desc_len;
     int verb, res;
@@ -652,7 +653,7 @@ scsi_read_capacity(struct xcopy_fp_t *xfp)
 {
     int res;
     unsigned int ui;
-    unsigned char rcBuff[RCAP16_REPLY_LEN];
+    uint8_t rcBuff[RCAP16_REPLY_LEN];
     int verb;
     char b[80];
 
@@ -700,7 +701,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
     uint32_t rcBuffLen = 256, len, n, td_list = 0;
     uint32_t num, max_target_num, max_segment_num, max_segment_len;
     uint32_t max_desc_len, max_inline_data, held_data_limit;
-    unsigned char rcBuff[256];
+    uint8_t rcBuff[256];
     char b[80];
 
     verb = (verbose ? verbose - 1: 0);
@@ -1002,7 +1003,7 @@ scsi_operating_parameter(struct xcopy_fp_t *xfp, int is_target)
 }
 
 static void
-decode_designation_descriptor(const unsigned char * bp, int i_len)
+decode_designation_descriptor(const uint8_t * bp, int i_len)
 {
     char c[2048];
 
@@ -1012,11 +1013,11 @@ decode_designation_descriptor(const unsigned char * bp, int i_len)
 }
 
 static int
-desc_from_vpd_id(int sg_fd, unsigned char *desc, int desc_len,
+desc_from_vpd_id(int sg_fd, uint8_t *desc, int desc_len,
                  unsigned int block_size, bool pad)
 {
     int res, verb;
-    unsigned char rcBuff[256], *bp, *best = NULL;
+    uint8_t rcBuff[256], *bp, *best = NULL;
     unsigned int len = 254;
     int off = -1, u, i_len, best_len = 0, assoc, desig, f_desig = 0;
     char b[80];
@@ -1313,12 +1314,12 @@ main(int argc, char * argv[])
     int src_desc_len;
     int64_t skip = 0;
     int64_t seek = 0;
-    unsigned char list_id = 1;
+    uint8_t list_id = 1;
     char * key;
     char * buf;
     char str[STR_SZ];
-    unsigned char src_desc[256];
-    unsigned char dst_desc[256];
+    uint8_t src_desc[256];
+    uint8_t dst_desc[256];
 
     ixcf.fname[0] = '\0';
     oxcf.fname[0] = '\0';

@@ -67,10 +67,10 @@ extern "C" {
 #define SAM_STAT_CHECK_CONDITION 0x2
 #define SAM_STAT_CONDITION_MET 0x4
 #define SAM_STAT_BUSY 0x8
-#define SAM_STAT_INTERMEDIATE 0x10              /* obsolete in SAM-4 */
+#define SAM_STAT_INTERMEDIATE 0x10                /* obsolete in SAM-4 */
 #define SAM_STAT_INTERMEDIATE_CONDITION_MET 0x14  /* obsolete in SAM-4 */
 #define SAM_STAT_RESERVATION_CONFLICT 0x18
-#define SAM_STAT_COMMAND_TERMINATED 0x22        /* obsolete in SAM-3 */
+#define SAM_STAT_COMMAND_TERMINATED 0x22          /* obsolete in SAM-3 */
 #define SAM_STAT_TASK_SET_FULL 0x28
 #define SAM_STAT_ACA_ACTIVE 0x30
 #define SAM_STAT_TASK_ABORTED 0x40
@@ -139,22 +139,22 @@ const char * sg_lib_version();
 /* Returns length of SCSI command given the opcode (first byte).
  * Yields the wrong answer for variable length commands (opcode=0x7f)
  * and potentially some vendor specific commands. */
-int sg_get_command_size(unsigned char cdb_byte0);
+int sg_get_command_size(uint8_t cdb_byte0);
 
 /* Command name given pointer to the cdb. Certain command names
  * depend on peripheral type (give 0 or -1 if unknown). Places command
  * name into buff and will write no more than buff_len bytes. */
-void sg_get_command_name(const unsigned char * cdbp, int peri_type,
-                         int buff_len, char * buff);
+void sg_get_command_name(const uint8_t * cdbp, int peri_type, int buff_len,
+                         char * buff);
 
 /* Command name given only the first byte (byte 0) of a cdb and
  * peripheral type (give 0 or -1 if unknown). */
-void sg_get_opcode_name(unsigned char cdb_byte0, int peri_type, int buff_len,
+void sg_get_opcode_name(uint8_t cdb_byte0, int peri_type, int buff_len,
                         char * buff);
 
 /* Command name given opcode (byte 0), service action and peripheral type.
  * If no service action give 0, if unknown peripheral type give 0 or -1 . */
-void sg_get_opcode_sa_name(unsigned char cdb_byte0, int service_action,
+void sg_get_opcode_sa_name(uint8_t cdb_byte0, int service_action,
                            int peri_type, int buff_len, char * buff);
 
 /* Fetch NVMe command name given first byte (byte offset 0 in 64 byte
@@ -174,14 +174,14 @@ void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff);
  * The original sense buffer should be kept around for those cases
  * in which more information is required (e.g. the LBA of a MEDIUM ERROR). */
 struct sg_scsi_sense_hdr {
-    unsigned char response_code; /* permit: 0x0, 0x70, 0x71, 0x72, 0x73 */
-    unsigned char sense_key;
-    unsigned char asc;
-    unsigned char ascq;
-    unsigned char byte4;
-    unsigned char byte5;
-    unsigned char byte6;
-    unsigned char additional_length;
+    uint8_t response_code; /* permit: 0x0, 0x70, 0x71, 0x72, 0x73 */
+    uint8_t sense_key;
+    uint8_t asc;
+    uint8_t ascq;
+    uint8_t byte4;
+    uint8_t byte5;
+    uint8_t byte6;
+    uint8_t additional_length;
 };
 
 /* Maps the salient data from a sense buffer which is in either fixed or
@@ -191,18 +191,18 @@ struct sg_scsi_sense_hdr {
  * is non-NULL then zero all fields and then set the appropriate fields in
  * that structure. sshp::additional_length is always 0 for response
  * codes 0x70 and 0x71 (fixed format). */
-bool sg_scsi_normalize_sense(const unsigned char * sensep, int sense_len,
+bool sg_scsi_normalize_sense(const uint8_t * sensep, int sense_len,
                              struct sg_scsi_sense_hdr * sshp);
 
 /* Attempt to find the first SCSI sense data descriptor that matches the
  * given 'desc_type'. If found return pointer to start of sense data
  * descriptor; otherwise (including fixed format sense data) returns NULL. */
-const unsigned char * sg_scsi_sense_desc_find(const unsigned char * sensep,
-                                              int sense_len, int desc_type);
+const uint8_t * sg_scsi_sense_desc_find(const uint8_t * sensep, int sense_len,
+                                        int desc_type);
 
 /* Get sense key from sense buffer. If successful returns a sense key value
  * between 0 and 15. If sense buffer cannot be decode, returns -1 . */
-int sg_get_sense_key(const unsigned char * sensep, int sense_len);
+int sg_get_sense_key(const uint8_t * sensep, int sense_len);
 
 /* Yield string associated with sense_key value. Returns 'buff'. */
 char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
@@ -213,7 +213,7 @@ char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff);
 /* Returns true if valid bit set, false if valid bit clear. Irrespective the
  * information field is written out via 'info_outp' (except when it is
  * NULL). Handles both fixed and descriptor sense formats. */
-bool sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
+bool sg_get_sense_info_fld(const uint8_t * sensep, int sb_len,
                            uint64_t * info_outp);
 
 /* Returns true if fixed format or command specific information descriptor
@@ -221,14 +221,14 @@ bool sg_get_sense_info_fld(const unsigned char * sensep, int sb_len,
  * specific information field (4 byte integer in fixed format, 8 byte
  * integer in descriptor format) is written out via 'cmd_spec_outp'.
  * Handles both fixed and descriptor sense formats. */
-bool sg_get_sense_cmd_spec_fld(const unsigned char * sensep, int sb_len,
+bool sg_get_sense_cmd_spec_fld(const uint8_t * sensep, int sb_len,
                                uint64_t * cmd_spec_outp);
 
 /* Returns true if any of the 3 bits (i.e. FILEMARK, EOM or ILI) are set.
  * In descriptor format if the stream commands descriptor not found
  * then returns false. Writes true or false corresponding to these bits to
  * the last three arguments if they are non-NULL. */
-bool sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
+bool sg_get_sense_filemark_eom_ili(const uint8_t * sensep, int sb_len,
                                    bool * filemark_p, bool * eom_p,
                                    bool * ili_p);
 
@@ -238,7 +238,7 @@ bool sg_get_sense_filemark_eom_ili(const unsigned char * sensep, int sb_len,
  * field is not available returns false. Handles both fixed and descriptor
  * sense formats. N.B. App should multiply by 100 and divide by 65536
  * to get percentage completion from given value. */
-bool sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
+bool sg_get_sense_progress_fld(const uint8_t * sensep, int sb_len,
                                int * progress_outp);
 
 /* Closely related to sg_print_sense(). Puts decoded sense data in 'buff'.
@@ -248,7 +248,7 @@ bool sg_get_sense_progress_fld(const unsigned char * sensep, int sb_len,
  * bytes written to 'buff' excluding the trailing '\0'.
  * N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the first
  * line output. Also this function returned type void. */
-int sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
+int sg_get_sense_str(const char * leadin, const uint8_t * sense_buffer,
                      int sb_len, bool raw_sinfo, int buff_len, char * buff);
 
 /* Decode descriptor format sense descriptors (assumes sense buffer is
@@ -256,7 +256,7 @@ int sg_get_sense_str(const char * leadin, const unsigned char * sense_buffer,
  * to 'b', NULL treated as "". Returns the number of bytes written to 'b'
  * excluding the trailing '\0'. */
 int sg_get_sense_descriptors_str(const char * leadin,
-                                 const unsigned char * sense_buffer,
+                                 const uint8_t * sense_buffer,
                                  int sb_len, int blen, char * b);
 
 /* Decodes a designation descriptor (e.g. as found in the Device
@@ -265,7 +265,7 @@ int sg_get_sense_descriptors_str(const char * leadin,
  * treated as "". Returns the number of bytes written to 'b' excluding the
  * trailing '\0'. */
 int sg_get_designation_descriptor_str(const char * leadin,
-                                      const unsigned char * ddp, int dd_len,
+                                      const uint8_t * ddp, int dd_len,
                                       bool print_assoc, bool do_long,
                                       int blen, char * b);
 
@@ -287,9 +287,8 @@ char * sg_get_trans_proto_str(int tpi, int buff_len, char * buff);
 /* Decode TransportID pointed to by 'bp' of length 'bplen'. Place decoded
  * string output in 'buff' which is also the return value. Each new line
  * is prefixed by 'leadin'. If leadin NULL treat as "". */
-char * sg_decode_transportid_str(const char * leadin, unsigned char * bp,
-                                 int bplen, bool only_one, int buff_len,
-                                 char * buff);
+char * sg_decode_transportid_str(const char * leadin, uint8_t * bp, int bplen,
+                                 bool only_one, int buff_len, char * buff);
 
 /* Returns a designator's type string given 'val' (0 to 15 inclusive),
  * otherwise returns NULL. */
@@ -358,21 +357,23 @@ void sg_set_warnings_strm(FILE * warnings_strm);
 /* The following "print" functions send ACSII to 'sg_warnings_strm' file
  * descriptor (default value is stderr). 'leadin' is string prepended to
  * each line printed out, NULL treated as "". */
-void sg_print_command(const unsigned char * command);
+void sg_print_command(const uint8_t * command);
 void sg_print_scsi_status(int scsi_status);
 
 /* 'leadin' is string prepended to each line printed out, NULL treated as
  * "". N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the
  * first line printed. */
-void sg_print_sense(const char * leadin, const unsigned char * sense_buffer,
+void sg_print_sense(const char * leadin, const uint8_t * sense_buffer,
                     int sb_len, bool raw_info);
 
-/* Following examines exit_status and outputs a clear error message to
- * warnings_strm (usually stderr) if one is known and returns true.
- * Otherwise it doesn't print anything and returns false. Note that if
- * exit_status==0 then returns true but prints nothing and if
- * exit_status<0 ("some error occurred") false is returned. If leadin is
- * non-NULL is will be printed before error message. */
+/* This examines exit_status and if an error message is known it is output
+ * to stdout/stderr and true is returned. If no error message is
+ * available nothing is output and false is returned. If exit_status is
+ * zero (no error) nothing is output and true is returned. If exit_status
+ * is negative then nothing is output and false is returned. If leadin is
+ * non-NULL then it is printed before the error message. All messages are
+ * a single line with a trailing LF. */
+bool sg_if_can2stdout(const char * leadin, int exit_status);
 bool sg_if_can2stderr(const char * leadin, int exit_status);
 
 /* Utilities can use these exit status values for syntax errors and
@@ -433,7 +434,7 @@ bool sg_if_can2stderr(const char * leadin, int exit_status);
 
 /* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
  * common sense key then return SG_LIB_CAT_SENSE .*/
-int sg_err_category_sense(const unsigned char * sense_buffer, int sb_len);
+int sg_err_category_sense(const uint8_t * sense_buffer, int sb_len);
 
 /* Here are some additional sense data categories that are not returned
  * by sg_err_category_sense() but are returned by some related functions. */
@@ -464,7 +465,7 @@ const char * sg_get_category_sense_str(int sense_cat, int buff_len,
  * descriptor; returns -1 if normal end condition and -2 for an abnormal
  * termination. Matches association, designator_type and/or code_set when
  * any of those values are greater than or equal to zero. */
-int sg_vpd_dev_id_iter(const unsigned char * initial_desig_desc, int page_len,
+int sg_vpd_dev_id_iter(const uint8_t * initial_desig_desc, int page_len,
                        int * off, int m_assoc, int m_desig_type,
                        int m_code_set);
 

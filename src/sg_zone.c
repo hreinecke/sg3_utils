@@ -20,6 +20,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_pt.h"
@@ -34,7 +35,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.06 20180210";
+static const char * version_str = "1.07 20180219";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -98,9 +99,9 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, bool all, bool noisy,
 {
     int k, ret, res, sense_cat;
     struct sg_pt_base * ptvp;
-    unsigned char zo_cdb[SG_ZONING_OUT_CMDLEN] =
+    uint8_t zo_cdb[SG_ZONING_OUT_CMDLEN] =
           {SG_ZONING_OUT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     char b[64];
 
     zo_cdb[1] = 0x1f & sa;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2017 Douglas Gilbert.
+ * Copyright (c) 2009-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * logical blocks.
  */
 
-static const char * version_str = "1.12 20171007";
+static const char * version_str = "1.13 20180219";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -340,7 +340,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     uint64_t addr_arr[MAX_NUM_ADDR];
     uint32_t num_arr[MAX_NUM_ADDR];
-    unsigned char param_arr[8 + (MAX_NUM_ADDR * 16)];
+    uint8_t param_arr[8 + (MAX_NUM_ADDR * 16)];
 
     while (1) {
         int option_index = 0;

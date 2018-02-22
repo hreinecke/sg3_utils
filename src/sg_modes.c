@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
 
 #ifdef HAVE_CONFIG_H
@@ -29,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.55 20180118";
+static const char * version_str = "1.56 20180219";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -504,7 +505,7 @@ process_cl(struct opts_t * op, int argc, char * argv[])
 }
 
 static void
-dStrRaw(const char * str, int len)
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
@@ -890,7 +891,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
     bool header_printed;
     int k, res, mresp_len, len, resid;
     const char * cp;
-    unsigned char rbuf[256];
+    uint8_t rbuf[256];
 
     mresp_len = (op->do_raw || op->do_hex) ? sizeof(rbuf) : 4;
     for (header_printed = false, k = 0; k < PG_CODE_MAX; ++k) {
@@ -932,7 +933,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
             if (len > mresp_len)
                 len = mresp_len;
             if (op->do_raw) {
-                dStrRaw((const char *)rbuf, len);
+                dStrRaw(rbuf, len);
                 continue;
             }
             if (op->do_hex > 2) {
@@ -975,21 +976,21 @@ main(int argc, char * argv[])
     bool resp_mode6, longlba, spf;
     bool encserv = false;
     bool mchngr = false;
-    unsigned char uc;
-    int sg_fd, k, num, len, res, md_len, bd_len, page_num, resid;
+    uint8_t uc;
+    int k, num, len, res, md_len, bd_len, page_num, resid;
     int density_code_off, t_proto, inq_pdt, num_ua_pages;
+    int sg_fd = -1;
     int ret = 0;
-    int rsp_buff_size = DEF_ALLOC_LEN;
+    int rsp_buff_sz = DEF_ALLOC_LEN;
     const char * descp;
     struct opts_t * op;
-    unsigned char * rsp_buff = NULL;
-    unsigned char * malloc_rsp_buff = NULL;
-    unsigned char * bp;
+    uint8_t * rsp_buff = NULL;
+    uint8_t * free_rsp_buff = NULL;
+    uint8_t * bp;
     const char * cdbLenStr;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts;
     char b[80];
-    unsigned char def_rsp_buff[DEF_ALLOC_LEN];
     char ebuff[EBUFF_SZ];
     char pdt_name[64];
 
@@ -1044,19 +1045,16 @@ main(int argc, char * argv[])
             pr2serr("For Mode Sense (6) maxlen cannot exceed 255\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (op->maxlen > DEF_ALLOC_LEN) {
-            malloc_rsp_buff = (unsigned char *)malloc(op->maxlen);
-            if (NULL == malloc_rsp_buff) {
-                pr2serr("Unable to malloc maxlen=%d bytes\n", op->maxlen);
-                return SG_LIB_SYNTAX_ERROR;
-        }
-            rsp_buff = malloc_rsp_buff;
-        } else
-            rsp_buff = def_rsp_buff;
-        rsp_buff_size = op->maxlen;
+        rsp_buff = sg_memalign(op->maxlen, 0, &free_rsp_buff, false);
+        rsp_buff_sz = op->maxlen;
     } else {    /* maxlen == 0 */
-        rsp_buff_size = op->do_six ? DEF_6_ALLOC_LEN : DEF_ALLOC_LEN;
-        rsp_buff = def_rsp_buff;
+        rsp_buff = sg_memalign(rsp_buff_sz, 0, &free_rsp_buff, false);
+        if (op->do_six)
+            rsp_buff_sz = DEF_6_ALLOC_LEN;
+    }
+    if (NULL == rsp_buff) {     /* check for both sg_memalign()s */
+        pr2serr("Unable to allocate %d bytes on heap\n", rsp_buff_sz);
+        return sg_convert_errno(ENOMEM);
     }
     /* If no pages or list selected than treat as 'a' */
     if (! ((op->pg_code >= 0) || op->do_all || op->do_list || op->do_examine))
@@ -1065,7 +1063,8 @@ main(int argc, char * argv[])
     if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+            goto fini;
         }
     }
 
@@ -1073,15 +1072,14 @@ main(int argc, char * argv[])
                                      op->do_verbose)) < 0) {
         pr2serr("error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
-        if (malloc_rsp_buff)
-            free(malloc_rsp_buff);
-        return SG_LIB_FILE_ERROR;
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     if (sg_simple_inquiry(sg_fd, &inq_out, 1, op->do_verbose)) {
         pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->device_name);
         ret = SG_LIB_CAT_OTHER;
-        goto finish;
+        goto fini;
     }
     inq_pdt = inq_out.peripheral_type;
     encserv = !! (0x40 & inq_out.byte_6);
@@ -1095,11 +1093,11 @@ main(int argc, char * argv[])
             list_page_codes(inq_pdt, encserv, mchngr, op->subpg_code);
         else
             list_page_codes(inq_pdt, encserv, mchngr, -1);
-        goto finish;
+        goto fini;
     }
     if (op->do_examine) {
         ret = examine_pages(sg_fd, inq_pdt, encserv, mchngr, op);
-        goto finish;
+        goto fini;
     }
     if (PG_CODE_ALL == op->pg_code) {
         if (0 == op->do_all)
@@ -1117,23 +1115,22 @@ main(int argc, char * argv[])
                 pr2serr("'-r' requires a specific (sub)page, not all\n");
             usage_for(op);
             ret = SG_LIB_SYNTAX_ERROR;
-            goto finish;
+            goto fini;
         }
     }
 
-    memset(rsp_buff, 0, rsp_buff_size);
     resid = 0;
     if (op->do_six) {
         res = sg_ll_mode_sense6(sg_fd, op->do_dbd, op->page_control,
                                 op->pg_code, op->subpg_code, rsp_buff,
-                                rsp_buff_size, true, op->do_verbose);
+                                rsp_buff_sz, true, op->do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again without the '-6' switch for a 10 byte "
                     "MODE SENSE command\n");
     } else {
         res = sg_ll_mode_sense10_v2(sg_fd, op->do_llbaa, op->do_dbd,
                                     op->page_control, op->pg_code,
-                                    op->subpg_code, rsp_buff, rsp_buff_size,
+                                    op->subpg_code, rsp_buff, rsp_buff_sz,
                                     0, &resid, true, op->do_verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again with a '-6' switch for a 6 byte MODE "
@@ -1186,51 +1183,51 @@ main(int argc, char * argv[])
                        "     decoded as %s byte response:\n",
                        cdbLenStr, (resp_mode6 ? "6" : "10"));
         }
-        rsp_buff_size -= resid;
-        if (rsp_buff_size < 0) {
+        rsp_buff_sz -= resid;
+        if (rsp_buff_sz < 0) {
             pr2serr("MS(%s) resid=%d implies negative response length "
-                    "(%d)\n", cdbLenStr, resid, rsp_buff_size);
+                    "(%d)\n", cdbLenStr, resid, rsp_buff_sz);
             ret = SG_LIB_WILD_RESID;
-            goto finish;
+            goto fini;
         }
         if (resp_mode6) {
-            if (rsp_buff_size < 4) {
+            if (rsp_buff_sz < 4) {
                 pr2serr("MS(6) resid=%d implies abridged header length "
-                        "(%d)\n", resid, rsp_buff_size);
+                        "(%d)\n", resid, rsp_buff_sz);
                 ret = SG_LIB_WILD_RESID;
-                goto finish;
+                goto fini;
             }
             headerlen = 4;
             medium_type = rsp_buff[1];
             specific = rsp_buff[2];
             longlba = false;
         } else {        /* MODE SENSE(10) with resid */
-            if (rsp_buff_size < 8) {
+            if (rsp_buff_sz < 8) {
                 pr2serr("MS(10) resid=%d implies abridged header length "
-                        "(%d)\n", resid, rsp_buff_size);
+                        "(%d)\n", resid, rsp_buff_sz);
                 ret = SG_LIB_WILD_RESID;
-                goto finish;
+                goto fini;
             }
             headerlen = 8;
             medium_type = rsp_buff[2];
             specific = rsp_buff[3];
             longlba = !!(rsp_buff[4] & 1);
         }
-        md_len = sg_msense_calc_length(rsp_buff, rsp_buff_size, resp_mode6,
+        md_len = sg_msense_calc_length(rsp_buff, rsp_buff_sz, resp_mode6,
                                        &bd_len);
         if (md_len < 0) {
             pr2serr("MS(%s): sg_msense_calc_length() failed\n", cdbLenStr);
             ret = SG_LIB_CAT_MALFORMED;
-            goto finish;
+            goto fini;
         }
-        md_len = (md_len < rsp_buff_size) ? md_len : rsp_buff_size;
+        md_len = (md_len < rsp_buff_sz) ? md_len : rsp_buff_sz;
         if ((bd_len + headerlen) > md_len) {
             pr2serr("Invalid block descriptor length=%d, ignore\n", bd_len);
             bd_len = 0;
         }
         if (op->do_raw || (op->do_hex > 2)) {
             if (1 == op->do_raw)
-                dStrRaw((const char *)rsp_buff, md_len);
+                dStrRaw(rsp_buff, md_len);
             else if (op->do_raw > 1) {
                 bp = rsp_buff + bd_len + headerlen;
                 md_len -= bd_len + headerlen;
@@ -1242,13 +1239,15 @@ main(int argc, char * argv[])
                     printf("%02x\n", bp[k]);
             } else
                 hex2stdout(rsp_buff, md_len, -1);
-            goto finish;
+            goto fini;
         }
         if (1 == op->do_hex) {
             hex2stdout(rsp_buff, md_len, 1);
-            goto finish;
-        } else if (op->do_hex > 1)
+            goto fini;
+        } else if (op->do_hex > 1) {
             hex2stdout(rsp_buff, headerlen, 1);
+            goto fini;
+        }
         if (0 == inq_pdt)
             printf("  Mode data length=%d, medium type=0x%.2x, WP=%d,"
                    " DpoFua=%d, longlba=%d\n", md_len, medium_type,
@@ -1257,12 +1256,12 @@ main(int argc, char * argv[])
             printf("  Mode data length=%d, medium type=0x%.2x, specific"
                    " param=0x%.2x, longlba=%d\n", md_len, medium_type,
                    specific, (int)longlba);
-        if (md_len > rsp_buff_size) {
+        if (md_len > rsp_buff_sz) {
             printf("Only fetched %d bytes of response, truncate output\n",
-                   rsp_buff_size);
-            md_len = rsp_buff_size;
-            if (bd_len + headerlen > rsp_buff_size)
-                bd_len = rsp_buff_size - headerlen;
+                   rsp_buff_sz);
+            md_len = rsp_buff_sz;
+            if (bd_len + headerlen > rsp_buff_sz)
+                bd_len = rsp_buff_sz - headerlen;
         }
         if (! op->do_dbout) {
             printf("  Block descriptor length=%d\n", bd_len);
@@ -1360,9 +1359,10 @@ main(int argc, char * argv[])
         }
     }
 
-finish:
-    sg_cmds_close_device(sg_fd);
-    if (malloc_rsp_buff)
-        free(malloc_rsp_buff);
+fini:
+    if (sg_fd >= 0)
+        sg_cmds_close_device(sg_fd);
+    if (free_rsp_buff)
+        free(free_rsp_buff);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

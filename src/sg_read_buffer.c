@@ -33,7 +33,7 @@
  * device.
  */
 
-static const char * version_str = "1.22 20180210";
+static const char * version_str = "1.23 20180219";
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -174,7 +174,7 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     }
     set_scsi_pt_cdb(ptvp, rb10_cb, sizeof(rb10_cb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "Read buffer(10)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -238,7 +238,7 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     }
     set_scsi_pt_cdb(ptvp, rb16_cb, sizeof(rb16_cb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "Read buffer(16)", res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
@@ -297,7 +297,7 @@ main(int argc, char * argv[])
     int64_t ll;
     uint64_t rb_offset = 0;
     const char * device_name = NULL;
-    unsigned char * resp;
+    uint8_t * resp;
     const struct mode_s * mp;
 
     while (1) {
@@ -422,7 +422,7 @@ main(int argc, char * argv[])
     }
 
     len = rb_len ? rb_len : 8;
-    resp = (unsigned char *)malloc(len);
+    resp = (uint8_t *)malloc(len);
     if (NULL == resp) {
         pr2serr("unable to allocate %d bytes on the heap\n", len);
         return SG_LIB_CAT_OTHER;

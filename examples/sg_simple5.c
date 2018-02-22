@@ -11,7 +11,7 @@
    interface. This allows this example program to be ported to
    OSes other than linux.
 
-*  Copyright (C) 2006-2007 D. Gilbert
+*  Copyright (C) 2006-20018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -19,7 +19,7 @@
 
    Invocation: sg_simple5 [-x] <scsi_device>
 
-   Version 1.02 (20160528)
+   Version 1.03 (20180220)
 
 */
 
@@ -33,14 +33,14 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok, dsize, res, duration, resid, cat, got, slen;
-    unsigned char inq_cdb [INQ_CMD_LEN] =
+    uint8_t inq_cdb [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char tur_cdb [TUR_CMD_LEN] =
+    uint8_t tur_cdb [TUR_CMD_LEN] =
                                 {0x00, 0, 0, 0, 0, 0};
-    unsigned char inqBuff[INQ_REPLY_LEN];
+    uint8_t inqBuff[INQ_REPLY_LEN];
     char * file_name = 0;
     char b[512];
-    unsigned char sense_b[32];
+    uint8_t sense_b[32];
     int verbose = 0;
     struct sg_pt_base * ptvp;
 

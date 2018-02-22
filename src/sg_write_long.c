@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2017 D. Gilbert
+ *  Copyright (C) 2004-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,12 +29,13 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.15 20171107";
+static const char * version_str = "1.16 20180219";
 
 
 #define MAX_XFER_LEN 10000
@@ -108,7 +109,7 @@ main(int argc, char * argv[])
     int64_t ll;
     uint64_t llba = 0;
     const char * device_name = NULL;
-    unsigned char * writeLongBuff = NULL;
+    uint8_t * writeLongBuff = NULL;
     void * rawp = NULL;
     const char * ten_or;
     char file_name[256];
@@ -213,7 +214,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
-        writeLongBuff = (unsigned char *)rawp;
+        writeLongBuff = (uint8_t *)rawp;
         memset(rawp, 0xff, MAX_XFER_LEN);
         if (file_name[0]) {
             got_stdin = (0 == strcmp(file_name, "-"));

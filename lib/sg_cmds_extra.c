@@ -138,8 +138,8 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
 {
     static const char * const cdb_name_s = "Get LBA status(16)";
     int k, res, sense_cat, ret;
-    unsigned char getLbaStatCmd[SERVICE_ACTION_IN_16_CMDLEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t getLbaStatCmd[SERVICE_ACTION_IN_16_CMDLEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(getLbaStatCmd, 0, sizeof(getLbaStatCmd));
@@ -160,7 +160,7 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
         return -1;
     set_scsi_pt_cdb(ptvp, getLbaStatCmd, sizeof(getLbaStatCmd));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, alloc_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, alloc_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, alloc_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -212,8 +212,8 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
 {
     static const char * const cdb_name_s = "Get LBA status(32)";
     int k, res, sense_cat, ret;
-    unsigned char gls32_cmd[GLS32_CMD_LEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t gls32_cmd[GLS32_CMD_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(gls32_cmd, 0, sizeof(gls32_cmd));
@@ -236,7 +236,7 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
         return -1;
     set_scsi_pt_cdb(ptvp, gls32_cmd, sizeof(gls32_cmd));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, alloc_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, alloc_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, alloc_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -286,10 +286,10 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
 {
     static const char * const cdb_name_s = "Report target port groups";
     int k, res, ret, sense_cat;
-    unsigned char rtpg_cdb[MAINTENANCE_IN_CMDLEN] =
+    uint8_t rtpg_cdb[MAINTENANCE_IN_CMDLEN] =
                          {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (extended)
@@ -306,7 +306,7 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
         return -1;
     set_scsi_pt_cdb(ptvp, rtpg_cdb, sizeof(rtpg_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -348,10 +348,10 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
 {
     static const char * const cdb_name_s = "Set target port groups";
     int k, res, ret, sense_cat;
-    unsigned char stpg_cdb[MAINTENANCE_OUT_CMDLEN] =
+    uint8_t stpg_cdb[MAINTENANCE_OUT_CMDLEN] =
                          {MAINTENANCE_OUT_CMD, SET_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)param_len, stpg_cdb + 6);
@@ -370,7 +370,7 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
         return -1;
     set_scsi_pt_cdb(ptvp, stpg_cdb, sizeof(stpg_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -401,10 +401,10 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
 {
     static const char * const cdb_name_s = "Report referrals";
     int k, res, ret, sense_cat;
-    unsigned char repRef_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
+    uint8_t repRef_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                          {SERVICE_ACTION_IN_16_CMD, REPORT_REFERRALS_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(start_llba, repRef_cdb + 2);
@@ -422,7 +422,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
         return -1;
     set_scsi_pt_cdb(ptvp, repRef_cdb, sizeof(repRef_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -468,12 +468,12 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
 {
     static const char * const cdb_name_s = "Send diagnostic";
     int k, res, ret, sense_cat, tmout;
-    unsigned char senddiag_cdb[SEND_DIAGNOSTIC_CMDLEN] =
+    uint8_t senddiag_cdb[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    senddiag_cdb[1] = (unsigned char)(st_code << 5);
+    senddiag_cdb[1] = (uint8_t)(st_code << 5);
     if (pf_bit)
         senddiag_cdb[1] |= 0x10;
     if (st_bit)
@@ -506,7 +506,7 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
         return -1;
     set_scsi_pt_cdb(ptvp, senddiag_cdb, sizeof(senddiag_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -550,13 +550,13 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
     int k, res, ret, sense_cat;
     static const char * const cdb_name_s = "Receive diagnostic results";
     struct sg_pt_base * ptvp;
-    unsigned char rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
+    uint8_t rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
 
     if (pcv)
         rcvdiag_cdb[1] = 0x1;
-    rcvdiag_cdb[2] = (unsigned char)(pg_code);
+    rcvdiag_cdb[2] = (uint8_t)(pg_code);
     sg_put_unaligned_be16((uint16_t)mx_resp_len, rcvdiag_cdb + 3);
 
     if (verbose) {
@@ -575,7 +575,7 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
     }
     set_scsi_pt_cdb(ptvp, rcvdiag_cdb, sizeof(rcvdiag_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -620,9 +620,9 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
 {
     static const char * const cdb_name_s = "Read defect(10)";
     int res, k, ret, sense_cat;
-    unsigned char rdef_cdb[READ_DEFECT10_CMDLEN] =
+    uint8_t rdef_cdb[READ_DEFECT10_CMDLEN] =
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     rdef_cdb[2] = (dl_format & 0x7);
@@ -646,7 +646,7 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
         return -1;
     set_scsi_pt_cdb(ptvp, rdef_cdb, sizeof(rdef_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -688,10 +688,10 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
 {
     static const char * const cdb_name_s = "Read media serial number";
     int k, res, ret, sense_cat;
-    unsigned char rmsn_cdb[SERVICE_ACTION_IN_12_CMDLEN] =
+    uint8_t rmsn_cdb[SERVICE_ACTION_IN_12_CMDLEN] =
                          {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rmsn_cdb + 6);
@@ -706,7 +706,7 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
         return -1;
     set_scsi_pt_cdb(ptvp, rmsn_cdb, sizeof(rmsn_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -749,10 +749,10 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
 {
     static const char * const cdb_name_s = "Report identifying information";
     int k, res, ret, sense_cat;
-    unsigned char rii_cdb[MAINTENANCE_IN_CMDLEN] = {MAINTENANCE_IN_CMD,
+    uint8_t rii_cdb[MAINTENANCE_IN_CMDLEN] = {MAINTENANCE_IN_CMD,
                         REPORT_IDENTIFYING_INFORMATION_SA,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)max_resp_len, rii_cdb + 6);
@@ -769,7 +769,7 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
         return -1;
     set_scsi_pt_cdb(ptvp, rii_cdb, sizeof(rii_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, max_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, max_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, max_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -812,10 +812,10 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
 {
     static const char * const cdb_name_s = "Set identifying information";
     int k, res, ret, sense_cat;
-    unsigned char sii_cdb[MAINTENANCE_OUT_CMDLEN] = {MAINTENANCE_OUT_CMD,
+    uint8_t sii_cdb[MAINTENANCE_OUT_CMDLEN] = {MAINTENANCE_OUT_CMD,
                          SET_IDENTIFYING_INFORMATION_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)param_len, sii_cdb + 6);
@@ -835,7 +835,7 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
         return -1;
     set_scsi_pt_cdb(ptvp, sii_cdb, sizeof(sii_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -893,9 +893,9 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
 {
     static const char * const cdb_name_s = "Format unit";
     int k, res, ret, sense_cat, tmout;
-    unsigned char fu_cdb[FORMAT_UNIT_CMDLEN] =
+    uint8_t fu_cdb[FORMAT_UNIT_CMDLEN] =
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (fmtpinfo)
@@ -929,7 +929,7 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
         return -1;
     set_scsi_pt_cdb(ptvp, fu_cdb, sizeof(fu_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -960,9 +960,9 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
 {
     static const char * const cdb_name_s = "Reassign blocks";
     int res, k, ret, sense_cat;
-    unsigned char reass_cdb[REASSIGN_BLKS_CMDLEN] =
+    uint8_t reass_cdb[REASSIGN_BLKS_CMDLEN] =
         {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (longlba)
@@ -984,7 +984,7 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
         return -1;
     set_scsi_pt_cdb(ptvp, reass_cdb, sizeof(reass_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1016,13 +1016,13 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
 {
     static const char * const cdb_name_s = "Persistent reservation in";
     int res, k, ret, sense_cat;
-    unsigned char prin_cdb[PERSISTENT_RESERVE_IN_CMDLEN] =
+    uint8_t prin_cdb[PERSISTENT_RESERVE_IN_CMDLEN] =
                  {PERSISTENT_RESERVE_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (rq_servact > 0)
-        prin_cdb[1] = (unsigned char)(rq_servact & 0x1f);
+        prin_cdb[1] = (uint8_t)(rq_servact & 0x1f);
     sg_put_unaligned_be16((uint16_t)mx_resp_len, prin_cdb + 7);
 
     if (verbose) {
@@ -1036,7 +1036,7 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
         return -1;
     set_scsi_pt_cdb(ptvp, prin_cdb, sizeof(prin_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1080,13 +1080,13 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
 {
     static const char * const cdb_name_s = "Persistent reservation out";
     int res, k, ret, sense_cat;
-    unsigned char prout_cdb[PERSISTENT_RESERVE_OUT_CMDLEN] =
+    uint8_t prout_cdb[PERSISTENT_RESERVE_OUT_CMDLEN] =
                  {PERSISTENT_RESERVE_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (rq_servact > 0)
-        prout_cdb[1] = (unsigned char)(rq_servact & 0x1f);
+        prout_cdb[1] = (uint8_t)(rq_servact & 0x1f);
     prout_cdb[2] = (((rq_scope & 0xf) << 4) | (rq_type & 0xf));
     sg_put_unaligned_be16((uint16_t)param_len, prout_cdb + 7);
 
@@ -1105,7 +1105,7 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
         return -1;
     set_scsi_pt_cdb(ptvp, prout_cdb, sizeof(prout_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1129,10 +1129,10 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
 }
 
 static bool
-has_blk_ili(unsigned char * sensep, int sb_len)
+has_blk_ili(uint8_t * sensep, int sb_len)
 {
     int resp_code;
-    const unsigned char * cup;
+    const uint8_t * cup;
 
     if (sb_len < 8)
         return false;
@@ -1156,8 +1156,8 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
 {
     static const char * const cdb_name_s = "read long(10)";
     int k, res, sense_cat, ret;
-    unsigned char readLong_cdb[READ_LONG10_CMDLEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t readLong_cdb[READ_LONG10_CMDLEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(readLong_cdb, 0, READ_LONG10_CMDLEN);
@@ -1180,7 +1180,7 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
         return -1;
     set_scsi_pt_cdb(ptvp, readLong_cdb, sizeof(readLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, xfer_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, xfer_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1245,8 +1245,8 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
 {
     static const char * const cdb_name_s = "read long(16)";
     int k, res, sense_cat, ret;
-    unsigned char readLong_cdb[SERVICE_ACTION_IN_16_CMDLEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t readLong_cdb[SERVICE_ACTION_IN_16_CMDLEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(readLong_cdb, 0, sizeof(readLong_cdb));
@@ -1270,7 +1270,7 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
         return -1;
     set_scsi_pt_cdb(ptvp, readLong_cdb, sizeof(readLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, xfer_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, xfer_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1335,8 +1335,8 @@ sg_ll_write_long10(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
 {
     static const char * const cdb_name_s = "write long(10)";
     int k, res, sense_cat, ret;
-    unsigned char writeLong_cdb[WRITE_LONG10_CMDLEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t writeLong_cdb[WRITE_LONG10_CMDLEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(writeLong_cdb, 0, WRITE_LONG10_CMDLEN);
@@ -1361,7 +1361,7 @@ sg_ll_write_long10(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
         return -1;
     set_scsi_pt_cdb(ptvp, writeLong_cdb, sizeof(writeLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, xfer_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)data_out, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1414,8 +1414,8 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
 {
     static const char * const cdb_name_s = "write long(16)";
     int k, res, sense_cat, ret;
-    unsigned char writeLong_cdb[SERVICE_ACTION_OUT_16_CMDLEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t writeLong_cdb[SERVICE_ACTION_OUT_16_CMDLEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(writeLong_cdb, 0, sizeof(writeLong_cdb));
@@ -1441,7 +1441,7 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
         return -1;
     set_scsi_pt_cdb(ptvp, writeLong_cdb, sizeof(writeLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, xfer_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)data_out, xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1497,9 +1497,9 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
 {
     static const char * const cdb_name_s = "verify(10)";
     int k, res, ret, sense_cat, slen;
-    unsigned char v_cdb[VERIFY10_CMDLEN] =
+    uint8_t v_cdb[VERIFY10_CMDLEN] =
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
@@ -1525,7 +1525,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
     set_scsi_pt_cdb(ptvp, v_cdb, sizeof(v_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (data_out_len > 0)
-        set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, data_out_len);
+        set_scsi_pt_data_out(ptvp, (uint8_t *)data_out, data_out_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1574,9 +1574,9 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
 {
     static const char * const cdb_name_s = "verify(16)";
     int k, res, ret, sense_cat, slen;
-    unsigned char v_cdb[VERIFY16_CMDLEN] =
+    uint8_t v_cdb[VERIFY16_CMDLEN] =
                 {VERIFY16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
@@ -1603,7 +1603,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
     set_scsi_pt_cdb(ptvp, v_cdb, sizeof(v_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (data_out_len > 0)
-        set_scsi_pt_data_out(ptvp, (unsigned char *)data_out, data_out_len);
+        set_scsi_pt_data_out(ptvp, (uint8_t *)data_out, data_out_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1661,18 +1661,18 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
  * SAT-2 descriptor sense format was required (i.e. sensep[0]==0x72).
  */
 int
-sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
+sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
              int timeout_secs, void * dinp, void * doutp, int dlen,
-             unsigned char * sensep, int max_sense_len,
-             unsigned char * ata_return_dp, int max_ata_return_len,
+             uint8_t * sensep, int max_sense_len,
+             uint8_t * ata_return_dp, int max_ata_return_len,
              int * residp, int verbose)
 {
     int k, res, slen, duration;
     int ret = -1;
-    unsigned char apt_cdb[ATA_PT_32_CMDLEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char * sp;
-    const unsigned char * bp;
+    uint8_t apt_cdb[ATA_PT_32_CMDLEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t * sp;
+    const uint8_t * bp;
     struct sg_pt_base * ptvp;
     const char * cnamep;
     char b[256];
@@ -1733,9 +1733,9 @@ sg_ll_ata_pt(int sg_fd, const unsigned char * cdbp, int cdb_len,
     set_scsi_pt_sense(ptvp, sp, slen);
     if (dlen > 0) {
         if (dinp)
-            set_scsi_pt_data_in(ptvp, (unsigned char *)dinp, dlen);
+            set_scsi_pt_data_in(ptvp, (uint8_t *)dinp, dlen);
         else if (doutp)
-            set_scsi_pt_data_out(ptvp, (unsigned char *)doutp, dlen);
+            set_scsi_pt_data_out(ptvp, (uint8_t *)doutp, dlen);
     }
     res = do_scsi_pt(ptvp, sg_fd,
                      ((timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT),
@@ -1823,13 +1823,13 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
 {
     static const char * const cdb_name_s = "read buffer(10)";
     int res, k, ret, sense_cat;
-    unsigned char rbuf_cdb[READ_BUFFER_CMDLEN] =
+    uint8_t rbuf_cdb[READ_BUFFER_CMDLEN] =
         {READ_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    rbuf_cdb[1] = (unsigned char)(mode & 0x1f);
-    rbuf_cdb[2] = (unsigned char)(buffer_id & 0xff);
+    rbuf_cdb[1] = (uint8_t)(mode & 0x1f);
+    rbuf_cdb[2] = (uint8_t)(buffer_id & 0xff);
     sg_put_unaligned_be24((uint32_t)buffer_offset, rbuf_cdb + 3);
     sg_put_unaligned_be24((uint32_t)mx_resp_len, rbuf_cdb + 6);
     if (verbose) {
@@ -1843,7 +1843,7 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
         return -1;
     set_scsi_pt_cdb(ptvp, rbuf_cdb, sizeof(rbuf_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -1885,13 +1885,13 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
 {
     static const char * const cdb_name_s = "write buffer";
     int k, res, ret, sense_cat;
-    unsigned char wbuf_cdb[WRITE_BUFFER_CMDLEN] =
+    uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
-    wbuf_cdb[1] = (unsigned char)(mode & 0x1f);
-    wbuf_cdb[2] = (unsigned char)(buffer_id & 0xff);
+    wbuf_cdb[1] = (uint8_t)(mode & 0x1f);
+    wbuf_cdb[2] = (uint8_t)(buffer_id & 0xff);
     sg_put_unaligned_be24((uint32_t)buffer_offset, wbuf_cdb + 3);
     sg_put_unaligned_be24((uint32_t)param_len, wbuf_cdb + 6);
     if (verbose) {
@@ -1916,7 +1916,7 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
         return -1;
     set_scsi_pt_cdb(ptvp, wbuf_cdb, sizeof(wbuf_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -2034,9 +2034,9 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
 {
     static const char * const cdb_name_s = "unmap";
     int k, res, ret, sense_cat, tmout;
-    unsigned char u_cdb[UNMAP_CMDLEN] =
+    uint8_t u_cdb[UNMAP_CMDLEN] =
                          {UNMAP_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (anchor)
@@ -2059,7 +2059,7 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
         return -1;
     set_scsi_pt_cdb(ptvp, u_cdb, sizeof(u_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -2089,9 +2089,9 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
 {
     static const char * const cdb_name_s = "read block limits";
     int k, ret, res, sense_cat;
-    unsigned char rl_cdb[READ_BLOCK_LIMITS_CMDLEN] =
+    uint8_t rl_cdb[READ_BLOCK_LIMITS_CMDLEN] =
       {READ_BLOCK_LIMITS_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (verbose) {
@@ -2105,7 +2105,7 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
         return -1;
     set_scsi_pt_cdb(ptvp, rl_cdb, sizeof(rl_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -2147,16 +2147,16 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
                            int mx_resp_len, bool noisy, int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char rcvcopyres_cdb[THIRD_PARTY_COPY_IN_CMDLEN] =
+    uint8_t rcvcopyres_cdb[THIRD_PARTY_COPY_IN_CMDLEN] =
       {THIRD_PARTY_COPY_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     char b[64];
 
     sg_get_opcode_sa_name(THIRD_PARTY_COPY_IN_CMD, sa, 0, (int)sizeof(b), b);
-    rcvcopyres_cdb[1] = (unsigned char)(sa & 0x1f);
+    rcvcopyres_cdb[1] = (uint8_t)(sa & 0x1f);
     if (sa <= 4)        /* LID1 variants */
-        rcvcopyres_cdb[2] = (unsigned char)(list_id);
+        rcvcopyres_cdb[2] = (uint8_t)(list_id);
     else if ((sa >= 5) && (sa <= 7))    /* LID4 variants */
         sg_put_unaligned_be32((uint32_t)list_id, rcvcopyres_cdb + 2);
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rcvcopyres_cdb + 10);
@@ -2172,7 +2172,7 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
         return -1;
     set_scsi_pt_cdb(ptvp, rcvcopyres_cdb, sizeof(rcvcopyres_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, b, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
@@ -2207,13 +2207,13 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
                     int verbose)
 {
     int k, res, ret, sense_cat;
-    unsigned char xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
+    uint8_t xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
       {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     const char * opcode_name = "Extended copy (LID1)";
 
-    xcopy_cdb[1] = (unsigned char)(EXTENDED_COPY_LID1_SA & 0x1f);
+    xcopy_cdb[1] = (uint8_t)(EXTENDED_COPY_LID1_SA & 0x1f);
     sg_put_unaligned_be32((uint32_t)param_len, xcopy_cdb + 10);
 
     if (verbose) {
@@ -2231,7 +2231,7 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
         return -1;
     set_scsi_pt_cdb(ptvp, xcopy_cdb, sizeof(xcopy_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, opcode_name, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -2264,15 +2264,15 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
                       bool noisy, int verbose)
 {
     int k, res, ret, sense_cat, tmout;
-    unsigned char xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
+    uint8_t xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
       {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
     char cname[80];
 
     sg_get_opcode_sa_name(THIRD_PARTY_COPY_OUT_CMD, sa, 0, sizeof(cname),
                           cname);
-    xcopy_cdb[1] = (unsigned char)(sa & 0x1f);
+    xcopy_cdb[1] = (uint8_t)(sa & 0x1f);
     switch (sa) {
     case 0x0:   /* XCOPY(LID1) */
     case 0x1:   /* XCOPY(LID4) */
@@ -2282,7 +2282,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
     case 0x11:  /* WRITE USING TOKEN (SBC-3) */
         sg_put_unaligned_be32((uint32_t)list_id, xcopy_cdb + 6);
         sg_put_unaligned_be32((uint32_t)param_len, xcopy_cdb + 10);
-        xcopy_cdb[14] = (unsigned char)(group_num & 0x1f);
+        xcopy_cdb[14] = (uint8_t)(group_num & 0x1f);
         break;
     case 0x1c:  /* COPY OPERATION ABORT */
         sg_put_unaligned_be32((uint32_t)list_id, xcopy_cdb + 2);
@@ -2308,7 +2308,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
         return -1;
     set_scsi_pt_cdb(ptvp, xcopy_cdb, sizeof(xcopy_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)paramp, param_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cname, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
@@ -2349,8 +2349,8 @@ sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
     static const char * const cdb_seek_name_s = "Seek(10)";
     int k, res, sense_cat, ret, cdb_len, tmout;
     const char *cdb_name_s;
-    unsigned char preFetchCdb[PRE_FETCH16_CMDLEN]; /* all use longest cdb */
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t preFetchCdb[PRE_FETCH16_CMDLEN]; /* all use longest cdb */
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     memset(preFetchCdb, 0, sizeof(preFetchCdb));

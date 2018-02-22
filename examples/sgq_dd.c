@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -16,13 +17,13 @@
 #include <sys/sysmacros.h>
 #include <linux/major.h>
 #include <sys/time.h>
-typedef unsigned char u_char;   /* horrible, for scsi.h */
+typedef uint8_t u_char;   /* horrible, for scsi.h */
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
 /* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999-2002 D. Gilbert and P. Allworth
+*  Copyright (C) 1999-2018 D. Gilbert and P. Allworth
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -48,7 +49,7 @@ typedef unsigned char u_char;   /* horrible, for scsi.h */
 
 */
 
-static char * version_str = "0.59 20160528";
+static char * version_str = "0.60 20180220";
 /* resurrected from "0.55 20020509" */
 
 #define DEF_BLOCK_SIZE 512
@@ -125,11 +126,11 @@ typedef struct request_element
     int wr;
     int blk;
     int num_blks;
-    unsigned char * buffp;
-    unsigned char * alloc_bp;
+    uint8_t * buffp;
+    uint8_t * alloc_bp;
     sg_io_hdr_t io_hdr;
-    unsigned char cmd[S_RW_LEN];
-    unsigned char sb[SENSE_BUFF_LEN];
+    uint8_t cmd[S_RW_LEN];
+    uint8_t sb[SENSE_BUFF_LEN];
     int bs;
     int dio;
     int dio_incomplete;
@@ -285,9 +286,9 @@ static int
 read_capacity(int sg_fd, int * num_sect, int * sect_sz)
 {
     int res;
-    unsigned char rc_cdb [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char rcBuff[64];
-    unsigned char sense_b[64];
+    uint8_t rc_cdb [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t rcBuff[64];
+    uint8_t sense_b[64];
     sg_io_hdr_t io_hdr;
 
     memset(&io_hdr, 0, sizeof(sg_io_hdr_t));
@@ -609,7 +610,7 @@ prepare_rq_elems(Rq_coll * clp, const char * inf, const char * outf)
         psz = getpagesize();
         if (NULL == (rep->alloc_bp = malloc(sz + psz)))
             return 1;
-        rep->buffp = (unsigned char *)
+        rep->buffp = (uint8_t *)
                 (((unsigned long)rep->alloc_bp + psz - 1) & (~(psz - 1)));
         rep->qstate = QS_IDLE;
         rep->bs = clp->bs;

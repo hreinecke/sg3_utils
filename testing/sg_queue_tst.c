@@ -49,16 +49,16 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
-    unsigned char inq_cdb[INQ_CMD_LEN] =
+    uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char sdiag_cdb[SDIAG_CMD_LEN] =
+    uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
                                 {0x1d, 0, 0, 0, 0, 0};
-    unsigned char inqBuff[16][INQ_REPLY_LEN];
+    uint8_t inqBuff[16][INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr[16];
     sg_io_hdr_t rio_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char sense_buffer[16][SENSE_BUFFER_LEN];
+    uint8_t sense_buffer[16][SENSE_BUFFER_LEN];
     int q_at_tail = 0;
 
     for (k = 1; k < argc; ++k) {
@@ -96,7 +96,7 @@ int main(int argc, char * argv[])
         memset(&io_hdr[k], 0, sizeof(sg_io_hdr_t));
         io_hdr[k].interface_id = 'S';
         /* io_hdr[k].iovec_count = 0; */  /* memset takes care of this */
-        io_hdr[k].mx_sb_len = (unsigned char)sizeof(sense_buffer);
+        io_hdr[k].mx_sb_len = (uint8_t)sizeof(sense_buffer);
         if (0 == (k % 3)) {
             io_hdr[k].cmd_len = sizeof(sdiag_cdb);
             io_hdr[k].cmdp = sdiag_cdb;

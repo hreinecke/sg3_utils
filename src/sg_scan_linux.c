@@ -51,7 +51,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.16 20180218";
+static const char * version_str = "4.17 20180219";
 
 #define ME "sg_scan: "
 
@@ -86,11 +86,11 @@ typedef struct my_sg_scsi_id {
     int unused2;        /* ditto */
 } My_sg_scsi_id;
 
-int sg3_inq(int sg_fd, unsigned char * inqBuff, bool do_extra);
-int scsi_inq(int sg_fd, unsigned char * inqBuff);
+int sg3_inq(int sg_fd, uint8_t * inqBuff, bool do_extra);
+int scsi_inq(int sg_fd, uint8_t * inqBuff);
 int try_ata_identity(const char * file_namep, int ata_fd, bool do_inq);
 
-static unsigned char inq_cdb[INQ_CMD_LEN] =
+static uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
 
 
@@ -192,7 +192,7 @@ int main(int argc, char * argv[])
     const char * cp;
     char fname[FNAME_SZ];
     char ebuff[EBUFF_SZ];
-    unsigned char inqBuff[INQ_REPLY_LEN];
+    uint8_t inqBuff[INQ_REPLY_LEN];
     My_scsi_idlun my_idlun;
     struct stat a_stat;
 
@@ -392,11 +392,11 @@ int main(int argc, char * argv[])
     return 0;
 }
 
-int sg3_inq(int sg_fd, unsigned char * inqBuff, bool do_extra)
+int sg3_inq(int sg_fd, uint8_t * inqBuff, bool do_extra)
 {
     bool ok;
     int err, sg_io;
-    unsigned char sense_buffer[32];
+    uint8_t sense_buffer[32];
     struct sg_io_hdr io_hdr;
 
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
@@ -461,15 +461,15 @@ int sg3_inq(int sg_fd, unsigned char * inqBuff, bool do_extra)
 struct lscsi_ioctl_command {
         unsigned int inlen;  /* _excluding_ scsi command length */
         unsigned int outlen;
-        unsigned char data[1];  /* was 0 but that's not ISO C!! */
+        uint8_t data[1];  /* was 0 but that's not ISO C!! */
                 /* on input, scsi command starts here then opt. data */
 };
 
 /* fallback INQUIRY using scsi mid-level's SCSI_IOCTL_SEND_COMMAND ioctl */
-int scsi_inq(int sg_fd, unsigned char * inqBuff)
+int scsi_inq(int sg_fd, uint8_t * inqBuff)
 {
     int res;
-    unsigned char buff[1024];
+    uint8_t buff[1024];
     struct lscsi_ioctl_command * sicp = (struct lscsi_ioctl_command *)buff;
 
     memset(buff, 0, sizeof(buff));
@@ -500,10 +500,10 @@ int scsi_inq(int sg_fd, unsigned char * inqBuff)
  */
 struct ata_identify_device {
   unsigned short words000_009[10];
-  unsigned char  serial_no[20];
+  uint8_t  serial_no[20];
   unsigned short words020_022[3];
-  unsigned char  fw_rev[8];
-  unsigned char  model[40];
+  uint8_t  fw_rev[8];
+  uint8_t  model[40];
   unsigned short words047_079[33];
   unsigned short major_rev_num;
   unsigned short minor_rev_num;
@@ -590,7 +590,7 @@ void printswap(char *output, char *in, unsigned int n)
 
 int ata_command_interface(int device, char *data)
 {
-    unsigned char buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
+    uint8_t buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     int retval;
 
     buff[0] = ATA_IDENTIFY_DEVICE;

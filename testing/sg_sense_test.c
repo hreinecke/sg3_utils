@@ -15,11 +15,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <errno.h>
 #include <getopt.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 
 #include "sg_lib.h"
 
@@ -28,7 +24,7 @@
 
 #define ME "sg_sense_test: "
 
-static const char * version_str = "2.02 20180122";
+static const char * version_str = "2.03 20180220";
 
 static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},

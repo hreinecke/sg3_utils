@@ -31,7 +31,7 @@
 
 */
 
-static const char * version_str = "0.44 20171008";    /* mmc6r02 */
+static const char * version_str = "0.45 20182198";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -39,7 +39,7 @@ static const char * version_str = "0.44 20171008";    /* mmc6r02 */
 #define ME "sg_get_config: "
 
 
-static unsigned char resp_buffer[MX_ALLOC_LEN];
+static uint8_t resp_buffer[MX_ALLOC_LEN];
 
 static struct option long_options[] = {
         {"brief", no_argument, 0, 'b'},
@@ -243,7 +243,7 @@ dStrRaw(const char * str, int len)
 }
 
 static void
-decode_feature(int feature, unsigned char * bp, int len)
+decode_feature(int feature, uint8_t * bp, int len)
 {
     int k, num, n, profile;
     char buff[128];
@@ -882,11 +882,11 @@ decode_feature(int feature, unsigned char * bp, int len)
 }
 
 static void
-decode_config(unsigned char * resp, int max_resp_len, int len, bool brief,
+decode_config(uint8_t * resp, int max_resp_len, int len, bool brief,
               bool inner_hex)
 {
     int k, curr_profile, extra_len, feature;
-    unsigned char * bp;
+    uint8_t * bp;
     char buff[128];
 
     if (max_resp_len < len) {

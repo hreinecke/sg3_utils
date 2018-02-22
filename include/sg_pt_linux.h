@@ -116,7 +116,7 @@ struct sg_pt_linux_scsi {
     void * mdxferp;
     uint8_t * nvme_id_ctlp;     /* cached response to controller IDENTIFY */
     uint8_t * free_nvme_id_ctlp;
-    unsigned char tmf_request[4];
+    uint8_t tmf_request[4];
 };
 
 struct sg_pt_base {

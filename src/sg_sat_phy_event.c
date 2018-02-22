@@ -19,12 +19,13 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.10 20171107";
+static const char * version_str = "1.11 20180219";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -170,12 +171,12 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
     int resid = 0;
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    unsigned char sense_buffer[64];
-    unsigned char ata_return_desc[16];
-    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
+    uint8_t sense_buffer[64];
+    uint8_t ata_return_desc[16];
+    uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
+    uint8_t apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
 
@@ -368,7 +369,7 @@ int main(int argc, char * argv[])
     int sg_fd, c, k, j, res, id, len, vendor;
     char * device_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char inBuff[READ_LOG_EXT_RESPONSE_LEN];
+    uint8_t inBuff[READ_LOG_EXT_RESPONSE_LEN];
     int cdb_len = 16;
     int hex = 0;
     int verbose = 0;

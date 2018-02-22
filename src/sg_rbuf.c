@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2017 D. Gilbert
+ *  Copyright (C) 1999-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.01 20171209";
+static const char * version_str = "5.02 20180219";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -363,10 +363,10 @@ main(int argc, char * argv[])
     unsigned int k, num;
     int64_t total_size = RB_DEF_SIZE;
     struct opts_t * op;
-    unsigned char * rbBuff = NULL;
+    uint8_t * rbBuff = NULL;
     void * rawp = NULL;
-    unsigned char sense_buffer[32];
-    unsigned char rb_cdb [RB_CMD_LEN];
+    uint8_t sense_buffer[32];
+    uint8_t rb_cdb [RB_CMD_LEN];
     struct sg_io_hdr io_hdr;
     struct timeval start_tm, end_tm;
     struct opts_t opts;
@@ -414,7 +414,7 @@ main(int argc, char * argv[])
         printf("out of memory (query)\n");
         return SG_LIB_CAT_OTHER;
     }
-    rbBuff = (unsigned char *)rawp;
+    rbBuff = (uint8_t *)rawp;
 
     memset(rb_cdb, 0, RB_CMD_LEN);
     rb_cdb[0] = RB_OPCODE;
@@ -502,7 +502,7 @@ main(int argc, char * argv[])
     }
 
     if (op->do_mmap) {
-        rbBuff = (unsigned char *)mmap(NULL, buf_size, PROT_READ, MAP_SHARED,
+        rbBuff = (uint8_t *)mmap(NULL, buf_size, PROT_READ, MAP_SHARED,
                                        sg_fd, 0);
         if (MAP_FAILED == rbBuff) {
             if (ENOMEM == errno) {
@@ -519,17 +519,17 @@ main(int argc, char * argv[])
         }
     }
     else { /* non mmap-ed IO */
-        rawp = (unsigned char *)malloc(buf_size + (op->do_dio ? psz : 0));
+        rawp = (uint8_t *)malloc(buf_size + (op->do_dio ? psz : 0));
         if (NULL == rawp) {
             printf("out of memory (data)\n");
             return SG_LIB_CAT_OTHER;
         }
         /* perhaps use posix_memalign() instead */
         if (op->do_dio)    /* align to page boundary */
-            rbBuff= (unsigned char *)(((sg_uintptr_t)rawp + psz - 1) &
+            rbBuff= (uint8_t *)(((sg_uintptr_t)rawp + psz - 1) &
                                       (~(psz - 1)));
         else
-            rbBuff = (unsigned char *)rawp;
+            rbBuff = (uint8_t *)rawp;
     }
 
     num = total_size / buf_size;

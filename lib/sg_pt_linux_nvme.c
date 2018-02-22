@@ -1153,7 +1153,7 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
     }
     memcpy(&cmd, (const uint8_t *)ptp->io_hdr.request, n);
     if (n < len)        /* zero out rest of 'cmd' */
-        memset((unsigned char *)&cmd + n, 0, len - n);
+        memset((uint8_t *)&cmd + n, 0, len - n);
     if (ptp->io_hdr.din_xfer_len > 0) {
         cmd.data_len = ptp->io_hdr.din_xfer_len;
         dp = (void *)ptp->io_hdr.din_xferp;

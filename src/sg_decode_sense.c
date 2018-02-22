@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2017 Douglas Gilbert.
+ * Copyright (c) 2010-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.13 20171010";
+static const char * version_str = "1.14 20180219";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -61,7 +61,7 @@ struct opts_t {
     int do_verbose;
     const char * wfname;
     const char * no_space_str;
-    unsigned char sense[MAX_SENSE_LEN + 4];
+    uint8_t sense[MAX_SENSE_LEN + 4];
 };
 
 static char concat_buff[1024];
@@ -216,7 +216,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
             pr2serr("sense data too long (max. %d bytes)\n", MAX_SENSE_LEN);
             return SG_LIB_SYNTAX_ERROR;
         }
-        op->sense[op->sense_len++] = (unsigned char)val;
+        op->sense[op->sense_len++] = (uint8_t)val;
     }
     return 0;
 }
@@ -227,7 +227,7 @@ process_cl(struct opts_t *op, int argc, char *argv[])
  * digits is expected, 2 per byte. Everything from and including a '#'
  * on a line is ignored.  Returns 0 if ok, or 1 if error. */
 static int
-f2hex_arr(const char * fname, bool no_space, unsigned char * mp_arr,
+f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
           int * mp_arr_len, int max_arr_len)
 {
     bool split_line;
@@ -445,7 +445,7 @@ main(int argc, char *argv[])
                 pr2serr("bad no_space hex string: %s\n", cp);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            op->sense[op->sense_len++] = (unsigned char)ui;
+            op->sense[op->sense_len++] = (uint8_t)ui;
         }
     }
 

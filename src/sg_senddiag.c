@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.57 20180217";
+static const char * version_str = "0.58 20180217";
 
 #define ME "sg_senddiag: "
 
@@ -465,7 +465,7 @@ do_modes_0a(int sg_fd, void * resp, int mx_resp_len, bool mode6, bool noisy,
 /* stdin (one per line, comma separated list or space separated list). */
 /* Returns 0 if ok, or 1 if error. */
 static int
-build_diag_page(const char * inp, unsigned char * mp_arr, int * mp_arr_len,
+build_diag_page(const char * inp, uint8_t * mp_arr, int * mp_arr_len,
                 int max_arr_len)
 {
     int in_len, k, j, m;
@@ -675,11 +675,11 @@ main(int argc, char * argv[])
     int ret = 0;
     struct opts_t opts;
     struct opts_t * op;
-    unsigned char * rsp_buff = NULL;
-    unsigned char * free_rsp_buff = NULL;
+    uint8_t * rsp_buff = NULL;
+    uint8_t * free_rsp_buff = NULL;
     const char * cp;
-    unsigned char * read_in = NULL;
-    unsigned char * free_read_in = NULL;
+    uint8_t * read_in = NULL;
+    uint8_t * free_read_in = NULL;
 
     op = &opts;
     memset(op, 0, sizeof(opts));

@@ -19,6 +19,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -51,7 +52,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.15 20171006";
+static const char * version_str = "1.16 20180219";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
@@ -127,16 +128,16 @@ static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
     int resid = 0;
     uint64_t ull;
     struct sg_scsi_sense_hdr ssh;
-    unsigned char inBuff[ID_RESPONSE_LEN];
-    unsigned char sense_buffer[64];
-    unsigned char ata_return_desc[16];
-    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
+    uint8_t inBuff[ID_RESPONSE_LEN];
+    uint8_t sense_buffer[64];
+    uint8_t ata_return_desc[16];
+    uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
+    uint8_t apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
-    unsigned char apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN];
+    uint8_t apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN];
     const unsigned short * usp;
 
     sb_sz = sizeof(sense_buffer);

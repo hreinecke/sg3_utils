@@ -12,10 +12,12 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 
@@ -31,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.59 20180205";
+static const char * version_str = "0.61 20180221";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -50,6 +52,8 @@ static const char * version_str = "0.59 20180205";
 #define MX_ALLOC_LEN 8192
 #define MX_TIDS 32
 #define MX_TID_LEN 256
+
+#define ME "sg_persist"
 
 #define SG_PERSIST_IN_RDONLY "SG_PERSIST_IN_RDONLY"
 
@@ -72,7 +76,7 @@ struct opts_t {
     unsigned int prout_type;
     uint64_t param_rk;
     uint64_t param_sark;
-    unsigned char transportid_arr[MX_TIDS * MX_TID_LEN];
+    uint8_t transportid_arr[MX_TIDS * MX_TID_LEN];
 };
 
 
@@ -268,12 +272,21 @@ usage(int help)
 static int
 prin_work(int sg_fd, const struct opts_t * op)
 {
-    int k, j, num, res, add_len, add_desc_len;
+    int k, j, num, add_len, add_desc_len;
+    int res = 0;
     unsigned int pr_gen;
-    unsigned char * bp;
-    unsigned char pr_buff[MX_ALLOC_LEN];
+    uint8_t * bp;
+    uint8_t * pr_buff = NULL;
+    uint8_t * free_pr_buff = NULL;
+    int pr_buff_sz = MX_ALLOC_LEN;
 
-    memset(pr_buff, 0, sizeof(pr_buff));
+    pr_buff = sg_memalign(pr_buff_sz, 0 /* page aligned */, &free_pr_buff,
+                          false);
+    if (NULL == pr_buff) {
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
+                pr_buff_sz);
+        return sg_convert_errno(ENOMEM);
+    }
     res = sg_ll_persistent_reserve_in(sg_fd, op->prin_sa, pr_buff,
                                       op->alloc_len, true, op->verbose);
     if (res) {
@@ -294,14 +307,15 @@ prin_work(int sg_fd, const struct opts_t * op)
             sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
             pr2serr("PR in (%s): %s\n", b, bb);
         }
-        return res;
+        goto fini;
     }
     if (PRIN_RCAP_SA == op->prin_sa) {
         if (8 != pr_buff[1]) {
             pr2serr("Unexpected response for PRIN Report Capabilities\n");
             if (op->hex)
                 hex2stdout(pr_buff, pr_buff[1], 1);
-            return SG_LIB_CAT_MALFORMED;
+            res = SG_LIB_CAT_MALFORMED;
+            goto fini;
         }
         if (op->hex)
             hex2stdout(pr_buff, 8, 1);
@@ -345,10 +359,10 @@ prin_work(int sg_fd, const struct opts_t * op)
                 printf("  PR generation=0x%x, ", pr_gen);
                 if (add_len <= 0)
                     printf("Additional length=%d\n", add_len);
-                if (add_len > ((int)sizeof(pr_buff) - 8)) {
+                if (add_len > (pr_buff_sz - 8)) {
                     printf("Additional length too large=%d, truncate\n",
                            add_len);
-                    hex2stdout((pr_buff + 8), sizeof(pr_buff) - 8, 1);
+                    hex2stdout((pr_buff + 8), pr_buff_sz - 8, 1);
                 } else {
                     printf("Additional length=%d\n", add_len);
                     hex2stdout((pr_buff + 8), add_len, 1);
@@ -423,7 +437,10 @@ prin_work(int sg_fd, const struct opts_t * op)
             }
         }
     }
-    return 0;
+fini:
+    if (free_pr_buff)
+        free(free_pr_buff);
+    return res;
 }
 
 /* Compact the 2 dimensional transportid_arr into a one dimensional
@@ -433,7 +450,7 @@ compact_transportid_array(struct opts_t * op)
 {
     int k, off, protocol_id, len;
     int compact_len = 0;
-    unsigned char * bp = op->transportid_arr;
+    uint8_t * bp = op->transportid_arr;
 
     for (k = 0, off = 0; ((k < op->num_transportids) && (k < MX_TIDS));
          ++k, off += MX_TID_LEN) {
@@ -458,13 +475,22 @@ compact_transportid_array(struct opts_t * op)
 static int
 prout_work(int sg_fd, struct opts_t * op)
 {
-    int len, res, t_arr_len;
-    unsigned char pr_buff[MX_ALLOC_LEN];
+    int len, t_arr_len;
+    int res = 0;
+    uint8_t * pr_buff = NULL;
+    uint8_t * free_pr_buff = NULL;
+    int pr_buff_sz = MX_ALLOC_LEN;
     char b[64];
     char bb[80];
 
     t_arr_len = compact_transportid_array(op);
-    memset(pr_buff, 0, sizeof(pr_buff));
+    pr_buff = sg_memalign(pr_buff_sz, 0 /* page aligned */, &free_pr_buff,
+                          false);
+    if (NULL == pr_buff) {
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
+                pr_buff_sz);
+        return sg_convert_errno(ENOMEM);
+    }
     sg_put_unaligned_be64(op->param_rk, pr_buff + 0);
     sg_put_unaligned_be64(op->param_sark, pr_buff + 8);
     if (op->param_alltgpt)
@@ -496,21 +522,33 @@ prout_work(int sg_fd, struct opts_t * op)
                 sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
                 pr2serr("PR out (%s): %s\n", b, bb);
             }
-            return res;
+            goto fini;
         } else if (op->verbose)
             pr2serr("PR out: command (%s) successful\n", b);
     }
-    return 0;
+fini:
+    if (free_pr_buff)
+        free(free_pr_buff);
+    return res;
 }
 
 static int
 prout_reg_move_work(int sg_fd, struct opts_t * op)
 {
-    int len, res, t_arr_len;
-    unsigned char pr_buff[MX_ALLOC_LEN];
+    int len, t_arr_len;
+    int res = 0;
+    uint8_t * pr_buff = NULL;
+    uint8_t * free_pr_buff = NULL;
+    int pr_buff_sz = MX_ALLOC_LEN;
 
     t_arr_len = compact_transportid_array(op);
-    memset(pr_buff, 0, sizeof(pr_buff));
+    pr_buff = sg_memalign(pr_buff_sz, 0 /* page aligned */, &free_pr_buff,
+                          false);
+    if (NULL == pr_buff) {
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
+                pr_buff_sz);
+        return sg_convert_errno(ENOMEM);
+    }
     sg_put_unaligned_be64(op->param_rk, pr_buff + 0);
     sg_put_unaligned_be64(op->param_sark, pr_buff + 8);
     if (op->param_unreg)
@@ -539,16 +577,19 @@ prout_reg_move_work(int sg_fd, struct opts_t * op)
             sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
             pr2serr("PR out (register and move): %s\n", bb);
         }
-        return res;
+        goto fini;
     } else if (op->verbose)
         pr2serr("PR out: 'register and move' command successful\n");
-    return 0;
+fini:
+    if (free_pr_buff)
+        free(free_pr_buff);
+    return res;
 }
 
 /* Decode various symbolic forms of TransportIDs into SPC-4 format.
  * Returns 1 if one found, else returns 0. */
 static int
-decode_sym_transportid(const char * lcp, unsigned char * tidp)
+decode_sym_transportid(const char * lcp, uint8_t * tidp)
 {
     int k, j, n, b, c, len, alen;
     unsigned int ui;
@@ -708,7 +749,7 @@ decode_file_tids(const char * fnp, struct opts_t * op)
     unsigned int h;
     FILE * fp = stdin;
     const char * lcp;
-    unsigned char * tid_arr = op->transportid_arr;
+    uint8_t * tid_arr = op->transportid_arr;
     char line[1024];
     char carry_over[4];
 
@@ -835,7 +876,7 @@ build_transportid(const char * inp, struct opts_t * op)
     int k = 0;
     unsigned int h;
     const char * lcp;
-    unsigned char * tid_arr = op->transportid_arr;
+    uint8_t * tid_arr = op->transportid_arr;
     char * cp;
     char * c2p;
 
@@ -898,14 +939,16 @@ int
 main(int argc, char * argv[])
 {
     bool got_maxlen, ok;
+    bool flagged = false;
     bool want_prin = false;
     bool want_prout = false;
-    int sg_fd, c, k, res;
+    int c, k, res;
     int help = 0;
     int num_prin_sa = 0;
     int num_prout_sa = 0;
     int num_prout_param = 0;
     int peri_type = 0;
+    int sg_fd = -1;
     int ret = 0;
     const char * cp;
     const char * device_name = NULL;
@@ -983,7 +1026,7 @@ main(int argc, char * argv[])
                 k = sg_get_num(optarg);
                 ok = (-1 != k);
                 op->alloc_len = (unsigned int)k;
-            } else 
+            } else
                 ok = (1 == sscanf(optarg, "%x", &op->alloc_len));
             if (! ok) {
                 pr2serr("bad argument to '--%s'\n", cp);
@@ -1171,7 +1214,7 @@ main(int argc, char * argv[])
     }
     if ((op->verbose > 2) && op->num_transportids) {
         char b[1024];
-        unsigned char * bp;
+        uint8_t * bp;
 
         pr2serr("number of tranport-ids decoded from command line (or "
                 "stdin): %d\n", op->num_transportids);
@@ -1186,11 +1229,14 @@ main(int argc, char * argv[])
     if (op->inquiry) {
         if ((sg_fd = sg_cmds_open_device(device_name, true /* ro */,
                                          op->verbose)) < 0) {
-            pr2serr("sg_persist: error opening file (ro): %s: %s\n",
+            pr2serr("%s: error opening file (ro): %s: %s\n", ME,
                     device_name, safe_strerror(-sg_fd));
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-sg_fd);
+            flagged = true;
+            goto fini;
         }
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, op->verbose)) {
+        ret = sg_simple_inquiry(sg_fd, &inq_resp, true, op->verbose);
+        if (0 == ret) {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);
             peri_type = inq_resp.peripheral_type;
@@ -1200,11 +1246,18 @@ main(int argc, char * argv[])
             else
                 printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
-            printf("sg_persist: %s doesn't respond to a SCSI INQUIRY\n",
-                   device_name);
-            return SG_LIB_CAT_OTHER;
+            printf("%s: SCSI INQUIRY failed on %s", ME, device_name);
+            if (ret < 0) {
+                ret = -ret;
+                printf(": %s\n", safe_strerror(ret));
+                ret = sg_convert_errno(ret);
+            } else
+                printf("\n");
+            flagged = true;
+            goto fini;
         }
         sg_cmds_close_device(sg_fd);
+        sg_fd = -1;
     }
 
     if (! op->readwrite_force) {
@@ -1214,11 +1267,13 @@ main(int argc, char * argv[])
                                      which is open(RW) */
     } else
         op->readonly = false;      /* '-yy' force open(RW) */
-    if ((sg_fd = sg_cmds_open_device(device_name, op->readonly,
-                                     op->verbose)) < 0) {
-        pr2serr("sg_persist: error opening file (rw): %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+    sg_fd = sg_cmds_open_device(device_name, op->readonly, op->verbose);
+    if (sg_fd < 0) {
+        pr2serr("%s: error opening file %s (r%s): %s\n", ME, device_name,
+                (op->readonly ? "o" : "w"), safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        flagged = true;
+        goto fini;
     }
 
     if (op->pr_in)
@@ -1228,11 +1283,18 @@ main(int argc, char * argv[])
     else /* PROUT commands other than 'register and move' */
         ret = prout_work(sg_fd, op);
 
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (ret && (0 == op->verbose) && (! flagged)) {
+        if (! sg_if_can2stderr("", ret))
+            pr2serr("Some error occurred [%d]\n", ret);
+    }
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = SG_LIB_FILE_ERROR;
+        }
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -32,7 +32,7 @@
  * device.
  */
 
-static const char * version_str = "1.12 20171005";
+static const char * version_str = "1.13 20180219";
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -41,8 +41,8 @@ static const char * version_str = "1.12 20171005";
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
 
-static unsigned char glbasBuff[DEF_GLBAS_BUFF_LEN];
-static unsigned char * glbasBuffp = glbasBuff;
+static uint8_t glbasBuff[DEF_GLBAS_BUFF_LEN];
+static uint8_t * glbasBuffp = glbasBuff;
 
 
 static struct option long_options[] = {
@@ -126,7 +126,7 @@ dStrRaw(const char * str, int len)
  * the number of blocks and returns the provisioning status, -1 for error.
  */
 static int
-decode_lba_status_desc(const unsigned char * bp, uint64_t * slbap,
+decode_lba_status_desc(const uint8_t * bp, uint64_t * slbap,
                        uint32_t * blocksp, uint8_t * add_statusp)
 {
     uint32_t blocks;
@@ -166,7 +166,7 @@ main(int argc, char * argv[])
     bool do_raw = false;
     bool o_readonly = false;
     const char * device_name = NULL;
-    const unsigned char * bp;
+    const uint8_t * bp;
     int ret = 0;
     uint8_t add_status;
 
@@ -271,7 +271,7 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_GLBAS_BUFF_LEN) {
-        glbasBuffp = (unsigned char *)calloc(maxlen, 1);
+        glbasBuffp = (uint8_t *)calloc(maxlen, 1);
         if (NULL == glbasBuffp) {
             pr2serr("unable to allocate %d bytes on heap\n", maxlen);
             return SG_LIB_SYNTAX_ERROR;

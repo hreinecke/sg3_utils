@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2016 Douglas Gilbert.
+ * Copyright (c) 2006-2018 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,7 @@
 
 #define EBUFF_SZ 256
 
-static char * version_str = "1.04 20160528";
+static char * version_str = "1.05 20180220";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
@@ -100,13 +100,13 @@ void usage()
 int main(int argc, char * argv[])
 {
     int sg_fd, c, k;
-    unsigned char apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
+    uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     sg_io_hdr_t io_hdr;
     char device_name[256];
     char ebuff[EBUFF_SZ];
-    unsigned char sense_buffer[64];
+    uint8_t sense_buffer[64];
     int count = 0;
     int feature = 0;
     int lba = 0;
@@ -117,7 +117,7 @@ int main(int argc, char * argv[])
     int t_dir = 1;      /* 0 -> to device, 1 -> from device */
     int byte_block = 1; /* 0 -> bytes, 1 -> 512 byte blocks */
     int t_length = 0;   /* 0 -> no data transferred, 2 -> sector count */
-    const unsigned char * bp = NULL;
+    const uint8_t * bp = NULL;
 
     memset(device_name, 0, sizeof(device_name));
     while (1) {

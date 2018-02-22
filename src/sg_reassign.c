@@ -37,7 +37,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.23 20180118";
+static const char * version_str = "1.24 20180219";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -231,7 +231,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     const char * device_name = NULL;
     uint64_t addr_arr[MAX_NUM_ADDR];
-    unsigned char param_arr[4 + (MAX_NUM_ADDR * 8)];
+    uint8_t param_arr[4 + (MAX_NUM_ADDR * 8)];
     char b[80];
     int param_len = 4;
     int ret = 0;

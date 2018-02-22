@@ -36,7 +36,7 @@
 #endif
 
 
-static const char * const version_str = "1.83 20180204";
+static const char * const version_str = "1.84 20180219";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -117,7 +117,7 @@ static const char * const pass_through_s = "pass-through";
 
 static int
 sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
-                       const unsigned char * sbp, int slen, bool noisy,
+                       const uint8_t * sbp, int slen, bool noisy,
                        int verbose, int * o_sense_cat)
 {
     int scat, got;
@@ -184,7 +184,7 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
  * categories also have data in bytes received; -2 is still returned. */
 int
 sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
-                     int pt_res, int mx_di_len, const unsigned char * sbp,
+                     int pt_res, int mx_di_len, const uint8_t * sbp,
                      bool noisy, int verbose, int * o_sense_cat)
 {
     int got, cat, duration, slen, resid, resp_code, sstat;
@@ -339,16 +339,16 @@ sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
                   bool noisy, int verbose)
 {
     int res, ret, k, sense_cat, resid;
-    unsigned char inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
-    unsigned char * up;
+    uint8_t inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
+    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t * up;
     struct sg_pt_base * ptvp;
 
     if (cmddt)
         inq_cdb[1] |= 0x2;
     if (evpd)
         inq_cdb[1] |= 0x1;
-    inq_cdb[2] = (unsigned char)pg_op;
+    inq_cdb[2] = (uint8_t)pg_op;
     /* 16 bit allocation length (was 8, increased in spc3r09, 200209) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
@@ -358,7 +358,7 @@ sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
         pr2ws("\n");
     }
     if (resp && (mx_resp_len > 0)) {
-        up = (unsigned char *)resp;
+        up = (uint8_t *)resp;
         up[0] = 0x7f;   /* defensive prefill */
         if (mx_resp_len > 4)
             up[4] = 0;
@@ -374,7 +374,7 @@ sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
     }
     set_scsi_pt_cdb(ptvp, inq_cdb, sizeof(inq_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, inquiry_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
@@ -408,7 +408,7 @@ sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
             return ret ? ret : SG_LIB_CAT_MALFORMED;
         }
         /* zero unfilled section of response buffer, based on resid */
-        memset((unsigned char *)resp + (mx_resp_len - resid), 0, resid);
+        memset((uint8_t *)resp + (mx_resp_len - resid), 0, resid);
     }
     return ret;
 }
@@ -432,7 +432,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                   bool noisy, int verbose)
 {
     int ret;
-    unsigned char inq_resp[SAFE_STD_INQ_RESP_LEN];
+    uint8_t inq_resp[SAFE_STD_INQ_RESP_LEN];
 
     if (inq_data) {
         memset(inq_data, 0, sizeof(* inq_data));
@@ -490,8 +490,8 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
 {
     static const char * const tur_s = "test unit ready";
     int res, ret, k, sense_cat;
-    unsigned char tur_cdb[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t tur_cdb[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (verbose) {
@@ -510,7 +510,7 @@ sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
     ret = sg_cmds_process_resp(ptvp, tur_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
-	ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         if (progress) {
             int slen = get_scsi_pt_sense_len(ptvp);
@@ -553,9 +553,9 @@ sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
 {
     static const char * const rq_s = "request sense";
     int k, ret, res, sense_cat;
-    unsigned char rs_cdb[REQUEST_SENSE_CMDLEN] =
+    uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (desc)
@@ -576,12 +576,12 @@ sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
         return -1;
     set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, rq_s, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
     if (-1 == ret)
-	ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
@@ -613,9 +613,9 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
 {
     static const char * const report_luns_s = "report luns";
     int k, ret, res, sense_cat;
-    unsigned char rl_cdb[REPORT_LUNS_CMDLEN] =
+    uint8_t rl_cdb[REPORT_LUNS_CMDLEN] =
                          {REPORT_LUNS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     rl_cdb[2] = select_report & 0xff;
@@ -631,12 +631,12 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
         return -1;
     set_scsi_pt_cdb(ptvp, rl_cdb, sizeof(rl_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_in(ptvp, (unsigned char *)resp, mx_resp_len);
+    set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, report_luns_s, res, mx_resp_len,
                                sense_b, noisy, verbose, &sense_cat);
     if (-1 == ret)
-	ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

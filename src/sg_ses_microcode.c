@@ -23,6 +23,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -40,7 +41,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.12 20180217";    /* ses4r02 */
+static const char * version_str = "1.13 20180219";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -142,8 +143,8 @@ static struct diag_page_code mc_status_arr[] = {
 };
 
 struct dout_buff_t {
-    unsigned char * doutp;
-    unsigned char * free_doutp;
+    uint8_t * doutp;
+    uint8_t * free_doutp;
     int dout_len;
 };
 
@@ -235,7 +236,7 @@ print_modes(void)
 }
 
 static const char *
-get_mc_status_str(unsigned char status_val)
+get_mc_status_str(uint8_t status_val)
 {
     const struct diag_page_code * mcsp;
 
@@ -248,11 +249,11 @@ get_mc_status_str(unsigned char status_val)
 
 /* display DPC_DOWNLOAD_MICROCODE status dpage [0xe] */
 static void
-show_download_mc_sdg(const unsigned char * resp, int resp_len,
+show_download_mc_sdg(const uint8_t * resp, int resp_len,
                      uint32_t gen_code)
 {
     int k, num_subs, num;
-    const unsigned char * bp;
+    const uint8_t * bp;
     const char * cp;
 
     printf("Download microcode status diagnostic page:\n");
@@ -291,15 +292,15 @@ truncated:
 
 static int
 send_then_receive(int sg_fd, uint32_t gen_code, int off_off,
-                  const unsigned char * dmp, int dmp_len,
-                  struct dout_buff_t * wp, unsigned char * dip,
+                  const uint8_t * dmp, int dmp_len,
+                  struct dout_buff_t * wp, uint8_t * dip,
                   int din_len, bool last, const struct opts_t * op)
 {
     bool send_data = false;
     int do_len, rem, res, rsp_len, k, n, num, mc_status, resid, act_len, verb;
     int ret = 0;
     uint32_t rec_gen_code;
-    const unsigned char * bp;
+    const uint8_t * bp;
     const char * cp;
 
     verb = (op->verbose > 1) ? op->verbose - 1 : 0;
@@ -486,9 +487,9 @@ main(int argc, char * argv[])
     uint32_t gen_code = 0;
     const char * device_name = NULL;
     const char * file_name = NULL;
-    unsigned char * dmp = NULL;
-    unsigned char * dip = NULL;
-    unsigned char * free_dip = NULL;
+    uint8_t * dmp = NULL;
+    uint8_t * dip = NULL;
+    uint8_t * free_dip = NULL;
     char * cp;
     char ebuff[EBUFF_SZ];
     struct stat a_stat;
@@ -729,7 +730,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_FILE_ERROR;
             goto fini;
         }
-        if (NULL == (dmp = (unsigned char *)malloc(op->mc_len))) {
+        if (NULL == (dmp = (uint8_t *)malloc(op->mc_len))) {
             pr2serr(ME "out of memory to hold microcode read from FILE\n");
             ret = SG_LIB_CAT_OTHER;
             goto fini;

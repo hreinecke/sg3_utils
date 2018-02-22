@@ -20,12 +20,12 @@
 #include "sg_lib.h"
 #include "sg_unaligned.h"
 
-/* A utility program to test sg_libs string handling, specifically
+/*
+ * A utility program to test sg_libs string handling, specifically
  * related to snprintf().
- *
  */
 
-static const char * version_str = "1.05 20180119";
+static const char * version_str = "1.07 20180220";
 
 
 #define MAX_LINE_LEN 1024
@@ -43,7 +43,7 @@ static struct option long_options[] = {
         {0, 0, 0, 0},   /* sentinel */
 };
 
-static const unsigned char desc_sense_data1[] = {
+static const uint8_t desc_sense_data1[] = {
    /* unrec_err, excessive_writes, sdat_ovfl, additional_len=? */
     0x72, 0x1, 0x3, 0x2, 0x80, 0x0, 0x0, 12+12+8+4+8+4+28,
    /* Information: 0x11223344556677bb */
@@ -65,7 +65,7 @@ static const unsigned char desc_sense_data1[] = {
         2,0,0x12,0x34,
     };
 
-static const unsigned char desc_sense_data2[] = {
+static const uint8_t desc_sense_data2[] = {
    /* ill_req, inv fld in para list, additional_len=? */
     0x72, 0x5, 0x26, 0x0, 0x0, 0x0, 0x0, 8+4,
    /* sense key specific: SKSV=1, C/D*=0, bitp=7 bytep=34 */
@@ -74,7 +74,7 @@ static const unsigned char desc_sense_data2[] = {
     0x3, 0x2, 0x0, 0x45,
     };
 
-static const unsigned char desc_sense_data3[] = {
+static const uint8_t desc_sense_data3[] = {
    /* medium err, vibration induced ..., additional_len=? */
     0x72, 0x3, 0x9, 0x5, 0x0, 0x0, 0x0, 32+16,
    /* 0xd: block dev: sense key specific: SKSV=1, retry_count=257, fru=0x45
@@ -89,7 +89,7 @@ static const unsigned char desc_sense_data3[] = {
         0x53, 0x33, 0x33, 0x30, 0x0, 0x0, 0x1f, 0x40,
     };
 
-static const unsigned char desc_sense_data4[] = {
+static const uint8_t desc_sense_data4[] = {
    /* ill_req, inv fld in para list, additional_len=? */
     0x72, 0x5, 0x26, 0x0, 0x0, 0x0, 0x0, 24,
    /* Forwarded sense data, FSDT=0, sd_src=7, f_status=2 */
@@ -102,7 +102,7 @@ static const unsigned char desc_sense_data4[] = {
     0x3, 0x2, 0x0, 0x45,
     };
 
-static const unsigned char desc_sense_data5[] = {
+static const uint8_t desc_sense_data5[] = {
    /* no_sense, ATA info available */
     0x72, 0x0, 0x0, 0x1d, 0x0, 0x0, 0x0, 14+14,
    /* ATA descriptor extend=1 */
@@ -113,7 +113,7 @@ static const unsigned char desc_sense_data5[] = {
     0x55, 0x22, 0x66, 0x33, 0x1, 0x0,
     };
 
-static const unsigned char desc_sense_data6[] = {
+static const uint8_t desc_sense_data6[] = {
    /* UA, req, subsidiary bindinganged */
     0x72, 0x6, 0x3f, 0x1a, 0x0, 0x0, 0x0, 26+12+12,
     /* 0xe: designator, reason: preferred admin lu, uuid */
@@ -250,7 +250,7 @@ main(int argc, char * argv[])
         printf("sg_get_sense_str(ds_data1):\n");
         sg_get_sense_str(leadin, desc_sense_data1,
                          sizeof(desc_sense_data1), verbose, sizeof(b), b);
-        printf("sg_get_sense_str: strlen(b)->%zd\n", strlen(b));
+        printf("sg_get_sense_str: strlen(b)->%u\n", (uint32_t)strlen(b));
         printf("%s", b);
         printf("\n");
 #endif
@@ -283,80 +283,80 @@ main(int argc, char * argv[])
         b[0] = '\0';
         len = sizeof(b);
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = -1;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 0;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 1;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 2;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 3;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 4;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 5;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 6;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 7;
         n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %zd\n",
-               len, n, strlen(b));
+        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+               len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
     }

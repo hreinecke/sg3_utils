@@ -27,7 +27,7 @@
    normal file. The purpose is to test the sg_iovec mechanism within the
    sg_io_hdr structure.
 
-   Version 0.15 (20171229)
+   Version 0.16 (20180219)
 */
 
 
@@ -58,11 +58,11 @@ usage(void)
 }
 
 /* Returns 0 if everything ok */
-static int sg_read(int sg_fd, unsigned char * buff, int num_blocks,
+static int sg_read(int sg_fd, uint8_t * buff, int num_blocks,
                    int from_block, int bs, int elem_size, int async)
 {
-    unsigned char rdCmd[10] = {READ_10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char senseBuff[SENSE_BUFF_LEN];
+    uint8_t rdCmd[10] = {READ_10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
     struct pollfd a_poll;
     int dxfer_len = bs * num_blocks;
@@ -161,7 +161,7 @@ int main(int argc, char * argv[])
     int count = 0;
     char * sg_file_name = 0;
     char * out_file_name = 0;
-    unsigned char * buffp;
+    uint8_t * buffp;
 
     for (j = 1; j < argc; ++j) {
         if (0 == strcmp("-a", argv[j]))
@@ -241,7 +241,7 @@ int main(int argc, char * argv[])
         return 1;
     }
     dxfer_len = count * blk_size;
-    buffp = (unsigned char *)calloc(count, blk_size);
+    buffp = (uint8_t *)calloc(count, blk_size);
     if (buffp) {
         if (0 == sg_read(sg_fd, buffp, count, 0, blk_size, elem_size,
                          do_async)) {

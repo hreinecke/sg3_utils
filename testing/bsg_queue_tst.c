@@ -52,16 +52,16 @@
 int main(int argc, char * argv[])
 {
     int bsg_fd, k, ok;
-    unsigned char inq_cdb[INQ_CMD_LEN] =
+    uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char sdiag_cdb[SDIAG_CMD_LEN] =
+    uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
                                 {0x1d, 0, 0, 0, 0, 0};
-    unsigned char inqBuff[16][INQ_REPLY_LEN];
+    uint8_t inqBuff[16][INQ_REPLY_LEN];
     struct sg_io_v4 io_hdr[16];
     struct sg_io_v4 rio_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char sense_buffer[16][SENSE_BUFFER_LEN];
+    uint8_t sense_buffer[16][SENSE_BUFFER_LEN];
     int q_at_tail = 0;
 
     for (k = 1; k < argc; ++k) {
@@ -138,7 +138,7 @@ int main(int argc, char * argv[])
         if (0 == rio_hdr.device_status)
             ok = 1;
         else {
-            switch (sg_err_category_sense((unsigned char *)(long)
+            switch (sg_err_category_sense((uint8_t *)(long)
                     rio_hdr.response, rio_hdr.response_len)) {
             case SG_LIB_CAT_CLEAN:
                 ok = 1;
@@ -149,7 +149,7 @@ int main(int argc, char * argv[])
                 break;
             default: /* won't bother decoding other categories */
                 fprintf(stderr, "command error:\n");
-                sg_print_sense(NULL, (unsigned char *)(long)rio_hdr.response,
+                sg_print_sense(NULL, (uint8_t *)(long)rio_hdr.response,
                                rio_hdr.response_len, 1);
                 break;
             }

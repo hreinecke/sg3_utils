@@ -23,6 +23,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_pt.h"
 #include "sg_cmds_basic.h"
@@ -30,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20180210";
+static const char * version_str = "1.21 20180219";
 
 
 #define ME "sg_write_same: "
@@ -159,8 +160,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 {
     int k, ret, res, sense_cat, cdb_len;
     uint64_t llba;
-    unsigned char ws_cdb[WRITE_SAME32_LEN];
-    unsigned char sense_b[SENSE_BUFF_LEN];
+    uint8_t ws_cdb[WRITE_SAME32_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     cdb_len = op->pref_cdb_size;
@@ -262,7 +263,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
     set_scsi_pt_cdb(ptvp, ws_cdb, cdb_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    set_scsi_pt_data_out(ptvp, (unsigned char *)dataoutp, op->xfer_len);
+    set_scsi_pt_data_out(ptvp, (uint8_t *)dataoutp, op->xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
     ret = sg_cmds_process_resp(ptvp, "Write same", res, SG_NO_DATA_IN,
                                sense_b, true /*noisy */, op->verbose,
@@ -315,10 +316,10 @@ main(int argc, char * argv[])
     int64_t ll;
     const char * device_name = NULL;
     struct opts_t * op;
-    unsigned char * wBuff = NULL;
+    uint8_t * wBuff = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
-    unsigned char resp_buff[RCAP16_RESP_LEN];
+    uint8_t resp_buff[RCAP16_RESP_LEN];
     struct opts_t opts;
     struct stat a_stat;
 
@@ -549,7 +550,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        wBuff = (unsigned char*)calloc(op->xfer_len, 1);
+        wBuff = (uint8_t*)calloc(op->xfer_len, 1);
         if (NULL == wBuff) {
             pr2serr("unable to allocate %d bytes of memory with calloc()\n",
                     op->xfer_len);

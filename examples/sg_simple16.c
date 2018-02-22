@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -13,7 +14,7 @@
 /* This program performs a READ_16 command as scsi mid-level support
    16 byte commands from lk 2.4.15
 
-*  Copyright (C) 2001 D. Gilbert
+*  Copyright (C) 2001-2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -21,7 +22,7 @@
 
    Invocation: sg_simple16 <scsi_device>
 
-   Version 1.03 (20160528)
+   Version 1.04 (20180218)
 
 */
 
@@ -33,13 +34,13 @@
 int main(int argc, char * argv[])
 {
     int sg_fd, k, ok;
-    unsigned char r16_cdb [READ16_CMD_LEN] =
+    uint8_t r16_cdb [READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     sg_io_hdr_t io_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    unsigned char inBuff[READ16_REPLY_LEN];
-    unsigned char sense_buffer[32];
+    uint8_t inBuff[READ16_REPLY_LEN];
+    uint8_t sense_buffer[32];
 
     for (k = 1; k < argc; ++k) {
         if (*argv[k] == '-') {

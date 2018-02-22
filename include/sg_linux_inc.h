@@ -2,8 +2,9 @@
 #define SG_LINUX_INC_H
 
 #ifdef SG_KERNEL_INCLUDES
+  #include <stdint.h>   /* C99 header for exact integer types */
   #define __user
-  typedef unsigned char u8;
+  typedef uint8_t u8;
   #include "/usr/src/linux/include/scsi/sg.h"
   #include "/usr/src/linux/include/scsi/scsi.h"
 #else
