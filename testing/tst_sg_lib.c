@@ -25,13 +25,14 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.07 20180220";
+static const char * version_str = "1.08 20180223";
 
 
 #define MAX_LINE_LEN 1024
 
 
 static struct option long_options[] = {
+        {"exit", no_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"hex2",  no_argument, 0, 'H'},
         {"leadin",  required_argument, 0, 'l'},
@@ -136,11 +137,12 @@ static void
 usage()
 {
     fprintf(stderr,
-            "Usage: tst_sg_lib [--help] [--hex2] [--leadin=STR] "
+            "Usage: tst_sg_lib [--exit] [--help] [--hex2] [--leadin=STR] "
             "[--printf]\n"
             "                  [--sense] [--unaligned] [--verbose] "
             "[--version]\n"
-            "  where; --help|-h          print out usage message\n"
+            "  where: --exit|-e          test exit status strings\n"
+            "         --help|-h          print out usage message\n"
             "         --hex2|-H          test hex2* variants\n"
             "         --leadin=STR|-l STR    every line output by --sense "
             "should\n"
@@ -175,30 +177,55 @@ my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
     return (n < cp_max_len) ? n : (cp_max_len - 1);
 }
 
+char *
+get_exit_status_str(int exit_status, bool longer, int b_len, char * b)
+{
+    int n;
+
+    n = my_snprintf(b, b_len, "  ES=%d: ", exit_status);
+    if (n >= (b_len - 1))
+        return b;
+    if (sg_exit2str(exit_status, longer, b_len - n, b + n)) {
+        n = (int)strlen(b);
+        if (n < (b_len - 1))
+            my_snprintf(b + n, b_len - n, " [ok=true]");
+        return b;
+    } else
+        snprintf(b, b_len, "  No ES string for %d%s", exit_status,
+                 (longer ? " [ok=false]" : ""));
+    return b;
+}
+
 
 int
 main(int argc, char * argv[])
 {
+    bool do_exit_status = false;
+    bool ok;
     int k, c, n, len;
     int do_hex2 = 0;
     int do_printf = 0;
     int do_sense = 0;
     int do_unaligned = 0;
     int did_something = 0;
-    int verbose = 0;
+    int vb = 0;
     int ret = 0;
     char b[2048];
     char bb[256];
+    const int b_len = sizeof(b);
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHl:psuvV", long_options,
+        c = getopt_long(argc, argv, "ehHl:psuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'e':
+            do_exit_status = true;
+            break;
         case 'h':
         case '?':
             usage();
@@ -219,7 +246,7 @@ main(int argc, char * argv[])
             ++do_unaligned;
             break;
         case 'v':
-            ++verbose;
+            ++vb;
             break;
         case 'V':
             fprintf(stderr, "version: %s\n", version_str);
@@ -240,39 +267,70 @@ main(int argc, char * argv[])
         }
     }
 
+    if (do_exit_status) {
+        printf("Test Exit Status strings (add -v for long version):\n");
+        printf("  No error (es=0): %s\n",
+               sg_get_category_sense_str(0, b_len, b, vb));
+        ok = sg_exit2str(0, true, b_len, b);
+        printf("  No error (force verbose): %s\n", b);
+        if (vb)
+            printf("    for previous line sg_exit2str() returned: %s\n",
+                   (ok ? "true" : "false"));
+        printf("%s\n", get_exit_status_str(1, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(2, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(3, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(4, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(5, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(6, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(7, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(8, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(25, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(33, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(48, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(50, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(51, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(96, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(97, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(97, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(255, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(-1, (vb > 0), b_len, b));
+
+        printf("\n");
+    }
+
     if (do_sense ) {
         ++did_something;
         printf("desc_sense_data test1:\n");
         sg_print_sense(leadin, desc_sense_data1,
-                       (int)sizeof(desc_sense_data1), verbose);
+                       (int)sizeof(desc_sense_data1), vb);
         printf("\n");
 #if 1
         printf("sg_get_sense_str(ds_data1):\n");
         sg_get_sense_str(leadin, desc_sense_data1,
-                         sizeof(desc_sense_data1), verbose, sizeof(b), b);
+                         sizeof(desc_sense_data1), vb, b_len, b);
         printf("sg_get_sense_str: strlen(b)->%u\n", (uint32_t)strlen(b));
         printf("%s", b);
         printf("\n");
 #endif
         printf("desc_sense_data test2\n");
         sg_print_sense(leadin, desc_sense_data2,
-                       (int)sizeof(desc_sense_data2), verbose);
+                       (int)sizeof(desc_sense_data2), vb);
         printf("\n");
         printf("desc_sense block dev combo plus designator test3\n");
         sg_print_sense(leadin, desc_sense_data3,
-                       (int)sizeof(desc_sense_data3), verbose);
+                       (int)sizeof(desc_sense_data3), vb);
         printf("\n");
         printf("desc_sense forwarded sense test4\n");
         sg_print_sense(leadin, desc_sense_data4,
-                       (int)sizeof(desc_sense_data4), verbose);
+                       (int)sizeof(desc_sense_data4), vb);
         printf("\n");
         printf("desc_sense ATA Info test5\n");
         sg_print_sense(leadin, desc_sense_data5,
-                       (int)sizeof(desc_sense_data5), verbose);
+                       (int)sizeof(desc_sense_data5), vb);
         printf("\n");
         printf("desc_sense UA subsidiary binfing changed test6\n");
         sg_print_sense(leadin, desc_sense_data6,
-                       (int)sizeof(desc_sense_data6), verbose);
+                       (int)sizeof(desc_sense_data6), vb);
         printf("\n");
         printf("\n");
     }
@@ -281,7 +339,7 @@ main(int argc, char * argv[])
         ++did_something;
         printf("Testing my_snprintf():\n");
         b[0] = '\0';
-        len = sizeof(b);
+        len = b_len;
         n = my_snprintf(b, len, "%s", "test");
         printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
@@ -392,69 +450,69 @@ main(int argc, char * argv[])
         uint8_t u8[64];
 
         ++did_something;
-        if (verbose)
+        if (vb)
             memset(u8, 0, sizeof(u8));
         printf("u16=0x%" PRIx16 "\n", u16);
         sg_put_unaligned_le16(u16, u8);
         printf("  le16:\n");
-        hex2stdout(u8, verbose ? 10 : 2, -1);
+        hex2stdout(u8, vb ? 10 : 2, -1);
         u16r = sg_get_unaligned_le16(u8);
         printf("  u16r=0x%" PRIx16 "\n", u16r);
         sg_put_unaligned_be16(u16, u8);
         printf("  be16:\n");
-        hex2stdout(u8, verbose ? 10 : 2, -1);
+        hex2stdout(u8, vb ? 10 : 2, -1);
         u16r = sg_get_unaligned_be16(u8);
         printf("  u16r=0x%" PRIx16 "\n\n", u16r);
 
         printf("u24=0x%" PRIx32 "\n", u24);
         sg_put_unaligned_le24(u24, u8);
         printf("  le24:\n");
-        hex2stdout(u8, verbose ? 10 : 3, -1);
+        hex2stdout(u8, vb ? 10 : 3, -1);
         u24r = sg_get_unaligned_le24(u8);
         printf("  u24r=0x%" PRIx32 "\n", u24r);
         sg_put_unaligned_be24(u24, u8);
         printf("  be24:\n");
-        hex2stdout(u8, verbose ? 10 : 3, -1);
+        hex2stdout(u8, vb ? 10 : 3, -1);
         u24r = sg_get_unaligned_be24(u8);
         printf("  u24r=0x%" PRIx32 "\n\n", u24r);
 
         printf("u32=0x%" PRIx32 "\n", u32);
         sg_put_unaligned_le32(u32, u8);
         printf("  le32:\n");
-        hex2stdout(u8, verbose ? 10 : 4, -1);
+        hex2stdout(u8, vb ? 10 : 4, -1);
         u32r = sg_get_unaligned_le32(u8);
         printf("  u32r=0x%" PRIx32 "\n", u32r);
         sg_put_unaligned_be32(u32, u8);
         printf("  be32:\n");
-        hex2stdout(u8, verbose ? 10 : 4, -1);
+        hex2stdout(u8, vb ? 10 : 4, -1);
         u32r = sg_get_unaligned_be32(u8);
         printf("  u32r=0x%" PRIx32 "\n\n", u32r);
 
         printf("u48=0x%" PRIx64 "\n", u48);
         sg_put_unaligned_le48(u48, u8);
         printf("  le48:\n");
-        hex2stdout(u8, verbose ? 10 : 6, -1);
+        hex2stdout(u8, vb ? 10 : 6, -1);
         u48r = sg_get_unaligned_le48(u8);
         printf("  u48r=0x%" PRIx64 "\n", u48r);
         sg_put_unaligned_be48(u48, u8);
         printf("  be48:\n");
-        hex2stdout(u8, verbose ? 10 : 6, -1);
+        hex2stdout(u8, vb ? 10 : 6, -1);
         u48r = sg_get_unaligned_be48(u8);
         printf("  u48r=0x%" PRIx64 "\n\n", u48r);
 
         printf("u64=0x%" PRIx64 "\n", u64);
         sg_put_unaligned_le64(u64, u8);
         printf("  le64:\n");
-        hex2stdout(u8, verbose ? 10 : 8, -1);
+        hex2stdout(u8, vb ? 10 : 8, -1);
         u64r = sg_get_unaligned_le64(u8);
         printf("  u64r=0x%" PRIx64 "\n", u64r);
         sg_put_unaligned_be64(u64, u8);
         printf("  be64:\n");
-        hex2stdout(u8, verbose ? 10 : 8, -1);
+        hex2stdout(u8, vb ? 10 : 8, -1);
         u64r = sg_get_unaligned_be64(u8);
         printf("  u64r=0x%" PRIx64 "\n\n", u64r);
         printf("  be[8]:\n");
-        hex2stdout(u8, verbose ? 10 : 8, -1);
+        hex2stdout(u8, vb ? 10 : 8, -1);
         u64r = sg_get_unaligned_be(8, u8);
         printf("  u64r[8]=0x%" PRIx64 "\n\n", u64r);
         printf("  le[8]:\n");
