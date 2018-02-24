@@ -376,6 +376,18 @@ void sg_print_sense(const char * leadin, const uint8_t * sense_buffer,
 bool sg_if_can2stdout(const char * leadin, int exit_status);
 bool sg_if_can2stderr(const char * leadin, int exit_status);
 
+/* This examines exit_status and if an error message is known it is output
+ * as a string to 'b' and true is returned. If 'longer' is true and extra
+ * information is available then it is added to the output. If no error
+ * message is available a null character is output and false is returned.
+ * If exit_status is zero (no error) and 'longer' is true then the string
+ * 'No errors' is output; if 'longer' is false then a null character is
+ * output; in both cases true is returned. If exit_status is negative then
+ * a null character is output and false is returned. All messages are a
+ * single line (less than 80 characters) with no trailing LF. The output
+ * string including the trailing null character is no longer than b_len. */
+bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
+
 /* Utilities can use these exit status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */
 #define SG_LIB_SYNTAX_ERROR 1   /* command line syntax problem */
@@ -451,7 +463,11 @@ int sg_err_category_sense(const uint8_t * sense_buffer, int sb_len);
 
 /* Yield string associated with sense category. Returns 'buff' (or pointer
  * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
- * yield "Sense category: <sense_cat>" string. */
+ * yield "Sense category: <sense_cat)val>" string. The original 'sense
+ * category' concept has been expanded to most detected errors and is
+ * returned by these utilities as their exit status value (an (unsigned)
+ * 8 bit value where 0 means good (i.e. no errors)).  Uses the
+ * sg_exit2str() function. */
 const char * sg_get_category_sense_str(int sense_cat, int buff_len,
                                        char * buff, int verbose);
 

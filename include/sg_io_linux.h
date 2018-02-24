@@ -13,8 +13,8 @@
  */
 
 /*
- * This header file contains linux specific information related to the SCSI
- * command pass through in the SCSI generic (sg) driver and the linux
+ * This header file contains Linux specific information related to the SCSI
+ * command pass through in the SCSI generic (sg) driver and the Linux
  * block layer.
  */
 
