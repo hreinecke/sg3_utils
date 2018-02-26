@@ -1624,7 +1624,7 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
     memset(rsp_buff, 0, rsp_buff_size);
     if (rsp_lenp)
         *rsp_lenp = 0;
-    if (op->data_arr) {
+    if (op->data_arr && op->do_data) {
         memcpy(rsp_buff, op->data_arr + 4, op->arr_len);
         cp = (char *)&op->data_arr[4];
         res = 0;
