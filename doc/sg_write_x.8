@@ -1,4 +1,4 @@
-.TH SG_WRITE_X "8" "December 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WRITE_X "8" "February 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 .SH SYNOPSIS
@@ -9,11 +9,11 @@ sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 [\fI\-\-generation=EOG,NOG\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR]
 \fI\-\-in=IF\fR [\fI\-\-lba=LBA[,LBA...]\fR] [\fI\-\-normal\fR]
 [\fI\-\-num=NUM[,NUM...]\fR] [\fI\-\-offset=OFF[,DLEN]\fR] [\fI\-\-or\fR]
-[\fI\-\-ref\-tag=RT\fR] [\fI\-\-same=NDOB\fR] [\fI\-\-scat\-file=SF\fR]
-[\fI\-\-scat\-raw\fR] [\fI\-\-scattered=RD\fR] [\fI\-\-stream=ID\fR]
-[\fI\-\-strict\fR] [\fI\-\-tag\-mask=TM\fR] [\fI\-\-timeout=TO\fR]
-[\fI\-\-unmap=U_A\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
+[\fI\-\-quiet\fR] [\fI\-\-ref\-tag=RT\fR] [\fI\-\-same=NDOB\fR]
+[\fI\-\-scat\-file=SF\fR] [\fI\-\-scat\-raw\fR] [\fI\-\-scattered=RD\fR]
+[\fI\-\-stream=ID\fR] [\fI\-\-strict\fR] [\fI\-\-tag\-mask=TM\fR]
+[\fI\-\-timeout=TO\fR] [\fI\-\-unmap=U_A\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wrprotect=WPR\fR] \fIDEVICE\fR
 .PP
 Synopsis per supported command:
 .PP
@@ -343,6 +343,11 @@ extra fields that are set with the \fI\-\-bmop=OP,PGP\fR and
 \fI\-\-generation=EOG,NOG\fR options. ORWRITE(32) is the only 32 byte cdb
 command in this utility that does not require a \fIDEVICE\fR formatted with
 type 1, 2 or 3 PI (although it will still work if it is formatted with PI).
+.TP
+\fB\-Q\fR, \fB\-\-quiet\fR
+suppress some informational messages such as the ones associated with
+detected errors when this utility is about to exit. The exit status value
+is still returned to the operating system when this utility exits.
 .TP
 \fB\-r\fR, \fB\-\-ref\-tag\fR=\fIRT\fR
 where \fIRT\fR is the "expected initial logical block reference tag" field

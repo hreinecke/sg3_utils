@@ -27,14 +27,15 @@
 #include <inttypes.h>
 #include <errno.h>
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 #ifdef SG_LIB_LINUX
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/hdreg.h>
+#endif
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
 
 #include "sg_lib.h"
@@ -47,7 +48,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.88 20180218";    /* SPC-5 rev 19 */
+static const char * version_str = "1.89 20180227";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -119,7 +120,7 @@ static const char * version_str = "1.88 20180218";    /* SPC-5 rev 19 */
 #define VPD_DI_SEL_TARGET 4
 #define VPD_DI_SEL_AS_IS 32
 
-#define DEF_ALLOC_LEN 252
+#define DEF_ALLOC_LEN 252       /* highest 1 byte value that is modulo 4 */
 #define SAFE_STD_INQ_RESP_LEN 36
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 #define VPD_ATA_INFO_LEN  572
@@ -141,7 +142,8 @@ static const char * find_version_descriptor_str(int value);
 static void decode_dev_ids(const char * leadin, uint8_t * buff,
                            int len, int do_hex, int verbose);
 
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int verbose);
 struct opts_t;
@@ -212,7 +214,8 @@ static struct svpd_values_name_t vpd_pg[] = {
 };
 
 static struct option long_options[] = {
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
         {"ata", no_argument, 0, 'a'},
 #endif
         {"block", required_argument, 0, 'B'},
@@ -277,7 +280,9 @@ struct opts_t {
 static void
 usage()
 {
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
+
     pr2serr("Usage: sg_inq [--ata] [--block=0|1] [--cmddt] [--descriptors] "
             "[--export]\n"
             "              [--extended] [--help] [--hex] [--id] [--inhex=FN] "
@@ -465,7 +470,8 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
 
         switch (c) {
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
         case 'a':
             op->do_ata = true;
             break;
@@ -3105,7 +3111,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
 
 /* When sg_fd >= 0 fetch VPD page from device; mxlen is command line
  * --maxlen=LEN option (def: 0) or -1 for a VPD page with a short length
- * (1 byte). When sg_fd < 0 then mxlen bytes have been read from
+ * field (1 byte). When sg_fd < 0 then mxlen bytes have been read from
  * --inhex=FN file. Returns 0 for success. */
 static int
 vpd_fetch_page_from_dev(int sg_fd, uint8_t * rp, int page,
@@ -3185,17 +3191,26 @@ static int
 fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
 {
     int len, k, res, c;
-    uint8_t b[DEF_ALLOC_LEN];
+    uint8_t * b;
+    uint8_t * free_b;
 
+    b = sg_memalign(DEF_ALLOC_LEN, 0, &free_b, false);
+    if (NULL == b) {
+        pr2serr("%s: unable to allocate on heap\n", __func__);
+        return sg_convert_errno(ENOMEM);
+    }
     res = vpd_fetch_page_from_dev(sg_fd, b, VPD_SUPPORTED_VPDS,
-                                  -1,verbose, &len);
+                                  -1 /* 1 byte alloc_len */, verbose, &len);
     if (res) {
         if (verbose > 2)
-            pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
-        return SG_LIB_CAT_MALFORMED;
+            pr2serr("%s: no supported VPDs page\n", __func__);
+        res = SG_LIB_CAT_MALFORMED;
+        goto fini;
     }
-    if (vpd_page_not_supported(b, len, VPD_UNIT_SERIAL_NUM))
-        return SG_LIB_CAT_ILLEGAL_REQ;
+    if (vpd_page_not_supported(b, len, VPD_UNIT_SERIAL_NUM)) {
+        res = SG_LIB_CAT_ILLEGAL_REQ;
+        goto fini;
+    }
 
     memset(b, 0xff, 4); /* guard against empty response */
     res = vpd_fetch_page_from_dev(sg_fd, b, VPD_UNIT_SERIAL_NUM, -1, verbose,
@@ -3213,17 +3228,21 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
                     break;
             }
             obuff[k] = '\0';
-            return 0;
+            res = 0;
+            goto fini;
         } else {
             if (verbose > 2)
-                pr2serr("fetch_unit_serial_num: bad sn VPD page\n");
-            return SG_LIB_CAT_MALFORMED;
+                pr2serr("%s: bad sn VPD page\n", __func__);
+            res = SG_LIB_CAT_MALFORMED;
         }
     } else {
         if (verbose > 2)
-            pr2serr("fetch_unit_serial_num: no supported VPDs page\n");
-        return SG_LIB_CAT_MALFORMED;
+            pr2serr("%s: no supported VPDs page\n", __func__);
+        res = SG_LIB_CAT_MALFORMED;
     }
+fini:
+    if (free_b)
+        free(free_b);
     return res;
 }
 
@@ -3281,13 +3300,14 @@ std_inq_process(int sg_fd, const struct opts_t * op, int inhex_len)
         std_inq_decode(op, act_len);
         return 0;
     } else if (res < 0) { /* could be an ATA device */
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
         /* Try an ATA Identify Device command */
         res = try_ata_identify(sg_fd, op->do_hex, op->do_raw, vb);
         if (0 != res) {
             pr2serr("SCSI INQUIRY, NVMe Identify and fetching ATA "
                     "information failed on %s\n", op->device_name);
-            return SG_LIB_CAT_OTHER;
+            return (res < 0) ? SG_LIB_CAT_OTHER : res;
         }
 #else
         pr2serr("SCSI INQUIRY failed on %s, res=%d\n",
@@ -4117,14 +4137,18 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     ptvp = construct_scsi_pt_obj_with_fd(pt_fd, vb);
     if (NULL == ptvp) {
         pr2serr("%s: memory problem\n", __func__);
-        return SG_LIB_CAT_OTHER;
+        return sg_convert_errno(ENOMEM);
     }
     memset(id_cmdp, 0, sizeof(*id_cmdp));
     id_cmdp->opcode = 0x6;
     nsid = get_pt_nvme_nsid(ptvp);
     /* leave id_cmdp->nsid at 0 */
     id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
-    id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, vb > 3);
+    id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, false);
+    if (NULL == id_dinp) {
+        pr2serr("%s: sg_memalign problem\n", __func__);
+        return sg_convert_errno(ENOMEM);
+    }
     set_scsi_pt_data_in(ptvp, id_dinp, pg_sz);
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
     set_scsi_pt_sense(ptvp, resp, sizeof(resp));
@@ -4437,7 +4461,8 @@ main(int argc, char * argv[])
                 ret = vpd_mainly_hex(-1, op, inhex_len);
             goto err_out;
         }
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
         else if (op->do_ata) {
             prepare_ata_identify(op, inhex_len);
             ret = 0;
@@ -4501,7 +4526,8 @@ main(int argc, char * argv[])
     }
 #endif
 
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
     if (op->do_ata) {
         res = try_ata_identify(sg_fd, op->do_hex, op->do_raw,
                                op->verbose);
@@ -4541,7 +4567,8 @@ main(int argc, char * argv[])
 #if (HAVE_NVME && (! IGNORE_NVME))
 fini2:
 #endif
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
 fini3:
 #endif
 
@@ -4563,7 +4590,8 @@ err_out:
 }
 
 
-#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS)
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
 /* Following code permits ATA IDENTIFY commands to be performed on
    ATA non "Packet Interface" devices (e.g. ATA disks).
    GPL-ed code borrowed from smartmontools (smartmontools.sf.net).
@@ -4605,6 +4633,7 @@ struct ata_identify_device {
 static int
 ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
 {
+    int err;
     uint8_t buff[ATA_IDENTIFY_BUFF_SZ + HDIO_DRIVE_CMD_OFFSET];
     unsigned short get_ident[256];
 
@@ -4612,7 +4641,8 @@ ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
         *atapi_flag = false;
     memset(buff, 0, sizeof(buff));
     if (ioctl(device, HDIO_GET_IDENTITY, &get_ident) < 0) {
-        if (ENOTTY == errno) {
+        err = errno;
+        if (ENOTTY == err) {
             if (verbose > 1)
                 pr2serr("HDIO_GET_IDENTITY failed with ENOTTY, "
                         "try HDIO_DRIVE_CMD ioctl ...\n");
@@ -4622,16 +4652,16 @@ ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
                 if (verbose)
                     pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) "
                             "ioctl failed:\n\t%s [%d]\n",
-                            safe_strerror(errno), errno);
-                return errno;
+                            safe_strerror(err), err);
+                return sg_convert_errno(err);
             }
             memcpy(data, buff + HDIO_DRIVE_CMD_OFFSET, ATA_IDENTIFY_BUFF_SZ);
             return 0;
         } else {
             if (verbose)
                 pr2serr("HDIO_GET_IDENTITY ioctl failed:\n"
-                        "\t%s [%d]\n", safe_strerror(errno), errno);
-            return errno;
+                        "\t%s [%d]\n", safe_strerror(err), err);
+            return sg_convert_errno(err);
         }
     } else if (verbose > 1)
         pr2serr("HDIO_GET_IDENTITY succeeded\n");
@@ -4642,18 +4672,18 @@ ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
         buff[0] = ATA_IDENTIFY_PACKET_DEVICE;
         buff[3] = 1;
         if (ioctl(device, HDIO_DRIVE_CMD, buff) < 0) {
+            err = errno;
             if (verbose)
-                pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_PACKET_DEVICE) "
-                        "ioctl failed:\n\t%s [%d]\n", safe_strerror(errno),
-                        errno);
+                pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_PACKET_DEVICE) ioctl "
+                        "failed:\n\t%s [%d]\n", safe_strerror(err), err);
             buff[0] = ATA_IDENTIFY_DEVICE;
             buff[3] = 1;
             if (ioctl(device, HDIO_DRIVE_CMD, buff) < 0) {
+                err = errno;
                 if (verbose)
-                    pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) "
-                            "ioctl failed:\n\t%s [%d]\n", safe_strerror(errno),
-                            errno);
-                return errno;
+                    pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) ioctl "
+                            "failed:\n\t%s [%d]\n", safe_strerror(err), err);
+                return sg_convert_errno(err);
             }
         } else if (atapi_flag) {
             *atapi_flag = true;
@@ -4664,10 +4694,11 @@ ata_command_interface(int device, char *data, bool * atapi_flag, int verbose)
         buff[0] = ATA_IDENTIFY_DEVICE;
         buff[3] = 1;
         if (ioctl(device, HDIO_DRIVE_CMD, buff) < 0) {
+            err = errno;
             if (verbose)
                 pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) ioctl failed:"
-                        "\n\t%s [%d]\n", safe_strerror(errno), errno);
-            return errno;
+                        "\n\t%s [%d]\n", safe_strerror(err), err);
+            return sg_convert_errno(err);
         } else if (verbose > 1)
             pr2serr("HDIO_DRIVE_CMD(ATA_IDENTIFY_DEVICE) succeeded\n");
     }

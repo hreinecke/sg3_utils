@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20180217";
+static const char * version_str = "1.14 20180227";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -107,6 +107,7 @@ static struct option long_options[] = {
     {"num", required_argument, 0, 'n'},
     {"offset", required_argument, 0, 'o'},
     {"or", no_argument, 0, 'O'},
+    {"quiet", no_argument, 0, 'Q'},
     {"ref-tag", required_argument, 0, 'r'},
     {"ref_tag", required_argument, 0, 'r'},
     {"same", required_argument, 0, 'M'},
@@ -135,6 +136,7 @@ struct opts_t {
                                 /*  --atomic=AB  AB --> .atomic_boundary */
     bool do_combined;           /* -c DOF --> .scat_lbdof */
     bool do_or;                 /* -O  ORWRITE(16 or 32) */
+    bool do_quiet;              /* -Q  suppress some messages */
     bool do_scat_raw;
     bool do_same;               /* -M  WRITE SAME(16 or 32) */
                                 /*  --same=NDOB  NDOB --> .ndob */
@@ -210,20 +212,22 @@ usage(int do_help)
             "           [--fua] [--generation=EOG,NOG] [--grpnum=GN] "
             "[--help] --in=IF\n"
             "           [--lba=LBA,LBA...] [--normal] [--num=NUM,NUM...]\n"
-            "           [--offset=OFF[,DLEN]] [--or] [--ref-tag=RT] "
-            "[--same=NDOB]\n"
-            "           [--scat-file=SF] [--scat-raw] [--scattered=RD] "
-            "[--stream=ID]\n"
-            "           [--strict] [--tag-mask=TM] [--timeout=TO] "
-            "[--unmap=U_A]\n"
-            "           [--verbose] [--version] [--wrprotect=WRP] DEVICE\n");
+            "           [--offset=OFF[,DLEN]] [--or] [--quiet] "
+            "[--ref-tag=RT]\n"
+            "           [--same=NDOB] [--scat-file=SF] [--scat-raw] "
+            "[--scattered=RD]\n"
+            "           [--stream=ID] [--strict] [--tag-mask=TM] "
+            "[--timeout=TO]\n"
+            "           [--unmap=U_A] [--verbose] [--version] "
+            "[--wrprotect=WRP]\n"
+            "           DEVICE\n");
         if (1 != do_help) {
             pr2serr("\nOr the corresponding short option usage:\n"
                 "sg_write_x [-6] [-3] [-a AT] [-A AB] [-B OP,PGP] [-b BS] "
                 "[-c DOF] [-D DLD]\n"
                 "           [-d] [-x] [-f] [-G EOG,NOG] [-g GN] [-h] -i IF "
                 "[-l LBA,LBA...]\n"
-                "           [-N] [-n NUM,NUM...] [-o OFF[,DLEN]] [-O] "
+                "           [-N] [-n NUM,NUM...] [-o OFF[,DLEN]] [-O] [-Q] "
                 "[-r RT] [-M NDOB]\n"
                 "           [-q SF] [-R] [-S RD] [-T ID] [-s] [-t TM] [-I TO] "
                 "[-u U_A] [-v]\n"
@@ -295,6 +299,7 @@ usage(int do_help)
             "        |-o OFF[,DLEN]     (def: 0), then read DLEN bytes(def: "
             "rest of IF)\n"
             "    --or|-O            send ORWRITE command\n"
+            "    --quiet|-Q         suppress some informational messages\n"
             "    --ref-tag=RT|-r RT     expected reference tag field (def: "
             "0xffffffff)\n"
             "    --same=NDOB|-M NDOB    send WRITE SAME command. NDOB (no "
@@ -1476,7 +1481,7 @@ do_read_capacity(int sg_fd, struct opts_t *op)
 
 #define WANT_ZERO_EXIT 9999
 static const char * const opt_long_ctl_str =
-    "36a:A:b:B:c:dD:Efg:G:hi:I:l:M:n:No:Oq:r:RsS:t:T:u:vVw:x";
+    "36a:A:b:B:c:dD:Efg:G:hi:I:l:M:n:No:Oq:Qr:RsS:t:T:u:vVw:x";
 
 /* command line processing, options and arguments. Returns 0 if ok,
  * returns WANT_ZERO_EXIT so upper level yields an exist status of zero.
@@ -1703,6 +1708,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
         case 'q':
             op->scat_filename = optarg;
             break;
+        case 'Q':
+            op->do_quiet = true;
+            break;
         case 'R':
             op->do_scat_raw = true;
             break;
@@ -1827,7 +1835,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
                     "unknown length\nthen give up\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        up = sg_memalign(d, 0, &free_up, vb > 4);
+        up = sg_memalign(d, 0, &free_up, false);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -1894,7 +1902,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
                         goto file_err_outt;
                 }
             }
-            u2p = sg_memalign(dd, 0, &free_u2p, vb > 4);
+            u2p = sg_memalign(dd, 0, &free_u2p, false);
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
@@ -1929,7 +1937,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         d = sum_num * op->bs_pi_do;
         do_len = dd + d;
         /* zeroed data-out buffer for SL+DATA */
-        up = sg_memalign(do_len, 0, &free_up, vb > 4);
+        up = sg_memalign(do_len, 0, &free_up, false);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -2018,7 +2026,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             d = op->bs_pi_do;      /* guess one LB */
         /* zero data-out buffer for SL+DATA */
         nn = dd + d;
-        up = sg_memalign(nn, 0, &free_up, vb > 4);
+        up = sg_memalign(nn, 0, &free_up, false);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -2040,7 +2048,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
 
             d = sum_num * op->bs_pi_do;
             nn = dd + d;
-            u2p = sg_memalign(nn, 0, &free_u2p, vb > 4);
+            u2p = sg_memalign(nn, 0, &free_u2p, false);
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
@@ -2082,7 +2090,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         for (sum_num = 0, k = 0; k < (int)addr_arr_len; ++k)
             sum_num += num_arr[k];
         do_len = ((op->scat_lbdof + sum_num) * op->bs_pi_do);
-        up = sg_memalign(do_len, 0, &free_up, vb > 4);
+        up = sg_memalign(do_len, 0, &free_up, false);
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
@@ -2549,7 +2557,7 @@ main(int argc, char * argv[])
 
     if (do_len > 0) {
         /* fill allocated buffer with zeros */
-        up = sg_memalign(do_len, 0, &free_up, vb > 4);
+        up = sg_memalign(do_len, 0, &free_up, false);
         if (NULL == up) {
             pr2serr("unable to allocate %u bytes of memory\n", do_len);
             ret = SG_LIB_OS_BASE_ERR + ENOMEM;
@@ -2563,7 +2571,7 @@ main(int argc, char * argv[])
         up = NULL;
 
     ret = do_write_x(sg_fd, up, do_len, op);
-    if (ret) {
+    if (ret && (! op->do_quiet)) {
         strcpy(b,"OS error");
         if (ret > 0)
             sg_get_category_sense_str(ret, sizeof(b), b, vb);
@@ -2583,24 +2591,32 @@ fini:
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
-            pr2serr("sg_fd close error: %s\n", safe_strerror(-res));
+            if (! op->do_quiet)
+                pr2serr("sg_fd close error: %s\n", safe_strerror(-res));
             if (0 == ret)
                 ret = SG_LIB_FILE_ERROR;
         }
     }
     if (sfr_fd >= 0) {
         if (close(sfr_fd) < 0) {
-            perror("sfr_fd close error");
+            if (! op->do_quiet)
+                perror("sfr_fd close error");
             if (0 == ret)
                 ret = SG_LIB_FILE_ERROR;
         }
     }
     if ((! got_stdin) && (infd >= 0)) {
         if (close(infd) < 0) {
-            perror("infd close error");
+            if (! op->do_quiet)
+                perror("infd close error");
             if (0 == ret)
                 ret = SG_LIB_FILE_ERROR;
         }
+    }
+    if ((0 == op->verbose) && (! op->do_quiet)) {
+        if (! sg_if_can2stderr("sg_write_x failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

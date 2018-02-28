@@ -804,8 +804,6 @@ main(int argc, char *argv[])
         }
         goto done;
     } else if (ret < 0) {
-        int err;
-
         k = -ret;
         pr2serr("do_scsi_pt: %s\n", safe_strerror(k));
         err = get_scsi_pt_os_err(ptvp);
