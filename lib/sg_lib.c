@@ -1949,19 +1949,29 @@ sg_if_can2fp(const char * leadin, int exit_status, FILE * fp)
     char b[256];
     const char * s = leadin ? leadin : "";
 
-    if (sg_exit2str(exit_status, false, sizeof(b), b)) {
+    if (0 == exit_status)
+        return true;    /* don't print anything */
+    else if (sg_exit2str(exit_status, false, sizeof(b), b)) {
         fprintf(fp, "%s%s\n", s, b);
         return true;
     } else
         return false;
 }
 
+/* This examines exit_status and if an error message is known it is output
+ * to stdout/stderr and true is returned. If no error message is
+ * available nothing is output and false is returned. If exit_status is
+ * zero (no error) nothing is output and true is returned. If exit_status
+ * is negative then nothing is output and false is returned. If leadin is
+ * non-NULL then it is printed before the error message. All messages are
+ * a single line with a trailing LF. */
 bool
 sg_if_can2stdout(const char * leadin, int exit_status)
 {
     return sg_if_can2fp(leadin, exit_status, stdout);
 }
 
+/* See sg_if_can2stdout() comments */
 bool
 sg_if_can2stderr(const char * leadin, int exit_status)
 {

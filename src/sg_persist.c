@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.61 20180221";
+static const char * version_str = "0.62 20180226";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -1257,7 +1257,6 @@ main(int argc, char * argv[])
             goto fini;
         }
         sg_cmds_close_device(sg_fd);
-        sg_fd = -1;
     }
 
     if (! op->readwrite_force) {

@@ -443,6 +443,7 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
                                 /* (e.g. a transport or driver error) */
+#define SG_LIB_UNUSED_ABOVE 99  /* Put extra errors in holes below this */
 
 /* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
  * common sense key then return SG_LIB_CAT_SENSE .*/

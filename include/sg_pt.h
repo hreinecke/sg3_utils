@@ -220,4 +220,4 @@ int scsi_pt_win32_spt_state(void);
 }
 #endif
 
-#endif
+#endif          /* SG_PT_H */
