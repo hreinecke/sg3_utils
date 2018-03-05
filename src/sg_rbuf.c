@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.02 20180219";
+static const char * version_str = "5.03 20180302";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -150,7 +150,7 @@ usage_for(const struct opts_t * optsp)
 }
 
 static int
-process_cl_new(struct opts_t * optsp, int argc, char * argv[])
+new_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
 {
     int c, n;
     int64_t nn;
@@ -236,7 +236,7 @@ process_cl_new(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-process_cl_old(struct opts_t * optsp, int argc, char * argv[])
+old_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
 {
     bool jmp_out;
     int k, plen, num;
@@ -328,7 +328,7 @@ process_cl_old(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-process_cl(struct opts_t * optsp, int argc, char * argv[])
+parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -336,14 +336,14 @@ process_cl(struct opts_t * optsp, int argc, char * argv[])
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
         optsp->opt_new = false;
-        res = process_cl_old(optsp, argc, argv);
+        res = old_parse_cmd_line(optsp, argc, argv);
         if ((0 == res) && optsp->opt_new)
-            res = process_cl_new(optsp, argc, argv);
+            res = new_parse_cmd_line(optsp, argc, argv);
     } else {
         optsp->opt_new = true;
-        res = process_cl_new(optsp, argc, argv);
+        res = new_parse_cmd_line(optsp, argc, argv);
         if ((0 == res) && (! optsp->opt_new))
-            res = process_cl_old(optsp, argc, argv);
+            res = old_parse_cmd_line(optsp, argc, argv);
     }
     return res;
 }
@@ -378,7 +378,7 @@ main(int argc, char * argv[])
 #endif
     op = &opts;
     memset(op, 0, sizeof(opts));
-    res = process_cl(op, argc, argv);
+    res = parse_cmd_line(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
     if (op->do_help) {

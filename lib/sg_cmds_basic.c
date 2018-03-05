@@ -36,7 +36,7 @@
 #endif
 
 
-static const char * const version_str = "1.84 20180219";
+static const char * const version_str = "1.85 20180302";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -333,6 +333,8 @@ create_pt_obj(const char * cname)
 
 static const char * const inquiry_s = "inquiry";
 
+/* Returns 0 on success, while positive values are SG_LIB_CAT_* errors
+ * (e.g. SG_LIB_CAT_MALFORMED). If OS error, returns negated errno or -1. */
 static int
 sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
                   int mx_resp_len, int timeout_secs, int * residp,
@@ -414,8 +416,8 @@ sg_ll_inquiry_com(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
 }
 
 /* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
- * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
- * The CMDDT field is obsolete in the INQUIRY cdb. */
+ * successful, various SG_LIB_CAT_* positive values, negated errno or
+ * -1 -> other errors. The CMDDT field is obsolete in the INQUIRY cdb. */
 int
 sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
               int mx_resp_len, bool noisy, int verbose)
@@ -425,8 +427,8 @@ sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
 }
 
 /* Yields most of first 36 bytes of a standard INQUIRY (evpd==0) response.
- * Returns 0 when successful, various SG_LIB_CAT_* positive values or
- * -1 -> other errors */
+ * Returns 0 when successful, various SG_LIB_CAT_* positive values, negated
+ * errno or -1 -> other errors */
 int
 sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                   bool noisy, int verbose)

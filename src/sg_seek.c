@@ -47,7 +47,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.02 20180222";
+static const char * version_str = "1.03 20180304";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -136,7 +136,7 @@ main(int argc, char * argv[])
     bool prefetch = false;
     bool readonly = false;
     bool start_tm_valid = false;
-    int sg_fd, res, c, err;
+    int sg_fd, res, c;
     int first_err = 0;
     int last_err = 0;
     int ret = 0;
@@ -326,6 +326,8 @@ main(int argc, char * argv[])
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
     if ((count > 0) && start_tm_valid &&
         (start_tm.tv_sec || start_tm.tv_nsec)) {
+        int err;
+
         res = clock_gettime(CLOCK_MONOTONIC, &end_tm);
         if (res < 0) {
             err = errno;

@@ -1,4 +1,4 @@
-.TH SG_SES "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SES "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -6,18 +6,22 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-descriptor=DES\fR] [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR]
 [\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-hex\fR]
 [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
-[\fI\-\-join\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
+[\fI\-\-join\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR]
+[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
 .PP
 .B sg_ses
 [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
-[\fI\-\-data=H,H...\fR] [\fI\-\-descriptor=DES\fR]
+[\fI\-\-data=H,H...\fR] [\fI\-\-data=@FN\fR] [\fI\-\-descriptor=DES\fR]
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR]
 [\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-nickname=SEN\fR]
 [\fI\-\-nickid=SEID\fR]  [\fI\-\-page=PG\fR] [\fI\-\-readonly\fR]
 [\fI\-\-sas\-addr=SA\fR] [\fI\-\-set=STR\fR] [\fI\-\-verbose\fR]
 \fIDEVICE\fR
+.PP
+.B sg_ses
+\fI\-\-data=@FN\fR \fI\-\-status\fR [\fI\-\-raw\fR \fI\-\-raw\fR]
+[<all options from first form>]
 .PP
 .B sg_ses
 [\fI\-\-enumerate\fR] [\fI\-\-index=IIA\fR] [\fI\-\-list\fR] [\fI\-\-help\fR]
@@ -34,25 +38,31 @@ device (e.g. a disk) in which case the EncServ bit is set in its INQUIRY
 response.
 .PP
 If the \fIDEVICE\fR argument is given with no options then the names of all
-diagnostic pages supported are listed. Most, but not necessarily all, of the
-named diagnostic pages are defined in the SES standards and drafts. The most
-recent reference for this utility is the draft SCSI Enclosure Services 4
-document T10/BSR INCITS 555 Revision 1 at http://www.t10.org . Existing
+diagnostic pages (dpages) supported are listed. Most, but not necessarily
+all, of the named dpages are defined in the SES standards and drafts. The
+most recent reference for this utility is the draft SCSI Enclosure Services
+4 document T10/BSR INCITS 555 Revision 1 at http://www.t10.org . Existing
 standards for SES, SES\-2 and SES\-3 are ANSI INCITS 305\-1998 and ANSI
 INCITS 448\-2008 and ANSI INCITS 518\-2017 respectively.
 .PP
-The first form shown in the synopsis is for fetching and decoding pages
-or fields from the SES \fIDEVICE\fR. Alternatively a fetched page may be
+The first form shown in the synopsis is for fetching and decoding dpages
+or fields from the SES \fIDEVICE\fR. Alternatively a fetched dpage may be
 output in hex or binary with the \fI\-\-hex\fR or \fI\-\-raw\fR options.
 .PP
-The second form in the synopsis is for modifying pages or fields held in
+The second form in the synopsis is for modifying dpages or fields held in
 the SES \fIDEVICE\fR. Changing the state of an enclosure (e.g. requesting
 the "ident" (locate) LED to flash on a disk carrier in an array) is typically
 done using a read\-modify\-write cycle. See the section on CHANGING STATE
 below.
 .PP
-The third form in the synopsis shows the options for providing command line
-help (i.e. usage information), listing out page and field information tables
+The third form in the synopsis shows the options for decoding the contents
+of a file that holds a hexadecimal or binary representation of a SES
+dpage response. Typically an earlier invocation of the first form of this
+utility with the '\-HHHH' option would have generated that file. Since no
+SCSI commands are sent, the \fIDEVICE\fR argument if given will be ignored.
+.PP
+The last form in the synopsis shows the options for providing command line
+help (i.e. usage information), listing out dpage and field information tables
 held by the utility (\fI\-\-enumerate\fR), or printing the version string
 of this utility.
 .PP
@@ -60,19 +70,20 @@ There is a web page discussing this utility at
 http://sg.danny.cz/sg/sg_ses.html . Support for downloading microcode to
 a SES device has been placed in a separate utility called sg_ses_microcode.
 .PP
-In the following sections "page" refers to a diagnostic page, either
-fetched with a SCSI RECEIVE DIAGNOSTIC RESULTS command or sent to the
-\fIDEVICE\fR with a SCSI SEND DIAGNOSTIC command.
+In the following sections "dpage" refers to a diagnostic page, either fetched
+with a SCSI RECEIVE DIAGNOSTIC RESULTS command, sent to the \fIDEVICE\fR with
+a SCSI SEND DIAGNOSTIC command, or fetched from data supplied by the
+\fI\-\-data=\fR option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
 option name.
 .TP
 \fB\-b\fR, \fB\-\-byte1\fR=\fIB1\fR
-some modifiable pages may need byte 1 (i.e. the second byte) set. In the
-Enclosure Control page, byte 1 contains the INFO, NON\-CRIT, CRIT and
+some modifiable dpages may need byte 1 (i.e. the second byte) set. In the
+Enclosure Control dpage, byte 1 contains the INFO, NON\-CRIT, CRIT and
 UNRECOV bits. In the Subenclosure String Out, Subenclosure Nickname Control
-and Download Microcode Control pages, byte 1 is the Subenclosure identifier.
+and Download Microcode Control dpages, byte 1 is the Subenclosure identifier.
 Active when the \fI\-\-control\fR and \fI\-\-data=H,H...\fR options are used
 and the default value is 0. If the \fI\-\-clear=STR\fR or \fI\-\-set=STR\fR
 option is used then the value read from byte 1 is written back to byte 1.
@@ -81,8 +92,8 @@ trailing 'h' or 'H').
 .TP
 \fB\-C\fR, \fB\-\-clear\fR=\fISTR\fR
 Used to clear an element field in the Enclosure Control or Threshold Out
-page. Must be used together with an indexing option to specify which element
-is to be changed. The Enclosure Control page is assumed if the
+dpage. Must be used together with an indexing option to specify which element
+is to be changed. The Enclosure Control dpage is assumed if the
 \fI\-\-page=PG\fR option is not given. See the STR FORMAT and the CLEAR, GET,
 SET sections below.
 .TP
@@ -91,31 +102,31 @@ will send control information to the \fIDEVICE\fR via a SCSI SEND
 DIAGNOSTIC command. Cannot give both this option and \fI\-\-status\fR.
 The Enclosure Control, String Out, Threshold Out, Array Control (obsolete
 in SES\-2), Subenclosure String Out, Subenclosure Nickname Control and
-Download Microcode pages can be set currently. This option is assumed if
+Download Microcode dpages can be set currently. This option is assumed if
 either the \fI\-\-clear=STR\fR or \fI\-\-set=STR\fR option is given.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\fIH,H...\fR
 permits a string of comma separated (ASCII) hex bytes to be specified (limit
 1024). A (single) space separated string of hex bytes is also allowed but
 the list needs to be in quotes. This option allows the parameters to a
-control page to be specified. The string given should not include the first 4
-bytes (i.e. page code and length).
+control dpage to be specified. The string given should not include the first 4
+bytes (i.e. page code and length). See the DATA SUPPLIED section below.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=\-
-reads one or more data strings from stdin, limit 2048 bytes. stdin may
-provide ASCII hex as a comma separated list (i.e. as with the
+reads one or more data strings from stdin, limit almost 2**16 bytes. stdin
+may provide ASCII hex as a comma separated list (i.e. as with the
 \fI\-\-data=H,H...\fR option). Additionally spaces, tabs and line feeds are
 permitted as separators from stdin . Stops reading stdin when an EOF is
-detected.
+detected. See the DATA SUPPLIED section below.
 .TP
 \fB\-d\fR, \fB\-\-data\fR=@\fIFN\fR
-reads one or more data strings from the file called \fIFN\fR, limit 2048
-bytes. The contents of the file is decoded in the same fashion as stdin
-described in the previous option.
+reads one or more data strings from the file called \fIFN\fR, limit almost
+2**16 bytes. The contents of the file is decoded in the same fashion as
+stdin described in the previous option. See the DATA SUPPLIED section below.
 .TP
 \fB\-D\fR, \fB\-\-descriptor\fR=\fIDES\fR
 where \fIDES\fR is a descriptor name (string) as found in the Element
-Descriptor page. This is a medium level indexing alternative to the low
+Descriptor dpage. This is a medium level indexing alternative to the low
 level \fI\-\-index=\fR options. If the descriptor name contains a space then
 \fIDES\fR needs to be surrounded by quotes (single or double) or the space
 escaped (e.g. preceded by a backslash). See the DESCRIPTOR NAME, DEVICE SLOT
@@ -123,7 +134,7 @@ NUMBER AND SAS ADDRESS section below.
 .TP
 \fB\-x\fR, \fB\-\-dev\-slot\-num\fR=\fISN\fR, \fB\-\-dsn\fR=\fISN\fR
 where \fISN\fR is a device slot number found in the Additional Element Status
-page. Only entries for FCP and SAS devices (with EIP=1) have device slot
+dpage. Only entries for FCP and SAS devices (with EIP=1) have device slot
 numbers. \fISN\fR must be a number in the range 0 to 255 (inclusive). 255 is
 used to indicate there is no corresponding device slot. This is a medium level
 indexing alternative to the low level \fI\-\-index=\fR options. See the
@@ -132,11 +143,11 @@ DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
 \fB\-E\fR, \fB\-\-eiioe\fR=\fIA_F\fR
 \fIA_F\fR is either the string 'auto' or 'force'. There was some fuzziness
 in the interpretation of the 'element index' field in the Additional Element
-Status (AES) page between SES\-2 and SES\-3. The EIIOE bit was introduced to
+Status (AES) dpage between SES\-2 and SES\-3. The EIIOE bit was introduced to
 resolve the problem but not all enclosures have caught up. In the SES\-3
 revision 12 draft the EIIOE bit was expanded to a 2 bit EIIOE field.
-Using '\-\-eiioe=force' will decode the AES page as if the EIIOE field is set
-to 1.  Using '\-\-eiioe=auto' will decode the AES page as if the EIIOE field
+Using '\-\-eiioe=force' will decode the AES dpage as if the EIIOE field is set
+to 1.  Using '\-\-eiioe=auto' will decode the AES dpage as if the EIIOE field
 is set to 1 if the first AES descriptor has its EIP bit set and its element
 index field is 1 (in other words a heuristic to guess whether the EIIOE field
 should be set to 1 or 0).
@@ -145,33 +156,33 @@ If the enclosure sets the actual EIIOE field to 1 or more then this option has
 no effect. It is recommended that HP JBOD users set \-\-eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
-enumerate all known page names and SES elements when this option is given
+enumerate all known dpage names and SES elements when this option is given
 once.
 .br
 If \fI\-\-enumerate\fR is given twice, then the recognised acronyms for the
 \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options are
-listed. The utility exits after listing this information (so most other
-options and \fIDEVICE\fR are ignored). Since there are many acronyms for
-the Enclosure Control/Status page then the output can be further restricted
+listed. The utility exits after listing this information, so most other
+options and \fIDEVICE\fR are ignored. Since there are many acronyms for
+the Enclosure Control/Status dpage then the output can be further restricted
 by giving the \fI\-\-index=IIA\fR option (e.g. "sg_ses \-ee \-I ts" to only
-show the acronyms associated with the Enclosure Control/Status page's
+show the acronyms associated with the Enclosure Control/Status dpage's
 Temperature Sensor Element Type).
 .TP
 \fB\-f\fR, \fB\-\-filter\fR
-cuts down on the amount of output from the Enclosure Status page and the
-Additional Element Status page. When this option is given, any line which
+cuts down on the amount of output from the Enclosure Status dpage and the
+Additional Element Status dpage. When this option is given, any line which
 has all its binary flags cleared (i.e. 0) is filtered out (i.e.  ignored).
 If a line has some other value on it (e.g. a temperature) then it is output.
 When this option is used twice only elements associated with the "status=ok"
-field (in the Enclosure status page) are output. The \fI\-\-filter\fR option
+field (in the Enclosure status dpage) are output. The \fI\-\-filter\fR option
 is useful for reducing the amount of output generated by the \fI\-\-join\fR
 option.
 .TP
 \fB\-G\fR, \fB\-\-get\fR=\fISTR\fR
 Used to read a field in a status element. Must be used together with a an
 indexing option to specify which element is to be read. By default the
-Enclosure Status page is read, the only other pages that can be read are the
-Threshold In and Additional Element Status pages. If a value is found it is
+Enclosure Status dpage is read, the only other dpages that can be read are the
+Threshold In and Additional Element Status dpages. If a value is found it is
 output in decimal to stdout (by default) or in hexadecimal preceded by "0x"
 if the \fI\-\-hex\fR option is also given. See the STR FORMAT and the CLEAR,
 GET, SET sections below.
@@ -188,14 +199,23 @@ If the \fI\-\-get=STR\fR option is given then output the value found (if
 any) in hexadecimal, with a leading "0x". Otherwise output the response
 in hexadecimal; with trailing ASCII if given once, without it if given
 twice, and simple hex if given three or more times. Ignored when all
-elements from several pages are being accessed (e.g. when the \fI\-\-join\fR
+elements from several dpages are being accessed (e.g. when the \fI\-\-join\fR
 option is used). Also see the \fI\-\-raw\fR option which may be used
 with this option.
+.br
+To dump one of more dpage responses to stdout in ASCII parsable hexadecimal
+use \fI-HHH\fR or \fI-HHHH\fR. The triple H form only outputs hexadecimals
+which is fine for a single dpage response. When all dpages are dumped (e.g.
+with \fI\-\-page=all\fR) then the quad H form adds the name of each dpage
+following a hash mark ('#'). The \fI\-\-data=\fR option parser ignores
+everything from and including a hash mark to the end of the line. Hence the
+output of the quad H form is still parsable plus it is easier to users to
+view and possibly edit.
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIIIA\fR
 where \fIIIA\fR is either an individual index (II) or an Element type
 abbreviation (A). See the INDEXES section below. If the \fI\-\-page=PG\fR
-option is not given then the Enclosure Status (or Control) page is assumed.
+option is not given then the Enclosure Status (or Control) dpage is assumed.
 May be used with the \fI\-\-join\fR option or one of the \fI\-\-clear=STR\fR,
 \fI\-\-get=STR\fR or \fI\-\-set=STR\fR options. To enumerate the available
 Element type abbreviations use the \fI\-\-enumerate\fR option.
@@ -204,30 +224,30 @@ Element type abbreviations use the \fI\-\-enumerate\fR option.
 where \fITIA,II\fR is an type header index (TI) or Element type
 abbreviation (A) followed by an individual index (II). See the INDEXES section
 below. If the \fI\-\-page=PG\fR option is not given then the Enclosure
-Status (or Control) page is assumed. May be used with the \fI\-\-join\fR
+Status (or Control) dpage is assumed. May be used with the \fI\-\-join\fR
 option or one of the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR or
 \fI\-\-set=STR\fR options. To enumerate the available Element type
 abbreviations use the \fI\-\-enumerate\fR option.
 .TP
 \fB\-i\fR, \fB\-\-inner\-hex\fR
-the outer levels of a status page are decoded and printed out but the
+the outer levels of a status dpage are decoded and printed out but the
 innermost level (e.g. the Element Status Descriptor) is output in hex. Also
-active with the Additional Element Status and Threshold In pages. Can be
+active with the Additional Element Status and Threshold In dpages. Can be
 used with an indexing option and/or \fI\-\-join\fR options.
 .TP
 \fB\-j\fR, \fB\-\-join\fR
 group elements from the Element Descriptor, Enclosure Status and Additional
-Element Status pages. If this option is given twice then elements from the
-Threshold In page are also grouped. The order is dictated by the Configuration
-page.
-.PP
+Element Status dpages. If this option is given twice then elements from the
+Threshold In dpage are also grouped. The order is dictated by the Configuration
+dpage.
+.br
 There can be a bewildering amount of information in the "join" output. The
 default is to output everything. Several additional options are provided to
 cut down the amount displayed. If the indexing options is given, only the
 matching elements and their associated fields are output. The \fI\-\-filter\fR
 option (see its description) can be added to reduce the amount of output.
 Also "\-\-page=aes" (or "\-p 0xa") can be added to suppress the output of
-rows that don't have a "aes" page component. See the INDEXES and DESCRIPTOR
+rows that don't have a "aes" dpage component. See the INDEXES and DESCRIPTOR
 NAME, DEVICE SLOT NUMBER AND SAS ADDRESS sections below.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
@@ -265,20 +285,37 @@ Subenclosure identifier. The default value is 0 which is the
 main enclosure.
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
-where \fIPG\fR is a page abbreviation or code (a number). If \fIPG\fR
+where \fIPG\fR is a dpage abbreviation or code (a number). If \fIPG\fR
 starts with a digit it is assumed to be in decimal unless prefixed by
 0x for hex. Valid range is 0 to 255 (0x0 to 0xff) inclusive. Default is
-page 'sdp' which is page_code 0 (i.e. "Supported Diagnostic Pages") if
+dpage 'sdp' which is page_code 0 (i.e. "Supported Diagnostic Pages") if
 no other options are given.
 .br
-To list the available page abbreviations give "xxx" for \fIPG\fR; the same
+Page code 0xff or abbreviation "all" is not a real dpage (as the highest
+real dpage is 0x3f) but instead causes all dpages whose page code is 0x2f
+or less to be output. This can be used with either the \fI\-HHHH\fR or
+\fI\-rr\fR to send either hexadecimal ASCII or binary respectively to
+stdout.
+.br
+To list the available dpage abbreviations give "xxx" for \fIPG\fR; the same
 information can also be found with the \fI\-\-enumerate\fR option.
 .TP
+\fB\-q\fR, \fB\-\-quiet\fR
+this suppresses the number of warnings and messages output. The exit status
+of the utility is unaffected by this option.
+.TP
 \fB\-r\fR, \fB\-\-raw\fR
-outputs the chosen status page in ASCII hex in a format suitable for a
-later invocation using the \fI\-\-data=\fR option. A page less its first
+outputs the chosen status dpage in ASCII hex in a format suitable for a
+later invocation using the \fI\-\-data=\fR option. A dpage less its first
 4 bytes (page code and length) is output. When used twice (e.g. \fI\-rr\fR)
-the full page contents is output in binary to stdout.
+the full dpage contents is output in binary to stdout.
+.br
+when \fI\-rr\fR is used together with the \fI\-\-data=\-\fR or
+\fI\-\-data=FN\fR then stdin or file FN is decoded as a binary stream that
+continues to be read until an end of file (EOF). Once that data is read then
+the internal raw option is cleared to 0 so the output is not effected. So
+the \fI\-rr\fR option either changes how the input or output is treated,
+but not both.
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
@@ -286,7 +323,7 @@ The default is to open it read\-write.
 .TP
 \fB\-A\fR, \fB\-\-sas\-addr\fR=\fISA\fR
 this is an indexing method for SAS end devices (e.g. SAS disks). The utility
-will try to find the element or slot in the Additional Element Status page
+will try to find the element or slot in the Additional Element Status dpage
 whose SAS address matches \fISA\fR. For a SAS disk or tape that SAS address
 is its target port identifier for the port connected to that element or slot.
 Most SAS disks and tapes have two such target ports, usually numbered
@@ -303,15 +340,19 @@ leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a medium level
 See the DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
 .TP
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
-Used to set an element field in the Enclosure Control or Threshold Out page.
+Used to set an element field in the Enclosure Control or Threshold Out dpage.
 Must be used together with an indexing option to specify which element is to
-be changed. The Enclosure Control page is assumed if the \fI\-\-page=PG\fR
+be changed. The Enclosure Control dpage is assumed if the \fI\-\-page=PG\fR
 option is not given. See the STR FORMAT and CLEAR, GET, SET sections below.
 .TP
 \fB\-s\fR, \fB\-\-status\fR
-will fetch page from the \fIDEVICE\fR via a SCSI RECEIVE DIAGNOSTIC RESULTS
-command. In the absence of other options that imply modifying a page (e.g.
-\fI\-\-control\fR or \fI\-\-set=STR\fR) then \fI\-\-status\fR is assumed.
+will fetch dpage from the \fIDEVICE\fR via a SCSI RECEIVE DIAGNOSTIC RESULTS
+command (or from \fI\-\-data=@FN\fR). In the absence of other options that
+imply modifying a dpage (e.g.  \fI\-\-control\fR or \fI\-\-set=STR\fR) then
+\fI\-\-status\fR is assumed, except when the \fI\-\-data=\fR option is given.
+When the \fI\-\-data=\fR option is given there is no default action: either
+the \fI\-\-control\fR or this option must be given to distinguish between
+the two different ways that data will be treated.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity. For example when this option is given four
@@ -324,42 +365,42 @@ print the version string and then exit.
 .TP
 \fB\-w\fR, \fB\-\-warn\fR
 warn about certain irregularities with warnings sent to stderr. The join
-is a complex operation that relies on information from several pages to be
+is a complex operation that relies on information from several dpages to be
 synchronized. The quality of SES devices vary and to be fair, the
 descriptions from T10 drafts and standards have been tweaked several
 times (see the EIIOE field) in order to clear up confusion.
 .SH INDEXES
 An enclosure can have information about its disk and tape drives plus other
-supporting components like power supplies spread across several pages.
-Addressing a specific element (overall or individual) within a page is
+supporting components like power supplies spread across several dpages.
+Addressing a specific element (overall or individual) within a dpage is
 complicated. This section describes low level indexing (i.e. choosing a
 single element (or a group of related elements) from a large number of
 elements). If available, the medium level indexing described in the
 following section (DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS)
 might be simpler to use.
 .PP
-The Configuration page is key to low level indexing: it contains a list
+The Configuration dpage is key to low level indexing: it contains a list
 of "type headers", each of which contains an Element type (e.g. Array
 Device Slot), a Subenclosure identifier (0 for the primary enclosure) and
 a "Number of possible elements". Corresponding to each type header, the
-Enclosure Status page has one "overall" element plus "Number of possible
+Enclosure Status dpage has one "overall" element plus "Number of possible
 elements" individual elements all of which have the given Element type. For
 some Element types the "Number of possible elements" will be 0 so the
-Enclosure Status page has only one "overall" element corresponding to that
-type header. The Element Descriptor page and the Threshold (In and Out)
-pages follow the same pattern as the Enclosure Status page.
+Enclosure Status dpage has only one "overall" element corresponding to that
+type header. The Element Descriptor dpage and the Threshold (In and Out)
+dpages follow the same pattern as the Enclosure Status dpage.
 .PP
 The numeric index corresponding to the overall element is "\-1". If the
-Configuration page indicates a particular element type has "n" elements
+Configuration dpage indicates a particular element type has "n" elements
 and n is greater than 0 then its indexes range from 0 to n\-1 .
 .PP
-The Additional Element Status page is a bit more complicated. It has
+The Additional Element Status dpage is a bit more complicated. It has
 entries for "Number of possible elements" of certain Element types. It
 does not have entries corresponding to the "overall" elements. To make
-the correspondence a little clearer each descriptor in this page optionally
+the correspondence a little clearer each descriptor in this dpage optionally
 contains an "Element Index Present" (EIP) indicator. If EIP is set then each
 element's "Element Index" field refers to the position of the corresponding
-element in the Enclosure Status page.
+element in the Enclosure Status dpage.
 .PP
 Addressing a single overall element or a single individual element is done
 with two indexes: TI and II. Both are origin 0. TI=0 corresponds to the
@@ -391,7 +432,7 @@ For example these are equivalent: \fI\-\-index=arr\fR and
 \fI\-\-index=_23\fR since the Array Device Slot Element type value is 23.
 Also \fI\-\-index=ps1\fR and \fI\-\-index=_2_1\fR are equivalent.
 .PP
-Another example: if the first type header in the Configuration page has
+Another example: if the first type header in the Configuration dpage has
 has Array Device Slot Element type then \fI\-\-index=0,\-1\fR is
 equivalent to \fI\-\-index=arr\fR. Also \fI\-\-index=arr,3\fR is equivalent
 to \fI\-\-index=3\fR.
@@ -406,13 +447,13 @@ The three options: \fI\-\-descriptor=DES\fR, \fI\-\-dev\-slot\-num=SN\fR
 and \fI\-\-sas\-addr=SA\fR allow medium level indexing, as an alternative
 to the low level \fI\-\-index=\fR options. Only one of the three options
 can be used in an invocation. Each of the three options implicitly set the
-\fI\-\-join\fR option since they need either the Element Descriptor page or
-the Additional Element Status page as well as the pages needed by the
+\fI\-\-join\fR option since they need either the Element Descriptor dpage
+or the Additional Element Status dpage as well as the dpages needed by the
 \fI\-\-index=\fR option.
 .PP
 These medium level indexing options need support from the SES device and
 that support is optional. For example the \fI\-\-descriptor=DES\fR needs
-the Element Descriptor page provided by the SES device however that is
+the Element Descriptor dpage provided by the SES device however that is
 optional. Also the provided descriptor names need to be useful, and having
 descriptor names which are all "0" is not very useful. Also some
 elements (e.g. overall elements) may not have descriptor names.
@@ -452,30 +493,72 @@ The supported list of <acronym>s can be viewed by using the
 .SH CLEAR, GET, SET
 The \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options can
 be used up to 8 times in the same invocation. Any <acronym>s used in the
-\fISTR\fR operands must refer to the same diagnostic page.
+\fISTR\fR operands must refer to the same dpage.
 .PP
 When multiple of these options are used, they are applied in the order in
 which they appear on the command line. So if options contradict each other,
 the last one appearing on the command line will be enforced. When there
 are multiple \fI\-\-clear=STR\fR and \fI\-\-set=STR\fR options, then the
-diagnostic page they refer to is only written after the last one.
+dpage they refer to is only written after the last one.
+.SH DATA SUPPLIED
+This section describes the two scenarios that can occur when the
+\fI\-\-data=\fR option is given. These scenarios are the same irrespective
+of whether the argument to the \fI\-\-data=\fR option is a string of
+hex bytes on the command line, stdin (indicated by \fI\-\-data=\-\fR) or
+names a file (e.g. \fI\-\-data=@thresh_in_dpage.hex\fR).
+.PP
+The first scenario is flagged by the \fI\-\-control\fR option. It uses the
+supplied data to build a 'control' dpage that will be sent to the
+\fIDEVICE\fR. The supplied dpage data should not include its first 4 bytes.
+Those 4 bytes are added by this utility using the \fI\-\-page=PG\fR option
+with \fIPG\fR placed at byte offset 0). The \fI\-\-byte1=B1\fR option sets
+byte offset 1, else 0 is placed in that position. The number of bytes
+decoded from the data provided (i.e. its length) goes into byte offsets 2
+and 3.
+.PP
+The second scenario is flagged by the \fI\-\-status\fR option. It decodes
+the supplied data assuming that it represents the response to one or more
+SCSI SEND DIAGNOSTIC commands. Those responses have typically been captured
+from some earlier invocation(s) of this utility. Those earlier invocations
+could use the '\-HHH' or '\-HHHH' option and file redirection to capture
+that response (or responses) in hexadecimal. The supplied dpage response
+data is decoded according to the other command line options. For example
+the \fI\-\-join\fR option could be given and that would require the data
+from multiple dpages typically:  Configuration, Enclosure status, Element
+descriptor and Additional element status dpages.
+.PP
+By default the user supplied data is assumed to be ASCII hexadecimal in
+lines that don't exceed 512 characters. Anything on a line from and
+including a hash mark ('#') to the end of line is ignored. An end of
+line can be a LF or CR,LF and blank lines are ignored. Each separated
+pair (or single) hexadecimal digits represent a byte (and neither a
+leading '0x' nor a trailing 'h' should be given). Separators are either
+space, tab, comma or end of line.
+.PP
+Alternatively binary can be used and this is flagged by the '\-rr' option.
+The \fI\-\-data=H,H...\fR form cannot use binary values for the 'H's, only
+ASCII hexadecimal. The other two forms (\fI\-\-data=\-\fR and
+\fI\-\-data=@FN\fR) may contain binary data. Note that when the '\-rr'
+option is used with \fI\-\-data=@FN\fR that it only changes the
+interpretation of the input data, it does not change the decoding and output
+representation.
 .SH CHANGING STATE
 This utility has various techniques for changing the state of a SES device.
 As noted above this is typically a read\-modify\-write type operation.
-Most modifiable pages have a "status" (or "in") page that can be read, and
-a corresponding "control" (or "out") page that can be written back to change
+Most modifiable dpages have a "status" (or "in") page that can be read, and
+a corresponding "control" (or "out") dpage that can be written back to change
 the state of the enclosure.
 .PP
 The lower level technique provided by this utility involves outputting
-a "status" page in hex with \fI\-\-raw\fR. Then a text editor can be used
+a "status" dpage in hex with \fI\-\-raw\fR. Then a text editor can be used
 to edit the hex (note: to change an Enclosure Control descriptor the SELECT
-bit needs to be set). Next the control page data can fed back with the
+bit needs to be set). Next the control dpage data can fed back with the
 \fI\-\-data=H,H...\fR option together with the \fI\-\-control\fR option;
 the \fI\-\-byte1=B1\fR option may need to be given as well.
 .PP
-Changes to the Enclosure Control page (and the Threshold Out page) can be
-done at a higher level. This involves choosing a page (the default in this
-case is the Enclosure Control page). Next choose an individual or overall
+Changes to the Enclosure Control dpage (and the Threshold Out dpage) can be
+done at a higher level. This involves choosing a dpage (the default in this
+case is the Enclosure Control dpage). Next choose an individual or overall
 element index (or name it with its Element Descriptor string). Then give
 the element's name (e.g. "ident" for RQST IDENT) or its position within that
 element (e.g. in an Array Device Slot Control element RQST IDENT is byte 2,
@@ -483,10 +566,10 @@ bit 1 and 1 bit long ("2:1:1")). Finally a value can be given, if not the
 value for \fI\-\-set=STR\fR defaults to 1 and for \fI\-\-clear=STR\fR
 defaults to 0.
 .SH SETTING SUBENCLOSURE NICKNAME
-The format of the Subenclosure Nickname control page is different from its
-corresponding status page. The status page reports all Subenclosure
+The format of the Subenclosure Nickname control dpage is different from its
+corresponding status dpage. The status dpage reports all Subenclosure
 Nicknames (and Subenclosure identifier 0 is the main enclosure) while the
-control page allows only one of them to be changed. Therefore using the
+control dpage allows only one of them to be changed. Therefore using the
 \fB\-\-data\fR option technique to change a Subenclosure nickname is
 difficult (but still possible).
 .PP
@@ -500,36 +583,36 @@ the \fI\-\-page=PG\fR option is not given then \fI\-\-page=snic\fR is
 assumed.
 .PP
 When \fI\-\-nickname=SEN\fR is given then the Subenclosure Nickname Status
-page is read to obtain the Generation Code field. That Generation Code
+dpage is read to obtain the Generation Code field. That Generation Code
 together with no more than 32 bytes from the Nickname (\fISEN\fR) and the
 Subenclosure Identifier (\fISEID\fR) are written to the Subenclosure Nickname
-Control page.
+Control dpage.
 .PP
 There is an example of changing a nickname in the EXAMPLES section below.
 .SH NVME ENCLOSURES
 Support has been added to sg_ses (actually, its underlying library) for
 NVMe (also known as NVM Express) Enclosures. It can be considered
-experimental in sg3_utils package version 1.43 and sg_ses version 2.31 .
+experimental in sg3_utils package version 1.43 and sg_ses version 2.34 .
 .PP
 This support is based on a decision by NVME-MI (Management Interface)
-developers to support the SES\-3 standard. This was done using the newly
-added SES Send and SES Receive commands that tunnel diagnostic page
-contents as used by SES.
+developers to support the SES\-3 standard. This was facilitated by adding
+NVME-MI SES Send and SES Receive commands that tunnel dpage contents as
+used by SES.
 .SH NOTES
-This utility can be used to fetch arbitrary (i.e. non SES) diagnostic
-pages (using the SCSI READ DIAGNOSTIC command). To this end the
-\fI\-\-page=PG\fR and \fI\-\-hex\fR options would be appropriate. Arbitrary
-diagnostic pages can be sent to a device with the sg_senddiag utility.
+This utility can be used to fetch arbitrary (i.e. non SES) dpages (using
+the SCSI READ DIAGNOSTIC command). To this end the \fI\-\-page=PG\fR and
+\fI\-\-hex\fR options would be appropriate. No-SES dpages can be sent to
+a device with the sg_senddiag utility.
 .PP
 The most troublesome part of the join operation is associating Additional
 Element Status descriptors correctly. At least one SES device vendor has
-misinterpreted the SES\-2 standard with its "element index" field. The
-code in this utility interprets the "element index" field as per the SES\-2
-standard and if that yields an inappropriate Element type, adjusts its
-indexing to follow that vendor's misinterpretation. The SES\-3 drafts have
-introduced the EIIOE (element index includes overall elements) bit which
-later became a 2 bit field to resolve this ambiguity. See the
-\fI\-\-eiioe=A_F\fR option.
+misinterpreted the SES\-2 standard, specifically with its "element index"
+field interpretation. The code in this utility interprets the "element
+index" field as per the SES\-2 standard and if that yields an inappropriate
+Element type, adjusts its indexing to follow that vendor's
+misinterpretation. The SES\-3 drafts have introduced the EIIOE (Element
+Index Includes Overall Elements) bit which later became a 2 bit field to
+resolve this ambiguity. See the \fI\-\-eiioe=A_F\fR option.
 .PP
 In draft SES\-3 revision 5 the "Door Lock" element name was changed to
 the "Door" (and an OPEN field was added to the status element). As a
@@ -547,25 +630,25 @@ Examples can also be found at http://sg.danny.cz/sg/sg_ses.html
 The following examples use Linux device names. For suitable device names
 in other supported Operating Systems see the sg3_utils(8) man page.
 .PP
-To view the supported pages:
+To view the supported dpages:
 .PP
    sg_ses /dev/bsg/6:0:2:0
 .PP
-To view the Configuration Diagnostic page:
+To view the Configuration Diagnostic dpage:
 .PP
    sg_ses \-\-page=cf /dev/bsg/6:0:2:0
 .PP
-To view the Enclosure Status page:
+To view the Enclosure Status dpage:
 .PP
    sg_ses \-\-page=es /dev/bsg/6:0:2:0
 .PP
 To get the (attached) SAS address of that device (which is held in the
-Additional Element Sense page (page 10)) printed on hex:
+Additional Element Sense dpage (dpage 10)) printed on hex:
 .PP
    sg_ses \-p aes \-D ArrayDevice07 \-G at_sas_addr \-H /dev/sg3
 .PP
 To collate the information in the Enclosure Status, Element Descriptor
-and Additional Element Status pages the \fI\-\-join\fR option can be used:
+and Additional Element Status dpages the \fI\-\-join\fR option can be used:
 .PP
    sg_ses \-\-join /dev/sg3
 .PP
@@ -574,16 +657,16 @@ much information add the \fI\-\-filter\fR option:
 .PP
    sg_ses \-\-join \-\-filter /dev/sg3
 .PP
-Fields in the various elements of the Enclosure Control and Threshold pages
+Fields in the various elements of the Enclosure Control and Threshold dpages
 can be changed with the \fI\-\-clear=STR\fR and \fI\-\-set=STR\fR
-options. [All modifiable pages can be changed with the \fI\-\-raw\fR and
+options. [All modifiable dpages can be changed with the \fI\-\-raw\fR and
 \fI\-\-data=H,H...\fR options.] The following example looks at making
 the "ident" LED (also called "locate") flash on "ArrayDevice07" which is a
 disk (or more precisely the carrier drawer the disk is in):
 .PP
    sg_ses \-\-index=7 \-\-set=2:1:1 /dev/sg3
 .PP
-If the Element Descriptor diagnostic page shows that "ArrayDevice07" is
+If the Element Descriptor diagnostic dpage shows that "ArrayDevice07" is
 the descriptor name associated with element index 7 then this invocation
 is equivalent to the previous one:
 .PP
@@ -604,15 +687,15 @@ The above assumes the descriptor name 'ArrayDevice07' corresponds to device
 slot number 7.
 .PP
 Now for an example of a more general but lower level technique for changing
-a modifiable diagnostic page. The String (In and Out) diagnostics page is
-relatively simple (compared with the Enclosure Status/Control page). However
+a modifiable diagnostic dpage. The String (In and Out) diagnostics dpage is
+relatively simple (compared with the Enclosure Status/Control dpage). However
 the use of this lower level technique is awkward involving three steps: read,
-modify then write. First check the current String (In) page contents:
+modify then write. First check the current String (In) dpage contents:
 .PP
    sg_ses \-\-page=str /dev/bsg/6:0:2:0
 .PP
 Now the "read" step. The following command will send the contents of the
-String page (from byte 4 onwards) to stdout. The output will be in ASCII
+String dpage (from byte 4 onwards) to stdout. The output will be in ASCII
 hex with pairs of hex digits representing a byte, 16 pairs per line,
 space separated. The redirection puts stdout in a file called "t":
 .PP
@@ -624,7 +707,7 @@ device with:
 .PP
    sg_ses \-\-page=str \-\-control \-\-data=\- /dev/bsg/6:0:2:0 < t
 .PP
-If the above is successful, the String page should have been changed. To
+If the above is successful, the String dpage should have been changed. To
 check try:
 .PP
    sg_ses \-\-page=str /dev/bsg/6:0:2:0
@@ -632,6 +715,20 @@ check try:
 To change the nickname on the main enclosure:
 .PP
    sg_ses \-\-nickname='1st enclosure' \-\-control /dev/bsg/6:0:2:0
+.PP
+To capture the whole state of an enclosure (from a SES perspective) for
+later analysis, this can be done:
+.PP
+   sg_ses \-\-page=all \-HHHH /dev/sg5 > enc_sg5_all.hex
+.PP
+Note that if there are errors or warnings they will be sent to stderr so
+they will appear on the command line (since only stdout is redirected).
+A text editor could be used to inspect enc_sg5_all.hex . If all looks in
+order at some later time, potentially on a different machine where
+enc_sg5_all.hex has been copied, a "join" could be done. Note that join
+reflects the state of the enclosure when the capture was done.
+.PP
+   sg_ses \-\-data=@enc_sg5_all.hex \-\-status \-\-join
 .SH EXIT STATUS
 The exit status of sg_ses is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

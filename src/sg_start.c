@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 1999-2017 D. Gilbert
+ *  Copyright (C) 1999-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.63 20171010";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.64 20180302";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", no_argument, 0, 'e'},
@@ -169,7 +169,7 @@ usage_old()
 }
 
 static int
-process_cl_new(struct opts_t * op, int argc, char * argv[])
+news_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int c, n, err;
 
@@ -286,7 +286,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 }
 
 static int
-process_cl_old(struct opts_t * op, int argc, char * argv[])
+old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     bool ambigu = false;
     bool jmp_out;
@@ -458,7 +458,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
 }
 
 static int
-process_cl(struct opts_t * op, int argc, char * argv[])
+parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -466,14 +466,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
         op->opt_new = false;
-        res = process_cl_old(op, argc, argv);
+        res = old_parse_cmd_line(op, argc, argv);
         if ((0 == res) && op->opt_new)
-            res = process_cl_new(op, argc, argv);
+            res = news_parse_cmd_line(op, argc, argv);
     } else {
         op->opt_new = true;
-        res = process_cl_new(op, argc, argv);
+        res = news_parse_cmd_line(op, argc, argv);
         if ((0 == res) && (! op->opt_new))
-            res = process_cl_old(op, argc, argv);
+            res = old_parse_cmd_line(op, argc, argv);
     }
     return res;
 }
@@ -490,7 +490,7 @@ main(int argc, char * argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     op->do_fl = -1;    /* only when >= 0 set FL bit */
-    res = process_cl(op, argc, argv);
+    res = parse_cmd_line(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
     if (op->do_help) {
