@@ -48,6 +48,7 @@ const char * sg_ansi_version_arr[16] =
 /* Corrected against spc5r18 on 20180201 */
 
 #ifdef SG_SCSI_STRINGS
+
 struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
     {0x0, "Version Descriptor not supported or No standard identified"},
     {0x20, "SAM (no version claimed)"},
@@ -535,10 +536,13 @@ struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},
     {0xffc2, "IEEE 1667-2009"},
-    {0xffff, NULL},	/* sentinel, leave at end */
+    {0xffff, NULL},     /* sentinel, leave at end */
 };
+
 #else
-struct sg_version_descriptor sg_version_descriptor_arr[] = {
-    {0xffff, NULL},	/* sentinel, leave at end */
+
+struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
+    {0xffff, NULL},     /* sentinel, leave at end */
 };
+
 #endif
