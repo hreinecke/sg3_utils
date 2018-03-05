@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.99 20180219";
+static const char * version_str = "4.00 20180302";
 
 #define ME "sg_readcap: "
 
@@ -151,7 +151,7 @@ usage_for(const struct opts_t * op)
 }
 
 static int
-process_cl_new(struct opts_t * op, int argc, char * argv[])
+new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int c;
     int a_one = 0;
@@ -246,7 +246,7 @@ process_cl_new(struct opts_t * op, int argc, char * argv[])
 }
 
 static int
-process_cl_old(struct opts_t * op, int argc, char * argv[])
+old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     bool jmp_out;
     int k, plen, num;
@@ -348,7 +348,7 @@ process_cl_old(struct opts_t * op, int argc, char * argv[])
 }
 
 static int
-process_cl(struct opts_t * op, int argc, char * argv[])
+parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
@@ -356,14 +356,14 @@ process_cl(struct opts_t * op, int argc, char * argv[])
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
         op->opt_new = false;
-        res = process_cl_old(op, argc, argv);
+        res = old_parse_cmd_line(op, argc, argv);
         if ((0 == res) && op->opt_new)
-            res = process_cl_new(op, argc, argv);
+            res = new_parse_cmd_line(op, argc, argv);
     } else {
         op->opt_new = true;
-        res = process_cl_new(op, argc, argv);
+        res = new_parse_cmd_line(op, argc, argv);
         if ((0 == res) && (! op->opt_new))
-            res = process_cl_old(op, argc, argv);
+            res = old_parse_cmd_line(op, argc, argv);
     }
     return res;
 }
@@ -413,7 +413,7 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(op, 0, sizeof(opts));
-    res = process_cl(op, argc, argv);
+    res = parse_cmd_line(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
     if (op->do_help) {

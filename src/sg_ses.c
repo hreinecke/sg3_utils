@@ -14,6 +14,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -36,14 +38,18 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.32 20180217";    /* ses4r02 */
+static const char * version_str = "2.34 20180304";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
-#define MX_DATA_IN 2048
+#define DATA_IN_OFF 4
+#define MIN_DATA_IN_SZ 8192     /* use max(MIN_DATA_IN_SZ, op->maxlen) for
+                                 * the size of data_arr */
+#define MX_DATA_IN_LINES (16 * 1024)
 #define MX_JOIN_ROWS 260        /* element index fields in dpages are only 8
                                  * bit, and index 0xff (255) is sometimes used
                                  * for 'not applicable' */
+#define MX_DATA_IN_DESCS 32
 #define NUM_ACTIVE_ET_AESP_ARR 32
 
 #define TEMPERAT_OFF 20         /* 8 bits represents -19 C to +235 C */
@@ -66,9 +72,10 @@ static const char * version_str = "2.32 20180217";    /* ses4r02 */
 #define ADD_ELEM_STATUS_DPC 0xa
 #define SUBENC_HELP_TEXT_DPC 0xb
 #define SUBENC_STRING_DPC 0xc
-#define SUPPORTED_SES_DPC 0xd
+#define SUPPORTED_SES_DPC 0xd   /* should be 0x1 <= dpc <= 0x2f */
 #define DOWNLOAD_MICROCODE_DPC 0xe
 #define SUBENC_NICKNAME_DPC 0xf
+#define ALL_DPC 0xff
 
 /* Element Type codes */
 #define UNSPECIFIED_ETC 0x0
@@ -124,24 +131,25 @@ struct cgs_cl_t {
 };
 
 struct opts_t {
-    bool byte1_given;
-    bool do_control;
-    bool do_data;
-    bool eiioe_auto;
+    bool byte1_given;   /* true if -b B1 or --byte1=B1 given */
+    bool do_control;    /* want to write to DEVICE */
+    bool do_data;       /* flag if --data= option has been used */
+    bool do_list;
+    bool do_status;     /* want to read from DEVICE (or user data) */
+    bool do_version;
+    bool eiioe_auto;    /* Element Index Includes Overall (status) Element */
     bool eiioe_force;
     bool ind_given;     /* '--index=...' or '-I ...' */
     bool inner_hex;
-    bool do_list;
+    bool many_dpages;   /* user supplied data has more than one dpage */
     bool mask_ign;      /* element read-mask-modify-write actions */
-    bool seid_given;
-    bool page_code_given;       /* or suitable abbreviation */
     bool o_readonly;
-    bool do_status;
-    bool do_version;
+    bool page_code_given;       /* or suitable abbreviation */
+    bool quiet;         /* exit status unaltered by --quiet */
+    bool seid_given;
     bool warn;
-    int byte1;
+    int byte1;          /* (origin 0 so second byte) in Control dpage */
     int dev_slot_num;
-    int enumerate;
     int do_filter;
     int do_help;
     int do_hex;
@@ -149,6 +157,7 @@ struct opts_t {
                            descriptor and Additional element status dpages.
                            Use twice to add Threshold in dpage to join. */
     int do_raw;
+    int enumerate;
     int ind_th;    /* type header index, set by build_type_desc_hdr_arr() */
     int ind_indiv;      /* individual element index; -1 for overall */
     int ind_indiv_last; /* if > ind_indiv then [ind_indiv..ind_indiv_last] */
@@ -158,16 +167,17 @@ struct opts_t {
     int page_code;      /* recognised abbreviations converted to dpage num */
     int verbose;
     int num_cgs;        /* number of --clear-, --get= and --set= options */
-    int arr_len;
-    uint8_t sas_addr[8];
+    int mx_arr_len;     /* allocated size of data_arr */
+    int arr_len;        /* valid bytes in data_arr */
     uint8_t * data_arr;
     uint8_t * free_data_arr;
     const char * desc_name;
     const char * dev_name;
+    const struct element_type_t * ind_etp;
     const char * index_str;
     const char * nickname_str;
-    const struct element_type_t * ind_etp;
     struct cgs_cl_t cgs_cl_arr[CGS_CL_ARR_MAX_SZ];
+    uint8_t sas_addr[8];
 };
 
 struct diag_page_code {
@@ -270,8 +280,15 @@ struct enclosure_info {
     uint8_t product_rev_level[4]; /* may differ from INQUIRY response */
 };
 
+/* When --status is given with --data= the file contents may contain more
+ * than one dpage to be decoded. */
+struct data_in_desc_t {
+    bool in_use;
+    int page_code;
+    int offset;         /* byte offset from op->data_arr + DATA_IN_OFF */
+    int dp_len;         /* byte length of this diagnostic page */
+};
 
-static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
 
 /* Join array has four "element index"ing stategies:
  *   [1] based on all descriptors in the Enclosure Status (ES) dpage
@@ -319,6 +336,14 @@ static struct join_row_t join_arr[MX_JOIN_ROWS];
 static struct join_row_t * join_arr_lastp = join_arr + MX_JOIN_ROWS - 1;
 static bool join_done = false;
 
+static struct type_desc_hdr_t type_desc_hdr_arr[MX_ELEM_HDR];
+static int type_desc_hdr_count = 0;
+static uint8_t * config_dp_resp = NULL;
+static uint8_t * free_config_dp_resp = NULL;
+static int config_dp_resp_len;
+
+static struct data_in_desc_t data_in_desc_arr[MX_DATA_IN_DESCS];
+
 /* Large buffers on heap, aligned to page size and zeroed */
 static uint8_t * enc_stat_rsp;
 static uint8_t * elem_desc_rsp;
@@ -358,6 +383,7 @@ static struct diag_page_code dpc_arr[] = {
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
     {0x42, "Rebuild Assist (SBC)"},     /* sbc3r31 */
+    {ALL_DPC, "All SES diagnostic pages output (sg_ses)"},
     {-1, NULL},
 };
 
@@ -414,6 +440,7 @@ static struct diag_page_code out_dpc_arr[] = {
 static struct diag_page_abbrev dp_abbrev[] = {
     {"ac", ARRAY_CONTROL_DPC},
     {"aes", ADD_ELEM_STATUS_DPC},
+    {"all", ALL_DPC},
     {"as", ARRAY_STATUS_DPC},
     {"cf", CONFIGURATION_DPC},
     {"dm", DOWNLOAD_MICROCODE_DPC},
@@ -430,7 +457,7 @@ static struct diag_page_abbrev dp_abbrev[] = {
     {"sstr", SUBENC_STRING_DPC},
     {"str", STRING_DPC},
     {"th", THRESHOLD_DPC},
-    {NULL, -1},
+    {NULL, -999},
 };
 
 /* Names of element types used by the Enclosure Control/Status diagnostic
@@ -727,6 +754,7 @@ static struct option long_options[] = {
     {"mask", required_argument, 0, 'M'},
     {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
+    {"quiet", no_argument, 0, 'q'},
     {"raw", no_argument, 0, 'r'},
     {"readonly", no_argument, 0, 'R'},
     {"sas-addr", required_argument, 0, 'A'},
@@ -771,24 +799,25 @@ static uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
 };
 
 
-static int read_hex(const char * inp, uint8_t * arr, int * arr_len,
-                    int verb);
+static int read_hex(const char * inp, uint8_t * arr, int mx_arr_len,
+                    int * arr_len, bool in_hex, int verb);
 static int strcase_eq(const char * s1p, const char * s2p);
 static void enumerate_diag_pages(void);
 static bool saddr_non_zero(const uint8_t * bp);
+static const char * find_in_diag_page_desc(int page_num);
 
 
 static void
 usage(int help_num)
 {
-    if (help_num < 2) {
+    if (2 != help_num) {
         pr2serr(
             "Usage: sg_ses [--descriptor=DES] [--dev-slot-num=SN] "
             "[--eiioe=A_F]\n"
             "              [--filter] [--get=STR] [--hex] "
             "[--index=IIA | =TIA,II]\n"
             "              [--inner-hex] [--join] [--maxlen=LEN] "
-            "[--page=PG]\n"
+            "[--page=PG] [--quiet]\n"
             "              [--raw] [--readonly] [--sas-addr=SA] [--status] "
             "[--verbose]\n"
             "              [--warn] DEVICE\n\n"
@@ -801,20 +830,24 @@ usage(int help_num)
             "              [--page=PG] [--sas-addr=SA] [--set=STR] "
             "[--verbose]\n"
             "              DEVICE\n\n"
+            "       sg_ses --data=@FN --status [-rr] [<most options from "
+            "first form>]\n\n"
             "       sg_ses [--enumerate] [--help] [--index=IIA] [--list] "
             "[--version]\n\n"
                );
-        if (help_num < 1) {
+        if ((help_num < 1) || (help_num > 2)) {
             pr2serr("Or the corresponding short option usage: \n"
                     "  sg_ses [-D DES] [-x SN] [-E A_F] [-f] [-G STR] [-H] "
                     "[-I IIA|TIA,II] [-i]\n"
-                    "         [-j] [-m LEN] [-p PG] [-r] [-R] [-A SA] [-s] "
-                    "[-v] [-w] DEVICE\n\n"
+                    "         [-j] [-m LEN] [-p PG] [-q] [-r] [-R] [-A SA] "
+                    "[-s] [-v] [-w] DEVICE\n\n"
                     "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DES] "
                     "[-x SN] [-I IIA|TIA,II]\n"
                     "         [-M] [-m LEN] [-N SEID] [-n SEN] [-p PG] "
                     "[-A SA] [-S STR]\n"
                     "         [-v] DEVICE\n\n"
+                    "  sg_ses -d @FN -s [-rr] [<most options from first "
+                    "form>]\n\n"
                     "  sg_ses [-e] [-h] [-I IIA] [-l] [-V]\n"
                    );
             pr2serr("\nFor help use with '-h' one or more times\n");
@@ -874,8 +907,10 @@ usage(int help_num)
             "  where the remaining sg_ses options are:\n"
             "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
             "to B1\n"
-            "    --data=H,H...|-d H,H...    string of ASCII hex bytes for "
-            "control pages\n"
+            "    --data=H,H...|-d H,H...    string of ASCII hex bytes to "
+            "send as a\n"
+            "                               control page or decode as a "
+            "status page\n"
             "    --data=- | -d -     fetch string of ASCII hex bytes from "
             "stdin\n"
             "    --data=@FN | -d @FN    fetch string of ASCII hex bytes from "
@@ -903,6 +938,7 @@ usage(int help_num)
             "                            used to specify which nickname to "
             "change\n"
             "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
+            "    --quiet|-q          suppress some output messages\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
             "                        when used twice outputs page in binary "
@@ -950,7 +986,7 @@ parse_index(struct opts_t *op)
         else {
             n = sg_get_num_nomult(cp + 1);
             if ((n < 0) || (n > 255)) {
-                pr2serr("bad argument to '--index', after comma expect "
+                pr2serr("bad argument to '--index=', after comma expect "
                         "number from -1 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -1080,7 +1116,7 @@ parse_index(struct opts_t *op)
 static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
-    int c, j, n, ret;
+    int c, j, n, d_len, ret;
     const char * data_arg = NULL;
     uint64_t saddr;
     const char * cp;
@@ -1089,7 +1125,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         int option_index = 0;
         bool ff;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:rRs"
+        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:qrRs"
                         "S:vVwx:", long_options, &option_index);
         if (c == -1)
             break;
@@ -1100,7 +1136,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if ((strlen(optarg) > 2) && ('X' == toupper(optarg[1])))
                 cp = optarg + 2;
             if (1 != sscanf(cp, "%" SCNx64 "", &saddr)) {
-                pr2serr("bad argument to '--sas-addr'\n");
+                pr2serr("bad argument to '--sas-addr=SA'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             for (j = 7, ff = true; j >= 0; --j) {
@@ -1110,14 +1146,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 saddr >>= 8;
             }
             if (ff) {
-                pr2serr("error decoding '--sas-addr=' argument\n");
+                pr2serr("error decoding '--sas-addr=SA' argument\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'b':
             op->byte1 = sg_get_num_nomult(optarg);
             if ((op->byte1 < 0) || (op->byte1 > 255)) {
-                pr2serr("bad argument to '--byte1' (0 to 255 inclusive)\n");
+                pr2serr("bad argument to '--byte1=B1' (0 to 255 "
+                        "inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->byte1_given = true;
@@ -1209,7 +1246,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'N':
             op->seid = sg_get_num_nomult(optarg);
             if ((op->seid < 0) || (op->seid > 255)) {
-                pr2serr("bad argument to '--nick_id' (0 to 255 inclusive)\n");
+                pr2serr("bad argument to '--nickid=SEID' (0 to 255 "
+                        "inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->seid_given = true;
@@ -1217,14 +1255,14 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'm':
             n = sg_get_num(optarg);
             if ((n < 0) || (n > 65535)) {
-                pr2serr("bad argument to '--maxlen' (0 to 65535 inclusive "
-                        "expected)\n");
+                pr2serr("bad argument to '--maxlen=LEN' (0 to 65535 "
+                        "inclusive expected)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (0 == n)
                 op->maxlen = MX_ALLOC_LEN;
             else if (n < 4)
-                pr2serr("Warning: --maxlen= less than 4 ignored\n");
+                pr2serr("Warning: --maxlen=LEN less than 4 ignored\n");
             else
                 op->maxlen = n;
             break;
@@ -1235,7 +1273,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if (isdigit(optarg[0])) {
                 op->page_code = sg_get_num_nomult(optarg);
                 if ((op->page_code < 0) || (op->page_code > 255)) {
-                    pr2serr("bad argument to '--page' (0 to 255 "
+                    pr2serr("bad argument to '--page=PG' (0 to 255 "
                             "inclusive)\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1249,13 +1287,16 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                     }
                 }
                 if (NULL == ap->abbrev) {
-                    pr2serr("'--page=' argument abbreviation \"%s\" not "
+                    pr2serr("'--page=PG' argument abbreviation \"%s\" not "
                             "found\nHere are the choices:\n", optarg);
                     enumerate_diag_pages();
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }
             op->page_code_given = true;
+            break;
+        case 'q':
+            op->quiet = true;
             break;
         case 'r':
             ++op->do_raw;
@@ -1317,10 +1358,67 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             goto err_help;
         }
     }
+    op->mx_arr_len = (op->maxlen > MIN_DATA_IN_SZ) ? op->maxlen :
+                                                     MIN_DATA_IN_SZ;
+    op->data_arr = sg_memalign(op->mx_arr_len, 0 /* page aligned */,
+                               &op->free_data_arr, false);
+    if (NULL == op->data_arr) {
+        pr2serr("unable to allocate %u bytes on heap\n", op->mx_arr_len);
+        return sg_convert_errno(ENOMEM);
+    }
     if (data_arg) {
-        if (read_hex(data_arg, op->data_arr + 4, &op->arr_len, op->verbose)) {
-            pr2serr("bad argument to '--data'\n");
+        if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
+                     op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
+                     (op->do_raw < 2), op->verbose)) {
+            pr2serr("bad argument, expect '--data=H,H...', '--data=-' or "
+                    "'--data=@FN'\n");
             return SG_LIB_SYNTAX_ERROR;
+        }
+        op->do_raw = 0;
+        if (op->arr_len > 3) {
+            int off;
+            int pc = 0;
+            const uint8_t * bp = op->data_arr + DATA_IN_OFF;
+            struct data_in_desc_t * didp = data_in_desc_arr;
+
+            d_len = sg_get_unaligned_be16(bp + 2) + 4;
+            for (n = 0, off = 0; n < MX_DATA_IN_DESCS; ++n, ++didp) {
+                didp->in_use = true;
+                pc = bp[0];
+                didp->page_code = pc;
+                didp->offset = off;
+                didp->dp_len = d_len;
+                off += d_len;
+                if ((off + 3) < op->arr_len) {
+                    bp += d_len;
+                    d_len = sg_get_unaligned_be16(bp + 2) + 4;
+                } else {
+                    ++n;
+                    break;
+                }
+            }
+            if (n > 1)
+                op->many_dpages = true;
+            else if (1 == n) {
+                op->page_code_given = true;
+                op->page_code = pc;
+            } else {
+                pr2serr("No dpage found --data= argument\n");
+                goto err_help;
+            }
+            if (op->verbose > 3) {
+                int k;
+                char b[128];
+
+                for (didp = data_in_desc_arr, k = 0; k < n; ++k, ++didp) {
+                    if ((cp = find_in_diag_page_desc(didp->page_code)))
+                        snprintf(b, sizeof(b), "%s dpage", cp);
+                    else
+                        snprintf(b, sizeof(b), "dpage 0x%x", didp->page_code);
+                    pr2serr("%s found, offset %d, dp_len=%d\n", b,
+                            didp->offset, didp->dp_len);
+                }
+            }
         }
     }
     if (op->do_join && op->do_control) {
@@ -1345,7 +1443,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
              saddr_non_zero(op->sas_addr)) > 1) {
             pr2serr("can only have one of --descriptor, "
                     "--dev-slot-num and --sas-addr\n");
-            return SG_LIB_SYNTAX_ERROR;
+            goto err_help;
         }
         if ((0 == op->do_join) && (! op->do_control) &&
             (0 == op->num_cgs) && (! op->page_code_given)) {
@@ -1365,6 +1463,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     }
     if (op->do_list || op->enumerate)
         return 0;
+
     if (op->do_control && op->do_status) {
         pr2serr("cannot have both '--control' and '--status'\n");
         goto err_help;
@@ -1375,26 +1474,36 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             pr2serr("need to give '--data' in control mode\n");
             goto err_help;
         }
-    } else if (! op->do_status)
+    } else if (! op->do_status) {
+        if (op->do_data) {
+            pr2serr("when user data given, require '--control' or "
+                    "'--status' option\n");
+            goto err_help;
+        }
         op->do_status = true;  /* default to receiving status pages */
+    } else if (op->do_status && op->do_data && op->dev_name) {
+        pr2serr(">>> Warning: device name (%s) will be ignored\n",
+                op->dev_name);
+        op->dev_name = NULL;    /* quash device name */
+    }
 
     if (op->nickname_str) {
         if (! op->do_control) {
             pr2serr("since '--nickname=' implies control mode, require "
                     "'--control' as well\n");
-            return SG_LIB_SYNTAX_ERROR;
+            goto err_help;
         }
         if (op->page_code_given) {
             if (SUBENC_NICKNAME_DPC != op->page_code) {
                 pr2serr("since '--nickname=' assume or expect "
                         "'--page=snic'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_help;
             }
         } else
             op->page_code = SUBENC_NICKNAME_DPC;
     } else if (op->seid_given) {
         pr2serr("'--nickid=' must be used together with '--nickname='\n");
-        return SG_LIB_SYNTAX_ERROR;
+        goto err_help;
 
     }
     if ((op->verbose > 4) && saddr_non_zero(op->sas_addr)) {
@@ -1404,15 +1513,17 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         pr2serr("\n");
     }
 
-    if (NULL == op->dev_name) {
+    if ((! (op->do_data && op->do_status)) && (NULL == op->dev_name)) {
         pr2serr("missing DEVICE name!\n");
         goto err_help;
     }
     return 0;
 
 err_help:
-    pr2serr("\n");
-    usage(0);
+    if (op->verbose) {
+        pr2serr("\n");
+        usage(0);
+    }
     return SG_LIB_SYNTAX_ERROR;
 }
 
@@ -1531,9 +1642,10 @@ match_last_ind_indiv(int index, const struct opts_t * op)
 /* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
  * failures */
 static int
-do_senddiag(int sg_fd, bool pf_bit, void * outgoing_pg, int outgoing_len,
-            bool noisy, int verbose)
+do_senddiag(int sg_fd, void * outgoing_pg, int outgoing_len, bool noisy,
+            int verbose)
 {
+    const bool pf_bit = true;
     const char * cp;
     int page_num;
 
@@ -1717,31 +1829,76 @@ find_join_row_cnst(const struct th_es_t * tesp, int index,
     }
 }
 
-/* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
- * failures */
+/* Return of 0 -> success, SG_LIB_CAT_* positive values or -2 if response
+ * had bad format, -1 -> other failures */
 static int
 do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
-            int rsp_buff_size, const struct opts_t * op, int * rsp_lenp)
+            int rsp_buff_size, struct opts_t * op, int * rsp_lenp)
 {
-    int rsp_len, res, resid;
+    int k, d_len, rsp_len, res;
+    int resid = 0;
+    int vb = op->verbose;
     const char * cp;
     char b[80];
+    char bb[120];
+    static const char * rdr = "Receive diagnostic results";
 
     memset(rsp_buff, 0, rsp_buff_size);
     if (rsp_lenp)
         *rsp_lenp = 0;
-    cp = find_in_diag_page_desc(page_code);
-    if (op->verbose > 1) {
-        if (cp)
-            pr2serr("    Receive diagnostic results command for %s page\n",
-                    cp);
-        else
-            pr2serr("    Receive diagnostic results command for page 0x%x\n",
-                    page_code);
+    if ((cp = find_in_diag_page_desc(page_code)))
+        snprintf(bb, sizeof(bb), "%s dpage", cp);
+    else
+        snprintf(bb, sizeof(bb), "dpage 0x%x", page_code);
+    cp = bb;
+
+    if (op->data_arr && op->do_data) {  /* user provided data */
+        /* N.B. First 4 bytes in data_arr are not used, user data was read in
+         * starting at byte offset 4 */
+        bool found = false;
+        int off = 0;
+        const uint8_t * bp = op->data_arr + DATA_IN_OFF;
+        const struct data_in_desc_t * didp = data_in_desc_arr;
+
+        for (k = 0, d_len = 0; k < MX_DATA_IN_DESCS; ++k, ++didp) {
+            if (! didp->in_use)
+                break;
+            if (page_code == didp->page_code) {
+                off = didp->offset;
+                d_len = didp->dp_len;
+                found = true;
+                break;
+            }
+        }
+        if (found)
+            memcpy(rsp_buff, bp + off, d_len);
+        else {
+            if (vb)
+                pr2serr("%s: %s not found in user data\n", __func__, cp);
+            return SG_LIB_CAT_OTHER;
+        }
+
+        cp = find_in_diag_page_desc(page_code);
+        if (vb > 2) {
+            pr2serr("    %s: response data from user", rdr);
+            if (3 == vb) {
+                pr2serr("%s:\n", (d_len > 256 ? ", first 256 bytes" : ""));
+                hex2stderr(rsp_buff, (d_len > 256 ? 256 : d_len), -1);
+            } else {
+                pr2serr(":\n");
+                hex2stderr(rsp_buff, d_len, 0);
+            }
+        }
+        res = 0;
+        resid = rsp_buff_size - d_len;
+        goto decode;    /* step over the device access */
     }
+    if (vb > 1)
+        pr2serr("    %s command for %s\n", rdr, cp);
     res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, page_code, rsp_buff,
                                 rsp_buff_size, 0 /* default timeout */,
-                                &resid, true, op->verbose);
+                                &resid, ! op->quiet, vb);
+decode:
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
         if (rsp_len > rsp_buff_size) {
@@ -1776,12 +1933,8 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
             return -2;
         }
         return 0;
-    } else if (op->verbose) {
-        if (cp)
-            pr2serr("Attempt to fetch %s diagnostic page failed\n", cp);
-        else
-            pr2serr("Attempt to fetch status diagnostic page [0x%x] failed\n",
-                    page_code);
+    } else if (vb) {
+        pr2serr("Attempt to fetch %s failed\n", cp);
         sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
         pr2serr("    %s\n", b);
     }
@@ -1906,35 +2059,44 @@ build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
     int resp_len, k, el, num_subs, sum_type_dheaders, res, n;
     int ret = 0;
     uint32_t gen_code;
-    uint8_t * resp = NULL;
-    uint8_t * free_resp = NULL;
     const uint8_t * bp;
     const uint8_t * last_bp;
 
-    resp = sg_memalign(op->maxlen, 0, &free_resp, op->verbose > 3);
-    if (NULL == resp) {
-        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                op->maxlen);
-        ret = -1;
-        goto the_end;
-    }
-    res = do_rec_diag(fd, CONFIGURATION_DPC, resp, op->maxlen, op, &resp_len);
-    if (res) {
-        pr2serr("%s: couldn't read config page, res=%d\n", __func__, res);
-        ret = -1;
-        goto the_end;
-    }
-    if (resp_len < 4) {
-        ret = -1;
-        goto the_end;
-    }
-    num_subs = resp[1] + 1;
+    if (NULL == config_dp_resp) {
+        config_dp_resp = sg_memalign(op->maxlen, 0, &free_config_dp_resp,
+                                     false);
+        if (NULL == config_dp_resp) {
+            pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
+                    op->maxlen);
+            ret = -1;
+            goto the_end;
+        }
+        res = do_rec_diag(fd, CONFIGURATION_DPC, config_dp_resp, op->maxlen,
+                          op, &resp_len);
+        if (res) {
+            pr2serr("%s: couldn't read config page, res=%d\n", __func__, res);
+            ret = -1;
+            free(free_config_dp_resp);
+            free_config_dp_resp = NULL;
+            goto the_end;
+        }
+        if (resp_len < 4) {
+            ret = -1;
+            free(free_config_dp_resp);
+            free_config_dp_resp = NULL;
+            goto the_end;
+        }
+	config_dp_resp_len = resp_len;
+    } else
+	resp_len = config_dp_resp_len;
+
+    num_subs = config_dp_resp[1] + 1;
     sum_type_dheaders = 0;
-    last_bp = resp + resp_len - 1;
-    gen_code = sg_get_unaligned_be32(resp + 4);
+    last_bp = config_dp_resp + resp_len - 1;
+    gen_code = sg_get_unaligned_be32(config_dp_resp + 4);
     if (generationp)
         *generationp = gen_code;
-    bp = resp + 8;
+    bp = config_dp_resp + 8;
     for (k = 0; k < num_subs; ++k, bp += el) {
         if ((bp + 3) > last_bp)
             goto p_truncated;
@@ -1998,8 +2160,8 @@ p_truncated:
     ret = -1;
 
 the_end:
-    if (free_resp)
-        free(free_resp);
+    if (0 == ret)
+        ++type_desc_hdr_count;
     return ret;
 }
 
@@ -3692,13 +3854,16 @@ truncated:
     return;
 }
 
-/* Reads hex data from command line, stdin or a file. Returns 0 on success,
- * 1 otherwise. */
+/* Reads hex data from command line, stdin or a file when in_hex is true.
+ * Reads binary from stdin or file when in_hex is false. Returns 0 on
+ * success, 1 otherwise. If inp is a file, then the first skipped (since
+ * (it should be '@'). */
 static int
-read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
+read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
+         bool in_hex, int vb)
 {
+    bool has_stdin, split_line;
     int in_len, k, j, m, off;
-    bool split_line;
     unsigned int h;
     const char * lcp;
     char * cp;
@@ -3711,10 +3876,60 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
         return 1;
     lcp = inp;
     in_len = strlen(inp);
-    if (0 == in_len)
+    if (0 == in_len) {
         *arr_len = 0;
-    if (('-' == inp[0]) || ('@' == inp[0])) {    /* read from stdin or file */
-        if ('-' == inp[0])
+        return 0;
+    }
+    has_stdin = ((1 == in_len) && ('-' == inp[0]));
+
+    if (! in_hex) {     /* binary, assume its not on the command line, */
+        int fd;         /* that leaves stdin or a file (pipe) */
+        struct stat a_stat;
+
+        if (has_stdin)
+            fd = STDIN_FILENO;
+        else {
+            fd = open(inp + 1, O_RDONLY);
+            if (fd < 0) {
+                pr2serr("unable to open binary file %s: %s\n", inp,
+                         safe_strerror(errno));
+                return 1;
+            }
+        }
+        k = read(fd, arr, mx_arr_len);
+        if (k <= 0) {
+            if (0 == k)
+                pr2serr("read 0 bytes from binary file %s\n", inp);
+            else
+                pr2serr("read from binary file %s: %s\n", inp,
+                        safe_strerror(errno));
+            if (! has_stdin)
+                close(fd);
+            return 1;
+        }
+        if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
+            /* pipe; keep reading till error or 0 read */
+            while (k < mx_arr_len) {
+                m = read(fd, arr + k, mx_arr_len - k);
+                if (0 == m)
+                   break;
+                if (m < 0) {
+                    pr2serr("read from binary pipe %s: %s\n", inp,
+                            safe_strerror(errno));
+                    if (! has_stdin)
+                        close(fd);
+                    return 1;
+                }
+                k += m;
+            }
+        }
+        *arr_len = k;
+        if (! has_stdin)
+            close(fd);
+        return 0;
+    }
+    if (has_stdin || ('@' == inp[0])) {    /* read from stdin or file */
+        if (has_stdin)
             fp = stdin;
         else {
             fp = fopen(inp + 1, "r");
@@ -3724,8 +3939,7 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
             }
         }
         carry_over[0] = 0;
-        for (j = 0, off = 0; j < MX_DATA_IN; ++j) {
-            /* limit lines read to MX_DATA_IN */
+        for (j = 0, off = 0; j < MX_DATA_IN_LINES; ++j) {
             if (NULL == fgets(line, sizeof(line), fp))
                 break;
             in_len = strlen(line);
@@ -3770,14 +3984,19 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
             if (in_len != k) {
                 pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                         j + 1, m + k + 1);
+                if (vb > 2)
+                    pr2serr("first 40 characters of line: %.40s\n", line);
                 goto err_with_fp;
             }
-            for (k = 0; k < (MX_DATA_IN - off); ++k) {
+            for (k = 0; k < (mx_arr_len - off); ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
                         pr2serr("%s: hex number larger than 0xff in line %d, "
                                 "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
+                        if (vb > 2)
+                            pr2serr("first 40 characters of line: %.40s\n",
+                                    line);
                         goto err_with_fp;
                     }
                     if (split_line && (1 == strlen(lcp))) {
@@ -3794,11 +4013,13 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
                 } else {
                     pr2serr("%s: error in line %d, at pos %d\n", __func__,
                             j + 1, (int)(lcp - line + 1));
+                    if (vb > 2)
+                        pr2serr("first 40 characters of line: %.40s\n", line);
                     goto err_with_fp;
                 }
             }
             off += k + 1;
-            if (off >= MX_DATA_IN)
+            if (off >= mx_arr_len)
                 break;
         }
         *arr_len = off;
@@ -3808,7 +4029,7 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
             pr2serr("%s: error at pos %d\n", __func__, k + 1);
             goto err_with_fp;
         }
-        for (k = 0; k < MX_DATA_IN; ++k) {
+        for (k = 0; k < mx_arr_len; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
                     pr2serr("%s: hex number larger than 0xff at pos %d\n",
@@ -3833,8 +4054,10 @@ read_hex(const char * inp, uint8_t * arr, int * arr_len, int verb)
         }
         *arr_len = k + 1;
     }
-    if (verb > 3)
-        hex2stdout(arr, *arr_len, 0);
+    if (vb > 3) {
+        pr2serr("%s: user provided data:\n", __func__);
+        hex2stderr(arr, *arr_len, 0);
+    }
     if (fp && (fp != stdin))
         fclose(fp);
     return 0;
@@ -3845,34 +4068,26 @@ err_with_fp:
     return 1;
 }
 
-/* Display "status" page (op->page_code). data-in from SES device.
- * Return 0 for success. */
 static int
-process_status_page(int sg_fd, struct opts_t * op)
+process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
+                      struct opts_t * op)
 {
-    int j, resp_len, num_ths;
+    int j, num_ths;
     int ret = 0;
     uint32_t ref_gen_code;
-    uint8_t * resp = NULL;
-    uint8_t * free_resp = NULL;
     const char * cp;
     struct enclosure_info primary_info;
     struct th_es_t tes;
     struct th_es_t * tesp;
+    char bb[120];
 
-    resp = sg_memalign(op->maxlen, 0, &free_resp, op->verbose > 3);
-    if (NULL == resp) {
-        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                op->maxlen);
-        ret = -1;
-        goto fini;
-    }
     tesp = &tes;
     memset(tesp, 0, sizeof(tes));
-    cp = find_in_diag_page_desc(op->page_code);
-    ret = do_rec_diag(sg_fd, op->page_code, resp, op->maxlen, op, &resp_len);
-    if (ret)
-        goto fini;
+    if ((cp = find_in_diag_page_desc(page_code)))
+        snprintf(bb, sizeof(bb), "%s dpage", cp);
+    else
+        snprintf(bb, sizeof(bb), "dpage 0x%x", page_code);
+    cp = bb;
     if (op->do_raw) {
         if (1 == op->do_raw)
             hex2stdout(resp + 4, resp_len - 4, -1);
@@ -3881,164 +4096,229 @@ process_status_page(int sg_fd, struct opts_t * op)
                 perror("sg_set_binary_mode");
             dStrRaw(resp, resp_len);
         }
+        goto fini;
     } else if (op->do_hex) {
-        if (op->do_hex > 2)
+        if (op->do_hex > 2) {
+            if (4 == op->do_hex)
+                printf("\n# %s:\n", cp);
             hex2stdout(resp, resp_len, -1);
-         else {
-            if (cp)
-                printf("Response in hex from diagnostic page: %s\n", cp);
-            else
-                printf("Response in hex from unknown diagnostic page "
-                       "[0x%x]\n", op->page_code);
+         } else {
+            printf("# Response in hex for %s:\n", cp);
             hex2stdout(resp, resp_len, (2 == op->do_hex));
         }
-    } else {
-        memset(&primary_info, 0, sizeof(primary_info));
-        switch (op->page_code) {
-        case SUPPORTED_DPC:
-            supported_pages_sdg("Supported diagnostic pages", resp, resp_len);
-            break;
-        case CONFIGURATION_DPC:
-            configuration_sdg(resp, resp_len);
-            break;
-        case ENC_STATUS_DPC:
-            num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                              MX_ELEM_HDR, &ref_gen_code,
-                                              &primary_info, op);
-            if (num_ths < 0) {
-                ret = num_ths;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            tesp->th_base = type_desc_hdr_arr;
-            tesp->num_ths = num_ths;
-            enc_status_dp(tesp, ref_gen_code, resp, resp_len, op);
-            break;
-        case ARRAY_STATUS_DPC:
-            num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                              MX_ELEM_HDR, &ref_gen_code,
-                                              &primary_info, op);
-            if (num_ths < 0) {
-                ret = num_ths;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            tesp->th_base = type_desc_hdr_arr;
-            tesp->num_ths = num_ths;
-            array_status_dp(tesp, ref_gen_code, resp, resp_len, op);
-            break;
-        case HELP_TEXT_DPC:
-            printf("Help text diagnostic page (for primary "
-                   "subenclosure):\n");
-            if (resp_len > 4)
-                printf("  %.*s\n", resp_len - 4, resp + 4);
-            else
-                printf("  <empty>\n");
-            break;
-        case STRING_DPC:
-            printf("String In diagnostic page (for primary "
-                   "subenclosure):\n");
-            if (resp_len > 4)
-                hex2stdout(resp + 4, resp_len - 4, 0);
-            else
-                printf("  <empty>\n");
-            break;
-        case THRESHOLD_DPC:
-            num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                              MX_ELEM_HDR, &ref_gen_code,
-                                              &primary_info, op);
-            if (num_ths < 0) {
-                ret = num_ths;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            tesp->th_base = type_desc_hdr_arr;
-            tesp->num_ths = num_ths;
-            threshold_sdg(tesp, ref_gen_code, resp, resp_len, op);
-            break;
-        case ELEM_DESC_DPC:
-            num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                              MX_ELEM_HDR, &ref_gen_code,
-                                              &primary_info, op);
-            if (num_ths < 0) {
-                ret = num_ths;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            tesp->th_base = type_desc_hdr_arr;
-            tesp->num_ths = num_ths;
-            element_desc_sdg(tesp, ref_gen_code, resp, resp_len, op);
-            break;
-        case SHORT_ENC_STATUS_DPC:
-            printf("Short enclosure status diagnostic page, "
-                   "status=0x%x\n", resp[1]);
-            break;
-        case ENC_BUSY_DPC:
-            printf("Enclosure Busy diagnostic page, "
-                   "busy=%d [vendor specific=0x%x]\n",
-                   resp[1] & 1, (resp[1] >> 1) & 0xff);
-            break;
-        case ADD_ELEM_STATUS_DPC:
-            num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
-                                              MX_ELEM_HDR, &ref_gen_code,
-                                              &primary_info, op);
-            if (num_ths < 0) {
-                ret = num_ths;
-                goto fini;
-            }
-            if (primary_info.have_info) {
-                printf("  Primary enclosure logical identifier (hex): ");
-                for (j = 0; j < 8; ++j)
-                    printf("%02x", primary_info.enc_log_id[j]);
-                printf("\n");
-            }
-            tesp->th_base = type_desc_hdr_arr;
-            tesp->num_ths = num_ths;
-            additional_elem_sdg(tesp, ref_gen_code, resp, resp_len, op);
-            break;
-        case SUBENC_HELP_TEXT_DPC:
-            subenc_help_sdg(resp, resp_len);
-            break;
-        case SUBENC_STRING_DPC:
-            subenc_string_sdg(resp, resp_len);
-            break;
-        case SUPPORTED_SES_DPC:
-            supported_pages_sdg("Supported SES diagnostic pages", resp,
-                                resp_len);
-            break;
-        case DOWNLOAD_MICROCODE_DPC:
-            download_code_sdg(resp, resp_len);
-            break;
-        case SUBENC_NICKNAME_DPC:
-            subenc_nickname_sdg(resp, resp_len);
-            break;
-        default:
-            printf("Cannot decode response from diagnostic "
-                   "page: %s\n", (cp ? cp : "<unknown>"));
-            hex2stdout(resp, resp_len, 0);
-        }
+        goto fini;
     }
-    ret = 0;
+
+    memset(&primary_info, 0, sizeof(primary_info));
+    switch (page_code) {
+    case SUPPORTED_DPC:
+        supported_pages_sdg("Supported diagnostic pages", resp, resp_len);
+        break;
+    case CONFIGURATION_DPC:
+        configuration_sdg(resp, resp_len);
+        break;
+    case ENC_STATUS_DPC:
+        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                          MX_ELEM_HDR, &ref_gen_code,
+                                          &primary_info, op);
+        if (num_ths < 0) {
+            ret = num_ths;
+            goto fini;
+        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
+            printf("  Primary enclosure logical identifier (hex): ");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", primary_info.enc_log_id[j]);
+            printf("\n");
+        }
+        tesp->th_base = type_desc_hdr_arr;
+        tesp->num_ths = num_ths;
+        enc_status_dp(tesp, ref_gen_code, resp, resp_len, op);
+        break;
+    case ARRAY_STATUS_DPC:
+        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                          MX_ELEM_HDR, &ref_gen_code,
+                                          &primary_info, op);
+        if (num_ths < 0) {
+            ret = num_ths;
+            goto fini;
+        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
+            printf("  Primary enclosure logical identifier (hex): ");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", primary_info.enc_log_id[j]);
+            printf("\n");
+        }
+        tesp->th_base = type_desc_hdr_arr;
+        tesp->num_ths = num_ths;
+        array_status_dp(tesp, ref_gen_code, resp, resp_len, op);
+        break;
+    case HELP_TEXT_DPC:
+        printf("Help text diagnostic page (for primary "
+               "subenclosure):\n");
+        if (resp_len > 4)
+            printf("  %.*s\n", resp_len - 4, resp + 4);
+        else
+            printf("  <empty>\n");
+        break;
+    case STRING_DPC:
+        printf("String In diagnostic page (for primary "
+               "subenclosure):\n");
+        if (resp_len > 4)
+            hex2stdout(resp + 4, resp_len - 4, 0);
+        else
+            printf("  <empty>\n");
+        break;
+    case THRESHOLD_DPC:
+        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                          MX_ELEM_HDR, &ref_gen_code,
+                                          &primary_info, op);
+        if (num_ths < 0) {
+            ret = num_ths;
+            goto fini;
+        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
+            printf("  Primary enclosure logical identifier (hex): ");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", primary_info.enc_log_id[j]);
+            printf("\n");
+        }
+        tesp->th_base = type_desc_hdr_arr;
+        tesp->num_ths = num_ths;
+        threshold_sdg(tesp, ref_gen_code, resp, resp_len, op);
+        break;
+    case ELEM_DESC_DPC:
+        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                              MX_ELEM_HDR, &ref_gen_code,
+                                              &primary_info, op);
+            if (num_ths < 0) {
+            ret = num_ths;
+            goto fini;
+        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
+            printf("  Primary enclosure logical identifier (hex): ");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", primary_info.enc_log_id[j]);
+            printf("\n");
+        }
+        tesp->th_base = type_desc_hdr_arr;
+        tesp->num_ths = num_ths;
+        element_desc_sdg(tesp, ref_gen_code, resp, resp_len, op);
+        break;
+    case SHORT_ENC_STATUS_DPC:
+        printf("Short enclosure status diagnostic page, "
+               "status=0x%x\n", resp[1]);
+        break;
+    case ENC_BUSY_DPC:
+        printf("Enclosure Busy diagnostic page, "
+               "busy=%d [vendor specific=0x%x]\n",
+               resp[1] & 1, (resp[1] >> 1) & 0xff);
+        break;
+    case ADD_ELEM_STATUS_DPC:
+        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+                                          MX_ELEM_HDR, &ref_gen_code,
+                                          &primary_info, op);
+        if (num_ths < 0) {
+            ret = num_ths;
+            goto fini;
+        }
+        if (primary_info.have_info) {
+            printf("  Primary enclosure logical identifier (hex): ");
+            for (j = 0; j < 8; ++j)
+                printf("%02x", primary_info.enc_log_id[j]);
+            printf("\n");
+        }
+        tesp->th_base = type_desc_hdr_arr;
+        tesp->num_ths = num_ths;
+        additional_elem_sdg(tesp, ref_gen_code, resp, resp_len, op);
+        break;
+    case SUBENC_HELP_TEXT_DPC:
+        subenc_help_sdg(resp, resp_len);
+        break;
+    case SUBENC_STRING_DPC:
+        subenc_string_sdg(resp, resp_len);
+        break;
+    case SUPPORTED_SES_DPC:
+        supported_pages_sdg("Supported SES diagnostic pages", resp,
+                            resp_len);
+        break;
+    case DOWNLOAD_MICROCODE_DPC:
+        download_code_sdg(resp, resp_len);
+        break;
+    case SUBENC_NICKNAME_DPC:
+        subenc_nickname_sdg(resp, resp_len);
+        break;
+    default:
+        printf("Cannot decode response from diagnostic "
+               "page: %s\n", (cp ? cp : "<unknown>"));
+        hex2stdout(resp, resp_len, 0);
+    }
+
+fini:
+    return ret;
+}
+
+/* Display "status" page or pages (if op->page_code==0xff) . data-in from
+ * SES device or user provided (with --data= option). Return 0 for success */
+static int
+process_status_page_s(int sg_fd, struct opts_t * op)
+{
+    int page_code, ret, resp_len;
+    uint8_t * resp = NULL;
+    uint8_t * free_resp = NULL;
+
+    resp = sg_memalign(op->maxlen, 0, &free_resp, false);
+    if (NULL == resp) {
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
+                op->maxlen);
+        ret = -1;
+        goto fini;
+    }
+    page_code = op->page_code;
+    if (ALL_DPC == page_code) {
+        int k, n;
+        uint8_t pc, prev;
+        uint8_t supp_dpg_arr[256];
+        const int s_arr_sz = sizeof(supp_dpg_arr);
+
+        memset(supp_dpg_arr, 0, s_arr_sz);
+        ret = do_rec_diag(sg_fd, SUPPORTED_DPC, resp, op->maxlen, op,
+                          &resp_len);
+        if (ret)        /* SUPPORTED_DPC failed so try SUPPORTED_SES_DPC */
+            ret = do_rec_diag(sg_fd, SUPPORTED_SES_DPC, resp, op->maxlen, op,
+                              &resp_len);
+        if (ret)
+            goto fini;
+        for (n = 0, pc = 0; (n < s_arr_sz) && (n < (resp_len - 4)); ++n) {
+            prev = pc;
+            pc = resp[4 + n];
+            if (prev > pc) {
+                if (pc) {       /* could be zero pad at end which is ok */
+                    pr2serr("%s: Supported (SES) dpage seems corrupt, "
+                            "should ascend\n", __func__);
+                    ret = SG_LIB_CAT_OTHER;
+                    goto fini;
+                }
+                break;
+            }
+            if (pc > 0x2f)
+                break;
+            supp_dpg_arr[n] = pc;
+        }
+        for (k = 0; k < n; ++k) {
+            page_code = supp_dpg_arr[k];
+            ret = do_rec_diag(sg_fd, page_code, resp, op->maxlen, op,
+                              &resp_len);
+            if (ret)
+                goto fini;
+            ret = process_status_dpage(sg_fd, page_code, resp, resp_len, op);
+        }
+    } else {    /* asking for a specific page code */
+        ret = do_rec_diag(sg_fd, page_code, resp, op->maxlen, op, &resp_len);
+        if (ret)
+            goto fini;
+        ret = process_status_dpage(sg_fd, page_code, resp, resp_len, op);
+    }
 
 fini:
     if (free_resp)
@@ -4843,7 +5123,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
             enc_stat_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(enc_stat_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(sg_fd, true, enc_stat_rsp, len, true,
+            ret = do_senddiag(sg_fd, enc_stat_rsp, len, ! op->quiet,
                               op->verbose);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
@@ -4901,7 +5181,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
             threshold_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(sg_fd, true, threshold_rsp, len, true,
+            ret = do_senddiag(sg_fd, threshold_rsp, len, ! op->quiet,
                               op->verbose);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
@@ -4972,6 +5252,11 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     const uint8_t * ed_bp;
     char b[64];
 
+    if ((sg_fd < 0) && (GET_OPT != tavp->cgs_sel)) {
+        pr2serr("%s: --clear= and --set= only supported when DEVICE is "
+                "given\n", __func__);
+        return SG_LIB_SYNTAX_ERROR;
+    }
     found = false;
     if (NULL == tavp->acron) {
         if (! op->page_code_given)
@@ -5093,6 +5378,10 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
     uint8_t b[64];
     const int control_plen = 0x24;
 
+    if (sg_fd < 0) {
+        pr2serr("%s: ignored when no device name\n", __func__);
+        return 0;
+    }
     memset(b, 0, sizeof(b));
     /* Only after the generation code, offset 4 for 4 bytes */
     res = do_rec_diag(sg_fd, SUBENC_NICKNAME_DPC, b, 8, op, &resp_len);
@@ -5120,7 +5409,8 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
     if (len > 32)
         len = 32;
     memcpy(b + 8, op->nickname_str, len);
-    return do_senddiag(sg_fd, true, b, control_plen + 4, true, op->verbose);
+    return do_senddiag(sg_fd, b, control_plen + 4, ! op->quiet,
+                       op->verbose);
 }
 
 static void
@@ -5225,12 +5515,10 @@ int
 main(int argc, char * argv[])
 {
     bool have_cgs = false;
-    bool vb3;
-    int k, res, vb;
+    int k, d_len, res, vb;
     int sg_fd = -1;
     int pd_type = 0;
     int ret = 0;
-    uint32_t pg_sz;
     const char * cp;
     struct opts_t opts;
     struct opts_t * op;
@@ -5250,18 +5538,13 @@ main(int argc, char * argv[])
     op->dev_slot_num = -1;
     op->ind_indiv_last = -1;
     op->maxlen = MX_ALLOC_LEN;
-    pg_sz = sg_get_page_size();
-    op->data_arr = sg_memalign(MX_DATA_IN + 16, pg_sz, &op->free_data_arr,
-                               false);
-    if (NULL == op->data_arr) {
-        pr2serr("unable to allocate %u bytes on heap\n", MX_DATA_IN + 16);
-        return sg_convert_errno(ENOMEM);
-    }
     res = parse_cmd_line(op, argc, argv);
     if (res) {
         ret = SG_LIB_SYNTAX_ERROR;
+        vb = op->verbose;
         goto early_out;
     }
+    vb = op->verbose;
     if (op->do_version) {
         pr2serr("version: %s\n", version_str);
         goto early_out;
@@ -5274,27 +5557,25 @@ main(int argc, char * argv[])
         enumerate_work(op);
         goto early_out;
     }
-    vb = op->verbose;
-    vb3 = (vb > 3);
-    enc_stat_rsp = sg_memalign(op->maxlen, pg_sz, &free_enc_stat_rsp, vb3);
+    enc_stat_rsp = sg_memalign(op->maxlen, 0, &free_enc_stat_rsp, false);
     if (NULL == enc_stat_rsp) {
         pr2serr("Unable to get heap for enc_stat_rsp\n");
         goto err_out;
     }
     enc_stat_rsp_sz = op->maxlen;
-    elem_desc_rsp = sg_memalign(op->maxlen, pg_sz, &free_elem_desc_rsp, vb3);
+    elem_desc_rsp = sg_memalign(op->maxlen, 0, &free_elem_desc_rsp, false);
     if (NULL == elem_desc_rsp) {
         pr2serr("Unable to get heap for elem_desc_rsp\n");
         goto err_out;
     }
     elem_desc_rsp_sz = op->maxlen;
-    add_elem_rsp = sg_memalign(op->maxlen, pg_sz, &free_add_elem_rsp, vb3);
+    add_elem_rsp = sg_memalign(op->maxlen, 0, &free_add_elem_rsp, false);
     if (NULL == add_elem_rsp) {
         pr2serr("Unable to get heap for add_elem_rsp\n");
         goto err_out;
     }
     add_elem_rsp_sz = op->maxlen;
-    threshold_rsp = sg_memalign(op->maxlen, pg_sz, &free_threshold_rsp, vb3);
+    threshold_rsp = sg_memalign(op->maxlen, 0, &free_threshold_rsp, false);
     if (NULL == threshold_rsp) {
         pr2serr("Unable to get heap for threshold_rsp\n");
         goto err_out;
@@ -5373,31 +5654,36 @@ main(int argc, char * argv[])
     }
 #endif
 
-    sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, vb);
-    if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", op->dev_name,
-                safe_strerror(-sg_fd));
-        ret = SG_LIB_FILE_ERROR;
-        goto err_out;
-    }
-    if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
-        if (sg_simple_inquiry(sg_fd, &inq_resp, 1, vb)) {
-            pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->dev_name);
-            ret = SG_LIB_CAT_OTHER;
+    if (op->dev_name) {
+        sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, vb);
+        if (sg_fd < 0) {
+            pr2serr("open error: %s: %s\n", op->dev_name,
+                    safe_strerror(-sg_fd));
+            ret = SG_LIB_FILE_ERROR;
             goto err_out;
-        } else {
-            printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
-                   inq_resp.product, inq_resp.revision);
-            pd_type = inq_resp.peripheral_type;
-            cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
-            if (0xd == pd_type) {
-                if (vb)
-                    printf("    enclosure services device\n");
-            } else if (0x40 & inq_resp.byte_6)
-                printf("    %s device has EncServ bit set\n", cp);
-            else
-                printf("    %s device (not an enclosure)\n", cp);
         }
+        if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
+            if ((ret = sg_simple_inquiry(sg_fd, &inq_resp, ! op->quiet, vb))) {
+                pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
+                        op->dev_name);
+                goto err_out;
+            } else {
+                printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
+                       inq_resp.product, inq_resp.revision);
+                pd_type = inq_resp.peripheral_type;
+                cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
+                if (0xd == pd_type) {
+                    if (vb)
+                        printf("    enclosure services device\n");
+                } else if (0x40 & inq_resp.byte_6)
+                    printf("    %s device has EncServ bit set\n", cp);
+                else
+                    printf("    %s device (not an enclosure)\n", cp);
+            }
+        }
+    } else if (op->do_control) {
+        pr2serr("Cannot do SCSI Send diagnostic command without a DEVICE\n");
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     if (op->nickname_str)
@@ -5412,17 +5698,17 @@ main(int argc, char * argv[])
     } else if (op->do_join)
         ret = join_work(sg_fd, op, true);
     else if (op->do_status)
-        ret = process_status_page(sg_fd, op);
+        ret = process_status_page_s(sg_fd, op);
     else { /* control page requested */
         op->data_arr[0] = op->page_code;
         op->data_arr[1] = op->byte1;
+        d_len = op->arr_len + DATA_IN_OFF;
         sg_put_unaligned_be16((uint16_t)op->arr_len, op->data_arr + 2);
         switch (op->page_code) {
         case ENC_CONTROL_DPC:  /* Enclosure Control diagnostic page [0x2] */
             printf("Sending Enclosure Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
                 goto err_out;
@@ -5431,8 +5717,7 @@ main(int argc, char * argv[])
         case STRING_DPC:       /* String Out diagnostic page [0x4] */
             printf("Sending String Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send String Out page\n");
                 goto err_out;
@@ -5441,8 +5726,7 @@ main(int argc, char * argv[])
         case THRESHOLD_DPC:       /* Threshold Out diagnostic page [0x5] */
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
                 goto err_out;
@@ -5451,8 +5735,7 @@ main(int argc, char * argv[])
         case ARRAY_CONTROL_DPC:   /* Array control diagnostic page [0x6] */
             printf("Sending Array Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Array Control page\n");
                 goto err_out;
@@ -5461,8 +5744,7 @@ main(int argc, char * argv[])
         case SUBENC_STRING_DPC: /* Subenclosure String Out page [0xc] */
             printf("Sending Subenclosure String Out [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure String Out page\n");
                 goto err_out;
@@ -5470,11 +5752,10 @@ main(int argc, char * argv[])
             break;
         case DOWNLOAD_MICROCODE_DPC: /* Download Microcode Control [0xe] */
             printf("Sending Download Microcode Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, op->arr_len);
+                   "page length=%d bytes\n", op->page_code, d_len);
             printf("  Perhaps it would be better to use the sg_ses_microcode "
                    "utility\n");
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Download Microcode Control page\n");
                 goto err_out;
@@ -5482,9 +5763,8 @@ main(int argc, char * argv[])
             break;
         case SUBENC_NICKNAME_DPC: /* Subenclosure Nickname Control [0xf] */
             printf("Sending Subenclosure Nickname Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, true, op->data_arr, op->arr_len + 4,
-                              true, vb);
+                   "page length=%d bytes\n", op->page_code, d_len);
+            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure Nickname Control page\n");
                 goto err_out;
@@ -5505,9 +5785,6 @@ err_out:
         sg_get_category_sense_str(ret, sizeof(b), b, vb);
         pr2serr("    %s\n", b);
     }
-    if (ret && (0 == vb))
-        pr2serr("Problem detected, try again with --verbose option for more "
-                "information\n");
     if (sg_fd >= 0)
         res = sg_cmds_close_device(sg_fd);
     else
@@ -5526,7 +5803,16 @@ err_out:
             ret = SG_LIB_FILE_ERROR;
     }
 early_out:
+    if ((0 == vb) && (! op->quiet)) {
+        if (! sg_if_can2stderr("sg_ses failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+        else if ((SG_LIB_SYNTAX_ERROR == ret) && (0 == vb))
+            pr2serr("Add '-h' to command line for usage infomation\n");
+    }
     if (op->free_data_arr)
         free(op->free_data_arr);
+    if (free_config_dp_resp)
+        free(free_config_dp_resp);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

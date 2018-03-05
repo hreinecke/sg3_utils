@@ -32,21 +32,21 @@ extern "C" {
 /* Invokes a SCSI INQUIRY command and yields the response
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb,
- * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other errors */
+ * SG_LIB_CAT_ABORTED_COMMAND, a negated errno or -1 -> other errors */
 int sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
                   int mx_resp_len, bool noisy, int verbose);
 
 /* Invokes a SCSI INQUIRY command and yields the response. Returns 0 when
- * successful, various SG_LIB_CAT_* positive values or -1 -> other errors.
- * The CMDDT field is obsolete in the INQUIRY cdb (since spc3r16 in 2003) so
- * an argument to set it has been removed (use the REPORT SUPPORTED OPERATION
- * CODES command instead). Adds the ability to set the command abort timeout
- * and the ability to report the residual count. If timeout_secs is zero
- * or less the default command abort timeout (60 seconds) is used.
- * If residp is non-NULL then the residual value is written where residp
- * points. A residual value of 0 implies mx_resp_len bytes have be written
- * where resp points. If the residual value equals mx_resp_len then no
- * bytes have been written. */
+ * successful, various SG_LIB_CAT_* positive values, negated error or -1
+ * for other errors. The CMDDT field is obsolete in the INQUIRY cdb (since
+ * spc3r16 in 2003) so * an argument to set it has been removed (use the
+ * REPORT SUPPORTED OPERATION CODES command instead). Adds the ability to
+ * set the command abort timeout and the ability to report the residual
+ * count. If timeout_secs is zero or less the default command abort timeout
+ * (60 seconds) is used. If residp is non-NULL then the residual value is
+ * written where residp points. A residual value of 0 implies mx_resp_len
+ * bytes have be written where resp points. If the residual value equals
+ * mx_resp_len then no bytes have been written. */
 int
 sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
                  int mx_resp_len, int timeout_secs, int * residp,
@@ -216,7 +216,7 @@ struct sg_simple_inquiry_resp {
 /* Yields most of first 36 bytes of a standard INQUIRY (evpd==0) response.
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
- * -1 -> other errors */
+ * a negated errno or -1 -> other errors */
 int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                       bool noisy, int verbose);
 

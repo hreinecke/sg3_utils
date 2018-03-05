@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180227] [svn: r757]
+Changelog for sg3_utils-1.43 [20180304] [svn: r758]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -15,12 +15,14 @@ Changelog for sg3_utils-1.43 [20180227] [svn: r757]
     - add --quick option to skip reconsideration time
   - sg_decode sense: add --cdb option
   - sg_ses: handle 2 bit EIIOE field in aes dpage
+    - add --quiet option to suppress messages
     - expand join handling of SAS connectors and others
     - expand join debug code
     - allow multiple --clear=, --get= and --set= options
     - allow individual index ranges (e.g. --index=3,5)
     - allow --index=IIA with -ee to enumerate only fields
       belonging to element type IIA
+    - --data=@FN with --status now decodes dpage(s) in FN
     - add 'offset_temp' and 'rqst_override' to temperature
       sensor element type
     - interpret '--join --page=aes' to only display join
@@ -88,7 +90,8 @@ Changelog for sg3_utils-1.43 [20180227] [svn: r757]
     - check resid and trim response if necessary
     - report when --no-inquiry is ignored
   - sg_raw: add --enumerate option
-    - add --cmdfile=CF option
+    - add --cmdfile=CF option, permit 64 byte NVMe
+      admin commands to be sent
     - add --raw option (for CF in binary)
     - page align input and output buffers
   - sg_get_lba_status: add --report-type= option (sbc4r12)

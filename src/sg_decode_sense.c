@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.14 20180219";
+static const char * version_str = "1.15 20180302";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -110,7 +110,7 @@ usage()
 }
 
 static int
-process_cl(struct opts_t *op, int argc, char *argv[])
+parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
     int c;
     unsigned int ui;
@@ -418,7 +418,7 @@ main(int argc, char *argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     memset(b, 0, sizeof(b));
-    ret = process_cl(op, argc, argv);
+    ret = parse_cmd_line(op, argc, argv);
     if (ret != 0) {
         usage();
         return ret;

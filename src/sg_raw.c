@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.23 (2018-02-16)"
+#define SG_RAW_VERSION "0.4.24 (2018-03-02)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -343,7 +343,7 @@ bad:
 }
 
 static int
-process_cl(struct opts_t * op, int argc, char *argv[])
+parse_cmd_line(struct opts_t * op, int argc, char *argv[])
 {
     while (1) {
         int c, n;
@@ -667,7 +667,7 @@ main(int argc, char *argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     op->timeout = DEFAULT_TIMEOUT;
-    ret = process_cl(op, argc, argv);
+    ret = parse_cmd_line(op, argc, argv);
     if (ret != 0) {
         usage();
         goto done;
