@@ -1,4 +1,4 @@
-.TH SG_STREAM_CTL "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_STREAM_CTL "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_stream_ctl \- send SCSI STREAM CONTROL or GET STREAM STATUS command
 .SH SYNOPSIS
@@ -14,9 +14,9 @@ These commands, together with WRITE STREAM(16 and 32) and several fields in
 the Block Limits Extension VPD page [0xb7] support the streams concept.
 The stream commands were added in SBC\-4 draft 8 (September 2015).
 .PP
-Both STREAM CONTROL and GET STREAM STATUS command expect data from the
+Both STREAM CONTROL and GET STREAM STATUS commands expect data from the
 \fIDEVICE\fR (referred to as 'data\-in'). In the case of STREAM CONTROL
-only the 'open' STR_CTL<\-\-0x1 actually needs the data\-in as it contains
+only the 'open' (STR_CTL<\-\-0x1) actually needs the data\-in as it contains
 the "Assigned stream id" if the open was successful. The assigned stream
 id should be used by subsequent WRITE STREAM commands and ultimately
 by the STREAM CONTROL close (STR_CTL<\-\-0x2). Valid stream ids are between
@@ -95,9 +95,9 @@ READs (6, 10, 12, 16 or 32) can be used. Note that when a stream is closed,
 all resources associated with that stream id are removed, apart from the
 data in the written LBAs. To make sure the reading back data is not delayed
 too much by error recovery (in the presence of media errors) the user may
-set the RECOVERY TIME LIMIT field (units for non\-zero values: milliseconds)
-in the 'Read\-write error recovery' mode page. This can be done with the
-sdparm utility.
+set the RECOVERY TIME LIMIT field (RTL, units for non\-zero values:
+milliseconds) in the 'Read\-write error recovery' mode page. This can be done
+with the sdparm utility.
 .PP
 The SCSI WRITE STREAM (16 and 32) commands can be found in the sg_write_x
 utility in this package.

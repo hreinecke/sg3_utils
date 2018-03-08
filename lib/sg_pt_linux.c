@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.39 20180219 */
+/* sg_pt_linux version 1.40 20180307 */
 
 
 #include <stdio.h>
@@ -836,7 +836,7 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
     /* convert v4 to v3 header */
     v3_hdr.interface_id = 'S';
     v3_hdr.dxfer_direction = SG_DXFER_NONE;
-    v3_hdr.cmdp = (uint8_t *)(long)ptp->io_hdr.request;
+    v3_hdr.cmdp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.request;
     v3_hdr.cmd_len = (uint8_t)ptp->io_hdr.request_len;
     if (ptp->io_hdr.din_xfer_len > 0) {
         if (ptp->io_hdr.dout_xfer_len > 0) {
@@ -853,7 +853,7 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
         v3_hdr.dxfer_direction =  SG_DXFER_TO_DEV;
     }
     if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
-        v3_hdr.sbp = (uint8_t *)(long)ptp->io_hdr.response;
+        v3_hdr.sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
         v3_hdr.mx_sb_len = (uint8_t)ptp->io_hdr.max_response_len;
     }
     v3_hdr.pack_id = (int)ptp->io_hdr.spare_in;
@@ -949,7 +949,7 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
         void * p;
 
-        p = (void *)(long)ptp->io_hdr.response;
+        p = (void *)(sg_uintptr_t)ptp->io_hdr.response;
         memset(p, 0, ptp->io_hdr.max_response_len);
     }
 #endif
