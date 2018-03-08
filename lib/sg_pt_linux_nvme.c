@@ -193,7 +193,7 @@ mk_sense_asc_ascq(struct sg_pt_linux_scsi * ptp, int sk, int asc, int ascq,
 {
     bool dsense = ptp->scsi_dsense;
     int n;
-    uint8_t * sbp = (uint8_t *)ptp->io_hdr.response;
+    uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
 
     ptp->io_hdr.device_status = SAM_STAT_CHECK_CONDITION;
     n = ptp->io_hdr.max_response_len;
@@ -218,7 +218,7 @@ mk_sense_from_nvme_status(struct sg_pt_linux_scsi * ptp, int vb)
     bool dsense = ptp->scsi_dsense;
     int n;
     uint8_t sstatus, sk, asc, ascq;
-    uint8_t * sbp = (uint8_t *)ptp->io_hdr.response;
+    uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
 
     ok = sg_nvme_status2scsi(ptp->nvme_status, &sstatus, &sk, &asc, &ascq);
     if (! ok) { /* can't find a mapping to a SCSI error, so ... */
@@ -249,7 +249,7 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
 {
     bool dsense = ptp->scsi_dsense;
     int sl, asc, n;
-    uint8_t * sbp = (uint8_t *)ptp->io_hdr.response;
+    uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
     uint8_t sks[4];
 
     ptp->io_hdr.device_status = SAM_STAT_CHECK_CONDITION;
@@ -339,7 +339,7 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     if (ptp->nvme_direct && ptp->io_hdr.response &&
         (ptp->io_hdr.max_response_len > 3)) {
         /* build 16 byte "sense" buffer */
-        uint8_t * sbp = (uint8_t *)ptp->io_hdr.response;
+        uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
         uint16_t st = (uint16_t)res;
 
         n = ptp->io_hdr.max_response_len;
@@ -506,14 +506,14 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
             n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
             ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
             if (n > 0) {
+                uint8_t * dp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp;
+
                 if (cp_id_ctl) {
-                    memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout,
-                           (n < 16 ? n : 16));
+                    memcpy(dp, inq_dout, (n < 16 ? n : 16));
                     if (n > 16)
-                        memcpy((uint8_t *)ptp->io_hdr.din_xferp + 16,
-                               ptp->nvme_id_ctlp, n - 16);
+                        memcpy(dp + 16, ptp->nvme_id_ctlp, n - 16);
                 } else
-                    memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout, n);
+                    memcpy(dp, inq_dout, n);
             }
         }
     } else {            /* Standard INQUIRY response */
@@ -531,7 +531,8 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
             n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
             ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
             if (n > 0)
-                memcpy((uint8_t *)ptp->io_hdr.din_xferp, inq_dout, n);
+                memcpy((uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp,
+                       inq_dout, n);
         }
     }
     return 0;
@@ -596,7 +597,8 @@ sntl_rluns(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
         ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
         if (n > 0)
-            memcpy((uint8_t *)ptp->io_hdr.din_xferp, rl_doutp, n);
+            memcpy((uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp, rl_doutp,
+                   n);
     }
     res = 0;
     free(rl_doutp);
@@ -701,7 +703,7 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;
     ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - n;
     if (n > 0)
-        memcpy((uint8_t *)ptp->io_hdr.din_xferp, rs_dout, n);
+        memcpy((uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp, rs_dout, n);
     return 0;
 }
 
@@ -793,7 +795,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     }
     n = dout_len;
     n = (n < alloc_len) ? n : alloc_len;
-    dop = (uint8_t *)ptp->io_hdr.dout_xferp;
+    dop = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.dout_xferp;
     if (! sg_is_aligned(dop, pg_sz)) {  /* is dop page aligned ? */
         if (vb)
             pr2ws("%s: dout [0x%" PRIx64 "] not page aligned\n", __func__,
@@ -852,7 +854,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     din_len = ptp->io_hdr.din_xfer_len;
     n = din_len;
     n = (n < alloc_len) ? n : alloc_len;
-    dip = (uint8_t *)ptp->io_hdr.din_xferp;
+    dip = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp;
     if (! sg_is_aligned(dip, pg_sz)) {
         if (vb)
             pr2ws("%s: din [0x%" PRIx64 "] not page aligned\n", __func__,
@@ -1028,7 +1030,7 @@ sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     len = (offset < alloc_len) ? offset : alloc_len;
     ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - len;
     if (len > 0)
-        memcpy((uint8_t *)ptp->io_hdr.din_xferp, arr, len);
+        memcpy((uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp, arr, len);
     free(free_arr);
     return 0;
 }
@@ -1061,7 +1063,7 @@ sntl_rep_tmfs(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     len = (len < alloc_len) ? len : alloc_len;
     ptp->io_hdr.din_resid = ptp->io_hdr.din_xfer_len - len;
     if (len > 0)
-        memcpy((uint8_t *)ptp->io_hdr.din_xferp, arr, len);
+        memcpy((uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp, arr, len);
     return 0;
 }
 
@@ -1102,7 +1104,7 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
         return SCSI_PT_DO_BAD_PARAMS;
     }
     n = ptp->io_hdr.request_len;
-    cdbp = (const uint8_t *)ptp->io_hdr.request;
+    cdbp = (const uint8_t *)(sg_uintptr_t)ptp->io_hdr.request;
     if (vb > 3)
         pr2ws("%s: opcode=0x%x, fd=%d (dev_fd=%d), time_secs=%d\n", __func__,
               cdbp[0], fd, hold_dev_fd, time_secs);
@@ -1151,17 +1153,17 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
                   n);
         return SCSI_PT_DO_BAD_PARAMS;
     }
-    memcpy(&cmd, (const uint8_t *)ptp->io_hdr.request, n);
+    memcpy(&cmd, (const uint8_t *)(sg_uintptr_t)ptp->io_hdr.request, n);
     if (n < len)        /* zero out rest of 'cmd' */
         memset((uint8_t *)&cmd + n, 0, len - n);
     if (ptp->io_hdr.din_xfer_len > 0) {
         cmd.data_len = ptp->io_hdr.din_xfer_len;
-        dp = (void *)ptp->io_hdr.din_xferp;
+        dp = (void *)(sg_uintptr_t)ptp->io_hdr.din_xferp;
         cmd.addr = (uint64_t)(sg_uintptr_t)ptp->io_hdr.din_xferp;
         is_read = true;
     } else if (ptp->io_hdr.dout_xfer_len > 0) {
         cmd.data_len = ptp->io_hdr.dout_xfer_len;
-        dp = (void *)ptp->io_hdr.dout_xferp;
+        dp = (void *)(sg_uintptr_t)ptp->io_hdr.dout_xferp;
         cmd.addr = (uint64_t)(sg_uintptr_t)ptp->io_hdr.dout_xferp;
         is_read = false;
     }

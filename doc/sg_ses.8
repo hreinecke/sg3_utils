@@ -45,15 +45,18 @@ most recent reference for this utility is the draft SCSI Enclosure Services
 standards for SES, SES\-2 and SES\-3 are ANSI INCITS 305\-1998 and ANSI
 INCITS 448\-2008 and ANSI INCITS 518\-2017 respectively.
 .PP
-The first form shown in the synopsis is for fetching and decoding dpages
-or fields from the SES \fIDEVICE\fR. Alternatively a fetched dpage may be
-output in hex or binary with the \fI\-\-hex\fR or \fI\-\-raw\fR options.
+The first form shown in the synopsis is for fetching and decoding dpages or
+fields from the SES \fIDEVICE\fR. A SCSI RECEIVE DIAGNOSTIC RESULTS command
+is sent to the \fIDEVICE\fR to obtain each dpage response.  Rather than
+decoding a fetched dpage, it may be output in hex or binary with the
+\fI\-\-hex\fR or \fI\-\-raw \-\-raw\fR options.
 .PP
 The second form in the synopsis is for modifying dpages or fields held in
-the SES \fIDEVICE\fR. Changing the state of an enclosure (e.g. requesting
-the "ident" (locate) LED to flash on a disk carrier in an array) is typically
-done using a read\-modify\-write cycle. See the section on CHANGING STATE
-below.
+the SES \fIDEVICE\fR. A SCSI SEND DIAGNOSTIC command containing a "control"
+dpage is sent to the \fIDEVICE\fR to cause changes. Changing the state of an
+enclosure (e.g. requesting the "ident" (locate) LED to flash on a disk
+carrier in an array) is typically done using a read\-modify\-write cycle.
+See the section on CHANGING STATE below.
 .PP
 The third form in the synopsis shows the options for decoding the contents
 of a file that holds a hexadecimal or binary representation of a SES
@@ -509,23 +512,25 @@ names a file (e.g. \fI\-\-data=@thresh_in_dpage.hex\fR).
 .PP
 The first scenario is flagged by the \fI\-\-control\fR option. It uses the
 supplied data to build a 'control' dpage that will be sent to the
-\fIDEVICE\fR. The supplied dpage data should not include its first 4 bytes.
-Those 4 bytes are added by this utility using the \fI\-\-page=PG\fR option
-with \fIPG\fR placed at byte offset 0). The \fI\-\-byte1=B1\fR option sets
-byte offset 1, else 0 is placed in that position. The number of bytes
-decoded from the data provided (i.e. its length) goes into byte offsets 2
-and 3.
+\fIDEVICE\fR using the SCSI SCSI SEND DIAGNOSTIC command. The supplied dpage
+data should not include its first 4 bytes. Those 4 bytes are added by this
+utility using the \fI\-\-page=PG\fR option with \fIPG\fR placed at byte
+offset 0). If needed, the \fI\-\-byte1=B1\fR option sets byte offset 1,
+else 0 is placed in that position. The number of bytes decoded from the data
+provided (i.e. its length) goes into byte offsets 2 and 3.
 .PP
 The second scenario is flagged by the \fI\-\-status\fR option. It decodes
 the supplied data assuming that it represents the response to one or more
-SCSI SEND DIAGNOSTIC commands. Those responses have typically been captured
-from some earlier invocation(s) of this utility. Those earlier invocations
-could use the '\-HHH' or '\-HHHH' option and file redirection to capture
-that response (or responses) in hexadecimal. The supplied dpage response
-data is decoded according to the other command line options. For example
-the \fI\-\-join\fR option could be given and that would require the data
-from multiple dpages typically:  Configuration, Enclosure status, Element
-descriptor and Additional element status dpages.
+SCSI RECEIVE DIAGNOSTIC RESULTS commands. Those responses have typically
+been captured from some earlier invocation(s) of this utility. Those earlier
+invocations could use the '\-HHH' or '\-HHHH' option and file redirection to
+capture that response (or responses) in hexadecimal. The supplied dpage
+response data is decoded according to the other command line options. For
+example the \fI\-\-join\fR option could be given and that would require the
+data from multiple dpages typically:  Configuration, Enclosure status,
+Element descriptor and Additional element status dpages. If in doubt use
+\fI\-\-page=all\fR in the capture phase; having more dpages than needed
+is not a problem.
 .PP
 By default the user supplied data is assumed to be ASCII hexadecimal in
 lines that don't exceed 512 characters. Anything on a line from and
@@ -594,14 +599,14 @@ Support has been added to sg_ses (actually, its underlying library) for
 NVMe (also known as NVM Express) Enclosures. It can be considered
 experimental in sg3_utils package version 1.43 and sg_ses version 2.34 .
 .PP
-This support is based on a decision by NVME-MI (Management Interface)
+This support is based on a decision by NVME\-MI (Management Interface)
 developers to support the SES\-3 standard. This was facilitated by adding
-NVME-MI SES Send and SES Receive commands that tunnel dpage contents as
+NVME\-MI SES Send and SES Receive commands that tunnel dpage contents as
 used by SES.
 .SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) dpages (using
 the SCSI READ DIAGNOSTIC command). To this end the \fI\-\-page=PG\fR and
-\fI\-\-hex\fR options would be appropriate. No-SES dpages can be sent to
+\fI\-\-hex\fR options would be appropriate. Non\-SES dpages can be sent to
 a device with the sg_senddiag utility.
 .PP
 The most troublesome part of the join operation is associating Additional
