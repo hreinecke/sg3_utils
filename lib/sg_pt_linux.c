@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.40 20180307 */
+/* sg_pt_linux version 1.40 20180309 */
 
 
 #include <stdio.h>
@@ -90,7 +90,7 @@ static const char * linux_driver_suggests[] = {
 #define DRIVER_MASK 0x0f
 #endif
 #ifndef SUGGEST_MASK
-#define SUGGEST_MASK 0xf0
+#define SUGGEST_MASK 0xf0       /* Suggest mask is obsolete */
 #endif
 #ifndef DRIVER_SENSE
 #define DRIVER_SENSE 0x08
@@ -399,6 +399,9 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
     ptp = (struct sg_pt_linux_scsi *)
           calloc(1, sizeof(struct sg_pt_linux_scsi));
     if (ptp) {
+#if (HAVE_NVME && (! IGNORE_NVME))
+        sntl_init_dev_stat(&ptp->dev_stat);
+#endif
         err = set_pt_file_handle((struct sg_pt_base *)ptp, dev_fd, verbose);
         if ((0 == err) && (! ptp->is_nvme)) {
             ptp->io_hdr.guard = 'Q';

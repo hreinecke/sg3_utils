@@ -21,12 +21,16 @@
 
 #include "sg_lib.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
+#include "sg_pr2serr.h"
+
+#if (HAVE_NVME && (! IGNORE_NVME))
 #include "sg_pt_nvme.h"
+#endif
 
 
-static const char * scsi_pt_version_str = "3.04 20180213";
+static const char * scsi_pt_version_str = "3.05 20180309";
 
-static const char * nvme_scsi_vendor_str = "NVMe    ";
 
 
 const char *
@@ -40,6 +44,53 @@ sg_pt_version()
 {
     return scsi_pt_version_str;
 }
+
+#if (HAVE_NVME && (! IGNORE_NVME))
+/* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
+
+#define SAVING_PARAMS_UNSUP 0x39
+#define INVALID_FIELD_IN_CDB 0x24
+#define INVALID_FIELD_IN_PARAM_LIST 0x26
+#define PARAMETER_LIST_LENGTH_ERR 0x1a
+
+static const char * nvme_scsi_vendor_str = "NVMe    ";
+
+
+#define F_SA_LOW                0x80    /* cdb byte 1, bits 4 to 0 */
+#define F_SA_HIGH               0x100   /* as used by variable length cdbs */
+#define FF_SA (F_SA_HIGH | F_SA_LOW)
+#define F_INV_OP                0x200
+
+/* Table of SCSI operation code (opcodes) supported by SNTL */
+struct sg_opcode_info_t sg_opcode_info_arr[] =
+{
+    {0x0, 0, 0, {6,              /* TEST UNIT READY */
+      0, 0, 0, 0, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x3, 0, 0, {6,             /* REQUEST SENSE */
+      0xe1, 0, 0, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x12, 0, 0, {6,            /* INQUIRY */
+      0xe3, 0xff, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x1c, 0, 0, {6,            /* RECEIVE DIAGNOSTIC RESULTS */
+      0x1, 0xff, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x1d, 0, 0, {6,            /* SEND DIAGNOSTIC */
+      0xf7, 0x0, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+    {0x55, 0, 0, {10,           /* MODE SELECT(10) */
+      0x13, 0x0, 0x0, 0x0, 0x0, 0x0, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0} },
+    {0x5a, 0, 0, {10,           /* MODE SENSE(10) */
+      0x18, 0xff, 0xff, 0x0, 0x0, 0x0, 0xff, 0xff, 0xc7, 0, 0, 0, 0, 0, 0} },
+    {0xa0, 0, 0, {12,           /* REPORT LUNS */
+      0xe3, 0xff, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0xc7, 0, 0, 0, 0} },
+    {0xa3, 0xc, F_SA_LOW, {12,  /* REPORT SUPPORTED OPERATION CODES */
+      0xc, 0x87, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0xc7, 0, 0, 0,
+      0} },
+    {0xa3, 0xd, F_SA_LOW, {12,  /* REPORT SUPPORTED TASK MAN. FUNCTIONS */
+      0xd, 0x80, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0xc7, 0, 0, 0, 0} },
+
+    {0xff, 0xffff, 0xffff, {0,  /* Sentinel, keep as last element */
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
+};
+
+
 
 /* Given the NVMe Identify controller response and optionally the NVMe
  * Identify namespace response (NULL otherwise), generate the SCSI VPD
@@ -145,3 +196,295 @@ sg_make_vpd_devid_for_nvme(const uint8_t * nvme_id_ctl_p,
         return n + 24;
     }
 }
+
+/* Disconnect-Reconnect page for mode_sense */
+static int
+resp_disconnect_pg(uint8_t * p, int pcontrol)
+{
+    uint8_t disconnect_pg[] = {0x2, 0xe, 128, 128, 0, 10, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0};
+
+    memcpy(p, disconnect_pg, sizeof(disconnect_pg));
+    if (1 == pcontrol)
+        memset(p + 2, 0, sizeof(disconnect_pg) - 2);
+    return sizeof(disconnect_pg);
+}
+
+static uint8_t ctrl_m_pg[] = {0xa, 10, 2, 0, 0, 0, 0, 0,
+                              0, 0, 0x2, 0x4b};
+
+/* Control mode page for mode_sense */
+static int
+resp_ctrl_m_pg(uint8_t *p, int pcontrol)
+{
+    uint8_t ch_ctrl_m_pg[] = {/* 0xa, 10, */ 0x6, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0};
+    uint8_t d_ctrl_m_pg[] = {0xa, 10, 2, 0, 0, 0, 0, 0,
+                             0, 0, 0x2, 0x4b};
+
+    memcpy(p, ctrl_m_pg, sizeof(ctrl_m_pg));
+    if (1 == pcontrol)
+        memcpy(p + 2, ch_ctrl_m_pg, sizeof(ch_ctrl_m_pg));
+    else if (2 == pcontrol)
+        memcpy(p, d_ctrl_m_pg, sizeof(d_ctrl_m_pg));
+    return sizeof(ctrl_m_pg);
+}
+
+static uint8_t iec_m_pg[] = {0x1c, 0xa, 0x08, 0, 0, 0, 0, 0, 0, 0, 0x0, 0x0};
+
+/* Informational Exceptions control mode page for mode_sense */
+static int
+resp_iec_m_pg(uint8_t *p, int pcontrol)
+{
+    uint8_t ch_iec_m_pg[] = {/* 0x1c, 0xa, */ 0x4, 0xf, 0, 0, 0, 0, 0, 0,
+                             0x0, 0x0};
+    uint8_t d_iec_m_pg[] = {0x1c, 0xa, 0x08, 0, 0, 0, 0, 0, 0, 0, 0x0, 0x0};
+
+    memcpy(p, iec_m_pg, sizeof(iec_m_pg));
+    if (1 == pcontrol)
+        memcpy(p + 2, ch_iec_m_pg, sizeof(ch_iec_m_pg));
+    else if (2 == pcontrol)
+        memcpy(p, d_iec_m_pg, sizeof(d_iec_m_pg));
+    return sizeof(iec_m_pg);
+}
+
+static uint8_t vs_ua_m_pg[] = {0x0, 0xe, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0};
+
+/* Vendor specific Unit Attention mode page for mode_sense */
+static int
+resp_vs_ua_m_pg(uint8_t *p, int pcontrol)
+{
+    uint8_t ch_vs_ua_m_pg[] = {/* 0x0, 0xe, */ 0xff, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t d_vs_ua_m_pg[] = {0x0, 0xe, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, 0, 0};
+
+    memcpy(p, vs_ua_m_pg, sizeof(vs_ua_m_pg));
+    if (1 == pcontrol)
+        memcpy(p + 2, ch_vs_ua_m_pg, sizeof(ch_vs_ua_m_pg));
+    else if (2 == pcontrol)
+        memcpy(p, d_vs_ua_m_pg, sizeof(d_vs_ua_m_pg));
+    return sizeof(vs_ua_m_pg);
+}
+
+void
+sntl_init_dev_stat(struct sg_sntl_dev_state_t * dsp)
+{
+    dsp->descriptor_sense = !! (0x4 & ctrl_m_pg[2]);
+    dsp->enclosure_override = vs_ua_m_pg[2];
+}
+
+
+#define SDEBUG_MAX_MSENSE_SZ 256
+
+/* Only support MODE SENSE(10). Returns the number of bytes written to dip,
+ * or -1 if error info placed in resp. */
+int
+sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
+                       const uint8_t * cdbp, uint8_t * dip, int mx_di_len,
+                       struct sg_sntl_result_t * resp)
+{
+    bool dbd, llbaa, is_disk, bad_pcode;
+    int pcontrol, pcode, subpcode, bd_len, alloc_len, offset, len;
+    const uint32_t num_blocks = 0x100000;       /* made up */
+    const uint32_t lb_size = 512;               /* guess */
+    uint8_t dev_spec;
+    uint8_t * ap;
+    uint8_t arr[SDEBUG_MAX_MSENSE_SZ];
+
+    memset(resp, 0, sizeof(*resp));
+    dbd = !! (cdbp[1] & 0x8);         /* disable block descriptors */
+    pcontrol = (cdbp[2] & 0xc0) >> 6;
+    pcode = cdbp[2] & 0x3f;
+    subpcode = cdbp[3];
+    llbaa = !!(cdbp[1] & 0x10);
+    is_disk = (dsp->pdt == PDT_DISK);
+    if (is_disk && !dbd)
+        bd_len = llbaa ? 16 : 8;
+    else
+        bd_len = 0;
+    alloc_len = sg_get_unaligned_be16(cdbp + 7);
+    memset(arr, 0, SDEBUG_MAX_MSENSE_SZ);
+    if (0x3 == pcontrol) {  /* Saving values not supported */
+        resp->asc = SAVING_PARAMS_UNSUP;
+        goto err_out;
+    }
+    /* for disks set DPOFUA bit and clear write protect (WP) bit */
+    if (is_disk)
+        dev_spec = 0x10;        /* =0x90 if WP=1 implies read-only */
+    else
+        dev_spec = 0x0;
+    arr[3] = dev_spec;
+    if (16 == bd_len)
+        arr[4] = 0x1;   /* set LONGLBA bit */
+    arr[7] = bd_len;        /* assume 255 or less */
+    offset = 8;
+    ap = arr + offset;
+
+    if (8 == bd_len) {
+        sg_put_unaligned_be32(num_blocks, ap + 0);
+        sg_put_unaligned_be16((uint16_t)lb_size, ap + 6);
+        offset += bd_len;
+        ap = arr + offset;
+    } else if (16 == bd_len) {
+        sg_put_unaligned_be64(num_blocks, ap + 0);
+        sg_put_unaligned_be32(lb_size, ap + 12);
+        offset += bd_len;
+        ap = arr + offset;
+    }
+
+    if ((subpcode > 0x0) && (subpcode < 0xff)) {
+        resp->asc = INVALID_FIELD_IN_CDB;
+        resp->in_byte = 3;
+        resp->in_bit = 255;
+        goto err_out;
+    }
+    bad_pcode = false;
+
+    switch (pcode) {
+    case 0x2:       /* Disconnect-Reconnect page, all devices */
+        len = resp_disconnect_pg(ap, pcontrol);
+        offset += len;
+        break;
+    case 0xa:       /* Control Mode page, all devices */
+        len = resp_ctrl_m_pg(ap, pcontrol);
+        offset += len;
+        break;
+    case 0x1c:      /* Informational Exceptions Mode page, all devices */
+        len = resp_iec_m_pg(ap, pcontrol);
+        offset += len;
+        break;
+    case 0x3f:      /* Read all Mode pages */
+        if ((0 == subpcode) || (0xff == subpcode)) {
+            len = 0;
+            len = resp_disconnect_pg(ap + len, pcontrol);
+            len += resp_ctrl_m_pg(ap + len, pcontrol);
+            len += resp_iec_m_pg(ap + len, pcontrol);
+            len += resp_vs_ua_m_pg(ap + len, pcontrol);
+            offset += len;
+        } else {
+            resp->asc = INVALID_FIELD_IN_CDB;
+            resp->in_byte = 3;
+            resp->in_bit = 255;
+            goto err_out;
+        }
+        break;
+    case 0x0:       /* Vendor specific "Unit Attention" mode page */
+        len = resp_vs_ua_m_pg(ap, pcontrol);
+        offset += len;
+        break;      /* vendor is "NVMe    " (from INQUIRY field) */
+    default:
+        bad_pcode = true;
+        break;
+    }
+    if (bad_pcode) {
+        resp->asc = INVALID_FIELD_IN_CDB;
+        resp->in_byte = 2;
+        resp->in_bit = 5;
+        goto err_out;
+    }
+    sg_put_unaligned_be16(offset - 2, arr + 0);
+    len = (alloc_len < offset) ? alloc_len : offset;
+    len = (len < mx_di_len) ? len : mx_di_len;
+    memcpy(dip, arr, len);
+    return len;
+
+err_out:
+    resp->sstatus = SAM_STAT_CHECK_CONDITION;
+    resp->sk = SPC_SK_ILLEGAL_REQUEST;
+    return -1;
+}
+
+#define SDEBUG_MAX_MSELECT_SZ 512
+
+/* Only support MODE SELECT(10). Returns number of bytes used from dop,
+ * else -1 on error with sense code placed in resp. */
+int
+sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
+                        const uint8_t * cdbp, const uint8_t * dop, int do_len,
+                        struct sg_sntl_result_t * resp)
+{
+    int pf, sp, ps, md_len, bd_len, off, spf, pg_len, rlen, param_len, mpage;
+    uint8_t arr[SDEBUG_MAX_MSELECT_SZ];
+
+    memset(resp, 0, sizeof(*resp));
+    memset(arr, 0, sizeof(arr));
+    pf = cdbp[1] & 0x10;
+    sp = cdbp[1] & 0x1;
+    param_len = sg_get_unaligned_be16(cdbp + 7);
+    if ((0 == pf) || sp || (param_len > SDEBUG_MAX_MSELECT_SZ)) {
+        resp->asc = INVALID_FIELD_IN_CDB;
+        resp->in_byte = 1;
+        if (sp)
+            resp->in_bit = 0;
+        else if (0 == pf)
+            resp->in_bit = 4;
+        else {
+            resp->in_byte = 7;
+            resp->in_bit = 255;
+        }
+        goto err_out;
+    }
+    rlen = (do_len < param_len) ? do_len : param_len;
+    memcpy(arr, dop, rlen);
+    md_len = sg_get_unaligned_be16(arr + 0) + 2;
+    bd_len = sg_get_unaligned_be16(arr + 6);
+    if (md_len > 2) {
+        resp->asc = INVALID_FIELD_IN_PARAM_LIST;
+        resp->in_byte = 0;
+        resp->in_bit = 255;
+        goto err_out;
+    }
+    off = bd_len + 8;
+    mpage = arr[off] & 0x3f;
+    ps = !!(arr[off] & 0x80);
+    if (ps) {
+        resp->asc = INVALID_FIELD_IN_PARAM_LIST;
+        resp->in_byte = off;
+        resp->in_bit = 7;
+        goto err_out;
+    }
+    spf = !!(arr[off] & 0x40);
+    pg_len = spf ? (sg_get_unaligned_be16(arr + off + 2) + 4) :
+                   (arr[off + 1] + 2);
+    if ((pg_len + off) > param_len) {
+        resp->asc = PARAMETER_LIST_LENGTH_ERR;
+        goto err_out;
+    }
+    switch (mpage) {
+    case 0xa:      /* Control Mode page */
+        if (ctrl_m_pg[1] == arr[off + 1]) {
+            memcpy(ctrl_m_pg + 2, arr + off + 2,
+                   sizeof(ctrl_m_pg) - 2);
+            dsp->descriptor_sense = !!(ctrl_m_pg[2] & 0x4);
+        }
+        break;
+    case 0x1c:      /* Informational Exceptions Mode page */
+        if (iec_m_pg[1] == arr[off + 1]) {
+            memcpy(iec_m_pg + 2, arr + off + 2,
+                   sizeof(iec_m_pg) - 2);
+        }
+        break;
+    case 0x0:       /* Vendor specific "Unit Attention" mode page */
+        if (vs_ua_m_pg[1] == arr[off + 1]) {
+            memcpy(vs_ua_m_pg + 2, arr + off + 2,
+                   sizeof(vs_ua_m_pg) - 2);
+            dsp->enclosure_override = vs_ua_m_pg[2];
+        }
+        break;
+    default:
+        resp->asc = INVALID_FIELD_IN_PARAM_LIST;
+        resp->in_byte = off;
+        resp->in_bit = 5;
+        goto err_out;
+    }
+    return rlen;
+
+err_out:
+    resp->sk = SPC_SK_ILLEGAL_REQUEST;
+    resp->sstatus = SAM_STAT_CHECK_CONDITION;
+    return -1;
+}
+
+#endif          /* (HAVE_NVME && (! IGNORE_NVME)) [near line 140] */

@@ -113,6 +113,7 @@ struct sg_pt_linux_scsi {
                                  * The whole 16 byte completion q entry is
                                  * sent back as sense data */
     uint32_t mdxfer_len;
+    struct sg_sntl_dev_state_t dev_stat;
     void * mdxferp;
     uint8_t * nvme_id_ctlp;     /* cached response to controller IDENTIFY */
     uint8_t * free_nvme_id_ctlp;

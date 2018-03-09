@@ -48,7 +48,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.90 20180304";    /* SPC-5 rev 19 */
+static const char * version_str = "1.90 20180307";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -4042,7 +4042,9 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
     } else if (do_long)
         printf("  FGUID: 0x0\n");
     printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(dinp + 78));
-    if (do_long) {
+    if (do_long) {	/* Bytes 240 to 255 are reserved for NVME-MI */
+	printf("  NVMe Enclosure: %d\n", !! (0x2 & dinp[253]));
+	printf("  NVMe Storage device: %d\n", !! (0x1 & dinp[253]));
         printf("  Management endpoint capabilities, over a PCIe port: %d\n",
                !! (0x2 & dinp[255]));
         printf("  Management endpoint capabilities, over a SMBus/I2C port: "
