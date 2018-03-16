@@ -32,7 +32,7 @@
  * device.
  */
 
-static const char * version_str = "1.13 20180219";
+static const char * version_str = "1.14 20180311";
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -168,7 +168,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const uint8_t * bp;
     int ret = 0;
-    uint8_t add_status;
+    uint8_t add_status = 0;     /* keep gcc quiet */
 
     while (1) {
         int option_index = 0;

@@ -39,6 +39,7 @@ endif
 ## CC = g++
 ## CC = clang
 ## CC = clang++
+## CC = powerpc64-linux-gnu-gcc
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11 for C code
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
