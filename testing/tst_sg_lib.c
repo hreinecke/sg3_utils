@@ -17,7 +17,23 @@
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
+#include <time.h>
+
+#ifdef __GNUC__
+#include <byteswap.h>
+#endif
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"     /* need this to see if HAVE_BYTESWAP_H */
+#endif
+
 #include "sg_lib.h"
+
+/* Uncomment the next two undefs to force use of the generic (i.e. shifting)
+ * unaligned functions (i.e. sg_get_* and sg_put_*). Use "-b 16|32|64
+ * -n 100m" to see the differences in timing. */
+/* #undef HAVE_CONFIG_H */
+/* #undef HAVE_BYTESWAP_H */
 #include "sg_unaligned.h"
 
 /*
@@ -25,17 +41,19 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.08 20180223";
+static const char * version_str = "1.10 20180311";
 
 
 #define MAX_LINE_LEN 1024
 
 
 static struct option long_options[] = {
+        {"byteswap",  required_argument, 0, 'b'},
         {"exit", no_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"hex2",  no_argument, 0, 'H'},
         {"leadin",  required_argument, 0, 'l'},
+        {"num",  required_argument, 0, 'n'},
         {"printf", no_argument, 0, 'p'},
         {"sense", no_argument, 0, 's'},
         {"unaligned", no_argument, 0, 'u'},
@@ -141,12 +159,21 @@ usage()
             "[--printf]\n"
             "                  [--sense] [--unaligned] [--verbose] "
             "[--version]\n"
+#ifdef __GNUC__
+            "  where: --byteswap=B|-b B    B is 16, 32 or 64; tests "
+            "NUM byteswaps\n"
+            "                              compared to sg_unaligned "
+            "equivalent\n"
+            "         --exit|-e          test exit status strings\n"
+#else
             "  where: --exit|-e          test exit status strings\n"
+#endif
             "         --help|-h          print out usage message\n"
             "         --hex2|-H          test hex2* variants\n"
             "         --leadin=STR|-l STR    every line output by --sense "
             "should\n"
             "                                be prefixed by STR\n"
+            "         --num=NUM|-n NUM    number of iterations (def=1)\n"
             "         --printf|-p        test library printf variants\n"
             "         --sense|-s         test sense data handling\n"
             "         --unaligned|-u     test unaligned data handling\n"
@@ -196,6 +223,9 @@ get_exit_status_str(int exit_status, bool longer, int b_len, char * b)
     return b;
 }
 
+static uint8_t arr[64];
+
+#define OFF 8
 
 int
 main(int argc, char * argv[])
@@ -203,7 +233,9 @@ main(int argc, char * argv[])
     bool do_exit_status = false;
     bool ok;
     int k, c, n, len;
+    int byteswap_sz = 0;
     int do_hex2 = 0;
+    int do_num = 1;
     int do_printf = 0;
     int do_sense = 0;
     int do_unaligned = 0;
@@ -217,12 +249,20 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ehHl:psuvV", long_options,
+        c = getopt_long(argc, argv, "b:ehHl:n:psuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'b':
+            byteswap_sz = sg_get_num(optarg);
+            if (! ((16 == byteswap_sz) || (32 == byteswap_sz) ||
+                   (64 == byteswap_sz))) {
+                fprintf(stderr, "--byteswap= requires 16, 32 or 64\n");
+                return 1;
+            }
+            break;
         case 'e':
             do_exit_status = true;
             break;
@@ -235,6 +275,13 @@ main(int argc, char * argv[])
             break;
         case 'l':
             leadin = optarg;
+            break;
+        case 'n':
+            do_num = sg_get_num(optarg);
+            if (do_num < 0) {
+                fprintf(stderr, "--num= unable decode argument as number\n");
+                return 1;
+            }
             break;
         case 'p':
             ++do_printf;
@@ -441,7 +488,7 @@ main(int argc, char * argv[])
         uint16_t u16r;
         uint32_t u24 = 0x224488;
         uint32_t u24r;
-        uint32_t u32 = 0x224488ff;
+        uint32_t u32 = 0x224488aa;
         uint32_t u32r;
         uint64_t u48 = 0x112233445566ULL;
         uint64_t u48r;
@@ -511,15 +558,111 @@ main(int argc, char * argv[])
         hex2stdout(u8, vb ? 10 : 8, -1);
         u64r = sg_get_unaligned_be64(u8);
         printf("  u64r=0x%" PRIx64 "\n\n", u64r);
-        printf("  be[8]:\n");
+
+        printf("  be[v=8 bytes]:\n");
         hex2stdout(u8, vb ? 10 : 8, -1);
         u64r = sg_get_unaligned_be(8, u8);
-        printf("  u64r[8]=0x%" PRIx64 "\n\n", u64r);
-        printf("  le[8]:\n");
+        printf("  u64r[v=8 bytes]=0x%" PRIx64 "\n", u64r);
+        printf("  le[v=8 bytes]:\n");
+        hex2stdout(u8, vb ? 10 : 8, -1);
         u64r = sg_get_unaligned_le(8, u8);
-        printf("  u64r[8]=0x%" PRIx64 "\n\n", u64r);
-
+        printf("  u64r[v=8 bytes]=0x%" PRIx64 "\n\n", u64r);
     }
+
+#ifdef __GNUC__
+    if (byteswap_sz > 0) {
+        uint32_t elapsed_msecs;
+        uint16_t count16 = 0;
+        uint32_t count32 = 0;
+        uint64_t count64 = 0;
+        struct timespec start_tm, end_tm;
+
+        ++did_something;
+        if (0 != clock_gettime(CLOCK_MONOTONIC, &start_tm)) {
+            perror("clock_gettime(CLOCK_MONOTONIC)\n");
+            return 1;
+        }
+        for (k = 0; k < do_num; ++k) {
+            switch (byteswap_sz) {
+            case 16:
+                sg_put_unaligned_be16(count16 + 1, arr + OFF);
+                count16 = sg_get_unaligned_be16(arr + OFF);
+                break;
+            case 32:
+                sg_put_unaligned_be32(count32 + 1, arr + OFF);
+                count32 = sg_get_unaligned_be32(arr + OFF);
+                break;
+            case 64:
+                sg_put_unaligned_be64(count64 + 1, arr + OFF);
+                count64 = sg_get_unaligned_be64(arr + OFF);
+                break;
+            default:
+                break;
+            }
+        }
+        if (0 != clock_gettime(CLOCK_MONOTONIC, &end_tm)) {
+            perror("clock_gettime(CLOCK_MONOTONIC)\n");
+            return 1;
+        }
+        elapsed_msecs = (end_tm.tv_sec - start_tm.tv_sec) * 1000;
+        elapsed_msecs += (end_tm.tv_nsec - start_tm.tv_nsec) / 1000000;
+        if (16 == byteswap_sz)
+            printf("  count16=%u\n", count16);
+        else if (32 == byteswap_sz)
+            printf("  count32=%u\n", count32);
+        else
+            printf("  count64=%" PRIu64 "\n", count64);
+        printf("Unaligned elapsed milliseconds: %u\n", elapsed_msecs);
+        count16 = 0;
+        count32 = 0;
+        count64 = 0;
+
+        if (0 != clock_gettime(CLOCK_MONOTONIC, &start_tm)) {
+            perror("clock_gettime(CLOCK_MONOTONIC)\n");
+            return 1;
+        }
+        for (k = 0; k < do_num; ++k) {
+            switch (byteswap_sz) {
+            case 16:
+                count16 = bswap_16(count16 + 1);
+                memcpy(arr + OFF, &count16, 2);
+                memcpy(&count16, arr + OFF, 2);
+                count16 = bswap_16(count16);
+                break;
+            case 32:
+                count32 = bswap_32(count32 + 1);
+                memcpy(arr + OFF, &count32, 4);
+                memcpy(&count32, arr + OFF, 4);
+                count32 = bswap_32(count32);
+                break;
+            case 64:
+                count64 = bswap_64(count64 + 1);
+                memcpy(arr + OFF, &count64, 8);
+                memcpy(&count64, arr + OFF, 8);
+                count64 = bswap_64(count64);
+                break;
+            default:
+                break;
+            }
+        }
+        if (0 != clock_gettime(CLOCK_MONOTONIC, &end_tm)) {
+            perror("clock_gettime(CLOCK_MONOTONIC)\n");
+            return 1;
+        }
+        elapsed_msecs = (end_tm.tv_sec - start_tm.tv_sec) * 1000;
+        elapsed_msecs += (end_tm.tv_nsec - start_tm.tv_nsec) / 1000000;
+        if (16 == byteswap_sz)
+            printf("  count16=%u\n", count16);
+        else if (32 == byteswap_sz)
+            printf("  count32=%u\n", count32);
+        else
+            printf("  count64=%" PRIu64 "\n", count64);
+        printf("Byteswap/memcpy elapsed milliseconds: %u\n", elapsed_msecs);
+        count16 = 0;
+        count32 = 0;
+        count64 = 0;
+    }
+#endif
 
     if (0 == did_something)
         printf("Looks like no tests done, check usage with '-h'\n");

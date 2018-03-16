@@ -787,6 +787,7 @@ enable_linuxbsg
 enable_win32_spt_direct
 enable_scsistrings
 enable_nvme_supp
+enable_fast_lebe
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1447,6 +1448,7 @@ Optional Features:
   --disable-scsistrings   Disable full SCSI sense strings and NVMe status
                           strings
   --disable-nvme-supp     remove all or most NVMe code
+  --disable-fast-lebe     use generic little-endian/big-endian code instead
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -12301,6 +12303,18 @@ $as_echo "#define STDC_HEADERS 1" >>confdefs.h
 
 fi
 
+for ac_header in byteswap.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "byteswap.h" "ac_cv_header_byteswap_h" "$ac_includes_default"
+if test "x$ac_cv_header_byteswap_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_BYTESWAP_H 1
+_ACEOF
+
+fi
+
+done
+
 
 # check for functions
 for ac_func in getopt_long
@@ -12740,6 +12754,16 @@ if test "${enable_nvme_supp+set}" = set; then :
   enableval=$enable_nvme_supp;
 cat >>confdefs.h <<_ACEOF
 #define IGNORE_NVME 1
+_ACEOF
+
+fi
+
+
+# Check whether --enable-fast-lebe was given.
+if test "${enable_fast_lebe+set}" = set; then :
+  enableval=$enable_fast_lebe;
+cat >>confdefs.h <<_ACEOF
+#define IGNORE_FAST_LEBE 1
 _ACEOF
 
 fi

@@ -8,6 +8,8 @@ scsiinclude_HEADERS = \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \
 	sg_cmds_mmc.h \
+	sg_pr2serr.h \
+	sg_unaligned.h \
 	sg_pt.h \
 	sg_pt_nvme.h
 
