@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015 Douglas Gilbert.
+ * Copyright (c) 2014-2018 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,11 +54,19 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
+#include "sg_pt.h"
+#include "sg_cmds.h"
 
-static const char * version_str = "1.11 20150227";
+static const char * version_str = "1.12 20180319";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -122,17 +130,20 @@ using namespace std::chrono;
 #endif
 
 
+#define DEF_PT_TIMEOUT 60       /* 60 seconds */
 
 #define EBUFF_SZ 256
 
 static mutex console_mutex;
 static mutex rand_lba_mutex;
 static atomic<int> async_starts(0);
+static atomic<int> sync_starts(0);
 static atomic<int> async_finishes(0);
 static atomic<int> ebusy_count(0);
 static atomic<int> start_eagain_count(0);
 static atomic<int> fin_eagain_count(0);
 static atomic<int> uniq_pack_id(1);
+static atomic<int> generic_errs(0);
 
 static int page_size = 4096;   /* rough guess, will ask sysconf() */
 
@@ -151,6 +162,7 @@ struct opts_t {
     int maxq_per_thread;
     int num_per_thread;
     bool block;
+    bool generic_pt;
     uint64_t lba;
     unsigned int hi_lba;        /* last one, inclusive range */
     vector<unsigned int> hi_lbas; /* only used when hi_lba=-1 */
@@ -207,6 +219,8 @@ private:
 static struct option long_options[] = {
         {"direct", no_argument, 0, 'd'},
         {"force", no_argument, 0, 'f'},
+        {"generic-pt", no_argument, 0, 'g'},
+        {"generic_pt", no_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"lba", required_argument, 0, 'l'},
         {"maxqpt", required_argument, 0, 'M'},
@@ -230,21 +244,24 @@ static struct option long_options[] = {
 static void
 usage(void)
 {
-    printf("Usage: %s [--direct] [--force] [--help] [--lba=LBA+] "
-           "[--maxqpt=QPT]\n"
-           "                    [--numpt=NPT] [--noxfer] [--qat=AT] "
-           "[-qfav=FAV]\n"
-           "                    [--read] [--szlb=LB] [--stats] [--tnum=NT] "
-           "[--tur]\n"
-           "                    [--verbose] [--version] [--wait=MS] "
-           "[--write]\n"
-           "                    <sg_disk_device>*\n",
+    printf("Usage: %s [--direct] [--force] [--generic-pt] [--help]\n"
+           "                    [--lba=LBA+] [--maxqpt=QPT] [--numpt=NPT] "
+           "[--noxfer]\n"
+           "                    [--qat=AT] [-qfav=FAV] [--read] [--szlb=LB] "
+           "[--stats]\n"
+           "                    [--tnum=NT] [--tur] [--verbose] [--version] "
+           "[--wait=MS]\n"
+           "                    [--write] <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
     printf("    --direct|-d     do direct_io (def: indirect)\n");
     printf("    --force|-f      force: any sg device (def: only scsi_debug "
            "owned)\n");
     printf("                    WARNING: <lba> written to if '-W' given\n");
+    printf("    --generic-pt|-g    use generic passthru in sg3_utils "
+           "instead\n");
+    printf("                       of Linux sg driver and SG_IO ioctl "
+           "(def)\n");
     printf("    --help|-h       print this usage message then exit\n");
     printf("    --lba=LBA|-l LBA    logical block to access (def: %u)\n",
            DEF_LBA);
@@ -325,7 +342,7 @@ get_urandom_uint(void)
 {
     unsigned int res = 0;
     int n;
-    unsigned char b[sizeof(unsigned int)];
+    uint8_t b[sizeof(unsigned int)];
     lock_guard<mutex> lg(rand_lba_mutex);
 
     int fd = open(URANDOM_DEV, O_RDONLY);
@@ -347,16 +364,16 @@ get_urandom_uint(void)
 /* Returns 0 if command injected okay, else -1 */
 static int
 start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
-              unsigned char * lbp, int xfer_bytes, int flags,
+              uint8_t * lbp, int xfer_bytes, int flags,
               unsigned int & eagains)
 {
     struct sg_io_hdr pt;
-    unsigned char turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
-    unsigned char r16CmdBlk[READ16_CMD_LEN] =
+    uint8_t turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
+    uint8_t r16CmdBlk[READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-    unsigned char w16CmdBlk[WRITE16_CMD_LEN] =
+    uint8_t w16CmdBlk[WRITE16_CMD_LEN] =
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-    unsigned char sense_buffer[64];
+    uint8_t sense_buffer[64];
     const char * np = NULL;
 
     memset(&pt, 0, sizeof(pt));
@@ -419,7 +436,7 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
 {
     int ok, res;
     struct sg_io_hdr pt;
-    unsigned char sense_buffer[64];
+    uint8_t sense_buffer[64];
     const char * np = NULL;
 
     memset(&pt, 0, sizeof(pt));
@@ -475,37 +492,87 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
     return ok ? 0 : -1;
 }
 
-/* Should have page alignment if direct_io chosen */
-static unsigned char *
-get_aligned_heap(int bytes_at_least)
+static void
+work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
+                 struct opts_t * op)
 {
-    int n;
-    void * wp;
+    bool is_rw = (SCSI_TUR != op->c2e);
+    int k, sg_fd, err, rs, n, sense_cat, ret;
+    int vb = op->verbose;
+    int num_errs = 0;
+    int thr_sync_starts = 0;
+    struct sg_pt_base * pbp = NULL;
+    uint8_t cdb[6];
+    uint8_t sense_b[32];
+    char b[120];
 
-    if (bytes_at_least < page_size)
-        n = page_size;
-    else
-        n = bytes_at_least;
-#if 1
-    int err = posix_memalign(&wp, page_size, n);
-    if (err) {
-        pr2serr_lk("posix_memalign: error [%d] out of memory?\n", err);
-        return NULL;
+    if (is_rw) {
+        pr2serr_lk("id=%d: only support TUR here for now\n", id);
+        goto err_out;
     }
-    memset(wp, 0, n);
-    return (unsigned char *)wp;
-#else
-    /* hack if posix_memalign() is not available */
-    if (n == page_size) {
-        wp = calloc(page_size, 1);
-        memset(wp, 0, n);
-        return (unsigned char *)wp;
-    } else {
-        pr2serr_lk("get_aligned_heap: too fiddly to align, choose smaller "
-                   "lb_sz\n");
-        return NULL;
+    if ((sg_fd = sg_cmds_open_device(dev_name, false /* ro */, vb)) < 0) {
+        pr2serr_lk("id=%d: error opening file: %s: %s\n", id, dev_name,
+                   safe_strerror(-sg_fd));
+        goto err_out;
     }
-#endif
+
+    pbp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
+    err = 0;
+    if ((NULL == pbp) || ((err = get_scsi_pt_os_err(pbp)))) {
+        ret = sg_convert_errno(err ? err : ENOMEM);
+        sg_exit2str(ret, true, sizeof(b), b);
+        pr2serr_lk("id=%d: construct_scsi_pt_obj_with_fd: %s\n", id, b);
+        goto err_out;
+    }
+    for (k = 0; k < op->num_per_thread; ++k) {
+        /* Might get Unit Attention on first invocation */
+        memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
+        set_scsi_pt_cdb(pbp, cdb, sizeof(cdb));
+        set_scsi_pt_sense(pbp, sense_b, sizeof(sense_b));
+        ++thr_sync_starts;
+        rs = do_scsi_pt(pbp, -1, DEF_PT_TIMEOUT, vb);
+        n = sg_cmds_process_resp(pbp, "Test unit ready", rs,
+                                 SG_NO_DATA_IN, sense_b,
+                                 (0 == k), vb, &sense_cat);
+        if (-1 == n) {
+            ret = sg_convert_errno(get_scsi_pt_os_err(pbp));
+            sg_exit2str(ret, true, sizeof(b), b);
+            pr2serr_lk("id=%d: do_scsi_pt: %s\n", id, b);
+            goto err_out;
+        } else if (-2 == n) {
+            switch (sense_cat) {
+            case SG_LIB_CAT_RECOVERED:
+            case SG_LIB_CAT_NO_SENSE:
+                break;
+            case SG_LIB_CAT_NOT_READY:
+                ++num_errs;
+                if (1 ==  op->num_per_thread) {
+                    pr2serr_lk("id=%d: device not ready\n", id);
+                }
+                break;
+            case SG_LIB_CAT_UNIT_ATTENTION:
+                ++num_errs;
+                if (vb)
+                    pr2serr_lk("Ignoring Unit attention (sense key)\n");
+                break;
+            default:
+                ++num_errs;
+                if (1 == op->num_per_thread) {
+                    sg_get_category_sense_str(sense_cat, sizeof(b), b, vb);
+                    pr2serr_lk("%s\n", b);
+                    goto err_out;
+                }
+                break;
+            }
+        }
+        clear_scsi_pt_obj(pbp);
+    }
+err_out:
+    if (pbp)
+        destruct_scsi_pt_obj(pbp);
+    if (num_errs > 0)
+        pr2serr_lk("id=%d: number of errors: %d\n", id, num_errs);
+    sync_starts += thr_sync_starts;
 }
 
 static void
@@ -513,6 +580,7 @@ work_thread(int id, struct opts_t * op)
 {
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
+    int vb = op->verbose;
     unsigned int thr_start_eagain_count = 0;
     unsigned int thr_fin_eagain_count = 0;
     unsigned int seed = 0;
@@ -523,13 +591,14 @@ work_thread(int id, struct opts_t * op)
     bool is_rw = (SCSI_TUR != op->c2e);
     char ebuff[EBUFF_SZ];
     uint64_t lba;
-    unsigned char * lbp;
+    uint8_t * lbp;
+    uint8_t * free_lbp = NULL;
     const char * dev_name;
     const char * err = NULL;
     Rand_uint * ruip = NULL;
     struct pollfd  pfd[1];
-    list<unsigned char *> free_lst;         /* of aligned lb buffers */
-    map<int, unsigned char *> pi_2_buff;    /* pack_id -> lb buffer */
+    list<pair<uint8_t *, uint8_t *> > free_lst;   /* of aligned lb buffers */
+    map<int, uint8_t *> pi_2_buff;    /* pack_id -> lb buffer */
     map<int, uint64_t> pi_2_lba;            /* pack_id -> LBA */
 
     /* device name and hi_lba may depend on id */
@@ -540,13 +609,17 @@ work_thread(int id, struct opts_t * op)
     else
         hi_lba = op->hi_lba;
 
-    if (op->verbose) {
-        if ((op->verbose > 1) && hi_lba)
+    if (vb) {
+        if ((vb > 1) && hi_lba)
             pr2serr_lk("Enter work_thread id=%d using %s\n"
                        "    LBA range: 0x%x to 0x%x (inclusive)\n",
                        id, dev_name, (unsigned int)op->lba, hi_lba);
         else
             pr2serr_lk("Enter work_thread id=%d using %s\n", id, dev_name);
+    }
+    if (op->generic_pt) {
+        work_sync_thread(id, dev_name, hi_lba, op);
+        return;
     }
     if (! op->block)
         open_flags |= O_NONBLOCK;
@@ -561,7 +634,7 @@ work_thread(int id, struct opts_t * op)
     pfd[0].events = POLLIN;
     if (is_rw && hi_lba) {
         seed = get_urandom_uint();
-        if (op->verbose > 1)
+        if (vb > 1)
             pr2serr_lk("  id=%d, /dev/urandom seed=0x%x\n", id, seed);
         ruip = new Rand_uint((unsigned int)op->lba, hi_lba, seed);
     }
@@ -575,7 +648,7 @@ work_thread(int id, struct opts_t * op)
         sg_flags |= SG_FLAG_DIRECT_IO;
     if (op->no_xfer)
         sg_flags |= SG_FLAG_NO_DXFER;
-    if (op->verbose > 1)
+    if (vb > 1)
         pr2serr_lk("  id=%d, sg_flags=0x%x, %s cmds\n", id, sg_flags,
                    ((SCSI_TUR == op->c2e) ? "TUR":
                     ((SCSI_READ16 == op->c2e) ? "READ" : "WRITE")));
@@ -591,13 +664,13 @@ work_thread(int id, struct opts_t * op)
             pack_id = uniq_pack_id.fetch_add(1);
             if (is_rw) {    /* get new lb buffer or one from free list */
                 if (free_lst.empty()) {
-                    lbp = get_aligned_heap(op->lb_sz);
+                    lbp = sg_memalign(op->lb_sz, 0, &free_lbp, vb);
                     if (NULL == lbp) {
                         err = "out of memory";
                         break;
                     }
                 } else {
-                    lbp = free_lst.back();
+                    lbp = free_lst.back().first;
                     free_lst.pop_back();
                 }
             } else
@@ -605,7 +678,7 @@ work_thread(int id, struct opts_t * op)
             if (is_rw) {
                 if (ruip) {
                     lba = ruip->get();  /* fetch a random LBA */
-                    if (op->verbose > 3)
+                    if (vb > 3)
                         pr2serr_lk("  id=%d: start IO at lba=0x%" PRIx64 "\n",
                                    id, lba);
                 } else
@@ -706,13 +779,13 @@ work_thread(int id, struct opts_t * op)
                 lbp = p->second;
                 pi_2_buff.erase(p);
                 if (lbp)
-                    free_lst.push_front(lbp);
+                    free_lst.push_front(make_pair(lbp, free_lbp));
             }
             if (ruip && (pack_id > 0)) {
                 auto q = pi_2_lba.find(pack_id);
 
                 if (q != pi_2_lba.end()) {
-                    if (op->verbose > 3)
+                    if (vb > 3)
                         pr2serr_lk("    id=%d: finish IO at lba=0x%" PRIx64
                                    "\n", id, q->second);
                     pi_2_lba.erase(q);
@@ -741,12 +814,13 @@ work_thread(int id, struct opts_t * op)
         pr2serr_lk("thread id=%d Still %d elements in pi_2_buff map on "
                    "exit\n", id, n);
     for (k = 0; ! free_lst.empty(); ++k) {
-        lbp = free_lst.back();
+        lbp = free_lst.back().first;
+        free_lbp = free_lst.back().second;
         free_lst.pop_back();
-        if (lbp)
-            free(lbp);
+        if (free_lbp)
+            free(free_lbp);
     }
-    if ((op->verbose > 2) && (k > 0))
+    if ((vb > 2) && (k > 0))
         pr2serr_lk("thread id=%d Maximum number of READ/WRITEs queued: %d\n",
                    id, k);
     async_starts += thr_async_starts;
@@ -766,10 +840,10 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
 {
     int sg_fd, ok, ret;
     struct sg_io_hdr pt;
-    unsigned char inqCmdBlk [INQ_CMD_LEN] =
+    uint8_t inqCmdBlk [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
-    unsigned char inqBuff[INQ_REPLY_LEN];
-    unsigned char sense_buffer[64];
+    uint8_t inqBuff[INQ_REPLY_LEN];
+    uint8_t sense_buffer[64];
     int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 
     if (! block)
@@ -843,9 +917,9 @@ do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
                  unsigned int * blk_sz)
 {
     int res, sg_fd;
-    unsigned char rcCmdBlk [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    unsigned char rcBuff[64];
-    unsigned char sense_b[64];
+    uint8_t rcCmdBlk [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t rcBuff[64];
+    uint8_t sense_b[64];
     sg_io_hdr_t io_hdr;
     int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 
@@ -926,7 +1000,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dfhl:M:n:Nq:Q:Rs:St:TvVw:W",
+        c = getopt_long(argc, argv, "dfghl:M:n:Nq:Q:Rs:St:TvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -937,6 +1011,9 @@ main(int argc, char * argv[])
             break;
         case 'f':
             force = true;
+            break;
+        case 'g':
+            op->generic_pt = true;
             break;
         case 'h':
         case '?':
@@ -1083,6 +1160,7 @@ main(int argc, char * argv[])
     }
 
     if (0 == op->dev_names.size()) {
+        fprintf(stderr, "No sg_disk_device-s given\n\n");
         usage();
         return 1;
     }
@@ -1167,10 +1245,13 @@ main(int argc, char * argv[])
             delete vt[k];
 
         n = uniq_pack_id.load() - 1;
-        if ((n > 0) && (0 == clock_gettime(CLOCK_MONOTONIC, &end_tm))) {
+        if (((n > 0) || op->generic_pt) &&
+            (0 == clock_gettime(CLOCK_MONOTONIC, &end_tm))) {
             struct timespec res_tm;
             double a, b;
 
+            if (op->generic_pt)
+                n = op->num_per_thread * num_threads;
             res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
             res_tm.tv_nsec = end_tm.tv_nsec - start_tm.tv_nsec;
             if (res_tm.tv_nsec < 0) {
@@ -1188,6 +1269,7 @@ main(int argc, char * argv[])
         }
 
         if (op->verbose || op->stats) {
+            cout << "Number of sync_starts: " << sync_starts.load() << endl;
             cout << "Number of async_starts: " << async_starts.load() << endl;
             cout << "Number of async_finishes: " << async_finishes.load() <<
                     endl;

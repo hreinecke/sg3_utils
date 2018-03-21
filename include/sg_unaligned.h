@@ -383,7 +383,7 @@ static inline void sg_put_unaligned_le64(uint64_t val, void *p)
 }
 
 /* Following are lesser used conversions that don't have specializations
- * for endianess; big endian first. In summary these are the 24, 48 bit and
+ * for endianness; big endian first. In summary these are the 24, 48 bit and
  * given-length conversions plus the "nz" conditional put conversions. */
 
 /* Now big endian, get 24+48 then put 24+48 */

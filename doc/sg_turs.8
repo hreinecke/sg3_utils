@@ -1,9 +1,9 @@
-.TH SG_TURS "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_TURS "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
 .B sg_turs
-[\fI\-\-help\fR] [\fI\-\-number=NUM\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-help\fR] [\fI\-\-low\fR] [\fI\-\-number=NUM\fR] [\fI\-\-num=NUM\fR]
 [\fI\-\-progress\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 \fIDEVICE\fR
 .PP
@@ -15,8 +15,8 @@ sg_turs \- send one or more SCSI TEST UNIT READY commands
 .PP
 This utility sends one or more SCSI TEST UNIT READY commands to the
 \fIDEVICE\fR. This may be useful for timing the per command overhead.
-Note that TEST UNIT READY has no associated data, just a 6 byte command
-and a returned SCSI status value.
+Note that TEST UNIT READY has no associated data, just a 6 byte
+command (with each byte a zero) and a returned SCSI status value.
 .PP
 This utility supports two command line syntaxes, the preferred one is
 shown first in the synopsis and explained in this section. A later section
@@ -26,6 +26,13 @@ Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
+.TP
+\fB\-l\fR, \fB\-\-low\fR
+when [\fI\-\-progress\fR] is not being used, this utility tries to complete
+the SCSI TEST UNIT READY command(s) as quickly as possible. Usually it
+calls a library function to do each TUR (sg_ll_test_unit_ready). With this
+option it uses the lower level sg_pt interface (see sg_pt.h) to save a
+little time on each TUR.
 .TP
 \fB\-n\fR, \fB\-\-number\fR=\fINUM\fR
 performs TEST UNIT READY \fINUM\fR times. If not given defaults to 1.
@@ -121,7 +128,7 @@ using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2017 Douglas Gilbert
+Copyright \(co 2000\-2018 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

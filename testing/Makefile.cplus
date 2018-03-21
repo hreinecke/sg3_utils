@@ -29,7 +29,8 @@ CPPFLAGS = -std=c++11 -pthread -g -O2 -W -Wall -iquote ../include -D_REENTRANT $
 LDFLAGS = -std=c++11 -pthread
 
 LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
-LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o ../lib/sg_pt_common.o ../lib/sg_pt_linux_nvme.o
+LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o ../lib/sg_pt_common.o \
+		../lib/sg_pt_linux_nvme.o ../lib/sg_io_linux.o ../lib/sg_cmds_basic.o
 
 all: $(EXECS)
 
@@ -55,7 +56,7 @@ sg_tst_excl3: sg_tst_excl3.o $(LIBFILESNEW)
 sg_tst_context: sg_tst_context.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sg_tst_async: sg_tst_async.o $(LIBFILESOLD)
+sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)

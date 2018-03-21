@@ -225,7 +225,7 @@ get_exit_status_str(int exit_status, bool longer, int b_len, char * b)
 
 static uint8_t arr[64];
 
-#define OFF 8
+#define OFF 7	/* in byteswap mode, can test different alignments (def: 8) */
 
 int
 main(int argc, char * argv[])

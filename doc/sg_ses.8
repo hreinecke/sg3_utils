@@ -314,7 +314,7 @@ later invocation using the \fI\-\-data=\fR option. A dpage less its first
 the full dpage contents is output in binary to stdout.
 .br
 when \fI\-rr\fR is used together with the \fI\-\-data=\-\fR or
-\fI\-\-data=FN\fR then stdin or file FN is decoded as a binary stream that
+\fI\-\-data=@FN\fR then stdin or file FN is decoded as a binary stream that
 continues to be read until an end of file (EOF). Once that data is read then
 the internal raw option is cleared to 0 so the output is not effected. So
 the \fI\-rr\fR option either changes how the input or output is treated,
@@ -498,11 +498,11 @@ The \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options can
 be used up to 8 times in the same invocation. Any <acronym>s used in the
 \fISTR\fR operands must refer to the same dpage.
 .PP
-When multiple of these options are used, they are applied in the order in
-which they appear on the command line. So if options contradict each other,
-the last one appearing on the command line will be enforced. When there
-are multiple \fI\-\-clear=STR\fR and \fI\-\-set=STR\fR options, then the
-dpage they refer to is only written after the last one.
+When multiple of these options are used (maximum: 8), they are applied in the
+order in which they appear on the command line. So if options contradict each
+other, the last one appearing on the command line will be enforced. When
+there are multiple \fI\-\-clear=STR\fR and \fI\-\-set=STR\fR options, then
+the dpage they refer to is only written after the last one.
 .SH DATA SUPPLIED
 This section describes the two scenarios that can occur when the
 \fI\-\-data=\fR option is given. These scenarios are the same irrespective

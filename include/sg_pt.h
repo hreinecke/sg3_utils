@@ -63,14 +63,16 @@ int check_pt_file_handle(int dev_fd, const char * device_name, int verbose);
  * destruct_scsi_pt_obj() when it is no longer needed. */
 struct sg_pt_base * construct_scsi_pt_obj(void);
 
-/* An alternate way to create an object that can be used to issue one or
- * more SCSI commands (or task management functions). This variant
- * associates a device file descriptor (handle) with the object and a
- * verbose argument that causes messages to be written to stderr if errors
- * occur. The reason for this is to optionally allow the detection of NVMe
- * devices that will cause pt_device_is_nvme() to return true. Set dev_fd
- * to -1 if no open device file descriptor is available. Caller should
- * additionally call get_scsi_pt_os_err() after this call. */
+/* An alternate and preferred way to create an object that can be used to
+ * issue one or more SCSI (or NVMe) commands (or task management functions).
+ * This variant associates a device file descriptor (handle) with the object
+ * and a verbose argument that causes messages to be written to stderr if
+ * errors occur. The reason for this is to optionally allow the detection of
+ * NVMe devices that will cause pt_device_is_nvme() to return true. Set
+ * dev_fd to -1 if no open device file descriptor is available. Caller
+ * should additionally call get_scsi_pt_os_err() after this call to check
+ * for errors. The dev_fd argument may be -1 to indicate no device file
+ * descriptor. */
 struct sg_pt_base *
         construct_scsi_pt_obj_with_fd(int dev_fd, int verbose);
 
@@ -89,22 +91,34 @@ int get_pt_file_handle(const struct sg_pt_base * objp);
  * Use set_pt_file_handle() to change dev_fd. */
 void clear_scsi_pt_obj(struct sg_pt_base * objp);
 
-/* Set the CDB (command descriptor block) */
+/* Set the CDB (command descriptor block). May also be a NVMe Admin command
+ * which will be 64 bytes long.
+ *
+ * Note that the sg_cmds_is_nvme() function found in sg_cmds_basic.h can be
+ * called after this function to "guess" which command set the given command
+ * belongs to. */
 void set_scsi_pt_cdb(struct sg_pt_base * objp, const uint8_t * cdb,
                      int cdb_len);
-/* Set the sense buffer and the maximum length that it can handle */
+
+/* Set the sense buffer and the maximum length of that buffer. For NVMe
+ * commands this "sense" buffer will receive the 4 DWORDs of from the
+ * completion queue. */
 void set_scsi_pt_sense(struct sg_pt_base * objp, uint8_t * sense,
                        int max_sense_len);
+
 /* Set a pointer and length to be used for data transferred from device */
 void set_scsi_pt_data_in(struct sg_pt_base * objp,   /* from device */
                          uint8_t * dxferp, int dxfer_ilen);
+
 /* Set a pointer and length to be used for data transferred to device */
 void set_scsi_pt_data_out(struct sg_pt_base * objp,    /* to device */
                           const uint8_t * dxferp, int dxfer_olen);
+
 /* Set a pointer and length to be used for metadata transferred to
- * (out_true=true) or from (out_true-false) device */
+ * (out_true=true) or from (out_true=false) device (NVMe only) */
 void set_pt_metadata_xfer(struct sg_pt_base * objp, uint8_t * mdxferp,
                           uint32_t mdxfer_len, bool out_true);
+
 /* The following "set_"s implementations may be dummies */
 void set_scsi_pt_packet_id(struct sg_pt_base * objp, int pack_id);
 void set_scsi_pt_tag(struct sg_pt_base * objp, uint64_t tag);
@@ -144,7 +158,13 @@ int do_scsi_pt(struct sg_pt_base * objp, int fd, int timeout_secs,
 #define SCSI_PT_RESULT_TRANSPORT_ERR 3
 #define SCSI_PT_RESULT_OS_ERR 4
 /* This function, called soon after do_scsi_pt(), returns one of the above
- * result categories. The highest numbered applicable category is returned. */
+ * result categories. The highest numbered applicable category is returned.
+ *
+ * Note that the sg_cmds_process_resp() function found in sg_cmds_basic.h
+ * is useful for processing SCSI command responses.
+ * And the sg_cmds_is_nvme() function found in sg_cmds_basic.h can be called
+ * after set_scsi_pt_cdb() to "guess" which command set the given command
+ * belongs to. */
 int get_scsi_pt_result_category(const struct sg_pt_base * objp);
 
 /* If not available return 0 which implies there is no residual
