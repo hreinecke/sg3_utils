@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180316] [svn: r762]
+Changelog for sg3_utils-1.43 [20180321] [svn: r763]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -19,7 +19,7 @@ Changelog for sg3_utils-1.43 [20180316] [svn: r762]
     - expand join handling of SAS connectors and others
     - expand join debug code
     - allow multiple --clear=, --get= and --set= options
-    - allow individual index ranges (e.g. --index=3,5)
+    - allow individual index ranges (e.g. --index=3-5)
     - allow --index=IIA with -ee to enumerate only fields
       belonging to element type IIA
     - --data=@FN with --status now decodes dpage(s) in FN
@@ -79,6 +79,7 @@ Changelog for sg3_utils-1.43 [20180316] [svn: r762]
   - sg_rdac: add sanity checks for -f=lun value
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility
+  - sg_turs: add --low option
   - sg_zone: fix debug cdb naming
   - sg_persist: add --maxlen-LEN option, LEN defaults to
     decimal, similar to --alloc-length= which takes hex

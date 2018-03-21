@@ -336,6 +336,7 @@ main(int argc, char * argv[])
                 pr2serr("clock_gettime(CLOCK_MONOTONIC) not supported\n");
         }
         elapsed_usecs = (end_tm.tv_sec - start_tm.tv_sec) * 1000000;
+        /* Note that (end_tm.tv_nsec - start_tm.tv_nsec) may be negative */
         elapsed_usecs += (end_tm.tv_nsec - start_tm.tv_nsec) / 1000;
     }
 #elif defined(HAVE_GETTIMEOFDAY)
