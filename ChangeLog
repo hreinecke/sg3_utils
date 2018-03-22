@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180321] [svn: r763]
+Changelog for sg3_utils-1.43 [20180322] [svn: r764]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -68,10 +68,12 @@ Changelog for sg3_utils-1.43 [20180321] [svn: r763]
       add extra info about corner cases
     - add enclosure services device characteristics
       VPD page (T10/170-142r1 --> ses4r02 ??)
-    - add --force option to bypass checking supported
-      vpd pages page and fetch requested page directly
     - add maximum inquiry|mode_page change logs fields
       to extended inquiry vpd page (spc5r17)
+    - both now return EDOM (adjusted sg error code) when
+      requested page not in Supported VPD Pages page
+    - add --force option to bypass checking Supported
+      Vpd Pages page and fetch requested page directly
   - sg_vpd: 3 party copy VPD page improvements
     - fully implement Device constituents VPD page
     - improve handling of unknown pages

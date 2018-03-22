@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "May 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_VPD "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
@@ -25,8 +25,8 @@ has been flagged as mandatory. This page can be fetched by
 using the \fI\-\-ident\fR option.
 .PP
 The reference document used for interpreting VPD pages (and the INQUIRY
-standard response) is T10/BSR INCITS 502 Revision 08 which is draft SPC\-5
-revision 08, 25 January 2016). It can be found at http://www.t10.org .
+standard response) is T10/BSR INCITS 502 Revision 19 which is draft SPC\-5
+revision 19, 14 February 2018). It can be found at http://www.t10.org .
 .PP
 When no options are given, other than a \fIDEVICE\fR, then the "Supported
 VPD pages" (0x0) VPD page is fetched and decoded.
@@ -130,6 +130,9 @@ is not given (nor '\-i', '\-l' nor '\-V') then the "Supported VPD pages" (0x0)
 VPD page is fetched and decoded. If \fIPG\fR is '\-1' or 'sinq' then the
 standard INQUIRY response is output. This option may also be used with the
 \fI\-\-enumerate\fR (see its description).
+.br
+If \fIPG\fR is not found in the 'Supported VPD pages' VPD page (0x0) then
+EDOM is returned. To bypass this check use the \fI\-\-force\fR option.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 suppress the amount of decoding output.
@@ -300,7 +303,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2016 Douglas Gilbert
+Copyright \(co 2006\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
