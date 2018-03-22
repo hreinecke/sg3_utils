@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_INQ "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -54,7 +54,7 @@ In some operating systems a NVMe device (e.g. SSD) may be given as the
 \fIDEVICE\fR. For more information see the NVME DEVICES section below.
 .PP
 The reference document used for interpreting an INQUIRY is T10/BSR INCITS
-502 Revision 18 which is draft SPC\-5 revision 18, 4 January 2018). It can
+502 Revision 19 which is draft SPC\-5 revision 19, 14 February 2018). It can
 be found at http://www.t10.org . Obsolete and reserved items in the standard
 INQUIRY response output are displayed in brackets.
 .SH OPTIONS
@@ -207,6 +207,9 @@ abbreviations make little sense).
 If \fIPG\fR is a negative number, then a standard INQUIRY is performed. This
 can be used to override some guessing logic associated with the
 \fI\-\-inhex=FN\fR option.
+.br
+If \fIPG\fR is not found in the 'Supported VPD pages' VPD page (0x0) then
+EDOM is returned. To bypass this check use the \fI\-\-force\fR option.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 in the absence of \fI\-\-inhex=FN\fR then output response in binary.

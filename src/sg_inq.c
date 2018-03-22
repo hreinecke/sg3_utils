@@ -48,7 +48,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.90 20180307";    /* SPC-5 rev 19 */
+static const char * version_str = "1.91 20180322";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -319,7 +319,7 @@ usage()
             "                    only supported for VPD pages 0x80 and 0x83\n"
             "    --extended|-E|-x    decode extended INQUIRY data VPD page "
             "(0x86)\n"
-            "    --force|-f      skip VPD page 0 checking; direct fetch "
+            "    --force|-f      skip VPD page 0 check; directly fetch "
             "requested page\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
@@ -1251,7 +1251,7 @@ decode_supported_vpd(uint8_t * buff, int len, int do_hex)
 }
 
 static bool
-vpd_page_is_supported(uint8_t * vpd_pg0, int v0_len, int pg_num)
+vpd_page_is_supported(uint8_t * vpd_pg0, int v0_len, int pg_num, int vb)
 {
     int k, rlen;
 
@@ -1264,7 +1264,10 @@ vpd_page_is_supported(uint8_t * vpd_pg0, int v0_len, int pg_num)
                 "%d\n", rlen, v0_len);
     else
         v0_len = rlen;
-
+    if (vb > 1) {
+        pr2serr("Supported VPD pages, hex list: ");
+        hex2stderr(vpd_pg0 + 4, v0_len - 4, -1);
+    }
     for (k = 4; k < v0_len; ++k) {
         if(vpd_pg0[k] == pg_num)
             return true;
@@ -1273,9 +1276,9 @@ vpd_page_is_supported(uint8_t * vpd_pg0, int v0_len, int pg_num)
 }
 
 static bool
-vpd_page_not_supported(uint8_t * vpd_pg0, int v0_len, int pg_num)
+vpd_page_not_supported(uint8_t * vpd_pg0, int v0_len, int pg_num, int vb)
 {
-    return ! vpd_page_is_supported(vpd_pg0, v0_len, pg_num);
+    return ! vpd_page_is_supported(vpd_pg0, v0_len, pg_num, vb);
 }
 
 /* ASCII Information VPD pages (page numbers: 0x1 to 0x7f) */
@@ -3207,8 +3210,8 @@ fetch_unit_serial_num(int sg_fd, char * obuff, int obuff_len, int verbose)
         res = SG_LIB_CAT_MALFORMED;
         goto fini;
     }
-    if (vpd_page_not_supported(b, len, VPD_UNIT_SERIAL_NUM)) {
-        res = SG_LIB_CAT_ILLEGAL_REQ;
+    if (vpd_page_not_supported(b, len, VPD_UNIT_SERIAL_NUM, verbose)) {
+        res = sg_convert_errno(EDOM); /* was SG_LIB_CAT_ILLEGAL_REQ */
         goto fini;
     }
 
@@ -3527,8 +3530,11 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                                       vb, &len);
         if (res)
             goto out;
-        if (vpd_page_not_supported(rp, len, pn)) {
-            res = SG_LIB_CAT_ILLEGAL_REQ;
+        if (vpd_page_not_supported(rp, len, pn, vb)) {
+            if (vb)
+                pr2serr("Given VPD page not in supported list, use --force "
+                        "to override this check\n");
+            res = sg_convert_errno(EDOM); /* was SG_LIB_CAT_ILLEGAL_REQ */
             goto out;
         }
     }
@@ -4042,9 +4048,9 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
     } else if (do_long)
         printf("  FGUID: 0x0\n");
     printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(dinp + 78));
-    if (do_long) {	/* Bytes 240 to 255 are reserved for NVME-MI */
-	printf("  NVMe Enclosure: %d\n", !! (0x2 & dinp[253]));
-	printf("  NVMe Storage device: %d\n", !! (0x1 & dinp[253]));
+    if (do_long) {      /* Bytes 240 to 255 are reserved for NVME-MI */
+        printf("  NVMe Enclosure: %d\n", !! (0x2 & dinp[253]));
+        printf("  NVMe Storage device: %d\n", !! (0x1 & dinp[253]));
         printf("  Management endpoint capabilities, over a PCIe port: %d\n",
                !! (0x2 & dinp[255]));
         printf("  Management endpoint capabilities, over a SMBus/I2C port: "

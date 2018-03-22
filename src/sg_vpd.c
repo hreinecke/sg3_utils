@@ -37,7 +37,7 @@
 
 */
 
-static const char * version_str = "1.40 20180219";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.41 20180222";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -256,7 +256,8 @@ usage()
             "    --enumerate|-e    enumerate known VPD pages names (ignore "
             "DEVICE),\n"
             "                      can be used with --page=num to search\n"
-            "    --force|-f      skip VPD page 0 checking\n"
+            "    --force|-f      skip VPD page 0 (supported VPD pages) "
+            "checking\n"
             "    --help|-h       output this usage message then exit\n"
             "    --hex|-H        output page in ASCII hexadecimal\n"
             "    --ident|-i      output device identification VPD page, "
@@ -2844,14 +2845,22 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
         num = rp[3];
         if (num > (len - 4))
             num = (len - 4);
+        if (vb > 1) {
+            pr2serr("Supported VPD pages, hex list: ");
+            hex2stderr(rp + 4, num, -1);
+        }
         for (k = 0; k < num; ++k) {
             if (pn == rp[4 + k]) {
                 vpd_supported = true;
                 break;
             }
         }
-        if (! vpd_supported)
-            return SG_LIB_CAT_ILLEGAL_REQ;
+        if (! vpd_supported) { /* get creative, was SG_LIB_CAT_ILLEGAL_REQ */
+            if (vb)
+                pr2serr("Given VPD page not in supported list, use --force "
+                        "to override this check\n");
+            return sg_convert_errno(EDOM);
+        }
     }
     switch(pn) {
     case VPD_NOPE_WANT_STD_INQ:    /* -2 (want standard inquiry response) */
