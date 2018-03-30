@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.59 20180302";
+static const char * version_str = "0.60 20180325";
 
 #define ME "sg_senddiag: "
 
@@ -641,7 +641,7 @@ static const char *
 find_page_code_desc(int page_num)
 {
     int k;
-    int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
+    int num = SG_ARRAY_SIZE(pc_desc_arr);
     const struct page_code_desc * pcdp = &pc_desc_arr[0];
 
     for (k = 0; k < num; ++k, ++pcdp) {
@@ -657,7 +657,7 @@ static void
 list_page_codes()
 {
     int k;
-    int num = sizeof(pc_desc_arr) / sizeof(pc_desc_arr[0]);
+    int num = SG_ARRAY_SIZE(pc_desc_arr);
     const struct page_code_desc * pcdp = &pc_desc_arr[0];
 
     printf("Page_Code  Description\n");
@@ -858,9 +858,12 @@ main(int argc, char * argv[])
                         hex2stdout(rsp_buff, rsp_len, 1);
                     else {
                         for (k = 0; k < (rsp_len - 4); ++k) {
-                            cp = find_page_code_desc(rsp_buff[k + 4]);
-                            printf("  0x%02x  %s\n", rsp_buff[k + 4],
-                                   (cp ? cp : "<unknown>"));
+                            pg = rsp_buff[k + 4];
+                            cp = find_page_code_desc(pg);
+                            if (NULL == cp)
+                                cp = (pg < 0x80) ? "<unknown>" :
+                                                   "<vendor specific>";
+                            printf("  0x%02x  %s\n", pg, cp);
                         }
                     }
                 } else {

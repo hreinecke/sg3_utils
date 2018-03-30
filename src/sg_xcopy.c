@@ -68,7 +68,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.63 20180219";
+static const char * version_str = "0.64 20180329";
 
 #define ME "sg_xcopy: "
 
@@ -340,7 +340,7 @@ open_sg(struct xcopy_fp_t * fp, int vb)
         perror(ebuff);
         return -1;
     }
-    if (sg_simple_inquiry(fp->sg_fd, &sir, 0, vb)) {
+    if (sg_simple_inquiry(fp->sg_fd, &sir, false, vb)) {
         pr2serr("INQUIRY failed on %s\n", ebuff);
         sg_cmds_close_device(fp->sg_fd);
         fp->sg_fd = -1;

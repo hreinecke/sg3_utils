@@ -1871,6 +1871,7 @@ static struct value_2names_t exit_str_arr[] = {
     {18, "Medium or hardware error with Info", NULL},
     {20, "No sense key", "probably additional sense code"},
     {21, "Recovered error (warning)", "sense key"},  /* Warning not error */
+    {22, "LBA out of range", NULL},
     {24, "Reservation conflict", "SCSI status"},
     {25, "Condition met", "SCSI status"},       /* from PRE-FETCH command */
     {26, "Busy", "SCSI status"},   /* more likely if SAS expander present */
@@ -2086,6 +2087,8 @@ sg_err_category_sense(const uint8_t * sbp, int sb_len)
         case SPC_SK_ILLEGAL_REQUEST:
             if ((0x20 == ssh.asc) && (0x0 == ssh.ascq))
                 return SG_LIB_CAT_INVALID_OP;
+            else if ((0x21 == ssh.asc) && (0x0 == ssh.ascq))
+                return SG_LIB_LBA_OUT_OF_RANGE;
             else
                 return SG_LIB_CAT_ILLEGAL_REQ;
             break;

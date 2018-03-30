@@ -1,9 +1,10 @@
-.TH SG_UNMAP "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_UNMAP "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_unmap \- send SCSI UNMAP command (known as 'trim' in ATA specs)
 .SH SYNOPSIS
 .B sg_unmap
-[\fI\-\-anchor\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=FILE\fR]
+[\fI\-\-all=ST,RN[,LA]\fR] [\fI\-\-anchor\fR] [\fI\-\-dry\-run\fR]
+[\fI\-\-force\fR] [\fI\-\-grpnum=GN\fR] [\fI\-\-help\fR] [\fI\-\-in=FILE\fR]
 [\fI\-\-lba=LBA,LBA...\fR] [\fI\-\-num=NUM,NUM...\fR] [\fI\-\-timeout=TO\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -16,14 +17,15 @@ by the SCSI WRITE SAME command; see the sg_write_same utility. The unmap
 capability is closely related to the ATA DATA SET MANAGEMENT command with
 the "Trim" bit set.
 .PP
-Logical blocks to be unmapped can be specified in one of two ways to this
+Logical blocks to be unmapped can be specified in one of three ways to this
 utility. One way is by supplying the start LBAs to the '\-\-lba=' option
-and the corresponding number(s) to unmap to the '\-\-num=' option. The
-other way is by putting start LBA and number to unmap pairs in a file whose
-name is given to the '\-\-in=' option. All values are assumed to be decimal
-unless prefixed by "0x" (or "0X") or have a trailing "h" (or "H") in which
-case they are interpreted as hexadecimal. Suffix multipliers are permitted
-on decimal values (e.g. '\-\-num=1m').
+and the corresponding number(s) to unmap to the '\-\-num=' option. Another
+way is by putting start LBA and number to unmap pairs in a file whose name
+is given to the '\-\-in=' option. Alternatively a large segment or all of
+a disk (SSD) can be unmapped with the \fI\-\-all=ST_RN[,LA]\fR option. All
+values are assumed to be decimal unless prefixed by "0x" (or "0X") or have
+a trailing "h" (or "H") in which case they are interpreted as hexadecimal.
+Suffix multipliers are permitted on decimal values (e.g. '\-\-num=1m').
 .PP
 When the '\-\-lba=' option is given then the '\-\-num=' option must also be
 given. If one has a comma separated list as its argument then the other must
@@ -37,11 +39,34 @@ second value is the number to unmap from that LBA. Everything from and
 including a "#" on a line is ignored as are blank lines. Values may be
 comma, space and tab separated or appear on separate lines. Each line should
 not exceed 1023 bytes in length.
+.PP
+Since a lot of data can be lost with this utility, a 15 second "cooling off"
+period is given before any UNMAP commands are sent. During this period the
+user is reminded what will happen, and to which device, so they can use
+control\-C (or some other technique) to terminate this utility before any
+unmapping takes place. This period can be bypassed with the \fI\-\-force\fR
+option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-A\fR, \fB\-\-all\fR=\fIST,RN[,LA]\fR
+where \fIST\fR is the starting LBA, \fIRN\fR is the repeat number which is
+the maximum number of blocks in each SCSI UNMAP command, and \fILA\fR, if
+given, is the last LBA to unmap. If \fILA\fR is not given, then the last
+LBA on the \fIDEVICE\fR is used. That is obtained by the SCSI READ CAPACITY
+command.
+.TP
 \fB\-a\fR, \fB\-\-anchor\fR
 sets the 'Anchor' bit in the command (introduced in sbc3r22).
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+perform all the preparation, including opening \fIDEVICE\fR plus sending
+a 'standard' SCSI INQUIRY command (and optionally a READ CAPACITY), but
+exit before performing any SCSI UNMAP commands.
+.TP
+\fB\-f\fR, \fB\-\-force\fR
+bypass the 15 second warning period that occurs before any UNMAP commands
+are sent.
 .TP
 \fB\-g\fR, \fB\-\-grpnum\fR=\fIGN\fR
 sets the 'Group number' field to \fIGN\fR. Defaults to a value of zero.
@@ -116,6 +141,15 @@ MANAGEMENT which also has a Trim bit.
 In the examples directory of the sg3_utils package there is a
 sg_unmap_example.txt file that shows the format that the '\-\-in='
 option accepts.
+.PP
+To unmap all blocks from and including LBA 0x2000 to the end of the
+device (e.g. disk or SSD) with each SCSI UNMAP command given 1024
+blocks to unmap:
+.PP
+  sg_unmap \-\-all=0x2000,1k /dev/sg2
+.PP
+Add '\-\-force' to bypass the 15 seconds of warnings. So '\-\-force' is
+appropriate for batch files.
 .SH EXIT STATUS
 The exit status of sg_unmap is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -124,7 +158,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2017 Douglas Gilbert
+Copyright \(co 2009\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

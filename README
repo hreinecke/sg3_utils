@@ -178,7 +178,7 @@ future) that include MSVC being basically a C++ compiler, not a C/C++
 compiler. For some reason MSVC only claims C89 compliance (i.e. the first
 C standard from 1989). MSVC 2013 and 2015 are moving closer to C99
 compliance and may be sufficient to compile this package. Another problem
-is the assumption of te availability of basic Unix system calls such as
+is the assumption of the availability of basic Unix system calls such as
 open(). Nearly 20 years ago Microsoft indicated (promised ?) that it
 would move in the direction of POSIX compliance, but very little ever
 happened. "Talk is cheap, there should be a tax on it."
@@ -301,7 +301,7 @@ both C code (with the extension ".c") and C++ code (with the extension
 ".cpp"). There is a "Makefile" to build the C code and a "Makefile.cplus"
 to build the C++ code. Both depend on some object files from the "lib"
 subdirectory. So a sequence like this may be required prior to invoking
-one of the Mkaefiles in the directory: "cd <top_of_package> ;
+one of the Makefiles in the directory: "cd <top_of_package> ;
 ./configure ; cd lib ; make ; cd ../testing".
 
 Here is a list in alphabetical order of utilities found in the 'testing'
@@ -483,14 +483,28 @@ and it has been replaced by:
 The Linux kernel only supplies "unaligned" functions for 16, 32 and 64
 bit quantities. SCSI commands also have cases of 24 and 48 bit numbers
 so sg_unaligned.h contains support for those plus a variant where the
-bit length is passed as an argument.
+byte length is passed as an argument.
 
-Associated with the above change fixed length integer types seem a better
+The unaligned functions are inlined for speed (at the possible expense of
+space) and now have specializations depending whether the host is big or
+(more likely) little endian. These functions can be broken down to a
+memcpy() and optionally a byte-swap for 16, 32 and 64 bit operations.
+The memcpy() takes care of alignment while the byte-swap (bswap_16(),
+bswap_32() and bswap_64() ) addresses integer endianness. If the host is
+little endian and a little endian variant of the unaligned functions is
+requested, then no byte-swap is required. These specializations can be
+"compiled out" with this configure option: './configure
+--disable-fast-lebe' in which case the classic "C shifting" technique is
+used to implement all the unaligned functions.
+
+Associated with the above change, fixed length integer types seem a better
 fit for SCSI command and parameter integers than the traditional integer
 types in the C language. Fixed length integer types were standardized in
 C99 and require the inclusion of <stdint.h>. For example this means for
 an integer that will represent a 64 bit LBA, to favour using "uint64_t"
-over the "unsigned long long" type.
+over the "unsigned long long" type. Also "unsigned char" has mostly been
+replaced by "uint8_t" as the 8 bit (unsigned) byte type; "char" is still
+used for ASCII text.
 
 
 Other SCSI and storage tools
@@ -499,4 +513,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-27th January 2018
+26th March 2018

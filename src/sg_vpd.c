@@ -23,6 +23,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
@@ -37,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.41 20180222";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.42 20180329";  /* spc5r18 + sbc4r14 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -3022,7 +3023,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off)
                 struct sg_simple_inquiry_resp sir;
 
                 if ((sg_fd >= 0) && long_notquiet) {
-                    res = sg_simple_inquiry(sg_fd, &sir, 0, vb);
+                    res = sg_simple_inquiry(sg_fd, &sir, false, vb);
                     if (res) {
                         if (op->verbose)
                             pr2serr("%s: sg_simple_inquiry() failed, "

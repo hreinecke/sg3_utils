@@ -30,7 +30,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.22 20180219";
+static const char * version_str = "1.23 20180329";
 
 #define ME "sg_wr_mode: "
 
@@ -445,7 +445,7 @@ int main(int argc, char * argv[])
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (0 == sg_simple_inquiry(sg_fd, &inq_data, 0, verbose))
+    if (0 == sg_simple_inquiry(sg_fd, &inq_data, false, verbose))
         pdt = inq_data.peripheral_type;
     else
         pdt = 0x1f;

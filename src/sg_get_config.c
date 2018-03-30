@@ -31,7 +31,7 @@
 
 */
 
-static const char * version_str = "0.45 20182198";    /* mmc6r02 */
+static const char * version_str = "0.47 20180329";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -222,7 +222,7 @@ get_feature_str(int feature_num, char * buff)
 {
     int k, num;
 
-    num = sizeof(feature_desc_arr) / sizeof(feature_desc_arr[0]);
+    num = SG_ARRAY_SIZE(feature_desc_arr);
     for (k = 0; k < num; ++k) {
         if (feature_desc_arr[k].val == feature_num) {
             strcpy(buff, feature_desc_arr[k].desc);
@@ -929,14 +929,14 @@ list_known(bool brief)
 {
     int k, num;
 
-    num = sizeof(feature_desc_arr) / sizeof(feature_desc_arr[0]);
+    num = SG_ARRAY_SIZE(feature_desc_arr);
     printf("Known features:\n");
     for (k = 0; k < num; ++k)
         printf("  %s [0x%x]\n", feature_desc_arr[k].desc,
                feature_desc_arr[k].val);
     if (! brief) {
         printf("Known profiles:\n");
-        num = sizeof(profile_desc_arr) / sizeof(profile_desc_arr[0]);
+        num = SG_ARRAY_SIZE(profile_desc_arr);
         for (k = 0; k < num; ++k)
             printf("  %s [0x%x]\n", profile_desc_arr[k].desc,
                    profile_desc_arr[k].val);
@@ -1052,7 +1052,7 @@ main(int argc, char * argv[])
                 safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
-    if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
+    if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, verbose)) {
         if (! do_raw)
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor, inq_resp.product,
                    inq_resp.revision);

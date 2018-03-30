@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.57 20180302";
+static const char * version_str = "1.59 20180329";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -625,34 +625,34 @@ get_mpage_tbl_size(int scsi_ptype, int * sizep)
     switch (scsi_ptype)
     {
         case -1:        /* common list */
-            *sizep = sizeof(pc_desc_common) / sizeof(pc_desc_common[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_common);
             return &pc_desc_common[0];
         case PDT_DISK:         /* disk (direct access) type devices */
         case PDT_WO:
         case PDT_OPTICAL:
-            *sizep = sizeof(pc_desc_disk) / sizeof(pc_desc_disk[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_disk);
             return &pc_desc_disk[0];
         case PDT_TAPE:         /* tape devices */
         case PDT_PRINTER:
-            *sizep = sizeof(pc_desc_tape) / sizeof(pc_desc_tape[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_tape);
             return &pc_desc_tape[0];
         case PDT_MMC:         /* cd/dvd/bd devices */
-            *sizep = sizeof(pc_desc_cddvd) / sizeof(pc_desc_cddvd[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_cddvd);
             return &pc_desc_cddvd[0];
         case PDT_MCHANGER:         /* medium changer devices */
-            *sizep = sizeof(pc_desc_smc) / sizeof(pc_desc_smc[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_smc);
             return &pc_desc_smc[0];
         case PDT_SAC:       /* storage array devices */
-            *sizep = sizeof(pc_desc_scc) / sizeof(pc_desc_scc[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_scc);
             return &pc_desc_scc[0];
         case PDT_SES:       /* enclosure services devices */
-            *sizep = sizeof(pc_desc_ses) / sizeof(pc_desc_ses[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_ses);
             return &pc_desc_ses[0];
         case PDT_RBC:       /* simplified direct access device */
-            *sizep = sizeof(pc_desc_rbc) / sizeof(pc_desc_rbc[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_rbc);
             return &pc_desc_rbc[0];
         case PDT_ADC:       /* automation device/interface */
-            *sizep = sizeof(pc_desc_adc) / sizeof(pc_desc_adc[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_adc);
             return &pc_desc_adc[0];
     }
     *sizep = 0;
@@ -696,16 +696,16 @@ get_mpage_trans_tbl_size(int t_proto, int * sizep)
     switch (t_proto)
     {
         case TPROTO_FCP:
-            *sizep = sizeof(pc_desc_t_fcp) / sizeof(pc_desc_t_fcp[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_t_fcp);
             return &pc_desc_t_fcp[0];
         case TPROTO_SPI:
-            *sizep = sizeof(pc_desc_t_spi4) / sizeof(pc_desc_t_spi4[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_t_spi4);
             return &pc_desc_t_spi4[0];
         case TPROTO_SAS:
-            *sizep = sizeof(pc_desc_t_sas) / sizeof(pc_desc_t_sas[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_t_sas);
             return &pc_desc_t_sas[0];
         case TPROTO_ADT:
-            *sizep = sizeof(pc_desc_t_adc) / sizeof(pc_desc_t_adc[0]);
+            *sizep = SG_ARRAY_SIZE(pc_desc_t_adc);
             return &pc_desc_t_adc[0];
     }
     *sizep = 0;
@@ -1076,7 +1076,7 @@ main(int argc, char * argv[])
         goto fini;
     }
 
-    if (sg_simple_inquiry(sg_fd, &inq_out, 1, op->do_verbose)) {
+    if (sg_simple_inquiry(sg_fd, &inq_out, true, op->do_verbose)) {
         pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->device_name);
         ret = SG_LIB_CAT_OTHER;
         goto fini;

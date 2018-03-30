@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.44 20180219";
+static const char * version_str = "1.45 20180330";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -69,6 +69,7 @@ static const char * version_str = "1.44 20180219";
 struct opts_t {
         bool cmplst;             /* -C value */
         bool dcrt;              /* -D */
+        bool dry_run;           /* -d */
         bool early;             /* -e */
         bool fwait;             /* -w (negate for immed) */
         bool ip_def;            /* -I */
@@ -105,11 +106,14 @@ static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},
         {"cmplst", required_argument, 0, 'C'},
         {"dcrt", no_argument, 0, 'D'},
+        {"dry-run", no_argument, 0, 'd'},
+        {"dry_run", no_argument, 0, 'd'},
         {"early", no_argument, 0, 'e'},
         {"ffmt", required_argument, 0, 't'},
         {"fmtpinfo", required_argument, 0, 'f'},
         {"format", no_argument, 0, 'F'},
         {"help", no_argument, 0, 'h'},
+        {"ip-def", no_argument, 0, 'I'},
         {"ip_def", no_argument, 0, 'I'},
         {"long", no_argument, 0, 'l'},
         {"mode", required_argument, 0, 'M'},
@@ -136,19 +140,18 @@ static struct option long_options[] = {
 static void
 usage()
 {
-        printf("usage: sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
-               "[--early]\n"
-               "                 [--ffmt=FFMT] [--fmtpinfo=FPI] [--format] "
-               "[--help]\n"
-               "                 [--ip_def] [--long] [--mode=MP] [--pfu=PFU] "
-               "[--pie=PIE]\n"
-               "                 [--pinfo] [--poll=PT] [--quick] [--resize] "
-               "[--rto_req]\n"
-               "                 [--security] [--six] [--size=SIZE] "
-               "[--tape=FM]\n"
-               "                 [--timeout=SEC] [--verbose] [--verify] "
-               "[--version] [--wait]\n"
-               "                 DEVICE\n"
+        printf("Usage:\n"
+               "  sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
+               "[--dry-run] [--early]\n"
+               "            [--ffmt=FFMT] [--fmtpinfo=FPI] [--format] "
+               "[--help] [--ip-def]\n"
+               "            [--long] [--mode=MP] [--pfu=PFU] [--pie=PIE] "
+               "[--pinfo]\n"
+               "            [--poll=PT] [--quick] [--resize] [--rto_req] "
+               "[--security]\n"
+               "            [--six] [--size=SIZE] [--tape=FM] "
+               "[--timeout=SEC] [--verbose]\n"
+               "            [--verify] [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -159,11 +162,13 @@ usage()
                "same as current\n"
                "    --dcrt|-D       disable certification (doesn't "
                "verify media)\n"
+               "    --dry-run|-d    bypass device modifying commands (i.e. "
+               "don't format)\n"
                "    --early|-e      exit once format started (user can "
                "monitor progress)\n"
                "    --ffmt=FFMT|-t FFMT      fast format (def: 0 -> "
-               "possibly write\n"
-               "                             to whole medium\n"
+               "possibly overwrite\n"
+               "                             whole medium)\n"
                "    --fmtpinfo=FPI|-f FPI    FMTPINFO field value "
                "(default: 0)\n"
                "    --format|-F     do FORMAT UNIT (default: report current "
@@ -171,7 +176,7 @@ usage()
                "                    use thrice for FORMAT UNIT command "
                "only\n"
                "    --help|-h       prints out this usage message\n"
-               "    --ip_def|-I     use default initialization pattern\n"
+               "    --ip-def|-I     use default initialization pattern\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
                "32 bit lbas)\n"
                "    --mode=MP|-M MP     mode page (def: 1 -> RW error "
@@ -323,11 +328,17 @@ scsi_format_unit(int fd, const struct opts_t * op)
         if (need_hdr)
                 fmt_pl_sz = off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0);
 
-        res = sg_ll_format_unit_v2(fd, op->fmtpinfo, longlist,
-                                   need_hdr/* FMTDATA*/, op->cmplst,
-                                   0 /* DEFECT_LIST_FORMAT */, op->ffmt,
-                                   timeout, fmt_pl, fmt_pl_sz, true,
-                                   op->verbose);
+        if (op->dry_run) {
+                res = 0;
+                pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
+                        "command\n");
+        } else {
+                res = sg_ll_format_unit_v2(fd, op->fmtpinfo, longlist,
+                                        need_hdr/* FMTDATA*/, op->cmplst,
+                                        0 /* DEFECT_LIST_FORMAT */, op->ffmt,
+                                        timeout, fmt_pl, fmt_pl_sz, true,
+                                        op->verbose);
+        }
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format unit command: %s\n", b);
@@ -336,7 +347,9 @@ scsi_format_unit(int fd, const struct opts_t * op)
         if (! immed)
                 return 0;
 
-        printf("\nFormat unit has started\n");
+        if (! op->dry_run)
+                printf("\nFormat unit has started\n");
+
         if (op->early) {
                 if (immed)
                         printf("Format continuing,\n    request sense or "
@@ -345,6 +358,10 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 return 0;
         }
 
+        if (op->dry_run) {
+                printf("No point in polling for progress, so exit\n");
+                return 0;
+        }
         verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
         if (! op->poll_type) {
                 for(;;) {
@@ -443,8 +460,14 @@ scsi_format_medium(int fd, const struct opts_t * op)
         timeout = (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT);
         if (op->timeout > timeout)
                 timeout = op->timeout;
-        res = sg_ll_format_medium(fd, op->verify, immed, 0xf & op->tape, NULL,
-                                  0, timeout, true, op->verbose);
+        if (op->dry_run) {
+                res = 0;
+                pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
+                        "command\n");
+        } else
+                res = sg_ll_format_medium(fd, op->verify, immed,
+                                          0xf & op->tape, NULL, 0, timeout,
+                                          true, op->verbose);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format medium command: %s\n", b);
@@ -453,7 +476,8 @@ scsi_format_medium(int fd, const struct opts_t * op)
         if (! immed)
                 return 0;
 
-        printf("\nFormat medium has started\n");
+        if (! op->dry_run)
+                printf("\nFormat medium has started\n");
         if (op->early) {
                 if (immed)
                         printf("Format continuing,\n    request sense or "
@@ -462,6 +486,10 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 return 0;
         }
 
+        if (op->dry_run) {
+                printf("No point in polling for progress, so exit\n");
+                return 0;
+        }
         verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
         if (! op->poll_type) {
                 for(;;) {
@@ -776,7 +804,7 @@ main(int argc, char **argv)
                 int c;
 
                 c = getopt_long(argc, argv,
-                                "c:C:Def:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
+                                "c:C:dDef:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
@@ -801,6 +829,9 @@ main(int argc, char **argv)
                                 return SG_LIB_SYNTAX_ERROR;
                         }
                         op->cmplst = !! j;
+                        break;
+                case 'd':
+                        op->dry_run = true;
                         break;
                 case 'D':
                         op->dcrt = true;
@@ -943,7 +974,7 @@ main(int argc, char **argv)
                 return SG_LIB_SYNTAX_ERROR;
         }
         if (NULL == op->device_name) {
-                pr2serr("no DEVICE name given\n");
+                pr2serr("no DEVICE name given\n\n");
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
@@ -1197,7 +1228,10 @@ again_with_long_lba:
                                 sg_put_unaligned_be24((uint32_t)op->blk_size,
                                                       dbuff + offset + 5);
                 }
-                if (op->mode6)
+                if (op->dry_run)
+                        pr2serr("Due to --dry-run option bypass MODE "
+                                "SELECT(%d)command\n", (op->mode6 ? 6 : 10));
+                else if (op->mode6)
                         res = sg_ll_mode_select6(fd, true /* PF */,
                                                  true /* SP */, dbuff,
                                                  calc_len, true, op->verbose);

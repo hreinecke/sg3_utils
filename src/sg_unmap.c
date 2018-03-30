@@ -27,17 +27,30 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
+#if defined(MSC_VER) || defined(__MINGW32__)
+#define HAVE_MS_SLEEP
+#endif
+
+#ifdef HAVE_MS_SLEEP
+#include <windows.h>
+#define sleep_for(seconds)    Sleep( (seconds) * 1000)
+#else
+#define sleep_for(seconds)    sleep(seconds)
+#endif
+
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
- * This utility invokes the UNMAP SCSI command to unmap one or more
- * logical blocks.
+ * This utility invokes the UNMAP SCSI command to unmap (trim) one or more
+ * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.13 20180219";
+static const char * version_str = "1.14 20180330";
 
 
 #define DEF_TIMEOUT_SECS 60
 #define MAX_NUM_ADDR 128
+#define RCAP10_RESP_LEN 8
+#define RCAP16_RESP_LEN 32
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -45,7 +58,11 @@ static const char * version_str = "1.13 20180219";
 
 
 static struct option long_options[] = {
+        {"all", required_argument, 0, 'A'},
         {"anchor", no_argument, 0, 'a'},
+        {"dry-run", no_argument, 0, 'd'},
+        {"dry_run", no_argument, 0, 'd'},
+        {"force", no_argument, 0, 'f'},
         {"grpnum", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'I'},
@@ -62,12 +79,22 @@ static void
 usage()
 {
     pr2serr("Usage: "
-          "sg_unmap [--anchor] [--grpnum=GN] [--help] [--in=FILE]\n"
-          "                [--lba=LBA,LBA...] [--num=NUM,NUM...] "
-          "[--timeout=TO]\n"
-          "                [--verbose] [--version] DEVICE\n"
+          "sg_unmap [--all=ST,RN[,LA]] [--anchor] [--dry-run] [--force]\n"
+          "                [--grpnum=GN] [--help] [--in=FILE] "
+          "[--lba=LBA,LBA...]\n"
+          "                [--num=NUM,NUM...] [--timeout=TO] [--verbose] "
+          "[--version]\n"
+          "                DEVICE\n"
           "  where:\n"
+          "    --all=ST,RN[,LA]|-A ST,RN[,LA]    start unmaps at LBA ST, "
+          "RN blocks\n"
+          "                         per unmap until the end of disk, or "
+          "until\n"
+          "                         and including LBA LA (last)\n"
           "    --anchor|-a          set anchor field in cdb\n"
+          "    --dry-run|-d         prepare but skip UNMAP call(s)\n"
+          "    --force|-f           don't ask for confirmation before "
+          "zapping media\n"
           "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
           "    --help|-h            print out usage message\n"
           "    --in=FILE|-I FILE    read LBA, NUM pairs from FILE (if "
@@ -85,11 +112,17 @@ usage()
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string and exit\n\n"
           "Perform a SCSI UNMAP command. LBA, NUM and the values in FILE "
-          "are assumed\n"
-          "to be decimal. Use '0x' prefix or 'h' suffix for hex values.\n"
+          "are assumed\nto be decimal. Use '0x' prefix or 'h' suffix for "
+          "hex values.\n"
           "Example to unmap LBA 0x12345:\n"
           "    sg_unmap --lba=0x12345 --num=1 /dev/sdb\n"
+          "Example to unmap starting at LBA 0x12345, 256 blocks per command:"
+          "\n    sg_unmap --all=0x12345,256 /dev/sg2\n"
+          "until the end if /dev/sg2 (assumed to be a storage device)\n\n"
           );
+    pr2serr("WARNING: This utility will destroy data on DEVICE in the given "
+            "range(s)\nthat will be unmapped. Unmap is also known as 'trim' "
+            "and is irreversible.\n");
 }
 
 /* Read numbers (up to 64 bits in size) from command line (comma (or
@@ -326,18 +359,29 @@ int
 main(int argc, char * argv[])
 {
     bool anchor = false;
-    int sg_fd, res, c, num, k, j;
+    bool do_force = false;
+    bool err_printed = false;
+    bool dry_run = false;
+    int res, c, num, k, j;
+    int sg_fd = -1;
     int grpnum = 0;
     int addr_arr_len = 0;
     int num_arr_len = 0;
     int param_len = 4;
     int ret = 0;
     int timeout = DEF_TIMEOUT_SECS;
-    int verbose = 0;
+    int vb = 0;
+    uint32_t all_rn = 0;        /* Repetition Number, 0 for inactive */
+    uint64_t all_start = 0;
+    uint64_t all_last = 0;
+    int64_t ll;
     const char * lba_op = NULL;
     const char * num_op = NULL;
     const char * in_op = NULL;
     const char * device_name = NULL;
+    char * first_comma = NULL;
+    char * second_comma = NULL;
+    struct sg_simple_inquiry_resp inq_resp;
     uint64_t addr_arr[MAX_NUM_ADDR];
     uint32_t num_arr[MAX_NUM_ADDR];
     uint8_t param_arr[8 + (MAX_NUM_ADDR * 16)];
@@ -345,7 +389,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ag:hIHl:n:t:vV", long_options,
+        c = getopt_long(argc, argv, "aA:dfg:hI:Hl:n:t:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -353,6 +397,44 @@ main(int argc, char * argv[])
         switch (c) {
         case 'a':
             anchor = true;
+            break;
+        case 'A':
+            first_comma = strchr(optarg, ',');
+            if (NULL == first_comma) {
+                pr2serr("--all=ST,RN[,LA] expects at least one comma in "
+                        "argument, found none\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            ll = sg_get_llnum(optarg);
+            if (ll < 0) {
+                pr2serr("unable to decode --all=ST,.... (starting LBA)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            all_start = (uint64_t)ll;
+            ll = sg_get_llnum(first_comma + 1);
+            if ((ll < 0) || (ll > UINT32_MAX)) {
+                pr2serr("unable to decode --all=ST,RN.... (repeat number)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            all_rn = (uint32_t)ll;
+            if (0 == ll)
+                pr2serr("warning: --all=ST,RN... being ignored because RN "
+                        "is 0\n");
+            second_comma = strchr(first_comma + 1, ',');
+            if (second_comma) {
+                ll = sg_get_llnum(second_comma + 1);
+                if (ll < 0) {
+                    pr2serr("unable to decode --all=ST,NR,LA (last LBA)\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                all_last = (uint64_t)ll;
+            }
+            break;
+        case 'd':
+            dry_run = true;
+            break;
+        case 'f':
+            do_force = true;
             break;
         case 'g':
             num = sscanf(optarg, "%d", &res);
@@ -385,7 +467,7 @@ main(int argc, char * argv[])
                 timeout = DEF_TIMEOUT_SECS;
             break;
         case 'v':
-            ++verbose;
+            ++vb;
             break;
         case 'V':
             pr2serr("version: %s\n", version_str);
@@ -409,111 +491,298 @@ main(int argc, char * argv[])
         }
     }
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (in_op && (lba_op || num_op)) {
-        pr2serr("expect '--in=' by itself, or both '--lba=' and '--num='\n");
+    if (all_rn > 0) {
+        if (lba_op || num_op || in_op) {
+            pr2serr("Can't have --all= together with --lba=, --num= or "
+                    "--in=\n\n");
+            usage();
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        /* here if --all= looks okay so far */
+    } else if (in_op && (lba_op || num_op)) {
+        pr2serr("expect '--in=' by itself, or both '--lba=' and "
+                "'--num='\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     } else if (in_op || (lba_op && num_op))
         ;
     else {
         if (lba_op)
-            pr2serr("since '--lba=' is given, also need '--num='\n");
+            pr2serr("since '--lba=' is given, also need '--num='\n\n");
         else
             pr2serr("expect either both '--lba=' and '--num=', or "
-                    "'--in=' by itself\n");
+                    "'--in=', or '--all='\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    memset(addr_arr, 0, sizeof(addr_arr));
-    memset(num_arr, 0, sizeof(num_arr));
-    addr_arr_len = 0;
-    if (lba_op && num_op) {
-        if (0 != build_lba_arr(lba_op, addr_arr, &addr_arr_len,
-                               MAX_NUM_ADDR)) {
-            pr2serr("bad argument to '--lba'\n");
+    if (all_rn > 0) {
+        if ((all_last > 0) && (all_start > all_last)) {
+            pr2serr("in --all=ST,RN,LA start address (ST) exceeds last "
+                    "address (LA)\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        if (0 != build_num_arr(num_op, num_arr, &num_arr_len,
-                               MAX_NUM_ADDR)) {
-            pr2serr("bad argument to '--num'\n");
-            return SG_LIB_SYNTAX_ERROR;
+    } else {
+        memset(addr_arr, 0, sizeof(addr_arr));
+        memset(num_arr, 0, sizeof(num_arr));
+        addr_arr_len = 0;
+        if (lba_op && num_op) {
+            if (0 != build_lba_arr(lba_op, addr_arr, &addr_arr_len,
+                                   MAX_NUM_ADDR)) {
+                pr2serr("bad argument to '--lba'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (0 != build_num_arr(num_op, num_arr, &num_arr_len,
+                                   MAX_NUM_ADDR)) {
+                pr2serr("bad argument to '--num'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if ((addr_arr_len != num_arr_len) || (num_arr_len <= 0)) {
+                pr2serr("need same number of arguments to '--lba=' "
+                        "and '--num=' options\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         }
-        if ((addr_arr_len != num_arr_len) || (num_arr_len <= 0)) {
-            pr2serr("need same number of arguments to '--lba=' "
-                    "and '--num=' options\n");
-            return SG_LIB_SYNTAX_ERROR;
+        if (in_op) {
+            if (0 != build_joint_arr(in_op, addr_arr, num_arr, &addr_arr_len,
+                                     MAX_NUM_ADDR)) {
+                pr2serr("bad argument to '--in'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (addr_arr_len <= 0) {
+                pr2serr("no addresses found in '--in=' argument, file: %s\n",
+                        in_op);
+                return SG_LIB_SYNTAX_ERROR;
+            }
         }
+        param_len = 8 + (16 * addr_arr_len);
+        memset(param_arr, 0, param_len);
+        k = 8;
+        for (j = 0; j < addr_arr_len; ++j) {
+            sg_put_unaligned_be64(addr_arr[j], param_arr + k);
+            k += 8;
+            sg_put_unaligned_be32(num_arr[j], param_arr + k);
+            k += 4 + 4;
+        }
+        k = 0;
+        num = param_len - 2;
+        sg_put_unaligned_be16((uint16_t)num, param_arr + k);
+        k += 2;
+        num = param_len - 8;
+        sg_put_unaligned_be16((uint16_t)num, param_arr + k);
     }
-    if (in_op) {
-        if (0 != build_joint_arr(in_op, addr_arr, num_arr, &addr_arr_len,
-                                 MAX_NUM_ADDR)) {
-            pr2serr("bad argument to '--in'\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        if (addr_arr_len <= 0) {
-            pr2serr("no addresses found in '--in=' argument, file: %s\n",
-                    in_op);
-            return SG_LIB_SYNTAX_ERROR;
-        }
-    }
-    param_len = 8 + (16 * addr_arr_len);
-    memset(param_arr, 0, param_len);
-    k = 8;
-    for (j = 0; j < addr_arr_len; ++j) {
-        sg_put_unaligned_be64(addr_arr[j], param_arr + k);
-        k += 8;
-        sg_put_unaligned_be32(num_arr[j], param_arr + k);
-        k += 4 + 4;
-    }
-    k = 0;
-    num = param_len - 2;
-    sg_put_unaligned_be16((uint16_t)num, param_arr + k);
-    k += 2;
-    num = param_len - 8;
-    sg_put_unaligned_be16((uint16_t)num, param_arr + k);
 
-
-    sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
+    sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
+        ret = sg_convert_errno(-sg_fd);
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        goto err_out;
     }
+    ret = sg_simple_inquiry(sg_fd, &inq_resp, true, vb);
 
-    res = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr, param_len,
-                         true, verbose);
-    ret = res;
-    if (SG_LIB_CAT_NOT_READY == res) {
-        pr2serr("UNMAP failed, device not ready\n");
-        goto err_out;
-    } else if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-        pr2serr("UNMAP, unit attention\n");
-        goto err_out;
-    } else if (SG_LIB_CAT_ABORTED_COMMAND == res) {
-        pr2serr("UNMAP, aborted command\n");
-        goto err_out;
-    } else if (SG_LIB_CAT_INVALID_OP == res) {
-        pr2serr("UNMAP not supported\n");
-        goto err_out;
-    } else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-        pr2serr("bad field in UNMAP cdb\n");
-        goto err_out;
-    } else if (0 != res) {
-        pr2serr("UNMAP failed (use '-v' to get more information)\n");
-        goto err_out;
+    if (all_rn > 0) {
+        bool last_retry;
+        bool to_end_of_device = false;
+        uint64_t ull;
+        uint32_t bump;
+
+        if (0 == all_last) {    /* READ CAPACITY(10 or 16) to find last */
+            uint8_t resp_buff[RCAP16_RESP_LEN];
+
+            res = sg_ll_readcap_16(sg_fd, false /* pmi */, 0 /* llba */,
+                                   resp_buff, RCAP16_RESP_LEN, true, vb);
+            if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+                pr2serr("Read capacity(16) unit attention, try again\n");
+                res = sg_ll_readcap_16(sg_fd, false, 0, resp_buff,
+                                       RCAP16_RESP_LEN, true, vb);
+            }
+            if (0 == res) {
+                if (vb > 3) {
+                    pr2serr("Read capacity(16) response:\n");
+                    hex2stderr(resp_buff, RCAP16_RESP_LEN, 1);
+                }
+                all_last = sg_get_unaligned_be64(resp_buff + 0);
+            } else if ((SG_LIB_CAT_INVALID_OP == res) ||
+                       (SG_LIB_CAT_ILLEGAL_REQ == res)) {
+                if (vb)
+                    pr2serr("Read capacity(16) not supported, try Read "
+                            "capacity(10)\n");
+                res = sg_ll_readcap_10(sg_fd, false /* pmi */, 0 /* lba */,
+                                       resp_buff, RCAP10_RESP_LEN, true,
+                                       vb);
+                if (0 == res) {
+                    if (vb > 3) {
+                        pr2serr("Read capacity(10) response:\n");
+                        hex2stderr(resp_buff, RCAP10_RESP_LEN, 1);
+                    }
+                    all_last = (uint64_t)sg_get_unaligned_be32(resp_buff + 0);
+                } else {
+                    if (res < 0)
+                        res = sg_convert_errno(-res);
+                    pr2serr("Read capacity(10) failed\n");
+                    ret = res;
+                    goto err_out;
+                }
+            } else {
+                if (res < 0)
+                    res = sg_convert_errno(-res);
+                pr2serr("Read capacity(16) failed\n");
+                ret = res;
+                goto err_out;
+            }
+            if (all_start > all_last) {
+                pr2serr("after READ CAPACITY the last block (0x%" PRIx64
+                        ") less than start address (0x%" PRIx64 ")\n",
+                        all_start, all_last);
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto err_out;
+            }
+            to_end_of_device = true;
+        }
+        if (! do_force) {
+            char b[120];
+
+            printf("%s is:  %.8s  %.16s  %.4s\n", device_name,
+                   inq_resp.vendor, inq_resp.product, inq_resp.revision);
+            sleep_for(3);
+            if (to_end_of_device)
+                snprintf(b, sizeof(b), "LBA 0x%" PRIx64 " to end of %s "
+                         "(0x%" PRIx64 ")", all_start, device_name, all_last);
+            else
+                snprintf(b, sizeof(b), "LBA 0x%" PRIx64 " to 0x%" PRIx64
+                         " on %s", all_start, all_last, device_name);
+            printf("\nAn UNMAP (a.k.a. trim) will commence in 15 seconds\n");
+            printf("    ALL data from %s will be LOST\n", b);
+            printf("        Press control-C to abort\n");
+            sleep_for(5);
+            printf("\nAn UNMAP will commence in 10 seconds\n");
+            printf("    ALL data from %s will be LOST\n", b);
+            printf("        Press control-C to abort\n");
+            sleep_for(5);
+            printf("\nAn UNMAP (a.k.a. trim) will commence in 5 seconds\n");
+            printf("    ALL data from %s will be LOST\n", b);
+            printf("        Press control-C to abort\n");
+            sleep_for(7);
+        }
+        if (dry_run) {
+            pr2serr("Doing dry-run, would have unmapped from LBA 0x%" PRIx64
+                    " to 0x%" PRIx64 "\n    %u blocks per UNMAP command\n",
+                    all_start, all_last, all_rn);
+           goto err_out;
+        }
+        last_retry = false;
+        param_len = 8 + (16 * 1);
+        for (ull = all_start, j = 0; ull <= all_last; ull += bump, ++j) {
+            if ((all_last - ull) < all_rn)
+                bump = (uint32_t)(all_last + 1 - ull);
+            else
+                bump = all_rn;
+retry:
+            memset(param_arr, 0, param_len);
+            k = 8;
+            sg_put_unaligned_be64(ull, param_arr + k);
+            k += 8;
+            sg_put_unaligned_be32(bump, param_arr + k);
+            k = 0;
+            num = param_len - 2;
+            sg_put_unaligned_be16((uint16_t)num, param_arr + k);
+            k += 2;
+            num = param_len - 8;
+            sg_put_unaligned_be16((uint16_t)num, param_arr + k);
+            ret = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr,
+                                 param_len, true, (vb > 2 ? vb - 2 : 0));
+            if (last_retry)
+                break;
+            if (ret) {
+                if ((SG_LIB_LBA_OUT_OF_RANGE == ret) &&
+                    ((ull + bump) > all_last)) {
+                    pr2serr("Typical end of disk out-of-range, decrement "
+                            "count and retry\n");
+                    if (bump > 1) {
+                        --bump;
+                        last_retry = true;
+                        goto retry;
+                    }  /* if bump==1 can't do last, so we are finished */
+                }
+                break;
+            }
+        }       /* end of for loop doing unmaps */
+        if (vb)
+            pr2serr("Completed %d UNMAP commands\n", j);
+    } else {            /* --all= not given */
+        if (dry_run) {
+            pr2serr("Doing dry-run so here is 'LBA, number_of_blocks' list "
+                    "of candidates\n");
+            k = 8;
+            for (j = 0; j < addr_arr_len; ++j) {
+                printf("    0x%" PRIx64 ", 0x%u\n",
+                      sg_get_unaligned_be64(param_arr + k),
+                      sg_get_unaligned_be32(param_arr + k + 8));
+                k += (8 + 4 + 4);
+            }
+            goto err_out;
+        }
+        if (! do_force) {
+            printf("%s is:  %.8s  %.16s  %.4s\n", device_name,
+                   inq_resp.vendor, inq_resp.product, inq_resp.revision);
+            sleep_for(3);
+            printf("\nAn UNMAP (a.k.a. trim) will commence in 15 seconds\n");
+            printf("    Some data will be LOST\n");
+            printf("        Press control-C to abort\n");
+            sleep_for(5);
+            printf("\nAn UNMAP will commence in 10 seconds\n");
+            printf("    Some data will be LOST\n");
+            printf("        Press control-C to abort\n");
+            sleep_for(5);
+            printf("\nAn UNMAP (a.k.a. trim) will commence in 5 seconds\n");
+            printf("    Some data will be LOST\n");
+            printf("        Press control-C to abort\n");
+            sleep_for(7);
+        }
+        res = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr,
+                             param_len, true, vb);
+        ret = res;
+        err_printed = true;
+        switch (ret) {
+        case SG_LIB_CAT_NOT_READY:
+            pr2serr("UNMAP failed, device not ready\n");
+            break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            pr2serr("UNMAP, unit attention\n");
+            break;
+        case SG_LIB_CAT_ABORTED_COMMAND:
+            pr2serr("UNMAP, aborted command\n");
+            break;
+        case SG_LIB_CAT_INVALID_OP:
+            pr2serr("UNMAP not supported\n");
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            pr2serr("bad field in UNMAP cdb\n");
+            break;
+        default:
+            err_printed = false;
+            break;
+        }
     }
 
 err_out:
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if ((0 == vb) && (! err_printed)) {
+        if (! sg_if_can2stderr("sg_unmap failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                return SG_LIB_FILE_ERROR;
+        }
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

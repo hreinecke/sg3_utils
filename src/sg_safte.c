@@ -32,7 +32,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.31 20180219";
+static const char * version_str = "0.32 20180329";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -618,7 +618,7 @@ main(int argc, char * argv[])
     no_hex_raw = ((0 == do_hex) && (0 == do_raw));
 
     if (no_hex_raw) {
-        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, verbose)) {
+        if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, verbose)) {
             printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                    inq_resp.product, inq_resp.revision);
             peri_type = inq_resp.peripheral_type;

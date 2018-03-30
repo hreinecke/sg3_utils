@@ -1,11 +1,11 @@
-.TH SG_FORMAT "8" "June 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
 [\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR] [\fI\-\-fmtpinfo=FPI\fR]
-[\fI\-\-format\fR] [\fI\-\-help\fR] [\fI\-\-ip_def\fR] [\fI\-\-long\fR]
+[\fI\-\-format\fR] [\fI\-\-help\fR] [\fI\-\-ip\-def\fR] [\fI\-\-long\fR]
 [\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR]
 [\fI\-\-poll=PT\fR] [\fI\-\-quick\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
 [\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR] [\fI\-\-tape=FM\fR]
@@ -129,14 +129,15 @@ are mutually exclusive.
 \fB\-t\fR, \fB\-\-ffmt\fR=\fIFFMT\fR
 \fIFFMT\fR is placed in a field of the same name in the FORMAT UNIT cdb.
 The field was introduced in SBC\-4 revision 10. The default value is 0 which
-implies the former action to typically write to all blocks on the
-\fIDEVICE\fR and that can take a long time.
+implies the former action which is typically to overwrite to all blocks on the
+\fIDEVICE\fR. That can take a long time (e.g. with hard disks over 10 TB in
+size).
 .br
 \fIFFMT\fR has values 1 and 2 for fast format with 3 being reserved
 currently. The difference between 1 and 2 concerns read operations on LBAs to
-which no data has been written to, since the fast format. When \fIFFMT\fR
+which no data has been written to, after the fast format. When \fIFFMT\fR
 is 1 the read operation should return "unspecified logical block data" and
-complete without error. When \fIFFMT\fR is 2 the read operation should
+complete without error. When \fIFFMT\fR is 2 the read operation may
 yield check condition status with a sense key set to hardware error, medium
 error or command aborted. See SBC\-4 revision 10 section 4.35 for more
 details.
@@ -170,12 +171,12 @@ use.
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage information then exit.
 .TP
-\fB\-I\fR, \fB\-\-ip_def\fR
+\fB\-I\fR, \fB\-\-ip\-def\fR
 sets the default Initialization Pattern. Some disks (SSDs) use this to flag
 that a format should fully provision (i.e. associate a physical block with
 every logical block). The same disks (SSDs) might thin provision if this
 option is not given. If this option is given then the \fI\-\-security\fR
-option cannot be given.
+option cannot be given. Also accepts \fI\-\-ip_def\fR for this option.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 the default action of this utility is to assume 32 bit logical block
@@ -581,7 +582,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2016 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2018 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
