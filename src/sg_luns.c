@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.37 20180219";
+static const char * version_str = "1.38 20180329";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -580,7 +580,7 @@ main(int argc, char * argv[])
             pr2serr("in order to decode LUN and since --lu_cong not given, "
                     "do standard\nINQUIRY to find LU_CONG bit\n");
         /* check if LU_CONG set in standard INQUIRY response */
-        res = sg_simple_inquiry(sg_fd, &sir, 0, verbose);
+        res = sg_simple_inquiry(sg_fd, &sir, false, verbose);
         ret = res;
         if (res) {
             pr2serr("fetching standard INQUIRY response failed\n");

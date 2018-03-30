@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.56 20180302";    /* spc5r14 */
+static const char * version_str = "0.57 20180329";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -1000,7 +1000,7 @@ main(int argc, char * argv[])
             pr2serr("--no-inquiry ignored because --pdt= not given\n");
         if (op->no_inquiry && (peri_dtype >= 0))
             ;
-        else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, 1, op->verbose)) {
+        else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, op->verbose)) {
             peri_dtype = inq_resp.peripheral_type;
             if (! (op->do_raw || op->no_inquiry)) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,

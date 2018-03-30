@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.96 20180219";
+static const char * version_str = "5.97 20180219";
 
 
 #define ME "sg_dd: "
@@ -1256,7 +1256,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
         }
         if (vb)
             pr2serr("        open input(sg_io), flags=0x%x\n", fl | flags);
-        if (sg_simple_inquiry(infd, &sir, 0, (vb ? (vb - 1) : 0))) {
+        if (sg_simple_inquiry(infd, &sir, false, (vb ? (vb - 1) : 0))) {
             pr2serr("INQUIRY failed on %s\n", inf);
             goto other_err;
         }
@@ -1378,7 +1378,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
         }
         if (vb)
             pr2serr("        open output(sg_io), flags=0x%x\n", flags);
-        if (sg_simple_inquiry(outfd, &sir, 0, (vb ? (vb - 1) : 0))) {
+        if (sg_simple_inquiry(outfd, &sir, false, (vb ? (vb - 1) : 0))) {
             pr2serr("INQUIRY failed on %s\n", outf);
             goto other_err;
         }

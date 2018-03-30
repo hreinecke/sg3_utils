@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20180227";
+static const char * version_str = "1.15 20180329";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1461,6 +1461,8 @@ do_read_capacity(int sg_fd, struct opts_t *op)
             strcpy(b,"OS error");
             if (res > 0)
                 sg_get_category_sense_str(res, sizeof(b), b, vb);
+            else
+                snprintf(b, sizeof(b), "error: %d", res);
             pr2serr("Read capacity(10): %s\n", b);
             pr2serr("Unable to calculate block size\n");
             return (res > 0) ? res : SG_LIB_FILE_ERROR;

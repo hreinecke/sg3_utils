@@ -38,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.18 20180219";
+static const char * version_str = "1.19 20180326";
 
 
 #define MAX_XFER_LEN 10000
@@ -415,7 +415,7 @@ main(int argc, char * argv[])
         goto finish;
     }
 
-    if ((sa < 0) || (sa >= (int)(sizeof(rec_copy_name_arr) / sizeof(char *))))
+    if ((sa < 0) || (sa >= (int)SG_ARRAY_SIZE(rec_copy_name_arr)))
         cp = "Out of range service action";
     else
         cp = rec_copy_name_arr[sa];

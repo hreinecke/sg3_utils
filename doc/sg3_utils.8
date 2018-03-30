@@ -1,12 +1,12 @@
-.TH SG3_UTILS "8" "February 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG3_UTILS "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
-[\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-timeout=SEC\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIOTHER_OPTIONS\fR]
-\fIDEVICE\fR
+[\fI\-\-dry\-run\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-in=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
+[\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -313,6 +313,16 @@ was successful. Most likely a utility will report a recovered error
 to stderr and continue, probably leaving the utility with an exit
 status of 0 .
 .TP
+.B 22
+the \fIDEVICE\fR reports that the current command or its parameters imply
+a logical block address (LBA) that is out of range. This happens surprisingly
+often when trying to access the last block on a storage device; either a
+classic "off by one" logic error or a misreading of the response from READ
+CAPACITY(10 or 16) in which the address of the last block rather than the
+number of blocks on the \fIDEVICE\fR is returned. Since LBAs are origin zero
+they range from 0 to n-1 where n is the number of blocks on the \fIDEVICE\fR,
+so the LBA of the last block is one less than the total number of blocks.
+.TP
 .B 24
 the \fIDEVICE\fR reports a SCSI status of "reservation conflict". This
 means access to the \fIDEVICE\fR with the current command has been blocked
@@ -424,6 +434,18 @@ trailing "h" or as noted in the usage message).
 Some options are used uniformly in most of the utilities in this
 package. Those options are listed below. Note that there are some
 exceptions.
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+utilities that can cause lots of user data to be lost or overwritten
+sometimes have a \fI\-\-dry\-run\fR option. Device modifying actions are
+typically bypassed (or skipped) to implement a policy of "do no harm".
+This allows complex command line invocations to be tested before the
+action required (e.g. format a disk) is performed. The \fI\-\-dry\-run\fR
+option has become a common feature of many command line utilities (e.g.
+the Unix 'patch' command), not just those from this package.
+.br
+Note that most hyphenated option names in this package also can be given
+with an underscore rather than a hyphen (e.g.  \fI\-\-dry_run\fR).
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
 some utilities (e.g. sg_ses and sg_vpd) store a lot of information in
@@ -541,15 +563,15 @@ strings appended directly after the number to which they apply:
 .br
    k K KiB     *1024
 .br
-   KB          *1000
+   KB kB       *1000
 .br
    m M MiB     *1048576
 .br
-   MB          *1000000
+   MB mB       *1000000
 .br
    g G GiB     *(2^30)
 .br
-   GB          *(10^9)
+   GB gB       *(10^9)
 .br
    t T TiB     *(2^40)
 .br

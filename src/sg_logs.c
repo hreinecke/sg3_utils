@@ -34,7 +34,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.62 20180302";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.63 20180325";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -4460,8 +4460,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                    !!(0x4 & bp[5]), !!(0x2 & bp[5]), !!(0x1 & bp[5]));
             printf("  DT device activity: ");
             j = bp[6];
-            if (j < (int)(sizeof(dt_dev_activity) /
-                          sizeof(dt_dev_activity[0])))
+            if (j < (int)SG_ARRAY_SIZE(dt_dev_activity))
                 printf("%s\n", dt_dev_activity[j]);
             else if (j < 0x80)
                 printf("Reserved [0x%x]\n", j);
@@ -4833,7 +4832,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             printf("%d [h:m  %d:%d]\n", j, (j / 60), (j % 60));
             printf("    Status: ");
             j = bp[9];
-            if (j < (int)(sizeof(bms_status) / sizeof(bms_status[0])))
+            if (j < (int)SG_ARRAY_SIZE(bms_status))
                 printf("%s\n", bms_status[j]);
             else
                 printf("unknown [0x%x] background scan status value\n", j);
@@ -4880,8 +4879,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             j = sg_get_unaligned_be32(bp + 4);
             printf("%d [%d:%d]\n", j, (j / 60), (j % 60));
             j = (bp[8] >> 4) & 0xf;
-            if (j <
-                (int)(sizeof(reassign_status) / sizeof(reassign_status[0])))
+            if (j < (int)SG_ARRAY_SIZE(reassign_status))
                 printf("    %s\n", reassign_status[j]);
             else
                 printf("    Reassign status: reserved [0x%x]\n", j);
@@ -6407,8 +6405,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
         if (op->verbose && (0 == op->do_brief) && flag)
             printf("  >>>> ");
         if ((0 == op->do_brief) || op->verbose || flag) {
-            if (pc < (int)(sizeof(tape_alert_strs) /
-                           sizeof(tape_alert_strs[0])))
+            if (pc < (int)SG_ARRAY_SIZE(tape_alert_strs))
                 printf("  %s: %d\n", tape_alert_strs[pc], flag);
             else
                 printf("  Reserved parameter code 0x%x, flag: %d\n", pc,
@@ -6902,7 +6899,7 @@ main(int argc, char * argv[])
 
     memset(&inq_out, 0, sizeof(inq_out));
     if (op->no_inq < 2) {
-        if (sg_simple_inquiry(sg_fd, &inq_out, 1, vb)) {
+        if (sg_simple_inquiry(sg_fd, &inq_out, true, vb)) {
             pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                     op->device_name);
             ret = SG_LIB_CAT_OTHER;

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180322] [svn: r764]
+Changelog for sg3_utils-1.43 [20180330] [svn: r765]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -12,6 +12,7 @@ Changelog for sg3_utils-1.43 [20180322] [svn: r764]
   - sg_senddiag: add --timeout=SEC option
   - sg_sanitize: add --timeout=SEC option
   - sg_format: add --timeout=SEC option
+    - add --dry-run option to bypass modifying behaviour
     - add --quick option to skip reconsideration time
   - sg_decode sense: add --cdb option
   - sg_ses: handle 2 bit EIIOE field in aes dpage
@@ -106,6 +107,9 @@ Changelog for sg3_utils-1.43 [20180322] [svn: r764]
     - decode completion condition (sbc4r14)
   - sg_modes: add Out of band management control mpage
   - sg_rep_zones: expand --help option information
+  - sg_unmap: add --all=ST,RN[,LA] option to unmap
+    large contiguous segments of a disk/ssd
+    - add --dry-run and --force options
   - manpages and usage messages: corrections from
     Gris Ge via github
   - group_number: is 6 bit field allowing 0 to 63,
@@ -140,6 +144,7 @@ Changelog for sg3_utils-1.43 [20180322] [svn: r764]
     - implement 'format' argument in dStrHexStr()
     - add read buffer(16) command mode names
     - add Microcode activation sense descriptor spc5r10
+    - add SG_LIB_LBA_OUT_OF_RANGE error code
     - add SG_LIB_UNBOUNDED_32BIT (_16BIT and _64BIT)
       defines to help with decoding corner cases
     - identify vendor specific sense data (response

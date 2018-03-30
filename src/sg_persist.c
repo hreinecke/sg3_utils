@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.62 20180226";
+static const char * version_str = "0.63 20180326";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -147,8 +147,7 @@ static const char * prin_sa_strs[] = {
     "[reserved 0x6]",
     "[reserved 0x7]",
 };
-static const int num_prin_sa_strs = sizeof(prin_sa_strs) /
-                                    sizeof(prin_sa_strs[0]);
+static const int num_prin_sa_strs = SG_ARRAY_SIZE(prin_sa_strs);
 
 static const char * prout_sa_strs[] = {
     "Register",
@@ -162,8 +161,7 @@ static const char * prout_sa_strs[] = {
     "Replace lost reservation",
     "[reserved 0x9]",
 };
-static const int num_prout_sa_strs = sizeof(prout_sa_strs) /
-                                     sizeof(prout_sa_strs[0]);
+static const int num_prout_sa_strs = SG_ARRAY_SIZE(prout_sa_strs);
 
 static const char * pr_type_strs[] = {
     "obsolete [0]",

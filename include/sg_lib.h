@@ -421,6 +421,8 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
                                 /*       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
                                 /*       [sk,asc,ascq: 0x1,*,*] */
+#define SG_LIB_LBA_OUT_OF_RANGE 22 /* Illegal request, LBA Out Of Range */
+                                   /*    [sk,asc,ascq: 0x5,0x21,0x0] */
 #define SG_LIB_CAT_RES_CONFLICT SAM_STAT_RESERVATION_CONFLICT
                                 /* 24: this is a SCSI status, not sense. */
                                 /* It indicates reservation by another */
