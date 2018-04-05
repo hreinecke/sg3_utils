@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180404] [svn: r766]
+Changelog for sg3_utils-1.43 [20180405] [svn: r767]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -137,6 +137,7 @@ Changelog for sg3_utils-1.43 [20180404] [svn: r766]
     - add sg_get_nvme_opcode_name()
     - add sg_memalign() and sg_get_page_size()
     - add sg_is_aligned()
+    - add sg_get_big_endian(), sg_set_big_endian()
     - add hex2stdout(), hex2stderr() and hex2str()
     - add sg_convert_errno()
     - add sg_if_can2stdout(), sg_if_can2stderr() and
