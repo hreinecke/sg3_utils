@@ -1152,7 +1152,7 @@ if test -x /usr/bin/sg_inq; then
   fi
   sg_version=${sg_version##0.}
   #echo "\"$sg_version\""
-  if [ -z "$sg_version" -o "$sg_version" -lt 70 ] ; then
+  if [ -z "$sg_version" ] || [ "$sg_version" -lt 70 ] ; then
     sg_len_arg="-36"
   else
     sg_len_arg="--len=36"
@@ -1238,7 +1238,7 @@ if [ -z "$hosts" ] ; then
   fi
 fi
 
-if [ -d /sys/class/scsi_host -a ! -w /sys/class/scsi_host ]; then
+if [ -d /sys/class/scsi_host ] && [ ! -w /sys/class/scsi_host ]; then
   echo "You need to run scsi-rescan-bus.sh as root"
   exit 2
 fi
