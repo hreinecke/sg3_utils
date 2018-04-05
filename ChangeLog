@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180330] [svn: r765]
+Changelog for sg3_utils-1.43 [20180404] [svn: r766]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -235,6 +235,7 @@ Changelog for sg3_utils-1.42 [20160217] [svn: r663]
   - sg_io_linux, sg_pt_linux: drop SUGGEST_* decoding
   - sg_unaligned.h: add 48 bit support and gets for
     variable length unsigned integers
+    - add specializations for little and big endian
   - change sg_ll_*() function's 'int noisy' to bool
 
 Changelog for sg3_utils-1.41 [20150511] [svn: r644]

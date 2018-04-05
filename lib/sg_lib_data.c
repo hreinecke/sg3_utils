@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.42 20180230";/* spc5r17, sbc4r15 */
+const char * sg_lib_version_str = "2.42 20180402";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1483,7 +1483,8 @@ const char * sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
     "0x15", "0x16", "0x17", "0x18",
     "0x19", "0x1a", "0x1b", "0x1c", "0x1d",
     "well known logical unit",
-    "no physical device on this lu",
+    "unknown or no device type", /* coupled with PQ=3 for not accessible
+                                    via this lu's port (try the other) */
 };
 
 const char * sg_lib_transport_proto_strs[] =

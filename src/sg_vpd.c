@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.42 20180329";  /* spc5r18 + sbc4r14 */
+static const char * version_str = "1.43 20180405";  /* spc5r19 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -676,17 +676,15 @@ std_inq_decode(uint8_t * b, int len, int verbose)
     if (len < 4)
         return;
     pqual = (b[0] & 0xe0) >> 5;
+    printf("standard INQUIRY:");
     if (0 == pqual)
-        printf("standard INQUIRY:\n");
+        printf("\n");
     else if (1 == pqual)
-        printf("standard INQUIRY: [qualifier indicates no connected "
-               "LU]\n");
+        printf(" [PQ indicates LU temporarily unavailable]\n");
     else if (3 == pqual)
-        printf("standard INQUIRY: [qualifier indicates not capable "
-               "of supporting LU]\n");
+        printf(" [PQ indicates LU not accessible via this port]\n");
     else
-        printf("standard INQUIRY: [reserved or vendor specific "
-                       "qualifier [%d]]\n", pqual);
+        printf(" [reserved or vendor specific qualifier [%d]]\n", pqual);
     printf("  PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  version=0x%02x ",
            pqual, b[0] & 0x1f, !!(b[1] & 0x80), !!(b[1] & 0x40),
            (unsigned int)b[2]);
@@ -3874,7 +3872,7 @@ main(int argc, char * argv[])
             }
         }
     } else if (NULL == op->device_name) {
-        pr2serr("No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n\n");
         usage();
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
