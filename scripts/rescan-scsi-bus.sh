@@ -527,7 +527,7 @@ dolunscan()
     if test -z "$SCSISTR" -a $RC != 1 -a "$remappedlun0" != "1"; then
       printf "\r${red}DEL: $norm\r\n\n"
       # In the event we're replacing with a well known node, we need to let it continue, to create the replacement node
-      test "$remappedlun0" != "2" && return 1
+      test "$remappedlun0" != "2" && return 2
     fi
   fi
   if test -z "$SCSISTR" -o -n "$remappedlun0"; then
@@ -546,7 +546,7 @@ dolunscan()
       printf "\r\e[A";
       # Optimization: if lun==0, stop here (only if in non-remove mode)
       if test $lun = 0 -a -z "$remove" -a $optscan = 1; then
-        break;
+        return 1;
       fi
     else
       if test "$remappedlun0" != "2" ; then
@@ -554,6 +554,7 @@ dolunscan()
       fi
     fi
   fi
+  return 0;
 }
 
 # Perform report lun scan on $host $channel $id using REPORT_LUNS
@@ -625,6 +626,7 @@ doreportlun()
       if test $tmplun -eq $lun ; then
         inlist=1
         dolunscan $lun0added
+        [ $? -eq 1 ] && break
       else
         newsearch="$newsearch $tmplun"
       fi
@@ -641,6 +643,7 @@ doreportlun()
   # Add new ones and check stale ones
   for lun in $targetluns $lunremove; do
     dolunscan $lun0added
+    [ $? -eq 1 ] && break
   done
 }
 
@@ -664,6 +667,7 @@ dosearch ()
       else
         for lun in $lunsearch; do
           dolunscan
+          [ $? -eq 1 ] && break
         done
       fi
     done
@@ -733,6 +737,7 @@ searchexisting()
     else
       for lun in $lunsearch ; do
         dolunscan
+        [ $? -eq 1 ] && break
       done
     fi
   done
