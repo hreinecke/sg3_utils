@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.34 20180304";    /* ses4r02 */
+static const char * version_str = "2.35 20180305";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -177,7 +177,7 @@ struct opts_t {
     const char * index_str;
     const char * nickname_str;
     struct cgs_cl_t cgs_cl_arr[CGS_CL_ARR_MAX_SZ];
-    uint8_t sas_addr[8];
+    uint8_t sas_addr[8];  /* Big endian byte sequence */
 };
 
 struct diag_page_code {
@@ -229,7 +229,7 @@ struct join_row_t {
     uint8_t * thresh_inp;
     const uint8_t * ae_statp;
     int dev_slot_num;           /* if not available, set to -1 */
-    uint8_t sas_addr[8];  /* if not available, set to 0 */
+    uint8_t sas_addr[8];  /* big endian, if not available, set to 0 */
 };
 
 enum fj_select_t {FJ_IOE, FJ_EOE, FJ_AESS, FJ_SAS_CON};
@@ -1123,7 +1123,6 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 
     while (1) {
         int option_index = 0;
-        bool ff;
 
         c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:qrRs"
                         "S:vVwx:", long_options, &option_index);
@@ -1139,13 +1138,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 pr2serr("bad argument to '--sas-addr=SA'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            for (j = 7, ff = true; j >= 0; --j) {
-                if (ff && (0xff != (saddr & 0xff)))
-                    ff = false;
-                op->sas_addr[j] = (saddr & 0xff);
-                saddr >>= 8;
-            }
-            if (ff) {
+            sg_put_unaligned_be64(saddr, op->sas_addr + 0);
+            if (sg_all_ffs(op->sas_addr, 8)) {
                 pr2serr("error decoding '--sas-addr=SA' argument\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -2086,9 +2080,9 @@ build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
             free_config_dp_resp = NULL;
             goto the_end;
         }
-	config_dp_resp_len = resp_len;
+        config_dp_resp_len = resp_len;
     } else
-	resp_len = config_dp_resp_len;
+        resp_len = config_dp_resp_len;
 
     num_subs = config_dp_resp[1] + 1;
     sum_type_dheaders = 0;
@@ -4955,49 +4949,6 @@ join_work(int sg_fd, struct opts_t * op, bool display)
 
 }
 
-static uint64_t
-get_big_endian(const uint8_t * from, int start_bit, int num_bits)
-{
-    uint64_t res;
-    int sbit_o1 = start_bit + 1;
-
-    res = (*from++ & ((1 << sbit_o1) - 1));
-    num_bits -= sbit_o1;
-    while (num_bits > 0) {
-        res <<= 8;
-        res |= *from++;
-        num_bits -= 8;
-    }
-    if (num_bits < 0)
-        res >>= (-num_bits);
-    return res;
-}
-
-static void
-set_big_endian(uint64_t val, uint8_t * to, int start_bit, int num_bits)
-{
-    int sbit_o1 = start_bit + 1;
-    int mask, num, k, x;
-
-    mask = (8 != sbit_o1) ? ((1 << sbit_o1) - 1) : 0xff;
-    k = start_bit - ((num_bits - 1) % 8);
-    if (0 != k)
-        val <<= ((k > 0) ? k : (8 + k));
-    num = (num_bits + 15 - sbit_o1) / 8;
-    for (k = 0; k < num; ++k) {
-        if ((sbit_o1 - num_bits) > 0)
-            mask &= ~((1 << (sbit_o1 - num_bits)) - 1);
-        if (k < (num - 1))
-            x = (val >> ((num - k - 1) * 8)) & 0xff;
-        else
-            x = val & 0xff;
-        to[k] = (to[k] & ~mask) | (x & mask);
-        mask = 0xff;
-        num_bits -= sbit_o1;
-        sbit_o1 = 8;
-    }
-}
-
 /* Returns 1 if strings equal (same length, characters same or only differ
  * by case), else returns 0. Assumes 7 bit ASCII (English alphabet). */
 static int
@@ -5101,7 +5052,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
     if (op->verbose > 1)
         pr2serr("  s_byte=%d, s_bit=%d, n_bits=%d\n", s_byte, s_bit, n_bits);
     if (GET_OPT == tavp->cgs_sel) {
-        ui = get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
+        ui = sg_get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else
@@ -5116,8 +5067,8 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
         } else
             jrp->enc_statp[0] &= 0x40;  /* keep PRDFAIL is set in byte 0 */
         /* next we modify requested bit(s) */
-        set_big_endian((uint64_t)tavp->val,
-                       jrp->enc_statp + s_byte, s_bit, n_bits);
+        sg_set_big_endian((uint64_t)tavp->val,
+                          jrp->enc_statp + s_byte, s_bit, n_bits);
         jrp->enc_statp[0] |= 0x80;  /* set SELECT bit */
         if (op->byte1_given)
             enc_stat_rsp[1] = op->byte1;
@@ -5169,14 +5120,14 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
             return -2;
     }
     if (GET_OPT == tavp->cgs_sel) {
-        ui = get_big_endian(jrp->thresh_inp + s_byte, s_bit, n_bits);
+        ui = sg_get_big_endian(jrp->thresh_inp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {
-        set_big_endian((uint64_t)tavp->val,
-                       jrp->thresh_inp + s_byte, s_bit, n_bits);
+        sg_set_big_endian((uint64_t)tavp->val,
+                          jrp->thresh_inp + s_byte, s_bit, n_bits);
         if (op->byte1_given)
             threshold_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
@@ -5227,7 +5178,7 @@ cgs_additional_el(const struct join_row_t * jrp,
             return -2;
     }
     if (GET_OPT == tavp->cgs_sel) {
-        ui = get_big_endian(jrp->ae_statp + s_byte, s_bit, n_bits);
+        ui = sg_get_big_endian(jrp->ae_statp + s_byte, s_bit, n_bits);
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else

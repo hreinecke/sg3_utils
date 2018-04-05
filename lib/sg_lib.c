@@ -3405,12 +3405,74 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
 #endif
 }
 
+/* If byte_count is 0 or less then the OS page size is used as denominator.
+ * Returns true  if the remainder of ((unsigned)pointer % byte_count) is 0,
+ * else returns false. */
 bool
 sg_is_aligned(const void * pointer, int byte_count)
 {
     return 0 == ((sg_uintptr_t)pointer %
                  ((byte_count > 0) ? (uint32_t)byte_count :
                                      sg_get_page_size()));
+}
+
+/* Does similar job to sg_get_unaligned_be*() but this function starts at
+ * a given start_bit (i.e. within byte, so 7 is MSbit of byte and 0 is LSbit)
+ * offset. Maximum number of num_bits is 64. For example, these two
+ * invocations are equivalent (and should yield the same result);
+ *       sg_get_big_endian(from_bp, 7, 16)
+ *       sg_get_unaligned_be16(from_bp)  */
+uint64_t
+sg_get_big_endian(const uint8_t * from_bp, int start_bit /* 0 to 7 */,
+                  int num_bits /* 1 to 64 */)
+{
+    uint64_t res;
+    int sbit_o1 = start_bit + 1;
+
+    res = (*from_bp++ & ((1 << sbit_o1) - 1));
+    num_bits -= sbit_o1;
+    while (num_bits > 0) {
+        res <<= 8;
+        res |= *from_bp++;
+        num_bits -= 8;
+    }
+    if (num_bits < 0)
+        res >>= (-num_bits);
+    return res;
+}
+
+/* Does similar job to sg_put_unaligned_be*() but this function starts at
+ * a given start_bit offset. Maximum number of num_bits is 64. Preserves
+ * residual bits in partially written bytes. start_bit 7 is MSb. */
+void
+sg_set_big_endian(uint64_t val, uint8_t * to,
+                  int start_bit /* 0 to 7 */, int num_bits /* 1 to 64 */)
+{
+    int sbit_o1 = start_bit + 1;
+    int mask, num, k, x;
+
+    if ((NULL == to) || (start_bit > 7) || (num_bits > 64)) {
+        pr2ws("%s: bad args: start_bit=%d, num_bits=%d\n", __func__,
+              start_bit, num_bits);
+        return;
+    }
+    mask = (8 != sbit_o1) ? ((1 << sbit_o1) - 1) : 0xff;
+    k = start_bit - ((num_bits - 1) % 8);
+    if (0 != k)
+        val <<= ((k > 0) ? k : (8 + k));
+    num = (num_bits + 15 - sbit_o1) / 8;
+    for (k = 0; k < num; ++k) {
+        if ((sbit_o1 - num_bits) > 0)
+            mask &= ~((1 << (sbit_o1 - num_bits)) - 1);
+        if (k < (num - 1))
+            x = (val >> ((num - k - 1) * 8)) & 0xff;
+        else
+            x = val & 0xff;
+        to[k] = (to[k] & ~mask) | (x & mask);
+        mask = 0xff;
+        num_bits -= sbit_o1;
+        sbit_o1 = 8;
+    }
 }
 
 const char *

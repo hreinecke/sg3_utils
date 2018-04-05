@@ -608,10 +608,26 @@ uint8_t * sg_memalign(uint32_t num_bytes, uint32_t align_to,
 /* Returns OS page size in bytes. If uncertain returns 4096. */
 uint32_t sg_get_page_size(void);
 
-/* If byte_count is 0 or less then the OS page size is used. Returns true
- * if the remainder of ((unsigned)pointer % byte_count) is 0, else returns
- * false. */
+/* If byte_count is 0 or less then the OS page size is used as denominator.
+ * Returns true  if the remainder of ((unsigned)pointer % byte_count) is 0,
+ * else returns false. */
 bool sg_is_aligned(const void * pointer, int byte_count);
+
+/* Does similar job to sg_get_unaligned_be*() but this function starts at
+ * a given start_bit (i.e. within byte, so 7 is MSbit of byte and 0 is LSbit)
+ * offset. Maximum number of num_bits is 64. For example, these two
+ * invocations are equivalent (and should yield the same result);
+ *       sg_get_big_endian(from_bp, 7, 16)
+ *       sg_get_unaligned_be16(from_bp)  */
+uint64_t sg_get_big_endian(const uint8_t * from_bp,
+                           int start_bit /* 0 to 7 */,
+                           int num_bits /* 1 to 64 */);
+
+/* Does similar job to sg_put_unaligned_be*() but this function starts at
+ * a given start_bit offset. Maximum number of num_bits is 64. Preserves
+ * residual bits in partially written bytes. start_bit 7 is MSb. */
+void sg_set_big_endian(uint64_t val, uint8_t * to, int start_bit /* 0 to 7 */,
+                       int num_bits /* 1 to 64 */);
 
 /* If os_err_num is within bounds then the returned value is 'os_err_num +
  * SG_LIB_OS_BASE_ERR' otherwise SG_LIB_OS_BASE_ERR is returned. If
