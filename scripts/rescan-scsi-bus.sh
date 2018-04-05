@@ -392,7 +392,7 @@ idlist ()
       dev=/sys/class/scsi_device/${host}:${channel}:${id}:${lun}
       if [ -d $dev ] ; then
 	hcil=${dev##*/}
-        printf "\r${green}NEW: $norm"
+        printf "\r${green}NEW: %s" "$norm"
         testexist
         if test "$SCSISTR" ; then
           incrfound "$hcil"
@@ -457,7 +457,7 @@ dolunscan()
   SCSISTR=
   devnr="$host $channel $id $lun"
   echo -e " Scanning for device $devnr ... "
-  printf "${yellow}OLD: $norm"
+  printf "${yellow}OLD: %s" "$norm"
   testexist
   # Device exists: Test whether it's still online
   # (testonline returns 2 if it's gone and 1 if it has changed)
@@ -522,10 +522,10 @@ dolunscan()
         echo 1 > /sys/class/scsi_device/${host}:${channel}:${id}:${lun}/device/rescan
       fi
     fi
-    printf "\r\e[A\e[A\e[A${yellow}OLD: $norm"
+    printf "\r\e[A\e[A\e[A${yellow}OLD: %s" "$norm"
     testexist
     if test -z "$SCSISTR" -a $RC != 1 -a "$remappedlun0" != "1"; then
-      printf "\r${red}DEL: $norm\r\n\n"
+      printf "\r${red}DEL: %s\r\n\n" "$norm"
       # In the event we're replacing with a well known node, we need to let it continue, to create the replacement node
       test "$remappedlun0" != "2" && return 2
     fi
@@ -533,7 +533,7 @@ dolunscan()
   if test -z "$SCSISTR" -o -n "$remappedlun0"; then
     if test "$remappedlun0" != "2" ; then
       # Device does not exist, try to add
-      printf "\r${green}NEW: $norm"
+      printf "\r${green}NEW: %s" "$norm"
     fi
     if test -e /sys/class/scsi_host/host${host}/scan; then
       echo "$channel $id $lun" > /sys/class/scsi_host/host${host}/scan 2> /dev/null
@@ -565,12 +565,12 @@ doreportlun()
   devnr="$host $channel $id $lun"
   echo -en " Scanning for device $devnr ...\r"
   lun0added=
-  #printf "${yellow}OLD: $norm"
+  #printf "${yellow}OLD: %s" "$norm"
   # Phase one: If LUN0 does not exist, try to add
   testexist -q
   if test -z "$SCSISTR"; then
     # Device does not exist, try to add
-    #printf "\r${green}NEW: $norm"
+    #printf "\r${green}NEW: %s" "$norm"
     if test -e /sys/class/scsi_host/host${host}/scan; then
       echo "$channel $id $lun" > /sys/class/scsi_host/host${host}/scan 2> /dev/null
       udevadm_settle
@@ -798,7 +798,7 @@ findremapped()
     if [ "$id_serial" = "1" ] || [ $remapped -eq 0 ] ; then
       continue
     fi
-    printf "${yellow}REMAPPED: $norm"
+    printf "${yellow}REMAPPED: %s" "$norm"
     host=`echo $hctl | cut -d":" -f1`
     channel=`echo $hctl | cut -d":" -f2`
     id=`echo $hctl | cut -d":" -f3`
@@ -1045,7 +1045,7 @@ findresized()
       new_size=`cat $sysfs_path/block/$sddev/size`
 
       if [ "$size" != "$new_size" ] && [ "$size" != "0" ] && [ "$new_size" != "0" ] ; then
-        printf "${yellow}RESIZED: $norm"
+        printf "${yellow}RESIZED: %s" "$norm"
         host=`echo $hctl | cut -d":" -f1`
         channel=`echo $hctl | cut -d":" -f2`
         id=`echo $hctl | cut -d":" -f3`
@@ -1347,15 +1347,15 @@ fi
 
 echo "$found new or changed device(s) found.          "
 if test ! -z "$FOUNDDEVS" ; then
-  printf "$FOUNDDEVS"
+  printf "%s" "$FOUNDDEVS"
 fi
 echo "$updated remapped or resized device(s) found."
 if test ! -z "$CHGDEVS" ; then
-  printf "$CHGDEVS"
+  printf "%s" "$CHGDEVS"
 fi
 echo "$rmvd device(s) removed.                 "
 if test ! -z "$RMVDDEVS" ; then
-  printf "$RMVDDEVS"
+  printf "%s" "$RMVDDEVS"
 fi
 
 # Local Variables:
