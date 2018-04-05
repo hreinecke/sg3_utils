@@ -55,9 +55,9 @@ white_out ()
 # Return hosts. sysfs must be mounted
 findhosts_26 ()
 {
-  hosts=`find /sys/class/scsi_host/host* -maxdepth 4 -type d -o -type l 2> /dev/null | awk -F'/' '{print $5}' | sed -e 's~host~~' | sort -nu`
-  scsi_host_data=`echo "$hosts" | sed -e 's~^~/sys/class/scsi_host/host~'`
-  for hostdir in $scsi_host_data; do
+  hosts=
+  for hostdir in /sys/class/scsi_host/host* ; do
+    [ -e "$hostdir" ] || continue
     hostno=${hostdir#/sys/class/scsi_host/host}
     if [ -f $hostdir/isp_name ] ; then
       hostname="qla2xxx"
@@ -66,7 +66,7 @@ findhosts_26 ()
     else
       hostname=`cat $hostdir/proc_name`
     fi
-    #hosts="$hosts $hostno"
+    hosts="$hosts $hostno"
     echo_debug "Host adapter $hostno ($hostname) found."
   done
   if [ -z "$hosts" ] ; then
