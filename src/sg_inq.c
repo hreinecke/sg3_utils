@@ -48,7 +48,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.91 20180322";    /* SPC-5 rev 19 */
+static const char * version_str = "1.92 20180405";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2949,17 +2949,15 @@ std_inq_decode(const struct opts_t * op, int act_len)
     }
     pqual = (rp[0] & 0xe0) >> 5;
     if (! op->do_raw && ! op->do_export) {
+        printf("standard INQUIRY:");
         if (0 == pqual)
-            printf("standard INQUIRY:\n");
+            printf("\n");
         else if (1 == pqual)
-            printf("standard INQUIRY: [qualifier indicates no connected "
-                   "LU]\n");
+            printf(" [PQ indicates LU temporarily unavailable]\n");
         else if (3 == pqual)
-            printf("standard INQUIRY: [qualifier indicates not capable "
-                   "of supporting LU]\n");
+            printf(" [PQ indicates LU not accessible via this port]\n");
         else
-            printf("standard INQUIRY: [reserved or vendor specific "
-                   "qualifier [%d]]\n", pqual);
+            printf(" [reserved or vendor specific qualifier [%d]]\n", pqual);
     }
     len = rp[4] + 5;
     /* N.B. rp[2] full byte is 'version' in SPC-2,3,4 but in SPC
@@ -4382,7 +4380,7 @@ main(int argc, char * argv[])
             }
         }
     } else if (0 == op->device_name) {
-        pr2serr("No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n\n");
         usage_for(op);
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;

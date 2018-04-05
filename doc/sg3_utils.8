@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG3_UTILS "8" "April 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -368,9 +368,9 @@ than zero after a command has been executed (i.e. something went wrong).
 Work in this area is currently experimental.
 .TP
 .B 49
-low level driver reports a residual count (i.e. number of bytes actually
-received by HBA is 'requested_bytes \- residual_count') that is high enough
-to indicate that no useful processing can be done on that response.
+low level driver reports a response's residual count (i.e. number of bytes
+actually received by HBA is 'requested_bytes \- residual_count') that is
+too high. So no useful processing can be done with that response.
 .TP
 .B 50 + <os_error_number>
 OS system calls that fail often return a small integer number to help

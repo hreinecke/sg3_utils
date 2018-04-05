@@ -30,7 +30,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.57 20180329";    /* spc5r14 */
+static const char * version_str = "0.58 20180403";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -45,6 +45,7 @@ static const char * version_str = "0.57 20180329";    /* spc5r14 */
 
 #define NAME_BUFF_SZ 128
 
+#define SEAGATE_READ_UDS_DATA_CMD 0xf7	/* may start reporting vendor cmds */
 
 static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
 
