@@ -636,8 +636,8 @@ doreportlun()
       # Stale lun
       lunremove="$lunremove $lun"
     fi
-    # $lun removed from $lunsearch (echo for whitespace cleanup)
-    targetluns=`echo $newsearch`
+    # $lun removed from $lunsearch
+    targetluns=${newsearch# }
   done
   # Add new ones and check stale ones
   for lun in $targetluns $lunremove; do
