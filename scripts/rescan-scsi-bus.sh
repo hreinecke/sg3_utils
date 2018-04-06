@@ -64,7 +64,7 @@ findhosts_26 ()
     elif [ -f $hostdir/lpfc_drvr_version ] ; then
       hostname="lpfc"
     else
-      hostname=`cat $hostdir/proc_name`
+      hostname=$(cat $hostdir/proc_name)
     fi
     hosts="$hosts $hostno"
     echo_debug "Host adapter $hostno ($hostname) found."
@@ -74,7 +74,7 @@ findhosts_26 ()
     exit 1;
   fi
   # Not necessary just use double quotes around variable to preserve new lines
-  #hosts=`echo $hosts | tr ' ' '\n'`
+  #hosts=$(echo $hosts | tr ' ' '\n')
 }
 
 # Return hosts. /proc/scsi/HOSTADAPTER/? must exist
@@ -138,9 +138,9 @@ print02i()
 procscsiscsi ()
 {
   if test -z "$1"; then LN=2; else LN=$1; fi
-  CHANNEL=`print02i "$channel"`
-  ID=`print02i "$id"`
-  LUN=`print02i "$lun"`
+  CHANNEL=$(print02i "$channel")
+  ID=$(print02i "$id")
+  LUN=$(print02i "$lun")
   if [ -d /sys/class/scsi_device ]; then
     SCSIPATH="/sys/class/scsi_device/${host}:${channel}:${id}:${lun}"
     if [ -d  "$SCSIPATH" ] ; then
@@ -181,9 +181,9 @@ sgdevice26 ()
     SGDEV=$(basename "$(readlink "$gendev")")
   else
     for SGDEV in /sys/class/scsi_generic/sg*; do
-      DEV=`readlink $SGDEV/device`
+      DEV=$(readlink $SGDEV/device)
       if test "${DEV##*/}" = "$host:$channel:$id:$lun"; then
-        SGDEV=`basename $SGDEV`; return
+        SGDEV=$(basename $SGDEV); return
       fi
     done
     SGDEV=""
@@ -194,7 +194,7 @@ sgdevice26 ()
 sgdevice24 ()
 {
   if procscsiscsi 3; then
-    SGDEV=`echo "$SCSISTR" | grep 'Attached drivers:' | sed 's/^ *Attached drivers: \(sg[0-9]*\).*/\1/'`
+    SGDEV=$(echo "$SCSISTR" | grep 'Attached drivers:' | sed 's/^ *Attached drivers: \(sg[0-9]*\).*/\1/')
   fi
 }
 
@@ -206,11 +206,11 @@ sgdevice ()
   if test -d /sys/class/scsi_device; then
     sgdevice26
   else
-    DRV=`grep 'Attached drivers:' /proc/scsi/scsi 2>/dev/null`
+    DRV=$(grep 'Attached drivers:' /proc/scsi/scsi 2>/dev/null)
     repdevstat=$((1-$?))
     if [ $repdevstat = 0 ]; then
       echo "scsi report-devs 1" >/proc/scsi/scsi
-      DRV=`grep 'Attached drivers:' /proc/scsi/scsi 2>/dev/null`
+      DRV=$(grep 'Attached drivers:' /proc/scsi/scsi 2>/dev/null)
       if [ $? = 1 ]; then return; fi
     fi
     if ! echo "$DRV" | grep -q 'drivers: sg'; then
@@ -282,17 +282,17 @@ testonline ()
   # Reset RC (might be !=0 for passive paths)
   RC=0
   # OK, device online, compare INQUIRY string
-  INQ=`sg_inq $sg_len_arg /dev/$SGDEV 2>/dev/null`
+  INQ=$(sg_inq $sg_len_arg /dev/$SGDEV 2>/dev/null)
   if [ -z "$INQ" ] ; then
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}INQUIRY failed${norm}    \n\n\n"
     return 2
   fi
-  IVEND=`echo "$INQ" | grep 'Vendor identification:' | sed 's/^[^:]*: \(.*\)$/\1/'`
-  IPROD=`echo "$INQ" | grep 'Product identification:' | sed 's/^[^:]*: \(.*\)$/\1/'`
-  IPREV=`echo "$INQ" | grep 'Product revision level:' | sed 's/^[^:]*: \(.*\)$/\1/'`
-  STR=`printf "  Vendor: %-08s Model: %-16s Rev: %-4s" "$IVEND" "$IPROD" "$IPREV"`
-  IPTYPE=`echo "$INQ" | sed -n 's/.* Device_type=\([0-9]*\) .*/\1/p'`
-  IPQUAL=`echo "$INQ" | sed -n 's/ *PQual=\([0-9]*\)  Device.*/\1/p'`
+  IVEND=$(echo "$INQ" | grep 'Vendor identification:' | sed 's/^[^:]*: \(.*\)$/\1/')
+  IPROD=$(echo "$INQ" | grep 'Product identification:' | sed 's/^[^:]*: \(.*\)$/\1/')
+  IPREV=$(echo "$INQ" | grep 'Product revision level:' | sed 's/^[^:]*: \(.*\)$/\1/')
+  STR=$(printf "  Vendor: %-08s Model: %-16s Rev: %-4s" "$IVEND" "$IPROD" "$IPREV")
+  IPTYPE=$(echo "$INQ" | sed -n 's/.* Device_type=\([0-9]*\) .*/\1/p')
+  IPQUAL=$(echo "$INQ" | sed -n 's/ *PQual=\([0-9]*\)  Device.*/\1/p')
   if [ "$IPQUAL" != 0 ] ; then
     [ -z "$IPQUAL" ] && IPQUAL=3
     [ -z "$IPTYPE" ] && IPTYPE=31
@@ -305,7 +305,7 @@ testonline ()
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV removed.\n\n\n"
     return 2
   fi
-  TMPSTR=`echo "$SCSISTR" | grep 'Vendor:'`
+  TMPSTR=$(echo "$SCSISTR" | grep 'Vendor:')
   if test $ignore_rev -eq 0 ; then
       if [ "$TMPSTR" != "$STR" ]; then
         echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
@@ -323,7 +323,7 @@ testonline ()
         return 1
       fi
   fi
-  TMPSTR=`echo "$SCSISTR" | sed -n 's/.*Type: *\(.*\) *ANSI.*/\1/p' | sed 's/ *$//g'`
+  TMPSTR=$(echo "$SCSISTR" | sed -n 's/.*Type: *\(.*\) *ANSI.*/\1/p' | sed 's/ *$//g')
   if [ "$TMPSTR" != "$TYPE" ] ; then
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${TMPSTR} \nto: $TYPE ${norm} \n\n\n"
     return 1
@@ -409,7 +409,7 @@ getluns()
   sgdevice
   if test -z "$SGDEV"; then return 1; fi
   if test ! -x /usr/bin/sg_luns; then echo 0; return 1; fi
-  LLUN=`sg_luns /dev/$SGDEV 2>/dev/null | sed -n 's/    \(.*\)/\1/p'`
+  LLUN=$(sg_luns /dev/$SGDEV 2>/dev/null | sed -n 's/    \(.*\)/\1/p')
   # Added -z $LLUN condition because $? gets the RC from sed, not sg_luns
   if test $? != 0 -o -z "$LLUN"; then echo 0; return 1; fi
   for lun in $LLUN ; do
@@ -591,7 +591,7 @@ doreportlun()
       done
     fi
   fi
-  targetluns=`getluns`
+  targetluns=$(getluns)
   REPLUNSTAT=$?
   lunremove=
   #echo "getluns reports " $targetluns
@@ -610,8 +610,8 @@ doreportlun()
       echo "scsi add-single-device $host $channel $id $SCAN_WILD_CARD" > /proc/scsi/scsi
     fi
     targetluns=$(find /sys/class/scsi_device/ -name "$host:$channel:$id:*" -printf "%f\n" | cut -d : -f 4)
-    let found+=`echo "$targetluns" | wc -l`
-    let found-=`echo "$olddev" | wc -l`
+    let found+=$(echo "$targetluns" | wc -l)
+    let found-=$(echo "$olddev" | wc -l)
   fi
   if test -z "$targetluns"; then targetluns="$oldtargets"; fi
   # Check existing luns
@@ -685,7 +685,7 @@ expandlist ()
       result="$result $beg";
     else
       end=${first#*-}
-      result="$result `seq $beg $end`"
+      result="$result $(seq $beg $end)"
     fi
     test "$rest" = "$first" && rest=""
     first=${rest%%,*}
@@ -765,8 +765,8 @@ findremapped()
   devs=$(ls /sys/class/scsi_device/)
   for hctl in $devs ; do
     if [ -d /sys/class/scsi_device/$hctl/device/block ] ; then
-      sddev=`ls /sys/class/scsi_device/$hctl/device/block`
-      id_serial_old=`udevadm info -q all -n $sddev | grep "ID_SERIAL=" | cut -d"=" -f2`
+      sddev=$(ls /sys/class/scsi_device/$hctl/device/block)
+      id_serial_old=$(udevadm info -q all -n $sddev | grep "ID_SERIAL=" | cut -d"=" -f2)
       [ -z "$id_serial_old" ] && id_serial_old="none"
       echo "$hctl $sddev $id_serial_old" >> $tmpfile
     fi
@@ -781,7 +781,7 @@ findremapped()
   # See what changed and reload the respective multipath device if applicable
   while read -r hctl sddev id_serial_old ; do
     remapped=0
-    id_serial=`udevadm info -q all -n $sddev | grep "ID_SERIAL=" | cut -d"=" -f2`
+    id_serial=$(udevadm info -q all -n $sddev | grep "ID_SERIAL=" | cut -d"=" -f2)
     [ -z "$id_serial" ] && id_serial="none"
     if [ "$id_serial_old" != "$id_serial" ] ; then
       remapped=1
@@ -801,10 +801,10 @@ findremapped()
       continue
     fi
     printf "${yellow}REMAPPED: %s" "$norm"
-    host=`echo $hctl | cut -d":" -f1`
-    channel=`echo $hctl | cut -d":" -f2`
-    id=`echo $hctl | cut -d":" -f3`
-    lun=`echo $hctl | cut -d":" -f4`
+    host=$(echo $hctl | cut -d":" -f1)
+    channel=$(echo $hctl | cut -d":" -f2)
+    id=$(echo $hctl | cut -d":" -f3)
+    lun=$(echo $hctl | cut -d":" -f4)
     procscsiscsi
     echo "$SCSISTR"
     incrchgd "$hctl"
@@ -1033,28 +1033,28 @@ findresized()
   declare -a mpathsizes
 
   if [ -z "$lunsearch" ] ; then
-    devs=`ls /sys/class/scsi_device/`
+    devs=$(ls /sys/class/scsi_device/)
   else
     for lun in $lunsearch ; do
-      devs="$devs `(cd /sys/class/scsi_device/ && ls -d *:${lun})`"
+      devs="$devs $(cd /sys/class/scsi_device/ && ls -d *:${lun})"
     done
   fi
 
   for hctl in $devs ; do
     sysfs_path="/sys/class/scsi_device/$hctl/device"
     if [ -d "$sysfs_path/block" ] ; then
-      sddev=`ls $sysfs_path/block`
-      size=`cat $sysfs_path/block/$sddev/size`
+      sddev=$(ls $sysfs_path/block)
+      size=$(cat $sysfs_path/block/$sddev/size)
 
       echo 1 > $sysfs_path/rescan
-      new_size=`cat $sysfs_path/block/$sddev/size`
+      new_size=$(cat $sysfs_path/block/$sddev/size)
 
       if [ "$size" != "$new_size" ] && [ "$size" != "0" ] && [ "$new_size" != "0" ] ; then
         printf "${yellow}RESIZED: %s" "$norm"
-        host=`echo $hctl | cut -d":" -f1`
-        channel=`echo $hctl | cut -d":" -f2`
-        id=`echo $hctl | cut -d":" -f3`
-        lun=`echo $hctl | cut -d":" -f4`
+        host=$(echo $hctl | cut -d":" -f1)
+        channel=$(echo $hctl | cut -d":" -f2)
+        id=$(echo $hctl | cut -d":" -f3)
+        lun=$(echo $hctl | cut -d":" -f4)
 
         procscsiscsi
         echo "$SCSISTR"
@@ -1066,13 +1066,13 @@ findresized()
   if test -n "$mp_enable" -a -n "$mpaths" ; then
     i=0
     for m in $mpaths ; do
-      mpathsizes[$i]="`$MULTIPATH -l $m | egrep -o [0-9]+.[0-9]+[KMGT]`"
+      mpathsizes[$i]="$($MULTIPATH -l $m | egrep -o [0-9]+.[0-9]+[KMGT])"
       let i=$i+1
     done
     resizempaths
     i=0
     for m in $mpaths ; do
-      mpathsize="`$MULTIPATH -l $m | egrep -o [0-9\.]+[KMGT]`"
+      mpathsize="$($MULTIPATH -l $m | egrep -o [0-9\.]+[KMGT])"
       echo "$m ${mpathsizes[$i]} => $mpathsize"
       let i=$i+1
     done
@@ -1171,7 +1171,7 @@ fi
 unsetcolor
 debug=0
 lunsearch=
-opt_idsearch=`seq 0 7`
+opt_idsearch=$(seq 0 7)
 filter_ids=0
 opt_channelsearch=
 remove=
@@ -1195,10 +1195,10 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     a) existing_targets=;;  #Scan ALL targets when specified
     d) debug=1 ;;
     f) flush=1 ;;
-    l) lunsearch=`seq 0 7` ;;
-    L) lunsearch=`seq 0 $2`; shift ;;
+    l) lunsearch=$(seq 0 7) ;;
+    L) lunsearch=$(seq 0 $2); shift ;;
     m) mp_enable=1 ;;
-    w) opt_idsearch=`seq 0 15` ;;
+    w) opt_idsearch=$(seq 0 15) ;;
     c) opt_channelsearch="0 1" ;;
     r) remove=1 ;;
     s) resize=1; mp_enable=1 ;;
@@ -1210,10 +1210,10 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     -remove)      remove=1 ;;
     -forcerescan) remove=1; forcerescan=1 ;;
     -forceremove) remove=1; forceremove=1 ;;
-    -hosts=*)     arg=${opt#-hosts=};   hosts=`expandlist $arg` ;;
-    -channels=*)  arg=${opt#-channels=};opt_channelsearch=`expandlist $arg` ;;
-    -ids=*)   arg=${opt#-ids=};         opt_idsearch=`expandlist $arg` ; filter_ids=1;;
-    -luns=*)  arg=${opt#-luns=};        lunsearch=`expandlist $arg` ;;
+    -hosts=*)     arg=${opt#-hosts=};   hosts=$(expandlist $arg) ;;
+    -channels=*)  arg=${opt#-channels=};opt_channelsearch=$(expandlist $arg) ;;
+    -ids=*)   arg=${opt#-ids=};         opt_idsearch=$(expandlist $arg) ; filter_ids=1;;
+    -luns=*)  arg=${opt#-luns=};        lunsearch=$(expandlist $arg) ;;
     -color) setcolor ;;
     -nooptscan) optscan=0 ;;
     -issue-lip) lipreset=0 ;;
@@ -1227,7 +1227,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     -largelun) scan_flags=$((scan_flags|0x200)) ;;
     -sparselun) scan_flags=$((scan_flags|0x40)) ;;
     -update) update=1;;
-    -wide) opt_idsearch=`seq 0 15` ;;
+    -wide) opt_idsearch=$(seq 0 15) ;;
     -ignore-rev) ignore_rev=1;;
     *) echo "Unknown option -$opt !" ;;
   esac
@@ -1250,7 +1250,7 @@ fi
 if test "$sync" = 1 -a "$remove" = 1; then sync=2; fi
 if test "$sync" = 2; then echo "Syncing file systems"; sync; fi
 if test -w /sys/module/scsi_mod/parameters/default_dev_flags -a $scan_flags != 0; then
-  OLD_SCANFLAGS=`cat /sys/module/scsi_mod/parameters/default_dev_flags`
+  OLD_SCANFLAGS=$(cat /sys/module/scsi_mod/parameters/default_dev_flags)
   NEW_SCANFLAGS=$((OLD_SCANFLAGS|scan_flags))
   if test "$OLD_SCANFLAGS" != "$NEW_SCANFLAGS"; then
     echo -n "Temporarily setting kernel scanning flags from "
