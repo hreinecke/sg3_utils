@@ -317,8 +317,8 @@ testonline ()
       local old_str_no_rev=
       local new_str_no_rev=
 
-      old_str_no_rev=$(echo "$TMPSTR" | sed -e 's/.\{4\}$//')
-      new_str_no_rev=$(echo "$STR" | sed -e 's/.\{4\}$//')
+      old_str_no_rev=${TMPSTR%Rev:*}
+      new_str_no_rev=${STR%Rev:*}
       if [ "$old_str_no_rev" != "$new_str_no_rev" ]; then
         echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
         return 1
