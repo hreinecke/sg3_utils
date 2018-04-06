@@ -596,7 +596,7 @@ doreportlun()
   REPLUNSTAT=$?
   lunremove=
   #echo "getluns reports " $targetluns
-  olddev=`find /sys/class/scsi_device/ -name "$host:$channel:$id:*" 2>/dev/null | sort -t: -k4 -n`
+  olddev=$(find /sys/class/scsi_device/ -name "$host:$channel:$id:*" 2>/dev/null | sort -t: -k4 -n)
   oldtargets="$targetluns"
   # OK -- if we don't have a LUN to send a REPORT_LUNS to, we could
   # fall back to wildcard scanning. Same thing if the device does not
@@ -610,7 +610,7 @@ doreportlun()
     else
       echo "scsi add-single-device $host $channel $id $SCAN_WILD_CARD" > /proc/scsi/scsi
     fi
-    targetluns=`find /sys/class/scsi_device/ -name "$host:$channel:$id:*" 2>/dev/null | awk -F'/' '{print $5}' | awk -F':' '{print $4}' | sort -n`
+    targetluns=$(find /sys/class/scsi_device/ -name "$host:$channel:$id:*" -printf "%f\n" | cut -d : -f 4)
     let found+=`echo "$targetluns" | wc -l`
     let found-=`echo "$olddev" | wc -l`
   fi
