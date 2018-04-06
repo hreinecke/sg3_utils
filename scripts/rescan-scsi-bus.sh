@@ -234,8 +234,7 @@ is_removable ()
 
   p=/sys/class/scsi_device/${host}:${channel}:${id}:${lun}/device/inquiry
   # Extract the second byte of the INQUIRY response and check bit 7 (mask 0x80).
-  b=$(od -tx1 -j1 -N1 "$p" 2>/dev/null |
-           { read -r offset byte rest; echo -n "$byte"; })
+  b=$(hexdump -n1 -e '/1 "%02X"' "$p" 2>/dev/null)
   if [ -n "$b" ]; then
     echo $(((0x$b & 0x80) != 0))
   else
