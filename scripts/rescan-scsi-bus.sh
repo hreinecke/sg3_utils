@@ -314,8 +314,11 @@ testonline ()
       fi
   else
       # Ignore disk revision change
-      local old_str_no_rev=`echo "$TMPSTR" | sed -e 's/.\{4\}$//'`
-      local new_str_no_rev=`echo "$STR" | sed -e 's/.\{4\}$//'`
+      local old_str_no_rev=
+      local new_str_no_rev=
+
+      old_str_no_rev=$(echo "$TMPSTR" | sed -e 's/.\{4\}$//')
+      new_str_no_rev=$(echo "$STR" | sed -e 's/.\{4\}$//')
       if [ "$old_str_no_rev" != "$new_str_no_rev" ]; then
         echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
         return 1
@@ -697,8 +700,9 @@ searchexisting()
   local tmpch;
   local tmpid
   local match=0
-  local targets=`ls -d /sys/class/scsi_device/$host:* 2> /dev/null | egrep -o $host:[0-9]+:[0-9]+ | sort | uniq`
+  local targets=
 
+  targets=$(ls -d /sys/class/scsi_device/$host:* 2> /dev/null | egrep -o $host:[0-9]+:[0-9]+ | sort | uniq)
   # Nothing came back on this host, so we should skip it
   test -z "$targets" && return
 
@@ -744,20 +748,22 @@ searchexisting()
 findremapped()
 {
   local hctl=;
-  local devs=`ls /sys/class/scsi_device/`
+  local devs=
   local sddev=
   local id_serial=
   local id_serial_old=
   local remapped=
   mpaths=""
-  local tmpfile=$(mktemp /tmp/rescan-scsi-bus.XXXXXXXX 2> /dev/null)
+  local tmpfile=
 
+  tmpfile=$(mktemp /tmp/rescan-scsi-bus.XXXXXXXX 2> /dev/null)
   if [ -z "$tmpfile" ] ; then
     tmpfile="/tmp/rescan-scsi-bus.$$"
     rm -f $tmpfile
   fi
 
   # Get all of the ID_SERIAL attributes, after finding their sd node
+  devs=$(ls /sys/class/scsi_device/)
   for hctl in $devs ; do
     if [ -d /sys/class/scsi_device/$hctl/device/block ] ; then
       sddev=`ls /sys/class/scsi_device/$hctl/device/block`
@@ -900,13 +906,14 @@ findmultipath()
   local mp=
   local mp2=
   local found_dup=0
+  local maj_min=
 
   # Need a sdev, and executable multipath and dmsetup command here
   if [ -z "$dev" ] || [ ! -x $DMSETUP ] || [ ! -x "$MULTIPATH" ] ; then
     return 1
   fi
 
-  local maj_min=`cat /sys/block/$dev/dev`
+  maj_min=$(cat /sys/block/$dev/dev)
   for mp in $($DMSETUP ls --target=multipath | cut -f 1) ; do
     [ "$mp" = "No" ] && break;
     if $DMSETUP status $mp | grep -q " $maj_min "; then
