@@ -374,10 +374,10 @@ idlist ()
   local newid
   local oldid
 
-  oldlist=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*:[0-9]*\)/\1/p" | uniq)
+  oldlist=$(find /sys/class/scsi_device -name "${host}:${channel}:*" -printf "%f\n")
   # Rescan LUN 0 to check if we found new targets
   echo "${channel} - 0" > /sys/class/scsi_host/host${host}/scan
-  newlist=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*:[0-9]*\)/\1/p" | uniq)
+  newlist=$(find /sys/class/scsi_device -name "${host}:${channel}:*" -printf "%f\n")
   for newid in $newlist ; do
     oldid=$newid
     for tmpid in $oldlist ; do
@@ -387,11 +387,8 @@ idlist ()
       fi
     done
     if test -n "$oldid" ; then
-      id=${oldid%%:*}
-      lun=${oldid##*:}
-      dev=/sys/class/scsi_device/${host}:${channel}:${id}:${lun}
-      if [ -d $dev ] ; then
-	hcil=${dev##*/}
+      if [ -d /sys/class/scsi_device/$oldid ] ; then
+	hcil=${oldid}
         printf "\r${green}NEW: %s" "$norm"
         testexist
         if test "$SCSISTR" ; then
@@ -400,7 +397,7 @@ idlist ()
       fi
     fi
   done
-  idsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
+  idsearch=$(find /sys/bus/scsi/devices -name "target${host}:${channel}:*" -printf "%f\n" | cut -f 3 -d :)
 }
 
 # Returns the list of existing LUNs from device $host $channel $id $lun
@@ -658,7 +655,7 @@ dosearch ()
       if test -z "$lunsearch" ; then
 	idlist
       else
-	idsearch=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*\):[0-9]*/\1/p" | uniq)
+	idsearch=$(find /sys/bus/scsi/devices -name "target${host}:${channel}:*" -printf "%f\n" | cut -f 3 -d :)
       fi
     fi
     for id in $idsearch; do
