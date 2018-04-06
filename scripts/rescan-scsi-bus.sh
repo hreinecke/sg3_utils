@@ -780,7 +780,7 @@ findremapped()
   echo "Done"
 
   # See what changed and reload the respective multipath device if applicable
-  while read hctl sddev id_serial_old ; do
+  while read -r hctl sddev id_serial_old ; do
     remapped=0
     id_serial=`udevadm info -q all -n $sddev | grep "ID_SERIAL=" | cut -d"=" -f2`
     [ -z "$id_serial" ] && id_serial="none"
