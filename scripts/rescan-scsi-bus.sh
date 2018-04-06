@@ -702,14 +702,14 @@ searchexisting()
   local match=0
   local targets=
 
-  targets=$(ls -d /sys/class/scsi_device/$host:* 2> /dev/null | egrep -o $host:[0-9]+:[0-9]+ | sort | uniq)
+  targets=$(find /sys/bus/scsi/devices -name "target${host}:*" -printf "%f\n" | cut -d : -f 2-3)
   # Nothing came back on this host, so we should skip it
   test -z "$targets" && return
 
   local target=;
   for target in $targets ; do
-    channel=`echo $target | cut -d":" -f2`
-    id=`echo $target | cut -d":" -f 3`
+    channel=${target%:*}
+    id=${target#*:}
     if [ -n "$channelsearch" ] ; then
       for tmpch in $channelsearch ; do
         test $tmpch -eq $channel && match=1
