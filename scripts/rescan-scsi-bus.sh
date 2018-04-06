@@ -837,8 +837,10 @@ incrchgd()
   fi
 
   if test -n "$mp_enable" ; then
-    local sdev="`findsddev \"$hctl\"`"
-    if test -n "$sdev" ; then
+    local sdev
+
+    sdev=$(findsddev "$hctl")
+    if [ -n "$sdev" ] ; then
       findmultipath "$sdev"
     fi
   fi
@@ -855,8 +857,10 @@ incrrmvd()
   fi
 
   if test -n "$mp_enable" ; then
-    local sdev="`findsddev \"$hctl\"`"
-    if test -n "$sdev" ; then
+    local sdev
+
+    sdev=$(findsddev "$hctl")
+    if [ -n "$sdev" ] ; then
       findmultipath "$sdev"
     fi
   fi
@@ -865,16 +869,14 @@ incrrmvd()
 findsddev()
 {
   local hctl="$1"
-  local sddev=
+  local sddev
+  local blkpath
 
-  if test ! -e /sys/class/scsi_device/$hctl/device/block ; then
-    return 1
+  blkpath="/sys/class/scsi_device/$hctl/device/block"
+  if [ -e "$blkpath" ] ; then
+    sddev=$(ls "$blkpath")
+    echo "$sddev"
   fi
-
-  sddev=`ls /sys/class/scsi_device/$hctl/device/block`
-  echo $sddev
-
-  return 0
 }
 
 addmpathtolist()
