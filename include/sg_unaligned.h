@@ -42,9 +42,10 @@ extern "C" {
  * generic version, use './configure --disable-fast-lebe ' . */
 
 /* Note: Assumes that the source and destination locations do not overlap.
- * So please don't do things like these:
- *     i = sg_get_unaligned_le64(&i);
- *     sg_put_unaligned_le64(j, ((uint8_t *)&j) + 1);           */
+ * An example of overlapping source and destination:
+ *     sg_put_unaligned_le64(j, ((uint8_t *)&j) + 1);
+ * Best not to do things like that.
+ */
 
 
 #ifdef HAVE_CONFIG_H

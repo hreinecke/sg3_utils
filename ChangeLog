@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180405] [svn: r767]
+Changelog for sg3_utils-1.43 [20180414] [svn: r768]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -110,6 +110,7 @@ Changelog for sg3_utils-1.43 [20180405] [svn: r767]
   - sg_unmap: add --all=ST,RN[,LA] option to unmap
     large contiguous segments of a disk/ssd
     - add --dry-run and --force options
+  - sg_wr_mode: add --rtd option for RTD bit
   - manpages and usage messages: corrections from
     Gris Ge via github
   - group_number: is 6 bit field allowing 0 to 63,
@@ -120,6 +121,8 @@ Changelog for sg3_utils-1.43 [20180405] [svn: r767]
     - add sg_ll_inquiry_v2()
     - add sg_ll_log_sense_v2()
     - add sg_ll_mode_sense10_v2()
+    - add sg_ll_mode_select6_v2() and
+      sg_ll_mode_select10_v2() for RTD bit
     - add sg_ll_receive_diag_v2()
     - add sg_ll_write_buffer_v2()
     - add sg_get_llnum_nomult()

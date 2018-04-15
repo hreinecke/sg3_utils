@@ -84,6 +84,10 @@ int sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
  * -1 -> other failure */
 int sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp,
                         int param_len, bool noisy, int verbose);
+/* v2 adds RTD (revert to defaults) bit, added in spc5r11 */
+int sg_ll_mode_select6_v2(int sg_fd, bool pf, bool rtd, bool sp,
+                          void * paramp, int param_len, bool noisy,
+                          int verbose);
 
 /* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
@@ -92,6 +96,10 @@ int sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp,
  * -1 -> other failure */
 int sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp,
                         int param_len, bool noisy, int verbose);
+/* v2 adds RTD (revert to defaults) bi, added in spc5r11 */
+int sg_ll_mode_select10_v2(int sg_fd, bool pf, bool rtd, bool sp,
+                           void * paramp, int param_len, bool noisy,
+                           int verbose);
 
 /* Invokes a SCSI MODE SENSE (6) command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> invalid opcode, SG_LIB_CAT_ILLEGAL_REQ ->
