@@ -30,7 +30,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.23 20180329";
+static const char * version_str = "1.24 20180414";
 
 #define ME "sg_wr_mode: "
 
@@ -48,7 +48,9 @@ static struct option long_options[] = {
         {"len", required_argument, 0, 'l'},
         {"mask", required_argument, 0, 'm'},
         {"page", required_argument, 0, 'p'},
+        {"rtd", no_argument, 0, 'R'},
         {"save", no_argument, 0, 's'},
+        {"six", no_argument, 0, '6'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -60,7 +62,9 @@ static void usage()
             "[--help]\n"
             "                  [--len=10|6] [--mask=M,M...] "
             "[--page=PG_H[,SPG_H]]\n"
-            "                  [--save] [--verbose] [--version] DEVICE\n"
+            "                  [--rtd] [--save] [--six] [--verbose] "
+            "[--version]\n"
+            "                  DEVICE\n"
             "  where:\n"
             "    --contents=H,H... | -c H,H...    comma separated string "
             "of hex numbers\n"
@@ -83,9 +87,13 @@ static void usage()
             "    --page=PG_H,SPG_H | -p PG_H,SPG_H    page and subpage code "
             "to be\n"
             "                                         written (in hex)\n"
+            "    --rtd | -R            set RTD bit (revert to defaults) in "
+            "cdb\n"
             "    --save | -s           set 'save page' (SP) bit; default "
             "don't so\n"
             "                          only 'current' values changed\n"
+            "    --six | -6            do SCSI MODE SENSE/SELECT(6) "
+            "commands\n"
             "    --verbose | -v        increase verbosity\n"
             "    --version | -V        print version string and exit\n\n"
             "writes given mode page with SCSI MODE SELECT (10 or 6) "
@@ -309,7 +317,8 @@ int main(int argc, char * argv[])
     bool force = false;
     bool got_contents = false;
     bool got_mask = false;
-    bool mode_6 = false;
+    bool mode_6 = false;        /* so default is mode_10 */
+    bool rtd = false;   /* added in spc5r11 */
     bool save = false;
     int sg_fd, res, c, num, alloc_len, off, pdt;
     int k, md_len, hdr_len, bd_len, mask_in_len;
@@ -331,12 +340,15 @@ int main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "c:dfhl:m:p:svV", long_options,
+        c = getopt_long(argc, argv, "6c:dfhl:m:p:RsvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case '6':
+            mode_6 = true;
+            break;
         case 'c':
             memset(read_in, 0, sizeof(read_in));
             if (0 != build_mode_page(optarg, read_in, &read_in_len,
@@ -397,6 +409,9 @@ int main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
+        case 'R':
+            rtd = true;
+            break;
         case 's':
             save = true;
             break;
@@ -425,17 +440,17 @@ int main(int argc, char * argv[])
         }
     }
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (pg_code < 0) {
-        pr2serr("need page code (see '--page=')\n");
+    if ((pg_code < 0) && (! rtd)) {
+        pr2serr("need page code (see '--page=')\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (got_mask && force) {
-        pr2serr("cannot use both '--force' and '--mask'\n");
+        pr2serr("cannot use both '--force' and '--mask'\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -445,6 +460,9 @@ int main(int argc, char * argv[])
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
+    if (rtd)
+        goto revert_to_defaults;
+
     if (0 == sg_simple_inquiry(sg_fd, &inq_data, false, verbose))
         pdt = inq_data.peripheral_type;
     else
@@ -471,23 +489,23 @@ int main(int argc, char * argv[])
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
             pr2serr("%s%s\n", errStr, b);
         }
-        goto err_out;
+        goto fini;
     }
     off = sg_mode_page_offset(ref_md, alloc_len, mode_6, ebuff, EBUFF_SZ);
     if (off < 0) {
         pr2serr("%s%s\n", errStr, ebuff);
-        goto err_out;
+        goto fini;
     }
     md_len = sg_msense_calc_length(ref_md, alloc_len, mode_6, &bd_len);
     if (md_len < 0) {
         pr2serr("%ssg_msense_calc_length() failed\n", errStr);
-        goto err_out;
+        goto fini;
     }
     hdr_len = mode_6 ? 4 : 8;
     if (got_contents) {
         if (read_in_len < 2) {
             pr2serr("contents length=%d too short\n", read_in_len);
-            goto err_out;
+            goto fini;
         }
         ref_md[0] = 0;  /* mode data length reserved for mode select */
         if (! mode_6)
@@ -497,7 +515,7 @@ int main(int argc, char * argv[])
         if (md_len > alloc_len) {
             pr2serr("mode data length=%d exceeds allocation length=%d\n",
                     md_len, alloc_len);
-            goto err_out;
+            goto fini;
         }
         if (got_mask) {
             for (k = 0; k < (md_len - off); ++k) {
@@ -514,45 +532,42 @@ int main(int argc, char * argv[])
             if ((! (ref_md[off] & 0x80)) && save) {
                 pr2serr("PS bit in existing mode page indicates that it is "
                         "not saveable\n    but '--save' option given\n");
-                goto err_out;
+                goto fini;
             }
             read_in[0] &= 0x7f; /* mask out PS bit, reserved in mode select */
             if ((md_len - off) != read_in_len) {
                 pr2serr("contents length=%d but reference mode page "
                         "length=%d\n", read_in_len, md_len - off);
-                goto err_out;
+                goto fini;
             }
             if (pg_code != (read_in[0] & 0x3f)) {
                 pr2serr("contents page_code=0x%x but reference "
                         "page_code=0x%x\n", (read_in[0] & 0x3f), pg_code);
-                goto err_out;
+                goto fini;
             }
             if ((read_in[0] & 0x40) != (ref_md[off] & 0x40)) {
                 pr2serr("contents flags subpage but reference page does not "
                         "(or vice versa)\n");
-                goto err_out;
+                goto fini;
             }
             if ((read_in[0] & 0x40) && (read_in[1] != sub_pg_code)) {
                 pr2serr("contents subpage_code=0x%x but reference "
                         "sub_page_code=0x%x\n", read_in[1], sub_pg_code);
-                goto err_out;
+                goto fini;
             }
         } else
             md_len = off + read_in_len; /* force length */
 
         memcpy(ref_md + off, read_in, read_in_len);
         if (mode_6)
-            res = sg_ll_mode_select6(sg_fd, true /* PF */, save, ref_md,
-                                     md_len, true, verbose);
+            res = sg_ll_mode_select6_v2(sg_fd, true /* PF */, rtd, save,
+                                        ref_md, md_len, true, verbose);
         else
-            res = sg_ll_mode_select10(sg_fd, true /* PF */, save, ref_md,
-                                      md_len, true, verbose);
+            res = sg_ll_mode_select10_v2(sg_fd, true /* PF */, rtd, save,
+                                         ref_md, md_len, true, verbose);
         ret = res;
-        if (res) {
-            sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            pr2serr("MODE SELECT (%d): %s\n", (mode_6 ? 6 : 10), b);
-            goto err_out;
-        }
+        if (res)
+            goto fini;
     } else {
         printf(">>> No contents given, so show current mode page data:\n");
         printf("  header:\n");
@@ -565,12 +580,31 @@ int main(int argc, char * argv[])
         printf("  mode page:\n");
         hex2stdout(ref_md + off, md_len - off, -1);
     }
-err_out:
+    ret = 0;
+    goto fini;
+
+revert_to_defaults:
+    if (verbose)
+        pr2serr("Doing MODE SELECT(%d) with revert to defaults (RTD) set "
+                "and SP=%d\n", mode_6 ? 6 : 10, !! save);
+    if (mode_6)
+        res = sg_ll_mode_select6_v2(sg_fd, false /* PF */, true /* rtd */,
+                                    save, NULL, 0, true, verbose);
+    else
+        res = sg_ll_mode_select10_v2(sg_fd, false /* PF */, true /* rtd */,
+                                     save, NULL, 0, true, verbose);
+    ret = res;
+fini:
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_wr_mode failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

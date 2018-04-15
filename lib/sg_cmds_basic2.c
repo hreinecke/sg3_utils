@@ -442,8 +442,8 @@ gen_err:
 /* Invokes a SCSI MODE SELECT (6) command.  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
-                   bool noisy, int verbose)
+sg_ll_mode_select6_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
+                      int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode select(6)";
     int res, ret, k, sense_cat;
@@ -453,6 +453,8 @@ sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
     struct sg_pt_base * ptvp;
 
     modes_cdb[1] = (uint8_t)((pf ? 0x10 : 0x0) | (sp ? 0x1 : 0x0));
+    if (rtd)
+        modes_cdb[1] |= 0x2;
     modes_cdb[4] = (uint8_t)(param_len & 0xff);
     if (param_len > 0xff) {
         pr2ws("%s: param_len too big\n", cdb_name_s);
@@ -496,11 +498,20 @@ sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
     return ret;
 }
 
-/* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
- * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
-                    bool noisy, int verbose)
+sg_ll_mode_select6(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
+                   bool noisy, int verbose)
+{
+    return sg_ll_mode_select6_v2(sg_fd, pf, false, sp, paramp, param_len,
+                                 noisy, verbose);
+}
+
+/* Invokes a SCSI MODE SELECT (10) command.  Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors,
+ * v2 adds rtd (revert to defaults) bit (spc5r11).  */
+int
+sg_ll_mode_select10_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
+                       int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "mode select(10)";
     int res, ret, k, sense_cat;
@@ -510,6 +521,8 @@ sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
     struct sg_pt_base * ptvp;
 
     modes_cdb[1] = (uint8_t)((pf ? 0x10 : 0x0) | (sp ? 0x1 : 0x0));
+    if (rtd)
+        modes_cdb[1] |= 0x2;
     sg_put_unaligned_be16((int16_t)param_len, modes_cdb + 7);
     if (param_len > 0xffff) {
         pr2ws("%s: param_len too big\n", cdb_name_s);
@@ -551,6 +564,14 @@ sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp, int param_len,
 
     destruct_scsi_pt_obj(ptvp);
     return ret;
+}
+
+int
+sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp,
+                       int param_len, bool noisy, int verbose)
+{
+    return sg_ll_mode_select10_v2(sg_fd, pf, false, sp, paramp, param_len,
+                                  noisy, verbose);
 }
 
 /* MODE SENSE commands yield a response that has header then zero or more

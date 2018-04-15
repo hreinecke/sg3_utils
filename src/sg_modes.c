@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.59 20180329";
+static const char * version_str = "1.60 20180414";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -85,7 +85,7 @@ struct opts_t {
     int do_hex;
     int maxlen;
     int do_raw;
-    int do_verbose;
+    int verbose;
     int page_control;
     int pg_code;
     int subpg_code;
@@ -300,7 +300,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_six = true;
             break;
         case 'v':
-            ++op->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
             op->do_version = true;
@@ -390,7 +390,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_raw += 2;
                     break;
                 case 'v':
-                    ++op->do_verbose;
+                    ++op->verbose;
                     break;
                 case 'V':
                     op->do_version = true;
@@ -898,7 +898,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
         resid = 0;
         if (op->do_six) {
             res = sg_ll_mode_sense6(sg_fd, 0, 0, k, 0, rbuf, mresp_len,
-                                    true, op->do_verbose);
+                                    true, op->verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again without the '-6' switch for a 10 "
                         "byte MODE SENSE command\n");
@@ -909,7 +909,7 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
             }
         } else {
             res = sg_ll_mode_sense10_v2(sg_fd, 0, 0, 0, k, 0, rbuf, mresp_len,
-                                        0, &resid, true, op->do_verbose);
+                                        0, &resid, true, op->verbose);
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again with a '-6' switch for a 6 byte "
                         "MODE SENSE command\n");
@@ -951,10 +951,10 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
                 printf("    [0x%x]\n", k);
             if (op->do_hex)
                 hex2stdout(rbuf, len, 1);
-        } else if (op->do_verbose) {
+        } else if (op->verbose) {
             char b[80];
 
-            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose - 1);
+            sg_get_category_sense_str(res, sizeof(b), b, op->verbose - 1);
             pr2serr("MODE SENSE (%s) failed: %s\n", (op->do_six ? "6" : "10"),
                     b);
         }
@@ -1069,16 +1069,16 @@ main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, ! op->o_readwrite,
-                                     op->do_verbose)) < 0) {
+                                     op->verbose)) < 0) {
         pr2serr("error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto fini;
     }
 
-    if (sg_simple_inquiry(sg_fd, &inq_out, true, op->do_verbose)) {
+    if ((res = sg_simple_inquiry(sg_fd, &inq_out, true, op->verbose))) {
         pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->device_name);
-        ret = SG_LIB_CAT_OTHER;
+        ret = (res > 0) ? res : sg_convert_errno(-res);
         goto fini;
     }
     inq_pdt = inq_out.peripheral_type;
@@ -1123,7 +1123,7 @@ main(int argc, char * argv[])
     if (op->do_six) {
         res = sg_ll_mode_sense6(sg_fd, op->do_dbd, op->page_control,
                                 op->pg_code, op->subpg_code, rsp_buff,
-                                rsp_buff_sz, true, op->do_verbose);
+                                rsp_buff_sz, true, op->verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again without the '-6' switch for a 10 byte "
                     "MODE SENSE command\n");
@@ -1131,7 +1131,7 @@ main(int argc, char * argv[])
         res = sg_ll_mode_sense10_v2(sg_fd, op->do_llbaa, op->do_dbd,
                                     op->page_control, op->pg_code,
                                     op->subpg_code, rsp_buff, rsp_buff_sz,
-                                    0, &resid, true, op->do_verbose);
+                                    0, &resid, true, op->verbose);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again with a '-6' switch for a 6 byte MODE "
                     "SENSE command\n");
@@ -1147,7 +1147,7 @@ main(int argc, char * argv[])
             pr2serr("invalid field in cdb (perhaps page 0x%x not "
                     "supported)\n", op->pg_code);
     } else if (res) {
-        sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
         pr2serr("%s\n", b);
     }
     ret = res;
@@ -1364,5 +1364,10 @@ fini:
         sg_cmds_close_device(sg_fd);
     if (free_rsp_buff)
         free(free_rsp_buff);
+    if (0 == op->verbose) {
+        if (! sg_if_can2stderr("sg_modes failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

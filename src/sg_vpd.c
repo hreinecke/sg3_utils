@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.43 20180405";  /* spc5r19 + sbc4r15 */
+static const char * version_str = "1.43 20180410";  /* spc5r19 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -3493,7 +3493,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
 
     if (op->vpd_pn > 0)
         max_pn = op->vpd_pn;
-    if (sg_fd >= 0) {
+    if (sg_fd >= 0) {   /* have valid open file descriptor (handle) */
         res = vpd_fetch_page(sg_fd, rp, VPD_SUPPORTED_VPDS, op->maxlen,
                              op->do_quiet, op->verbose, &rlen);
         if (res) {
@@ -3522,6 +3522,8 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             if (pn > max_pn)
                 continue;
             op->vpd_pn = pn;
+            if (k > 0)
+                printf("\n");
             if (op->do_long)
                 printf("[0x%x] ", pn);
 
