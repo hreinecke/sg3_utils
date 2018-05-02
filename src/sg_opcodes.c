@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
 
 #ifdef HAVE_CONFIG_H
@@ -30,7 +31,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.58 20180403";    /* spc5r14 */
+static const char * version_str = "0.59 20180428";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -45,7 +46,7 @@ static const char * version_str = "0.58 20180403";    /* spc5r14 */
 
 #define NAME_BUFF_SZ 128
 
-#define SEAGATE_READ_UDS_DATA_CMD 0xf7	/* may start reporting vendor cmds */
+#define SEAGATE_READ_UDS_DATA_CMD 0xf7  /* may start reporting vendor cmds */
 
 static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
 
@@ -907,12 +908,13 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, cd_len, res, len, act_len, rq_len;
+    int sg_fd, cd_len, res, len, act_len, rq_len, vb;
     int rep_opts = 0;
     const char * cp;
     struct opts_t * op;
     const char * op_name;
-    uint8_t rsoc_buff[MX_ALLOC_LEN];
+    uint8_t * rsoc_buff = NULL;
+    uint8_t * free_rsoc_buff = NULL;
     char buff[48];
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;
@@ -936,6 +938,7 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
+    vb = op->verbose;
 
     if ((NULL == op->device_name) && (! op->do_enumerate)) {
         pr2serr("No DEVICE argument given\n");
@@ -976,7 +979,7 @@ main(int argc, char * argv[])
             if (peri_dtype < 0)
                 peri_dtype = 0;
             printf("SCSI command:");
-            if (op->verbose)
+            if (vb)
                 printf(" [opcode=0x%x, sa=0x%x, pdt=0x%x]\n", op->opcode,
                        op->servact, peri_dtype);
             else
@@ -990,18 +993,25 @@ main(int argc, char * argv[])
     op_name = op->do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
+    rsoc_buff = (uint8_t *)sg_memalign(MX_ALLOC_LEN, 0, &free_rsoc_buff,
+                                       vb > 3);
+    if (NULL == rsoc_buff) {
+        pr2serr("Unable to allocate memory\n");
+        return sg_convert_errno(ENOMEM);
+    }
+
     if (op->opcode < 0) {
-        if ((sg_fd = scsi_pt_open_device(op->device_name, 1 /* RO */,
-                                         op->verbose)) < 0) {
+        /* Try to open read-only */
+        if ((sg_fd = scsi_pt_open_device(op->device_name, 1, vb)) < 0) {
             pr2serr("sg_opcodes: error opening file (ro): %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
-            return SG_LIB_FILE_ERROR;
+            goto open_rw;
         }
         if (op->no_inquiry && (peri_dtype < 0))
             pr2serr("--no-inquiry ignored because --pdt= not given\n");
         if (op->no_inquiry && (peri_dtype >= 0))
             ;
-        else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, op->verbose)) {
+        else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, vb)) {
             peri_dtype = inq_resp.peripheral_type;
             if (! (op->do_raw || op->no_inquiry)) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
@@ -1024,26 +1034,25 @@ main(int argc, char * argv[])
         }
     }
 
-    if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */,
-                                     op->verbose)) < 0) {
+open_rw:
+    if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */, vb)) < 0) {
         pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
                 op->device_name, safe_strerror(-sg_fd));
         return SG_LIB_FILE_ERROR;
     }
     if (op->opcode >= 0)
         rep_opts = ((op->servact >= 0) ? 2 : 1);
-    memset(rsoc_buff, 0, sizeof(rsoc_buff));
     if (op->do_taskman) {
         rq_len = (op->do_repd ? 16 : 4);
-        res = do_rstmf(sg_fd, op->do_repd, rsoc_buff,
-                       rq_len, &act_len, true, op->verbose);
+        res = do_rstmf(sg_fd, op->do_repd, rsoc_buff, rq_len, &act_len, true,
+                       vb);
     } else {
-        rq_len = sizeof(rsoc_buff);
+        rq_len = MX_ALLOC_LEN;
         res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->opcode, op->servact,
-                      rsoc_buff, rq_len, &act_len, true, op->verbose);
+                      rsoc_buff, rq_len, &act_len, true, vb);
     }
     if (res) {
-        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+        sg_get_category_sense_str(res, sizeof(b), b, vb);
         pr2serr("%s: %s\n", op_name, b);
         goto err_out;
     }
@@ -1133,6 +1142,8 @@ main(int argc, char * argv[])
     res = 0;
 
 err_out:
+    if (free_rsoc_buff)
+        free(free_rsoc_buff);
     scsi_pt_close_device(sg_fd);
     return res;
 }

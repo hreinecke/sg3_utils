@@ -856,6 +856,9 @@ decode_mode_policy_vpd(uint8_t * buff, int len, int do_hex)
                 printf(",  subpage code: 0x%x\n", bp[1]);
             else
                 printf("\n");
+            if ((0 == k) && (0x3f == (0x3f & bp[0])) && (0xff == bp[1]))
+                printf("  therefore the policy applies to all modes pages "
+                       "and subpages\n");
             printf("    MLUS=%d,  Policy: %s\n", !!(bp[2] & 0x80),
                    mode_page_policy_arr[bp[2] & 0x3]);
         }

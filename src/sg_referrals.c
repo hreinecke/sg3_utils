@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -34,7 +35,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.10 20180219";    /* sbc4r10 */
+static const char * version_str = "1.11 20180425";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -48,7 +49,6 @@ static const char * version_str = "1.10 20180219";    /* sbc4r10 */
 #define TPGS_STATE_TRANSITIONING 0xf
 
 static uint8_t referralBuff[DEF_REFER_BUFF_LEN];
-static uint8_t * referralBuffp = referralBuff;
 
 static const char *decode_tpgs_state(const int st)
 {
@@ -86,6 +86,7 @@ static struct option long_options[] = {
         {"lba", required_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"one-segment", no_argument, 0, 's'},
+        {"one_segment", no_argument, 0, 's'},
         {"raw", no_argument, 0, 'r'},
         {"readonly", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
@@ -182,6 +183,8 @@ main(int argc, char * argv[])
     uint64_t lba = 0;
     const char * device_name = NULL;
     const uint8_t * bp;
+    uint8_t * referralBuffp = referralBuff;
+    uint8_t * free_referralBuffp = NULL;
 
     while (1) {
         int option_index = 0;
@@ -255,10 +258,12 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_REFER_BUFF_LEN) {
-        referralBuffp = (uint8_t *)calloc(maxlen, 1);
+        referralBuffp = (uint8_t *)sg_memalign(maxlen, 0,
+                                               &free_referralBuffp,
+                                               verbose > 3);
         if (NULL == referralBuffp) {
             pr2serr("unable to allocate %d bytes on heap\n", maxlen);
-            return SG_LIB_SYNTAX_ERROR;
+            return sg_convert_errno(ENOMEM);
         }
     }
     if (do_raw) {
@@ -343,7 +348,7 @@ the_end:
             ret = SG_LIB_FILE_ERROR;
     }
 free_buff:
-    if (referralBuffp && (referralBuffp != referralBuff))
-        free(referralBuffp);
+    if (free_referralBuffp)
+        free(free_referralBuffp);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

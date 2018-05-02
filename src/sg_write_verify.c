@@ -288,7 +288,8 @@ main(int argc, char * argv[])
     uint64_t llba = 0;
     int64_t ll;
     uint8_t * wvb = NULL;
-    void * wrkBuff = NULL;
+    uint8_t * wrkBuff = NULL;
+    uint8_t * free_wrkBuff = NULL;
     const char * device_name = NULL;
     const char * ifnp;
     char cmd_name[32];
@@ -497,9 +498,10 @@ main(int argc, char * argv[])
                     } else if (verbose)
                         pr2serr("Using file size of %d bytes\n", ilen);
                 }
-                if (NULL == (wrkBuff = malloc(ilen))) {
+                if (NULL == (wrkBuff = (uint8_t *)sg_memalign(ilen, 0,
+                                           &free_wrkBuff, verbose > 3))) {
                     pr2serr(ME "out of memory\n");
-                    ret = SG_LIB_CAT_OTHER;
+                    ret = sg_convert_errno(ENOMEM);
                     goto err_out;
                 }
                 wvb = (uint8_t *)wrkBuff;
@@ -523,9 +525,10 @@ main(int argc, char * argv[])
                                 num_lb, 512, 512 * num_lb);
                     ilen = 512 * num_lb;
                 }
-                if (NULL == (wrkBuff = malloc(ilen))) {
+                if (NULL == (wrkBuff = (uint8_t *)sg_memalign(ilen, 0,
+                                           &free_wrkBuff, verbose > 3))) {
                     pr2serr(ME "out of memory\n");
-                    ret = SG_LIB_CAT_OTHER;
+                    ret = sg_convert_errno(ENOMEM);
                     goto err_out;
                 }
                 wvb = (uint8_t *)wrkBuff;
@@ -576,8 +579,8 @@ err_out:
     if (repeat)
         pr2serr("%d [0x%x] logical blocks written, in total\n", tnum_lb_wr,
                 tnum_lb_wr);
-    if (wrkBuff)
-        free(wrkBuff);
+    if (free_wrkBuff)
+        free(free_wrkBuff);
     if ((ifd >= 0) && (STDIN_FILENO != ifd))
         close(ifd);
     res = sg_cmds_close_device(sg_fd);

@@ -459,10 +459,10 @@ int sg_err_category_sense(const uint8_t * sense_buffer, int sb_len);
 #define SG_LIB_CAT_MEDIUM_HARD_WITH_INFO 18 /* medium or hardware error */
                                 /* sense key plus 'info' field: */
                                 /*       [sk,asc,ascq: 0x3/0x4,*,*] */
+#define SG_LIB_CAT_TIMEOUT 33   /* SCSI command timeout */
 #define SG_LIB_CAT_PROTECTION_WITH_INFO 41 /* aborted command sense key, */
                                 /* protection plus 'info' field: */
                                 /*  [sk,asc,ascq: 0xb,0x10,*] */
-#define SG_LIB_CAT_TIMEOUT 33
 
 /* Yield string associated with sense category. Returns 'buff' (or pointer
  * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then

@@ -32,7 +32,7 @@
  * device.
  */
 
-static const char * version_str = "1.14 20180311";
+static const char * version_str = "1.15 20180425";
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -42,7 +42,6 @@ static const char * version_str = "1.14 20180311";
 #define DEF_GLBAS_BUFF_LEN 24
 
 static uint8_t glbasBuff[DEF_GLBAS_BUFF_LEN];
-static uint8_t * glbasBuffp = glbasBuff;
 
 
 static struct option long_options[] = {
@@ -149,26 +148,28 @@ decode_lba_status_desc(const uint8_t * bp, uint64_t * slbap,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, j, res, c, rlen, num_descs, completion_cond;
-    int do_brief = 0;
-    int do_hex = 0;
-    int64_t ll;
-    uint64_t lba = 0;
-    uint64_t d_lba = 0;
-    uint32_t d_blocks = 0;
-    uint32_t element_id = 0;
-    uint32_t scan_len = 0;
-    int maxlen = DEF_GLBAS_BUFF_LEN;
-    int rt = 0;
-    int verbose = 0;
     bool do_16 = false;
     bool do_32 = false;
     bool do_raw = false;
     bool o_readonly = false;
+    int sg_fd, k, j, res, c, rlen, num_descs, completion_cond;
+    int do_brief = 0;
+    int do_hex = 0;
+    int ret = 0;
+    int maxlen = DEF_GLBAS_BUFF_LEN;
+    int rt = 0;
+    int verbose = 0;
+    uint8_t add_status = 0;     /* keep gcc quiet */
+    uint64_t d_lba = 0;
+    uint32_t d_blocks = 0;
+    uint32_t element_id = 0;
+    uint32_t scan_len = 0;
+    int64_t ll;
+    uint64_t lba = 0;
     const char * device_name = NULL;
     const uint8_t * bp;
-    int ret = 0;
-    uint8_t add_status = 0;     /* keep gcc quiet */
+    uint8_t * glbasBuffp = glbasBuff;
+    uint8_t * free_glbasBuffp = NULL;
 
     while (1) {
         int option_index = 0;
@@ -271,7 +272,8 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if (maxlen > DEF_GLBAS_BUFF_LEN) {
-        glbasBuffp = (uint8_t *)calloc(maxlen, 1);
+        glbasBuffp = (uint8_t *)sg_memalign(maxlen, 0, &free_glbasBuffp,
+                                            verbose > 3);
         if (NULL == glbasBuffp) {
             pr2serr("unable to allocate %d bytes on heap\n", maxlen);
             return SG_LIB_SYNTAX_ERROR;
@@ -477,7 +479,7 @@ the_end:
             ret = SG_LIB_FILE_ERROR;
     }
 free_buff:
-    if (glbasBuffp && (glbasBuffp != glbasBuff))
-        free(glbasBuffp);
+    if (free_glbasBuffp)
+        free(free_glbasBuffp);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

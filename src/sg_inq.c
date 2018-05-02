@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -48,7 +49,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.92 20180405";    /* SPC-5 rev 19 */
+static const char * version_str = "1.93 20180425";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a

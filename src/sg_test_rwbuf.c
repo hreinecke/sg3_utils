@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -44,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.15 20180219";
+static const char * version_str = "1.16 20180428";
 
 #define BPI (signed)(sizeof(int))
 
@@ -64,6 +65,7 @@ static int base = 0x12345678;
 static int buf_capacity = 0;
 static int buf_granul = 255;
 static uint8_t *cmpbuf = NULL;
+static uint8_t *free_cmpbuf = NULL;
 
 
 /* Options */
@@ -229,7 +231,9 @@ int read_buffer (int sg_fd, unsigned ssize)
         int res, k;
         uint8_t rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = ssize + addread;
-        uint8_t * rbBuff = (uint8_t *)malloc(bufSize);
+        uint8_t * free_rbBuff = NULL;
+        uint8_t * rbBuff = (uint8_t *)sg_memalign(bufSize, 0, &free_rbBuff,
+                                                  false);
         uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
 
@@ -280,7 +284,8 @@ int read_buffer (int sg_fd, unsigned ssize)
         }
 
         res = do_checksum((int*)rbBuff, ssize, false);
-        free(rbBuff);
+        if (free_rbBuff)
+                free(free_rbBuff);
         return res;
 }
 
@@ -288,7 +293,9 @@ int write_buffer (int sg_fd, unsigned ssize)
 {
         uint8_t wb_cdb[] = {WRITE_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = ssize + addwrite;
-        uint8_t * wbBuff = (uint8_t *)malloc(bufSize);
+        uint8_t * free_wbBuff = NULL;
+        uint8_t * wbBuff = (uint8_t *)sg_memalign(bufSize, 0, &free_wbBuff,
+                                                  false);
         uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
         int k, res;
@@ -340,7 +347,8 @@ int write_buffer (int sg_fd, unsigned ssize)
                 free(wbBuff);
                 return res;
         }
-        free(wbBuff);
+        if (free_wbBuff)
+                free(free_wbBuff);
         return res;
 }
 
@@ -511,7 +519,7 @@ int main (int argc, char * argv[])
                 goto err_out;
         }
 
-        cmpbuf = (uint8_t *)malloc(size);
+        cmpbuf = (uint8_t *)sg_memalign(size, 0, &free_cmpbuf, false);
         for (k = 0; k < times; ++k) {
                 ret = write_buffer (sg_fd, size);
                 if (ret) {
@@ -526,8 +534,8 @@ int main (int argc, char * argv[])
         }
 
 err_out:
-        if (cmpbuf)
-                free(cmpbuf);
+        if (free_cmpbuf)
+                free(free_cmpbuf);
         res = close(sg_fd);
         if (res < 0) {
                 perror(ME "close error");

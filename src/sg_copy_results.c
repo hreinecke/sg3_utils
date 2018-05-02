@@ -38,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.19 20180326";
+static const char * version_str = "1.20 20180428";
 
 
 #define MAX_XFER_LEN 10000
@@ -314,6 +314,7 @@ main(int argc, char * argv[])
     uint32_t list_id = 0;
     const char * cp;
     uint8_t * cpResultBuff = NULL;
+    uint8_t * free_cprb = NULL;
     const char * device_name = NULL;
     char file_name[256];
 
@@ -401,11 +402,12 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (NULL == (cpResultBuff = (uint8_t *)malloc(xfer_len))) {
+    cpResultBuff = (uint8_t *)sg_memalign(xfer_len, 0, &free_cprb,
+                                          verbose > 3);
+    if (NULL == cpResultBuff) {
             pr2serr(ME "out of memory\n");
-            return SG_LIB_FILE_ERROR;
+            return sg_convert_errno(ENOMEM);
     }
-    memset(cpResultBuff, 0x00, xfer_len);
 
     sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
@@ -453,7 +455,8 @@ main(int argc, char * argv[])
     }
 
 finish:
-    free(cpResultBuff);
+    if (free_cprb)
+        free(free_cprb);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr(ME "close error: %s\n", safe_strerror(-res));

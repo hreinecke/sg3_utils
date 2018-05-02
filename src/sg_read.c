@@ -53,7 +53,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.30 20180219";
+static const char * version_str = "1.31 20180502";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -368,7 +368,7 @@ static int sg_bread(int sg_fd, uint8_t * buff, int blocks,
 
 #define STR_SZ 1024
 #define INF_SZ 512
-#define EBUFF_SZ 512
+#define EBUFF_SZ 768
 
 
 int main(int argc, char * argv[])

@@ -28,9 +28,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
-#ifdef SG_LIB_WIN32
-#include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
-#endif
+#include "sg_pt.h"
 #include "sg_pr2serr.h"
 
 /*
@@ -38,10 +36,11 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.35 20180305";    /* ses4r02 */
+static const char * version_str = "2.37 20180502";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
+#define REQUEST_SENSE_RESP_SZ 252
 #define DATA_IN_OFF 4
 #define MIN_DATA_IN_SZ 8192     /* use max(MIN_DATA_IN_SZ, op->maxlen) for
                                  * the size of data_arr */
@@ -499,6 +498,7 @@ static struct element_type_t element_type_by_code =
 /* Many control element names below have "RQST" in front in drafts.
    These are for the Enclosure Control/Status diagnostic page */
 static struct acronym2tuple ecs_a2t_arr[] = {
+    /* acron   element_type  start_byte  start_bit  num_bits */
     {"ac_fail", UI_POWER_SUPPLY_ETC, 2, 4, 1, NULL},
     {"ac_hi", UI_POWER_SUPPLY_ETC, 2, 6, 1, NULL},
     {"ac_lo", UI_POWER_SUPPLY_ETC, 2, 7, 1, NULL},
@@ -557,7 +557,8 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"fault", ARRAY_DEV_ETC, 3, 5, 1, NULL},
     {"hotspare", ARRAY_DEV_ETC, 1, 5, 1, NULL},
     {"hotswap", COOLING_ETC, 3, 7, 1, NULL},
-    {"hotswap", ENC_SCELECTR_ETC, 3, 7, 1, NULL},
+    {"hotswap", ENC_SCELECTR_ETC, 3, 7, 1, NULL},       /* status only */
+    {"hw_reset", ENC_SCELECTR_ETC, 1, 2, 1, "hardware reset"}, /* 18-047r0 */
     {"ident", DEVICE_ETC, 2, 1, 1, "flash LED"},
     {"ident", ARRAY_DEV_ETC, 2, 1, 1, "flash LED"},
     {"ident", POWER_SUPPLY_ETC, 1, 7, 1, "flash LED"},
@@ -652,7 +653,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"remove", DEVICE_ETC, 2, 2, 1, NULL},
     {"remove", ARRAY_DEV_ETC, 2, 2, 1, NULL},
     {"remind", AUD_ALARM_ETC, 3, 4, 1, NULL},
-    {"report", ENC_SCELECTR_ETC, 2, 0, 1, NULL},
+    {"report", ENC_SCELECTR_ETC, 2, 0, 1, NULL},        /* status only */
     {"report", SCC_CELECTR_ETC, 2, 0, 1, NULL},
     {"report", SCSI_IPORT_ETC, 2, 0, 1, NULL},
     {"report", SCSI_TPORT_ETC, 2, 0, 1, NULL},
@@ -661,7 +662,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"rqst_override", TEMPERATURE_ETC, 3, 7, 1, "Request(ed) override"},
     {"rrabort", ARRAY_DEV_ETC, 1, 0, 1, "rebuild/remap abort"},
     {"rsvddevice", ARRAY_DEV_ETC, 1, 6, 1, "reserved device"},
-    {"select_element", ENC_SCELECTR_ETC, 2, 0, 1, NULL},
+    {"select_element", ENC_SCELECTR_ETC, 2, 0, 1, NULL},        /* control */
     {"short_stat", SIMPLE_SUBENC_ETC, 3, 7, 8, "short enclosure status"},
     {"size", NV_CACHE_ETC, 2, 7, 16, NULL},
     {"speed_act", COOLING_ETC, 1, 2, 11, "actual speed (rpm / 10)"},
@@ -669,6 +670,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
      "0: leave; 1: lowest... 7: highest"},
     {"size_mult", NV_CACHE_ETC, 1, 1, 2, NULL},
     {"swap", -1, 0, 4, 1, NULL},               /* Reset swap */
+    {"sw_reset", ENC_SCELECTR_ETC, 1, 3, 1, "software reset"},/* 18-047r0 */
     {"temp", TEMPERATURE_ETC, 2, 7, 8, "(Requested) temperature"},
     {"unlock", DOOR_ETC, 3, 0, 1, NULL},
     {"undertemp_fail", TEMPERATURE_ETC, 3, 1, 1, "Undertemperature failure"},
@@ -738,6 +740,7 @@ static struct option long_options[] = {
     {"data", required_argument, 0, 'd'},
     {"descriptor", required_argument, 0, 'D'},
     {"dev-slot-num", required_argument, 0, 'x'},
+    {"dev_slot_num", required_argument, 0, 'x'},
     {"dsn", required_argument, 0, 'x'},
     {"eiioe", required_argument, 0, 'E'},
     {"enumerate", no_argument, 0, 'e'},
@@ -747,6 +750,7 @@ static struct option long_options[] = {
     {"hex", no_argument, 0, 'H'},
     {"index", required_argument, 0, 'I'},
     {"inner-hex", no_argument, 0, 'i'},
+    {"inner_hex", no_argument, 0, 'i'},
     {"join", no_argument, 0, 'j'},
     {"list", no_argument, 0, 'l'},
     {"nickid", required_argument, 0, 'N'},
@@ -758,6 +762,7 @@ static struct option long_options[] = {
     {"raw", no_argument, 0, 'r'},
     {"readonly", no_argument, 0, 'R'},
     {"sas-addr", required_argument, 0, 'A'},
+    {"sas_addr", required_argument, 0, 'A'},
     {"set", required_argument, 0, 'S'},
     {"status", no_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
@@ -1508,7 +1513,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     }
 
     if ((! (op->do_data && op->do_status)) && (NULL == op->dev_name)) {
-        pr2serr("missing DEVICE name!\n");
+        pr2serr("missing DEVICE name!\n\n");
         goto err_help;
     }
     return 0;
@@ -1636,12 +1641,12 @@ match_last_ind_indiv(int index, const struct opts_t * op)
 /* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
  * failures */
 static int
-do_senddiag(int sg_fd, void * outgoing_pg, int outgoing_len, bool noisy,
-            int verbose)
+do_senddiag(struct sg_pt_base * ptvp, void * outgoing_pg, int outgoing_len,
+            bool noisy, int verbose)
 {
     const bool pf_bit = true;
+    int page_num, ret;
     const char * cp;
-    int page_num;
 
     if (outgoing_pg && (verbose > 2)) {
         page_num = ((const char *)outgoing_pg)[0];
@@ -1652,10 +1657,12 @@ do_senddiag(int sg_fd, void * outgoing_pg, int outgoing_len, bool noisy,
             pr2serr("    Send diagnostic command page number: 0x%x\n",
                     page_num);
     }
-    return sg_ll_send_diag(sg_fd, 0 /* sf_code */, pf_bit, false /* sf_bit */,
-                           false /* devofl_bit */, false /* unitofl_bit */,
-                           0 /* long_duration */, outgoing_pg, outgoing_len,
-                           noisy, verbose);
+    ret = sg_ll_send_diag_pt(ptvp, 0 /* sf_code */, pf_bit,
+                             false /* sf_bit */, false /* devofl_bit */,
+                             false /* unitofl_bit */, 0 /* long_duration */,
+                             outgoing_pg, outgoing_len, noisy, verbose);
+    clear_scsi_pt_obj(ptvp);
+    return ret;
 }
 
 /* Fetch diagnostic page name (status and/or control). Returns NULL if not
@@ -1826,7 +1833,7 @@ find_join_row_cnst(const struct th_es_t * tesp, int index,
 /* Return of 0 -> success, SG_LIB_CAT_* positive values or -2 if response
  * had bad format, -1 -> other failures */
 static int
-do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
+do_rec_diag(struct sg_pt_base * ptvp, int page_code, uint8_t * rsp_buff,
             int rsp_buff_size, struct opts_t * op, int * rsp_lenp)
 {
     int k, d_len, rsp_len, res;
@@ -1889,9 +1896,10 @@ do_rec_diag(int sg_fd, int page_code, uint8_t * rsp_buff,
     }
     if (vb > 1)
         pr2serr("    %s command for %s\n", rdr, cp);
-    res = sg_ll_receive_diag_v2(sg_fd, true /* pcv */, page_code, rsp_buff,
+    res = sg_ll_receive_diag_pt(ptvp, true /* pcv */, page_code, rsp_buff,
                                 rsp_buff_size, 0 /* default timeout */,
                                 &resid, ! op->quiet, vb);
+    clear_scsi_pt_obj(ptvp);
 decode:
     if (0 == res) {
         rsp_len = sg_get_unaligned_be16(rsp_buff + 2) + 4;
@@ -2045,7 +2053,8 @@ truncated:
  * Returns total number of type descriptor headers written to 'tdhp' or -1
  * if there is a problem */
 static int
-build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
+build_type_desc_hdr_arr(struct sg_pt_base * ptvp,
+                         struct type_desc_hdr_t * tdhp, int max_elems,
                         uint32_t * generationp,
                         struct enclosure_info * primary_ip,
                         struct opts_t * op)
@@ -2065,7 +2074,7 @@ build_type_desc_hdr_arr(int fd, struct type_desc_hdr_t * tdhp, int max_elems,
             ret = -1;
             goto the_end;
         }
-        res = do_rec_diag(fd, CONFIGURATION_DPC, config_dp_resp, op->maxlen,
+        res = do_rec_diag(ptvp, CONFIGURATION_DPC, config_dp_resp, op->maxlen,
                           op, &resp_len);
         if (res) {
             pr2serr("%s: couldn't read config page, res=%d\n", __func__, res);
@@ -4063,8 +4072,8 @@ err_with_fp:
 }
 
 static int
-process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
-                      struct opts_t * op)
+process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
+                     int resp_len, struct opts_t * op)
 {
     int j, num_ths;
     int ret = 0;
@@ -4112,7 +4121,7 @@ process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
         configuration_sdg(resp, resp_len);
         break;
     case ENC_STATUS_DPC:
-        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+        num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
         if (num_ths < 0) {
@@ -4130,7 +4139,7 @@ process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
         enc_status_dp(tesp, ref_gen_code, resp, resp_len, op);
         break;
     case ARRAY_STATUS_DPC:
-        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+        num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
         if (num_ths < 0) {
@@ -4164,7 +4173,7 @@ process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
             printf("  <empty>\n");
         break;
     case THRESHOLD_DPC:
-        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+        num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
         if (num_ths < 0) {
@@ -4182,7 +4191,7 @@ process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
         threshold_sdg(tesp, ref_gen_code, resp, resp_len, op);
         break;
     case ELEM_DESC_DPC:
-        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+        num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                               MX_ELEM_HDR, &ref_gen_code,
                                               &primary_info, op);
             if (num_ths < 0) {
@@ -4209,7 +4218,7 @@ process_status_dpage(int sg_fd, int page_code, uint8_t * resp, int resp_len,
                resp[1] & 1, (resp[1] >> 1) & 0xff);
         break;
     case ADD_ELEM_STATUS_DPC:
-        num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr,
+        num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
         if (num_ths < 0) {
@@ -4255,7 +4264,7 @@ fini:
 /* Display "status" page or pages (if op->page_code==0xff) . data-in from
  * SES device or user provided (with --data= option). Return 0 for success */
 static int
-process_status_page_s(int sg_fd, struct opts_t * op)
+process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op)
 {
     int page_code, ret, resp_len;
     uint8_t * resp = NULL;
@@ -4276,10 +4285,10 @@ process_status_page_s(int sg_fd, struct opts_t * op)
         const int s_arr_sz = sizeof(supp_dpg_arr);
 
         memset(supp_dpg_arr, 0, s_arr_sz);
-        ret = do_rec_diag(sg_fd, SUPPORTED_DPC, resp, op->maxlen, op,
+        ret = do_rec_diag(ptvp, SUPPORTED_DPC, resp, op->maxlen, op,
                           &resp_len);
         if (ret)        /* SUPPORTED_DPC failed so try SUPPORTED_SES_DPC */
-            ret = do_rec_diag(sg_fd, SUPPORTED_SES_DPC, resp, op->maxlen, op,
+            ret = do_rec_diag(ptvp, SUPPORTED_SES_DPC, resp, op->maxlen, op,
                               &resp_len);
         if (ret)
             goto fini;
@@ -4301,17 +4310,17 @@ process_status_page_s(int sg_fd, struct opts_t * op)
         }
         for (k = 0; k < n; ++k) {
             page_code = supp_dpg_arr[k];
-            ret = do_rec_diag(sg_fd, page_code, resp, op->maxlen, op,
+            ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op,
                               &resp_len);
             if (ret)
                 goto fini;
-            ret = process_status_dpage(sg_fd, page_code, resp, resp_len, op);
+            ret = process_status_dpage(ptvp, page_code, resp, resp_len, op);
         }
     } else {    /* asking for a specific page code */
-        ret = do_rec_diag(sg_fd, page_code, resp, op->maxlen, op, &resp_len);
+        ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op, &resp_len);
         if (ret)
             goto fini;
-        ret = process_status_dpage(sg_fd, page_code, resp, resp_len, op);
+        ret = process_status_dpage(ptvp, page_code, resp, resp_len, op);
     }
 
 fini:
@@ -4785,7 +4794,7 @@ join_juggle_aes(struct th_es_t * tesp, uint8_t * es_bp, const uint8_t * ed_bp,
  * stderr when op->verbose > 3. Returns 0 for success, any other return value
  * is an error. */
 static int
-join_work(int sg_fd, struct opts_t * op, bool display)
+join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
 {
     bool broken_ei;
     int j, res, num_ths, mlen;
@@ -4802,7 +4811,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     struct th_es_t tes;
 
     memset(&primary_info, 0, sizeof(primary_info));
-    num_ths = build_type_desc_hdr_arr(sg_fd, type_desc_hdr_arr, MX_ELEM_HDR,
+    num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr, MX_ELEM_HDR,
                                       &ref_gen_code, &primary_info, op);
     if (num_ths < 0)
         return num_ths;
@@ -4819,7 +4828,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     mlen = enc_stat_rsp_sz;
     if (mlen > op->maxlen)
         mlen = op->maxlen;
-    res = do_rec_diag(sg_fd, ENC_STATUS_DPC, enc_stat_rsp, mlen, op,
+    res = do_rec_diag(ptvp, ENC_STATUS_DPC, enc_stat_rsp, mlen, op,
                       &enc_stat_rsp_len);
     if (res)
         return res;
@@ -4838,7 +4847,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
     mlen = elem_desc_rsp_sz;
     if (mlen > op->maxlen)
         mlen = op->maxlen;
-    res = do_rec_diag(sg_fd, ELEM_DESC_DPC, elem_desc_rsp, mlen, op,
+    res = do_rec_diag(ptvp, ELEM_DESC_DPC, elem_desc_rsp, mlen, op,
                       &elem_desc_rsp_len);
     if (0 == res) {
         if (elem_desc_rsp_len < 8) {
@@ -4866,7 +4875,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         mlen = add_elem_rsp_sz;
         if (mlen > op->maxlen)
             mlen = op->maxlen;
-        res = do_rec_diag(sg_fd, ADD_ELEM_STATUS_DPC, add_elem_rsp, mlen, op,
+        res = do_rec_diag(ptvp, ADD_ELEM_STATUS_DPC, add_elem_rsp, mlen, op,
                           &add_elem_rsp_len);
         if (0 == res) {
             if (add_elem_rsp_len < 8) {
@@ -4904,7 +4913,7 @@ join_work(int sg_fd, struct opts_t * op, bool display)
         mlen = threshold_rsp_sz;
         if (mlen > op->maxlen)
             mlen = op->maxlen;
-        res = do_rec_diag(sg_fd, THRESHOLD_DPC, threshold_rsp, mlen, op,
+        res = do_rec_diag(ptvp, THRESHOLD_DPC, threshold_rsp, mlen, op,
                           &threshold_rsp_len);
         if (0 == res) {
             if (threshold_rsp_len < 8) {
@@ -5013,7 +5022,7 @@ is_acronym_in_additional(const struct tuple_acronym_val * tavp)
  * Do clear/get/set (cgs) on Enclosure Control/Status page. Return 0 for ok
  * -2 for acronym not found, else -1 . */
 static int
-cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
+cgs_enc_ctl_stat(struct sg_pt_base * ptvp, struct join_row_t * jrp,
                  const struct tuple_acronym_val * tavp,
                  const struct opts_t * op, bool last)
 {
@@ -5074,7 +5083,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
             enc_stat_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(enc_stat_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(sg_fd, enc_stat_rsp, len, ! op->quiet,
+            ret = do_senddiag(ptvp, enc_stat_rsp, len, ! op->quiet,
                               op->verbose);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
@@ -5089,7 +5098,7 @@ cgs_enc_ctl_stat(int sg_fd, struct join_row_t * jrp,
  * Do clear/get/set (cgs) on Threshold In/Out page. Return 0 for ok,
  * -2 for acronym not found, else -1 . */
 static int
-cgs_threshold(int sg_fd, const struct join_row_t * jrp,
+cgs_threshold(struct sg_pt_base * ptvp, const struct join_row_t * jrp,
               const struct tuple_acronym_val * tavp,
               const struct opts_t * op, bool last)
 {
@@ -5132,7 +5141,7 @@ cgs_threshold(int sg_fd, const struct join_row_t * jrp,
             threshold_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(sg_fd, threshold_rsp, len, ! op->quiet,
+            ret = do_senddiag(ptvp, threshold_rsp, len, ! op->quiet,
                               op->verbose);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
@@ -5194,7 +5203,7 @@ cgs_additional_el(const struct join_row_t * jrp,
 /* Do --clear, --get or --set .
  * Returns 0 for success, any other return value is an error. */
 static int
-ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
+ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         struct opts_t * op, bool last)
 {
     int ret, k, j, desc_len, dn_len;
@@ -5203,7 +5212,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
     const uint8_t * ed_bp;
     char b[64];
 
-    if ((sg_fd < 0) && (GET_OPT != tavp->cgs_sel)) {
+    if ((NULL == ptvp) && (GET_OPT != tavp->cgs_sel)) {
         pr2serr("%s: --clear= and --set= only supported when DEVICE is "
                 "given\n", __func__);
         return SG_LIB_SYNTAX_ERROR;
@@ -5240,7 +5249,7 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
         return -1;
     }
     if (false == join_done) {
-        ret = join_work(sg_fd, op, false);
+        ret = join_work(ptvp, op, false);
         if (ret)
             return ret;
     }
@@ -5278,9 +5287,9 @@ ses_cgs(int sg_fd, const struct tuple_acronym_val * tavp,
                 continue;
         }
         if (ENC_CONTROL_DPC == op->page_code)
-            ret = cgs_enc_ctl_stat(sg_fd, jrp, tavp, op, last);
+            ret = cgs_enc_ctl_stat(ptvp, jrp, tavp, op, last);
         else if (THRESHOLD_DPC == op->page_code)
-            ret = cgs_threshold(sg_fd, jrp, tavp, op, last);
+            ret = cgs_threshold(ptvp, jrp, tavp, op, last);
         else if (ADD_ELEM_STATUS_DPC == op->page_code)
             ret = cgs_additional_el(jrp, tavp, op);
         else {
@@ -5322,20 +5331,20 @@ inconsistent:
  * the generation code. Returns 0 for success, any other return value is
  * an error. */
 static int
-ses_set_nickname(int sg_fd, struct opts_t * op)
+ses_set_nickname(struct sg_pt_base * ptvp, struct opts_t * op)
 {
     int res, len;
     int resp_len = 0;
     uint8_t b[64];
     const int control_plen = 0x24;
 
-    if (sg_fd < 0) {
+    if (NULL == ptvp) {
         pr2serr("%s: ignored when no device name\n", __func__);
         return 0;
     }
     memset(b, 0, sizeof(b));
     /* Only after the generation code, offset 4 for 4 bytes */
-    res = do_rec_diag(sg_fd, SUBENC_NICKNAME_DPC, b, 8, op, &resp_len);
+    res = do_rec_diag(ptvp, SUBENC_NICKNAME_DPC, b, 8, op, &resp_len);
     if (res) {
         pr2serr("%s: Subenclosure nickname status page, res=%d\n", __func__,
                 res);
@@ -5360,7 +5369,7 @@ ses_set_nickname(int sg_fd, struct opts_t * op)
     if (len > 32)
         len = 32;
     memcpy(b + 8, op->nickname_str, len);
-    return do_senddiag(sg_fd, b, control_plen + 4, ! op->quiet,
+    return do_senddiag(ptvp, b, control_plen + 4, ! op->quiet,
                        op->verbose);
 }
 
@@ -5466,7 +5475,7 @@ int
 main(int argc, char * argv[])
 {
     bool have_cgs = false;
-    int k, d_len, res, vb;
+    int k, d_len, res, resid, vb;
     int sg_fd = -1;
     int pd_type = 0;
     int ret = 0;
@@ -5479,10 +5488,10 @@ main(int argc, char * argv[])
     uint8_t * free_elem_desc_rsp = NULL;
     uint8_t * free_add_elem_rsp = NULL;
     uint8_t * free_threshold_rsp = NULL;
+    struct sg_pt_base * ptvp = NULL;
     struct tuple_acronym_val tav_arr[CGS_CL_ARR_MAX_SZ];
-    struct sg_simple_inquiry_resp inq_resp;
     char buff[128];
-    char b[80];
+    char b[128];
 
     op = &opts;
     memset(op, 0, sizeof(*op));
@@ -5610,46 +5619,131 @@ main(int argc, char * argv[])
         if (sg_fd < 0) {
             pr2serr("open error: %s: %s\n", op->dev_name,
                     safe_strerror(-sg_fd));
-            ret = SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-sg_fd);
+            goto err_out;
+        }
+        ptvp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
+        if (NULL == ptvp) {
+            pr2serr("construct pt_base failed, probably out of memory\n");
+            ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
         if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
-            if ((ret = sg_simple_inquiry(sg_fd, &inq_resp, ! op->quiet, vb))) {
+            if ((ret = sg_ll_inquiry_pt(ptvp, false, 0, enc_stat_rsp, 36,
+                                        0, &resid, ! op->quiet, vb))) {
                 pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                         op->dev_name);
                 goto err_out;
             } else {
-                printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
-                       inq_resp.product, inq_resp.revision);
-                pd_type = inq_resp.peripheral_type;
+                if (resid > 0)
+                    pr2serr("Short INQUIRY response, not looking good\n");
+                printf("  %.8s  %.16s  %.4s\n", enc_stat_rsp + 8,
+                       enc_stat_rsp + 16, enc_stat_rsp + 32);
+                pd_type = 0x1f & enc_stat_rsp[0];
                 cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
                 if (0xd == pd_type) {
                     if (vb)
                         printf("    enclosure services device\n");
-                } else if (0x40 & inq_resp.byte_6)
+                } else if (0x40 & enc_stat_rsp[6])
                     printf("    %s device has EncServ bit set\n", cp);
-                else
-                    printf("    %s device (not an enclosure)\n", cp);
+                else {
+                    if (0 != memcmp("NVMe", enc_stat_rsp + 8, 4))
+                        printf("    %s device (not an enclosure)\n", cp);
+                }
             }
+            clear_scsi_pt_obj(ptvp);
+            /* finished using enc_stat_rsp so clear back to zero */
+            memset(enc_stat_rsp, 0, enc_stat_rsp_sz);
         }
     } else if (op->do_control) {
         pr2serr("Cannot do SCSI Send diagnostic command without a DEVICE\n");
         return SG_LIB_SYNTAX_ERROR;
     }
 
+#if (HAVE_NVME && (! IGNORE_NVME))
+    if (ptvp && pt_device_is_nvme(ptvp) && (enc_stat_rsp_sz > 4095)) {
+        /* Fetch VPD 0xde (vendor specific: sg3_utils) for Identify ctl */
+        ret = sg_ll_inquiry_pt(ptvp, true, 0xde, enc_stat_rsp, 4096, 0,
+                               &resid, ! op->quiet, vb);
+        if (ret) {
+            if (vb)
+                pr2serr("Fetch VPD page 0xde (NVMe Identify ctl) failed, "
+                        "continue\n");
+        } else if (resid > 0) {
+            if (vb)
+                pr2serr("VPD page 0xde (NVMe Identify ctl) less than 4096 "
+                        "bytes, continue\n");
+        } else {
+            uint8_t nvmsr;
+            uint16_t oacs;
+
+            nvmsr = enc_stat_rsp[253];
+            oacs = sg_get_unaligned_le16(enc_stat_rsp + 256);
+            if (vb > 3)
+                pr2serr("NVMe Identify ctl response: nvmsr=%u, oacs=0x%x\n",
+                        nvmsr, oacs);
+            if (! ((0x2 & nvmsr) && (0x40 & oacs))) {
+                pr2serr(">>> Warning: A NVMe enclosure needs both the "
+                        "enclosure bit and support for\n");
+                pr2serr(">>> MI Send+Receive commands bit set; current "
+                        "state: %s, %s\n", (0x2 & nvmsr) ? "set" : "clear",
+                        (0x40 & oacs) ? "set" : "clear");
+            }
+        }
+        clear_scsi_pt_obj(ptvp);
+        memset(enc_stat_rsp, 0, 4096);
+    }
+#endif
+
+    if (ptvp) {
+        ret = sg_ll_request_sense_pt(ptvp, false, enc_stat_rsp,
+                                     REQUEST_SENSE_RESP_SZ, ! op->quiet, vb);
+        if (0 == ret) {
+            int sense_len = REQUEST_SENSE_RESP_SZ - get_scsi_pt_resid(ptvp);
+            struct sg_scsi_sense_hdr ssh;
+
+            if ((sense_len > 7) && sg_scsi_normalize_sense(enc_stat_rsp,
+                                        sense_len, &ssh)) {
+                const char * aa_str = sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
+                                                          sizeof(b), b);
+
+                /* Ignore the possibility that multiple UAs queued up */
+                if (SPC_SK_UNIT_ATTENTION == ssh.sense_key)
+                    pr2serr("Unit attention detected: %s\n  ... continue\n",
+                            aa_str);
+                else {
+                    if (vb) {
+                        pr2serr("Request Sense near startup detected "
+                                "something:\n");
+                        pr2serr("  Sense key: %s, additional: %s\n  ... "
+                                "continue\n",
+                                sg_get_sense_key_str(ssh.sense_key,
+                                         sizeof(buff), buff), aa_str);
+                    }
+                }
+            }
+        } else {
+            if (vb)
+                pr2serr("Request sense failed (res=%d), most likely "
+                        " problems ahead\n", ret);
+        }
+        clear_scsi_pt_obj(ptvp);
+        memset(enc_stat_rsp, 0, REQUEST_SENSE_RESP_SZ);
+    }
+
     if (op->nickname_str)
-        ret = ses_set_nickname(sg_fd, op);
+        ret = ses_set_nickname(ptvp, op);
     else if (have_cgs) {
         for (k = 0, tavp = tav_arr, cgs_clp = op->cgs_cl_arr;
              k < op->num_cgs; ++k, ++tavp, ++cgs_clp) {
-            ret = ses_cgs(sg_fd, tavp, op,  cgs_clp->last_cs);
+            ret = ses_cgs(ptvp, tavp, op,  cgs_clp->last_cs);
             if (ret)
                 break;
         }
     } else if (op->do_join)
-        ret = join_work(sg_fd, op, true);
+        ret = join_work(ptvp, op, true);
     else if (op->do_status)
-        ret = process_status_page_s(sg_fd, op);
+        ret = process_status_page_s(ptvp, op);
     else { /* control page requested */
         op->data_arr[0] = op->page_code;
         op->data_arr[1] = op->byte1;
@@ -5659,7 +5753,7 @@ main(int argc, char * argv[])
         case ENC_CONTROL_DPC:  /* Enclosure Control diagnostic page [0x2] */
             printf("Sending Enclosure Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
                 goto err_out;
@@ -5668,7 +5762,7 @@ main(int argc, char * argv[])
         case STRING_DPC:       /* String Out diagnostic page [0x4] */
             printf("Sending String Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send String Out page\n");
                 goto err_out;
@@ -5677,7 +5771,7 @@ main(int argc, char * argv[])
         case THRESHOLD_DPC:       /* Threshold Out diagnostic page [0x5] */
             printf("Sending Threshold Out [0x%x] page, with page length=%d "
                    "bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
                 goto err_out;
@@ -5686,7 +5780,7 @@ main(int argc, char * argv[])
         case ARRAY_CONTROL_DPC:   /* Array control diagnostic page [0x6] */
             printf("Sending Array Control [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Array Control page\n");
                 goto err_out;
@@ -5695,7 +5789,7 @@ main(int argc, char * argv[])
         case SUBENC_STRING_DPC: /* Subenclosure String Out page [0xc] */
             printf("Sending Subenclosure String Out [0x%x] page, with page "
                    "length=%d bytes\n", op->page_code, op->arr_len);
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure String Out page\n");
                 goto err_out;
@@ -5706,7 +5800,7 @@ main(int argc, char * argv[])
                    "page length=%d bytes\n", op->page_code, d_len);
             printf("  Perhaps it would be better to use the sg_ses_microcode "
                    "utility\n");
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Download Microcode Control page\n");
                 goto err_out;
@@ -5715,7 +5809,7 @@ main(int argc, char * argv[])
         case SUBENC_NICKNAME_DPC: /* Subenclosure Nickname Control [0xf] */
             printf("Sending Subenclosure Nickname Control [0x%x] page, with "
                    "page length=%d bytes\n", op->page_code, d_len);
-            ret = do_senddiag(sg_fd, op->data_arr, d_len, ! op->quiet, vb);
+            ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure Nickname Control page\n");
                 goto err_out;
@@ -5754,6 +5848,8 @@ err_out:
             ret = SG_LIB_FILE_ERROR;
     }
 early_out:
+    if (ptvp)
+        destruct_scsi_pt_obj(ptvp);
     if ((0 == vb) && (! op->quiet)) {
         if (! sg_if_can2stderr("sg_ses failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "

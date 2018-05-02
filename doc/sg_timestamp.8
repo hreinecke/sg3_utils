@@ -1,9 +1,10 @@
-.TH SG_TIMESTAMP "8" "December 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_TIMESTAMP "8" "April 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_timestamp \- report or set timestamp on SCSI device
 .SH SYNOPSIS
 .B sg_timestamp
-[\fI\-\-help\fR] [\fI\-\-milliseconds=MS\fR] [\fI\-\-origin\fR]
+[\fI\-\-elapsed\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-milliseconds=MS\fR] [\fI\-\-no\-timestamp\fR] [\fI\-\-origin\fR]
 [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-seconds=SEC\fR] [\fI\-\-srep\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -26,18 +27,46 @@ timestamps and more humanly readable forms. See the EXAMPLES section below.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-e\fR, \fB\-\-elapsed\fR
+assume the timestamp in the REPORT TIMESTAMP is an elapsed time from an
+event such as a power cycle or hard reset and format the output as '<n>
+days hh:mm:ss.xxx' where hh is hours (00 to 23 inclusive); mm is
+minutes (00 to 59 inclusive); ss is seconds (00 to 59 inclusive) and xxx
+is milliseconds (000 to 999 inclusive). If the number of days is 0
+then '0 days' is not output unless this option is given two or more times.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the response to REPORT TIMESTAMP in ASCII hexadecimal on stderr. The
+response is not decoded.
 .TP
 \fB\-m\fR, \fB\-\-milliseconds\fR=\fIMS\fR
 where \fIMS\fR is the number of milliseconds since 1970\-01\-01 00:00:00 UTC
 to set in the \fIDEVICE\fR with the SCSI SET TIMESTAMP command.
+.TP
+\fB\-N\fR, \fB\-\-no\-timestamp\fR
+when REPORT TIMESTAMP is called this option suppress the output of the
+timestamp value (in either seconds or milliseconds). This may be useful
+in uncluttering the output when trying to decode the timestamp origin (see
+the \fI\-\-origin\fR option).
 .TP
 \fB\-o\fR, \fB\-\-origin\fR
 the REPORT TIMESTAMP returned parameter data contains a "timestamp origin"
 field. When this option is given, that field is decoded and printed out
 before the timestamp value is output. The default action (i.e. when the
 option is not given) is not to print out this decoded field.
+.br
+T10 defines this field as "the most recent event that initialized the
+returned device clock". The value 0 indicates a power up of hard reset
+initialized the clock; 2 indicates a SET TIMESTAMP initialized the
+clock while 3 indicates some other method initialized the clock.
+.br
+When used once a descriptive string is output (in a line before the
+timestamp value). When used twice the value of the TIMESTAMP ORIGIN
+field is output (in decimal, a value between 0 and 7 inclusive). When
+used thrice a line of the form 'TIMESTAMP_ORIGIN=<value>' is output.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the SCSI REPORT TIMESTAMP response (i.e. the data\-out buffer) in
@@ -84,7 +113,7 @@ readable form the following could be used:
 .br
 1448993950
 .br
-   # date \-\-date="@1448993950"
+   # date \-\-date=@1448993950
 .br
 Tue Dec  1 13:19:10 EST 2015
 .br
@@ -96,7 +125,7 @@ The latter two date commands show different forms of the same date (i.e.
 1448993950 seconds since 1970\-01\-01 00:00:00 UTC). The sg_timestamp and
 date commands can be combined using backquotes:
 .PP
-   # date \-R \-\-date="@`sg_timestamp \-S /dev/sdc`"
+   # date \-R \-\-date=@`sg_timestamp \-S /dev/sdc`
 .br
 Wed, 16 Dec 2015 20:12:59 \-0500
 .PP
@@ -118,7 +147,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2015 Douglas Gilbert
+Copyright \(co 2015\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

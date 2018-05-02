@@ -36,16 +36,16 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.15 20180329";
+static const char * version_str = "1.16 20180425";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
  * its fields: reference-tag (4 bytes), application-tag (2 bytes) and
  * tag-mask (2 bytes) are often abbreviated to RT, AT and TM respectively.
  * And the LBA Range Descriptor associated with the WRITE SCATTERED command
- * is abbreviated to RD. A degenerate RD is one where both the LBA and length
- * components are zero; they are not illegal according to T10 but are a
- * little tricky to handle when scanning and little extra information
+ * is abbreviated to RD. A degenerate RD is one where length components,
+ ( and perhaps the LBA, are zero; it is not illegal according to T10 but are
+ * a little tricky to handle when scanning and little extra information
  * is provided. */
 
 #define ORWRITE16_OP 0x8b
@@ -1841,7 +1841,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
-            return SG_LIB_OS_BASE_ERR + ENOMEM;
+            return sg_convert_errno(ENOMEM);
         }
         ret = bin_read(infd, up, ((if_len < d) ? if_len : d), "IF c1");
         if (ret)
@@ -1908,7 +1908,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
-                ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+                ret = sg_convert_errno(ENOMEM);
                 goto finii;
             }
             memcpy(u2p, up, d);
@@ -1943,7 +1943,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
-            return SG_LIB_OS_BASE_ERR + ENOMEM;
+            return sg_convert_errno(ENOMEM);
         }
         num_lbard = 0;
         sum_num = 0;
@@ -2032,7 +2032,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
-            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+            ret = sg_convert_errno(ENOMEM);
             goto finii;
         }
         ret = bin_read(sfr_fd, up, sf_len, "SF");
@@ -2054,7 +2054,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             if (NULL == u2p) {
                 pr2serr("unable to allocate memory for final "
                         "scatterlist+data\n");
-                ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+                ret = sg_convert_errno(ENOMEM);
                 goto finii;
             }
             memcpy(u2p, up, dd);
@@ -2096,7 +2096,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         if (NULL == up) {
             pr2serr("unable to allocate aligned memory for "
                     "scatterlist+data\n");
-            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+            ret = sg_convert_errno(ENOMEM);
             goto finii;
         }
         for (n = lbard_sz, k = 0; k < (int)addr_arr_len; ++k,
@@ -2562,7 +2562,7 @@ main(int argc, char * argv[])
         up = sg_memalign(do_len, 0, &free_up, false);
         if (NULL == up) {
             pr2serr("unable to allocate %u bytes of memory\n", do_len);
-            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+            ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
         ret = bin_read(infd, up, ((if_len < do_len) ? if_len : do_len),

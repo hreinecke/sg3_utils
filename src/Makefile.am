@@ -35,7 +35,7 @@ endif
 
 
 # For C++/clang testing
-## CC = gcc
+## CC = gcc-8
 ## CC = g++
 ## CC = clang
 ## CC = clang++
@@ -49,6 +49,7 @@ AM_CFLAGS = -Wall -W
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
 # AM_CFLAGS = -Wall -W -pedantic -std=c++14
+# AM_CFLAGS = -Wall -W -pedantic -std=c++1z
 
 sg_bg_ctl_LDADD = ../lib/libsgutils2.la
 
