@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.97 20180219";
+static const char * version_str = "5.98 20180502";
 
 
 #define ME "sg_dd: "
@@ -71,7 +71,7 @@ static const char * version_str = "5.97 20180219";
 
 #define STR_SZ 1024
 #define INOUTF_SZ 512
-#define EBUFF_SZ 512
+#define EBUFF_SZ 768
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

@@ -35,20 +35,21 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20180219";
+static const char * version_str = "1.17 20180502";
 
 
-#define MAX_XFER_LEN 10000
+#define MAX_XFER_LEN (15 * 1024)
 
 /* #define SG_DEBUG */
 
 #define ME "sg_write_long: "
 
-#define EBUFF_SZ 256
+#define EBUFF_SZ 512
 
 static struct option long_options[] = {
         {"16", no_argument, 0, 'S'},
         {"cor_dis", no_argument, 0, 'c'},
+        {"cor-dis", no_argument, 0, 'c'},
         {"help", no_argument, 0, 'h'},
         {"in", required_argument, 0, 'i'},
         {"lba", required_argument, 0, 'l'},
@@ -56,7 +57,9 @@ static struct option long_options[] = {
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {"wr_uncor", no_argument, 0, 'w'},
+        {"wr-uncor", no_argument, 0, 'w'},
         {"xfer_len", required_argument, 0, 'x'},
+        {"xfer-len", required_argument, 0, 'x'},
         {0, 0, 0, 0},
 };
 
@@ -111,6 +114,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     uint8_t * writeLongBuff = NULL;
     void * rawp = NULL;
+    uint8_t * free_rawp = NULL;
     const char * ten_or;
     char file_name[256];
     char b[80];
@@ -209,9 +213,9 @@ main(int argc, char * argv[])
             pr2serr(">>> warning: when '--wr_uncor' given '-in=' is "
                     "ignored\n");
     } else {
-        if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
+        if (NULL == (rawp = sg_memalign(MAX_XFER_LEN, 0, &free_rawp, false))) {
             pr2serr(ME "out of memory\n");
-            ret = SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
         writeLongBuff = (uint8_t *)rawp;
@@ -279,8 +283,8 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (rawp)
-        free(rawp);
+    if (free_rawp)
+        free(free_rawp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));

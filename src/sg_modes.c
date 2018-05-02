@@ -550,7 +550,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0xa, 0x5, "IO advice hints grouping"}, /* added sbc4r06 */
     {0xa, 0x6, "Background operation control"}, /* added sbc4r07 */
     {0xa, 0xf1, "Parallel ATA control (SAT)"},
-    {0xa, 0xf2, "Reserved (SATA control) (SAT)"},
+/*  {0xa, 0xf2, "Reserved (SATA control) (SAT)"}, // proposed + dropped ?? */
     {0xb, 0x0, "Medium types supported (obsolete)"},
     {0xc, 0x0, "Notch and partition (obsolete)"},
     {0xd, 0x0, "Power condition (obsolete, moved to 0x1a)"},

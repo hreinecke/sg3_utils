@@ -22,6 +22,15 @@ extern "C" {
  * commands (e.g. FORMAT UNIT and the Third Party copy commands) can take
  * a lot longer than the default timeout. */
 
+/* Functions with the "_pt" suffix ^^^ take a pointer to an object (derived
+ * from) sg_pt_base rather than an open file descriptor as their first
+ * argument. That object is assumed to be constructed and have a device file
+ * descriptor * associated with it. Caller is responsible for lifetime of
+ * ptp.
+ *    ^^^ apart from sg_ll_ata_pt() as 'pass-through' is part of its name. */
+
+struct sg_pt_base;
+
 
 /* Invokes a ATA PASS-THROUGH (12, 16 or 32) SCSI command (SAT). This is
  * selected by the cdb_len argument that can take values of 12, 16 or 32
@@ -180,6 +189,10 @@ int sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
                           int mx_resp_len, int timeout_secs, int * residp,
                           bool noisy, int verbose);
 
+int sg_ll_receive_diag_pt(struct sg_pt_base * ptp, bool pcv, int pg_code,
+                          void * resp, int mx_resp_len, int timeout_secs,
+                          int * residp, bool noisy, int verbose);
+
 /* Invokes a SCSI REPORT IDENTIFYING INFORMATION command. This command was
  * called REPORT DEVICE IDENTIFIER prior to spc4r07. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Report identifying information not supported,
@@ -224,6 +237,11 @@ int sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
 int sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
                     bool devofl_bit, bool unitofl_bit, int long_duration,
                     void * paramp, int param_len, bool noisy, int verbose);
+
+int sg_ll_send_diag_pt(struct sg_pt_base * ptp, int st_code, bool pf_bit,
+                       bool st_bit, bool devofl_bit, bool unitofl_bit,
+                       int long_duration, void * paramp, int param_len,
+                       bool noisy, int verbose);
 
 /* Invokes a SCSI SET IDENTIFYING INFORMATION command. This command was
  * called SET DEVICE IDENTIFIER prior to spc4r07. Return of 0 -> success,

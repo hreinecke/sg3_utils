@@ -661,7 +661,7 @@ main(int argc, char * argv[])
             if (! got_stdin)
                 close(infd);
         }
-        wBuff[0] = op->count & 0x1f;;
+        wBuff[0] = op->count & 0x1f;
         if (op->test)
             wBuff[0] |= ((op->test & 0x3) << 5);
         if (op->invert)

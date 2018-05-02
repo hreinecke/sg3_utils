@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.24 (2018-03-02)"
+#define SG_RAW_VERSION "0.4.25 (2018-04-25)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -576,7 +576,7 @@ fetch_dataout(struct opts_t * op, uint8_t ** free_buf, int * errp)
         pr2serr("sg_memalign: failed to get %d bytes of memory\n",
                 op->dataout_len);
         if (errp)
-            *errp = SG_LIB_OS_BASE_ERR + ENOMEM;
+            *errp = sg_convert_errno(ENOMEM);
         goto bail;
     }
 
@@ -728,7 +728,7 @@ main(int argc, char *argv[])
         if (dinp == NULL) {
             pr2serr("sg_memalign: failed to get %d bytes of memory\n",
                     din_len);
-            ret = SG_LIB_OS_BASE_ERR + ENOMEM;
+            ret = sg_convert_errno(ENOMEM);
             goto done;
         }
         if (op->verbose > 2)

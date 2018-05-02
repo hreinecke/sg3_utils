@@ -28,6 +28,13 @@
 extern "C" {
 #endif
 
+/* Functions with the "_pt" suffix take a pointer to an object (derived from)
+ * sg_pt_base rather than an open file descriptor as their first argument.
+ * That object is assumed to be constructed and have a device file descriptor
+ * associated with it. Caller is responsible for lifetime of ptp. */
+
+struct sg_pt_base;
+
 
 /* Invokes a SCSI INQUIRY command and yields the response
  * Returns 0 when successful, SG_LIB_CAT_INVALID_OP -> not supported,
@@ -47,10 +54,14 @@ int sg_ll_inquiry(int sg_fd, bool cmddt, bool evpd, int pg_op, void * resp,
  * written where residp points. A residual value of 0 implies mx_resp_len
  * bytes have be written where resp points. If the residual value equals
  * mx_resp_len then no bytes have been written. */
-int
-sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
-                 int mx_resp_len, int timeout_secs, int * residp,
-                 bool noisy, int verbose);
+int sg_ll_inquiry_v2(int sg_fd, bool evpd, int pg_op, void * resp,
+                     int mx_resp_len, int timeout_secs, int * residp,
+                     bool noisy, int verbose);
+
+/* Similar to sg_ll_inquiry_v2(). See note above about "_pt" suffix. */
+int sg_ll_inquiry_pt(struct sg_pt_base * ptp, bool evpd, int pg_op,
+                     void * resp, int mx_resp_len, int timeout_secs,
+                     int * residp, bool noisy, int verbose);
 
 /* Invokes a SCSI LOG SELECT command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Log Select not supported,
@@ -165,6 +176,10 @@ int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
 int sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
                         bool noisy, int verbose);
 
+/* Similar to sg_ll_request_sense(). See note above about "_pt" suffix. */
+int sg_ll_request_sense_pt(struct sg_pt_base * ptp, bool desc, void * resp,
+                           int mx_resp_len, bool noisy, int verbose);
+
 /* Invokes a SCSI START STOP UNIT command (SBC + MMC).
  * Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Start stop unit not supported,
@@ -204,6 +219,11 @@ int sg_ll_test_unit_ready(int sg_fd, int pack_id, bool noisy, int verbose);
  * device not ready, -1 -> other failure */
 int sg_ll_test_unit_ready_progress(int sg_fd, int pack_id, int * progress,
                                    bool noisy, int verbose);
+
+/* Similar to sg_ll_test_unit_ready_progress(). See note above about "_pt"
+ * suffix. */
+int sg_ll_test_unit_ready_progress_pt(struct sg_pt_base * ptp, int pack_id,
+                                     int * progress, bool noisy, int verbose);
 
 
 struct sg_simple_inquiry_resp {
@@ -288,7 +308,6 @@ const char * sg_cmds_version();
 
 #define SG_NO_DATA_IN 0
 
-struct sg_pt_base;
 
 /* This is a helper function used by sg_cmds_* implementations after the
  * call to the pass-through. pt_res is returned from do_scsi_pt(). If valid

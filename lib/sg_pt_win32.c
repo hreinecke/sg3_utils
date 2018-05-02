@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.24 20180309 */
+/* sg_pt_win32 version 1.25 20180427 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1536,7 +1536,7 @@ nvme_identify(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                    sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + n;
     buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, false);
     if (buffer == NULL) {
-        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        res = sg_convert_errno(ENOMEM);
         if (vb > 1)
             pr2ws("%s: unable to allocate memory\n", __func__);
         psp->os_err = res;
@@ -1626,7 +1626,7 @@ nvme_get_features(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                    sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + n;
     buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, false);
     if (buffer == NULL) {
-        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        res = sg_convert_errno(ENOMEM);
         if (vb > 1)
             pr2ws("%s: unable to allocate memory\n", __func__);
         psp->os_err = res;
@@ -1705,7 +1705,7 @@ nvme_get_log_page(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                    sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) + n;
     buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, false);
     if (buffer == NULL) {
-        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        res = sg_convert_errno(ENOMEM);
         if (vb > 1)
             pr2ws("%s: unable to allocate memory\n", __func__);
         psp->os_err = res;
@@ -1787,7 +1787,7 @@ nvme_real_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                    sizeof(NVME_ERROR_INFO_LOG) + n;
     buffer = sg_memalign(bufferLength, pg_sz, &free_buffer, false);
     if (buffer == NULL) {
-        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        res = sg_convert_errno(ENOMEM);
         if (vb > 1)
             pr2ws("%s: unable to allocate memory\n", __func__);
         psp->os_err = res;
@@ -2014,7 +2014,7 @@ do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     pthru = (NVME_PASS_THROUGH_IOCTL *)sg_memalign(alloc_len, pg_sz,
                                                    &free_pthru, false);
     if (NULL == pthru) {
-        res = SG_LIB_OS_BASE_ERR + ENOMEM;
+        res = sg_convert_errno(ENOMEM);
         if (vb > 1)
             pr2ws("%s: unable to allocate memory\n", __func__);
         psp->os_err = res;

@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.22 20180219";
+static const char * version_str = "1.22 20180428";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -457,11 +457,12 @@ int
 main(int argc, char * argv[])
 {
         bool ifn_stdin;
-        int res, half_xlen;
+        int res, half_xlen, vb;
         int infd = -1;
         int wfd = -1;
         int devfd = -1;
         uint8_t * wrkBuff = NULL;
+        uint8_t * free_wrkBuff = NULL;
         struct opts_t * op;
         struct opts_t opts;
 
@@ -473,7 +474,8 @@ main(int argc, char * argv[])
                 goto out;
         }
 
-        if (op->verbose) {
+        vb = op->verbose;
+        if (vb) {
                 pr2serr("Running COMPARE AND WRITE command with the "
                         "following options:\n  in=%s ", op->ifn);
                 if (op->wfn_given)
@@ -501,16 +503,17 @@ main(int argc, char * argv[])
                 }
         }
 
-        devfd = open_dev(op->device_name, op->verbose);
+        devfd = open_dev(op->device_name, vb);
         if (devfd < 0) {
                 res = -devfd;
                 goto out;
         }
 
-        wrkBuff = (uint8_t *)malloc(op->xfer_len);
-        if (0 == wrkBuff) {
+        wrkBuff = (uint8_t *)sg_memalign(op->xfer_len, 0, &free_wrkBuff,
+                                         vb > 3);
+        if (NULL == wrkBuff) {
                 pr2serr("Not enough user memory\n");
-                res = SG_LIB_CAT_OTHER;
+                res = sg_convert_errno(ENOMEM);
                 goto out;
         }
 
@@ -547,7 +550,7 @@ main(int argc, char * argv[])
         }
         res = sg_ll_compare_and_write(devfd, wrkBuff, op->numblocks, op->lba,
                                       op->xfer_len, op->flags, ! op->quiet,
-                                      op->verbose);
+                                      vb);
 
 out:
         if (0 != res) {
@@ -559,15 +562,14 @@ out:
                 case SG_LIB_FILE_ERROR:
                         break;  /* already reported */
                 default:
-                        sg_get_category_sense_str(res, sizeof(b), b,
-                                                  op->verbose);
+                        sg_get_category_sense_str(res, sizeof(b), b, vb);
                         pr2serr(ME "SCSI COMPARE AND WRITE: %s\n", b);
                         break;
                 }
         }
 
-        if (wrkBuff)
-                free(wrkBuff);
+        if (free_wrkBuff)
+                free(free_wrkBuff);
         if ((infd >= 0) && (! ifn_stdin))
                 close(infd);
         if (wfd >= 0)

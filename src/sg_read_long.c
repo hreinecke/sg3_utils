@@ -33,13 +33,13 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.24 20180219";
+static const char * version_str = "1.26 20180502";
 
 #define MAX_XFER_LEN 10000
 
 #define ME "sg_read_long: "
 
-#define EBUFF_SZ 256
+#define EBUFF_SZ 512
 
 
 static struct option long_options[] = {
@@ -53,6 +53,7 @@ static struct option long_options[] = {
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {"xfer_len", required_argument, 0, 'x'},
+        {"xfer-len", required_argument, 0, 'x'},
         {0, 0, 0, 0},
 };
 

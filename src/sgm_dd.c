@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.51 20171209";
+static const char * version_str = "1.53 20180502";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -680,7 +680,7 @@ process_flags(const char * arg, struct flags_t * fp)
 
 #define STR_SZ 1024
 #define INOUTF_SZ 512
-#define EBUFF_SZ 512
+#define EBUFF_SZ 768
 
 
 int
@@ -1187,24 +1187,18 @@ main(int argc, char * argv[])
     if (wrkMmap) {
         wrkPos = wrkMmap;
     } else {
-        if ((FT_RAW == in_type) || (FT_RAW == out_type)) {
-            wrkBuff = (uint8_t *)malloc(blk_sz * bpt + psz);
-            if (NULL == wrkBuff) {
-                pr2serr("Not enough user memory for raw\n");
-                return SG_LIB_FILE_ERROR;
-            }
+        wrkPos = (uint8_t *)sg_memalign(blk_sz * bpt, 0, &wrkBuff,
+                                        verbose > 3);
+        if (NULL == wrkPos) {
+            pr2serr("Not enough user memory\n");
+            return sg_convert_errno(ENOMEM);
+        }
+#if 0           /* keep copy of hack below, just in case ... */
             /* perhaps use posix_memalign() instead */
+            wrkBuff = (uint8_t *)malloc(blk_sz * bpt + psz);
             wrkPos = (uint8_t *)(((sg_uintptr_t)wrkBuff + psz - 1) &
                                        (~(psz - 1)));
-        }
-        else {
-            wrkBuff = (uint8_t *)malloc(blk_sz * bpt);
-            if (NULL == wrkBuff) {
-                pr2serr("Not enough user memory\n");
-                return SG_LIB_FILE_ERROR;
-            }
-            wrkPos = wrkBuff;
-        }
+#endif
     }
 
     blocks_per = bpt;

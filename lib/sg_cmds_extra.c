@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <errno.h>
 #include <unistd.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -462,16 +463,16 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
  * value is taken as the timeout value in seconds. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
-                bool devofl_bit, bool unitofl_bit, int long_duration,
-                void * paramp, int param_len, bool noisy, int verbose)
+sg_ll_send_diag_pt(struct sg_pt_base * ptvp, int st_code, bool pf_bit,
+                   bool st_bit, bool devofl_bit, bool unitofl_bit,
+                   int long_duration, void * paramp, int param_len,
+                   bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "Send diagnostic";
     int k, res, ret, sense_cat, tmout;
     uint8_t senddiag_cdb[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
 
     senddiag_cdb[1] = (uint8_t)(st_code << 5);
     if (pf_bit)
@@ -502,12 +503,10 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
         }
     }
 
-    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
     set_scsi_pt_cdb(ptvp, senddiag_cdb, sizeof(senddiag_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
-    res = do_scsi_pt(ptvp, sg_fd, tmout, verbose);
+    res = do_scsi_pt(ptvp, -1, tmout, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
@@ -525,6 +524,23 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
     } else
         ret = 0;
 
+    return ret;
+}
+
+int
+sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
+                bool devofl_bit, bool unitofl_bit, int long_duration,
+                void * paramp, int param_len, bool noisy, int verbose)
+{
+    int ret;
+    struct sg_pt_base * ptvp;
+
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+    if (NULL == ptvp)
+        return sg_convert_errno(ENOMEM);
+    ret = sg_ll_send_diag_pt(ptvp, st_code, pf_bit, st_bit, devofl_bit,
+                             unitofl_bit, long_duration, paramp, param_len,
+                             noisy, verbose);
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
@@ -532,24 +548,13 @@ sg_ll_send_diag(int sg_fd, int st_code, bool pf_bit, bool st_bit,
 /* Invokes a SCSI RECEIVE DIAGNOSTIC RESULTS command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_receive_diag(int sg_fd, bool pcv, int pg_code, void * resp,
-                   int mx_resp_len, bool noisy, int verbose)
-{
-    return sg_ll_receive_diag_v2(sg_fd, pcv, pg_code, resp, mx_resp_len, 0,
-                                 NULL, noisy, verbose);
-}
-
-/* Invokes a SCSI RECEIVE DIAGNOSTIC RESULTS command. Return of 0 -> success,
- * various SG_LIB_CAT_* positive values or -1 -> other errors */
-int
-sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
-                      int mx_resp_len, int timeout_secs, int * residp,
-                      bool noisy, int verbose)
+sg_ll_receive_diag_pt(struct sg_pt_base * ptvp, bool pcv, int pg_code,
+                      void * resp, int mx_resp_len, int timeout_secs,
+                      int * residp, bool noisy, int verbose)
 {
     int resid = 0;
     int k, res, ret, sense_cat;
     static const char * const cdb_name_s = "Receive diagnostic results";
-    struct sg_pt_base * ptvp;
     uint8_t rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -568,15 +573,10 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
     if (timeout_secs <= 0)
         timeout_secs = DEF_PT_TIMEOUT;
 
-    if (NULL == ((ptvp = create_pt_obj(cdb_name_s)))) {
-        if (residp)
-            *residp = 0;
-        return -1;
-    }
     set_scsi_pt_cdb(ptvp, rcvdiag_cdb, sizeof(rcvdiag_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, timeout_secs, verbose);
+    res = do_scsi_pt(ptvp, -1, timeout_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
@@ -608,6 +608,41 @@ sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
         }
         ret = 0;
     }
+    return ret;
+}
+
+
+/* Invokes a SCSI RECEIVE DIAGNOSTIC RESULTS command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
+int
+sg_ll_receive_diag(int sg_fd, bool pcv, int pg_code, void * resp,
+                   int mx_resp_len, bool noisy, int verbose)
+{
+    int ret;
+    struct sg_pt_base * ptvp;
+
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+    if (NULL == ptvp)
+        return sg_convert_errno(ENOMEM);
+    ret = sg_ll_receive_diag_pt(ptvp, pcv, pg_code, resp, mx_resp_len, 0,
+                                NULL, noisy, verbose);
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
+int
+sg_ll_receive_diag_v2(int sg_fd, bool pcv, int pg_code, void * resp,
+                      int mx_resp_len, int timeout_secs, int * residp,
+                      bool noisy, int verbose)
+{
+    int ret;
+    struct sg_pt_base * ptvp;
+
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+    if (NULL == ptvp)
+        return sg_convert_errno(ENOMEM);
+    ret = sg_ll_receive_diag_pt(ptvp, pcv, pg_code, resp, mx_resp_len,
+                                timeout_secs, residp, noisy, verbose);
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }

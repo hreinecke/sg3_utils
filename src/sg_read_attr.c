@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -36,7 +37,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.08 20180219";
+static const char * version_str = "1.09 20180425";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -912,6 +913,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const char * fname = NULL;
     uint8_t * rabp = NULL;
+    uint8_t * free_rabp = NULL;
     struct opts_t opts;
     struct opts_t * op;
     char b[80];
@@ -1052,10 +1054,10 @@ main(int argc, char * argv[])
 
     if (0 == op->maxlen)
         op->maxlen = DEF_RATTR_BUFF_LEN;
-    rabp = (uint8_t *)calloc(1, op->maxlen);
+    rabp = (uint8_t *)sg_memalign(op->maxlen, 0, &free_rabp, op->verbose > 3);
     if (NULL == rabp) {
-        pr2serr("unable to calloc %d bytes\n", op->maxlen);
-        return SG_LIB_CAT_OTHER;
+        pr2serr("unable to sg_memalign %d bytes\n", op->maxlen);
+        return sg_convert_errno(ENOMEM);
     }
 
     if (NULL == device_name) {
@@ -1142,7 +1144,7 @@ close_then_end:
             ret = SG_LIB_FILE_ERROR;
     }
 clean_up:
-    if (rabp)
-        free(rabp);
+    if (free_rabp)
+        free(free_rabp);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

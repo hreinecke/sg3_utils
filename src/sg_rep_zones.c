@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -35,7 +36,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.15 20180219";
+static const char * version_str = "1.16 20180425";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -287,6 +288,7 @@ main(int argc, char * argv[])
     int64_t ll;
     const char * device_name = NULL;
     uint8_t * reportZonesBuff = NULL;
+    uint8_t * free_rzbp = NULL;
     uint8_t * bp;
     char b[80];
 
@@ -390,10 +392,11 @@ main(int argc, char * argv[])
 
     if (0 == maxlen)
         maxlen = DEF_RZONES_BUFF_LEN;
-    reportZonesBuff = (uint8_t *)calloc(1, maxlen);
+    reportZonesBuff = (uint8_t *)sg_memalign(maxlen, 0, &free_rzbp,
+                                             verbose > 3);
     if (NULL == reportZonesBuff) {
-        pr2serr("unable to malloc %d bytes\n", maxlen);
-        return SG_LIB_CAT_OTHER;
+        pr2serr("unable to sg_memalign %d bytes\n", maxlen);
+        return sg_convert_errno(ENOMEM);
     }
 
     res = sg_ll_report_zones(sg_fd, st_lba, do_partial, reporting_opt,
@@ -467,8 +470,8 @@ main(int argc, char * argv[])
     }
 
 the_end:
-    if (reportZonesBuff)
-        free(reportZonesBuff);
+    if (free_rzbp)
+        free(free_rzbp);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));

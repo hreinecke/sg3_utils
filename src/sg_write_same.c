@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.21 20180219";
+static const char * version_str = "1.22 20180425";
 
 
 #define ME "sg_write_same: "
@@ -317,6 +317,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     struct opts_t * op;
     uint8_t * wBuff = NULL;
+    uint8_t * free_wBuff = NULL;
     char ebuff[EBUFF_SZ];
     char b[80];
     uint8_t resp_buff[RCAP16_RESP_LEN];
@@ -550,11 +551,11 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        wBuff = (uint8_t*)calloc(op->xfer_len, 1);
+        wBuff = (uint8_t *)sg_memalign(op->xfer_len, 0, &free_wBuff, vb > 3);
         if (NULL == wBuff) {
-            pr2serr("unable to allocate %d bytes of memory with calloc()\n",
-                    op->xfer_len);
-            ret = SG_LIB_SYNTAX_ERROR;
+            pr2serr("unable to allocate %d bytes of memory with "
+                    "sg_memalign()\n", op->xfer_len);
+            ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
         if (op->ifilename[0]) {
@@ -610,8 +611,8 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (wBuff)
-        free(wBuff);
+    if (free_wBuff)
+        free(free_wBuff);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));

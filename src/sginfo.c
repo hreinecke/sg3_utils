@@ -374,7 +374,7 @@ struct scsi_cmnd_io
 
 #define SENSE_BUFF_LEN   64
 #define CMD_TIMEOUT   60000 /* 60,000 milliseconds (60 seconds) */
-#define EBUFF_SZ   256
+#define EBUFF_SZ   512
 
 
 #define GENERAL_ERROR           1

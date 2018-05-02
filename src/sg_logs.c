@@ -34,7 +34,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.63 20180325";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.65 20180501";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -3042,17 +3042,22 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc;
+    int k, num, param_len, pc;
     const uint8_t * bp;
     const char * cp;
     char str[PCB_STR_LEN];
     char b[256];
     char bb[32];
-    bool full, decoded, has_header;
+    bool full, decoded;
+    bool has_header = false;
     bool is_smstr = op->lep ? (MVP_SMSTR & op->lep->flags) :
                               (VP_SMSTR == op->vend_prod_num);
 
     full = ! op->do_temperature;
+    if ('\0' != t10_vendor_str[0]) {
+        if (0 != strcmp(vp_arr[VP_SMSTR].t10_vendorp, t10_vendor_str))
+            is_smstr = false;  /* Inquiry vendor string says not SmrtStor */
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -3063,54 +3068,63 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (full)
             printf("Informational Exceptions page  [0x2f]\n");
     }
-    for (k = num, has_header = false; k > 0; k -= extra, bp += extra) {
+    for (k = num; k > 0; k -= param_len, bp += param_len) {
         if (k < 3) {
             printf("short Informational Exceptions page\n");
             return false;
         }
-        extra = bp[3] + 4;
+        param_len = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
             if (op->do_raw) {
-                dStrRaw(bp, extra);
+                dStrRaw(bp, param_len);
                 break;
             } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
+                hex2stdout(bp, param_len, ((1 == op->do_hex) ? 1 : -1));
                 break;
             }
         }
         decoded = true;
         cp = NULL;
+
         switch (pc) {
         case 0x0:
-            if (extra > 5) {
+            if (param_len > 5) {
                 if (full) {
                     printf("  IE asc = 0x%x, ascq = 0x%x", bp[4], bp[5]);
                     if (bp[4] || bp[5])
                         if(sg_get_asc_ascq_str(bp[4], bp[5], sizeof(b), b))
                             printf("\n    [%s]", b);
                 }
-                if (extra > 6) {
+                if (param_len > 6) {
                     if (bp[6] < 0xff)
                         printf("\n    Current temperature = %d C", bp[6]);
                     else
                         printf("\n    Current temperature = <not available>");
-                    if (extra > 7) {
+                    if (param_len > 7) {
                         if (bp[7] < 0xff)
                             printf("\n    Threshold temperature = %d C  "
                                    "[common extension]", bp[7]);
                         else
                             printf("\n    Threshold temperature = <not "
                                    "available>");
-                     }
+                        if ((param_len > 8) && (bp[8] >= bp[6])) {
+                            if (bp[8] < 0xff)
+                                printf("\n    Maximum temperature = %d C  "
+                                       "[(since new), extension]", bp[8]);
+                            else
+                                printf("\n    Maximum temperature = <not "
+                                       "available>");
+                        }
+                    }
                 }
                 decoded = true;
             }
             break;
         default:
-            if (! is_smstr) {
+            if ((! is_smstr) || (param_len < 24)) {
                 decoded = false;
                 break;
             }
@@ -3170,8 +3184,8 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
                 break;
             }
             break;
-        }
-        if (cp && (extra >= 24)) {
+        }               /* end of switch statement */
+        if (cp && (param_len >= 24)) {
             if (! has_header) {
                 has_header = true;
                 printf("  Has|Ever  %% to  worst %%   Current      "
@@ -3188,14 +3202,14 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             /* decoded = true; */
         } else if ((! decoded) && full) {
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
-            hex2stdout(bp, extra, 1);
+            hex2stdout(bp, param_len, 1);
         }
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
             break;
-    }
+    }           /* end of for loop */
     return true;
 }
 

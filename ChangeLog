@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180414] [svn: r768]
+Changelog for sg3_utils-1.43 [20180502] [svn: r769]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -26,6 +26,8 @@ Changelog for sg3_utils-1.43 [20180414] [svn: r768]
     - --data=@FN with --status now decodes dpage(s) in FN
     - add 'offset_temp' and 'rqst_override' to temperature
       sensor element type
+    - add 'hw_reset' and 'sw_reset' to enclosure services
+      controller electronics element type (18-047r0)
     - interpret '--join --page=aes' to only display join
       rows that have a corresponding AES dpage element
     - support NVMe attached enclosure via NVME-MI Send and
@@ -111,6 +113,8 @@ Changelog for sg3_utils-1.43 [20180414] [svn: r768]
     large contiguous segments of a disk/ssd
     - add --dry-run and --force options
   - sg_wr_mode: add --rtd option for RTD bit
+  - sg_timestamp: add '--no-timestamp' option
+    - add --elapsed and --hex options
   - manpages and usage messages: corrections from
     Gris Ge via github
   - group_number: is 6 bit field allowing 0 to 63,
@@ -118,7 +122,7 @@ Changelog for sg3_utils-1.43 [20180414] [svn: r768]
   - convert many two valued 'int's to bool
   - sg_lib: add SSC maintenance in/out sa names
     - enhance exit status, add SG_LIB_OS_BASE_ERR (50)
-    - add sg_ll_inquiry_v2()
+    - add sg_ll_inquiry_v2() and sg_ll_inquiry_pt()
     - add sg_ll_log_sense_v2()
     - add sg_ll_mode_sense10_v2()
     - add sg_ll_mode_select6_v2() and
@@ -129,6 +133,9 @@ Changelog for sg3_utils-1.43 [20180414] [svn: r768]
     - add sg_ll_get_lba_status16()
     - add sg_ll_get_lba_status32()
     - add sg_ll_format_unit_v2()
+    - add sg_ll_test_unit_ready_progress_pt()
+    - add sg_ll_request_sense_pt()
+    - add sg_ll_send_diag_pt(), sg_ll_receive_diag_pt()
     - add sg_get_sfs_name() for spc5r11 (Feature sets)
     - add sg_decode_transportid_str()
     - add sg_msense_calc_length()

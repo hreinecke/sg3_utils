@@ -31,7 +31,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.38 20180329";
+static const char * version_str = "1.39 20180425";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -380,6 +380,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const char * cp;
     uint8_t * reportLunsBuff = NULL;
+    uint8_t * free_reportLunsBuff = NULL;
     uint8_t lun_arr[8];
     struct sg_simple_inquiry_resp sir;
 
@@ -593,9 +594,10 @@ main(int argc, char * argv[])
 
     if (0 == maxlen)
         maxlen = DEF_RLUNS_BUFF_LEN;
-    reportLunsBuff = (uint8_t *)calloc(1, maxlen);
+    reportLunsBuff = (uint8_t *)sg_memalign(maxlen, 0, &free_reportLunsBuff,
+                                            verbose > 3);
     if (NULL == reportLunsBuff) {
-        pr2serr("unable to malloc %d bytes\n", maxlen);
+        pr2serr("unable to sg_memalign %d bytes\n", maxlen);
         return SG_LIB_CAT_OTHER;
     }
     trunc = false;
@@ -669,8 +671,8 @@ main(int argc, char * argv[])
     }
 
 the_end:
-    if (reportLunsBuff)
-        free(reportLunsBuff);
+    if (free_reportLunsBuff)
+        free(free_reportLunsBuff);
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
