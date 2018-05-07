@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.43 20180405";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.43 20180504";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -517,6 +517,7 @@ struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
     {0x2, PDT_ZBC, "Finish zone"},
     {0x3, PDT_ZBC, "Open zone"},
     {0x4, PDT_ZBC, "Reset write pointer"},
+    {0x10, PDT_ZBC, "Sequentialize zone"},      /* zbc2r01b */
     {0xffff, 0, NULL},
 };
 

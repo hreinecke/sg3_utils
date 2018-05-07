@@ -35,12 +35,13 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.07 20180219";
+static const char * version_str = "1.08 20180504";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
 #define FINISH_ZONE_SA 0x2
 #define OPEN_ZONE_SA 0x3
+#define SEQUENTIALIZE_ZONE_SA 0x10
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
@@ -49,11 +50,13 @@ static const char * version_str = "1.07 20180219";
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
         {"close", no_argument, 0, 'c'},
+        {"count", required_argument, 0, 'C'},
         {"finish", no_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"open", no_argument, 0, 'o'},
         {"reset-all", no_argument, 0, 'R'},
         {"reset_all", no_argument, 0, 'R'},
+        {"sequentialize", no_argument, 0, 'S'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {"zone", required_argument, 0, 'z'},
@@ -66,6 +69,13 @@ static const char * sa_name_arr[] = {
     "Close zone",
     "Finish zone",
     "Open zone",
+    "-", "-", "-", "-",
+    "-",                /* 0x8 */
+    "-", "-", "-", "-",
+    "-",
+    "-",
+    "-",
+    "Sequentialize zone",       /* 0x10 */
 };
 
 
@@ -73,14 +83,18 @@ static void
 usage()
 {
     pr2serr("Usage: "
-            "sg_zone  [--all] [--close] [--finish] [--help] [--open]\n"
-            "                [--verbose] [--version] [--zone=ID] DEVICE\n");
+            "sg_zone  [--all] [--close] [--count=ZC] [--finish] [--help]\n"
+            "                [--open] [--sequentialize] [--verbose] "
+            "[--version]\n"
+            "                [--zone=ID] DEVICE\n");
     pr2serr("  where:\n"
             "    --all|-a           sets the ALL flag in the cdb\n"
             "    --close|-c         issue CLOSE ZONE command\n"
+            "    --count=ZC|-C ZC    set zone count field (def: 0)\n"
             "    --finish|-f        issue FINISH ZONE command\n"
             "    --help|-h          print out usage message\n"
             "    --open|-o          issue OPEN ZONE command\n"
+            "    --sequentialize|-S    issue SEQUENTIALIZE ZONE command\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
             "    --zone=ID|-z ID    ID is the starting LBA of the zone "
@@ -94,8 +108,8 @@ usage()
 /* Invokes the zone out command indicated by 'sa' (ZBC).  Return of 0
  * -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, bool all, bool noisy,
-               int verbose)
+sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
+               bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     struct sg_pt_base * ptvp;
@@ -106,6 +120,7 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, bool all, bool noisy,
 
     zo_cdb[1] = 0x1f & sa;
     sg_put_unaligned_be64(zid, zo_cdb + 2);
+    sg_put_unaligned_be16(zc, zo_cdb + 12);
     if (all)
         zo_cdb[14] = 0x1;
     sg_get_opcode_sa_name(zo_cdb[0], sa, -1, sizeof(b), b);
@@ -153,10 +168,12 @@ main(int argc, char * argv[])
     bool close = false;
     bool finish = false;
     bool open = false;
-    int sg_fd, res, c;
+    bool sequentialize = false;
+    int sg_fd, res, c, n;
     int verbose = 0;
     int ret = 0;
     int sa = 0;
+    uint16_t zc = 0;
     uint64_t zid = 0;
     int64_t ll;
     const char * device_name = NULL;
@@ -165,7 +182,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acfhoRvVz:", long_options,
+        c = getopt_long(argc, argv, "acC:fhoRSvVz:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -179,6 +196,15 @@ main(int argc, char * argv[])
             close = true;
             sa = CLOSE_ZONE_SA;
             break;
+        case 'C':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xffff)) {
+                pr2serr("--count= expects an argument between 0 and 0xffff "
+                        "inclusive\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            zc = (uint16_t)n;
+            break;
         case 'f':
             finish = true;
             sa = FINISH_ZONE_SA;
@@ -190,6 +216,10 @@ main(int argc, char * argv[])
         case 'o':
             open = true;
             sa = OPEN_ZONE_SA;
+            break;
+        case 'S':
+            sequentialize = true;
+            sa = SEQUENTIALIZE_ZONE_SA;
             break;
         case 'v':
             ++verbose;
@@ -225,9 +255,9 @@ main(int argc, char * argv[])
         }
     }
 
-    if (1 != ((int)close + (int)finish + (int)open)) {
-        pr2serr("one from the --close, --finish and --open options must be "
-                "given\n");
+    if (1 != ((int)close + (int)finish + (int)open + (int)sequentialize)) {
+        pr2serr("one from the --close, --finish, --open and --sequentialize "
+                "options must be given\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -241,12 +271,13 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
+        int err = -sg_fd;
         pr2serr("open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+                safe_strerror(err));
+        return sg_convert_errno(err);
     }
 
-    res = sg_ll_zone_out(sg_fd, sa, zid, all, true, verbose);
+    res = sg_ll_zone_out(sg_fd, sa, zid, zc, all, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -259,11 +290,16 @@ main(int argc, char * argv[])
         }
     }
 
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_zone failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-res);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
