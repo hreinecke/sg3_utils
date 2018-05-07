@@ -83,6 +83,7 @@ RESET WRITE POINTER sg_reset_wp
 SANITIZE            sg_sanitize
 SEEK(10)	    sg_seek ++
 SEND DIAGNOSTIC     sg_senddiag, sg_ses, sg_ses_microcode ++
+SEQUENTIALIZE ZONE  sg_zone
 SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
 SET TARGET PORT GROUPS       sg_stpg, ++
 SET TIMESTAMP       sg_timestamp
@@ -157,4 +158,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-27th January 2018
+6th May 2018

@@ -1,15 +1,16 @@
-.TH SG_RESET_WP "8" "November 2015" "sg3_utils\-1.42" SG3_UTILS
+.TH SG_RESET_WP "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_reset_wp \- send SCSI RESET WRITE POINTER command
 .SH SYNOPSIS
 .B sg_reset_wp
-[\fI\-\-all\fR] [\fI\-\-help\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-zone=ID\fR] \fIDEVICE\fR
+[\fI\-\-all\fR] [\fI\-\-count=ZC\fR] [\fI\-\-help\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-zone=ID\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Sends a SCSI RESET WRITE POINTER command to the \fIDEVICE\fR. This command
-is found in the ZBC draft standard revision 4c (zbc\-r04c.pdf).
+is found in the soon to be released ZBC standard (draft prior to standard:
+zbc\-r05.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -18,6 +19,11 @@ sets the ALL field in the cdb. This causes a reset write pointer operation of
 all open zones and full zones. When this option is given then the
 \fI\-\-zone=ID\fR option is ignored. Either this option or the
 \fI\-\-zone=ID\fR option is required.
+.TP
+\fB\-C\fR, \fB\-\-count\fR=\fIZC\fR
+ZC is placed in the Zone Count field in the cdb of the RESET WRITE POINTER
+command supported by this utility. ZC should be a value from 0 to
+65535 (0xffff) inclusive.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -43,7 +49,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2015 Douglas Gilbert
+Copyright \(co 2014\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

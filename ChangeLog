@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180502] [svn: r769]
+Changelog for sg3_utils-1.43 [20180506] [svn: r770]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -86,6 +86,8 @@ Changelog for sg3_utils-1.43 [20180502] [svn: r769]
     and '--number=NUM' for mutual compatibility
   - sg_turs: add --low option
   - sg_zone: fix debug cdb naming
+    - add --sequentialize, --count=ZC options, zbc2r01b
+  - sg_reset_wp add --count=ZC option, zbc2r01b
   - sg_persist: add --maxlen-LEN option, LEN defaults to
     decimal, similar to --alloc-length= which takes hex
   - sgp_dd: pthread_cancel() has issues in C++ (and

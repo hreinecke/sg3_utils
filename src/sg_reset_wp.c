@@ -35,7 +35,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.09 20180219";
+static const char * version_str = "1.10 20180504";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -46,6 +46,7 @@ static const char * version_str = "1.09 20180219";
 
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
+        {"count", required_argument, 0, 'C'},
         {"help", no_argument, 0, 'h'},
         {"reset-all", no_argument, 0, 'R'},
         {"reset_all", no_argument, 0, 'R'},
@@ -60,10 +61,11 @@ static void
 usage()
 {
     pr2serr("Usage: "
-            "sg_reset_wp  [--all] [--help] [--verbose] [--version]\n"
-            "                    [--zone=ID] DEVICE\n");
+            "sg_reset_wp  [--all] [--count=ZC] [--help] [--verbose]\n"
+            "                    [--version] [--zone=ID] DEVICE\n");
     pr2serr("  where:\n"
             "    --all|-a           sets the ALL flag in the cdb\n"
+            "    --count=ZC|-C ZC    set zone count field (def: 0)\n"
             "    --help|-h          print out usage message\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
@@ -78,8 +80,8 @@ usage()
 /* Invokes a SCSI RESET WRITE POINTER command (ZBC).  Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, bool all, bool noisy,
-                          int verbose)
+sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, uint16_t zc, bool all,
+                          bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rwp_cdb[SG_ZONING_OUT_CMDLEN] = {SG_ZONING_OUT,
@@ -88,6 +90,7 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, bool all, bool noisy,
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(zid, rwp_cdb + 2);
+    sg_put_unaligned_be16(zc, rwp_cdb + 12);
     if (all)
         rwp_cdb[14] = 0x1;
     if (verbose) {
@@ -132,9 +135,10 @@ main(int argc, char * argv[])
 {
     bool all = false;
     bool zid_given = false;
-    int sg_fd, res, c;
+    int sg_fd, res, c, n;
     int ret = 0;
     int verbose = 0;
+    uint16_t zc = 0;
     uint64_t zid = 0;
     int64_t ll;
     const char * device_name = NULL;
@@ -142,7 +146,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ahRvVz:", long_options,
+        c = getopt_long(argc, argv, "aC:hRvVz:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -151,6 +155,15 @@ main(int argc, char * argv[])
         case 'a':
         case 'R':
             all = true;
+            break;
+        case 'C':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 0xffff)) {
+                pr2serr("--count= expects an argument between 0 and 0xffff "
+                        "inclusive\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            zc = (uint16_t)n;
             break;
         case 'h':
         case '?':
@@ -204,12 +217,14 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
+        int err = -sg_fd;
+
         pr2serr("open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+                safe_strerror(err));
+        return sg_convert_errno(err);
     }
 
-    res = sg_ll_reset_write_pointer(sg_fd, zid, all, true, verbose);
+    res = sg_ll_reset_write_pointer(sg_fd, zid, zc, all, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)
@@ -222,11 +237,16 @@ main(int argc, char * argv[])
         }
     }
 
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_reset_wp failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
     res = sg_cmds_close_device(sg_fd);
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-res);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
