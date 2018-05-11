@@ -38,7 +38,7 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.20 20180428";
+static const char * version_str = "1.21 20180510";
 
 
 #define MAX_XFER_LEN 10000
@@ -461,7 +461,12 @@ finish:
     if (res < 0) {
         pr2serr(ME "close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-res);
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_copy_results failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

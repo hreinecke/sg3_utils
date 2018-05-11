@@ -59,6 +59,12 @@ struct sg_lib_value_name_t {
     const char * name;
 };
 
+struct sg_value_2names_t {
+    int value;
+    const char * name;
+    const char * name2;
+};
+
 struct sg_lib_asc_ascq_t {
     uint8_t asc;          /* additional sense code */
     uint8_t ascq;         /* additional sense code qualifier */
@@ -115,6 +121,8 @@ extern struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[];
 extern struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[];
 extern struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[];
 extern struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[];
+
+extern struct sg_value_2names_t sg_exit_str_arr[];
 
 #ifdef __cplusplus
 }

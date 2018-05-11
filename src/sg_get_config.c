@@ -31,7 +31,7 @@
 
 */
 
-static const char * version_str = "0.47 20180329";    /* mmc6r02 */
+static const char * version_str = "0.48 20180510";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -1050,7 +1050,7 @@ main(int argc, char * argv[])
         < 0) {
         pr2serr(ME "error opening file: %s (ro): %s\n", device_name,
                 safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(-sg_fd);
     }
     if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, verbose)) {
         if (! do_raw)
@@ -1073,7 +1073,7 @@ main(int argc, char * argv[])
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error (rw): %s\n", safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(-sg_fd);
     }
     if (do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
@@ -1109,7 +1109,12 @@ main(int argc, char * argv[])
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-ret);
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_get_config failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
