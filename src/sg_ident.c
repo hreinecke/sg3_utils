@@ -31,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.19 20180219";
+static const char * version_str = "1.20 20180510";
 
 #define ME "sg_ident: "
 
@@ -208,7 +208,7 @@ main(int argc, char * argv[])
     sg_fd = sg_cmds_open_device(device_name, false /* rw=false */, verbose);
     if (sg_fd < 0) {
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(-sg_fd);
     }
 
     memset(rdi_buff, 0x0, sizeof(rdi_buff));
@@ -279,7 +279,12 @@ err_out:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-res);
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_ident failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

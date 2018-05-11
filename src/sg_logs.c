@@ -34,7 +34,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.65 20180501";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.66 20180510";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -7071,5 +7071,10 @@ err_out:
         free(free_rsp_buff);
     if (sg_fd >= 0)
         sg_cmds_close_device(sg_fd);
+    if (0 == vb) {
+        if (! sg_if_can2stderr("sg_logs failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

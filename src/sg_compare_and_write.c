@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.22 20180428";
+static const char * version_str = "1.23 20180510";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -72,6 +72,7 @@ static struct option long_options[] = {
         {"dpo", no_argument, 0, 'd'},
         {"fua", no_argument, 0, 'f'},
         {"fua_nv", no_argument, 0, 'F'},
+        {"fua-nv", no_argument, 0, 'F'},
         {"group", required_argument, 0, 'g'},
         {"grpnum", required_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
@@ -446,9 +447,8 @@ open_dev(const char * outf, int verbose)
         if (sg_fd < 0) {
                 pr2serr(ME "open error: %s: %s\n", outf,
                         safe_strerror(-sg_fd));
-                return -SG_LIB_FILE_ERROR;
+                return -sg_convert_errno(-sg_fd);
         }
-
         return sg_fd;
 }
 
@@ -576,5 +576,10 @@ out:
                 close(wfd);
         if (devfd >= 0)
                 close(devfd);
+        if (0 == op->verbose) {
+                if (! sg_if_can2stderr("sg_compare_and_write failed: ", res))
+                        pr2serr("Some error occurred, try again with '-v' "
+                                "or '-vv' for more information\n");
+        }
         return res;
 }

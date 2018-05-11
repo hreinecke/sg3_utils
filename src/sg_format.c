@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.45 20180330";
+static const char * version_str = "1.46 20180510";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -1023,7 +1023,7 @@ main(int argc, char **argv)
                                       op->verbose)) < 0) {
                 pr2serr("error opening device file: %s: %s\n",
                         op->device_name, safe_strerror(-fd));
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(-fd);
         }
 
         if (op->format > 2)
@@ -1346,7 +1346,12 @@ out:
         if (res < 0) {
                 pr2serr("close error: %s\n", safe_strerror(-res));
                 if (0 == ret)
-                        return SG_LIB_FILE_ERROR;
+                        ret = sg_convert_errno(-res);
+        }
+        if (0 == op->verbose) {
+                if (! sg_if_can2stderr("sg_format failed: ", ret))
+                        pr2serr("Some error occurred, try again with '-v' "
+                                "or '-vv' for more information\n");
         }
         return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

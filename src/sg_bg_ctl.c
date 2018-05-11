@@ -33,7 +33,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.06 20180219";
+static const char * version_str = "1.07 20180509";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -137,7 +137,8 @@ sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c;
+    int sg_fd = -1;
+    int res, c;
     unsigned int ctl = 0;
     unsigned int time_tnth = 0;
     int verbose = 0;
@@ -203,9 +204,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     res = sg_ll_background_control(sg_fd, ctl, time_tnth, true, verbose);
@@ -221,11 +224,19 @@ main(int argc, char * argv[])
         }
     }
 
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_bg_ctl failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                return sg_convert_errno(-res);
+        }
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
