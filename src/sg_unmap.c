@@ -44,7 +44,7 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.14 20180330";
+static const char * version_str = "1.15 20180514";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -771,18 +771,18 @@ retry:
     }
 
 err_out:
-    if ((0 == vb) && (! err_printed)) {
-        if (! sg_if_can2stderr("sg_unmap failed: ", ret))
-            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
-                    "more information\n");
-    }
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
             pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
-                return SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(-res);
         }
+    }
+    if ((0 == vb) && (! err_printed)) {
+        if (! sg_if_can2stderr("sg_unmap failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

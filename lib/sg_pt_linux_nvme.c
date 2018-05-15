@@ -451,7 +451,7 @@ sntl_cache_identity(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
     ptp->nvme_id_ctlp = up;
     if (NULL == up) {
         pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
-        return -ENOMEM;
+        return sg_convert_errno(ENOMEM);
     }
     memset(&cmd, 0, sizeof(cmd));
     cmd.opcode = 0x6;   /* Identify */
@@ -461,7 +461,7 @@ sntl_cache_identity(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
     ret = do_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
     if (0 == ret)
         sntl_check_enclosure_override(ptp, vb);
-    return ret;
+    return (ret < 0) ? sg_convert_errno(-ret) : ret;
 }
 
 static const char * nvme_scsi_vendor_str = "NVMe    ";

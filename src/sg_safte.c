@@ -514,7 +514,8 @@ main(int argc, char * argv[])
 {
     bool do_insertions = false;
     bool no_hex_raw;
-    int sg_fd, c, ret, peri_type;
+    int c, ret, peri_type;
+    int sg_fd = -1;
     int res = SG_LIB_CAT_OTHER;
     const char * device_name = NULL;
     char ebuff[EBUFF_SZ];
@@ -610,10 +611,13 @@ main(int argc, char * argv[])
 
     if ((sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose))
         < 0) {
-        snprintf(ebuff, EBUFF_SZ, "sg_safte: error opening file: %s (rw)",
-                 device_name);
-        perror(ebuff);
-        return SG_LIB_FILE_ERROR;
+        if (verbose) {
+            snprintf(ebuff, EBUFF_SZ, "sg_safte: error opening file: %s (rw)",
+                     device_name);
+            perror(ebuff);
+        }
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
     no_hex_raw = ((0 == do_hex) && (0 == do_raw));
 
@@ -728,11 +732,19 @@ err_out:
         break;
     }
     ret = res;
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_safte failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

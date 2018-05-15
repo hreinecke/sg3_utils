@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <errno.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -37,7 +38,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.25 20180217";    /* spc5r19 */
+static const char * version_str = "1.26 20180515";    /* spc5r19 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -193,7 +194,8 @@ main(int argc, char * argv[])
     bool dry_run = false;
     bool got_stdin = false;
     bool wb_len_given = false;
-    int sg_fd, infd, res, c, len, k, n;
+    int infd, res, c, len, k, n;
+    int sg_fd = -1;
     int bpw = 0;
     int do_help = 0;
     int ret = 0;
@@ -369,9 +371,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr(ME "open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
     if (file_name || (wb_len > 0)) {
         if (0 == wb_len)
@@ -379,7 +383,7 @@ main(int argc, char * argv[])
         dop = sg_memalign(wb_len, 0, &free_dop, false);
         if (NULL == dop) {
             pr2serr(ME "out of memory\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
         memset(dop, 0xff, wb_len);
@@ -509,11 +513,18 @@ main(int argc, char * argv[])
 err_out:
     if (free_dop)
         free(free_dop);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_write_buffer failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

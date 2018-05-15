@@ -31,7 +31,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.16 20180219";
+static const char * version_str = "1.17 20180513";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -65,7 +65,8 @@ int main(int argc, char * argv[])
 {
     bool raw = false;
     bool readonly = false;
-    int sg_fd, res, c, sn_len, n;
+    int res, c, sn_len, n;
+    int sg_fd = -1;
     int ret = 0;
     int verbose = 0;
     uint8_t rmsn_buff[4];
@@ -130,8 +131,11 @@ int main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
 
     memset(rmsn_buff, 0x0, sizeof(rmsn_buff));
@@ -185,11 +189,18 @@ int main(int argc, char * argv[])
 err_out:
     if (bp)
         free(bp);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_rmsn failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

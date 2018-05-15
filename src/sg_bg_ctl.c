@@ -33,7 +33,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.07 20180509";
+static const char * version_str = "1.08 20180512";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -235,7 +235,7 @@ fini:
         if (res < 0) {
             pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
-                return sg_convert_errno(-res);
+                ret = sg_convert_errno(-res);
         }
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;

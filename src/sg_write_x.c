@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20180425";
+static const char * version_str = "1.17 20180515";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -2370,9 +2370,11 @@ main(int argc, char * argv[])
     /* Open device file, do READ CAPACITY(16, maybe 10) if no BS */
     sg_fd = sg_cmds_open_device(op->device_name, false /* rw */, vb);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", op->device_name,
-                safe_strerror(-sg_fd));
-        goto file_err_out;
+        if (op->verbose)
+            pr2serr("open error: %s: %s\n", op->device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
     if (0 == op->bs) {  /* ask DEVICE about logical/actual block size */
         ret = do_read_capacity(sg_fd, op);

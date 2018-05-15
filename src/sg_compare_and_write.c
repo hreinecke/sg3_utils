@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.23 20180510";
+static const char * version_str = "1.24 20180512";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -444,11 +444,9 @@ open_dev(const char * outf, int verbose)
 {
         int sg_fd = sg_cmds_open_device(outf, false /* rw */, verbose);
 
-        if (sg_fd < 0) {
+        if ((sg_fd < 0) && verbose)
                 pr2serr(ME "open error: %s: %s\n", outf,
                         safe_strerror(-sg_fd));
-                return -sg_convert_errno(-sg_fd);
-        }
         return sg_fd;
 }
 
@@ -505,7 +503,7 @@ main(int argc, char * argv[])
 
         devfd = open_dev(op->device_name, vb);
         if (devfd < 0) {
-                res = -devfd;
+                res = sg_convert_errno(-devfd);
                 goto out;
         }
 
@@ -551,8 +549,6 @@ main(int argc, char * argv[])
         res = sg_ll_compare_and_write(devfd, wrkBuff, op->numblocks, op->lba,
                                       op->xfer_len, op->flags, ! op->quiet,
                                       vb);
-
-out:
         if (0 != res) {
                 char b[80];
 
@@ -567,7 +563,7 @@ out:
                         break;
                 }
         }
-
+out:
         if (free_wrkBuff)
                 free(free_wrkBuff);
         if ((infd >= 0) && (! ifn_stdin))

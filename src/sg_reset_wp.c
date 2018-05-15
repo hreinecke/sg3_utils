@@ -35,7 +35,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.10 20180504";
+static const char * version_str = "1.11 20180513";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -135,7 +135,8 @@ main(int argc, char * argv[])
 {
     bool all = false;
     bool zid_given = false;
-    int sg_fd, res, c, n;
+    int res, c, n;
+    int sg_fd = -1;
     int ret = 0;
     int verbose = 0;
     uint16_t zc = 0;
@@ -219,9 +220,11 @@ main(int argc, char * argv[])
     if (sg_fd < 0) {
         int err = -sg_fd;
 
-        pr2serr("open error: %s: %s\n", device_name,
-                safe_strerror(err));
-        return sg_convert_errno(err);
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(err));
+        ret = sg_convert_errno(err);
+        goto fini;
     }
 
     res = sg_ll_reset_write_pointer(sg_fd, zid, zc, all, true, verbose);
@@ -237,16 +240,19 @@ main(int argc, char * argv[])
         }
     }
 
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_reset_wp failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
-    }
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            ret = sg_convert_errno(-res);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

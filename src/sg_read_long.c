@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #include <errno.h>
 #define __STDC_FORMAT_MACROS 1
@@ -127,14 +128,16 @@ main(int argc, char * argv[])
     bool pblock = false;
     bool readonly = false;
     bool got_stdout;
-    int sg_fd, outfd, res, c;
+    int outfd, res, c;
+    int sg_fd = -1;
     int ret = 0;
     int xfer_len = 520;
     int verbose = 0;
     uint64_t llba = 0;
     int64_t ll;
     uint8_t * readLongBuff = NULL;
-    void * rawp = NULL;
+    uint8_t * rawp = NULL;
+    uint8_t * free_rawp = NULL;
     const char * device_name = NULL;
     char out_fname[256];
     char ebuff[EBUFF_SZ];
@@ -221,14 +224,19 @@ main(int argc, char * argv[])
     }
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr(ME "open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
 
-    if (NULL == (rawp = malloc(MAX_XFER_LEN))) {
-        pr2serr(ME "out of memory\n");
-        sg_cmds_close_device(sg_fd);
-        return SG_LIB_SYNTAX_ERROR;
+    if (NULL == (rawp = (uint8_t *)sg_memalign(MAX_XFER_LEN, 0, &free_rawp,
+                                               false))) {
+        if (verbose)
+            pr2serr(ME "out of memory\n");
+        ret = sg_convert_errno(ENOMEM);
+        goto err_out;
     }
     readLongBuff = (uint8_t *)rawp;
     memset(rawp, 0x0, MAX_XFER_LEN);
@@ -272,12 +280,20 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (rawp) free(rawp);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (free_rawp)
+        free(free_rawp);
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_read_long failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

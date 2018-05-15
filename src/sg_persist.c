@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.63 20180326";
+static const char * version_str = "0.64 20180511";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -1282,7 +1282,7 @@ main(int argc, char * argv[])
 
 fini:
     if (ret && (0 == op->verbose) && (! flagged)) {
-        if (! sg_if_can2stderr("", ret))
+        if (! sg_if_can2stderr("sg_persist failed: ", ret))
             pr2serr("Some error occurred [%d]\n", ret);
     }
     if (sg_fd >= 0) {

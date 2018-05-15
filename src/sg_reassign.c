@@ -37,7 +37,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.24 20180219";
+static const char * version_str = "1.25 20180513";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -225,7 +225,8 @@ main(int argc, char * argv[])
     bool longlist = false;
     bool primary = false;
     bool grown = false;
-    int sg_fd, res, c, num, k, j;
+    int res, c, num, k, j;
+    int sg_fd = -1;
     int addr_arr_len = 0;
     int do_hex = 0;
     int verbose = 0;
@@ -365,8 +366,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
 
     if (got_addr) {
@@ -457,11 +461,18 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_reassign failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

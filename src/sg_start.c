@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.64 20180302";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.65 20180513";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", no_argument, 0, 'e'},
@@ -71,7 +71,7 @@ struct opts_t {
     int do_help;
     int do_mod;
     int do_pc;
-    int do_verbose;
+    int verbose;
     const char * device_name;
 };
 
@@ -247,7 +247,7 @@ news_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_stop = true;
             break;
         case 'v':
-            ++op->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
             op->do_version = true;
@@ -315,7 +315,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_readonly = true;
                     break;
                 case 'v':
-                    ++op->do_verbose;
+                    ++op->verbose;
                     break;
                 case 'V':
                     op->do_version = true;
@@ -482,7 +482,8 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 int
 main(int argc, char * argv[])
 {
-    int fd, res;
+    int res;
+    int sg_fd = -1;
     int ret = 0;
     struct opts_t opts;
     struct opts_t * op;
@@ -545,39 +546,49 @@ main(int argc, char * argv[])
         }
     }
 
-    fd = sg_cmds_open_device(op->device_name, op->do_readonly,
-                             op->do_verbose);
-    if (fd < 0) {
-        pr2serr("Error trying to open %s: %s\n", op->device_name,
-                safe_strerror(-fd));
-        return SG_LIB_FILE_ERROR;
+    sg_fd = sg_cmds_open_device(op->device_name, op->do_readonly,
+                                op->verbose);
+    if (sg_fd < 0) {
+        if (op->verbose)
+            pr2serr("Error trying to open %s: %s\n", op->device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     if (op->do_fl >= 0)
-        res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_fl, 0 /* pc */,
+        res = sg_ll_start_stop_unit(sg_fd, op->do_immed, op->do_fl, 0 /* pc */,
                                     true /* fl */, true /* loej */,
                                     true /*start */, true /* noisy */,
-                                    op->do_verbose);
+                                    op->verbose);
     else if (op->do_pc > 0)
-        res = sg_ll_start_stop_unit(fd, op->do_immed, op->do_mod,
+        res = sg_ll_start_stop_unit(sg_fd, op->do_immed, op->do_mod,
                                     op->do_pc, op->do_noflush, false, false,
-                                    true, op->do_verbose);
+                                    true, op->verbose);
     else
-        res = sg_ll_start_stop_unit(fd, op->do_immed, 0, false,
+        res = sg_ll_start_stop_unit(sg_fd, op->do_immed, 0, false,
                                     op->do_noflush, op->do_loej,
-                                    op->do_start, true, op->do_verbose);
+                                    op->do_start, true, op->verbose);
     ret = res;
     if (res) {
-        if (op->do_verbose < 2) {
+        if (op->verbose < 2) {
             char b[80];
 
-            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
             pr2serr("%s\n", b);
         }
         pr2serr("START STOP UNIT command failed\n");
     }
-    res = sg_cmds_close_device(fd);
-    if ((res < 0) && (0 == ret))
-        return SG_LIB_FILE_ERROR;
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (0 == ret)
+            ret = sg_convert_errno(-res);
+    }
+    if (0 == op->verbose) {
+        if (! sg_if_can2stderr("sg_start failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

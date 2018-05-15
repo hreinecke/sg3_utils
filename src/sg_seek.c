@@ -47,7 +47,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.03 20180304";
+static const char * version_str = "1.05 20180513";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -136,7 +136,8 @@ main(int argc, char * argv[])
     bool prefetch = false;
     bool readonly = false;
     bool start_tm_valid = false;
-    int sg_fd, res, c;
+    int res, c;
+    int sg_fd = -1;
     int first_err = 0;
     int last_err = 0;
     int ret = 0;
@@ -283,9 +284,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, readonly, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s %s\n", device_name, cdb_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s %s\n", device_name, cdb_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
     if (do_time) {
@@ -375,11 +378,19 @@ main(int argc, char * argv[])
                 printf(" code: %d\n", last_err);
         }
     }
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_seek failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

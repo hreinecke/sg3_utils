@@ -29,7 +29,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.30 20180219";
+static const char * version_str = "1.31 20180513";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -110,7 +110,8 @@ dStrRaw(const uint8_t * str, int len)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, resp_len, k, progress;
+    int res, c, resp_len, k, progress;
+    int sg_fd = -1;
     uint8_t requestSenseBuff[MAX_REQS_RESP_LEN + 1];
     bool desc = false;
     bool do_progress = false;
@@ -217,8 +218,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, true /* ro */, verbose);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr(ME "open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto finish;
     }
     if (do_progress) {
         for (k = 0; k < num_rs; ++k) {
@@ -344,11 +348,18 @@ main(int argc, char * argv[])
 #endif
 
 finish:
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_requests failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

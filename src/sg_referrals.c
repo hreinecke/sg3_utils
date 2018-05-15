@@ -35,7 +35,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.11 20180425";    /* sbc4r10 */
+static const char * version_str = "1.12 20180513";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -173,7 +173,8 @@ main(int argc, char * argv[])
     bool do_one_segment = false;
     bool o_readonly = false;
     bool do_raw = false;
-    int sg_fd, k, res, c, rlen;
+    int k, res, c, rlen;
+    int sg_fd = -1;
     int do_hex = 0;
     int maxlen = DEF_REFER_BUFF_LEN;
     int verbose = 0;
@@ -276,8 +277,10 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        ret = SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
         goto free_buff;
     }
 
@@ -345,10 +348,15 @@ the_end:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            ret = SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-res);
     }
 free_buff:
     if (free_referralBuffp)
         free(free_referralBuffp);
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_referrals failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.37 20180502";    /* ses4r02 */
+static const char * version_str = "2.38 20180511";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -558,7 +558,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
     {"hotspare", ARRAY_DEV_ETC, 1, 5, 1, NULL},
     {"hotswap", COOLING_ETC, 3, 7, 1, NULL},
     {"hotswap", ENC_SCELECTR_ETC, 3, 7, 1, NULL},       /* status only */
-    {"hw_reset", ENC_SCELECTR_ETC, 1, 2, 1, "hardware reset"}, /* 18-047r0 */
+    {"hw_reset", ENC_SCELECTR_ETC, 1, 2, 1, "hardware reset"}, /* 18-047r1 */
     {"ident", DEVICE_ETC, 2, 1, 1, "flash LED"},
     {"ident", ARRAY_DEV_ETC, 2, 1, 1, "flash LED"},
     {"ident", POWER_SUPPLY_ETC, 1, 7, 1, "flash LED"},
@@ -670,7 +670,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
      "0: leave; 1: lowest... 7: highest"},
     {"size_mult", NV_CACHE_ETC, 1, 1, 2, NULL},
     {"swap", -1, 0, 4, 1, NULL},               /* Reset swap */
-    {"sw_reset", ENC_SCELECTR_ETC, 1, 3, 1, "software reset"},/* 18-047r0 */
+    {"sw_reset", ENC_SCELECTR_ETC, 1, 3, 1, "software reset"},/* 18-047r1 */
     {"temp", TEMPERATURE_ETC, 2, 7, 8, "(Requested) temperature"},
     {"unlock", DOOR_ETC, 3, 0, 1, NULL},
     {"undertemp_fail", TEMPERATURE_ETC, 3, 1, 1, "Undertemperature failure"},
@@ -5617,10 +5617,11 @@ main(int argc, char * argv[])
     if (op->dev_name) {
         sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, vb);
         if (sg_fd < 0) {
-            pr2serr("open error: %s: %s\n", op->dev_name,
-                    safe_strerror(-sg_fd));
+            if (vb)
+                pr2serr("open error: %s: %s\n", op->dev_name,
+                        safe_strerror(-sg_fd));
             ret = sg_convert_errno(-sg_fd);
-            goto err_out;
+            goto early_out;
         }
         ptvp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
         if (NULL == ptvp) {
@@ -5830,10 +5831,6 @@ err_out:
         sg_get_category_sense_str(ret, sizeof(b), b, vb);
         pr2serr("    %s\n", b);
     }
-    if (sg_fd >= 0)
-        res = sg_cmds_close_device(sg_fd);
-    else
-        res = 0;
     if (free_enc_stat_rsp)
         free(free_enc_stat_rsp);
     if (free_elem_desc_rsp)
@@ -5842,12 +5839,16 @@ err_out:
         free(free_add_elem_rsp);
     if (free_threshold_rsp)
         free(free_threshold_rsp);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            ret = SG_LIB_FILE_ERROR;
-    }
+
 early_out:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
     if (ptvp)
         destruct_scsi_pt_obj(ptvp);
     if ((0 == vb) && (! op->quiet)) {

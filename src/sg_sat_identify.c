@@ -52,9 +52,10 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.16 20180219";
+static const char * version_str = "1.17 20180515";
 
 static struct option long_options[] = {
+        {"ck-cond", no_argument, 0, 'c'},
         {"ck_cond", no_argument, 0, 'c'},
         {"extend", no_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
@@ -392,7 +393,8 @@ int main(int argc, char * argv[])
     bool o_readonly = false;
     bool ck_cond = false;    /* set to true to read register(s) back */
     bool extend = false;    /* set to true to send 48 bit LBA with command */
-    int sg_fd, c, res;
+    int c, res;
+    int sg_fd = -1;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
     int do_hex = 0;
     int verbose = 0;
@@ -483,19 +485,29 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose)) < 0) {
-        pr2serr("error opening file: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("error opening file: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     ret = do_identify_dev(sg_fd, do_packet, cdb_len, ck_cond, extend,
                           do_ident, do_hex, do_raw, verbose);
 
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_sat_identify failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

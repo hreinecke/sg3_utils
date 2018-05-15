@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.07 20180219";
+static const char * version_str = "1.08 20180515";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -432,7 +432,8 @@ int
 main(int argc, char * argv[])
 {
     bool got_stdin = false;
-    int sg_fd, k, res, c, infd, progress, vb, n, resp_len;
+    int k, res, c, infd, progress, vb, n, resp_len, err;
+    int sg_fd = -1;
     int param_lst_len = 0;
     int ret = -1;
     const char * device_name = NULL;
@@ -582,9 +583,11 @@ main(int argc, char * argv[])
             if (! got_stdin) {
                 memset(&a_stat, 0, sizeof(a_stat));
                 if (stat(op->pattern_fn, &a_stat) < 0) {
+                    err = errno;
                     pr2serr("pattern file: unable to stat(%s): %s\n",
-                            op->pattern_fn, safe_strerror(errno));
-                    return SG_LIB_FILE_ERROR;
+                            op->pattern_fn, safe_strerror(err));
+                    ret = sg_convert_errno(err);
+                    goto err_out;
                 }
                 if (op->ipl <= 0) {
                     op->ipl = (int)a_stat.st_size;
@@ -605,9 +608,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (op->verbose)
+            pr2serr(ME "open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
 
     ret = print_dev_id(sg_fd, inq_resp, sizeof(inq_resp), op->verbose);
@@ -741,11 +746,18 @@ main(int argc, char * argv[])
 err_out:
     if (wBuff)
         free(wBuff);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == op->verbose) {
+        if (! sg_if_can2stderr("sg_sanitize failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

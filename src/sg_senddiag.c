@@ -670,7 +670,8 @@ list_page_codes()
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, k, num, rsp_len, res, rsp_buff_size, pg, bd_len, resid, vb;
+    int k, num, rsp_len, res, rsp_buff_size, pg, bd_len, resid, vb;
+    int sg_fd = -1;
     int read_in_len = 0;
     int ret = 0;
     struct opts_t opts;
@@ -791,8 +792,9 @@ main(int argc, char * argv[])
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, false /* rw */, vb)) <
          0) {
-        pr2serr(ME "error opening file: %s: %s\n", op->device_name,
-                safe_strerror(-sg_fd));
+        if (vb)
+            pr2serr(ME "error opening file: %s: %s\n", op->device_name,
+                    safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto fini;
     }
@@ -920,13 +922,20 @@ err_out9:
     if (vb < 2)
         pr2serr("  try again with '-vv' for more information\n");
 close_fini:
-    res = sg_cmds_close_device(sg_fd);
-    if ((res < 0) && (0 == ret))
-        ret = SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (0 == ret)
+            ret = sg_convert_errno(-res);
+    }
 fini:
     if (free_read_in)
         free(free_read_in);
     if (free_rsp_buff)
         free(free_rsp_buff);
+    if (0 == vb) {
+        if (! sg_if_can2stderr("sg_senddiag failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

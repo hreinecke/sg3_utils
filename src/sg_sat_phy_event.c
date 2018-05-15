@@ -25,7 +25,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.11 20180219";
+static const char * version_str = "1.12 20180515";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -62,6 +62,7 @@ static const char * version_str = "1.11 20180219";
 
 static struct option long_options[] = {
         {"ck_cond", no_argument, 0, 'c'},
+        {"ck-cond", no_argument, 0, 'c'},
         {"extend", no_argument, 0, 'e'},
         {"hex", no_argument, 0, 'H'},
         {"ignore", no_argument, 0, 'i'},

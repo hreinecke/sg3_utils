@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180510] [svn: r771]
+Changelog for sg3_utils-1.43 [20180515] [svn: r772]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -27,7 +27,7 @@ Changelog for sg3_utils-1.43 [20180510] [svn: r771]
     - add 'offset_temp' and 'rqst_override' to temperature
       sensor element type
     - add 'hw_reset' and 'sw_reset' to enclosure services
-      controller electronics element type (18-047r0)
+      controller electronics element type (18-047r1)
     - interpret '--join --page=aes' to only display join
       rows that have a corresponding AES dpage element
     - support NVMe attached enclosure via NVME-MI Send and
