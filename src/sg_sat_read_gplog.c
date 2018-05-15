@@ -52,7 +52,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.18 20180219";
+static const char * version_str = "1.19 20180513";
 
 struct opts_t {
     bool ck_cond;
@@ -69,6 +69,7 @@ struct opts_t {
 static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
     {"ck_cond", no_argument, 0, 'C'},
+    {"ck-cond", no_argument, 0, 'C'},
     {"dma", no_argument, 0, 'd'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
@@ -328,9 +329,11 @@ do_read_gplog(int sg_fd, int ata_cmd, uint8_t *inbuff,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, c, ret, res, n;
+    int c, ret, res, n;
+    int sg_fd = -1;
     int ata_cmd = ATA_READ_LOG_EXT;
-    uint8_t *inbuff;
+    uint8_t *inbuff = NULL;
+    uint8_t *free_inbuff = NULL;
     struct opts_t opts;
     struct opts_t * op;
 
@@ -431,7 +434,7 @@ main(int argc, char * argv[])
     }
 
     n = op->count * 512;
-    inbuff = (uint8_t *)malloc(n);
+    inbuff = (uint8_t *)sg_memalign(n, 0, &free_inbuff, op->verbose > 3);
     if (!inbuff) {
         pr2serr("Cannot allocate output buffer of size %d\n", n);
         return SG_LIB_CAT_OTHER;
@@ -439,21 +442,30 @@ main(int argc, char * argv[])
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, op->rdonly,
                                      op->verbose)) < 0) {
-        pr2serr("error opening file: %s: %s\n", op->device_name,
-                safe_strerror(-sg_fd));
-        ret = SG_LIB_FILE_ERROR;
+        if (op->verbose)
+            pr2serr("error opening file: %s: %s\n", op->device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
         goto fini;
     }
 
     ret = do_read_gplog(sg_fd, ata_cmd, inbuff, op);
 
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            ret = SG_LIB_FILE_ERROR;
-    }
 fini:
-    free(inbuff);
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == op->verbose) {
+        if (! sg_if_can2stderr("sg_sat_read_gplog failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
+    }
+    if (free_inbuff)
+        free(free_inbuff);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

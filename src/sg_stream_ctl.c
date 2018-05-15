@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.03 20180427";
+static const char * version_str = "1.04 20180513";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -242,7 +242,8 @@ main(int argc, char * argv[])
     bool ctl_given = false;
     bool maxlen_given = false;
     bool read_only = false;
-    int c, k, sg_fd, res, resid;
+    int c, k, res, resid;
+    int sg_fd = -1;
     int maxlen = 0;
     int ret = 0;
     int verbose = 0;
@@ -253,8 +254,8 @@ main(int argc, char * argv[])
     uint32_t param_dl;
     const char * device_name = NULL;
     const char * cmd_name = NULL;
-    uint8_t * arr;
-    uint8_t * free_arr;
+    uint8_t * arr = NULL;
+    uint8_t * free_arr = NULL;
 
     while (1) {
         int option_index = 0;
@@ -367,9 +368,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, read_only, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     if (maxlen > (int)pg_sz)
@@ -464,11 +467,18 @@ main(int argc, char * argv[])
 fini:
     if (free_arr)
         free(free_arr);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_stream_ctl failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

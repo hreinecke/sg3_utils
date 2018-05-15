@@ -50,11 +50,12 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.16 20180219";
+static const char * version_str = "1.17 20180513";
 
 static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
     {"ck_cond", no_argument, 0, 'C'},
+    {"ck-cond", no_argument, 0, 'C'},
     {"extended", no_argument, 0, 'e'},
     {"feature", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},
@@ -304,7 +305,8 @@ main(int argc, char * argv[])
     bool ck_cond = false;
     bool extend = false;
     bool rdonly = false;
-    int sg_fd, c, ret, res;
+    int c, ret, res;
+    int sg_fd = -1;
     int count = 0;
     int feature = 0;
     int verbose = 0;
@@ -409,19 +411,29 @@ main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(device_name, rdonly, verbose)) < 0) {
-        pr2serr("error opening file: %s: %s\n", device_name,
-                safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("error opening file: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
     }
 
     ret = do_set_features(sg_fd, feature, count, lba, cdb_len, ck_cond,
                           extend, verbose);
 
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_sat_set_feature failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

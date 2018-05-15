@@ -30,7 +30,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.16 20180219";
+static const char * version_str = "1.17 20180512";
 
 uint8_t mode6_hdr[] = {
     0x75, /* Length */
@@ -440,7 +440,8 @@ int main(int argc, char * argv[])
         if (fd < 0) {
                 pr2serr("open error: %s: %s\n", file_name, safe_strerror(-fd));
                 usage();
-                return SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(-fd);
+                goto fini;
         }
 
         if (fail_all) {
@@ -501,7 +502,13 @@ int main(int argc, char * argv[])
         if (res < 0) {
                 pr2serr("close error: %s\n", safe_strerror(-res));
                 if (0 == ret)
-                        return SG_LIB_FILE_ERROR;
+                        ret = sg_convert_errno(res);
+        }
+fini:
+        if (0 == do_verbose) {
+                if (! sg_if_can2stderr("sg_rdac failed: ", ret))
+                        pr2serr("Some error occurred, try again with '-v' "
+                                "or '-vv' for more information\n");
         }
         return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

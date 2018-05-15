@@ -338,13 +338,13 @@ open_sg(struct xcopy_fp_t * fp, int vb)
                  fp->sg_type & FT_BLOCK ? "block" : "char",
                  devmajor, devminor);
         perror(ebuff);
-        return -1;
+        return -sg_convert_errno(-fp->sg_fd);
     }
     if (sg_simple_inquiry(fp->sg_fd, &sir, false, vb)) {
         pr2serr("INQUIRY failed on %s\n", ebuff);
         sg_cmds_close_device(fp->sg_fd);
         fp->sg_fd = -1;
-        return -2;
+        return -1;
     }
 
     fp->pdt = sir.peripheral_type;
@@ -1716,22 +1716,25 @@ main(int argc, char * argv[])
             pr2serr("Unit attention (%s), continuing\n",
                     rec_copy_op_params_str);
             res = scsi_operating_parameter(&ixcf, 0);
-        } else {
-            if (-res == SG_LIB_CAT_INVALID_OP) {
-                pr2serr("%s command not supported on %s\n",
-                        rec_copy_op_params_str, ixcf.fname);
-                return EINVAL;
-            } else if (-res == SG_LIB_CAT_NOT_READY)
-                pr2serr("%s failed on %s - not ready\n",
-                        rec_copy_op_params_str, ixcf.fname);
-            else {
-                pr2serr("Unable to %s on %s\n", rec_copy_op_params_str,
-                        ixcf.fname);
-                return -res;
-            }
         }
-    } else if (res == 0)
-        return SG_LIB_CAT_INVALID_OP;
+        if (-res == SG_LIB_CAT_INVALID_OP) {
+            pr2serr("%s command not supported on %s\n",
+                    rec_copy_op_params_str, ixcf.fname);
+            ret = sg_convert_errno(EINVAL);
+            goto fini;
+        } else if (-res == SG_LIB_CAT_NOT_READY)
+            pr2serr("%s failed on %s - not ready\n",
+                    rec_copy_op_params_str, ixcf.fname);
+        else {
+            pr2serr("Unable to %s on %s\n", rec_copy_op_params_str,
+                    ixcf.fname);
+            ret = -res;
+            goto fini;
+        }
+    } else if (res == 0) {
+        ret = SG_LIB_CAT_INVALID_OP;
+        goto fini;
+    }
 
     if (res & TD_VPD) {
         if (verbose)
@@ -1741,10 +1744,12 @@ main(int argc, char * argv[])
                                  sizeof(src_desc), ixcf.sect_sz, ixcf.pad);
         if (src_desc_len > (int)sizeof(src_desc)) {
             pr2serr("source descriptor too large (%d bytes)\n", res);
-            return SG_LIB_CAT_MALFORMED;
+            ret = SG_LIB_CAT_MALFORMED;
+            goto fini;
         }
     } else {
-        return SG_LIB_CAT_INVALID_OP;
+        ret = SG_LIB_CAT_INVALID_OP;
+        goto fini;
     }
 
     res = scsi_operating_parameter(&oxcf, 1);
@@ -1753,22 +1758,25 @@ main(int argc, char * argv[])
             pr2serr("Unit attention (%s), continuing\n",
                     rec_copy_op_params_str);
             res = scsi_operating_parameter(&oxcf, 1);
-        } else {
-            if (-res == SG_LIB_CAT_INVALID_OP) {
-                pr2serr("%s command not supported on %s\n",
-                        rec_copy_op_params_str, oxcf.fname);
-                return EINVAL;
-            } else if (-res == SG_LIB_CAT_NOT_READY)
-                pr2serr("%s failed on %s - not ready\n",
-                        rec_copy_op_params_str, oxcf.fname);
-            else {
-                pr2serr("Unable to %s on %s\n", rec_copy_op_params_str,
-                        oxcf.fname);
-                return -res;
-            }
         }
-    } else if (res == 0)
-        return SG_LIB_CAT_INVALID_OP;
+        if (-res == SG_LIB_CAT_INVALID_OP) {
+            pr2serr("%s command not supported on %s\n",
+                    rec_copy_op_params_str, oxcf.fname);
+            ret = sg_convert_errno(EINVAL);
+            goto fini;
+        } else if (-res == SG_LIB_CAT_NOT_READY)
+            pr2serr("%s failed on %s - not ready\n",
+                    rec_copy_op_params_str, oxcf.fname);
+        else {
+            pr2serr("Unable to %s on %s\n", rec_copy_op_params_str,
+                    oxcf.fname);
+            ret = -res;
+            goto fini;
+        }
+    } else if (res == 0) {
+        ret = SG_LIB_CAT_INVALID_OP;
+        goto fini;
+    }
 
     if (res & TD_VPD) {
         if (verbose)
@@ -1778,10 +1786,12 @@ main(int argc, char * argv[])
                                  sizeof(dst_desc), oxcf.sect_sz, oxcf.pad);
         if (dst_desc_len > (int)sizeof(dst_desc)) {
             pr2serr("destination descriptor too large (%d bytes)\n", res);
-            return SG_LIB_CAT_MALFORMED;
+            ret = SG_LIB_CAT_MALFORMED;
+            goto fini;
         }
     } else {
-        return SG_LIB_CAT_INVALID_OP;
+        ret = SG_LIB_CAT_INVALID_OP;
+        goto fini;
     }
 
     if (dd_count < 0) {
@@ -1865,6 +1875,14 @@ main(int argc, char * argv[])
     else
         pr2serr("sg_xcopy: %" PRId64 " blocks, %d command%s\n", in_full,
                 num_xcopy, ((num_xcopy > 1) ? "s" : ""));
+    ret = res;
 
-    return res;
+fini:
+    /* file handles not explicity closed; let process cleanup do that */
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_xcopy failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
+                    "more information\n");
+    }
+    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

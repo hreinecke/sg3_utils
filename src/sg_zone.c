@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.08 20180504";
+static const char * version_str = "1.09 20180515";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -169,7 +169,8 @@ main(int argc, char * argv[])
     bool finish = false;
     bool open = false;
     bool sequentialize = false;
-    int sg_fd, res, c, n;
+    int res, c, n;
+    int sg_fd = -1;
     int verbose = 0;
     int ret = 0;
     int sa = 0;
@@ -272,9 +273,11 @@ main(int argc, char * argv[])
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         int err = -sg_fd;
-        pr2serr("open error: %s: %s\n", device_name,
-                safe_strerror(err));
-        return sg_convert_errno(err);
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(err));
+        ret = sg_convert_errno(err);
+        goto fini;
     }
 
     res = sg_ll_zone_out(sg_fd, sa, zid, zc, all, true, verbose);
@@ -290,16 +293,19 @@ main(int argc, char * argv[])
         }
     }
 
+fini:
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_zone failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
-    }
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            ret = sg_convert_errno(-res);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

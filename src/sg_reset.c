@@ -1,12 +1,13 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2017 D. Gilbert
+ *  Copyright (C) 1999-2018 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
  * This program send either device, bus or host resets to device,
- * or bus or host associated with the given sg device.
+ * or bus or host associated with the given sg device. This is a Linux
+ * only utility (perhaps Android as well).
  */
 
 #include <unistd.h>
@@ -30,7 +31,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.65 20171021";
+static const char * version_str = "0.66 20180515";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -103,8 +104,8 @@ usage(int compat_mode)
                 "    --host|-H       host (bus adapter: HBA) reset\n");
     }
     pr2serr("    --no-esc|-N     overrides default action and only does "
-            "    --no-escalate   The same as --no-esc|-N"
             "reset requested\n"
+            "    --no-escalate   The same as --no-esc|-N"
             "    --target|-t     target reset. The target holds the DEVICE "
             "and perhaps\n"
             "                    other LUs\n"

@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.44 20180510";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.45 20180514";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1768,6 +1768,7 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {33, "SCSI command timeout", NULL},         /* OS timed out command */
     {40, "Aborted command, protection error", NULL},
     {41, "Aborted command, protection error with Info field", NULL},
+    {47, "flock (Unix system call) error", NULL},       /* ddpt */
     {48, "NVMe command with non-zero status", NULL},
     {50, "An OS error occurred", "(errno > 46)"},
     /* OS errors (errno in Unix) from 1 to 46 mapped into this range */

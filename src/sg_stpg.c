@@ -32,7 +32,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.16 20180219";
+static const char * version_str = "1.17 20180513";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -415,7 +415,8 @@ main(int argc, char * argv[])
 {
     bool hex = false;
     bool raw = false;
-    int sg_fd, k, off, res, c, report_len, tgt_port_count;
+    int k, off, res, c, report_len, tgt_port_count;
+    int sg_fd = -1;
     int port_arr_len = 0;
     int verbose = 0;
     uint8_t reportTgtGrpBuff[TGT_GRP_BUFF_LEN];
@@ -561,8 +562,11 @@ main(int argc, char * argv[])
     }
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
-        pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (verbose)
+            pr2serr("open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
 
     if (0 == port_arr_len) {
@@ -683,11 +687,18 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == verbose) {
+        if (! sg_if_can2stderr("sg_stpg failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -71,7 +71,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int do_lba;
-    int do_verbose;
+    int verbose;
     uint64_t llba;
     const char * device_name;
 };
@@ -214,7 +214,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->o_readonly = true;
             break;
         case 'v':
-            ++op->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
             op->do_version = true;
@@ -299,7 +299,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->o_readonly = true;
                     break;
                 case 'v':
-                    ++op->do_verbose;
+                    ++op->verbose;
                     break;
                 case 'V':
                     op->do_version = true;
@@ -457,7 +457,7 @@ main(int argc, char * argv[])
     else
         rw_0_flag = true;  /* RCAP(10) has opened RO in past, so leave */
     if ((sg_fd = sg_cmds_open_device(op->device_name, rw_0_flag,
-                                     op->do_verbose)) < 0) {
+                                     op->verbose)) < 0) {
         pr2serr(ME "error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
@@ -467,7 +467,7 @@ main(int argc, char * argv[])
     if (! op->do_long) {
         res = sg_ll_readcap_10(sg_fd, op->do_pmi, (unsigned int)op->llba,
                                resp_buff, RCAP_REPLY_LEN, true,
-                               op->do_verbose);
+                               op->verbose);
         ret = res;
         if (0 == res) {
             if (op->do_hex || op->do_raw) {
@@ -525,23 +525,23 @@ main(int argc, char * argv[])
             op->do_long = true;
             sg_cmds_close_device(sg_fd);
             if ((sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
-                                             op->do_verbose)) < 0) {
+                                             op->verbose)) < 0) {
                 pr2serr(ME "error re-opening file: %s (rw): %s\n",
                         op->device_name, safe_strerror(-sg_fd));
                 ret = sg_convert_errno(-sg_fd);
                 goto fini;
             }
-            if (op->do_verbose)
+            if (op->verbose)
                 pr2serr("READ CAPACITY (10) not supported, trying READ "
                         "CAPACITY (16)\n");
         } else if (res) {
-            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
             pr2serr("READ CAPACITY (10) failed: %s\n", b);
         }
     }
     if (op->do_long) {
         res = sg_ll_readcap_16(sg_fd, op->do_pmi, op->llba, resp_buff,
-                               RCAP16_REPLY_LEN, true, op->do_verbose);
+                               RCAP16_REPLY_LEN, true, op->verbose);
         ret = res;
         if (0 == res) {
             if (op->do_hex || op->do_raw) {
@@ -619,7 +619,7 @@ main(int argc, char * argv[])
             pr2serr("bad field in READ CAPACITY (16) cdb including "
                     "unsupported service action\n");
         else if (res) {
-            sg_get_category_sense_str(res, sizeof(b), b, op->do_verbose);
+            sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
             pr2serr("READ CAPACITY (16) failed: %s\n", b);
         }
     }
@@ -633,8 +633,13 @@ fini:
         if (res < 0) {
             pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
-                return SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(-res);
         }
+    }
+    if (0 == op->verbose) {
+        if (! sg_if_can2stderr("sg_readcap failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

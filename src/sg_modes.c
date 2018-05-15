@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.60 20180414";
+static const char * version_str = "1.62 20180511";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -62,6 +62,7 @@ static struct option long_options[] = {
         {"raw", no_argument, 0, 'r'},
         {"read-write", no_argument, 0, 'w'},
         {"read_write", no_argument, 0, 'w'},
+        {"readwrite", no_argument, 0, 'w'},
         {"six", no_argument, 0, '6'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},

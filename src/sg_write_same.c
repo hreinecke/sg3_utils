@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.22 20180425";
+static const char * version_str = "1.23 20180515";
 
 
 #define ME "sg_write_same: "
@@ -150,7 +150,8 @@ usage()
             "specified blocks\nwill be filled with zeros or the "
             "'provisioning initialization pattern'\nas indicated by the "
             "LBPRZ field. As a precaution one of the '--in=',\n'--lba=' or "
-            "'--num=' options is required.\n"
+            "'--num=' options is required.\nAnother implementation of WRITE "
+            "SAME is found in the sg_write_x utility.\n"
             );
 }
 
@@ -310,7 +311,8 @@ main(int argc, char * argv[])
     bool lba_given = false;
     bool num_given = false;
     bool prot_en;
-    int sg_fd, res, c, infd, act_cdb_len, vb;
+    int res, c, infd, act_cdb_len, vb;
+    int sg_fd = -1;
     int ret = -1;
     uint32_t block_size;
     int64_t ll;
@@ -491,8 +493,11 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, vb);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        if (op->verbose)
+            pr2serr(ME "open error: %s: %s\n", device_name,
+                    safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto err_out;
     }
 
     if (! op->ndob) {
@@ -613,11 +618,18 @@ main(int argc, char * argv[])
 err_out:
     if (free_wBuff)
         free(free_wBuff);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
+    }
+    if (0 == op->verbose) {
+        if (! sg_if_can2stderr("sg_write_same failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }
