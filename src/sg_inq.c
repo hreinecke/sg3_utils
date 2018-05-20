@@ -49,7 +49,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.93 20180425";    /* SPC-5 rev 19 */
+static const char * version_str = "1.94 20180519";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -4048,12 +4048,15 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
         printf("  FGUID: 0x0\n");
     printf("  Controller ID: 0x%x\n", sg_get_unaligned_le16(dinp + 78));
     if (do_long) {      /* Bytes 240 to 255 are reserved for NVME-MI */
-        printf("  NVMe Enclosure: %d\n", !! (0x2 & dinp[253]));
-        printf("  NVMe Storage device: %d\n", !! (0x1 & dinp[253]));
-        printf("  Management endpoint capabilities, over a PCIe port: %d\n",
+        printf("  NVMe Management Interface [MI] settings:\n");
+        printf("    Enclosure: %d [NVMEE]\n", !! (0x2 & dinp[253]));
+        printf("    NVMe Storage device: %d [NVMESD]\n",
+               !! (0x1 & dinp[253]));
+        printf("    Management endpoint capabilities, over a PCIe port: %d "
+               "[PCIEME]\n",
                !! (0x2 & dinp[255]));
-        printf("  Management endpoint capabilities, over a SMBus/I2C port: "
-               "%d\n", !! (0x1 & dinp[255]));
+        printf("    Management endpoint capabilities, over a SMBus/I2C port: "
+               "%d [SMBUSME]\n", !! (0x1 & dinp[255]));
     }
     printf("  Number of namespaces: %u\n", max_nsid);
     sz1 = sg_get_unaligned_le64(dinp + 280);  /* lower 64 bits */
@@ -4186,7 +4189,7 @@ skip1:
         goto fini;
     if (nsid > 0) {
         if (! (op->do_raw || (op->do_hex > 2))) {
-            printf("  Namespace %u (derived from device name):\n", nsid);
+            printf("  Namespace %u (deduced from device name):\n", nsid);
             if (nsid > max_nsid)
                 pr2serr("NSID from device (%u) should not exceed number of "
                         "namespaces (%u)\n", nsid, max_nsid);

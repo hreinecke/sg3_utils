@@ -1,13 +1,13 @@
-.TH SG_SANITIZE "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SANITIZE "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 .SH SYNOPSIS
 .B sg_sanitize
 [\fI\-\-ause\fR] [\fI\-\-block\fR] [\fI\-\-count=OC\fR] [\fI\-\-crypto\fR]
-[\fI\-\-desc\fR] [\fI\-\-early\fR] [\fI\-\-fail\fR] [\fI\-\-help\fR]
-[\fI\-\-invert\fR] [\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR]
+[\fI\-\-dry\-run\fR] [\fI\-\-desc\fR] [\fI\-\-early\fR] [\fI\-\-fail\fR]
+[\fI\-\-help\fR] [\fI\-\-invert\fR] [\fI\-\-ipl=LEN\fR] [\fI\-\-overwrite\fR]
 [\fI\-\-pattern=PF\fR] [\fI\-\-quick\fR] [\fI\-\-test=TE\fR]
-[\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fI\-\-wait\fR] [\fI\-\-zero\fR] [\fI\-\-znr\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -72,6 +72,10 @@ used after the SANITIZE command is issued (assuming that neither the
 \fI\-\-early\fR nor the \fI\-\-wait\fR option have been given) to check
 on the progress of this command as it can take some time.
 .TP
+\fB\-D\fR, \fB\-\-dry\-run\fR
+this option will parse the command line, do all the preparation but bypass
+the actual SANITIZE command.
+.TP
 \fB\-e\fR, \fB\-\-early\fR
 the default action of this utility is to poll the disk every 60 seconds to
 fetch the progress indication until the sanitize is finished. When this
@@ -124,8 +128,8 @@ set the TEST field in the overwrite service action parameter list. This
 only affects the "overwrite" sanitize operation. The default is to place
 0 in that field.
 .TP
-\fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
-where \fISEC\fR is the number of seconds used for the timeout on the
+\fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
+where \fISECS\fR is the number of seconds used for the timeout on the
 SANITIZE command.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
@@ -234,7 +238,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2011\-2016 Douglas Gilbert
+Copyright \(co 2011\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

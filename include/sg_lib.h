@@ -14,8 +14,8 @@
  * The intention is to keep this file and the related sg_lib.c file
  * as open source and encourage their unencumbered use.
  *
- * Current version number is in the sg_lib.c file and can be accessed
- * with the sg_lib_version() function.
+ * Current version number of this library is in the sg_lib_data.c file and
+ * can be accessed with the sg_lib_version() function.
  */
 
 
@@ -27,7 +27,7 @@
  * http://www.t10.org . Virtually all devices in the Linux SCSI subsystem
  * utilize SCSI command sets. Many devices in other Linux device subsystems
  * utilize SCSI command sets either natively or via emulation (e.g. a
- * parallel ATA disk in a USB enclosure).
+ * SATA disk in a USB enclosure).
  */
 
 #include <stdio.h>
@@ -391,7 +391,6 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 /* Utilities can use these exit status values for syntax errors and
  * file (device node) problems (e.g. not found or permissions). */
 #define SG_LIB_SYNTAX_ERROR 1   /* command line syntax problem */
-#define SG_LIB_FILE_ERROR 15    /* device or other file problem */
 
 /* The sg_err_category_sense() function returns one of the following.
  * These may be used as exit status values (from a process). Notice that
@@ -417,6 +416,7 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
                                 /*       [sk,asc,ascq: 0xb,! 0x10,*] */
 #define SG_LIB_CAT_MISCOMPARE 14 /* sense key, probably verify */
                                 /*       [sk,asc,ascq: 0xe,*,*] */
+#define SG_LIB_FILE_ERROR 15    /* device or other file problem */
 #define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense" */
                                 /*       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
@@ -435,17 +435,21 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_CAT_TASK_ABORTED 29 /* SCSI status, this command aborted by? */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
                                 /*       [sk,asc,ascq: 0xb,0x10,*] */
+/* 47: flock error in ddpt */
 #define SG_LIB_NVME_STATUS 48   /* NVMe Status Field (SF) other than 0 */
 #define SG_LIB_WILD_RESID 49    /* Residual value for data-in transfer of a */
                                 /* SCSI command is nonsensical */
 #define SG_LIB_OS_BASE_ERR 50   /* in Linux: values found in: */
                                 /* include/uapi/asm-generic/errno-base.h */
                                 /* Example: ENOMEM reported as 62 (=50+12) */
+                                /* if errno > 46 then use this value */
+/* 51-->96 set aside for Unix errno values shifted by SG_LIB_OS_BASE_ERR */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
 #define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
                                 /* (e.g. a transport or driver error) */
-#define SG_LIB_UNUSED_ABOVE 99  /* Put extra errors in holes below this */
+/* 100 to 120 (inclusive) used by ddpt */
+#define SG_LIB_UNUSED_ABOVE 120  /* Put extra errors in holes below this */
 
 /* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
  * common sense key then return SG_LIB_CAT_SENSE .*/

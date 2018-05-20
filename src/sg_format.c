@@ -37,14 +37,17 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.47 20180512";
+static const char * version_str = "1.49 20180519";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
 
 #define SHORT_TIMEOUT           20   /* 20 seconds unless --wait given */
 #define FORMAT_TIMEOUT          (20 * 3600)       /* 20 hours ! */
-/* Seagate ST32000444SS 2TB disk takes 9.5 hours, now there are 4TB disks */
+#define FOUR_TBYTE      (4LL * 1000 * 1000 * 1000 * 1000)
+#define LONG_FORMAT_TIMEOUT     (40 * 3600)       /* 40 hours */
+#define EIGHT_TBYTE     (FOUR_TBYTE * 2)
+#define VLONG_FORMAT_TIMEOUT    (80 * 3600)       /* 3 days, 8 hours */
 
 #define POLL_DURATION_SECS 60
 #define DEF_POLL_TYPE_RS false     /* false -> test unit ready;
@@ -92,9 +95,10 @@ struct opts_t {
         int pie;                /* -q value */
         int sec_init;           /* -S */
         int tape;               /* -T <format>, def: -1 */
-        int timeout;            /* -m SEC, def: depends on IMMED bit */
+        int timeout;            /* -m SECS, def: depends on IMMED bit */
         int verbose;            /* -v */
         int64_t blk_count;      /* -c value */
+        int64_t total_byte_count;      /* from READ CAPACITY command */
         const char * device_name;
 };
 
@@ -150,7 +154,7 @@ usage()
                "            [--poll=PT] [--quick] [--resize] [--rto_req] "
                "[--security]\n"
                "            [--six] [--size=SIZE] [--tape=FM] "
-               "[--timeout=SEC] [--verbose]\n"
+               "[--timeout=SECS] [--verbose]\n"
                "            [--verify] [--version] [--wait] DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
@@ -211,7 +215,7 @@ usage()
                "    --tape=FM|-T FM    request FORMAT MEDIUM with FORMAT "
                "field set\n"
                "                       to FM (def: 0 --> default format)\n"
-               "    --timeout=SEC|-m SEC    FORMAT UNIT/MEDIUM command "
+               "    --timeout=SECS|-m SECS    FORMAT UNIT/MEDIUM command "
                "timeout in seconds\n"
                "    --verbose|-v    increase verbosity\n"
                "    --verify|-y     sets VERIFY bit in FORMAT MEDIUM (tape)\n"
@@ -290,20 +294,27 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
 static int
 scsi_format_unit(int fd, const struct opts_t * op)
 {
-        bool need_hdr, longlist;
+        bool need_hdr, longlist, ip_desc;
         bool immed = ! op->fwait;
-        bool ip_desc;
-        int res, progress, pr, rem, verb, fmt_pl_sz, off, resp_len;
-        int timeout;
+        int res, progress, pr, rem, verb, fmt_pl_sz, off, resp_len, timeout;
         const int SH_FORMAT_HEADER_SZ = 4;
         const int LO_FORMAT_HEADER_SZ = 8;
-        const char INIT_PATTERN_DESC_SZ = 4;
+        const int INIT_PATTERN_DESC_SZ = 4;
         uint8_t fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
         uint8_t reqSense[MAX_BUFF_SZ];
         char b[80];
 
         memset(fmt_pl, 0, sizeof(fmt_pl));
-        timeout = (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT);
+        if (immed)
+                timeout = SHORT_TIMEOUT;
+        else {
+                if (op->total_byte_count > EIGHT_TBYTE)
+                        timeout = VLONG_FORMAT_TIMEOUT;
+                else if (op->total_byte_count > FOUR_TBYTE)
+                        timeout = LONG_FORMAT_TIMEOUT;
+                else
+                        timeout = FORMAT_TIMEOUT;
+        }
         if (op->timeout > timeout)
                 timeout = op->timeout;
         longlist = (op->pie > 0);
@@ -332,13 +343,20 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 res = 0;
                 pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
                         "command\n");
-        } else {
+                if (op->verbose) {
+                        pr2serr("FU would have received: fmt_pl: ");
+                        hex2stderr(fmt_pl, sizeof(fmt_pl), -1);
+                        pr2serr("  fmtpinfo=0x%x, longlist=%d, need_hdr=%d, "
+                                "cmplst=%d, ffmt=%d, timeout=%d\n",
+                                op->fmtpinfo, longlist, need_hdr, op->cmplst,
+                                op->ffmt, timeout);
+                }
+        } else
                 res = sg_ll_format_unit_v2(fd, op->fmtpinfo, longlist,
                                         need_hdr/* FMTDATA*/, op->cmplst,
                                         0 /* DEFECT_LIST_FORMAT */, op->ffmt,
                                         timeout, fmt_pl, fmt_pl_sz, true,
                                         op->verbose);
-        }
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("Format unit command: %s\n", b);
@@ -457,7 +475,16 @@ scsi_format_medium(int fd, const struct opts_t * op)
         uint8_t reqSense[MAX_BUFF_SZ];
         char b[80];
 
-        timeout = (immed ? SHORT_TIMEOUT : FORMAT_TIMEOUT);
+        if (immed)
+                timeout = SHORT_TIMEOUT;
+        else {
+                if (op->total_byte_count > EIGHT_TBYTE)
+                        timeout = VLONG_FORMAT_TIMEOUT;
+                else if (op->total_byte_count > FOUR_TBYTE)
+                        timeout = LONG_FORMAT_TIMEOUT;
+                else
+                        timeout = FORMAT_TIMEOUT;
+        }
         if (op->timeout > timeout)
                 timeout = op->timeout;
         if (op->dry_run) {
@@ -718,12 +745,13 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
 /* Returns block size or -2 if do_16==0 and the number of blocks is too
  * big, or returns -1 for other error. */
 static int
-print_read_cap(int fd, const struct opts_t * op)
+print_read_cap(int fd, struct opts_t * op)
 {
         int res;
         uint8_t resp_buff[RCAP_REPLY_LEN];
         unsigned int last_blk_addr, block_size;
         uint64_t llast_blk_addr;
+        int64_t ll;
         char b[80];
 
         if (op->do_rcap16) {
@@ -750,6 +778,9 @@ print_read_cap(int fd, const struct opts_t * op)
                                llast_blk_addr + 1);
                         printf("   Logical block size=%u bytes\n",
                                block_size);
+                        ll = (int64_t)(llast_blk_addr + 1) * block_size;
+                        if (ll > op->total_byte_count)
+                                op->total_byte_count = ll;
                         return (int)block_size;
                 }
         } else {
@@ -770,6 +801,9 @@ print_read_cap(int fd, const struct opts_t * op)
                                last_blk_addr + 1);
                         printf("   Logical block size=%u bytes\n",
                                block_size);
+                        ll = (int64_t)(last_blk_addr + 1) * block_size;
+                        if (ll > op->total_byte_count)
+                                op->total_byte_count = ll;
                         return (int)block_size;
                 }
         }
@@ -788,6 +822,7 @@ main(int argc, char **argv)
         int resid = 0;
         int ret = 0;
         uint64_t ull;
+        int64_t ll;
         struct opts_t * op;
         uint8_t inq_resp[SAFE_STD_INQ_RESP_LEN];
         struct opts_t opts;
@@ -1158,6 +1193,9 @@ again_with_long_lba:
                 printf("  Number of blocks=%" PRIu64 " [0x%" PRIx64 "]\n",
                        ull, ull);
                 printf("  Block size=%d [0x%x]\n", bd_blk_len, bd_blk_len);
+                ll = (int64_t)ull * bd_blk_len;
+                if (ll > op->total_byte_count)
+                        op->total_byte_count = ll;
         } else {
                 printf("  No block descriptors present\n");
                 prob = true;

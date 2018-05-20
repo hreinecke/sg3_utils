@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.25 (2018-04-25)"
+#define SG_RAW_VERSION "0.4.26 (2018-05-19)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -138,7 +138,7 @@ usage()
             "  --skip=KLEN|-k KLEN    Skip the first KLEN bytes when "
             "reading\n"
             "                         data to send (default: 0)\n"
-            "  --timeout=SEC|-t SEC    Timeout in seconds (default: 20)\n"
+            "  --timeout=SECS|-t SECS    Timeout in seconds (default: 20)\n"
             "  --verbose|-v           Increase verbosity\n"
             "  --version|-V           Show version information and exit\n"
             "\n"

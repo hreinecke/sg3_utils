@@ -1,16 +1,16 @@
-.TH SG_FORMAT "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
-[\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR] [\fI\-\-fmtpinfo=FPI\fR]
-[\fI\-\-format\fR] [\fI\-\-help\fR] [\fI\-\-ip\-def\fR] [\fI\-\-long\fR]
-[\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR]
-[\fI\-\-poll=PT\fR] [\fI\-\-quick\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
-[\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=SIZE\fR] [\fI\-\-tape=FM\fR]
-[\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-verify\fR]
-[\fI\-\-version\fR] [\fI\-\-wait\fR]
+[\fI\-\-dry\-run\fR] [\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR]
+[\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR] [\fI\-\-help\fR]
+[\fI\-\-ip\-def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR]
+[\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR] [\fI\-\-quick\fR]
+[\fI\-\-resize\fR] [\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
+[\fI\-\-size=SIZE\fR] [\fI\-\-tape=FM\fR] [\fI\-\-timeout=SECS\fR]
+[\fI\-\-verbose\fR] [\fI\-\-verify\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -116,6 +116,12 @@ are usable during the format process. Using this option may speed the format.
 The default action of this utility (i.e. when this option is not given) is
 to clear the DCRT bit thereby requesting "media certification". When the DCRT
 bit is set, the FOV bit must also be set hence sg_format does that.
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+this option will parse the command line, do all the preparation but bypass
+the actual FORMAT UNIT or FORMAT MEDIUM commands. Also if the options would
+cause the logical block size to change, then the MODE SELECT command that
+would do that is also bypassed when the dry run option is given.
 .TP
 \fB\-e\fR, \fB\-\-early\fR
 during a format operation, The default action of this utility is to poll the
@@ -275,17 +281,19 @@ set to \fIFM\fR. This option is used to prepare a tape (i.e. the "medium")
 in a tape drive for use. Values for \fIFM\fR include 0 to do the "default"
 format; 1 to partition a volume and 2 to do a default format then partition.
 .TP
-\fB\-m\fR, \fB\-\-timeout\fR=\fISEC\fR
-where \fISEC\fR is the FORMAT UNIT or FORMAT MEDIUM command timeout in
-seconds. \fISEC\fR will only be used if it exceeds the internal timeout
+\fB\-m\fR, \fB\-\-timeout\fR=\fISECS\fR
+where \fISECS\fR is the FORMAT UNIT or FORMAT MEDIUM command timeout in
+seconds. \fISECS\fR will only be used if it exceeds the internal timeout
 which is 20 seconds if the IMMED bit is set and 72000 seconds (20 hours)
-if the IMMED bit is not set. If the timeout is exceeded then the
-operating system will typically abort the command. Aborting a command
-may escalate to a LUN reset (or worse). A timeout may also leave
-the disk or tape format operation incomplete. And that may result in the
-disk or tape being in a "format corrupt" state requiring another format
-to remedy the situation. So for various reasons timeouts are best
-avoided.
+or higher if the IMMED bit is not set. If the didk unit exceeds 4 TB then
+the timeout value is increased to 144000 seconds (40 hours). And if it is
+greater than 8 TB then the timeout value is increased to 288000 seconds (80
+hours). If the timeout is exceeded then the operating system will typically
+abort the command. Aborting a command may escalate to a LUN reset (or
+worse). A timeout may also leave the disk or tape format operation
+incomplete. And that may result in the disk or tape being in a "format
+corrupt" state requiring another format to remedy the situation. So for
+various reasons timeouts are best avoided.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). "\-vvv" gives
@@ -304,7 +312,7 @@ command's (short) parameter header. If this option (i.e. \fI\-\-wait\fR) is
 given then the "IMMED" bit is not set. If \fI\-\-wait\fR is given then the
 FORMAT UNIT or FORMAT MEDIUM command waits until the format operation
 completes before returning its response. This can be many hours on large
-disks. See the \fI\-\-timeout=SEC\fR option.
+disks. See the \fI\-\-timeout=SECS\fR option.
 .SH LISTS
 The SBC\-3 draft (revision 36) defines PLIST, CLIST, DLIST and GLIST in
 section 4.13 on "Medium defects". Briefly, the PLIST is the "primary"

@@ -35,7 +35,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.21 20180514";
+static const char * version_str = "1.22 20180519";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -61,7 +61,7 @@ static void usage()
 {
     pr2serr("Usage: sg_sync    [--16] [--count=COUNT] [--group=GN] [--help] "
             "[--immed]\n"
-            "                  [--lba=LBA] [--sync-nv] [--timeout=SEC] "
+            "                  [--lba=LBA] [--sync-nv] [--timeout=SECS] "
             "[--verbose]\n"
             "                  [--version] DEVICE\n"
             "  where:\n"
@@ -82,7 +82,7 @@ static void usage()
             "    --sync-nv|-s        synchronize to non-volatile storage "
             "(if distinct\n"
             "                        from medium). Obsolete in sbc3r35d.\n"
-            "    --timeout=SEC|-t SEC    command timeout in seconds, only "
+            "    --timeout=SECS|-t SECS    command timeout in seconds, only "
             "active\n"
             "                              if '--16' given (def: 60 seconds)\n"
             "    --verbose|-v        increase verbosity\n"
