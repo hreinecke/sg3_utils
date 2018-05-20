@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.08 20180502";
+static const char * version_str = "1.09 20180519";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -92,7 +92,7 @@ usage(int num)
             "sg_timestamp  [--elapsed] [--help] [--hex] [--milliseconds=MS]\n"
             "                     [--no-timestamp] [--origin] [--raw] "
             "[--readonly]\n"
-            "                     [--seconds=SEC] [--srep] [--verbose] "
+            "                     [--seconds=SECS] [--srep] [--verbose] "
             "[--version]\n"
             "                     DEVICE\n"
            );
@@ -120,7 +120,7 @@ usage(int num)
             "                       binary\n"
             "    --readonly|-R      open DEVICE read only (def: "
             "read/write)\n"
-            "    --seconds=SEC|-s SEC    set timestamp to SEC "
+            "    --seconds=SECS|-s SECS    set timestamp to SECS "
             "seconds since\n"
             "                            1970-01-01 00:00:00 UTC\n"
             "    --srep|-S          output Report timestamp in seconds "
@@ -131,7 +131,7 @@ usage(int num)
           );
     pr2serr("Performs a SCSI REPORT TIMESTAMP or SET TIMESTAMP command. "
             "The timestamp\nis SET if either the --milliseconds=MS or "
-            "--seconds=SEC option is given,\notherwise the existing "
+            "--seconds=SECS option is given,\notherwise the existing "
             "timestamp is reported in milliseconds. The\nDEVICE stores "
             "the timestamp as the number of milliseconds since power up\n"
             "(or reset) or since 1970-01-01 00:00:00 UTC which also "
@@ -374,7 +374,7 @@ main(int argc, char * argv[])
         case 's':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                pr2serr("bad argument to '--seconds=SEC'\n");
+                pr2serr("bad argument to '--seconds=SECS'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             secs = (uint64_t)ll;
@@ -414,7 +414,7 @@ main(int argc, char * argv[])
     }
 
     if (do_set > 1) {
-        pr2serr("either --milliseconds=MS or --seconds=SEC may be given, "
+        pr2serr("either --milliseconds=MS or --seconds=SECS may be given, "
                 "not both\n");
         usage(1);
         return SG_LIB_SYNTAX_ERROR;

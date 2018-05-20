@@ -5,7 +5,7 @@ sg3_utils \- a package of utilities for sending SCSI commands
 .B sg_*
 [\fI\-\-dry\-run\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-in=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
-[\fI\-\-timeout=SEC\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -516,19 +516,19 @@ SCSI command, use this option. Alternatively the \fI\-\-in=FN\fR option causes
 from a file named \fIFN\fR. In these cases this option may indicate that
 binary data can be read from stdin or from a nominated file (e.g. \fIFN\fR).
 .TP
-\fB\-t\fR, \fB\-\-timeout\fR=\fISEC\fR
+\fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
 utilities that issue potentially long\-running SCSI commands often have a
-\fI\-\-timeout=SEC\fR option. This typically instructs the operating system
+\fI\-\-timeout=SECS\fR option. This typically instructs the operating system
 to abort the SCSI command in question once the timeout expires. Aborting
 SCSI commands is typically a messy business and in the case of format like
 commands may leave the device in a "format corrupt" state requiring another
-long\-running re\-initialization command to be sent. The argument, \fISEC\fR,
+long\-running re\-initialization command to be sent. The argument, \fISECS\fR,
 is usually in seconds and the short form of the option may be something
 other than \fI\-t\fR since the timeout option was typically added later as
 storage devices grew in size and initialization commands took longer. Since
 many utilities had relatively long internal command timeouts before this
 option was introduced, the actual command timeout given to the operating
-systems is the higher of the internal timeout and \fISEC\fR.
+systems is the higher of the internal timeout and \fISECS\fR.
 .br
 Many long running SCSI commands have an IMMED bit which causes the command
 to finish relatively quickly but the initialization process to continue. In

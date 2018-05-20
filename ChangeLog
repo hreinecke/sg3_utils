@@ -2,18 +2,21 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180515] [svn: r772]
+Changelog for sg3_utils-1.43 [20180519] [svn: r773]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
   - sg_bg_ctl: new Background control command (sbc4r08)
   - sg_seek: new SEEK(10) or PRE-FETCH(10 or 16)
   - sg_stream_ctl: new, STREAM CONTROL or GET STREAM STATUS
-  - sg_senddiag: add --timeout=SEC option
-  - sg_sanitize: add --timeout=SEC option
-  - sg_format: add --timeout=SEC option
+  - sg_senddiag: add --timeout=SECS option
+  - sg_sanitize: add --timeout=SECS option
+    - add --dry-run option
+  - sg_format: add --timeout=SECS option
     - add --dry-run option to bypass modifying behaviour
     - add --quick option to skip reconsideration time
+    - extend --wait timeout to 40 hours for disk sizes
+      > 4 TB and 80 hours if > 8 TB
   - sg_decode sense: add --cdb option
   - sg_ses: handle 2 bit EIIOE field in aes dpage
     - add --quiet option to suppress messages

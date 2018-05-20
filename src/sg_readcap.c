@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.00 20180302";
+static const char * version_str = "4.01 20180519";
 
 #define ME "sg_readcap: "
 
@@ -509,11 +509,19 @@ main(int argc, char * argv[])
                     printf("Hence:\n");
 #ifdef SG_LIB_MINGW
                     printf("   Device size: %" PRIu64 " bytes, %g MiB, %g "
-                           "GB\n", total_sz, sz_mb, sz_gb);
+                           "GB", total_sz, sz_mb, sz_gb);
 #else
                     printf("   Device size: %" PRIu64 " bytes, %.1f MiB, "
-                           "%.2f GB\n", total_sz, sz_mb, sz_gb);
+                           "%.2f GB", total_sz, sz_mb, sz_gb);
 #endif
+                    if (sz_gb > 2000) {
+#ifdef SG_LIB_MINGW
+                        printf(", %g TB", sz_gb / 1000);
+#else
+                        printf(", %.2f TB", sz_gb / 1000);
+#endif
+                    }
+                    printf("\n");
                 }
                 goto fini;
             } else {

@@ -5,7 +5,7 @@ sg_timestamp \- report or set timestamp on SCSI device
 .B sg_timestamp
 [\fI\-\-elapsed\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-milliseconds=MS\fR] [\fI\-\-no\-timestamp\fR] [\fI\-\-origin\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-seconds=SEC\fR] [\fI\-\-srep\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-seconds=SECS\fR] [\fI\-\-srep\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -14,7 +14,7 @@ Sends a SCSI REPORT TIMESTAMP or SET TIMESTAMP command to the \fIDEVICE\fR.
 These commands are found in the SPC\-5 draft standard revision
 7 (spc5r07.pdf).
 .PP
-If either the \fI\-\-milliseconds=MS\fR or \fI\-\-seconds=SEC\fR option is
+If either the \fI\-\-milliseconds=MS\fR or \fI\-\-seconds=SECS\fR option is
 given (and both can't be given) then the SET TIMESTAMP command is sent;
 otherwise the REPORT TIMESTAMP command is sent.
 .PP
@@ -78,9 +78,9 @@ verbose messages are output to stderr.
 open the \fIDEVICE\fR read\-only. The default action is to open the
 \fIDEVICE\fR read\-write.
 .TP
-\fB\-s\fR, \fB\-\-seconds\fR=\fISEC\fR
-where \fISEC\fR is the number of seconds since 1970\-01\-01 00:00:00 UTC
-to set in the \fIDEVICE\fR with the SCSI SET TIMESTAMP command. \fISEC\fR
+\fB\-s\fR, \fB\-\-seconds\fR=\fISECS\fR
+where \fISECS\fR is the number of seconds since 1970\-01\-01 00:00:00 UTC
+to set in the \fIDEVICE\fR with the SCSI SET TIMESTAMP command. \fISECS\fR
 is multiplied by 1000 before being used in the SET TIMESTAMP command.
 .TP
 \fB\-S\fR, \fB\-\-srep\fR

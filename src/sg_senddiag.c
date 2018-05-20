@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.60 20180325";
+static const char * version_str = "0.61 20180519";
 
 #define ME "sg_senddiag: "
 
@@ -87,7 +87,7 @@ usage()
            "[--list]\n"
            "                   [--maxlen=LEN] [--page=PG] [--pf] "
            "[--raw=H,H...]\n"
-           "                   [--selftest=ST] [--test] [--timeout=SEC] "
+           "                   [--selftest=ST] [--test] [--timeout=SECS] "
            "[--uoff]\n"
            "                   [--verbose] [--version] [DEVICE]\n"
            "  where:\n"
@@ -117,7 +117,7 @@ usage()
            "                           5->foreground short, 6->foreground "
            "extended\n"
            "    --test|-t       default self-test\n"
-           "    --timeout=SEC|-T SEC    timeout for foreground self tests\n"
+           "    --timeout=SECS|-T SECS    timeout for foreground self tests\n"
            "                            unit: second (def: 7200 seconds)\n"
            "    --uoff|-u       unit offline (def: 0, only with '--test')\n"
            "    --verbose|-v    increase verbosity\n"
@@ -133,7 +133,7 @@ usage_old()
 {
     printf("Usage: sg_senddiag [-doff] [-e] [-h] [-H] [-l] [-pf]"
            " [-raw=H,H...]\n"
-           "                   [-s=SF] [-t] [-T=SEC] [-uoff] [-v] [-V] "
+           "                   [-s=SF] [-t] [-T=SECS] [-uoff] [-v] [-V] "
            "[DEVICE]\n"
            "  where:\n"
            "    -doff   device online (def: 0, only with '-t')\n"
@@ -151,7 +151,7 @@ usage_old()
            " 4->abort test\n"
            "            5->foreground short, 6->foreground extended\n"
            "    -t      default self-test\n"
-           "    -T SEC    timeout for foreground self tests\n"
+           "    -T SECS    timeout for foreground self tests\n"
            "    -uoff   unit offline (def: 0, only with '-t')\n"
            "    -v      increase verbosity (print issued SCSI cmds)\n"
            "    -V      output version string\n"
@@ -237,7 +237,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         case 'T':
             n = sg_get_num(optarg);
             if (n < 0) {
-                pr2serr("bad argument to '--timeout=SEC'\n");
+                pr2serr("bad argument to '--timeout=SECS'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->timeout = n;
@@ -364,7 +364,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             } else if (0 == strncmp("T=", cp, 2)) {
                 num = sscanf(cp + 2, "%d", &n);
                 if ((1 != num) || (n < 0)) {
-                    printf("Bad page code after '-T=SEC' option\n");
+                    printf("Bad page code after '-T=SECS' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }

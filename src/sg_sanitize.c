@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.08 20180515";
+static const char * version_str = "1.09 20180519";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -70,6 +70,8 @@ static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
     {"crypto", no_argument, 0, 'C'},
     {"desc", no_argument, 0, 'd'},
+    {"dry-run", no_argument, 0, 'D'},
+    {"dry_run", no_argument, 0, 'D'},
     {"early", no_argument, 0, 'e'},
     {"fail", no_argument, 0, 'F'},
     {"help", no_argument, 0, 'h'},
@@ -92,6 +94,7 @@ struct opts_t {
     bool block;
     bool crypto;
     bool desc;
+    bool dry_run;
     bool early;
     bool fail;
     bool invert;
@@ -113,13 +116,14 @@ static void
 usage()
 {
   pr2serr("Usage: sg_sanitize [--ause] [--block] [--count=OC] [--crypto] "
-          "[--early]\n"
-          "                   [--fail] [--help] [--invert] [--ipl=LEN] "
-          "[--overwrite]\n"
-          "                   [--pattern=PF] [--quick] [--test=TE] "
-          "[--timeout=SEC]\n"
-          "                   [--verbose] [--version] [--wait] [--zero] "
-          "[--znr] DEVICE\n"
+          "[--dry-run]\n"
+          "                   [--early] [--fail] [--help] [--invert] "
+          "[--ipl=LEN]\n"
+          "                   [--overwrite] [--pattern=PF] [--quick] "
+          "[--test=TE]\n"
+          "                   [--timeout=SECS] [--verbose] [--version] "
+          "[--wait]\n"
+          "                   [--zero] [--znr] DEVICE\n"
           "  where:\n"
           "    --ause|-A            set AUSE bit in cdb\n"
           "    --block|-B           do BLOCK ERASE sanitize\n"
@@ -129,6 +133,8 @@ usage()
           "    --desc|-d            polling request sense sets 'desc' "
           "field\n"
           "                         (def: clear 'desc' field)\n"
+          "    --dry-run|-D         to preparation but bypass SANITIZE "
+          "commnd\n"
           "    --early|-e           exit once sanitize started (IMMED set "
           "in cdb)\n"
           "                         user can monitor progress with REQUEST "
@@ -149,7 +155,8 @@ usage()
           "    --test=TE|-T TE      TE is placed in TEST field of "
           "OVERWRITE\n"
           "                         parameter list (def: 0)\n"
-          "    --timeout=SEC|-t SEC    SANITIZE command timeout in seconds\n"
+          "    --timeout=SECS|-t SECS    SANITIZE command timeout in "
+          "seconds\n"
           "    --verbose|-v         increase verbosity\n"
           "    --version|-V         print version string then exit\n"
           "    --wait|-w            wait for command to finish (could "
@@ -213,10 +220,14 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
         if (op->verbose > 2) {
             if (param_lst_len > 0) {
                 pr2serr("    Parameter list contents:\n");
-                hex2stderr((const uint8_t *)param_lstp, param_lst_len, 1);
+                hex2stderr((const uint8_t *)param_lstp, param_lst_len, -1);
             }
             pr2serr("    Sanitize command timeout: %d seconds\n", timeout);
         }
+    }
+    if (op->dry_run) {
+        pr2serr("Due to --dry-run option, bypassing SANITIZE command\n");
+        return 0;
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -441,6 +452,7 @@ main(int argc, char * argv[])
     char b[80];
     uint8_t rsBuff[DEF_REQS_RESP_LEN];
     uint8_t * wBuff = NULL;
+    uint8_t * free_wBuff = NULL;
     struct opts_t opts;
     struct opts_t * op;
     struct stat a_stat;
@@ -452,8 +464,8 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ABc:CdeFhi:IOp:Qt:T:vVwzZ", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "ABc:CdDeFhi:IOp:Qt:T:vVwzZ",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
@@ -476,6 +488,9 @@ main(int argc, char * argv[])
             break;
         case 'd':
             op->desc = true;
+            break;
+        case 'D':
+            op->dry_run = true;
             break;
         case 'e':
             op->early = true;
@@ -509,7 +524,7 @@ main(int argc, char * argv[])
         case 't':
             op->timeout = sg_get_num(optarg);
             if (op->timeout < 0) {
-                pr2serr("bad argument to '--timeout=SEC', want 0 or more\n");
+                pr2serr("bad argument to '--timeout=SECS', want 0 or more\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -621,7 +636,7 @@ main(int argc, char * argv[])
 
     if (op->overwrite) {
         param_lst_len = op->ipl + 4;
-        wBuff = (uint8_t*)calloc(op->ipl + 4, 1);
+        wBuff = (uint8_t*)sg_memalign(op->ipl + 4, 0, &free_wBuff, false);
         if (NULL == wBuff) {
             pr2serr("unable to allocate %d bytes of memory with calloc()\n",
                     op->ipl + 4);
@@ -697,6 +712,10 @@ main(int argc, char * argv[])
 
     if ((0 == ret) && (! op->early) && (! op->wait)) {
         for (k = 0; ;++k) {     /* unbounded, exits via break */
+            if (op->dry_run && (k > 0)) {
+                pr2serr("Due to --dry-run option, leave poll loop\n");
+                break;
+            }
             sleep_for(POLL_DURATION_SECS);
             memset(rsBuff, 0x0, sizeof(rsBuff));
             res = sg_ll_request_sense(sg_fd, op->desc, rsBuff, sizeof(rsBuff),
@@ -726,7 +745,7 @@ main(int argc, char * argv[])
             resp_len = rsBuff[7] + 8;
             if (vb > 2) {
                 pr2serr("Parameter data in hex\n");
-                hex2stderr(rsBuff, resp_len, 1);
+                hex2stderr(rsBuff, resp_len, -1);
             }
             progress = -1;
             sg_get_sense_progress_fld(rsBuff, resp_len, &progress);
@@ -744,8 +763,8 @@ main(int argc, char * argv[])
     }
 
 err_out:
-    if (wBuff)
-        free(wBuff);
+    if (free_wBuff)
+        free(free_wBuff);
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
