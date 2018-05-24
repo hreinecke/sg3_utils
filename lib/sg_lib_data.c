@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.46 20180516";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.47 20180522";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1742,7 +1742,7 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
  * that in Unix the exit status is an (unsigned) 8 bit value. */
 struct sg_value_2names_t sg_exit_str_arr[] = {
     {0,  "No errors", NULL},
-    {1,  "Syntax error", NULL},
+    {1,  "Syntax error", "command line options (usually)"},
     {2,  "Device not ready", "sense key"},
     {3,  "Medium or hardware error", "sense key (plus blank check for tape)"},
     {5,  "Illegal request", "sense key, apart from Invalid opcode"},
@@ -1765,6 +1765,8 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {27, "Task set full", "SCSI status"},
     {28, "ACA aactive", "SCSI status"},
     {29, "Task aborted", "SCSI status"},
+    {31, "Contradict", "command line options contradict or select bad mode"},
+    {32, "Logic error", "unexpected situation, contact author"},
     {33, "SCSI command timeout", NULL},         /* OS timed out command */
     {40, "Aborted command, protection error", NULL},
     {41, "Aborted command, protection error with Info field", NULL},

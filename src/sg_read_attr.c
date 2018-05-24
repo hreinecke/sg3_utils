@@ -37,7 +37,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.10 20180512";
+static const char * version_str = "1.11 20180523";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -373,15 +373,16 @@ enum_sa_acrons(void)
  * stdin). If reading ASCII hex then there should be either one entry per
  * line or a comma, space or tab separated list of bytes. If no_space is
  * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
- * error. */
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or error
+ * code. */
 static int
 f2hex_arr(const char * fname, bool as_binary, bool no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
     bool split_line, has_stdin;
-    int fn_len, in_len, k, j, m, fd;
+    int fn_len, in_len, k, j, m, fd, err;
     int off = 0;
+    int ret = SG_LIB_SYNTAX_ERROR;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -389,10 +390,10 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
     char carry_over[4];
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     fn_len = strlen(fname);
     if (0 == fn_len)
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
     if (as_binary) {
         if (has_stdin) {
@@ -402,9 +403,10 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
         } else {
             fd = open(fname, O_RDONLY);
             if (fd < 0) {
+                err = errno;
                 pr2serr("unable to open binary file %s: %s\n", fname,
-                         safe_strerror(errno));
-                return 1;
+                         safe_strerror(err));
+                return sg_convert_errno(err);
             } else if (sg_set_binary_mode(fd) < 0)
                 perror("sg_set_binary_mode");
         }
@@ -412,12 +414,15 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
         if (k <= 0) {
             if (0 == k)
                 pr2serr("read 0 bytes from binary file %s\n", fname);
-            else
+            else {
+                err = errno;
                 pr2serr("read from binary file %s: %s\n", fname,
-                        safe_strerror(errno));
+                        safe_strerror(err));
+                ret = sg_convert_errno(err);
+            }
             if (! has_stdin)
                 close(fd);
-            return 1;
+            return ret;
         }
         *mp_arr_len = k;
         if (! has_stdin)
@@ -907,8 +912,9 @@ decode_all_sa_s(const uint8_t * rabp, int len, const struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, res, c, len, resid, rlen, in_len;
+    int sg_fd, res, c, len, resid, rlen;
     unsigned int ra_len;
+    int in_len = 0;
     int ret = 0;
     const char * device_name = NULL;
     const char * fname = NULL;
@@ -1062,11 +1068,9 @@ main(int argc, char * argv[])
 
     if (NULL == device_name) {
         if (fname) {
-            if (f2hex_arr(fname, op->do_raw, 0 /* no space */, rabp,
-                          &in_len, op->maxlen)) {
-                ret = SG_LIB_FILE_ERROR;
+            if ((ret = f2hex_arr(fname, op->do_raw, 0 /* no space */, rabp,
+                                 &in_len, op->maxlen)))
                 goto clean_up;
-            }
             if (op->do_raw)
                 op->do_raw = false;    /* can interfere on decode */
             if (in_len < 4) {

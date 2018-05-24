@@ -49,7 +49,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.94 20180519";    /* SPC-5 rev 19 */
+static const char * version_str = "1.95 20180522";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -832,7 +832,7 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
     char carry_over[4];
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_LOGIC_ERROR;
     fn_len = strlen(fname);
     if (0 == fn_len)
         return SG_LIB_SYNTAX_ERROR;
@@ -4254,7 +4254,7 @@ main(int argc, char * argv[])
         if (op->page_num >= 0) {
             pr2serr("Given '-p' option and another option that "
                     "implies a page\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (isalpha(op->page_arg[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_arg);
@@ -4328,12 +4328,12 @@ main(int argc, char * argv[])
     if (op->inhex_fn) {
         if (op->device_name) {
             pr2serr("Cannot have both a DEVICE and --inhex= option\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
         if (op->do_cmddt) {
             pr2serr("Don't support --cmddt with --inhex= option\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
         err = f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff, &inhex_len,
@@ -4399,7 +4399,7 @@ main(int argc, char * argv[])
                 pr2serr("Option '--export' only supported for VPD pages 0x80 "
                         "and 0x83\n");
                 usage_for(op);
-                ret = SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_CONTRADICT;
                 goto err_out;
             }
             op->do_decode = true;
@@ -4413,7 +4413,7 @@ main(int argc, char * argv[])
     if (op->do_raw && op->do_hex) {
         pr2serr("Can't do hex and raw at the same time\n");
         usage_for(op);
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto err_out;
     }
     if (op->do_vpd && op->do_cmddt) {
@@ -4426,7 +4426,7 @@ main(int argc, char * argv[])
         pr2serr("Can't use '--cmddt' with VPD pages\n");
 #endif
         usage_for(op);
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto err_out;
     }
     if (((op->do_vpd || op->do_cmddt)) && (op->page_num < 0))
@@ -4452,7 +4452,7 @@ main(int argc, char * argv[])
     }
     if (op->num_pages && op->do_ata) {
         pr2serr("Can't use '-A' with an explicit decode VPD page option\n");
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto err_out;
     }
 
@@ -4594,7 +4594,7 @@ err_out:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            return sg_convert_errno(-res);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

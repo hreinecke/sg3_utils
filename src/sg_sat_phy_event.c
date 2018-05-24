@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <errno.h>
 #include <string.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -367,7 +368,7 @@ int main(int argc, char * argv[])
     bool raw = false;
     bool reset = false;
     bool ck_cond = false;   /* set to true to read register(s) back */
-    int sg_fd, c, k, j, res, id, len, vendor;
+    int sg_fd, c, k, j, res, id, len, vendor, err;
     char * device_name = 0;
     char ebuff[EBUFF_SZ];
     uint8_t inBuff[READ_LOG_EXT_RESPONSE_LEN];
@@ -454,10 +455,11 @@ int main(int argc, char * argv[])
     }
 
     if ((sg_fd = open(device_name, O_RDWR)) < 0) {
+        err = errno;
         snprintf(ebuff, EBUFF_SZ,
                  "sg_sat_phy_event: error opening file: %s", device_name);
         perror(ebuff);
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(err);
     }
     ret = do_read_log_ext(sg_fd, SATA_PHY_EVENT_LPAGE,
                           false /* page_in_log */,
@@ -494,9 +496,10 @@ int main(int argc, char * argv[])
 
     res = close(sg_fd);
     if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
+        err = errno;
+        pr2serr("close error: %s\n", safe_strerror(err));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(err);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.61 20180519";
+static const char * version_str = "0.62 20180523";
 
 #define ME "sg_senddiag: "
 
@@ -742,7 +742,7 @@ main(int argc, char * argv[])
             printf("setting -doff or -uoff only useful when -t is set\n");
             usage_old();
         }
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto fini;
     }
     if ((op->do_selftest > 0) && op->do_deftest) {
@@ -753,7 +753,7 @@ main(int argc, char * argv[])
             printf("either set -s=SF or -t (not both)\n");
             usage_old();
         }
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto fini;
     }
     if (op->do_raw) {
@@ -768,7 +768,7 @@ main(int argc, char * argv[])
                        "'-l'\n");
                 usage_old();
             }
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto fini;
         }
         if (! op->do_pf) {

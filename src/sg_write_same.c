@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.23 20180515";
+static const char * version_str = "1.24 20180523";
 
 
 #define ME "sg_write_same: "
@@ -311,7 +311,7 @@ main(int argc, char * argv[])
     bool lba_given = false;
     bool num_given = false;
     bool prot_en;
-    int res, c, infd, act_cdb_len, vb;
+    int res, c, infd, act_cdb_len, vb, err;
     int sg_fd = -1;
     int ret = -1;
     uint32_t block_size;
@@ -390,7 +390,7 @@ main(int argc, char * argv[])
         case 'S':
             if (DEF_WS_CDB_SIZE != op->pref_cdb_size) {
                 pr2serr("only one '--10', '--16' or '--32' please\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->pref_cdb_size = 16;
             break;
@@ -404,7 +404,7 @@ main(int argc, char * argv[])
         case 'T':
             if (DEF_WS_CDB_SIZE != op->pref_cdb_size) {
                 pr2serr("only one '--10', '--16' or '--32' please\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->pref_cdb_size = 32;
             break;
@@ -451,7 +451,7 @@ main(int argc, char * argv[])
     }
     if (op->want_ws10 && (DEF_WS_CDB_SIZE != op->pref_cdb_size)) {
         pr2serr("only one '--10', '--16' or '--32' please\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (NULL == device_name) {
         pr2serr("missing device name!\n");
@@ -463,28 +463,29 @@ main(int argc, char * argv[])
     if ((! if_given) && (! lba_given) && (! num_given)) {
         pr2serr("As a precaution, one of '--in=', '--lba=' or '--num=' is "
                 "required\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if (op->ndob) {
         if (if_given) {
             pr2serr("Can't have both --ndob and '--in='\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (0 != op->xfer_len) {
             pr2serr("With --ndob only '--xferlen=0' (or not given) is "
                     "acceptable\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     } else if (op->ifilename[0]) {
         got_stdin = (0 == strcmp(op->ifilename, "-"));
         if (! got_stdin) {
             memset(&a_stat, 0, sizeof(a_stat));
             if (stat(op->ifilename, &a_stat) < 0) {
+                err = errno;
                 if (vb)
                     pr2serr("unable to stat(%s): %s\n", op->ifilename,
-                            safe_strerror(errno));
-                return SG_LIB_FILE_ERROR;
+                            safe_strerror(err));
+                return sg_convert_errno(err);
             }
             if (op->xfer_len <= 0)
                 op->xfer_len = (int)a_stat.st_size;
@@ -570,22 +571,22 @@ main(int argc, char * argv[])
                     perror("sg_set_binary_mode");
             } else {
                 if ((infd = open(op->ifilename, O_RDONLY)) < 0) {
+                    ret = sg_convert_errno(errno);
                     snprintf(ebuff, EBUFF_SZ, ME "could not open %.400s for "
                              "reading", op->ifilename);
                     perror(ebuff);
-                    ret = SG_LIB_FILE_ERROR;
                     goto err_out;
                 } else if (sg_set_binary_mode(infd) < 0)
                     perror("sg_set_binary_mode");
             }
             res = read(infd, wBuff, op->xfer_len);
             if (res < 0) {
+                ret = sg_convert_errno(errno);
                 snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %.400s",
                          op->ifilename);
                 perror(ebuff);
                 if (! got_stdin)
                     close(infd);
-                ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
             if (res < op->xfer_len) {

@@ -32,7 +32,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.17 20180513";
+static const char * version_str = "1.18 20180523";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -282,9 +282,9 @@ encode_tpgs_states(uint8_t *buff, struct tgtgrp *tgtState, int numgrp)
      }
 }
 
-/* Read numbers (up to 32 bits in size) from command line (comma separated */
-/* list). Assumed decimal unless prefixed by '0x', '0X' or contains */
-/* trailing 'h' or 'H' (which indicate hex). Returns 0 if ok, 1 if error. */
+/* Read numbers (up to 32 bits in size) from command line (comma separated
+ * list). Assumed decimal unless prefixed by '0x', '0X' or contains traling
+ * 'h' or 'H' (which indicate hex). Returns 0 if ok, else error code. */
 static int
 build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
                int max_arr_len)
@@ -296,15 +296,15 @@ build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
 
     if ((NULL == inp) || (NULL == port_arr) ||
         (NULL == port_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len)
         *port_arr_len = 0;
     k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX,");
     if (in_len != k) {
-        pr2serr("build_port_arr: error at pos %d\n", k + 1);
-        return 1;
+        pr2serr("%s: error at pos %d\n", __func__, k + 1);
+        return SG_LIB_SYNTAX_ERROR;
     }
     for (k = 0; k < max_arr_len; ++k) {
         v = sg_get_num_nomult(lcp);
@@ -315,25 +315,23 @@ build_port_arr(const char * inp, int * port_arr, int * port_arr_len,
                 break;
             lcp = cp + 1;
         } else {
-            pr2serr("build_port_arr: error at pos %d\n",
-                    (int)(lcp - inp + 1));
-            return 1;
+            pr2serr("%s: error at pos %d\n", __func__, (int)(lcp - inp + 1));
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     *port_arr_len = k + 1;
     if (k == max_arr_len) {
-        pr2serr("build_port_arr: array length exceeded\n");
-        return 1;
+        pr2serr("%s: array length exceeded\n", __func__);
+        return SG_LIB_SYNTAX_ERROR;
     }
     return 0;
 }
 
-/* Read numbers (up to 32 bits in size) from command line (comma separated */
-/* list). Assumed decimal unless prefixed by '0x', '0X' or contains */
-/* trailing 'h' or 'H' (which indicate hex). Also accepts 'ao' for active */
-/* optimized [0], 'an' for active/non-optimized [1], 's' for standby [2], */
-/* 'u' for unavailable [3], 'o' for offline [14]. */
-/* Returns 0 if ok, 1 if error. */
+/* Read numbers (up to 32 bits in size) from command line (comma separated
+ * list). Assumed decimal unless prefixed by '0x', '0X' or contains trailing
+ * 'h' or 'H' (which indicate hex). Also accepts 'ao' for active optimized
+ * [0], 'an' for active/non-optimized [1], 's' for standby [2], 'u' for
+ * unavailable [3], 'o' for offline [14]. Returns 0 if ok, else error code. */
 static int
 build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
                 int max_arr_len)
@@ -345,7 +343,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
 
     if ((NULL == inp) || (NULL == state_arr) ||
         (NULL == state_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len)
@@ -353,7 +351,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
     k = strspn(inp, "0123456789aAbBcCdDeEfFhHnNoOsSuUxX,");
     if (in_len != k) {
         pr2serr("%s: error at pos %d\n", __func__, k + 1);
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     for (k = 0; k < max_arr_len; ++k) {
         try_num = true;
@@ -380,7 +378,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
             default:
                 pr2serr("%s: expected 'ao', 'an', 'o', 's' or 'u' at pos "
                         "%d\n", __func__, (int)(lcp - inp + 1));
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         }
         if (try_num) {
@@ -390,10 +388,10 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
             else if (-1 == v) {
                 pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             } else {
                 pr2serr("%s: expect 0,1,2,3 or 14\n", __func__);
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         }
         cp = (char *)strchr(lcp, ',');
@@ -404,7 +402,7 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
     *state_arr_len = k + 1;
     if (k == max_arr_len) {
         pr2serr("%s: array length exceeded\n", __func__);
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     }
     return 0;
 }
@@ -504,17 +502,17 @@ main(int argc, char * argv[])
     }
 
     if (state_arg) {
-        if (build_state_arr(state_arg, state_arr, &state_arr_len,
-                            MAX_PORT_LIST_ARR_LEN)) {
+        if ((ret = build_state_arr(state_arg, state_arr, &state_arr_len,
+                                   MAX_PORT_LIST_ARR_LEN))) {
             usage();
-            return SG_LIB_SYNTAX_ERROR;
+            return ret;
         }
     }
     if (tp_arg) {
-        if (build_port_arr(tp_arg, port_arr, &port_arr_len,
-                           MAX_PORT_LIST_ARR_LEN)) {
+        if ((ret = build_port_arr(tp_arg, port_arr, &port_arr_len,
+                                  MAX_PORT_LIST_ARR_LEN))) {
             usage();
-            return SG_LIB_SYNTAX_ERROR;
+            return ret;
         }
     }
     if ((state >= 0) && (state_arr_len > 0)) {
@@ -552,7 +550,7 @@ main(int argc, char * argv[])
     if (port_arr_len != state_arr_len) {
         pr2serr("'state=' and '--tp=' lists mismatched\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if (NULL == device_name) {

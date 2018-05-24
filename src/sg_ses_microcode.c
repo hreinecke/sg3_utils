@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -41,7 +42,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.14 20180513";    /* ses4r02 */
+static const char * version_str = "1.15 20180523";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -702,10 +703,10 @@ main(int argc, char * argv[])
             infd = STDIN_FILENO;
         else {
             if ((infd = open(file_name, O_RDONLY)) < 0) {
+                ret = sg_convert_errno(errno);
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", file_name);
                 perror(ebuff);
-                ret = SG_LIB_FILE_ERROR;
                 goto fini;
             } else if (sg_set_binary_mode(infd) < 0)
                 perror("sg_set_binary_mode");
@@ -750,19 +751,19 @@ main(int argc, char * argv[])
                 goto fini;
             }
             if (lseek(infd, op->mc_skip, SEEK_SET) < 0) {
+                ret = sg_convert_errno(errno);
                 snprintf(ebuff,  EBUFF_SZ, ME "couldn't skip to "
                          "required position on %s", file_name);
                 perror(ebuff);
-                ret = SG_LIB_FILE_ERROR;
                 goto fini;
             }
         }
         res = read(infd, dmp, op->mc_len);
         if (res < 0) {
+            ret = sg_convert_errno(errno);
             snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
                      file_name);
             perror(ebuff);
-            ret = SG_LIB_FILE_ERROR;
             goto fini;
         }
         if (res < op->mc_len) {
@@ -789,7 +790,7 @@ main(int argc, char * argv[])
         infd = -1;
     } else if (want_file) {
         pr2serr("need --in=FILE option with given mode\n");
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto fini;
     }
     if (op->mc_tlen < op->mc_len)

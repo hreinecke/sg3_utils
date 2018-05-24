@@ -30,7 +30,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.24 20180414";
+static const char * version_str = "1.25 20180523";
 
 #define ME "sg_wr_mode: "
 
@@ -105,7 +105,7 @@ static void usage()
  * either be comma or space separated list. Space separated list need to be
  * quoted. For stdin (indicated by *inp=='-') there should be either
  * one entry per line, a comma separated list or space separated list.
- * Returns 0 if ok, or 1 if error. */
+ * Returns 0 if ok, or sg3_utils error code if error. */
 static int build_mode_page(const char * inp, uint8_t * mp_arr,
                            int * mp_arr_len, int max_arr_len)
 {
@@ -117,7 +117,7 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
 
     if ((NULL == inp) || (NULL == mp_arr) ||
         (NULL == mp_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len)
@@ -152,9 +152,9 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
                     if (1 == sscanf(carry_over, "%x", &h))
                         mp_arr[off - 1] = h;       /* back up and overwrite */
                     else {
-                        pr2serr("build_mode_page: carry_over error ['%s'] "
-                                "around line %d\n", carry_over, j + 1);
-                        return 1;
+                        pr2serr("%s: carry_over error ['%s'] around line "
+                                "%d\n", __func__, carry_over, j + 1);
+                        return SG_LIB_SYNTAX_ERROR;
                     }
                     lcp = line + 1;
                     --in_len;
@@ -172,9 +172,9 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
             if ((k < in_len) && ('#' != lcp[k])) {
-                pr2serr("build_mode_page: syntax error at "
-                        "line %d, pos %d\n", j + 1, m + k + 1);
-                return 1;
+                pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
+                        j + 1, m + k + 1);
+                return SG_LIB_SYNTAX_ERROR;
             }
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
@@ -182,7 +182,7 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
                         pr2serr("%s: hex number larger than 0xff in line %d, "
                                 "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                     }
                     if (split_line && (1 == strlen(lcp))) {
                         /* single trailing hex digit might be a split pair */
@@ -190,7 +190,7 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
                     }
                     if ((off + k) >= max_arr_len) {
                         pr2serr("%s: array length exceeded\n", __func__);
-                        return 1;
+                        return SG_LIB_SYNTAX_ERROR;
                     }
                     mp_arr[off + k] = h;
                     lcp = strpbrk(lcp, " ,\t");
@@ -206,7 +206,7 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
                     }
                     pr2serr("%s: error in line %d, at pos %d\n", __func__,
                             j + 1, (int)(lcp - line + 1));
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             }
             off += (k + 1);
@@ -216,14 +216,14 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
             pr2serr("%s: error at pos %d\n", __func__, k + 1);
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         for (k = 0; k < max_arr_len; ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
                     pr2serr("%s: hex number larger than 0xff at pos %d\n",
                             __func__, (int)(lcp - inp + 1));
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 mp_arr[k] = h;
                 cp = (char *)strchr(lcp, ',');
@@ -238,13 +238,13 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
             } else {
                 pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         }
         *mp_arr_len = k + 1;
         if (k == max_arr_len) {
             pr2serr("%s: array length exceeded\n", __func__);
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     return 0;
@@ -327,6 +327,7 @@ int main(int argc, char * argv[])
     int sub_pg_code = 0;
     int verbose = 0;
     int read_in_len = 0;
+    int ret = 0;
     unsigned u, uu;
     const char * device_name = NULL;
     uint8_t read_in[MX_ALLOC_LEN];
@@ -336,7 +337,6 @@ int main(int argc, char * argv[])
     char errStr[128];
     char b[80];
     struct sg_simple_inquiry_resp inq_data;
-    int ret = 0;
 
     while (1) {
         int option_index = 0;
@@ -352,10 +352,10 @@ int main(int argc, char * argv[])
             break;
         case 'c':
             memset(read_in, 0, sizeof(read_in));
-            if (0 != build_mode_page(optarg, read_in, &read_in_len,
-                                     sizeof(read_in))) {
-                pr2serr("bad argument to '--contents'\n");
-                return SG_LIB_SYNTAX_ERROR;
+            if ((ret = build_mode_page(optarg, read_in, &read_in_len,
+                                       sizeof(read_in)))) {
+                pr2serr("bad argument to '--contents='\n");
+                return ret;
             }
             got_contents = true;
             break;
@@ -453,7 +453,7 @@ int main(int argc, char * argv[])
     if (got_mask && force) {
         pr2serr("cannot use both '--force' and '--mask'\n\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
@@ -604,7 +604,7 @@ fini:
         if (res < 0) {
             pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
-                ret = SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(-res);
         }
     }
     if (0 == verbose) {

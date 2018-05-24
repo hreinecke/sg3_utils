@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.16 20180428";
+static const char * version_str = "1.17 20180523";
 
 #define BPI (signed)(sizeof(int))
 
@@ -391,6 +391,7 @@ int main (int argc, char * argv[])
         int times = 1;
         int ret = 0;
         int k = 0;
+        int err;
 
         while (1) {
                 int option_index = 0;
@@ -501,8 +502,9 @@ int main (int argc, char * argv[])
 
         sg_fd = open(device_name, O_RDWR | O_NONBLOCK);
         if (sg_fd < 0) {
+                err = errno;
                 perror("sg_test_rwbuf: open error");
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
         }
         ret = find_out_about_buffer(sg_fd);
         if (ret)
@@ -540,7 +542,7 @@ err_out:
         if (res < 0) {
                 perror(ME "close error");
                 if (0 == ret)
-                        ret = SG_LIB_FILE_ERROR;
+                        ret = sg_convert_errno(errno);
         }
         if ((0 == ret) && (! do_quick))
                 printf ("Success\n");

@@ -352,6 +352,14 @@ the \fIDEVICE\fR reports a SCSI status of "task aborted". SAM\-5 says:
 management function on another I_T nexus and the Control mode page TAS bit
 is set to one".
 .TP
+.B 31
+error involving two or more command line options. They may be contradicting,
+select an unsupported mode, or a required option (given the context) is
+missing.
+.TP
+.B 32
+there is a logic error in the utility. It corresponds to code comments
+like "shouldn't/can't get here". Perhaps the author should be informed.
 .B 33
 the command sent to \fIDEVICE\fR has timed out.
 .TP

@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.09 20180519";
+static const char * version_str = "1.10 20180523";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -578,21 +578,21 @@ main(int argc, char * argv[])
     if (1 != n) {
         pr2serr("one and only one of '--block', '--crypto', '--fail' or "
                 "'--overwrite' please\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->overwrite) {
         if (op->zero) {
             if (op->pattern_fn) {
                 pr2serr("confused: both '--pattern=PF' and '--zero' "
                         "options\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->ipl = 4;
         } else {
             if (NULL == op->pattern_fn) {
                 pr2serr("'--overwrite' requires '--pattern=PF' or '--zero' "
                         "option\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             got_stdin = (0 == strcmp(op->pattern_fn, "-"));
             if (! got_stdin) {
@@ -616,7 +616,7 @@ main(int argc, char * argv[])
             if (op->ipl < 1) {
                 pr2serr("'--overwrite' requires '--ipl=LEN' option if can't "
                         "get PF length\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
         }
     }
@@ -640,7 +640,7 @@ main(int argc, char * argv[])
         if (NULL == wBuff) {
             pr2serr("unable to allocate %d bytes of memory with calloc()\n",
                     op->ipl + 4);
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
         if (op->zero) {
@@ -655,22 +655,24 @@ main(int argc, char * argv[])
                     perror("sg_set_binary_mode");
             } else {
                 if ((infd = open(op->pattern_fn, O_RDONLY)) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
                              "reading", op->pattern_fn);
                     perror(ebuff);
-                    ret = SG_LIB_FILE_ERROR;
+                    ret = sg_convert_errno(err);;
                     goto err_out;
                 } else if (sg_set_binary_mode(infd) < 0)
                     perror("sg_set_binary_mode");
             }
             res = read(infd, wBuff + 4, op->ipl);
             if (res < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
                          op->pattern_fn);
                 perror(ebuff);
                 if (! got_stdin)
                     close(infd);
-                ret = SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(err);
                 goto err_out;
             }
             if (res < op->ipl) {

@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.09 20180515";
+static const char * version_str = "1.10 20180523";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -260,7 +260,7 @@ main(int argc, char * argv[])
         pr2serr("one from the --close, --finish, --open and --sequentialize "
                 "options must be given\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     sa_name = sa_name_arr[sa];
 

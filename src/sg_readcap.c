@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.01 20180519";
+static const char * version_str = "4.02 20180532";
 
 #define ME "sg_readcap: "
 
@@ -415,7 +415,7 @@ main(int argc, char * argv[])
     memset(op, 0, sizeof(opts));
     res = parse_cmd_line(op, argc, argv);
     if (res)
-        return SG_LIB_SYNTAX_ERROR;
+        return res;
     if (op->do_help) {
         usage_for(op);
         return 0;
@@ -449,7 +449,7 @@ main(int argc, char * argv[])
     if ((! op->do_pmi) && (op->llba > 0)) {
         pr2serr(ME "lba can only be non-zero when '--pmi' is set\n");
         usage_for(op);
-        ret = SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_CONTRADICT;
         goto fini;
     }
     if (op->do_long)

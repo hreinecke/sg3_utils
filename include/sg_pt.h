@@ -174,7 +174,7 @@ int get_scsi_pt_resid(const struct sg_pt_base * objp);
 
 /* Returns SCSI status value (from device that received the command). If an
  * NVMe command was issued directly (i.e. through do_scsi_pt() then return
- * NVMe status (i.e. ((SCT << 8) | SC)) */
+ * NVMe status (i.e. ((SCT << 8) | SC)). If problem returns -1. */
 int get_scsi_pt_status_response(const struct sg_pt_base * objp);
 
 /* Returns SCSI status value or, if NVMe command given to do_scsi_pt(),

@@ -31,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.20 20180510";
+static const char * version_str = "1.21 20180522";
 
 #define ME "sg_ident: "
 
@@ -193,17 +193,17 @@ main(int argc, char * argv[])
     if (do_set && do_clear) {
         pr2serr("only one of '--clear' and '--set' can be given\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (ascii && raw) {
         pr2serr("only one of '--ascii' and '--raw' can be given\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if ((do_set || do_clear) && (raw || ascii)) {
         pr2serr("'--set' cannot be used with either '--ascii' or '--raw'\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     sg_fd = sg_cmds_open_device(device_name, false /* rw=false */, verbose);
     if (sg_fd < 0) {

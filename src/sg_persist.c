@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.64 20180511";
+static const char * version_str = "0.65 20180523";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -896,14 +896,14 @@ build_transportid(const char * inp, struct opts_t * op)
             goto my_cont_b;
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
-            pr2serr("build_transportid: error at pos %d\n", k + 1);
+            pr2serr("%s: error at pos %d\n", __func__, k + 1);
             return 1;
         }
         for (k = 0; k < (int)sizeof(op->transportid_arr); ++k) {
             if (1 == sscanf(lcp, "%x", &h)) {
                 if (h > 0xff) {
-                    pr2serr("build_transportid: hex number larger than 0xff "
-                            "at pos %d\n", (int)(lcp - inp + 1));
+                    pr2serr("%s: hex number larger than 0xff at pos %d\n",
+                            __func__, (int)(lcp - inp + 1));
                     return 1;
                 }
                 tid_arr[k] = h;
@@ -917,7 +917,7 @@ build_transportid(const char * inp, struct opts_t * op)
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                pr2serr("build_transportid: error at pos %d\n",
+                pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
                 return 1;
             }
@@ -925,7 +925,7 @@ build_transportid(const char * inp, struct opts_t * op)
 my_cont_b:
         op->num_transportids = 1;
         if (k >= (int)sizeof(op->transportid_arr)) {
-            pr2serr("build_transportid: array length exceeded\n");
+            pr2serr("%s: array length exceeded\n", __func__);
             return 1;
         }
     }
@@ -1162,21 +1162,21 @@ main(int argc, char * argv[])
     if (want_prout && want_prin) {
         pr2serr("choose '--in' _or_ '--out' (not both)\n");
         usage(1);
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     } else if (want_prout) { /* syntax check on PROUT arguments */
         op->pr_in = false;
         if ((1 != num_prout_sa) || (0 != num_prin_sa)) {
             pr2serr(">> For Persistent Reserve Out one and only one "
                     "appropriate\n>> service action must be chosen (e.g. "
                     "'--register')\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     } else { /* syntax check on PRIN arguments */
         if (num_prout_sa > 0) {
             pr2serr(">> When a service action for Persistent Reserve Out "
                     "is chosen the\n>> '--out' option must be given (as a "
                     "safeguard)\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (0 == num_prin_sa) {
             pr2serr(">> No service action given; assume Persistent Reserve "
@@ -1186,7 +1186,7 @@ main(int argc, char * argv[])
         } else if (num_prin_sa > 1)  {
             pr2serr("Too many service actions given; choose one only\n");
             usage(1);
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     }
     if ((op->param_unreg || op->param_rtp) &&
@@ -1194,14 +1194,14 @@ main(int argc, char * argv[])
         pr2serr("--unreg or --relative-target-port only useful with "
                 "--register-move\n");
         usage(1);
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if ((PROUT_REG_MOVE_SA == op->prout_sa) &&
         (1 != op->num_transportids)) {
         pr2serr("with --register-move one (and only one) --transport-id "
                 "should be given\n");
         usage(1);
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (((PROUT_RES_SA == op->prout_sa) ||
          (PROUT_REL_SA == op->prout_sa) ||
@@ -1290,7 +1290,7 @@ fini:
         if (res < 0) {
             pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
-                ret = SG_LIB_FILE_ERROR;
+                ret = sg_convert_errno(-res);
         }
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;

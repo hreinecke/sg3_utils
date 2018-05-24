@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.15 20180302";
+static const char * version_str = "1.16 20180522";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -128,7 +128,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if (op->fname) {
                 pr2serr("expect only one '--binary=FN' or '--file=FN' "
                         "option\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->do_binary = true;
             op->fname = optarg;
@@ -140,7 +140,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if (op->fname) {
                 pr2serr("expect only one '--binary=FN' or '--file=FN' "
                         "option\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->file_given = true;
             op->fname = optarg;
@@ -225,13 +225,13 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
  * There should be either one entry per line or a comma, space or tab
  * separated list of bytes. If no_space is set then a string of ACSII hex
  * digits is expected, 2 per byte. Everything from and including a '#'
- * on a line is ignored.  Returns 0 if ok, or 1 if error. */
+ * on a line is ignored.  Returns 0 if ok, sg3_utils code value. */
 static int
 f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
           int * mp_arr_len, int max_arr_len)
 {
     bool split_line;
-    int fn_len, in_len, k, j, m;
+    int fn_len, in_len, k, j, m, err;
     int off = 0;
     unsigned int h;
     const char * lcp;
@@ -240,17 +240,19 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
     char carry_over[4];
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     fn_len = strlen(fname);
     if (0 == fn_len)
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     if ((1 == fn_len) && ('-' == fname[0]))        /* read from stdin */
         fp = stdin;
     else {
         fp = fopen(fname, "r");
         if (NULL == fp) {
-            pr2serr("Unable to open %s for reading\n", fname);
-            return 1;
+            err = errno;
+            pr2serr("Unable to open %s for reading: %s\n", fname,
+                    safe_strerror(err));
+            return sg_convert_errno(err);
         }
     }
 
@@ -278,8 +280,8 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
                 if (1 == sscanf(carry_over, "%x", &h))
                     mp_arr[off - 1] = h;       /* back up and overwrite */
                 else {
-                    pr2serr("f2hex_arr: carry_over error ['%s'] around line "
-                            "%d\n", carry_over, j + 1);
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
                     goto bad;
                 }
                 lcp = line + 1;
@@ -299,7 +301,7 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
             continue;
         k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
         if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
-            pr2serr("f2hex_arr: syntax error at line %d, pos %d\n", j + 1,
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__, j + 1,
                     m + k + 1);
             goto bad;
         }
@@ -307,12 +309,12 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
             for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
                  ++k, lcp += 2) {
                 if (1 != sscanf(lcp, "%2x", &h)) {
-                    pr2serr("f2hex_arr: bad hex number in line %d, pos %d\n",
-                            j + 1, (int)(lcp - line + 1));
+                    pr2serr("%s: bad hex number in line %d, pos %d\n",
+                            __func__, j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
                 if ((off + k) >= max_arr_len) {
-                    pr2serr("f2hex_arr: array length exceeded\n");
+                    pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
                 mp_arr[off + k] = h;
@@ -324,8 +326,8 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
             for (k = 0; k < 1024; ++k) {
                 if (1 == sscanf(lcp, "%x", &h)) {
                     if (h > 0xff) {
-                        pr2serr("f2hex_arr: hex number larger than 0xff in "
-                                "line %d, pos %d\n", j + 1,
+                        pr2serr("%s: hex number larger than 0xff in line %d, "
+                                "pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
                         goto bad;
                     }
@@ -334,7 +336,7 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        pr2serr("f2hex_arr: array length exceeded\n");
+                        pr2serr("%s: array length exceeded\n", __func__);
                         goto bad;
                     }
                     mp_arr[off + k] = h;
@@ -349,8 +351,8 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
                         --k;
                         break;
                     }
-                    pr2serr("f2hex_arr: error in line %d, at pos %d\n", j + 1,
-                            (int)(lcp - line + 1));
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
                     goto bad;
                 }
             }
@@ -364,7 +366,7 @@ f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
 bad:
     if (stdin != fp)
         fclose(fp);
-    return 1;
+    return SG_LIB_SYNTAX_ERROR;
 }
 
 static void
@@ -405,7 +407,7 @@ write2wfn(FILE * fp, struct opts_t * op)
 int
 main(int argc, char *argv[])
 {
-    int k;
+    int k, err;
     int ret = 0;
     unsigned int ui;
     size_t s;
@@ -459,19 +461,21 @@ main(int argc, char *argv[])
     if (op->sense_len && (op->do_binary || op->file_given)) {
         pr2serr(">> Need sense data on command line or in a file, not "
                 "both\n\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->do_binary && op->file_given) {
         pr2serr(">> Either a binary file or a ASCII hexadecimal, file not "
                 "both\n\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if (op->do_binary) {
         fp = fopen(op->fname, "r");
         if (NULL == fp) {
-            pr2serr("unable to open file: %s\n", op->fname);
-            return SG_LIB_SYNTAX_ERROR;
+            err = errno;
+            pr2serr("unable to open file: %s: %s\n", op->fname,
+                    safe_strerror(err));
+            return sg_convert_errno(err);
         }
         s = fread(op->sense, 1, MAX_SENSE_LEN, fp);
         fclose(fp);
@@ -485,7 +489,7 @@ main(int argc, char *argv[])
                         MAX_SENSE_LEN);
         if (ret) {
             pr2serr("unable to decode ASCII hex from file: %s\n", op->fname);
-            return SG_LIB_SYNTAX_ERROR;
+            return ret;
         }
     }
 
@@ -495,8 +499,10 @@ main(int argc, char *argv[])
                 write2wfn(fp, op);
                 fclose(fp);
             } else {
+                err =errno;
                 perror("open");
                 pr2serr("trying to write to %s\n", op->wfname);
+                ret = sg_convert_errno(err);
             }
         }
         if (op->do_cdb) {
@@ -516,5 +522,5 @@ main(int argc, char *argv[])
         printf("%s\n", b);
     }
 
-    return 0;
+    return ret;
 }

@@ -37,7 +37,7 @@
 #endif
 
 
-static const char * const version_str = "1.86 20180501";
+static const char * const version_str = "1.87 20180522";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -90,12 +90,6 @@ pr2ws(const char * fmt, ...)
 int
 sg_cmds_open_device(const char * device_name, bool read_only, int verbose)
 {
-    /* The following 2 lines are temporary. It is to avoid a NULL pointer
-     * crash when an old utility is used with a newer library built after
-     * the sg_warnings_strm cleanup */
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
-
     return scsi_pt_open_device(device_name, read_only, verbose);
 }
 
@@ -692,7 +686,7 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
     }
 
     if (NULL == ((ptvp = create_pt_obj(report_luns_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, rl_cdb, sizeof(rl_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);

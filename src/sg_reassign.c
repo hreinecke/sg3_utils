@@ -37,7 +37,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.25 20180513";
+static const char * version_str = "1.26 20180523";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -104,7 +104,7 @@ usage()
  * (single) space) separated list) or from stdin (one per line, comma
  * separated list or space separated list). Assumed decimal unless prefixed
  * by '0x', '0X' or contains trailing 'h' or 'H' (which indicate hex).
- * Returns 0 if ok, or 1 if error. */
+ * Returns 0 if ok, or error code. */
 static int
 build_lba_arr(const char * inp, uint64_t * lba_arr,
               int * lba_arr_len, int max_arr_len)
@@ -117,7 +117,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
 
     if ((NULL == inp) || (NULL == lba_arr) ||
         (NULL == lba_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len)
@@ -149,16 +149,16 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                 continue;
             k = strspn(lcp, "0123456789aAbBcCdDeEfFhHxX ,\t");
             if ((k < in_len) && ('#' != lcp[k])) {
-                pr2serr("build_lba_arr: syntax error at line %d, pos %d\n",
+                pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                         j + 1, m + k + 1);
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             for (k = 0; k < 1024; ++k) {
                 ll = sg_get_llnum_nomult(lcp);
                 if (-1 != ll) {
                     if ((off + k) >= max_arr_len) {
-                        pr2serr("build_lba_arr: array length exceeded\n");
-                        return 1;
+                        pr2serr("%s: array length exceeded\n", __func__);
+                        return SG_LIB_SYNTAX_ERROR;
                     }
                     lba_arr[off + k] = (uint64_t)ll;
                     lcp = strpbrk(lcp, " ,\t");
@@ -172,9 +172,9 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                         --k;
                         break;
                     }
-                    pr2serr("build_lba_arr: error in line %d, at pos %d\n",
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
                             j + 1, (int)(lcp - line + 1));
-                    return 1;
+                    return SG_LIB_SYNTAX_ERROR;
                 }
             }
             off += (k + 1);
@@ -183,8 +183,8 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
     } else {        /* list of numbers (default decimal) on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfFhHxX, ");
         if (in_len != k) {
-            pr2serr("build_lba_arr: error at pos %d\n", k + 1);
-            return 1;
+            pr2serr("%s: error at pos %d\n", __func__, k + 1);
+            return SG_LIB_SYNTAX_ERROR;
         }
         for (k = 0; k < max_arr_len; ++k) {
             ll = sg_get_llnum_nomult(lcp);
@@ -200,15 +200,15 @@ build_lba_arr(const char * inp, uint64_t * lba_arr,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                pr2serr("build_lba_arr: error at pos %d\n",
+                pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         }
         *lba_arr_len = k + 1;
         if (k == max_arr_len) {
-            pr2serr("build_lba_arr: array length exceeded\n");
-            return 1;
+            pr2serr("%s: array length exceeded\n", __func__);
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     return 0;
@@ -248,10 +248,10 @@ main(int argc, char * argv[])
         switch (c) {
         case 'a':
             memset(addr_arr, 0, sizeof(addr_arr));
-            if (0 != build_lba_arr(optarg, addr_arr, &addr_arr_len,
-                                   MAX_NUM_ADDR)) {
+            if ((res = build_lba_arr(optarg, addr_arr, &addr_arr_len,
+                                     MAX_NUM_ADDR))) {
                 pr2serr("bad argument to '--address'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return res;
             }
             got_addr = true;
             break;
@@ -323,7 +323,7 @@ main(int argc, char * argv[])
         if (got_addr) {
             pr2serr("can't have '--address=' with '--grown' or '--primary'\n");
             usage();
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     } else if ((! got_addr) || (addr_arr_len < 1)) {
         pr2serr("need at least one address (see '--address=')\n");
@@ -339,7 +339,7 @@ main(int argc, char * argv[])
                 } else if (! eight) {
                     pr2serr("address number %d exceeds 32 bits so "
                             "'--eight=0' invalid\n", k + 1);
-                    return SG_LIB_SYNTAX_ERROR;
+                    return SG_LIB_CONTRADICT;
                 }
             }
         }

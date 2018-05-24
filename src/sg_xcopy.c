@@ -68,7 +68,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.64 20180329";
+static const char * version_str = "0.65 20180523";
 
 #define ME "sg_xcopy: "
 
@@ -1196,7 +1196,7 @@ process_flags(const char * arg, struct xcopy_fp_t * fp)
 static int
 open_if(struct xcopy_fp_t * ifp, int vb)
 {
-    int infd = -1, flags, fl, res;
+    int infd = -1, flags, fl, res, err;
     char ebuff[EBUFF_SZ];
 
     ifp->sg_type = dd_filetype(ifp);
@@ -1216,10 +1216,11 @@ open_if(struct xcopy_fp_t * ifp, int vb)
     if ((infd = open(ifp->fname, fl | flags)) < 0) {
         fl = O_RDONLY;
         if ((infd = open(ifp->fname, fl | flags)) < 0) {
+            err = errno;
             snprintf(ebuff, EBUFF_SZ,
                      ME "could not open %.500s for sg reading", ifp->fname);
             perror(ebuff);
-            return -SG_LIB_FILE_ERROR;
+            return -sg_convert_errno(err);
         }
     }
     if (vb)
@@ -1245,7 +1246,7 @@ open_if(struct xcopy_fp_t * ifp, int vb)
 static int
 open_of(struct xcopy_fp_t * ofp, int vb)
 {
-    int outfd, flags, res;
+    int outfd, flags, res, err;
     char ebuff[EBUFF_SZ];
 
     ofp->sg_type = dd_filetype(ofp);
@@ -1259,10 +1260,11 @@ open_of(struct xcopy_fp_t * ofp, int vb)
         if (ofp->excl)
             flags |= O_EXCL;
         if ((outfd = open(ofp->fname, flags)) < 0) {
+            err = errno;
             snprintf(ebuff, EBUFF_SZ,
                      ME "could not open %.500s for sg writing", ofp->fname);
             perror(ebuff);
-            return -SG_LIB_FILE_ERROR;
+            return -sg_convert_errno(err);
         }
         if (vb)
             pr2serr("        open output(sg_io), flags=0x%x\n", flags);
@@ -1329,7 +1331,7 @@ main(int argc, char * argv[])
     if (argc < 2) {
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     for (k = 1; k < argc; k++) {
@@ -1409,7 +1411,7 @@ main(int argc, char * argv[])
         } else if (strcmp(key, "if") == 0) {
             if ('\0' != ixcf.fname[0]) {
                 pr2serr("Second IFILE argument??\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             } else
                 strncpy(ixcf.fname, buf, INOUTF_SZ - 1);
         } else if (0 == strcmp(key, "iflag")) {
@@ -1422,7 +1424,7 @@ main(int argc, char * argv[])
         } else if (strcmp(key, "of") == 0) {
             if ('\0' != oxcf.fname[0]) {
                 pr2serr("Second OFILE argument??\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             } else
                 strncpy(oxcf.fname, buf, INOUTF_SZ - 1);
         } else if (0 == strcmp(key, "oflag")) {
@@ -1455,7 +1457,7 @@ main(int argc, char * argv[])
                 pr2serr("Syntax error - either specify --on_src OR "
                         "--on_dst\n");
                 pr2serr("For more information use '--help'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             on_src_dst_given = true;
         } else if (0 == strncmp(key, "--on_src", 8)) {
@@ -1464,7 +1466,7 @@ main(int argc, char * argv[])
                 pr2serr("Syntax error - either specify --on_src OR "
                         "--on_dst\n");
                 pr2serr("For more information use '--help'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             on_src_dst_given = true;
         } else if (0 == strncmp(key, "--verb", 6))
@@ -1542,7 +1544,7 @@ main(int argc, char * argv[])
         (obs && blk_sz && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (blk_sz && !ibs)
         ibs = blk_sz;
@@ -1551,11 +1553,11 @@ main(int argc, char * argv[])
 
     if ((skip < 0) || (seek < 0)) {
         pr2serr("skip and seek cannot be negative\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (oxcf.append && (seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (bpt < 1) {
         pr2serr("bpt must be greater than 0\n");
@@ -1621,7 +1623,7 @@ main(int argc, char * argv[])
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
         pr2serr("Can't have both 'if' as stdin _and_ 'of' as stdout\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     res = scsi_read_capacity(&ixcf);

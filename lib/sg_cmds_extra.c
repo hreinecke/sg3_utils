@@ -158,7 +158,7 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, getLbaStatCmd, sizeof(getLbaStatCmd));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, alloc_len);
@@ -234,7 +234,7 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, gls32_cmd, sizeof(gls32_cmd));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, alloc_len);
@@ -304,7 +304,7 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, rtpg_cdb, sizeof(rtpg_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
@@ -368,7 +368,7 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, stpg_cdb, sizeof(stpg_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
@@ -420,7 +420,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, repRef_cdb, sizeof(repRef_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
@@ -678,7 +678,7 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, rdef_cdb, sizeof(rdef_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
@@ -738,7 +738,7 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, rmsn_cdb, sizeof(rmsn_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
@@ -801,7 +801,7 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, rii_cdb, sizeof(rii_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, max_resp_len);
@@ -867,7 +867,7 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, sii_cdb, sizeof(sii_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
@@ -961,7 +961,7 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, fu_cdb, sizeof(fu_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
@@ -1016,7 +1016,7 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, reass_cdb, sizeof(reass_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
@@ -1068,7 +1068,7 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, prin_cdb, sizeof(prin_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
@@ -1137,7 +1137,7 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, prout_cdb, sizeof(prout_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
@@ -1212,7 +1212,7 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, readLong_cdb, sizeof(readLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, xfer_len);
@@ -1302,7 +1302,7 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, readLong_cdb, sizeof(readLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, xfer_len);
@@ -1393,7 +1393,7 @@ sg_ll_write_long10(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, writeLong_cdb, sizeof(writeLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)data_out, xfer_len);
@@ -1473,7 +1473,7 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, writeLong_cdb, sizeof(writeLong_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)data_out, xfer_len);
@@ -1556,7 +1556,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
         }
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, v_cdb, sizeof(v_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (data_out_len > 0)
@@ -1634,7 +1634,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
         }
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+        return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, v_cdb, sizeof(v_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     if (data_out_len > 0)

@@ -33,7 +33,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.04 20180513";
+static const char * version_str = "1.05 20180523";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -345,7 +345,7 @@ main(int argc, char * argv[])
     k = (int)do_close + (int)do_get + (int)do_open + (int)ctl_given;
     if (k > 1) {
         pr2serr("Can only have one of: --close, --ctl==, --get, or --open\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     } else if (0 == k)
         do_get = true;
     if (do_close)
@@ -381,7 +381,8 @@ main(int argc, char * argv[])
         arr = sg_memalign(pg_sz, pg_sz, &free_arr, verbose > 3);
     if (NULL == arr) {
         pr2serr("Unable to allocate space for response\n");
-        return sg_convert_errno(ENOMEM);
+        ret = sg_convert_errno(ENOMEM);
+        goto fini;
     }
 
     resid = 0;

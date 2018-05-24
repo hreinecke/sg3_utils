@@ -37,7 +37,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.23 20180515";    /* sbc4r01 */
+static const char * version_str = "1.24 20180523";    /* sbc4r15 */
 
 #define ME "sg_verify: "
 
@@ -282,7 +282,7 @@ main(int argc, char * argv[])
     } else if (bytchk > 0) {
         pr2serr("when the 'ebytchk=BCH' option is given, then '--bytchk=NDO' "
                 "must also be given\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if ((bpc > 0xffff) && (! verify16)) {
@@ -315,10 +315,10 @@ main(int argc, char * argv[])
                 perror("sg_set_binary_mode");
         } else {
             if ((infd = open(file_name, O_RDONLY)) < 0) {
+                ret = sg_convert_errno(errno);
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", file_name);
                 perror(ebuff);
-                ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             } else if (sg_set_binary_mode(infd) < 0)
                 perror("sg_set_binary_mode");
@@ -328,9 +328,9 @@ main(int argc, char * argv[])
         for (nread = 0; nread < ndo; nread += res) {
             res = read(infd, ref_data + nread, ndo - nread);
             if (res <= 0) {
+                ret = sg_convert_errno(errno);
                 pr2serr("reading from %s failed at file offset=%d\n",
                         (got_stdin ? "stdin" : file_name), nread);
-                ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
         }

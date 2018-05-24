@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -276,7 +277,7 @@ main(int argc, char * argv[])
                                             verbose > 3);
         if (NULL == glbasBuffp) {
             pr2serr("unable to allocate %d bytes on heap\n", maxlen);
-            return SG_LIB_SYNTAX_ERROR;
+            return sg_convert_errno(ENOMEM);
         }
     }
     if (do_raw) {
@@ -358,7 +359,7 @@ main(int argc, char * argv[])
                                          &add_status);
             if ((res < 0) || (res > 15)) {
                 pr2serr("first LBA status descriptor returned %d ??\n", res);
-                ret = SG_LIB_CAT_OTHER;
+                ret = SG_LIB_LOGIC_ERROR;
                 goto the_end;
             }
             if ((lba < d_lba) || (lba >= (d_lba + d_blocks))) {

@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.63 20180502";
+static const char * version_str = "5.64 20180523";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1148,7 +1148,7 @@ main(int argc, char * argv[])
     char * buf;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
-    int res, k;
+    int res, k, err;
     int64_t in_num_sect = 0;
     int64_t out_num_sect = 0;
     pthread_t threads[MAX_NUM_THREADS];
@@ -1353,10 +1353,11 @@ main(int argc, char * argv[])
                 flags |= O_SYNC;
 
             if ((rcoll.infd = open(inf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ, "%scould not open %s for sg "
                          "reading", my_name, inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);;
             }
             if (sg_prepare(rcoll.infd, rcoll.bs, rcoll.bpt))
                 return SG_LIB_FILE_ERROR;
@@ -1371,20 +1372,22 @@ main(int argc, char * argv[])
                 flags |= O_SYNC;
 
             if ((rcoll.infd = open(inf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ, "%scould not open %s for reading",
                          my_name, inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             else if (skip > 0) {
                 off64_t offset = skip;
 
                 offset *= rcoll.bs;       /* could exceed 32 here! */
                 if (lseek64(rcoll.infd, offset, SEEK_SET) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scouldn't skip to required "
                              "position on %s", my_name, inf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
         }
@@ -1406,10 +1409,11 @@ main(int argc, char * argv[])
                 flags |= O_SYNC;
 
             if ((rcoll.outfd = open(outf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff,  EBUFF_SZ, "%scould not open %s for sg "
                          "writing", my_name, outf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
 
             if (sg_prepare(rcoll.outfd, rcoll.bs, rcoll.bpt))
@@ -1430,18 +1434,20 @@ main(int argc, char * argv[])
                     flags |= O_APPEND;
 
                 if ((rcoll.outfd = open(outf, flags, 0666)) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
                              "writing", my_name, outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
             else {      /* raw output file */
                 if ((rcoll.outfd = open(outf, O_WRONLY)) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scould not open %s for raw "
                              "writing", my_name, outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
             if (seek > 0) {
@@ -1449,10 +1455,11 @@ main(int argc, char * argv[])
 
                 offset *= rcoll.bs;       /* could exceed 32 bits here! */
                 if (lseek64(rcoll.outfd, offset, SEEK_SET) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scouldn't seek to required "
                              "position on %s", my_name, outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
         }

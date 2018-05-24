@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.53 20180502";
+static const char * version_str = "1.54 20180532";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -690,8 +690,7 @@ main(int argc, char * argv[])
     bool cdbsz_given = false;
     bool do_coe = false;     /* dummy, just accept + ignore */
     bool do_sync = false;
-    int res, k, t, infd, outfd, blocks, n, flags;
-    int blocks_per;
+    int res, k, t, infd, outfd, blocks, n, flags, blocks_per, err;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
     int ibs = 0;
     int in_res_sz = 0;
@@ -787,7 +786,7 @@ main(int argc, char * argv[])
         } else if (strcmp(key,"if") == 0) {
             if ('\0' != inf[0]) {
                 pr2serr("Second 'if=' argument??\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             } else
                 strncpy(inf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "iflag")) {
@@ -798,7 +797,7 @@ main(int argc, char * argv[])
         } else if (strcmp(key,"of") == 0) {
             if ('\0' != outf[0]) {
                 pr2serr("Second 'of=' argument??\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             } else
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
@@ -852,15 +851,15 @@ main(int argc, char * argv[])
     if ((ibs && (ibs != blk_sz)) || (obs && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if ((skip < 0) || (seek < 0)) {
         pr2serr("skip and seek cannot be negative\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (out_flags.append && (seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (bpt < 1) {
         pr2serr("bpt must be greater than 0\n");
@@ -904,10 +903,11 @@ main(int argc, char * argv[])
             if (in_flags.dsync)
                 flags |= O_SYNC;
             if ((infd = open(inf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for sg reading", inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30122)) {
@@ -918,24 +918,27 @@ main(int argc, char * argv[])
             if (0 != (in_res_sz % psz)) /* round up to next page */
                 in_res_sz = ((in_res_sz / psz) + 1) * psz;
             if (ioctl(infd, SG_GET_RESERVED_SIZE, &t) < 0) {
+                err = errno;
                 perror(ME "SG_GET_RESERVED_SIZE error");
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             if (t < MIN_RESERVED_SIZE)
                 t = MIN_RESERVED_SIZE;
             if (in_res_sz > t) {
                 if (ioctl(infd, SG_SET_RESERVED_SIZE, &in_res_sz) < 0) {
+                    err = errno;
                     perror(ME "SG_SET_RESERVED_SIZE error");
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
             wrkMmap = (uint8_t *)mmap(NULL, in_res_sz,
                                  PROT_READ | PROT_WRITE, MAP_SHARED, infd, 0);
             if (MAP_FAILED == wrkMmap) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ,
                          ME "error using mmap() on file: %s", inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
         } else {
             flags = O_RDONLY;
@@ -946,20 +949,22 @@ main(int argc, char * argv[])
             if (in_flags.dsync)
                 flags |= O_SYNC;
             if ((infd = open(inf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for reading", inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             else if (skip > 0) {
                 off64_t offset = skip;
 
                 offset *= blk_sz;       /* could exceed 32 bits here! */
                 if (lseek64(infd, offset, SEEK_SET) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
                              "required position on %s", inf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
                 if (verbose)
                     pr2serr("  >> skip: lseek64 SEEK_SET, byte offset=0x%"
@@ -987,10 +992,11 @@ main(int argc, char * argv[])
             if (out_flags.dsync)
                 flags |= O_SYNC;
             if ((outfd = open(outf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
                          "sg writing", outf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30122)) {
@@ -998,26 +1004,29 @@ main(int argc, char * argv[])
                 return SG_LIB_FILE_ERROR;
             }
             if (ioctl(outfd, SG_GET_RESERVED_SIZE, &t) < 0) {
+                err = errno;
                 perror(ME "SG_GET_RESERVED_SIZE error");
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
            if (t < MIN_RESERVED_SIZE)
                 t = MIN_RESERVED_SIZE;
             out_res_sz = blk_sz * bpt;
             if (out_res_sz > t) {
                 if (ioctl(outfd, SG_SET_RESERVED_SIZE, &out_res_sz) < 0) {
+                    err = errno;
                     perror(ME "SG_SET_RESERVED_SIZE error");
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
             if (NULL == wrkMmap) {
                 wrkMmap = (uint8_t *)mmap(NULL, out_res_sz,
                                 PROT_READ | PROT_WRITE, MAP_SHARED, outfd, 0);
                 if (MAP_FAILED == wrkMmap) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ,
                              ME "error using mmap() on file: %s", outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
         }
@@ -1035,18 +1044,20 @@ main(int argc, char * argv[])
                 if (out_flags.append)
                     flags |= O_APPEND;
                 if ((outfd = open(outf, flags, 0666)) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ,
                              ME "could not open %s for writing", outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
             else {
                 if ((outfd = open(outf, O_WRONLY)) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, ME "could not open %s "
                              "for raw writing", outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
             }
             if (seek > 0) {
@@ -1054,10 +1065,11 @@ main(int argc, char * argv[])
 
                 offset *= blk_sz;       /* could exceed 32 bits here! */
                 if (lseek64(outfd, offset, SEEK_SET) < 0) {
+                    err = errno;
                     snprintf(ebuff, EBUFF_SZ, ME "couldn't seek to "
                              "required position on %s", outf);
                     perror(ebuff);
-                    return SG_LIB_FILE_ERROR;
+                    return sg_convert_errno(err);
                 }
                 if (verbose)
                     pr2serr("   >> seek: lseek64 SEEK_SET, byte offset=0x%"
@@ -1069,7 +1081,7 @@ main(int argc, char * argv[])
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to as "
                 "stdout\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (dd_count < 0) {
         in_num_sect = -1;

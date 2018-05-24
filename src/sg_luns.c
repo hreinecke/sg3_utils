@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -31,7 +32,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.40 20180510";
+static const char * version_str = "1.41 20180522";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -598,7 +599,7 @@ main(int argc, char * argv[])
                                             verbose > 3);
     if (NULL == reportLunsBuff) {
         pr2serr("unable to sg_memalign %d bytes\n", maxlen);
-        return SG_LIB_CAT_OTHER;
+        return sg_convert_errno(ENOMEM);
     }
     trunc = false;
 
@@ -677,7 +678,7 @@ the_end:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            return sg_convert_errno(-res);
     }
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_luns failed: ", ret))

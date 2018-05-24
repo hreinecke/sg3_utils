@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2017 Douglas Gilbert.
+ * Copyright (c) 2004-2018 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.10 20171006";
+static const char * version_str = "1.11 20180523";
 
 #define ME "sg_prevent: "
 
@@ -125,7 +125,7 @@ int main(int argc, char * argv[])
     if (allow && (prevent >= 0)) {
         pr2serr("can't give both '--allow' and '--prevent='\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (allow)
         prevent = 0;

@@ -35,7 +35,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.11 20180513";
+static const char * version_str = "1.11 20180523";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -208,7 +208,7 @@ main(int argc, char * argv[])
     if ((! zid_given) && (! all)) {
         pr2serr("either the --zone=ID or --all option is required\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (NULL == device_name) {
         pr2serr("missing device name!\n");

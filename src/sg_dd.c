@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.98 20180502";
+static const char * version_str = "5.99 20180522";
 
 
 #define ME "sg_dd: "
@@ -1513,7 +1513,7 @@ main(int argc, char * argv[])
     if (argc < 2) {
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     for (k = 1; k < argc; k++) {
@@ -1599,13 +1599,13 @@ main(int argc, char * argv[])
         } else if (strcmp(key, "of") == 0) {
             if ('\0' != outf[0]) {
                 pr2serr("Second OFILE argument??\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             } else
                 strncpy(outf, buf, INOUTF_SZ);
         } else if (strcmp(key, "of2") == 0) {
             if ('\0' != out2f[0]) {
                 pr2serr("Second OFILE2 argument??\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             } else
                 strncpy(out2f, buf, INOUTF_SZ);
         } else if (0 == strcmp(key, "oflag")) {
@@ -1660,15 +1660,15 @@ main(int argc, char * argv[])
     if ((ibs && (ibs != blk_sz)) || (obs && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if ((skip < 0) || (seek < 0)) {
         pr2serr("skip and seek cannot be negative\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (oflag.append && (seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (bpt < 1) {
         pr2serr("bpt must be greater than 0\n");
@@ -1722,12 +1722,12 @@ main(int argc, char * argv[])
     if ((STDIN_FILENO == infd) && (STDOUT_FILENO == outfd)) {
         pr2serr("Can't have both 'if' as stdin _and_ 'of' as stdout\n");
         pr2serr("For more information use '--help'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (oflag.sparse) {
         if (STDOUT_FILENO == outfd) {
             pr2serr("oflag=sparse needs seekable output file\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     }
 

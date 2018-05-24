@@ -254,7 +254,7 @@ int sg_get_sense_str(const char * leadin, const uint8_t * sense_buffer,
 /* Decode descriptor format sense descriptors (assumes sense buffer is
  * in descriptor format). 'leadin' is string prepended to each line written
  * to 'b', NULL treated as "". Returns the number of bytes written to 'b'
- * excluding the trailing '\0'. */
+ * excluding the trailing '\0'. If problem, returns 0. */
 int sg_get_sense_descriptors_str(const char * leadin,
                                  const uint8_t * sense_buffer,
                                  int sb_len, int blen, char * b);
@@ -433,6 +433,8 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_CAT_TS_FULL    27 /* SCSI status, not sense. Wait then retry */
 #define SG_LIB_CAT_ACA_ACTIVE 28 /* SCSI status; ACA seldom used */
 #define SG_LIB_CAT_TASK_ABORTED 29 /* SCSI status, this command aborted by? */
+#define SG_LIB_CONTRADICT 31    /* error involving two or more cl options */
+#define SG_LIB_LOGIC_ERROR 32   /* unexpected situation in code */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
                                 /*       [sk,asc,ascq: 0xb,0x10,*] */
 /* 47: flock error in ddpt */

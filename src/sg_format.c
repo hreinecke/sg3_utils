@@ -22,6 +22,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #include <unistd.h>
 #define __STDC_FORMAT_MACROS 1
@@ -37,7 +38,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.49 20180519";
+static const char * version_str = "1.50 20180522";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -264,7 +265,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         ptvp = construct_scsi_pt_obj();
         if (NULL == ptvp) {
                 pr2serr("%s: out of memory\n", __func__);
-                return -1;
+                return sg_convert_errno(ENOMEM);
         }
         set_scsi_pt_cdb(ptvp, fm_cdb, sizeof(fm_cdb));
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
@@ -1016,28 +1017,28 @@ main(int argc, char **argv)
         if (op->format && (op->tape >= 0)) {
                 pr2serr("Cannot choose both '--format' and '--tape='; disk "
                         "or tape, choose one only\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
         }
         if (op->ip_def && op->sec_init) {
                 pr2serr("'--ip_def' and '--security' contradict, choose "
                         "one\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
         }
         if (op->resize) {
                 if (op->format) {
                         pr2serr("both '--format' and '--resize' not "
                                 "permitted\n");
                         usage();
-                        return SG_LIB_SYNTAX_ERROR;
+                        return SG_LIB_CONTRADICT;
                 } else if (0 == op->blk_count) {
                         pr2serr("'--resize' needs a '--count' (other than "
                                 "0)\n");
                         usage();
-                        return SG_LIB_SYNTAX_ERROR;
+                        return SG_LIB_CONTRADICT;
                 } else if (0 != op->blk_size) {
                         pr2serr("'--resize' not compatible with '--size'\n");
                         usage();
-                        return SG_LIB_SYNTAX_ERROR;
+                        return SG_LIB_CONTRADICT;
                 }
         }
         if ((op->pinfo > 0) || (op->rto_req > 0) || (op->fmtpinfo > 0)) {
@@ -1046,7 +1047,7 @@ main(int argc, char **argv)
                                 "'--rto_req' together with\n'--fmtpinfo', "
                                 "best use '--fmtpinfo' only\n");
                         usage();
-                        return SG_LIB_SYNTAX_ERROR;
+                        return SG_LIB_CONTRADICT;
                 }
                 if (op->pinfo)
                         op->fmtpinfo |= 2;

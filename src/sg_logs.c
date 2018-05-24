@@ -34,7 +34,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.66 20180510";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.67 20180523";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1347,14 +1347,14 @@ num_or_unknown(const uint8_t * xp, int num_bytes /* max is 8 */, bool in_hex,
  * stdin). If reading ASCII hex then there should be either one entry per
  * line or a comma, space or tab separated list of bytes. If no_space is
  * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
- * error. */
+ * from and including a '#' on a line is ignored. Returns 0 if ok, error
+ * code. */
 static int
 f2hex_arr(const char * fname, bool as_binary, bool no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
     bool split_line, has_stdin;
-    int fn_len, in_len, k, j, m, fd;
+    int fn_len, in_len, k, j, m, fd, err;
     int off = 0;
     unsigned int h;
     const char * lcp;
@@ -1363,10 +1363,10 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
     char carry_over[4];
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     fn_len = strlen(fname);
     if (0 == fn_len)
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
     if (as_binary) {
         if (has_stdin) {
@@ -1376,9 +1376,10 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
         } else {
             fd = open(fname, O_RDONLY);
             if (fd < 0) {
+                err = errno;
                 pr2serr("unable to open binary file %s: %s\n", fname,
-                         safe_strerror(errno));
-                return 1;
+                         safe_strerror(err));
+                return sg_convert_errno(err);
             } else if (sg_set_binary_mode(fd) < 0)
                 perror("sg_set_binary_mode");
         }
@@ -1391,7 +1392,7 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
                         safe_strerror(errno));
             if (! has_stdin)
                 close(fd);
-            return 1;
+            return SG_LIB_SYNTAX_ERROR;
         }
         *mp_arr_len = k;
         if (! has_stdin)
@@ -1403,8 +1404,10 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
         else {
             fp = fopen(fname, "r");
             if (NULL == fp) {
-                pr2serr("Unable to open %s for reading\n", fname);
-                return 1;
+                err = errno;
+                pr2serr("Unable to open %s for reading: %s\n", fname,
+                        safe_strerror(err));
+                return sg_convert_errno(err);
             }
         }
     }
@@ -1519,7 +1522,7 @@ f2hex_arr(const char * fname, bool as_binary, bool no_space,
 bad:
     if (stdin != fp)
         fclose(fp);
-    return 1;
+    return SG_LIB_SYNTAX_ERROR;
 }
 
 
@@ -6757,11 +6760,9 @@ main(int argc, char * argv[])
             int pg_code, subpg_code, pdt, n;
             uint16_t u;
 
-            if (f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
-                          rsp_buff_sz)) {
-                ret = SG_LIB_FILE_ERROR;
+            if ((ret = f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff,
+                                 &in_len, rsp_buff_sz)))
                 goto err_out;
-            }
             if (vb > 2)
                 pr2serr("Read %d [0x%x] bytes of user supplied data\n",
                         in_len, in_len);
@@ -6822,12 +6823,12 @@ main(int argc, char * argv[])
     if (op->do_select) {
         if (op->do_temperature) {
             pr2serr("--select cannot be used with --temperature\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
         if (op->do_transport) {
             pr2serr("--select cannot be used with --transport\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
     } else if (op->do_raw) {
@@ -6840,12 +6841,12 @@ main(int argc, char * argv[])
     if (op->do_all) {
         if (op->do_select) {
             pr2serr("--all conflicts with --select\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
         if (op->filter) {
             pr2serr("--all conflicts with --filter\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
     }
@@ -6853,14 +6854,12 @@ main(int argc, char * argv[])
         if (! op->do_select) {
             pr2serr("--in=FN can only be used with --select when DEVICE "
                     "given\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
-        if (f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
-                      rsp_buff_sz)) {
-            ret = SG_LIB_FILE_ERROR;
+        if ((ret = f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
+                             rsp_buff_sz)))
             goto err_out;
-        }
         if (vb > 2)
             pr2serr("Read %d [0x%x] bytes of user supplied data\n", in_len,
                     in_len);
