@@ -954,7 +954,7 @@ main(int argc, char * argv[])
             usage();
         else
             usage_old();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->do_unsorted && op->do_alpha)
         pr2serr("warning: unsorted ('-u') and alpha ('-a') options chosen, "
@@ -1030,7 +1030,7 @@ main(int argc, char * argv[])
         res = scsi_pt_close_device(sg_fd);
         if (res < 0) {
             pr2serr("close error: %s\n", safe_strerror(-res));
-            return SG_LIB_FILE_ERROR;
+            return sg_convert_errno(-res);
         }
     }
 
@@ -1038,7 +1038,7 @@ open_rw:
     if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */, vb)) < 0) {
         pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
                 op->device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(-sg_fd);
     }
     if (op->opcode >= 0)
         rep_opts = ((op->servact >= 0) ? 2 : 1);

@@ -33,7 +33,7 @@
  * device.
  */
 
-static const char * version_str = "1.24 20180513";
+static const char * version_str = "1.25 20180523";
 
 
 #ifndef SG_READ_BUFFER_10_CMD

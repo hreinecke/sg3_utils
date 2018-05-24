@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.09 20180519";
+static const char * version_str = "1.10 20180523";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -417,7 +417,7 @@ main(int argc, char * argv[])
         pr2serr("either --milliseconds=MS or --seconds=SECS may be given, "
                 "not both\n");
         usage(1);
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if (NULL == device_name) {

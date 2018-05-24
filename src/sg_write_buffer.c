@@ -38,7 +38,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.26 20180515";    /* spc5r19 */
+static const char * version_str = "1.27 20180523";    /* spc5r19 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -398,32 +398,32 @@ main(int argc, char * argv[])
                 infd = STDIN_FILENO;
             } else {
                 if ((infd = open(file_name, O_RDONLY)) < 0) {
+                    ret = sg_convert_errno(errno);
                     snprintf(ebuff, EBUFF_SZ,
                              ME "could not open %s for reading", file_name);
                     perror(ebuff);
-                    ret = SG_LIB_FILE_ERROR;
                     goto err_out;
                 } else if (sg_set_binary_mode(infd) < 0)
                     perror("sg_set_binary_mode");
                 if (wb_skip > 0) {
                     if (lseek(infd, wb_skip, SEEK_SET) < 0) {
+                        ret = sg_convert_errno(errno);
                         snprintf(ebuff,  EBUFF_SZ, ME "couldn't skip to "
                                  "required position on %s", file_name);
                         perror(ebuff);
                         close(infd);
-                        ret = SG_LIB_FILE_ERROR;
                         goto err_out;
                     }
                 }
             }
             res = read(infd, dop, wb_len);
             if (res < 0) {
+                ret = sg_convert_errno(errno);
                 snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
                          file_name);
                 perror(ebuff);
                 if (! got_stdin)
                     close(infd);
-                ret = SG_LIB_FILE_ERROR;
                 goto err_out;
             }
             if (res < wb_len) {

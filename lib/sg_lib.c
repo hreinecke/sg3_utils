@@ -1281,7 +1281,9 @@ static const char * dd_usage_reason_str_arr[] = {
 
 
 /* Decode descriptor format sense descriptors (assumes sense buffer is
- * in descriptor format) */
+ * in descriptor format). 'leadin' is string prepended to each line written
+ * to 'b', NULL treated as "". Returns the number of bytes written to 'b'
+ * excluding the trailing '\0'. If problem, returns 0. */
 int
 sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
                              int sb_len, int blen, char * b)

@@ -41,7 +41,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.40 20180321";
+static const char * version_str = "3.41 20180523";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -420,7 +420,7 @@ main(int argc, char * argv[])
     op->do_number = 1;
     res = parse_cmd_line(op, argc, argv);
     if (res)
-        return SG_LIB_SYNTAX_ERROR;
+        return res;
     if (op->do_help) {
         usage_for(op);
         return 0;

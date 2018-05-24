@@ -44,7 +44,7 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.15 20180514";
+static const char * version_str = "1.16 20180523";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -501,14 +501,14 @@ main(int argc, char * argv[])
             pr2serr("Can't have --all= together with --lba=, --num= or "
                     "--in=\n\n");
             usage();
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         /* here if --all= looks okay so far */
     } else if (in_op && (lba_op || num_op)) {
         pr2serr("expect '--in=' by itself, or both '--lba=' and "
                 "'--num='\n\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     } else if (in_op || (lba_op && num_op))
         ;
     else {
@@ -518,14 +518,14 @@ main(int argc, char * argv[])
             pr2serr("expect either both '--lba=' and '--num=', or "
                     "'--in=', or '--all='\n\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if (all_rn > 0) {
         if ((all_last > 0) && (all_start > all_last)) {
             pr2serr("in --all=ST,RN,LA start address (ST) exceeds last "
                     "address (LA)\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     } else {
         memset(addr_arr, 0, sizeof(addr_arr));
@@ -545,7 +545,7 @@ main(int argc, char * argv[])
             if ((addr_arr_len != num_arr_len) || (num_arr_len <= 0)) {
                 pr2serr("need same number of arguments to '--lba=' "
                         "and '--num=' options\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
         }
         if (in_op) {
@@ -639,7 +639,7 @@ main(int argc, char * argv[])
                 pr2serr("after READ CAPACITY the last block (0x%" PRIx64
                         ") less than start address (0x%" PRIx64 ")\n",
                         all_start, all_last);
-                ret = SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_CONTRADICT;
                 goto err_out;
             }
             to_end_of_device = true;

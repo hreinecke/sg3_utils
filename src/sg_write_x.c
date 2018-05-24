@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.17 20180515";
+static const char * version_str = "1.18 20180523";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -481,6 +481,7 @@ usage(int do_help)
     }
 }
 
+/* Returns 0 if successful, else sg3_utils error code. */
 static int
 bin_read(int fd, uint8_t * up, uint32_t len, const char * fname)
 {
@@ -491,7 +492,7 @@ bin_read(int fd, uint8_t * up, uint32_t len, const char * fname)
         err = errno;
         pr2serr("Error doing read of %s file: %s\n", fname,
                 safe_strerror(err));
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(err);
     }
     if ((uint32_t)res < len) {
         pr2serr("Short (%u) read of %s file, wanted %u\n", (unsigned int)res,
@@ -583,7 +584,7 @@ build_lba_arr(const char * inp, uint64_t * lba_arr, uint32_t * lba_arr_len,
 /* Read numbers (up to 32 bits in size) from command line (comma (or
  * (single) space) separated list). Assumed decimal unless prefixed
  * by '0x', '0X' or contains trailing 'h' or 'H' (which indicate hex).
- * Returns 0 if ok, or 1 if error. */
+ * Returns 0 if ok, else a sg3_utils error code is returned. */
 static int
 build_num_arr(const char * inp, uint32_t * num_arr, uint32_t * num_arr_len,
               int max_arr_len)
@@ -596,27 +597,27 @@ build_num_arr(const char * inp, uint32_t * num_arr, uint32_t * num_arr_len,
 
     if ((NULL == inp) || (NULL == num_arr) ||
         (NULL == num_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len)
         *num_arr_len = 0;
     if ('-' == inp[0]) {        /* read from stdin */
         pr2serr("'--len' cannot be read from stdin\n");
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     } else {        /* list of numbers (default decimal) on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfFhHxXiIkKmMgGtTpP, ");
         if (in_len != k) {
-            pr2serr("build_num_arr: error at pos %d\n", k + 1);
-            return 1;
+            pr2serr("%s: error at pos %d\n", __func__, k + 1);
+            return SG_LIB_SYNTAX_ERROR;
         }
         for (k = 0; k < max_arr_len; ++k) {
             ll = sg_get_llnum(lcp);
             if (-1 != ll) {
                 if (ll > UINT32_MAX) {
-                    pr2serr("build_num_arr: number exceeds 32 bits at pos "
-                            "%d\n", (int)(lcp - inp + 1));
-                    return 1;
+                    pr2serr("%s: number exceeds 32 bits at pos %d\n",
+                            __func__, (int)(lcp - inp + 1));
+                    return SG_LIB_SYNTAX_ERROR;
                 }
                 num_arr[k] = (uint32_t)ll;
                 cp = (char *)strchr(lcp, ',');
@@ -629,15 +630,15 @@ build_num_arr(const char * inp, uint32_t * num_arr, uint32_t * num_arr_len,
                     cp = c2p;
                 lcp = cp + 1;
             } else {
-                pr2serr("build_num_arr: error at pos %d\n",
+                pr2serr("%s: error at pos %d\n", __func__,
                         (int)(lcp - inp + 1));
-                return 1;
+                return SG_LIB_SYNTAX_ERROR;
             }
         }
         *num_arr_len = (uint32_t)(k + 1);
         if (k == max_arr_len) {
-            pr2serr("build_num_arr: array length exceeded\n");
-            return 1;
+            pr2serr("%s: array length exceeded\n", __func__);
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     return 0;
@@ -806,7 +807,7 @@ build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
     bool have_stdin = false;
     bool bit0, ok;
     int off = 0;
-    int in_len, k, j, m, n, res;
+    int in_len, k, j, m, n, res, err;
     int64_t ll;
     char * lcp;
     uint8_t * up = t10_scat_list_out;
@@ -829,8 +830,10 @@ build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
     } else {
         fp = fopen(scat_fname, "r");
         if (NULL == fp) {
-            pr2serr("%s: unable to open %s\n", __func__, scat_fname);
-            return SG_LIB_FILE_ERROR;
+            err = errno;
+            pr2serr("%s: unable to open %s: %s\n", __func__, scat_fname,
+                    safe_strerror(err));
+            return sg_convert_errno(err);
         }
     }
     for (j = 0; j < 1024; ++j) {/* loop over lines in file */
@@ -1043,11 +1046,12 @@ sum_num_lbards(const uint8_t * up, int num_lbards)
     return sum;
 }
 
+/* Returns 0 if successful, else sg3_utils error code. */
 static int
 do_write_x(int sg_fd, const void * dataoutp, int dout_len,
            const struct opts_t * op)
 {
-    int k, ret, res, sense_cat, cdb_len, vb;
+    int k, ret, res, sense_cat, cdb_len, vb, err;
     uint8_t x_cdb[WRITE_X_32_LEN];        /* use for both lengths */
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1099,7 +1103,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
         if (16 == cdb_len)  {
             if (op->numblocks > UINT16_MAX) {
                 pr2serr("Need WRITE ATOMIC(32) since blocks exceed 65535\n");
-                return -1;
+                return SG_LIB_SYNTAX_ERROR;
             }
             x_cdb[0] = WRITE_ATOMIC16_OP;
             x_cdb[1] = ((op->wrprotect & 0x7) << 5);
@@ -1231,7 +1235,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
         }
     } else {
         pr2serr("%s: bad cdb name or length (%d)\n", __func__, cdb_len);
-        return -1;
+        return SG_LIB_SYNTAX_ERROR;
     }
 
     if (vb > 1) {
@@ -1287,14 +1291,16 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
 
             w_fd = open(xx_wr_fname, O_WRONLY | O_CREAT | O_TRUNC, 0644);
             if (w_fd < 0) {
+                err = errno;
                 perror(xx_wr_fname);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             res = write(w_fd, dataoutp, dout_len);
             if (res < 0) {
+                err = errno;
                 perror(xx_wr_fname);
                 close(w_fd);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             close(w_fd);
             printf("Wrote %u bytes to %s", dout_len, xx_wr_fname);
@@ -1309,7 +1315,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
         pr2serr("%s: out of memory\n", op->cdb_name);
-        return -1;
+        return sg_convert_errno(ENOMEM);
     }
     set_scsi_pt_cdb(ptvp, x_cdb, cdb_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
@@ -1373,6 +1379,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     return ret;
 }
 
+/* Returns 0 if successful, else sg3_utils error code. */
 static int
 do_read_capacity(int sg_fd, struct opts_t *op)
 {
@@ -1835,7 +1842,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
         } else {
             pr2serr("With --combined= if DOF, RD are 0 and IF has an "
                     "unknown length\nthen give up\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         up = sg_memalign(d, 0, &free_up, false);
         if (NULL == up) {
@@ -2083,7 +2090,7 @@ process_scattered(int sg_fd, int infd, uint32_t if_len, uint32_t if_rlen,
             pr2serr("%s: number given to --scattered= (%u) exceeds number of "
                     "--lba= elements (%u)\n", __func__, op->scat_num_lbard,
                     addr_arr_len);
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         d = lbard_sz * (num_lbard + 1);
         op->scat_lbdof = d / op->bs_pi_do;
@@ -2213,12 +2220,12 @@ main(int argc, char * argv[])
     if (n > 1) {
         pr2serr("Can only select one command; so only one of --atomic, "
                 "--normal, --or,\n--same=, --scattered= or --stream=\n") ;
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     } else if (n < 1) {
         if (op->strict) {
             pr2serr("With --strict won't default to a normal WRITE, add "
                     "--normal\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         } else {
             op->do_write_normal = true;
             op->cmd_name = "Write";
@@ -2232,42 +2239,42 @@ main(int argc, char * argv[])
         if (! op->do_scattered) {
             pr2serr("--combined=DOF only allowed with --scattered=RD (i.e. "
                     "only with\nWRITE SCATTERED command)\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (op->scat_filename) {
             pr2serr("Ambiguous: got --combined=DOF and --scat-file=SF .\n"
                     "Give one, the other or neither\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (lba_op || num_op) {
             pr2serr("--scattered=RD --combined=DOF does not use --lba= or "
                     "--num=\nPlease remove.\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (op->do_scat_raw) {
             pr2serr("Ambiguous: don't expect --combined=DOF and --scat-raw\n"
                     "Give one or the other\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     }
     if ((NULL == op->scat_filename) && op->do_scat_raw) {
         pr2serr("--scat-raw only applies to the --scat-file=SF option\n"
                 "--scat-raw without the --scat-file=SF option is an "
                 "error\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     n = (!! op->scat_filename) + (!! (lba_op || num_op)) +
         (!! op->do_combined);
     if (n > 1) {
         pr2serr("want one and only one of: (--lba=LBA and/or --num=NUM), or\n"
                 "--scat-file=SF, or --combined=DOF\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->scat_filename && (1 == strlen(op->scat_filename)) &&
         ('-' == op->scat_filename[0])) {
         pr2serr("don't accept '-' (implying stdin) as a filename in "
                 "--scat-file=SF\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (vb && op->do_16 && (! is_pi_default(op)))
         pr2serr("--app-tag=, --ref-tag= and --tag-mask= options ignored "
@@ -2294,19 +2301,21 @@ main(int argc, char * argv[])
             }
         } else {
             if ((infd = open(op->if_name, O_RDONLY)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ, "could not open %s for reading",
                          op->if_name);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
             if (sg_set_binary_mode(infd) < 0) {
                 perror("sg_set_binary_mode");
                 return SG_LIB_FILE_ERROR;
             }
             if (fstat(infd, &if_stat) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ, "could not fstat %s", op->if_name);
                 perror(ebuff);
-                goto file_err_out;
+                return sg_convert_errno(err);
             }
             got_stat = true;
             if (S_ISREG(if_stat.st_mode)) {
@@ -2329,10 +2338,12 @@ main(int argc, char * argv[])
             if (if_reg_file) {
                 /* lseek() won't work with stdin, pipes or sockets, etc */
                 if (lseek(infd, off, SEEK_SET) < 0) {
+                    err = errno;
                     snprintf(ebuff,  EBUFF_SZ, "couldn't offset to required "
                             "position on %s", op->if_name);
                     perror(ebuff);
-                    goto file_err_out;
+                    ret = sg_convert_errno(err);
+                    goto err_out;
                 }
                 if_readable_len -= op->if_offset;
                 if (if_readable_len <= 0) {
@@ -2417,7 +2428,7 @@ main(int argc, char * argv[])
         if (0 != build_num_arr(num_op, num_arr, &num_arr_len,
                                MAX_NUM_ADDR)) {
             pr2serr("bad argument to '--num'\n");
-            goto syntax_err_out;
+            goto err_out;
         }
     }
     if (((addr_arr_len > 1) && (addr_arr_len != num_arr_len)) ||
@@ -2426,7 +2437,8 @@ main(int argc, char * argv[])
          * element --num=, otherwise this error ... */
         pr2serr("need same number of arguments to '--lba=' and '--num=' "
                     "options\n");
-        goto syntax_err_out;
+        ret = SG_LIB_CONTRADICT;
+        goto err_out;
     }
     if ((0 == addr_arr_len) && (1 == num_arr_len)) {
         if (num_arr[0] > 0) {
@@ -2442,7 +2454,8 @@ main(int argc, char * argv[])
             err = errno;
             pr2serr("Unable to stat(%s) as SF: %s\n", op->scat_filename,
                     safe_strerror(err));
-            goto file_err_out;
+            ret = sg_convert_errno(err);
+            goto err_out;
         }
         if (op->do_scat_raw) {
             if (! S_ISREG(sf_stat.st_mode)) {
@@ -2455,7 +2468,8 @@ main(int argc, char * argv[])
                 err = errno;
                 pr2serr("Failed to open %s for raw read: %s\n",
                         op->scat_filename, safe_strerror(err));
-                goto file_err_out;
+                ret = sg_convert_errno(err);
+                goto err_out;
             }
             if (sg_set_binary_mode(sfr_fd) < 0) {
                 perror("sg_set_binary_mode");

@@ -53,7 +53,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.31 20180502";
+static const char * version_str = "1.32 20180523";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -389,7 +389,7 @@ int main(int argc, char * argv[])
     int in_type = FT_OTHER;
     int ret = 0;
     int scsi_cdbsz = DEF_SCSI_CDBSZ;
-    int res, k, t, buf_sz, iters, infd, blocks, flags, blocks_per;
+    int res, k, t, buf_sz, iters, infd, blocks, flags, blocks_per, err;
     size_t psz;
     int64_t skip = 0;
     char * key;
@@ -515,11 +515,11 @@ int main(int argc, char * argv[])
     }
     if (do_dio && do_mmap) {
         pr2serr("cannot select both dio and mmap\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (no_dxfer && (do_dio || do_mmap)) {
         pr2serr("cannot select no_dxfer with dio or mmap\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     install_handler (SIGINT, interrupt_handler);
@@ -557,10 +557,11 @@ int main(int argc, char * argv[])
             if (do_odir)
                 flags |= O_DIRECT;
             if ((infd = open(inf, flags)) < 0) {
+                err = errno;
                 snprintf(ebuff, EBUFF_SZ,
                          ME "could not open %s for sg reading", inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
         }
         if (verbose)
@@ -599,10 +600,11 @@ int main(int argc, char * argv[])
         if (do_odir)
             flags |= O_DIRECT;
         if ((infd = open(inf, flags)) < 0) {
+            err = errno;
             snprintf(ebuff,  EBUFF_SZ,
                      ME "could not open %s for reading", inf);
             perror(ebuff);
-            return SG_LIB_FILE_ERROR;
+            return sg_convert_errno(err);
         }
         if (verbose)
             pr2serr("Opened %s for Unix reads with flags=0x%x\n", inf, flags);
@@ -611,10 +613,11 @@ int main(int argc, char * argv[])
 
             offset *= bs;       /* could exceed 32 bits here! */
             if (lseek64(infd, offset, SEEK_SET) < 0) {
+                err = errno;
                 snprintf(ebuff,  EBUFF_SZ,
                     ME "couldn't skip to required position on %s", inf);
                 perror(ebuff);
-                return SG_LIB_FILE_ERROR;
+                return sg_convert_errno(err);
             }
         }
     }

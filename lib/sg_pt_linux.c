@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.40 20180309 */
+/* sg_pt_linux version 1.41 20180522 */
 
 
 #include <stdio.h>
@@ -335,16 +335,6 @@ check_pt_file_handle(int dev_fd, const char * device_name, int verbose)
 #endif
 
 
-/* Returns >= 0 if successful. If error in Unix returns negated errno. */
-int
-scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
-{
-    int oflags = O_NONBLOCK;
-
-    oflags |= (read_only ? O_RDONLY : O_RDWR);
-    return scsi_pt_open_flags(device_name, oflags, verbose);
-}
-
 /* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed */
 /* together. The 'flags' argument is advisory and may be ignored. */
 /* Returns >= 0 if successful, otherwise returns negated errno. */
@@ -370,6 +360,16 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
     return fd;
 }
 
+/* Returns >= 0 if successful. If error in Unix returns negated errno. */
+int
+scsi_pt_open_device(const char * device_name, bool read_only, int verbose)
+{
+    int oflags = O_NONBLOCK;
+
+    oflags |= (read_only ? O_RDONLY : O_RDWR);
+    return scsi_pt_open_flags(device_name, oflags, verbose);
+}
+
 /* Returns 0 if successful. If error in Unix returns negated errno. */
 int
 scsi_pt_close_device(int device_fd)
@@ -389,12 +389,6 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
 {
     int err;
     struct sg_pt_linux_scsi * ptp;
-
-    /* The following 2 lines are temporary. It is to avoid a NULL pointer
-     * crash when an old utility is used with a newer library built after
-     * the sg_warnings_strm cleanup */
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
 
     ptp = (struct sg_pt_linux_scsi *)
           calloc(1, sizeof(struct sg_pt_linux_scsi));

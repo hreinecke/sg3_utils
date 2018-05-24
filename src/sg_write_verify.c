@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20180219";
+static const char * version_str = "1.14 20180523";
 
 
 #define ME "sg_write_verify: "
@@ -241,18 +241,21 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, bool dpo, int bytchk,
     return ret;
 }
 
+/* Returns file descriptor ( >= 0) if successfule. Else a negated sg3_utils
+ * error code is returned. */
 static int
 open_if(const char * fn, int got_stdin)
 {
-    int fd;
+    int fd, err;
 
     if (got_stdin)
         fd = STDIN_FILENO;
     else {
         fd = open(fn, O_RDONLY);
         if (fd < 0) {
-            pr2serr(ME "open error: %s: %s\n", fn, safe_strerror(errno));
-            return -SG_LIB_FILE_ERROR;
+            err = errno;
+            pr2serr(ME "open error: %s: %s\n", fn, safe_strerror(err));
+            return -sg_convert_errno(err);
         }
     }
     if (sg_set_binary_mode(fd) < 0) {
@@ -421,12 +424,12 @@ main(int argc, char * argv[])
         if (! has_filename) {
             pr2serr("with '--repeat' need '--in=IF' option\n");
             usage();
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (ilen < 1) {
             pr2serr("with '--repeat' need '--ilen=ILEN' option\n");
             usage();
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         } else {
             b_p_lb = ilen / num_lb;
             if (b_p_lb < 64) {
@@ -440,8 +443,9 @@ main(int argc, char * argv[])
 
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
+        ret = sg_convert_errno(-sg_fd);
         pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
-        return SG_LIB_FILE_ERROR;
+        goto err_out;
     }
 
     if ((! do_16) && (llba > UINT_MAX))
@@ -587,15 +591,12 @@ err_out:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            ret = sg_convert_errno(-res);
     }
     if (ret && (0 == verbose)) {
-        if (SG_LIB_CAT_INVALID_OP == ret)
-            pr2serr("%s command not supported\n", cmd_name);
-        else if (ret > 0)
-            pr2serr("%s, exit status %d\n", cmd_name, ret);
-        else if (ret < 0)
-            pr2serr("Some error occurred\n");
+        if (! sg_if_can2stderr("sg_write_verify failed: ", ret))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

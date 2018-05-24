@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.38 20180511";    /* ses4r02 */
+static const char * version_str = "2.39 20180523";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1174,7 +1174,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             } else {
                 pr2serr("Too many --clear=, --get= and --set= options "
                         "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             break;
         case 'd':
@@ -1195,7 +1195,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             else {
                 pr2serr("--eiioe option expects 'auto' or 'force' as an "
                         "argument\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             break;
         case 'f':
@@ -1214,7 +1214,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             } else {
                 pr2serr("Too many --clear=, --get= and --set= options "
                         "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             break;
         case 'h':
@@ -1319,7 +1319,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             } else {
                 pr2serr("Too many --clear=, --get= and --set= options "
                         "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             break;
         case 'v':
@@ -5215,7 +5215,7 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
     if ((NULL == ptvp) && (GET_OPT != tavp->cgs_sel)) {
         pr2serr("%s: --clear= and --set= only supported when DEVICE is "
                 "given\n", __func__);
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     found = false;
     if (NULL == tavp->acron) {
@@ -5558,7 +5558,7 @@ main(int argc, char * argv[])
                saddr_non_zero(op->sas_addr))) {
             pr2serr("with --clear, --get or --set option need either\n   "
                     "--index, --descriptor, --dev-slot-num or --sas-addr\n");
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
         for (k = 0, cgs_clp = op->cgs_cl_arr, tavp = tav_arr; k < op->num_cgs;

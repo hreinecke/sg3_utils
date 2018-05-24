@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.03 20180302";
+static const char * version_str = "5.04 20180523";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -356,7 +356,7 @@ main(int argc, char * argv[])
     bool clear = true;
 #endif
     bool dio_incomplete = false;
-    int sg_fd, res, j;
+    int sg_fd, res, j, err;
     int buf_capacity = 0;
     int buf_size = 0;
     size_t psz;
@@ -403,8 +403,9 @@ main(int argc, char * argv[])
 
     sg_fd = open(op->device_name, O_RDONLY | O_NONBLOCK);
     if (sg_fd < 0) {
+        err = errno;
         perror("device open error");
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(err);
     }
     if (op->do_mmap) {
         op->do_dio = false;
@@ -653,8 +654,9 @@ main(int argc, char * argv[])
     if (rawp) free(rawp);
     res = close(sg_fd);
     if (res < 0) {
+        err = errno;
         perror("close error");
-        return SG_LIB_FILE_ERROR;
+        return sg_convert_errno(err);
     }
 #ifdef SG_DEBUG
     if (clear)

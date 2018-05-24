@@ -169,7 +169,7 @@ usage_old()
 }
 
 static int
-news_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
+new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int c, n, err;
 
@@ -446,7 +446,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             pr2serr("please, only one of 0, 1, --eject, "
                     "--load, --start or --stop\n");
             usage_old();
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         } else if (startstop_set) {
             if (startstop)
                 op->do_start = true;
@@ -468,10 +468,10 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         op->opt_new = false;
         res = old_parse_cmd_line(op, argc, argv);
         if ((0 == res) && op->opt_new)
-            res = news_parse_cmd_line(op, argc, argv);
+            res = new_parse_cmd_line(op, argc, argv);
     } else {
         op->opt_new = true;
-        res = news_parse_cmd_line(op, argc, argv);
+        res = new_parse_cmd_line(op, argc, argv);
         if ((0 == res) && (! op->opt_new))
             res = old_parse_cmd_line(op, argc, argv);
     }
@@ -493,7 +493,7 @@ main(int argc, char * argv[])
     op->do_fl = -1;    /* only when >= 0 set FL bit */
     res = parse_cmd_line(op, argc, argv);
     if (res)
-        return SG_LIB_SYNTAX_ERROR;
+        return res;
     if (op->do_help) {
         if (op->opt_new)
             usage();
@@ -508,11 +508,11 @@ main(int argc, char * argv[])
 
     if (op->do_start && op->do_stop) {
         pr2serr("Ambiguous to give both '--start' and '--stop'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->do_load && op->do_eject) {
         pr2serr("Ambiguous to give both '--load' and '--eject'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->do_load)
        op->do_start = true;
@@ -537,12 +537,12 @@ main(int argc, char * argv[])
         if (! op->do_start) {
             pr2serr("Giving '--fl=FL' with '--stop' (or '--eject') is "
                     "invalid\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
         if (op->do_pc > 0) {
             pr2serr("Giving '--fl=FL' with '--pc=PC' when PC is non-zero "
                     "is invalid\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_CONTRADICT;
         }
     }
 
@@ -582,8 +582,10 @@ main(int argc, char * argv[])
 fini:
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
-        if (0 == ret)
-            ret = sg_convert_errno(-res);
+        if (res < 0) {
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
     }
     if (0 == op->verbose) {
         if (! sg_if_can2stderr("sg_start failed: ", ret))

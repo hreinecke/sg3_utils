@@ -371,7 +371,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         case 'i':
             if (op->dataout_file) {
                 pr2serr("Too many '--infile=' options\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->dataout_file = optarg;
             break;
@@ -389,7 +389,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         case 'o':
             if (op->datain_file) {
                 pr2serr("Too many '--outfile=' options\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_LIB_CONTRADICT;
             }
             op->datain_file = optarg;
             break;
@@ -620,6 +620,7 @@ write_dataout(const char *filename, uint8_t *buf, int len)
     else {
         fd = creat(filename, 0666);
         if (fd < 0) {
+            ret = sg_convert_errno(errno);
             perror(filename);
             goto bail;
         }
@@ -630,6 +631,7 @@ write_dataout(const char *filename, uint8_t *buf, int len)
     }
 
     if (write(fd, buf, len) != len) {
+        ret = sg_convert_errno(errno);
         perror(filename ? filename : "stdout");
         goto bail;
     }
@@ -684,7 +686,7 @@ main(int argc, char *argv[])
                                 op->verbose);
     if (sg_fd < 0) {
         pr2serr("%s: %s\n", op->device_name, safe_strerror(-sg_fd));
-        ret = SG_LIB_FILE_ERROR;
+        ret = sg_convert_errno(-sg_fd);
         goto done;
     }
 

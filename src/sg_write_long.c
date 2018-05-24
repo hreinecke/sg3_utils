@@ -35,7 +35,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.18 20180515";
+static const char * version_str = "1.19 20180523";
 
 
 #define MAX_XFER_LEN (15 * 1024)

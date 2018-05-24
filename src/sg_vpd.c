@@ -298,13 +298,13 @@ usage()
  * stdin). If reading ASCII hex then there should be either one entry per
  * line or a comma, space or tab separated list of bytes. If no_space is
  * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, or 1 if
- * error. */
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or an
+ * error code. */
 static int
 f2hex_arr(const char * fname, int as_binary, int no_space,
           uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int fn_len, in_len, k, j, m, fd;
+    int fn_len, in_len, k, j, m, fd, err;
     bool has_stdin, split_line;
     unsigned int h;
     const char * lcp;
@@ -315,10 +315,10 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
     struct stat a_stat;
 
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     fn_len = strlen(fname);
     if (0 == fn_len)
-        return 1;
+        return SG_LIB_SYNTAX_ERROR;
     has_stdin = ((1 == fn_len) && ('-' == fname[0]));   /* read from stdin */
     if (as_binary) {
         if (has_stdin)
@@ -326,21 +326,26 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         else {
             fd = open(fname, O_RDONLY);
             if (fd < 0) {
+                err = errno;
                 pr2serr("unable to open binary file %s: %s\n", fname,
-                         safe_strerror(errno));
-                return 1;
+                         safe_strerror(err));
+                return sg_convert_errno(err);
             }
         }
         k = read(fd, mp_arr, max_arr_len);
         if (k <= 0) {
+            int ret = SG_LIB_SYNTAX_ERROR;
+
             if (0 == k)
                 pr2serr("read 0 bytes from binary file %s\n", fname);
-            else
+            else {
+                ret = sg_convert_errno(errno);
                 pr2serr("read from binary file %s: %s\n", fname,
                         safe_strerror(errno));
+            }
             if (! has_stdin)
                 close(fd);
-            return 1;
+            return ret;
         }
         if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
             /* pipe; keep reading till error or 0 read */
@@ -349,11 +354,12 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
                 if (0 == m)
                    break;
                 if (m < 0) {
+                    err = errno;
                     pr2serr("read from binary pipe %s: %s\n", fname,
-                            safe_strerror(errno));
+                            safe_strerror(err));
                     if (! has_stdin)
                         close(fd);
-                    return 1;
+                    return sg_convert_errno(err);
                 }
                 k += m;
             }
@@ -368,8 +374,10 @@ f2hex_arr(const char * fname, int as_binary, int no_space,
         else {
             fp = fopen(fname, "r");
             if (NULL == fp) {
-                pr2serr("Unable to open %s for reading\n", fname);
-                return 1;
+                err = errno;
+                pr2serr("Unable to open %s for reading: %s\n", fname,
+                        safe_strerror(err));
+                return sg_convert_errno(err);
             }
         }
      }
@@ -3840,9 +3848,8 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        if (f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff, &inhex_len,
-                      rsp_buff_sz)) {
-            ret = SG_LIB_FILE_ERROR;
+        if ((ret = f2hex_arr(op->inhex_fn, op->do_raw, 0, rsp_buff,
+                             &inhex_len, rsp_buff_sz))) {
             goto err_out;
         }
         if (op->verbose > 2)
@@ -3969,7 +3976,7 @@ err_out:
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return SG_LIB_FILE_ERROR;
+            return sg_convert_errno(-res);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

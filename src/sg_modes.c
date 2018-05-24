@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.62 20180511";
+static const char * version_str = "1.63 20180523";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -1000,7 +1000,7 @@ main(int argc, char * argv[])
     op->pg_code = -1;
     res = parse_cmd_line(op, argc, argv);
     if (res)
-        return SG_LIB_SYNTAX_ERROR;
+        return res;
     if (op->do_help) {
         usage_for(op);
         return 0;
@@ -1034,12 +1034,12 @@ main(int argc, char * argv[])
 
     if (op->do_examine && (op->pg_code >= 0)) {
         pr2serr("can't give '-e' and a page number\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
 
     if (op->do_six && op->do_llbaa) {
         pr2serr("LLBAA not defined for MODE SENSE 6, try without '-L'\n");
-        return SG_LIB_SYNTAX_ERROR;
+        return SG_LIB_CONTRADICT;
     }
     if (op->maxlen > 0) {
         if (op->do_six && (op->maxlen > 255)) {
@@ -1115,7 +1115,7 @@ main(int argc, char * argv[])
             else
                 pr2serr("'-r' requires a specific (sub)page, not all\n");
             usage_for(op);
-            ret = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_CONTRADICT;
             goto fini;
         }
     }

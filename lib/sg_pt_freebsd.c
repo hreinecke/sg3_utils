@@ -347,11 +347,11 @@ scsi_pt_close_device(int device_han)
     return 0;
 }
 
-/* Assumes dev_fd is an "open" file handle associated with some device.
+/* Assumes device_han is an "open" file handle associated with some device.
  * Returns 1 if SCSI generic pass-though device, returns 2 if secondary
  * SCSI pass-through device (in Linux a bsg device); returns 3 is char
  * NVMe device (i.e. no NSID); returns 4 if block NVMe device (includes
- * NSID), or 0 if something else (e.g. ATA block device) or dev_fd < 0.
+ * NSID), or 0 if something else (e.g. ATA block device) or device_han < 0.
  * If error, returns negated errno (operating system) value. */
 int
 check_pt_file_handle(int device_han, const char * device_name, int vb)
@@ -359,15 +359,11 @@ check_pt_file_handle(int device_han, const char * device_name, int vb)
     struct freebsd_dev_channel *fdc_p;
     int han = device_han - FREEBSD_FDOFFSET;
 
-    if ((han < 0) || (han >= FREEBSD_MAXDEV)) {
-        errno = ENODEV;
-        return -errno;
-    }
+    if ((han < 0) || (han >= FREEBSD_MAXDEV))
+        return -ENODEV;
     fdc_p = devicetable[han];
-    if (NULL == fdc_p) {
-        errno = ENODEV;
-        return -errno;
-    }
+    if (NULL == fdc_p)
+        return -ENODEV;
     if (fdc_p->is_nvme)
         return 4 - (int)fdc_p->is_char;
     else if (fdc_p->cam_dev)
@@ -384,12 +380,6 @@ struct sg_pt_base *
 construct_scsi_pt_obj_with_fd(int dev_han, int vb)
 {
     struct sg_pt_freebsd_scsi * ptp;
-
-    /* The following 2 lines are temporary. It is to avoid a NULL pointer
-     * crash when an old utility is used with a newer library built after
-     * the sg_warnings_strm cleanup */
-    if (NULL == sg_warnings_strm)
-        sg_warnings_strm = stderr;
 
     ptp = (struct sg_pt_freebsd_scsi *)
                 calloc(1, sizeof(struct sg_pt_freebsd_scsi));
@@ -778,6 +768,9 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
     return ptp->nvme_direct ? 0 : ptp->resid;
 }
 
+/* Returns SCSI status value (from device that received the command). If an
+ * NVMe command was issued directly (i.e. through do_scsi_pt() then return
+ * NVMe status (i.e. ((SCT << 8) | SC)). If problem returns -1. */
 int
 get_scsi_pt_status_response(const struct sg_pt_base * vp)
 {
@@ -902,6 +895,7 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 
         fdc_p = get_fdc_cp(ptp);
         if (NULL == fdc_p) {
+            pr2serr("%s: unable to find fdc_p\n", __func__);
             errno = ENODEV;
             return false;
         }
