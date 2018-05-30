@@ -509,7 +509,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
             inq_dout[4] = 0x0;
             inq_dout[5] = 0x80;
             inq_dout[6] = 0x83;
-            inq_dout[n - 1] = 0xde;     /* last VPD number */
+            inq_dout[n - 1] = SG_NVME_VPD_NICR;     /* last VPD number */
             break;
         case 0x80:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -552,7 +552,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
                 nvme_id_ns = NULL;
             }
             break;
-        case 0xde:
+        case SG_NVME_VPD_NICR:  /* 0xde */
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
             n = 16 + 4096;

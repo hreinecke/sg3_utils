@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.10 20180523";
+static const char * version_str = "1.11 20180526";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -99,10 +99,11 @@ usage()
             "    --version|-V       print version string and exit\n"
             "    --zone=ID|-z ID    ID is the starting LBA of the zone "
             "(def: 0)\n\n"
-            "Performs a SCSI OPEN ZONE, CLOSE ZONE or FINISH ZONE command. "
-            "ID is\ndecimal by default, for hex use a leading '0x' or a "
-            "trailing 'h'.\nEither --close, --finish, or --open option "
-            "needs to be given.\n");
+            "Performs a SCSI OPEN ZONE, CLOSE ZONE, FINISH ZONE or "
+            "SEQUENTIALIZE\nZONE command. ID is decimal by default, for hex "
+            "use a leading '0x'\nor a trailing 'h'. Either --close, "
+            "--finish, --open or\n--sequentialize option needs to be "
+            "given.\n");
 }
 
 /* Invokes the zone out command indicated by 'sa' (ZBC).  Return of 0

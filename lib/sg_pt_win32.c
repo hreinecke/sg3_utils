@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.25 20180427 */
+/* sg_pt_win32 version 1.26 20180526 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2249,7 +2249,7 @@ sntl_inq(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
             inq_dout[4] = 0x0;
             inq_dout[5] = 0x80;
             inq_dout[6] = 0x83;
-            inq_dout[n - 1] = 0xde;     /* last VPD number */
+            inq_dout[n - 1] = SG_NVME_VPD_NICR;  /* 0xde last VPD number */
             break;
         case 0x80:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -2294,7 +2294,7 @@ sntl_inq(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                 nvme_id_ns = NULL;
             }
             break;
-        case 0xde:
+        case SG_NVME_VPD_NICR:          /* 0xde */
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
             n = 16 + 4096;

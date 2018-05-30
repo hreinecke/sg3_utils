@@ -49,7 +49,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.95 20180522";    /* SPC-5 rev 19 */
+static const char * version_str = "1.96 20180526";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -107,6 +107,11 @@ static const char * version_str = "1.95 20180522";    /* SPC-5 rev 19 */
 #define VPD_BLOCK_DEV_C_EXTENS 0xb5     /* sbc4r02 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
+
+#ifndef SG_NVME_VPD_NICR
+#define SG_NVME_VPD_NICR 0xde
+#endif
+
 #define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
 /* Vendor specific VPD pages (typically >= 0xc0) */
@@ -208,6 +213,8 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_ZBC_DEV_CHARS, 0, -1, 0, "zbdc", "Zoned block device "
      "characteristics"},
     /* Following are vendor specific */
+    {SG_NVME_VPD_NICR, 0, -1, 1, "nicr",
+     "NVMe Identify Controller Response (sg3_utils)"},
     {VPD_RDAC_VAC, 0, -1, 1, "rdac_vac", "RDAC volume access control (RDAC)"},
     {VPD_RDAC_VERS, 0, -1, 1, "rdac_vers", "RDAC software version (RDAC)"},
     {VPD_UPR_EMC, 0, -1, 1, "upr", "Unit path report (EMC)"},

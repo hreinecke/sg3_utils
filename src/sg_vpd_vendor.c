@@ -51,6 +51,8 @@
 #define VPD_VP_HP3PAR 4
 #define VPD_VP_IBM_LTO 5
 #define VPD_VP_HP_LTO 6
+#define VPD_VP_NVME 7
+#define VPD_VP_SG 8     /* this package/library as a vendor */
 
 
 /* vendor VPD pages */
@@ -80,6 +82,10 @@
 #define VPD_V_VAC_RDAC 0xc9
 #define VPD_V_RVSI_RDAC 0xca
 #define VPD_V_SAID_RDAC 0xd0
+
+#ifndef SG_NVME_VPD_NICR
+#define SG_NVME_VPD_NICR 0xde   /* NVME Identify Controller Response */
+#endif
 
 
 #define DEF_ALLOC_LEN 252
@@ -141,6 +147,8 @@ static struct svpd_vp_name_t vp_arr[] = {
     {VPD_VP_HP_LTO, "hp_lto", "HP LTO tape/systems"},
     {VPD_VP_RDAC, "rdac", "RDAC array (NetApp E-Series)"},
     {VPD_VP_SEAGATE, "sea", "Seagate disk"},
+    {VPD_VP_NVME, "nvme", "NVMe related"},
+    {VPD_VP_SG, "sg", "sg3_utils extensions"},
     {0, NULL, NULL},
 };
 
@@ -179,6 +187,8 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
      "(HP LTO)"},
     {VPD_V_MPDS_LTO, VPD_VP_IBM_LTO, 1, "mpds", "Mode parameter default "
      "settings (IBM LTO)"},
+    {SG_NVME_VPD_NICR, VPD_VP_SG, 0, "nicr",
+     "NVMe Identify Controller Response (sg3_utils)"},
     {VPD_V_PCA_LTO, VPD_VP_HP_LTO, 1, "pca", "PCA revision level (HP LTO)"},
     {VPD_V_RVSI_RDAC, VPD_VP_RDAC, 0, "rvsi", "Replicated volume source "
      "identifier (RDAC)"},

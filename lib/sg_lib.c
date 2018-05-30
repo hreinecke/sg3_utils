@@ -1934,7 +1934,7 @@ sg_convert_errno(int os_err_num)
     if (os_err_num <= 0) {
         if (os_err_num < 0)
             return SG_LIB_OS_BASE_ERR;
-        return os_err_num;
+        return os_err_num;      /* os_err_num of 0 maps to 0 */
     }
     if (os_err_num < (SG_LIB_CAT_MALFORMED - SG_LIB_OS_BASE_ERR))
         return SG_LIB_OS_BASE_ERR + os_err_num;
