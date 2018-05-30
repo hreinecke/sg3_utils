@@ -178,6 +178,9 @@ struct sg_opcode_info_t {
 #define SG_NVME_BROADCAST_NSID 0xffffffff       /* all namespaces */
 #define SG_NVME_CTL_NSID 0x0            /* the "controller's" namespace */
 
+/* Vendor specific (sg3_utils) VPD pages */
+#define SG_NVME_VPD_NICR 0xde   /* NVME Identify controller response */
+
 extern struct sg_opcode_info_t sg_opcode_info_arr[];
 
 

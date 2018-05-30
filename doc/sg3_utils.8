@@ -301,6 +301,15 @@ the utility is unable to open, close or use the given \fIDEVICE\fR or some
 other file. The given file name could be incorrect or there may be
 permission problems. Adding the '\-v' option may give more information.
 .TP
+.B 17
+a SCSI "Illegal request" sense code received with a flag indicating the
+Info field is valid. This is often a LBA but its meaning is command specific.
+.TP
+.B 18
+the \fIDEVICE\fR reports a medium or hardware error (or a blank check)
+with a flag indicating the Info field is valid. This is often a LBA (of
+the first encountered error) but its meaning is command specific.
+.TP
 .B 20
 the \fIDEVICE\fR reports it has a check condition but "no sense"
 and non\-zero information in its additional sense codes. Some polling
@@ -360,6 +369,7 @@ missing.
 .B 32
 there is a logic error in the utility. It corresponds to code comments
 like "shouldn't/can't get here". Perhaps the author should be informed.
+.TP
 .B 33
 the command sent to \fIDEVICE\fR has timed out.
 .TP
@@ -370,6 +380,11 @@ problems with protection information (PI or DIF). For example this error
 may occur when reading a block on a drive that has never been written (or
 is unmapped) if that drive was formatted with type 1, 2 or 3 protection.
 .TP
+.B 41
+the command sent to \fIDEVICE\fR has received an "aborted command" sense
+key with an additional sense code of 0x10 (as with error code) plus a flag
+indicating the Info field is valid.
+.TP
 .B 48
 this is an internal message indicating a NVMe status field (SF) is other
 than zero after a command has been executed (i.e. something went wrong).
@@ -378,7 +393,15 @@ Work in this area is currently experimental.
 .B 49
 low level driver reports a response's residual count (i.e. number of bytes
 actually received by HBA is 'requested_bytes \- residual_count') that is
-too high. So no useful processing can be done with that response.
+.TP
+.B 50
+OS system calls that fail often return a small integer number to help. In
+Unix these are valled "errno" values where 0 implies no error. These error
+codes set aside 51 to 96 for mapping these errno values but that may not be
+sufficient. Higher errno values that cannot be mapped are all mapped to
+this value (i.e. 50).
+.br
+Note that an errno value of 0 is mapped to error code 0.
 .TP
 .B 50 + <os_error_number>
 OS system calls that fail often return a small integer number to help
@@ -392,8 +415,9 @@ mapping between symbolic constants (e.g. ENOMEM) and the corresponding
 integer is in the kernel source code file:
 include/uapi/asm\-generic/errno\-base.h
 .br
-Note that error number greater than or equal to 47 cannot be mapped, instead
-50 is used (i.e. as if the os_error_number was 0).
+Note that errno values that are greater than or equal to 47 cannot fit in
+range provided. Instead they are all mapped to 50 as discussed in the
+previous entry.
 .TP
 .B 97
 a SCSI command response failed sanity checks.
@@ -406,6 +430,11 @@ doesn't fit into any of the above categories.
 any errors that can't be categorized into values 1 to 98 may yield
 this value. This includes transport and operating system errors
 after the command has been sent to the device.
+.TP
+.B 100\-125
+these error codes are used by the ddpt utility which uses the sg3_utils
+library. They are mainly specialized error codes associated with offloaded
+copies.
 .TP
 .B 126
 the utility was found but could not be executed. That might occur if the
@@ -635,7 +664,14 @@ the 'utils' subdirectory.
 There is a web page discussing this package at
 http://sg.danny.cz/sg/sg3_utils.html . The device naming used by this
 package on various operating systems is discussed at:
-http://sg.danny.cz/sg/device_name.html .
+http://sg.danny.cz/sg/device_name.html . There is a git code mirror at
+https://github.com/hreinecke/sg3_utils . The principle code repository
+uses subversion and is on the author's equipment. The author keeps track
+of this via the subversion revision number which is an ascending integer
+(currently at 774 for this package). The github mirror gets updated
+periodically from the author's repository. Depending on the time of
+update, the above Downloads section at sg.danny.cz may be more up to
+date than the github mirror.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).
