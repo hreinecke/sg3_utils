@@ -62,7 +62,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "5.99 20180522";
+static const char * version_str = "6.00 20180531";
 
 
 #define ME "sg_dd: "
@@ -135,6 +135,7 @@ static int recovered_errs = 0;
 static int unrecovered_errs = 0;
 static int read_longs = 0;
 static int num_retries = 0;
+static int dry_run = 0;
 
 static bool do_time = false;
 static bool start_tm_valid = false;
@@ -351,7 +352,7 @@ usage()
             "[iflag=FLAGS]\n"
             "              [obs=BS] [of=OFILE] [oflag=FLAGS] "
             "[seek=SEEK] [skip=SKIP]\n"
-            "              [--help] [--version]\n\n"
+            "              [--dry-run] [--help] [--verbose] [--version]\n\n"
             "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1|2|3]\n"
             "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
@@ -404,7 +405,10 @@ usage()
             "throughput\n"
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
+            "    --dry-run    do preparation but bypass copy (or read)\n"
             "    --help      print out this usage message then exit\n"
+            "    --verbose   same as 'verbose=1', can be used multiple "
+            "times\n"
             "    --version   print version information then exit\n\n"
             "copy from IFILE to OFILE, similar to dd command; "
             "specialized for SCSI devices\n");
@@ -1467,6 +1471,20 @@ other_err:
     return -SG_LIB_CAT_OTHER;
 }
 
+/* Returns the number of times 'ch' is found in string 's' given the
+ * string's length. */
+static int
+num_chs_in_str(const char * s, int slen, int ch)
+{
+    int res = 0;
+
+    while (--slen >= 0) {
+        if (ch == s[slen])
+            ++res;
+    }
+    return res;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -1477,7 +1495,7 @@ main(int argc, char * argv[])
     bool do_sync = false;
     bool penult_sparse_skip = false;
     bool sparse_skip = false;
-    int res, k, t, buf_sz, blocks_per, infd, outfd, out2fd;
+    int res, k, n, t, buf_sz, blocks_per, infd, outfd, out2fd, keylen;
     int retries_tmp, blks_read, bytes_read, bytes_of2, bytes_of;
     int in_sect_sz, out_sect_sz;
     int blocks = 0;
@@ -1526,6 +1544,7 @@ main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
+        keylen = strlen(key);
         if (0 == strncmp(key, "app", 3)) {
             iflag.append = !! sg_get_num(buf);
             oflag.append = iflag.append;
@@ -1538,6 +1557,9 @@ main(int argc, char * argv[])
                 pr2serr(ME "bad argument to 'bpt='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            bpt_given = true;
+        } else if (0 == strcmp(key, "bs")) {
+            blk_sz = sg_get_num(buf);
             bpt_given = true;
         } else if (0 == strcmp(key, "bs")) {
             blk_sz = sg_get_num(buf);
@@ -1638,13 +1660,37 @@ main(int argc, char * argv[])
             do_time = !! sg_get_num(buf);
         else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
-        else if ((0 == strncmp(key, "--help", 7)) ||
-                 (0 == strncmp(key, "-h", 2)) ||
+        else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
+            res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'd');
+            dry_run += n;
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'h');
+            if (n > 0) {
+                usage();
+                return 0;
+            }
+            n = num_chs_in_str(key + 1, keylen - 1, 'v');
+            verbose += n;
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'V');
+            if (n > 0) {
+                pr2serr(ME "%s\n", version_str);
+                return 0;
+            }
+            if (res < (keylen - 1)) {
+                pr2serr("Unrecognised short option in '%s', try '--help'\n",
+                        key);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if ((0 == strncmp(key, "--dry-run", 9)) ||
+                 (0 == strncmp(key, "--dry_run", 9)))
+            ++dry_run;
+        else if ((0 == strncmp(key, "--help", 6)) ||
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if ((0 == strncmp(key, "--vers", 6)) ||
-                   (0 == strcmp(key, "-V"))) {
+        } else if (0 == strncmp(key, "--vers", 6)) {
             pr2serr(ME "%s\n", version_str);
             return 0;
         } else {
@@ -1840,13 +1886,13 @@ main(int argc, char * argv[])
     if (iflag.dio || iflag.direct || oflag.direct || (FT_RAW & in_type) ||
         (FT_RAW & out_type)) {  /* want heap buffer aligned to page_size */
 
-        wrkPos = sg_memalign(blk_sz * bpt, 0, &wrkBuff, verbose > 3);
+        wrkPos = sg_memalign(blk_sz * bpt, 0, &wrkBuff, false);
         if (NULL == wrkPos) {
             pr2serr("sg_memalign: error, out of memory?\n");
             return sg_convert_errno(ENOMEM);
         }
     } else {
-        wrkPos = sg_memalign(blk_sz * bpt, 0, &wrkBuff, verbose > 3);
+        wrkPos = sg_memalign(blk_sz * bpt, 0, &wrkBuff, false);
         if (0 == wrkPos) {
             pr2serr("Not enough user memory\n");
             return sg_convert_errno(ENOMEM);
@@ -1865,6 +1911,11 @@ main(int argc, char * argv[])
         start_tm_valid = true;
     }
     req_count = dd_count;
+
+    if (dry_run > 0) {
+        pr2serr("Since --dry-run option given, bypassing copy\n");
+        goto bypass_copy;
+    }
 
     /* <<< main loop that does the copy >>> */
     while (dd_count > 0) {
@@ -2127,6 +2178,7 @@ main(int argc, char * argv[])
         skip += blocks;
         seek += blocks;
     } /* end of main loop that does the copy ... */
+
     if (ret && penult_sparse_skip && (penult_blocks > 0)) {
         /* if error and skipped last output due to sparse ... */
         if ((FT_SG & out_type) || (FT_DEV_NULL & out_type))
@@ -2147,9 +2199,6 @@ main(int argc, char * argv[])
         }
     }
 
-    if (do_time)
-        calc_duration_throughput(false);
-
     if (do_sync) {
         if (FT_SG & out_type) {
             pr2serr(">> Synchronizing cache on %s\n", outf);
@@ -2163,6 +2212,11 @@ main(int argc, char * argv[])
                 pr2serr("Unable to synchronize cache\n");
         }
     }
+
+bypass_copy:
+    if (do_time)
+        calc_duration_throughput(false);
+
     free(wrkBuff);
     if (free_zeros_buff)
         free(free_zeros_buff);
@@ -2170,6 +2224,9 @@ main(int argc, char * argv[])
         close(infd);
     if (! ((STDOUT_FILENO == outfd) || (FT_DEV_NULL & out_type)))
         close(outfd);
+    if (dry_run > 0)
+        goto bypass2;
+
     if (0 != dd_count) {
         pr2serr("Some error occurred,");
         if (0 == ret)
@@ -2193,5 +2250,7 @@ main(int argc, char * argv[])
     }
     if (sum_of_resids)
         pr2serr(">> Non-zero sum of residual counts=%d\n", sum_of_resids);
+
+bypass2:
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

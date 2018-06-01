@@ -188,7 +188,6 @@ build_sense_buffer(bool desc, uint8_t *buf, uint8_t skey, uint8_t asc,
     }
 }
 
-/* Set in_bit to -1 to indicate no bit position of invalid field */
 static void
 mk_sense_asc_ascq(struct sg_pt_linux_scsi * ptp, int sk, int asc, int ascq,
                   int vb)
@@ -285,7 +284,8 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
         memcpy(sbp + 15, sks, 3);
     if (vb > 3)
         pr2ws("%s:  [sense_key,asc,ascq]: [0x5,0x%x,0x0] %c byte=%d, bit=%d\n",
-              __func__, asc, in_cdb ? 'C' : 'D', in_byte, in_bit);
+              __func__, asc, in_cdb ? 'C' : 'D', in_byte,
+              ((in_bit > 0) ? (0x7 & in_bit) : 0));
 }
 
 /* Returns 0 for success. Returns SG_LIB_NVME_STATUS if there is non-zero
@@ -504,19 +504,22 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         case 0:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
-            n = 8;
+            n = 11;
             sg_put_unaligned_be16(n - 4, inq_dout + 2);
             inq_dout[4] = 0x0;
             inq_dout[5] = 0x80;
             inq_dout[6] = 0x83;
+            inq_dout[7] = 0x86;
+            inq_dout[8] = 0x87;
+            inq_dout[9] = 0x92;
             inq_dout[n - 1] = SG_NVME_VPD_NICR;     /* last VPD number */
             break;
         case 0x80:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
-            sg_put_unaligned_be16(20, inq_dout + 2);
-            memcpy(inq_dout + 4, ptp->nvme_id_ctlp + 4, 20);    /* SN */
             n = 24;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            memcpy(inq_dout + 4, ptp->nvme_id_ctlp + 4, 20);    /* SN */
             break;
         case 0x83:
             if ((ptp->nvme_nsid > 0) &&
@@ -552,7 +555,29 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
                 nvme_id_ns = NULL;
             }
             break;
-        case SG_NVME_VPD_NICR:  /* 0xde */
+        case 0x86:      /* Extended INQUIRY (per SFS SPC Discovery 2016) */
+            inq_dout[1] = pg_cd;
+            n = 64;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            inq_dout[5] = 0x1;          /* SIMPSUP=1 */
+            inq_dout[7] = 0x1;          /* LUICLR=1 */
+            inq_dout[13] = 0x40;        /* max supported sense data length */
+            break;
+        case 0x87:      /* Mode page policy (per SFS SPC Discovery 2016) */
+            inq_dout[1] = pg_cd;
+            n = 8;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            inq_dout[4] = 0x3f;         /* all mode pages */
+            inq_dout[5] = 0xff;         /*     and their sub-pages */
+            inq_dout[6] = 0x80;         /* MLUS=1, policy=shared */
+            break;
+        case 0x92:      /* SCSI Feature set: only SPC Discovery 2016 */
+            inq_dout[1] = pg_cd;
+            n = 10;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            inq_dout[9] = 0x1;  /* SFS SPC Discovery 2016 */
+            break;
+        case SG_NVME_VPD_NICR:  /* 0xde (vendor (sg3_utils) specific) */
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
             n = 16 + 4096;
