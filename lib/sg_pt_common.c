@@ -29,7 +29,7 @@
 #endif
 
 
-static const char * scsi_pt_version_str = "3.05 20180309";
+static const char * scsi_pt_version_str = "3.06 20180531";
 
 
 
@@ -230,6 +230,32 @@ resp_ctrl_m_pg(uint8_t *p, int pcontrol)
     return sizeof(ctrl_m_pg);
 }
 
+static uint8_t ctrl_ext_m_pg[] = {0x4a, 0x1, 0, 0x1c,  0, 0, 0x40, 0,
+                                  0, 0, 0, 0,  0, 0, 0, 0,
+                                  0, 0, 0, 0,  0, 0, 0, 0,
+                                  0, 0, 0, 0,  0, 0, 0, 0, };
+
+/* Control Extension mode page [0xa,0x1] for mode_sense */
+static int
+resp_ctrl_ext_m_pg(uint8_t *p, int pcontrol)
+{
+    uint8_t ch_ctrl_ext_m_pg[] = {/* 0x4a, 0x1, 0, 0x1c, */ 0, 0, 0, 0,
+                         0, 0, 0, 0,  0, 0, 0, 0,
+                         0, 0, 0, 0,  0, 0, 0, 0,
+                         0, 0, 0, 0,  0, 0, 0, 0, };
+    uint8_t d_ctrl_ext_m_pg[] = {0x4a, 0x1, 0, 0x1c,  0, 0, 0x40, 0,
+                         0, 0, 0, 0,  0, 0, 0, 0,
+                         0, 0, 0, 0,  0, 0, 0, 0,
+                         0, 0, 0, 0,  0, 0, 0, 0, };
+
+    memcpy(p, ctrl_ext_m_pg, sizeof(ctrl_ext_m_pg));
+    if (1 == pcontrol)
+        memcpy(p + 4, ch_ctrl_ext_m_pg, sizeof(ch_ctrl_ext_m_pg));
+    else if (2 == pcontrol)
+        memcpy(p, d_ctrl_ext_m_pg, sizeof(d_ctrl_ext_m_pg));
+    return sizeof(ctrl_ext_m_pg);
+}
+
 static uint8_t iec_m_pg[] = {0x1c, 0xa, 0x08, 0, 0, 0, 0, 0, 0, 0, 0x0, 0x0};
 
 /* Informational Exceptions control mode page for mode_sense */
@@ -333,26 +359,36 @@ sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
         offset += bd_len;
         ap = arr + offset;
     }
-
-    if ((subpcode > 0x0) && (subpcode < 0xff)) {
-        resp->asc = INVALID_FIELD_IN_CDB;
-        resp->in_byte = 3;
-        resp->in_bit = 255;
-        goto err_out;
-    }
     bad_pcode = false;
 
     switch (pcode) {
     case 0x2:       /* Disconnect-Reconnect page, all devices */
-        len = resp_disconnect_pg(ap, pcontrol);
+        if (0x0 == subpcode)
+            len = resp_disconnect_pg(ap, pcontrol);
+        else {
+            len = 0;
+            bad_pcode = true;
+        }
         offset += len;
         break;
     case 0xa:       /* Control Mode page, all devices */
-        len = resp_ctrl_m_pg(ap, pcontrol);
+        if (0x0 == subpcode)
+            len = resp_ctrl_m_pg(ap, pcontrol);
+        else if (0x1 == subpcode)
+            len = resp_ctrl_ext_m_pg(ap, pcontrol);
+        else {
+            len = 0;
+            bad_pcode = true;
+        }
         offset += len;
         break;
     case 0x1c:      /* Informational Exceptions Mode page, all devices */
-        len = resp_iec_m_pg(ap, pcontrol);
+        if (0x0 == subpcode)
+            len = resp_iec_m_pg(ap, pcontrol);
+        else {
+            len = 0;
+            bad_pcode = true;
+        }
         offset += len;
         break;
     case 0x3f:      /* Read all Mode pages */
@@ -360,6 +396,8 @@ sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
             len = 0;
             len = resp_disconnect_pg(ap + len, pcontrol);
             len += resp_ctrl_m_pg(ap + len, pcontrol);
+            if (0xff == subpcode)
+                len += resp_ctrl_ext_m_pg(ap + len, pcontrol);
             len += resp_iec_m_pg(ap + len, pcontrol);
             len += resp_vs_ua_m_pg(ap + len, pcontrol);
             offset += len;
@@ -371,6 +409,7 @@ sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
         }
         break;
     case 0x0:       /* Vendor specific "Unit Attention" mode page */
+        /* all sub-page codes ?? */
         len = resp_vs_ua_m_pg(ap, pcontrol);
         offset += len;
         break;      /* vendor is "NVMe    " (from INQUIRY field) */
@@ -406,6 +445,7 @@ sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
                         struct sg_sntl_result_t * resp)
 {
     int pf, sp, ps, md_len, bd_len, off, spf, pg_len, rlen, param_len, mpage;
+    int sub_mpage;
     uint8_t arr[SDEBUG_MAX_MSELECT_SZ];
 
     memset(resp, 0, sizeof(*resp));
@@ -448,24 +488,31 @@ sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
     spf = !!(arr[off] & 0x40);
     pg_len = spf ? (sg_get_unaligned_be16(arr + off + 2) + 4) :
                    (arr[off + 1] + 2);
+    sub_mpage = spf ? arr[off + 1] : 0;
     if ((pg_len + off) > param_len) {
         resp->asc = PARAMETER_LIST_LENGTH_ERR;
         goto err_out;
     }
     switch (mpage) {
     case 0xa:      /* Control Mode page */
-        if (ctrl_m_pg[1] == arr[off + 1]) {
-            memcpy(ctrl_m_pg + 2, arr + off + 2,
-                   sizeof(ctrl_m_pg) - 2);
-            dsp->descriptor_sense = !!(ctrl_m_pg[2] & 0x4);
+        if (0x0 == sub_mpage) {
+            if (ctrl_m_pg[1] == arr[off + 1]) {
+                memcpy(ctrl_m_pg + 2, arr + off + 2,
+                       sizeof(ctrl_m_pg) - 2);
+                dsp->descriptor_sense = !!(ctrl_m_pg[2] & 0x4);
+                break;
+            }
         }
-        break;
-    case 0x1c:      /* Informational Exceptions Mode page */
-        if (iec_m_pg[1] == arr[off + 1]) {
-            memcpy(iec_m_pg + 2, arr + off + 2,
-                   sizeof(iec_m_pg) - 2);
+        goto def_case;
+    case 0x1c:      /* Informational Exceptions Mode page (SBC) */
+        if (0x0 == sub_mpage) {
+            if (iec_m_pg[1] == arr[off + 1]) {
+                memcpy(iec_m_pg + 2, arr + off + 2,
+                       sizeof(iec_m_pg) - 2);
+                break;
+            }
         }
-        break;
+        goto def_case;
     case 0x0:       /* Vendor specific "Unit Attention" mode page */
         if (vs_ua_m_pg[1] == arr[off + 1]) {
             memcpy(vs_ua_m_pg + 2, arr + off + 2,
@@ -474,6 +521,7 @@ sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
         }
         break;
     default:
+def_case:
         resp->asc = INVALID_FIELD_IN_PARAM_LIST;
         resp->in_byte = off;
         resp->in_bit = 5;
