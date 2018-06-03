@@ -166,9 +166,9 @@ dmc_offs_defer  [14, 0xe]
 Download microcode with offsets, save, and defer activate.
 .TP
 activate_mc  [15, 0xf]
-Activate deferred microcode. There is no follow-up RECEIVE DIAGNOSTIC RESULTS
-to fetch the Download microcode status dpage since the \fIDEVICE\fR might be
-resetting.
+Activate deferred microcode. There is no follow\-up RECEIVE DIAGNOSTIC
+RESULTS to fetch the Download microcode status dpage since the \fIDEVICE\fR
+might be resetting.
 .PP
 Apart from dmc_status, these are placed in the Download microcode mode
 field in the Download microcode control dpage. In the case of dmc_status

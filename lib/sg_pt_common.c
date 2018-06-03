@@ -23,13 +23,14 @@
 #include "sg_pt.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
+#include "sg_pr2serr.h"
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 #include "sg_pt_nvme.h"
 #endif
 
 
-static const char * scsi_pt_version_str = "3.06 20180531";
+static const char * scsi_pt_version_str = "3.07 20180603";
 
 
 
@@ -44,6 +45,7 @@ sg_pt_version()
 {
     return scsi_pt_version_str;
 }
+
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
@@ -297,8 +299,10 @@ resp_vs_ua_m_pg(uint8_t *p, int pcontrol)
 void
 sntl_init_dev_stat(struct sg_sntl_dev_state_t * dsp)
 {
-    dsp->descriptor_sense = !! (0x4 & ctrl_m_pg[2]);
-    dsp->enclosure_override = vs_ua_m_pg[2];
+    if (dsp) {
+        dsp->scsi_dsense = !! (0x4 & ctrl_m_pg[2]);
+        dsp->enclosure_override = vs_ua_m_pg[2];
+    }
 }
 
 
@@ -499,7 +503,7 @@ sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
             if (ctrl_m_pg[1] == arr[off + 1]) {
                 memcpy(ctrl_m_pg + 2, arr + off + 2,
                        sizeof(ctrl_m_pg) - 2);
-                dsp->descriptor_sense = !!(ctrl_m_pg[2] & 0x4);
+                dsp->scsi_dsense = !!(ctrl_m_pg[2] & 0x4);
                 break;
             }
         }

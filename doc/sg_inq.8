@@ -65,7 +65,7 @@ option name.
 \fB\-a\fR, \fB\-\-ata\fR
 Assume given \fIDEVICE\fR is an ATA or ATAPI device which can receive ATA
 commands from the host operating system. Skip the SCSI INQUIRY command and
-use either the ATA IDENTIFY DEVICE command (for non-packet devices) or the
+use either the ATA IDENTIFY DEVICE command (for non\-packet devices) or the
 ATA IDENTIFY PACKET DEVICE command. To show the response in hex, add
 a '\-\-verbose' option. This option is only available in Linux.
 .TP
@@ -186,7 +186,7 @@ Do not attempt to additionally retrieve the serial number VPD page (0x80) to
 enhance the output of a standard INQUIRY. So with this option given and no
 others, this utility will send a standard INQUIRY SCSI command and decode
 its response. No other SCSI commands will be sent to the \fIDEVICE\fR.
-Without this option an additional SCSI command is sent: a (non-standard)
+Without this option an additional SCSI command is sent: a (non\-standard)
 SCSI INQUIRY to fetch the Serial Number VPD page. However the Serial
 Number VPD page is not mandatory (while the Device Identification page is
 mandatory but a billion USB keys ignore that) and may cause nuisance error
@@ -330,8 +330,8 @@ get the controller's Identify decoded use the \fI\-\-only\fR option.
 .PP
 It is possible that even though the \fIDEVICE\fR presents as a NVMe device,
 it has a SNTL and accepts SCSI commands. In this case to send a SCSI INQUIRY
-command (and fetch its VPD pages) use 'sg_vpd -p sinq <dev>' (or to get VPD
-pages: 'sg_vpd -p <vpd_page> <dev>').
+command (and fetch its VPD pages) use 'sg_vpd \-p sinq <dev>' (or to get VPD
+pages: 'sg_vpd \-p <vpd_page> <dev>').
 .SH EXIT STATUS
 The exit status of sg_inq is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

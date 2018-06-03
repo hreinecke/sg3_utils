@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.64 20180523";
+static const char * version_str = "5.65 20180601";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -140,6 +140,7 @@ typedef struct request_collection
     int sum_of_resids;          /*  | */
     pthread_mutex_t aux_mutex;  /* -/ (also serializes some printf()s */
     int debug;
+    int dry_run;
 } Rq_coll;
 
 typedef struct request_element
@@ -346,6 +347,7 @@ usage()
             "[deb=VERB] [dio=0|1]\n"
             "               [fua=0|1|2|3] [sync=0|1] [thr=THR] "
             "[time=0|1] [verbose=VERB]\n"
+            "               [--dry-run] [--verbose]\n"
             "  where:\n"
             "    bpt         is blocks_per_transfer (default is 128)\n"
             "    bs          must be device block size (default 512)\n"
@@ -378,8 +380,10 @@ usage()
             "    time        0->no timing(def), 1->time plus calculate "
             "throughput\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
-            "    --help      output this usage message then exit\n"
-            "    --version   output version string then exit\n"
+            "    --dry-run|-d    prepare but bypass copy/read\n"
+            "    --help|-h      output this usage message then exit\n"
+            "    --verbose|-v   increase verbosity of utility\n"
+            "    --version|-V   output version string then exit\n"
             "Copy from IFILE to OFILE, similar to dd command\n"
             "specialized for SCSI devices, uses multiple POSIX threads\n");
 }
@@ -1129,10 +1133,23 @@ process_flags(const char * arg, struct flags_t * fp)
     return 0;
 }
 
+/* Returns the number of times 'ch' is found in string 's' given the
+ * string's length. */
+static int
+num_chs_in_str(const char * s, int slen, int ch)
+{
+    int res = 0;
+
+    while (--slen >= 0) {
+        if (ch == s[slen])
+            ++res;
+    }
+    return res;
+}
+
 
 #define STR_SZ 1024
 #define INOUTF_SZ 512
-
 
 int
 main(int argc, char * argv[])
@@ -1148,7 +1165,7 @@ main(int argc, char * argv[])
     char * buf;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
-    int res, k, err;
+    int res, k, err, keylen;
     int64_t in_num_sect = 0;
     int64_t out_num_sect = 0;
     pthread_t threads[MAX_NUM_THREADS];
@@ -1184,6 +1201,7 @@ main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
+        keylen = strlen(key);
         if (0 == strcmp(key,"bpt")) {
             rcoll.bpt = sg_get_num(buf);
             if (-1 == rcoll.bpt) {
@@ -1276,17 +1294,42 @@ main(int argc, char * argv[])
             num_threads = sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
             do_time = !! sg_get_num(buf);
-        else if ((0 == strncmp(key, "--help", 7)) ||
-                 (0 == strncmp(key, "-h", 2)) ||
-                 (0 == strcmp(key, "-?"))) {
+        else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
+            res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'd');
+            rcoll.dry_run += n;
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'h');
+            if (n > 0) {
+                usage();
+                return 0;
+            }
+            n = num_chs_in_str(key + 1, keylen - 1, 'v');
+            rcoll.debug += n;   /* -v  ---> --verbose */
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'V');
+            if (n > 0) {
+                pr2serr("%s%s\n", my_name, version_str);
+                return 0;
+            }
+            if (res < (keylen - 1)) {
+                pr2serr("Unrecognised short option in '%s', try '--help'\n",
+                        key);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if ((0 == strncmp(key, "--dry-run", 9)) ||
+                   (0 == strncmp(key, "--dry_run", 9)))
+            ++rcoll.dry_run;
+        else if ((0 == strncmp(key, "--help", 6)) ||
+                   (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if ((0 == strncmp(key, "--vers", 6)) ||
-                   (0 == strcmp(key, "-V"))) {
+        } else if (0 == strncmp(key, "--verb", 6))
+            ++rcoll.debug;      /* --verbose */
+        else if (0 == strncmp(key, "--vers", 6)) {
             pr2serr("%s%s\n", my_name, version_str);
             return 0;
-        }
-        else {
+        } else {
             pr2serr("Unrecognized option '%s'\n", key);
             pr2serr("For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
@@ -1584,6 +1627,10 @@ main(int argc, char * argv[])
     status = pthread_cond_init(&rcoll.out_sync_cv, NULL);
     if (0 != status) err_exit(status, "init out_sync_cv");
 
+    if (rcoll.dry_run > 0) {
+        pr2serr("Due to --dry-run option, bypass copy/read\n");
+        goto fini;
+    }
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
     status = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
@@ -1666,12 +1713,13 @@ main(int argc, char * argv[])
     shutting_down = true;
     status = pthread_kill(sig_listen_thread_id, SIGINT);
     if (0 != status) err_exit(status, "pthread_kill");
+fini:
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);
     if ((STDOUT_FILENO != rcoll.outfd) && (FT_DEV_NULL != rcoll.out_type))
         close(rcoll.outfd);
     res = exit_status;
-    if (0 != rcoll.out_count) {
+    if ((0 != rcoll.out_count) && (0 == rcoll.dry_run)) {
         pr2serr(">>>> Some error occurred, remaining blocks=%" PRId64 "\n",
                 rcoll.out_count);
         if (0 == res)

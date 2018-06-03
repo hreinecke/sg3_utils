@@ -114,7 +114,7 @@ __packed;
 #endif
 
 struct sg_sntl_dev_state_t {
-    uint8_t descriptor_sense;
+    uint8_t scsi_dsense;
     uint8_t enclosure_override; /* ENC_OV in sdparm */
     uint8_t pdt;        /* 6 bit value in INQUIRY response */
     uint8_t enc_serv;   /* single bit in INQUIRY response */

@@ -26,6 +26,7 @@
 
 #include "sg_pt.h"
 #include "sg_lib.h"
+#include "sg_pr2serr.h"
 
 
 #define OSF1_MAXDEV 64
@@ -65,25 +66,6 @@ struct sg_pt_base {
     struct sg_pt_osf1_scsi impl;
 };
 
-#if defined(__GNUC__) || defined(__clang__)
-static int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2ws(const char * fmt, ...);
-#endif
-
-
-static int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */

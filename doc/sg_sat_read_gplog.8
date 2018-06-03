@@ -42,7 +42,7 @@ a sense buffer containing a ATA Result descriptor if the ATA command failed.
 .TP
 \fB\-c\fR, \fB\-\-count\fR=\fICO\fR
 the number \fICO\fR is placed in the "count" field in the ATA READ
-LOG EXT command. This specified the number of 512-byte blocks of
+LOG EXT command. This specified the number of 512\-byte blocks of
 data to be read from the specified log.
 .TP
 \fB\-d\fR, \fB\-\-dma\fR
@@ -65,7 +65,7 @@ to process.
 \fB\-L\fR, \fB\-\-log\fR=\fILA\fR
 the number \fILA\fR is known as the "log address" in the ATA standards and
 is placed in bits 7:0 of the "lba" field of the ATA READ LOG (DMA) EXT
-command. This specifies the log to be returned (See ATA-ACS for a detailed
+command. This specifies the log to be returned (See ATA\-ACS for a detailed
 list of available log addresses). The default value placed in the "lba
 field is 0, returning the directory of available logs. The maximum value
 allowed for \fILOG\fR is 0xff.

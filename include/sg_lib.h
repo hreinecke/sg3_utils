@@ -350,6 +350,16 @@ char * sg_get_nvme_cmd_status_str(uint16_t sct_sc, int buff_len, char * buff);
 bool sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
                          uint8_t * asc_p, uint8_t * ascq_p);
 
+/* Add vendor (sg3_utils) specific sense descriptor for the NVMe Status
+ * field. Assumes descriptor (i.e. not fixed) sense. Assume sbp has room. */
+void sg_nvme_desc2sense(uint8_t * sbp, bool dnr, bool more, uint16_t sct_sc);
+
+/* Build minimum sense buffer, either descriptor type (desc=true) or fixed
+ * type (desc=false). Assume sbp has enough room (8 or 14 bytes
+ * respectively). sbp should have room for 32 or 18 bytes respectively */
+void sg_build_sense_buffer(bool desc, uint8_t *sbp, uint8_t skey,
+                           uint8_t asc, uint8_t ascq);
+
 extern FILE * sg_warnings_strm;
 
 void sg_set_warnings_strm(FILE * warnings_strm);
@@ -359,6 +369,10 @@ void sg_set_warnings_strm(FILE * warnings_strm);
  * each line printed out, NULL treated as "". */
 void sg_print_command(const uint8_t * command);
 void sg_print_scsi_status(int scsi_status);
+
+/* DSENSE is 'descriptor sense' as opposed to the older 'fixed sense'. Reads
+ * environment variable SG3_UTILS_DSENSE. Only (currently) used in SNTL. */
+bool sg_get_initial_dsense(void);
 
 /* 'leadin' is string prepended to each line printed out, NULL treated as
  * "". N.B. prior to sg3_utils v 1.42 'leadin' was only prepended to the

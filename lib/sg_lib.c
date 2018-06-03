@@ -53,15 +53,8 @@
 
 FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
-#if defined(__GNUC__) || defined(__clang__)
-static int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2ws(const char * fmt, ...);
-#endif
 
-
-static int
+int
 pr2ws(const char * fmt, ...)
 {
     va_list args;
@@ -103,9 +96,26 @@ scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 
 /* Simple ASCII printable (does not use locale), includes space and excludes
  * DEL (0x7f). */
-static inline int my_isprint(int ch)
+static inline int
+my_isprint(int ch)
 {
     return ((ch >= ' ') && (ch < 0x7f));
+}
+
+/* DSENSE is 'descriptor sense' as opposed to the older 'fixed sense'.
+ * Only (currently) used in SNTL. */
+bool
+sg_get_initial_dsense(void)
+{
+    int k;
+    const char * cp;
+
+    cp = getenv("SG3_UTILS_DSENSE");
+    if (cp) {
+        if (1 == sscanf(cp, "%d", &k))
+            return k ? true : false;
+    }
+    return false;
 }
 
 /* Searches 'arr' for match on 'value' then 'peri_type'. If matches
@@ -1290,6 +1300,7 @@ sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
 {
     int add_sb_len, add_d_len, desc_len, k, j, sense_key;
     int n, progress, pr, rem;
+    uint16_t sct_sc;
     bool processed;
     const uint8_t * descp;
     const char * dtsp = "   >> descriptor too short";
@@ -1549,6 +1560,24 @@ sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
             else
                 n += scnpr(b + n, blen - n, "%d seconds\n", progress);
             break;
+        case 0xde:       /* NVME Status Field; vendor (sg3_utils) specific */
+            n += scnpr(b + n, blen - n, "NVMe Status: ");
+            if (add_d_len < 6) {
+                n += scnpr(b + n, blen - n, "%s\n", dtsp);
+                processed = false;
+                break;
+            }
+            n += scnpr(b + n, blen - n, "DNR=%d, M=%d, ",
+                       (int)!!(0x80 & descp[5]), (int)!!(0x40 & descp[5]));
+            sct_sc = sg_get_unaligned_be16(descp + 6);
+            n += scnpr(b + n, blen - n, "SCT_SC=0x%x\n", sct_sc);
+            if (sct_sc > 0) {
+                char d[80];
+
+                n += scnpr(b + n, blen - n, "    %s\n",
+                           sg_get_nvme_cmd_status_str(sct_sc, sizeof(d), d));
+            }
+            break;
         default:
             if (descp[0] >= 0x80)
                 n += scnpr(b + n, blen - n, "Vendor specific [0x%x]\n",
@@ -1678,8 +1707,8 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
         n += scnpr(cbp + n, cblen - n, "%s%s; Sense key: %s\n", lip, ebp,
                    sg_lib_sense_key_desc[ssh.sense_key]);
         if (sdat_ovfl)
-            n += scnpr(cbp + n, cblen - n, "%s<<<Sense data overflow>>>\n",
-                       lip);
+            n += scnpr(cbp + n, cblen - n, "%s<<<Sense data overflow "
+                       "(SDAT_OVFL)>>>\n", lip);
         if (descriptor_format) {
             n += scnpr(cbp + n, cblen - n, "%s%s\n", lip,
                        sg_get_asc_ascq_str(ssh.asc, ssh.ascq, blen, b));
@@ -1814,14 +1843,25 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
     }
 check_raw:
     if (raw_sinfo) {
+        int embed_len;
         char z[64];
 
-        n += scnpr(cbp + n, cblen - n, "%s Raw sense data (in hex):\n",
-                   lip);
+        n += scnpr(cbp + n, cblen - n, "%s Raw sense data (in hex), "
+                   "sb_len=%d", lip, sb_len);
         if (n >= (cblen - 1))
             return n;
+        if ((sb_len > 7) && (sbp[0] >= 0x70) && (sbp[0] < 0x74)) {
+            embed_len = sbp[7] + 8;
+            n += scnpr(cbp + n, cblen - n, ", embedded_len=%d\n", embed_len);
+        } else {
+            embed_len = sb_len;
+            n += scnpr(cbp + n, cblen - n, "\n");
+        }
+        if (n >= (cblen - 1))
+            return n;
+
         scnpr(z, sizeof(z), "%.50s        ", lip);
-        n += hex2str(sbp, len, z,  -1, cblen - n, cbp + n);
+        n += hex2str(sbp, embed_len, z,  -1, cblen - n, cbp + n);
     }
     return n;
 }
@@ -1852,7 +1892,9 @@ sg_print_sense(const char * leadin, const uint8_t * sbp, int sb_len,
  * output; in both cases true is returned. If exit_status is negative then
  * a null character is output and false is returned. All messages are a
  * single line (less than 80 characters) with no trailing LF. The output
- * string including the trailing null character is no longer than b_len. */
+ * string including the trailing null character is no longer than b_len.
+ * exit_status represents the Unix exit status available after a utility
+ * finishes executing (for whatever reason). */
 bool sg_exit2str(int exit_status, bool longer, int b_len, char *b)
 {
     const struct sg_value_2names_t * ess = sg_exit_str_arr;
@@ -1873,6 +1915,10 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char *b)
         (exit_status < SG_LIB_CAT_MALFORMED)) {
         snprintf(b, b_len, "%s%s", (longer ? "OS error: " : ""),
                  safe_strerror(exit_status - SG_LIB_OS_BASE_ERR));
+        return true;
+    } else if ((exit_status > 128) && (exit_status < 255)) {
+        snprintf(b, b_len, "Utility stopped/aborted by signal number: %d",
+                 exit_status - 128);
         return true;
     }
     for ( ; ess->name; ++ess) {
@@ -2537,6 +2583,46 @@ sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
     if (ascq_p)
         *ascq_p = mp->t4;
     return true;
+}
+
+/* Add vendor (sg3_utils) specific sense descriptor for the NVMe Status
+ * field. Assumes descriptor (i.e. not fixed) sense. Assumes sbp has room. */
+void
+sg_nvme_desc2sense(uint8_t * sbp, bool dnr, bool more, uint16_t sct_sc)
+{
+    int len = sbp[7] + 8;
+
+    sbp[len] = 0xde;            /* vendor specific descriptor type */
+    sbp[len + 1] = 6;           /* descriptor is 8 bytes long */
+    memset(sbp + len + 2, 0, 6);
+    if (dnr)
+        sbp[len + 5] = 0x80;
+    if (more)
+        sbp[len + 5] |= 0x40;
+    sg_put_unaligned_be16(sct_sc, sbp + len + 6);
+    sbp[7] += 8;
+}
+
+/* Build minimum sense buffer, either descriptor type (desc=true) or fixed
+ * type (desc=false). Assume sbp has enough room (8 or 14 bytes
+ * respectively). sbp should have room for 32 or 18 bytes respectively */
+void
+sg_build_sense_buffer(bool desc, uint8_t *sbp, uint8_t skey, uint8_t asc,
+                      uint8_t ascq)
+{
+    if (desc) {
+        sbp[0] = 0x72;  /* descriptor, current */
+        sbp[1] = skey;
+        sbp[2] = asc;
+        sbp[3] = ascq;
+        sbp[7] = 0;
+    } else {
+        sbp[0] = 0x70;  /* fixed, current */
+        sbp[2] = skey;
+        sbp[7] = 0xa;   /* Assumes length is 18 bytes */
+        sbp[12] = asc;
+        sbp[13] = ascq;
+    }
 }
 
 /* safe_strerror() contributed by Clayton Weaver <cgweav at email dot com>

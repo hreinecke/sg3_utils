@@ -30,6 +30,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_pt.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* Needs to be after config.h */
 #ifdef SG_LIB_LINUX
@@ -37,7 +38,7 @@
 #endif
 
 
-static const char * const version_str = "1.87 20180522";
+static const char * const version_str = "1.88 20180603";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -63,26 +64,6 @@ const char *
 sg_cmds_version()
 {
     return version_str;
-}
-
-#if defined(__GNUC__) || defined(__clang__)
-static int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2ws(const char * fmt, ...);
-#endif
-
-
-static int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
-    va_end(args);
-    return n;
 }
 
 /* Returns file descriptor >= 0 if successful. If error in Unix returns

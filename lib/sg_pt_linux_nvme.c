@@ -39,7 +39,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.04 20180115 */
+/* sg_pt_linux_nvme version 1.05 20180602 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -76,6 +76,7 @@
 #include "sg_linux_inc.h"
 #include "sg_pt_linux.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 #define SCSI_INQUIRY_OPC     0x12
 #define SCSI_REPORT_LUNS_OPC 0xa0
@@ -119,25 +120,6 @@
 #define MICROCODE_CHANGED_WO_RESET_ASCQ 0x16
 
 
-#if defined(__GNUC__) || defined(__clang__)
-static int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2ws(const char * fmt, ...);
-#endif
-
-
-static int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 #if (HAVE_NVME && (! IGNORE_NVME))
 
@@ -170,29 +152,10 @@ sg_get_nvme_char_devname(const char * nvme_block_devname, uint32_t b_len,
 }
 
 static void
-build_sense_buffer(bool desc, uint8_t *buf, uint8_t skey, uint8_t asc,
-                   uint8_t ascq)
-{
-    if (desc) {
-        buf[0] = 0x72;  /* descriptor, current */
-        buf[1] = skey;
-        buf[2] = asc;
-        buf[3] = ascq;
-        buf[7] = 0;
-    } else {
-        buf[0] = 0x70;  /* fixed, current */
-        buf[2] = skey;
-        buf[7] = 0xa;   /* Assumes length is 18 bytes */
-        buf[12] = asc;
-        buf[13] = ascq;
-    }
-}
-
-static void
 mk_sense_asc_ascq(struct sg_pt_linux_scsi * ptp, int sk, int asc, int ascq,
                   int vb)
 {
-    bool dsense = !! ptp->dev_stat.descriptor_sense;
+    bool dsense = !! ptp->dev_stat.scsi_dsense;
     int n;
     uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
 
@@ -204,9 +167,9 @@ mk_sense_asc_ascq(struct sg_pt_linux_scsi * ptp, int sk, int asc, int ascq,
                   __func__, n);
         return;
     } else
-        ptp->io_hdr.response_len = dsense ? 8 : ((n < 18) ? n : 18);
+        ptp->io_hdr.response_len = dsense ? n : ((n < 18) ? n : 18);
     memset(sbp, 0, n);
-    build_sense_buffer(dsense, sbp, sk, asc, ascq);
+    sg_build_sense_buffer(dsense, sbp, sk, asc, ascq);
     if (vb > 3)
         pr2ws("%s:  [sense_key,asc,ascq]: [0x%x,0x%x,0x%x]\n", __func__, sk,
               asc, ascq);
@@ -216,7 +179,7 @@ static void
 mk_sense_from_nvme_status(struct sg_pt_linux_scsi * ptp, int vb)
 {
     bool ok;
-    bool dsense = !! ptp->dev_stat.descriptor_sense;
+    bool dsense = !! ptp->dev_stat.scsi_dsense;
     int n;
     uint8_t sstatus, sk, asc, ascq;
     uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
@@ -235,9 +198,12 @@ mk_sense_from_nvme_status(struct sg_pt_linux_scsi * ptp, int vb)
         pr2ws("%s: sense_len=%d too short, want 14 or more\n", __func__, n);
         return;
     } else
-        ptp->io_hdr.response_len = (dsense ? 8 : ((n < 18) ? n : 18));
+        ptp->io_hdr.response_len = dsense ? n : ((n < 18) ? n : 18);
     memset(sbp, 0, n);
-    build_sense_buffer(dsense, sbp, sk, asc, ascq);
+    sg_build_sense_buffer(dsense, sbp, sk, asc, ascq);
+    if (dsense && (ptp->nvme_status > 0))
+        sg_nvme_desc2sense(sbp, ptp->nvme_stat_dnr, ptp->nvme_stat_more,
+                           ptp->nvme_status);
     if (vb > 3)
         pr2ws("%s: [status, sense_key,asc,ascq]: [0x%x, 0x%x,0x%x,0x%x]\n",
               __func__, sstatus, sk, asc, ascq);
@@ -248,7 +214,7 @@ static void
 mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
                      int in_bit, int vb)
 {
-    bool dsense = !! ptp->dev_stat.descriptor_sense;
+    bool dsense = !! ptp->dev_stat.scsi_dsense;
     int sl, asc, n;
     uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
     uint8_t sks[4];
@@ -262,9 +228,10 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
                   __func__, n);
         return;
     } else
-        ptp->io_hdr.response_len = dsense ? 8 : ((n < 18) ? n : 18);
+        ptp->io_hdr.response_len = dsense ? n : ((n < 18) ? n : 18);
+
     memset(sbp, 0, n);
-    build_sense_buffer(dsense, sbp, SPC_SK_ILLEGAL_REQUEST, asc, 0);
+    sg_build_sense_buffer(dsense, sbp, SPC_SK_ILLEGAL_REQUEST, asc, 0);
     memset(sks, 0, sizeof(sks));
     sks[0] = 0x80;
     if (in_cdb)
@@ -340,12 +307,12 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     ptp->nvme_result = cmdp->result;
     if (ptp->nvme_direct && ptp->io_hdr.response &&
         (ptp->io_hdr.max_response_len > 3)) {
-        /* build 16 byte "sense" buffer */
+        /* build 32 byte "sense" buffer */
         uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
         uint16_t st = (uint16_t)res;
 
         n = ptp->io_hdr.max_response_len;
-        n = (n < 16) ? n : 16;
+        n = (n < 32) ? n : 32;
         memset(sbp, 0 , n);
         ptp->io_hdr.response_len = n;
         sg_put_unaligned_le32(cmdp->result,
@@ -354,8 +321,10 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
             sg_put_unaligned_le16(st << 1, sbp + SG_NVME_PT_CQ_STATUS_P);
     }
     /* clear upper bits (DNR and More) leaving ((SCT << 8) | SC) */
-    sct_sc = 0x3ff & res;
+    sct_sc = 0x7ff & res;       /* 11 bits */
     ptp->nvme_status = sct_sc;
+    ptp->nvme_stat_dnr = !!(0x4000 & res);
+    ptp->nvme_stat_more = !!(0x2000 & res);
     if (sct_sc) {  /* when non-zero, treat as command error */
         if (vb > 1) {
             char b[80];
@@ -781,11 +750,11 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: pow_state=%u\n", __func__, pow_state);
     memset(rs_dout, 0, sizeof(rs_dout));
     if (pow_state)
-        build_sense_buffer(desc, rs_dout, SPC_SK_NO_SENSE,
-                           LOW_POWER_COND_ON_ASC, 0);
+        sg_build_sense_buffer(desc, rs_dout, SPC_SK_NO_SENSE,
+                              LOW_POWER_COND_ON_ASC, 0);
     else
-        build_sense_buffer(desc, rs_dout, SPC_SK_NO_SENSE,
-                           NO_ADDITIONAL_SENSE, 0);
+        sg_build_sense_buffer(desc, rs_dout, SPC_SK_NO_SENSE,
+                              NO_ADDITIONAL_SENSE, 0);
     n = desc ? 8 : 18;
     n = (n < alloc_len) ? n : alloc_len;
     n = (n < ptp->io_hdr.din_xfer_len) ? n : ptp->io_hdr.din_xfer_len;

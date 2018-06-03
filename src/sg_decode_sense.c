@@ -28,13 +28,16 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.16 20180522";
+static const char * version_str = "1.17 20180602";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
 static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
     {"cdb", no_argument, 0, 'c'},
+    {"err", required_argument, 0, 'e'},
+    {"exit-status", required_argument, 0, 'e'},
+    {"exit_status", required_argument, 0, 'e'},
     {"file", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
@@ -54,11 +57,13 @@ struct opts_t {
     bool no_space;
     bool do_status;
     bool do_version;
+    bool err_given;
     bool file_given;
     const char * fname;
+    int es_val;
     int sense_len;
     int sstatus;
-    int do_verbose;
+    int verbose;
     const char * wfname;
     const char * no_space_str;
     uint8_t sense[MAX_SENSE_LEN + 4];
@@ -70,11 +75,11 @@ static char concat_buff[1024];
 static void
 usage()
 {
-  pr2serr("Usage: sg_decode_sense [--binary=FN] [--cdb] [--file=FN] "
-          "[--help] [--hex]\n"
-          "                       [--nospace] [--status=SS] [--verbose] "
-          "[--version]\n"
-          "                       [--write=WFN] H1 H2 H3 ...\n"
+  pr2serr("Usage: sg_decode_sense [--binary=FN] [--cdb] [--err=ES] "
+          "[--file=FN]\n"
+          "                       [--help] [--hex] [--nospace] [--status=SS] "
+          "[--verbose]\n"
+          "                       [--version] [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=FN|-b FN     FN is a file name to read sense "
           "data in\n"
@@ -82,6 +87,8 @@ usage()
           "from stdin\n"
           "    --cdb|-c              decode given hex as cdb rather than "
           "sense data\n"
+          "    --err=ES|-e ES        ES is Exit Status from utility in this "
+          "package\n"
           "    --file=FN|-f FN       FN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
@@ -112,14 +119,14 @@ usage()
 static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
-    int c;
+    int c, n;
     unsigned int ui;
     long val;
     char * avp;
     char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:cf:hHns:vVw:", long_options, NULL);
+        c = getopt_long(argc, argv, "b:ce:f:hHns:vVw:", long_options, NULL);
         if (c == -1)
             break;
 
@@ -135,6 +142,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'c':
             op->do_cdb = true;
+            break;
+        case 'e':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 255)) {
+                pr2serr("--err= expected number from 0 to 255 inclusive\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->err_given = true;
+            op->es_val = n;
             break;
         case 'f':
             if (op->fname) {
@@ -168,7 +184,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->sstatus = ui;
             break;
         case 'v':
-            ++op->do_verbose;
+            ++op->verbose;
             break;
         case 'V':
             op->do_version = true;
@@ -180,6 +196,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (op->err_given)
+        goto the_end;
 
     while (optind < argc) {
         avp = argv[optind++];
@@ -218,6 +236,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         }
         op->sense[op->sense_len++] = (uint8_t)val;
     }
+the_end:
     return 0;
 }
 
@@ -407,6 +426,7 @@ write2wfn(FILE * fp, struct opts_t * op)
 int
 main(int argc, char *argv[])
 {
+    bool ok;
     int k, err;
     int ret = 0;
     unsigned int ui;
@@ -432,6 +452,19 @@ main(int argc, char *argv[])
         return 0;
     }
 
+    if (op->err_given) {
+        char d[128];
+        const int dlen = sizeof(d);
+
+        ok = sg_exit2str(op->es_val, op->verbose > 1, dlen, d);
+        if (! ok)
+            snprintf(d, dlen, "Unable to decode exit status %d", op->es_val);
+        if (1 & op->verbose) /* odd values of verbose print to stderr */
+            pr2serr("%s\n", d);
+        else    /* even values of verbose (including not given) to stdout */
+            printf("%s\n", d);
+        goto fini;
+    }
 
     if (op->do_status) {
         sg_get_scsi_status_str(op->sstatus, sizeof(b) - 1, b);
@@ -439,7 +472,7 @@ main(int argc, char *argv[])
     }
 
     if ((0 == op->sense_len) && op->no_space_str) {
-        if (op->do_verbose > 2)
+        if (op->verbose > 2)
             pr2serr("no_space str: %s\n", op->no_space_str);
         cp = op->no_space_str;
         for (k = 0; isxdigit(cp[k]) && isxdigit(cp[k + 1]); k += 2) {
@@ -518,9 +551,9 @@ main(int argc, char *argv[])
             sg_get_opcode_sa_name(opcode, sa, 0, sizeof(b), b);
         } else
             sg_get_sense_str(NULL, op->sense, op->sense_len,
-                             op->do_verbose, sizeof(b) - 1, b);
+                             op->verbose, sizeof(b) - 1, b);
         printf("%s\n", b);
     }
-
+fini:
     return ret;
 }

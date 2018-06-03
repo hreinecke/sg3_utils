@@ -1,4 +1,4 @@
-.TH SG_LUNS "8" "November" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_LUNS "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
@@ -41,7 +41,7 @@ given or not. If this option is given once then the given \fIALUN\fR is
 output in T10 preferred format (which is 8 pairs of hex digits, each
 separated by a space). If given twice then the given \fIALUN\fR is output
 in an alternate T10 format made up of four quads of hex digits with each
-quad separated by a "-" (e.g. C101-0000-0000-0000).
+quad separated by a "-" (e.g. C101\-0000\-0000\-0000).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -128,9 +128,9 @@ the right if less than 16 hexadecimal digits are given (e.g.
 \fI\-\-test=0122003a\fR represents T10 LUN: 01 22 00 3a 00 00 00 00).
 \fIALUN\fR may be prefixed by '0x' or '0X' (e.g. the previous example could
 have been \fI\-\-test=0x0122003a\fR). \fIALUN\fR may also be given with
-spaces, tabs, or a '-' between each byte (or other grouping (e.g.
-c101-0000-0000-0000)). However in the case of space or tab separators the
-\fIALUN\fR would need to be surrounded by single or double quotes.
+spaces, tabs, or a '\-' between each byte (or other grouping (e.g.
+c101\-0000\-0000\-0000)). However in the case of space or tab separators
+the \fIALUN\fR would need to be surrounded by single or double quotes.
 .br
 In the leading 'L' case the, following decimal number (hex if preceded
 by '0x') is assumed to be a Linux "word flipped" LUN which is converted
@@ -311,7 +311,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2017 Douglas Gilbert
+Copyright \(co 2004\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

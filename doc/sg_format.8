@@ -211,10 +211,10 @@ below for more information.
 \fB\-q\fR, \fB\-\-pie\fR=\fIPIE\fR
 sets the "Protection Interval Exponent" field in the parameter block
 associated with a FORMAT UNIT command to \fIPIE\fR. The default value is 0.
-\fIPIE\fR can only be non-zero with protection types 2 and 3.
+\fIPIE\fR can only be non\-zero with protection types 2 and 3.
 The value of 0 is typical for 512 byte blocks; with 4096 byte blocks a value
 of 3 may be appropriate (i.e. 8 protection intervals interleaved with 4096
-bytes of user data). A device may not support any non-zero values. This
+bytes of user data). A device may not support any non\-zero values. This
 field first appeared in SBC\-3 revision 18.
 .TP
 \fB\-p\fR, \fB\-\-pinfo\fR
@@ -504,7 +504,7 @@ sdparm utility.
 .PP
 Prior to invoking this utility the tape may need to be positioned to the
 beginning of partition 0. In Linux that can typically be done with the mt
-utility (e.g. 'mt -f /dev/st0 rewind').
+utility (e.g. 'mt \-f /dev/st0 rewind').
 .SH EXAMPLES
 These examples use Linux device names. For suitable device names in
 other supported Operating Systems see the sg3_utils(8) man page.
@@ -598,4 +598,4 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .B sg_turs(8), sg_requests(8), sg_inq(8), sg_modes(8), sg_vpd(8),
 .B sg_reassign(8), sg_readcap(8), sg3_utils(8),
 .B sg_sanitize(8) [all in sg3_utils],
-.B mt(mt-st), sdparm(8), scsiformat (old), hdparm(8)
+.B mt(mt\-st), sdparm(8), scsiformat (old), hdparm(8)

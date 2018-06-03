@@ -1,17 +1,17 @@
-.TH SG_DECODE_SENSE "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense data
 .SH SYNOPSIS
 .B sg_decode_sense
-[\fI\-\-binary=FN\fR] [\fI\-\-cdb\fR] [\fI\-\-file=FN\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
+[\fI\-\-binary=FN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=FN\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR]
 [H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of
 ASCII hexadecimal bytes and decodes it. The primary reference for the
-decoding is SPC\-4 ANSI INCITS 513-2015 and the most recent draft
+decoding is SPC\-4 ANSI INCITS 513\-2015 and the most recent draft
 SPC\-5 revision 8 which can be found at http://www.t10.org and other
 locations on the internet.
 .PP
@@ -35,6 +35,10 @@ arguments as sense data, it is viewed as a SCSI command descriptor
 block (CDB). In this case the command name is printed out. That name is
 based on the first hex byte given (know as the opcode) and optionally on
 another field called the "service action". 
+.PP
+Another alternate action is when the \fI\-\-err=ES\fR is given. \fIES\fR
+is assumed to be an "exit status" value between 0 and 255. A descriptive
+string is printed. Other options are ignored apart from \fI\-\-verbose\fR.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -45,14 +49,15 @@ the sense data is read in binary from a file called \fIFN\fR.
 treat the given string of hex arguments as bytes in a SCSI CDB and
 decode the command name.
 .TP
-\fB\-h\fR, \fB\-\-help\fR
-output the usage message then exit.
-.TP
-\fB\-H\fR, \fB\-\-hex\fR
-this option is used in conjunction with \fI\-\-write=WFN\fR in order to
-change the output written to \fIWFN\fR to lines of ASCII hex bytes suitable
-for a C language compiler. Each line contains up to 16 bytes (e.g. a line
-starting with "0x3b,0x07,0x00,0xff").
+\fB\-e\fR, \fB\-\-err\fR=\fIES\fR
+\fIES\fR should be an "exit status" value between 0 and 255 that is
+available from the shell (i.e. the utility's execution context) after the
+utility is finished. By default an indicative error message is printed to
+stdout; and if the \fI\-\-verbose\fR option is given once (or an odd number
+of times) then the message is instead printed to stderr. If \fI\-\-verbose\fR
+is given two or more times a longer form of the message is output. In all
+cases the message is less than 128 characters long with one trailing line
+feed. All other command line options and arguments are ignored.
 .TP
 \fB\-f\fR, \fB\-\-file\fR=\fIFN\fR
 the sense data is read in ASCII hexadecimal from a file called \fIFN\fR.
@@ -61,6 +66,15 @@ comma, tab or newline. Everything from and including a hash symbol to the
 end of that line is ignored. If \fI\-\-nospace\fR is set then no separator
 is required between the ASCII hexadecimal digits in \fIFN\fR with bytes
 decoded from pairs of ASCII hexadecimal digits.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+this option is used in conjunction with \fI\-\-write=WFN\fR in order to
+change the output written to \fIWFN\fR to lines of ASCII hex bytes suitable
+for a C language compiler. Each line contains up to 16 bytes (e.g. a line
+starting with "0x3b,0x07,0x00,0xff").
 .TP
 \fB\-n\fR, \fB\-\-nospace\fR
 expect ASCII hexadecimal to be a string of hexadecimal digits with no

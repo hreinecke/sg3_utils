@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_linux version 1.42 20180526 */
+/* sg_pt_linux version 1.43 20180603 */
 
 
 #include <stdio.h>
@@ -35,6 +35,7 @@
 #include "sg_lib.h"
 #include "sg_linux_inc.h"
 #include "sg_pt_linux.h"
+#include "sg_pr2serr.h"
 
 
 #ifdef major
@@ -105,26 +106,6 @@ volatile int sg_nvme_char_major = 0;
 
 long sg_lin_page_size = 4096;   /* default, overridden with correct value */
 
-
-#if defined(__GNUC__) || defined(__clang__)
-static int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2ws(const char * fmt, ...);
-#endif
-
-
-static int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 /* This function only needs to be called once (unless a NVMe controller
  * can be hot-plugged into system in which case it should be called
@@ -382,6 +363,11 @@ scsi_pt_close_device(int device_fd)
     return res;
 }
 
+#if (HAVE_NVME && (! IGNORE_NVME))
+static bool checked_ev_dsense = false;
+static bool ev_dsense = false;
+#endif
+
 
 /* Caller should additionally call get_scsi_pt_os_err() after this call */
 struct sg_pt_base *
@@ -395,6 +381,11 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
     if (ptp) {
 #if (HAVE_NVME && (! IGNORE_NVME))
         sntl_init_dev_stat(&ptp->dev_stat);
+        if (! checked_ev_dsense) {
+            ev_dsense = sg_get_initial_dsense();
+            checked_ev_dsense = true;
+        }
+        ptp->dev_stat.scsi_dsense = ev_dsense;
 #endif
         err = set_pt_file_handle((struct sg_pt_base *)ptp, dev_fd, verbose);
         if ((0 == err) && (! ptp->is_nvme)) {
@@ -444,6 +435,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     bool is_sg, is_bsg, is_nvme;
     int fd;
     uint32_t nvme_nsid;
+    struct sg_sntl_dev_state_t dev_stat;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp) {
@@ -452,6 +444,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
         is_bsg = ptp->is_bsg;
         is_nvme = ptp->is_nvme;
         nvme_nsid = ptp->nvme_nsid;
+        dev_stat = ptp->dev_stat;
         if (ptp->free_nvme_id_ctlp)
             free(ptp->free_nvme_id_ctlp);
         memset(ptp, 0, sizeof(struct sg_pt_linux_scsi));
@@ -468,6 +461,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
         ptp->is_nvme = is_nvme;
         ptp->nvme_direct = false;
         ptp->nvme_nsid = nvme_nsid;
+        ptp->dev_stat = dev_stat;
     }
 }
 
