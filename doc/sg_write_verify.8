@@ -1,4 +1,4 @@
-.TH "WRITE AND VERIFY" "8" "July 2014" "sg3_utils\-1.40" SG3_UTILS
+.TH "WRITE AND VERIFY" "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_write_and_verify \- send the SCSI WRITE AND VERIFY command
 .SH SYNOPSIS
@@ -161,13 +161,13 @@ Since '\-\-num=' is not given then it defaults to 1. Further the \fIILEN\fR
 value is obtained from the file size of t.bin . To additionally do a
 data\-out comparison to the read back data:
 .PP
-  # sg_write_verify -l 0x1234 -i t.bin --bytchk=1 /dev/sg4
+  # sg_write_verify \-l 0x1234 \-i t.bin --bytchk=1 /dev/sg4
 .PP
 The ddpt command can do copies between SCSI devices using READ and WRITE
 commands. However, currently it has no facility to promote those WRITES
 to WRITE AND VERIFY commands. Using a pipe, that could be done like this:
 .PP
-  # ddpt if=/dev/sg2 bs=512 bpt=8 count=11 of=- |
+  # ddpt if=/dev/sg2 bs=512 bpt=8 count=11 of=\- |
 .br
 sg_write_verify \-\-in=\- \-l 0x567 \-n 8 \-\-ilen=4096 \-\-repeat /dev/sg4
 .PP
@@ -182,7 +182,7 @@ Bruno Goncalves and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014 Douglas Gilbert
+Copyright \(co 2014\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

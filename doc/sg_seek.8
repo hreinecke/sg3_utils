@@ -28,7 +28,7 @@ IMMED=1) then a CONDITION MET status is returned. If the requested number of
 blocks did not fit (IMMED=0) or would not fit (IMMED=1) then status GOOD
 is returned. So if a disk has a large cache and PRE\-FETCH is used sparingly
 then the command is more likely to return CONDITION MET than GOOD. This
-presents some SCSI sub-systems with problems as due to its rareness they
+presents some SCSI sub\-systems with problems as due to its rareness they
 mishandle CONDITION MET and treat it as an error.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
@@ -116,7 +116,8 @@ print the version string and then exit.
 \fB\-w\fR, \fB\-\-wrap\-offset\fR=\fIWO\fR
 \fIWO\fR is the number of blocks, relative to \fILBA\fR, that when exceeded,
 set the next command's logical block address back to \fILBA\fR. Whether
-this "reset-to-LBA" action occurs depends on the values \fINC\fR and \fISB\fR.
+this "reset\-to\-LBA" action occurs depends on the values \fINC\fR and
+\fISB\fR.
 .SH NOTES
 As of Linux kernel 4.15 the CONDITION MET status is logged as an error.
 .SH EXIT STATUS

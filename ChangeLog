@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180531] [svn: r776]
+Changelog for sg3_utils-1.43 [20180603] [svn: r777]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -17,7 +17,7 @@ Changelog for sg3_utils-1.43 [20180531] [svn: r776]
     - add --quick option to skip reconsideration time
     - extend --wait timeout to 40 hours for disk sizes
       > 4 TB and 80 hours if > 8 TB
-  - sg_decode sense: add --cdb option
+  - sg_decode sense: add --cdb and --err=ES options
   - sg_ses: handle 2 bit EIIOE field in aes dpage
     - add --quiet option to suppress messages
     - expand join handling of SAS connectors and others
@@ -83,8 +83,6 @@ Changelog for sg3_utils-1.43 [20180531] [svn: r776]
   - sg_vpd: 3 party copy VPD page improvements
     - fully implement Device constituents VPD page
     - improve handling of unknown pages
-  - sg_dd: add --dry-run and --verbose options
-    - allow multiple short options (e.g. -dvv )
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_rdac: add sanity checks for -f=lun value
   - sg_turs+sg_requests: make both accept '--num=NUM'
@@ -95,9 +93,13 @@ Changelog for sg3_utils-1.43 [20180531] [svn: r776]
   - sg_reset_wp add --count=ZC option, zbc2r01b
   - sg_persist: add --maxlen-LEN option, LEN defaults to
     decimal, similar to --alloc-length= which takes hex
+  - sg_dd: add --dry-run and --verbose options
+    - allow multiple short options (e.g. -dvv )
   - sgp_dd: pthread_cancel() has issues in C++ (and
     the Android multi-threaded library doesn't supply it)
     so use pthread_kill() in its place [Linux only]
+    - add --dry-run and --verbose options
+  - sgm_dd: add --dry-run and --verbose options
   - sg_opcode: add '--enumerate' and '--pdt=' options
     - support CDLP (command duration limit page)
     - check resid and trim response if necessary
@@ -122,6 +124,7 @@ Changelog for sg3_utils-1.43 [20180531] [svn: r776]
   - sg_wr_mode: add --rtd option for RTD bit
   - sg_timestamp: add '--no-timestamp' option
     - add --elapsed and --hex options
+  - introduce SG3_UTILS_DSENSE environment variable
   - manpages and usage messages: corrections from
     Gris Ge via github
   - group_number: is 6 bit field allowing 0 to 63,
@@ -152,9 +155,11 @@ Changelog for sg3_utils-1.43 [20180531] [svn: r776]
     - add sg_is_scsi_cdb()
     - add sg_get_nvme_cmd_status_str()
     - add sg_nvme_status2scsi()
+    - add sg_nvme_desc2sense()
+    - add sg_build_sense_buffer()
     - add sg_get_nvme_opcode_name()
     - add sg_memalign() and sg_get_page_size()
-    - add sg_is_aligned()
+    - add sg_is_aligned() and pr2ws()
     - add sg_get_big_endian(), sg_set_big_endian()
     - add hex2stdout(), hex2stderr() and hex2str()
     - add sg_convert_errno()

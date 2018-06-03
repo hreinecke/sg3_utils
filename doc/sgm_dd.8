@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "February 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SGM_DD "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sgm_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -9,7 +9,8 @@ devices
 [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR] [\fI\-\-version\fR]
 .PP
 [\fIbpt=BPT\fR] [\fIcdbsz=\fR6|10|12|16] [\fIdio=\fR0|1] [\fIsync=\fR0|1]
-[\fItime=\fR0|1] [\fIverbose=VERB\fR]
+[\fItime=\fR0|1] [\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR]
+[\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -134,10 +135,21 @@ A value of 1 reports extra information that is not repetitive. A value
 repetitive. Values of 3 and 4 yield output for all SCSI commands (and
 Unix read() and write() calls) so there can be a lot of output.
 .TP
-\fB\-\-help\fR
+\fB\-d\fR, \fB\-\-dry\-run\fR
+does all the command line parsing and preparation but bypasses the actual
+copy or read. That preparation may include opening \fIIFILE\fR or
+\fIOFILE\fR to determine their lengths. This option may be useful for
+testing the syntax of complex command line invocations in advance of
+executing them.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
 outputs usage message and exits.
 .TP
-\fB\-\-version\fR
+\fB\-v\fR, \fB\-\-verbose\fR
+when used once, this is equivalent to \fIverbose=1\fR. When used
+twice (e.g. "\-vv") this is equivalent to \fIverbose=2\fR, etc.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
 outputs version number information and exits.
 .SH FLAGS
 Here is a list of flags and their meanings:
@@ -238,7 +250,6 @@ advanced "copy on error" logic see the
 .B sg_dd
 utility (and its 'coe' flag).
 .SH EXAMPLES
-.PP
 See the examples given in the man page for
 .B sg_dd(8).
 .SH SIGNALS
@@ -258,7 +269,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2015 Douglas Gilbert
+Copyright \(co 2000\-2018 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

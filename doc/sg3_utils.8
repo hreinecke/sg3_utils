@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG3_UTILS "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -84,6 +84,18 @@ and permit copying data at the level of SCSI READ and WRITE commands. sg_dd
 is tightly bound to Linux and hence is not ported to other OSes. A more
 generic utility (than sg_dd) called ddpt in a package of the same name has
 been ported to other OSes.
+.SH ENVIRONMENT VARIABLES
+The SG3_UTILS_OLD_OPTS environment variable is explained in the previous
+section. It is only for backward compatibility of the command line options
+for older utilities.
+.PP
+The SG3_UTILS_DSENSE environment variable may be set to a number. If that
+number is non\-zero then descriptor sense is set in the SNTL (the small
+SCSI to NVMe Translation Layer within the underlying library).
+.PP
+Several utilities have their own environment variable setting (e.g.
+sg_persist has SG_PERSIST_IN_RDONLY). See individual utility man pages
+for more information.
 .SH LINUX DEVICE NAMING
 Most disk block devices have names like /dev/sda, /dev/sdb, /dev/sdc, etc.
 SCSI disks in Linux have always had names like that but in recent Linux
@@ -240,7 +252,16 @@ of "NVMe    " (an 8 character long string with 4 spaces to the right).
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
-correspond to the SCSI sense key values. The exit status values are:
+correspond to the SCSI sense key values.
+.PP
+The exit status values listed below can be given to the sg_decode_sense
+utility (which is found in this package) as follows:
+.br
+  sg_decode_sense \-\-err=<exit_status>
+.br
+and a short explanatory string will be output to stdout.
+.PP
+The exit status values are:
 .TP
 .B 0
 success
@@ -329,7 +350,7 @@ often when trying to access the last block on a storage device; either a
 classic "off by one" logic error or a misreading of the response from READ
 CAPACITY(10 or 16) in which the address of the last block rather than the
 number of blocks on the \fIDEVICE\fR is returned. Since LBAs are origin zero
-they range from 0 to n-1 where n is the number of blocks on the \fIDEVICE\fR,
+they range from 0 to n\-1 where n is the number of blocks on the \fIDEVICE\fR,
 so the LBA of the last block is one less than the total number of blocks.
 .TP
 .B 24
@@ -396,7 +417,7 @@ actually received by HBA is 'requested_bytes \- residual_count') that is
 .TP
 .B 50
 OS system calls that fail often return a small integer number to help. In
-Unix these are valled "errno" values where 0 implies no error. These error
+Unix these are called "errno" values where 0 implies no error. These error
 codes set aside 51 to 96 for mapping these errno values but that may not be
 sufficient. Higher errno values that cannot be mapped are all mapped to
 this value (i.e. 50).
@@ -455,10 +476,9 @@ associated signal number of 11; so the exit status will be 139 .
 the utility tried to yield an exit status of 255 or larger. That should
 not happen; given here for completeness.
 .PP
-Most of the error conditions reported above will be repeatable (an
-example of one that is not is "unit attention") so the utility can
-be run again with the '\-v' option (or several) to obtain more
-information.
+Most of the error conditions reported above will be repeatable (an example
+of one that is not is "unit attention") so the utility can be run again with
+the '\-v' option (or several) to obtain more information.
 .SH COMMON OPTIONS
 Arguments to long options are mandatory for short options as well. In the
 short form an argument to an option uses zero or more spaces as a

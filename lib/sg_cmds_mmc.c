@@ -22,6 +22,7 @@
 #include "sg_cmds_mmc.h"
 #include "sg_pt.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -37,25 +38,6 @@
 #define SET_STREAMING_CMD 0xb6
 #define SET_STREAMING_CMDLEN 12
 
-#if defined(__GNUC__) || defined(__clang__)
-static int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-#else
-static int pr2ws(const char * fmt, ...);
-#endif
-
-
-static int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
-    va_end(args);
-    return n;
-}
 
 static struct sg_pt_base *
 create_pt_obj(const char * cname)

@@ -292,7 +292,7 @@ OSes, any number of zeros can be produced by using the /dev/zero device file.
 .br
 \fIIF\fR may be "\-" which is taken as stdin. In this case the
 \fI\-\-offset=OFF,DLEN\fR can be given with \fIOFF\fR set to 0 and
-\fILEN\fR set to a non-zero value, preferably a multiple of the actual block
+\fILEN\fR set to a non\-zero value, preferably a multiple of the actual block
 size. The utility can also deduce how long the \fIIF\fR should be from
 \fINUM\fR (or the sum of them in the case of a scatter list).
 .TP
@@ -435,7 +435,7 @@ where \fITO\fR is the command timeout value in seconds. The default value is
 may require considerably more time than 120 seconds to complete.
 .TP
 \fB\-u\fR, \fB\-\-unmap\fR=\fIU_A\fR
-where \fIU_A\fR is OR-ed bit values used to set the UNMAP and ANCHOR bit
+where \fIU_A\fR is OR\-ed bit values used to set the UNMAP and ANCHOR bit
 fields in the WRITE SAME (16 or 32) cdb. If \fIU_A\fR is 1 then the UNMAP
 bit field is set; if \fIU_A\fR is 2 then the ANCHOR bit field is set; if
 \fIU_A\fR is 3 then both the UNMAP and ANCHOR bit fields are set. The
