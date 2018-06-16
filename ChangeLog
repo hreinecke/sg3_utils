@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180603] [svn: r777]
+Changelog for sg3_utils-1.43 [20180615] [svn: r778]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -93,6 +93,8 @@ Changelog for sg3_utils-1.43 [20180603] [svn: r777]
   - sg_reset_wp add --count=ZC option, zbc2r01b
   - sg_persist: add --maxlen-LEN option, LEN defaults to
     decimal, similar to --alloc-length= which takes hex
+    - add Replace lost reservation capable (RLR_C) bit
+      in Report Capabilities (spc4r36)
   - sg_dd: add --dry-run and --verbose options
     - allow multiple short options (e.g. -dvv )
   - sgp_dd: pthread_cancel() has issues in C++ (and
@@ -188,6 +190,7 @@ Changelog for sg3_utils-1.43 [20180603] [svn: r777]
     - fixes from Suse; bump version to: 20160511
     - add to install list in Makefile, hope it does
       not clash with other package providing it
+    - add --ignore-rev to ignore revision change
   - 55-scsi-sg3_id.rules: fixes from Suse
   - https://github.com/hreinecke/sg3_utils branch
     sles15 synced 20170914

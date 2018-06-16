@@ -307,9 +307,19 @@ testonline ()
     return 2
   fi
   TMPSTR=`echo "$SCSISTR" | grep 'Vendor:'`
-  if [ "$TMPSTR" != "$STR" ]; then
-    echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
-    return 1
+  if test $ignore_rev -eq 0 ; then
+      if [ "$TMPSTR" != "$STR" ]; then
+        echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
+        return 1
+      fi
+  else
+      # Ignore disk revision change
+      local old_str_no_rev=`echo "$TMPSTR" | sed -e 's/.\{4\}$//'`
+      local new_str_no_rev=`echo "$STR" | sed -e 's/.\{4\}$//'`
+      if [ "$old_str_no_rev" != "$new_str_no_rev" ]; then
+        echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${SCSISTR#* } \nto: $STR ${norm} \n\n\n"
+        return 1
+      fi
   fi
   TMPSTR=`echo "$SCSISTR" | sed -n 's/.*Type: *\(.*\) *ANSI.*/\1/p' | sed 's/ *$//g'`
   if [ "$TMPSTR" != "$TYPE" ] ; then
@@ -1106,6 +1116,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--update:        same as -u"
     echo "--version:       same as -V"
     echo "--wide:          same as -w"
+    echo "--ignore-rev:    Ignore the revision change"
     echo ""
     echo "Host numbers may thus be specified either directly on cmd line (deprecated)"
     echo "or with the --hosts=LIST parameter (recommended)."
@@ -1164,6 +1175,7 @@ existing_targets=1
 mp_enable=
 lipreset=-1
 declare -i scan_flags=0
+ignore_rev=0
 
 # Scan options
 opt="$1"
@@ -1206,6 +1218,7 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
     -sparselun) scan_flags=$((scan_flags|0x40)) ;;
     -update) update=1;;
     -wide) opt_idsearch=`seq 0 15` ;;
+    -ignore-rev) ignore_rev=1;;
     *) echo "Unknown option -$opt !" ;;
   esac
   shift

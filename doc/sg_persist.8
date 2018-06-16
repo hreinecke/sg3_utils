@@ -1,4 +1,4 @@
-.TH SG_PERSIST "8" "February 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_PERSIST "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_persist \- use SCSI PERSISTENT RESERVE command to access registrations
 and reservations
@@ -331,11 +331,6 @@ the PROUT register and ignore existing key sub\-command. In SPC\-4 that
 is disallowed yielding a CHECK CONDITION status with and ILLEGAL REQUEST
 sense key and an additional sense code set to INVALID FIELD IN PARAMETER
 LIST.
-.SH ENVIRONMENT VARIABLES
-Currently there is one recognised environment variable: SG_PERSIST_IN_RDONLY.
-If present and only if a PRIN command has been selected then the
-given \fIDEVICE\fR is opened read\-only (e.g. in Unix that is with the
-O_RDONLY flag). See the \fI\-\-readonly\fR option.
 .SH NOTES
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
 a SCSI generic (sg) device. In the 2.6 series any SCSI device
@@ -424,10 +419,10 @@ The above sequence of commands was tested successfully on a Seagate Savvio
 The exit status of sg_persist is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH ENVIRONMENT VARIABLES
-If the SG_PERSIST_IN_RDONLY environment variable is present and only if a
-PRIN command has been selected then the given \fIDEVICE\fR is opened
-read\-only (e.g. in Unix that is with the O_RDONLY flag) unless
-overridden. See the \fI\-\-readonly\fR option.
+Currently there is one recognised environment variable: SG_PERSIST_IN_RDONLY.
+If present and only if a PRIN command has been selected then the
+given \fIDEVICE\fR is opened read\-only (e.g. in Unix that is with the
+O_RDONLY flag). See the \fI\-\-readonly\fR option.
 .SH AUTHOR
 Written by Douglas Gilbert
 .SH "REPORTING BUGS"

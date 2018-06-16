@@ -31,7 +31,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.59 20180428";    /* spc5r14 */
+static const char * version_str = "0.60 20180615";    /* spc5r14 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -704,7 +704,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
     }
     /* SPC-4 does _not_ require any ordering of opcodes in the response */
     if (! op->do_unsorted) {
-        sort_arr = (uint8_t **)malloc(cd_len * sizeof(uint8_t *));
+        sort_arr = (uint8_t **)calloc(cd_len, sizeof(uint8_t *));
         if (NULL == sort_arr) {
             printf("sg_opcodes: no memory to sort operation codes, "
                    "try '-u'\n");
