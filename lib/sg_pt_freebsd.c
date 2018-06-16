@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.30 20180603 */
+/* sg_pt_freebsd version 1.31 20180615 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -489,6 +489,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
         ptp->dxfer_dir = CAM_DIR_NONE;
         ptp->is_nvme = fdc_p->is_nvme;
         ptp->cam_dev = fdc_p->cam_dev;
+        ptp->dev_statp = &fdc_p->dev_stat;
     }
     return 0;
 }
@@ -669,6 +670,7 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int vb)
         return -ptp->os_err;
     }
     ptp->is_nvme = fdc_p->is_nvme;
+    ptp->dev_statp = &fdc_p->dev_stat;
     if (fdc_p->is_nvme)
         return sg_do_nvme_pt(vp, -1, vb);
 

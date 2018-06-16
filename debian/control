@@ -18,7 +18,8 @@ Description: utilities for devices using the SCSI command set.
  standards at www.t10.org for SCSI command definitions plus SAT. ATA
  commands are defined in the draft standards at www.t13.org . For a mapping
  between supported SCSI and ATA commands and utility names in this package
- see the COVERAGE file.
+ see the COVERAGE file. Also some support for NVMe devices, especially via
+ sg_ses to NVMe enclsoures.
 
 Package: libsgutils2-2
 Section: libs

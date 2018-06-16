@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_win32 version 1.27 20180603 */
+/* sg_pt_win32 version 1.28 20180615 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -806,6 +806,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
             return psp->os_err;
         psp->is_nvme = shp->is_nvme;
         psp->nvme_nsid = 0;  /* should be 'psp->nvme_nsid = shp->nvme_nsid' */
+        psp->dev_statp = &shp->dev_stat;
     }
     return 0;
 }
@@ -1233,6 +1234,7 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_fd, int time_secs, int vb)
     if (psp->os_err)
         return -psp->os_err;
     psp->is_nvme = shp->is_nvme;
+    psp->dev_statp = &shp->dev_stat;
 
     if (psp->is_nvme)
         return nvme_pt(psp, shp, time_secs, vb);

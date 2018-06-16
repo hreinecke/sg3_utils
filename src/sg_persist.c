@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.65 20180523";
+static const char * version_str = "0.66 20180615";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -71,9 +71,9 @@ struct opts_t {
     int prin_sa;
     int prout_sa;
     int verbose;
-    unsigned int alloc_len;
-    unsigned int param_rtp;
-    unsigned int prout_type;
+    uint32_t alloc_len;
+    uint32_t param_rtp;
+    uint32_t prout_type;
     uint64_t param_rk;
     uint64_t param_sark;
     uint8_t transportid_arr[MX_TIDS * MX_TID_LEN];
@@ -276,13 +276,12 @@ prin_work(int sg_fd, const struct opts_t * op)
     uint8_t * bp;
     uint8_t * pr_buff = NULL;
     uint8_t * free_pr_buff = NULL;
-    int pr_buff_sz = MX_ALLOC_LEN;
 
-    pr_buff = sg_memalign(pr_buff_sz, 0 /* page aligned */, &free_pr_buff,
+    pr_buff = sg_memalign(op->alloc_len, 0 /* page aligned */, &free_pr_buff,
                           false);
     if (NULL == pr_buff) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                pr_buff_sz);
+                op->alloc_len);
         return sg_convert_errno(ENOMEM);
     }
     res = sg_ll_persistent_reserve_in(sg_fd, op->prin_sa, pr_buff,
@@ -319,6 +318,8 @@ prin_work(int sg_fd, const struct opts_t * op)
             hex2stdout(pr_buff, 8, 1);
         else {
             printf("Report capabilities response:\n");
+            printf("  Replace Lost Reservation Capable(RLR_C): %d\n",
+                   !!(pr_buff[2] & 0x80));      /* added spc4r26 */
             printf("  Compatible Reservation Handling(CRH): %d\n",
                    !!(pr_buff[2] & 0x10));
             printf("  Specify Initiator Ports Capable(SIP_C): %d\n",
@@ -334,17 +335,17 @@ prin_work(int sg_fd, const struct opts_t * op)
             if (pr_buff[3] & 0x80) {
                 printf("    Support indicated in Type mask:\n");
                 printf("      %s: %d\n", pr_type_strs[7],
-                       !!(pr_buff[4] & 0x80));
+                       !!(pr_buff[4] & 0x80));  /* WR_EX_AR */
                 printf("      %s: %d\n", pr_type_strs[6],
-                       !!(pr_buff[4] & 0x40));
+                       !!(pr_buff[4] & 0x40));  /* EX_AC_RO */
                 printf("      %s: %d\n", pr_type_strs[5],
-                       !!(pr_buff[4] & 0x20));
+                       !!(pr_buff[4] & 0x20));  /* WR_EX_RO */
                 printf("      %s: %d\n", pr_type_strs[3],
-                       !!(pr_buff[4] & 0x8));
+                       !!(pr_buff[4] & 0x8));   /* EX_AC */
                 printf("      %s: %d\n", pr_type_strs[1],
-                       !!(pr_buff[4] & 0x2));
+                       !!(pr_buff[4] & 0x2));   /* WR_EX */
                 printf("      %s: %d\n", pr_type_strs[8],
-                       !!(pr_buff[5] & 0x1));
+                       !!(pr_buff[5] & 0x1));   /* EX_AC_AR */
             }
         }
     } else {
@@ -357,10 +358,10 @@ prin_work(int sg_fd, const struct opts_t * op)
                 printf("  PR generation=0x%x, ", pr_gen);
                 if (add_len <= 0)
                     printf("Additional length=%d\n", add_len);
-                if (add_len > (pr_buff_sz - 8)) {
+                if ((uint32_t)add_len > (op->alloc_len - 8)) {
                     printf("Additional length too large=%d, truncate\n",
                            add_len);
-                    hex2stdout((pr_buff + 8), pr_buff_sz - 8, 1);
+                    hex2stdout((pr_buff + 8), op->alloc_len - 8, 1);
                 } else {
                     printf("Additional length=%d\n", add_len);
                     hex2stdout((pr_buff + 8), add_len, 1);
@@ -477,16 +478,15 @@ prout_work(int sg_fd, struct opts_t * op)
     int res = 0;
     uint8_t * pr_buff = NULL;
     uint8_t * free_pr_buff = NULL;
-    int pr_buff_sz = MX_ALLOC_LEN;
     char b[64];
     char bb[80];
 
     t_arr_len = compact_transportid_array(op);
-    pr_buff = sg_memalign(pr_buff_sz, 0 /* page aligned */, &free_pr_buff,
+    pr_buff = sg_memalign(op->alloc_len, 0 /* page aligned */, &free_pr_buff,
                           false);
     if (NULL == pr_buff) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                pr_buff_sz);
+                op->alloc_len);
         return sg_convert_errno(ENOMEM);
     }
     sg_put_unaligned_be64(op->param_rk, pr_buff + 0);
@@ -537,14 +537,13 @@ prout_reg_move_work(int sg_fd, struct opts_t * op)
     int res = 0;
     uint8_t * pr_buff = NULL;
     uint8_t * free_pr_buff = NULL;
-    int pr_buff_sz = MX_ALLOC_LEN;
 
     t_arr_len = compact_transportid_array(op);
-    pr_buff = sg_memalign(pr_buff_sz, 0 /* page aligned */, &free_pr_buff,
+    pr_buff = sg_memalign(op->alloc_len, 0 /* page aligned */, &free_pr_buff,
                           false);
     if (NULL == pr_buff) {
         pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
-                pr_buff_sz);
+                op->alloc_len);
         return sg_convert_errno(ENOMEM);
     }
     sg_put_unaligned_be64(op->param_rk, pr_buff + 0);

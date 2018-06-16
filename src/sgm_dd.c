@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.55 20180601";
+static const char * version_str = "1.56 20180615";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1249,12 +1249,6 @@ main(int argc, char * argv[])
             pr2serr("Not enough user memory\n");
             return sg_convert_errno(ENOMEM);
         }
-#if 0           /* keep copy of hack below, just in case ... */
-            /* perhaps use posix_memalign() instead */
-            wrkBuff = (uint8_t *)malloc(blk_sz * bpt + psz);
-            wrkPos = (uint8_t *)(((sg_uintptr_t)wrkBuff + psz - 1) &
-                                       (~(psz - 1)));
-#endif
     }
 
     blocks_per = bpt;

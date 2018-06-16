@@ -19,9 +19,10 @@
 #ifdef SG_LIB_LINUX
 
 #include "sg_io_linux.h"
+#include "sg_pr2serr.h"
 
 
-/* Version 1.09 20180603 */
+/* Version 1.10 20180613 */
 
 
 void
