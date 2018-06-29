@@ -32,7 +32,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.18 20180523";
+static const char * version_str = "1.19 20180628";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -413,6 +413,8 @@ main(int argc, char * argv[])
 {
     bool hex = false;
     bool raw = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int k, off, res, c, report_len, tgt_port_count;
     int sg_fd = -1;
     int port_arr_len = 0;
@@ -477,11 +479,12 @@ main(int argc, char * argv[])
             state = TPGS_STATE_UNAVAILABLE;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("Version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -499,6 +502,26 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("Version: %s\n", version_str);
+        return 0;
     }
 
     if (state_arg) {

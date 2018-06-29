@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.56 20180615";
+static const char * version_str = "1.57 20180626";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -76,7 +76,6 @@ static const char * version_str = "1.56 20180615";
 
 #define ME "sgm_dd: "
 
-/* #define SG_DEBUG */
 
 #ifndef SG_FLAG_MMAP_IO
 #define SG_FLAG_MMAP_IO 4
@@ -540,7 +539,7 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         return res;
     }
     sum_of_resids += io_hdr.resid;
-#ifdef SG_DEBUG
+#ifdef DEBUG
     pr2serr("duration=%u ms\n", io_hdr.duration);
 #endif
     return 0;
@@ -707,6 +706,8 @@ main(int argc, char * argv[])
     bool cdbsz_given = false;
     bool do_coe = false;     /* dummy, just accept + ignore */
     bool do_sync = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, k, t, infd, outfd, blocks, n, flags, blocks_per, err, keylen;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
     int ibs = 0;
@@ -861,10 +862,9 @@ main(int argc, char * argv[])
             verbose += n;
             res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'V');
-            if (n > 0) {
-                pr2serr(ME ": %s\n", version_str);
-                return 0;
-            }
+            if (n > 0)
+                version_given = true;
+            res += n;
             if (res < (keylen - 1)) {
                 pr2serr("Unrecognised short option in '%s', try '--help'\n",
                         key);
@@ -879,15 +879,35 @@ main(int argc, char * argv[])
             return 0;
         } else if (0 == strncmp(key, "--verb", 6))
             ++verbose;
-        else if (0 == strncmp(key, "--vers", 6)) {
-            pr2serr(ME ": %s\n", version_str);
-            return 0;
-        } else {
+        else if (0 == strncmp(key, "--vers", 6))
+            version_given = true;
+        else {
             pr2serr("Unrecognized option '%s'\n", key);
             pr2serr("For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME ": %s\n", version_str);
+        return 0;
+    }
+
     if (blk_sz <= 0) {
         blk_sz = DEF_BLOCK_SIZE;
         pr2serr("Assume default 'bs' (block size) of %d bytes\n", blk_sz);
@@ -915,7 +935,7 @@ main(int argc, char * argv[])
     if ((blk_sz >= 2048) && (! bpt_given))
         bpt = DEF_BLOCKS_PER_2048TRANSFER;
 
-#ifdef SG_DEBUG
+#ifdef DEBUG
     pr2serr(ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%" PRId64
             "\n", inf, skip, outf, seek, dd_count);
 #endif
@@ -1186,7 +1206,7 @@ main(int argc, char * argv[])
         }
         if (out_num_sect > seek)
             out_num_sect -= seek;
-#ifdef SG_DEBUG
+#ifdef DEBUG
         pr2serr("Start of loop, count=%" PRId64 ", in_num_sect=%" PRId64 ", "
                 "out_num_sect=%" PRId64 "\n", dd_count, in_num_sect,
                 out_num_sect);
@@ -1252,7 +1272,7 @@ main(int argc, char * argv[])
     }
 
     blocks_per = bpt;
-#ifdef SG_DEBUG
+#ifdef DEBUG
     pr2serr("Start of loop, count=%" PRId64 ", blocks_per=%d\n", dd_count,
             blocks_per);
 #endif

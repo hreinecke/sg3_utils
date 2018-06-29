@@ -32,7 +32,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.32 20180329";
+static const char * version_str = "0.33 20180628";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -469,8 +469,8 @@ do_safte_global_flags(int sg_fd, int do_hex, int do_raw, int verbose)
     return 0;
 }
 
-static
-void usage()
+static void
+usage()
 {
     pr2serr("Usage:  sg_safte [--config] [--devstatus] [--encstatus] "
             "[--flags] [--help]\n"
@@ -514,6 +514,8 @@ main(int argc, char * argv[])
 {
     bool do_insertions = false;
     bool no_hex_raw;
+    bool verbose_given = false;
+    bool version_given = false;
     int c, ret, peri_type;
     int sg_fd = -1;
     int res = SG_LIB_CAT_OTHER;
@@ -573,11 +575,12 @@ main(int argc, char * argv[])
                 do_usage = true;
                 break;
             case 'v':
+                verbose_given = true;
                 ++verbose;
                 break;
             case 'V':
-                pr2serr("Version string: %s\n", version_str);
-                exit(0);
+                version_given = true;
+                break;
             default:
                 pr2serr("unrecognised option code 0x%x ??\n", c);
                 usage();
@@ -597,8 +600,29 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("Version string: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

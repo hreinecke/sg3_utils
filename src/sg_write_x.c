@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.18 20180523";
+static const char * version_str = "1.19 20180628";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -152,6 +152,8 @@ struct opts_t {
     bool dpo;                   /* "Disable Page Out" bit field */
     bool fua;           /* "Force Unit Access" bit field */
     bool ndob;          /* "No Data-Out Buffer" from --same=NDOB */
+    bool verbose_given;
+    bool version_given;
     int dld;            /* "Duration Limit Descrptor" bit mask; bit 0 -->
                          * DLD0, bit 1 --> DLD1, bit 2 --> DLD2
                          * only WRITE(16) and WRITE SCATTERED(16) */
@@ -1776,11 +1778,12 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             op->do_anchor = !!(2 & j);
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr("sg_write_x version: %s\n", version_str);
-            return WANT_ZERO_EXIT;
+            op->version_given = true;
+            break;
         case 'w':       /* WRPROTECT field (or ORPROTECT for ORWRITE) */
             op->wrprotect = sg_get_num(optarg);
             if ((op->wrprotect < 0) || (op->wrprotect > 7))  {
@@ -2204,6 +2207,28 @@ main(int argc, char * argv[])
         usage(op->help);
         return 0;
     }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr("sg_write_x version: %s\n", version_str);
+        return WANT_ZERO_EXIT;
+    }
+
     vb = op->verbose;
     /* sanity checks */
     if ((! op->do_16) && (! op->do_32)) {

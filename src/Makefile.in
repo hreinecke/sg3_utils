@@ -568,13 +568,17 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 sg_scan_SOURCES = $(am__append_2) $(am__append_4) $(am__append_6)
+@DEBUG_FALSE@DBG_CFLAGS = 
+@DEBUG_TRUE@DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+@DEBUG_FALSE@DBG_CPPFLAGS = 
+@DEBUG_TRUE@DBG_CPPFLAGS = -DDEBUG
 
 # For C++/clang testing
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
-AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
-AM_CFLAGS = -Wall -W
+AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 $(DBG_CPPFLAGS)
+AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze

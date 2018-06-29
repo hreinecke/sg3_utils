@@ -34,6 +34,15 @@ if OS_OSF
 libsgutils2_la_SOURCES += sg_pt_osf1.c
 endif
 
+if DEBUG
+# This does nothing at the moment but may be useful for adding
+DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+DBG_CPPFLAGS = -DDEBUG
+else
+DBG_CFLAGS =
+DBG_CPPFLAGS =
+endif
+
 # For C++/clang testing
 ## CC = gcc-8
 ## CC = g++
@@ -43,8 +52,8 @@ endif
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11 for C code
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
-AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
-AM_CFLAGS = -Wall -W
+AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 $(DBG_CPPFLAGS)
+AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze

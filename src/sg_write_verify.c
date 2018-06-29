@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20180523";
+static const char * version_str = "1.15 20180628";
 
 
 #define ME "sg_write_verify: "
@@ -275,6 +275,8 @@ main(int argc, char * argv[])
     bool has_filename = false;
     bool lba_given = false;
     bool repeat = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int sg_fd, res, c, n;
     int bytchk = 0;
     int group = 0;
@@ -377,11 +379,12 @@ main(int argc, char * argv[])
             }
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         case 'w':
             wrprotect = sg_get_num(optarg);
             if ((wrprotect < 0) || (wrprotect > 7))  {
@@ -410,8 +413,29 @@ main(int argc, char * argv[])
        }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

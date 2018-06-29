@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.65 20180601";
+static const char * version_str = "5.67 20180627";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -68,8 +68,6 @@ static const char * version_str = "5.65 20180601";
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
 
-
-/* #define SG_DEBUG */
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
@@ -1154,6 +1152,8 @@ num_chs_in_str(const char * s, int slen, int ch)
 int
 main(int argc, char * argv[])
 {
+    bool verbose_given = false;
+    bool version_given = false;
     int64_t skip = 0;
     int64_t seek = 0;
     int ibs = 0;
@@ -1305,13 +1305,15 @@ main(int argc, char * argv[])
                 return 0;
             }
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
+            if (n > 0)
+                verbose_given = true;
             rcoll.debug += n;   /* -v  ---> --verbose */
             res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'V');
-            if (n > 0) {
-                pr2serr("%s%s\n", my_name, version_str);
-                return 0;
-            }
+            if (n > 0)
+                version_given = true;
+            res += n;
+
             if (res < (keylen - 1)) {
                 pr2serr("Unrecognised short option in '%s', try '--help'\n",
                         key);
@@ -1324,17 +1326,39 @@ main(int argc, char * argv[])
                    (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--verb", 6))
+        } else if (0 == strncmp(key, "--verb", 6)) {
+            verbose_given = true;
             ++rcoll.debug;      /* --verbose */
-        else if (0 == strncmp(key, "--vers", 6)) {
-            pr2serr("%s%s\n", my_name, version_str);
-            return 0;
-        } else {
+        } else if (0 == strncmp(key, "--vers", 6))
+            version_given = true;
+        else {
             pr2serr("Unrecognized option '%s'\n", key);
             pr2serr("For more information use '--help'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        rcoll.debug = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        rcoll.debug = 2;
+    } else
+        pr2serr("keep verbose=%d\n", rcoll.debug);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("%s%s\n", my_name, version_str);
+        return 0;
+    }
+
     if (rcoll.bs <= 0) {
         rcoll.bs = DEF_BLOCK_SIZE;
         pr2serr("Assume default 'bs' (block size) of %d bytes\n", rcoll.bs);
@@ -1680,7 +1704,7 @@ main(int argc, char * argv[])
             if (rcoll.debug)
                 pr2serr("Worker thread k=%d terminated\n", k);
         }
-    }
+    }   /* started worker threads and here after they have all exited */
 
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
         calc_duration_throughput(0);
@@ -1704,15 +1728,19 @@ main(int argc, char * argv[])
     /* Android doesn't have pthread_cancel() so use pthread_kill() instead.
      * Also there is no need to link with -lpthread in Android */
     status = pthread_kill(sig_listen_thread_id, SIGUSR1);
+    if (0 != status) err_exit(status, "pthread_kill");
 #else
     status = pthread_cancel(sig_listen_thread_id);
-#endif
     if (0 != status) err_exit(status, "pthread_cancel");
-#endif          /* 0 */
+#endif
+#endif  /* 0, because always do pthread_kill() next */
 
     shutting_down = true;
     status = pthread_kill(sig_listen_thread_id, SIGINT);
     if (0 != status) err_exit(status, "pthread_kill");
+    /* valgrind says the above _kill() leaks; web says it needs a following
+     * _join() to clear heap taken by associated _create() */
+
 fini:
     if (STDIN_FILENO != rcoll.infd)
         close(rcoll.infd);

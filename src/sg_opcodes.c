@@ -31,7 +31,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.60 20180615";    /* spc5r14 */
+static const char * version_str = "0.62 20180626";    /* spc5r19+ */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -57,6 +57,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"mask", no_argument, 0, 'm'},
+        {"mlu", no_argument, 0, 'M'},
         {"no-inquiry", no_argument, 0, 'n'},
         {"no_inquiry", no_argument, 0, 'n'},
         {"new", no_argument, 0, 'N'},
@@ -80,13 +81,15 @@ struct opts_t {
     bool do_enumerate;
     bool no_inquiry;
     bool do_mask;
+    bool do_mlu;
     bool do_raw;
     bool do_rctd;
     bool do_repd;
-    bool do_version;
     bool do_unsorted;
     bool do_taskman;
     bool opt_new;
+    bool verbose_given;
+    bool version_given;
     int do_help;
     int do_hex;
     int opcode;
@@ -101,11 +104,12 @@ usage()
 {
     pr2serr("Usage:  sg_opcodes [--alpha] [--compact] [--enumerate] "
             "[--help] [--hex]\n"
-            "                   [--mask] [--no-inquiry] [--opcode=OP[,SA]] "
-            "[--pdt=DT]\n"
-            "                   [--raw] [--rctd] [--repd] [--sa=SA] [--tmf] "
-            "[--unsorted]\n"
-            "                   [--verbose] [--version] DEVICE\n"
+            "                   [--mask] [--mlu] [--no-inquiry] "
+            "[--opcode=OP[,SA]]\n"
+            "                   [--pdt=DT] [--raw] [--rctd] [--repd] "
+            "[--sa=SA] [--tmf]\n"
+            "                   [--unsorted] [--verbose] [--version] "
+            "DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
@@ -115,8 +119,9 @@ usage()
             "                      ignore DEVICE\n"
             "    --help|-h       print usage message then exit\n"
             "    --hex|-H        output response in hex\n"
-            "    --mask|-m       and show cdb usage data (a mask) when "
+            "    --mask|-m       show cdb usage data (a mask) when "
             "all listed\n"
+            "    --mlu|-M        show MLU bit when all listed\n"
             "    --no-inquiry|-n    don't output INQUIRY information\n"
             "    --opcode=OP|-o OP    first byte of command to query\n"
             "                         (decimal, prefix with '0x' for hex)\n"
@@ -149,9 +154,9 @@ usage()
 static void
 usage_old()
 {
-    pr2serr("Usage:  sg_opcodes [-a] [-c] [-e] [-H] [-m] [-n] [-o=OP] "
-            "[-p=DT] [-q]\n"
-            "                   [-r] [-R] [-s=SA] [-t] [-u] [-v] [-V] "
+    pr2serr("Usage:  sg_opcodes [-a] [-c] [-e] [-H] [-m] [-M] [-n] [-o=OP] "
+            "[-p=DT]\n"
+            "                   [-q] [-r] [-R] [-s=SA] [-t] [-u] [-v] [-V] "
             "DEVICE\n"
             "  where:\n"
             "    -a    output list of operation codes sorted "
@@ -160,7 +165,8 @@ usage_old()
             "    -e    use '--opcode=' and '--pdt=' to look up name, "
             "ignore DEVICE\n"
             "    -H    print response in hex\n"
-            "    -m    and show cdb usage data (a mask) when all listed\n"
+            "    -m    show cdb usage data (a mask) when all listed\n"
+            "    -M    show MLU bit when all listed\n"
             "    -n    don't output INQUIRY information\n"
             "    -o=OP    first byte of command to query (in hex)\n"
             "    -p=DT    alternate source of pdt (normally obtained from "
@@ -183,15 +189,14 @@ usage_old()
 static const char * const rsoc_s = "Report supported operation codes";
 
 static int
-do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
-        void * resp, int mx_resp_len, int * act_resp_lenp, bool noisy,
-        int verbose)
+do_rsoc(struct sg_pt_base * ptvp, bool rctd, int rep_opts, int rq_opcode,
+        int rq_servact, void * resp, int mx_resp_len, int * act_resp_lenp,
+        bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
 
     if (rctd)
         rsoc_cdb[2] |= 0x80;
@@ -211,15 +216,11 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
             pr2serr("%02x ", rsoc_cdb[k]);
         pr2serr("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2serr("%s: out of memory\n", rsoc_s);
-        return -1;
-    }
+    clear_scsi_pt_obj(ptvp);
     set_scsi_pt_cdb(ptvp, rsoc_cdb, sizeof(rsoc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
+    res = do_scsi_pt(ptvp, -1, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, rsoc_s, res, mx_resp_len, sense_b, noisy,
                                verbose, &sense_cat);
     if (-1 == ret)
@@ -243,8 +244,6 @@ do_rsoc(int sg_fd, bool rctd, int rep_opts, int rq_opcode, int rq_servact,
         }
         ret = 0;
     }
-
-    destruct_scsi_pt_obj(ptvp);
     return ret;
 }
 
@@ -252,14 +251,13 @@ static const char * const rstmf_s = "Report supported task management "
                                     "functions";
 
 static int
-do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
+do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
          int * act_resp_lenp, bool noisy, int verbose)
 {
     int k, ret, res, sense_cat;
     uint8_t rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
 
     if (repd)
         rstmf_cdb[2] = 0x80;
@@ -273,15 +271,11 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
             pr2serr("%02x ", rstmf_cdb[k]);
         pr2serr("\n");
     }
-    ptvp = construct_scsi_pt_obj();
-    if (NULL == ptvp) {
-        pr2serr("%s: out of memory\n", rstmf_s);
-        return -1;
-    }
+    clear_scsi_pt_obj(ptvp);
     set_scsi_pt_cdb(ptvp, rstmf_cdb, sizeof(rstmf_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
-    res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
+    res = do_scsi_pt(ptvp, -1, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, rstmf_s, res, mx_resp_len, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
@@ -305,8 +299,6 @@ do_rstmf(int sg_fd, bool repd, void * resp, int mx_resp_len,
         }
         ret = 0;
     }
-
-    destruct_scsi_pt_obj(ptvp);
     return ret;
 }
 
@@ -320,7 +312,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acehHmnNo:Op:qrRs:tuvV", long_options,
+        c = getopt_long(argc, argv, "acehHmMnNo:Op:qrRs:tuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -344,6 +336,9 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'm':
             op->do_mask = true;
+            break;
+        case 'M':
+            op->do_mlu = true;
             break;
         case 'n':
             op->no_inquiry = true;
@@ -422,10 +417,11 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_unsorted = true;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -480,6 +476,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'm':
                     op->do_mask = true;
                     break;
+                case 'M':
+                    op->do_mlu = true;
+                    break;
                 case 'n':
                     op->no_inquiry = true;
                     break;
@@ -504,10 +503,11 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_unsorted = true;
                     break;
                 case 'v':
+                    op->verbose_given = true;
                     ++op->verbose;
                     break;
                 case 'V':
-                    op->do_version = true;
+                    op->version_given = true;
                     break;
                 case 'h':
                 case '?':
@@ -657,12 +657,13 @@ opcode_alpha_compare(const void * left, const void * right)
     return strncmp(l_name_buff, r_name_buff, NAME_BUFF_SZ);
 }
 
-static void
+static int
 list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
-               int sg_fd)
+               struct sg_pt_base * ptvp)
 {
     bool sa_v;
     int k, j, m, cd_len, serv_act, len, act_len, opcode, res;
+    uint8_t byt5;
     unsigned int timeout;
     uint8_t * bp;
     uint8_t ** sort_arr = NULL;
@@ -677,7 +678,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
     }
     if (0 == cd_len) {
         printf("sg_opcodes: no commands to display\n");
-        return;
+        return 0;
     }
     if (op->do_rctd) {  /* Return command timeout descriptor */
         if (op->do_compact) {
@@ -696,6 +697,10 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             printf("\nOpcode,sa  Name\n");
             printf(  "  (hex)        \n");
             printf("---------------------------------------\n");
+        } else if (op->do_mlu) {
+            printf("\nOpcode  Service    CDB    CDLP,  Name\n");
+            printf(  "(hex)   action(h)  size   MLU        \n");
+            printf("-----------------------------------------------\n");
         } else {
             printf("\nOpcode  Service    CDB    CDLP   Name\n");
             printf(  "(hex)   action(h)  size              \n");
@@ -708,7 +713,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
         if (NULL == sort_arr) {
             printf("sg_opcodes: no memory to sort operation codes, "
                    "try '-u'\n");
-            return;
+            return sg_convert_errno(ENOMEM);
         }
         memset(sort_arr, 0, cd_len * sizeof(uint8_t *));
         bp = rsoc_buff + 4;
@@ -721,9 +726,10 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
     }
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
         bp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
-        len = (bp[5] & 0x2) ? 20 : 8;
+        byt5 = bp[5];
+        len = (byt5 & 0x2) ? 20 : 8;
         opcode = bp[0];
-        sa_v = !!(bp[5] & 1);
+        sa_v = !!(byt5 & 1);
         serv_act = 0;
         if (sa_v) {
             serv_act = sg_get_unaligned_be16(bp + 2);
@@ -738,7 +744,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
-            if (bp[5] & 0x2) {          /* CTDP set */
+            if (byt5 & 0x2) {          /* CTDP set */
                 /* don't show CDLP because it makes line too long */
                 if (op->do_compact)
                     printf(" %.2x%c%.4s", opcode, (sa_v ? ',' : ' '),
@@ -765,21 +771,25 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                     printf(" %.2x     %.4s       %3d                         "
                            "%s\n", opcode, sa_buff,
                            sg_get_unaligned_be16(bp + 6), name_buff);
-        } else {                        /* RCTD clear in cdb */
+        } else {            /* RCTD clear in cdb */
             if (op->do_compact)
                 printf(" %.2x%c%.4s   %s\n", bp[0], (sa_v ? ',' : ' '),
                        sa_buff, name_buff);
+            else if (op->do_mlu)
+                printf(" %.2x     %.4s       %3d   %2d,%d    %s\n", bp[0],
+                       sa_buff, sg_get_unaligned_be16(bp + 6),
+                       (byt5 >> 2) & 0x3, !!(0x10 & byt5), name_buff);
             else
                 printf(" %.2x     %.4s       %3d     %2d    %s\n", bp[0],
                        sa_buff, sg_get_unaligned_be16(bp + 6),
-                       (*(bp + 5) >> 2) & 0x3, name_buff);
+                       (byt5 >> 2) & 0x3, name_buff);
         }
         if (op->do_mask) {
             int cdb_sz;
             uint8_t b[64];
 
             memset(b, 0, sizeof(b));
-            res = do_rsoc(sg_fd, false, (sa_v ? 2 : 1), opcode, serv_act,
+            res = do_rsoc(ptvp, false, (sa_v ? 2 : 1), opcode, serv_act,
                           b, sizeof(b), &act_len, true, op->verbose);
             if (0 == res) {
                 cdb_sz = sg_get_unaligned_be16(b + 2);
@@ -793,11 +803,15 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                         printf("%.2x ", b[4 + m]);
                     printf("\n");
                 }
-            }
+            } else
+                goto err_out;
         }
     }
+    res = 0;
+err_out:
     if (sort_arr)
         free(sort_arr);
+    return res;
 }
 
 static void
@@ -890,6 +904,7 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         break;
     }
     printf("  Command %s, [%s]\n", cp, dlp);
+    printf("  Multiple Logical Units (MLU): %d\n", !! (rsoc_buff[1] & 0x20));
     if (valid) {
         printf("  Usage data: ");
         bp = rsoc_buff + 4;
@@ -908,13 +923,15 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
 int
 main(int argc, char * argv[])
 {
-    int sg_fd, cd_len, res, len, act_len, rq_len, vb;
+    int cd_len, res, len, act_len, rq_len, vb;
     int rep_opts = 0;
+    int sg_fd = -1;
     const char * cp;
     struct opts_t * op;
     const char * op_name;
     uint8_t * rsoc_buff = NULL;
     uint8_t * free_rsoc_buff = NULL;
+    struct sg_pt_base * ptvp = NULL;
     char buff[48];
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;
@@ -934,7 +951,23 @@ main(int argc, char * argv[])
             usage_old();
         return 0;
     }
-    if (op->do_version) {
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
@@ -988,30 +1021,37 @@ main(int argc, char * argv[])
                                   NAME_BUFF_SZ, name_buff);
             printf("  %s\n", name_buff);
         }
-        return 0;
+        goto fini;
     }
     op_name = op->do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
 
     rsoc_buff = (uint8_t *)sg_memalign(MX_ALLOC_LEN, 0, &free_rsoc_buff,
-                                       vb > 3);
+                                       false);
     if (NULL == rsoc_buff) {
         pr2serr("Unable to allocate memory\n");
-        return sg_convert_errno(ENOMEM);
+        res = sg_convert_errno(ENOMEM);
+        goto err_out;
     }
 
     if (op->opcode < 0) {
         /* Try to open read-only */
-        if ((sg_fd = scsi_pt_open_device(op->device_name, 1, vb)) < 0) {
+        if ((sg_fd = scsi_pt_open_device(op->device_name, true, vb)) < 0) {
             pr2serr("sg_opcodes: error opening file (ro): %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
             goto open_rw;
+        }
+        ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
+        if (NULL == ptvp) {
+            pr2serr("Out of memory (ro)\n");
+            res = sg_convert_errno(ENOMEM);
+            goto err_out;
         }
         if (op->no_inquiry && (peri_dtype < 0))
             pr2serr("--no-inquiry ignored because --pdt= not given\n");
         if (op->no_inquiry && (peri_dtype >= 0))
             ;
-        else if (0 == sg_simple_inquiry(sg_fd, &inq_resp, true, vb)) {
+        else if (0 == sg_simple_inquiry_pt(ptvp, &inq_resp, true, vb)) {
             peri_dtype = inq_resp.peripheral_type;
             if (! (op->do_raw || op->no_inquiry)) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
@@ -1025,30 +1065,36 @@ main(int argc, char * argv[])
         } else {
             pr2serr("sg_opcodes: %s doesn't respond to a SCSI INQUIRY\n",
                     op->device_name);
-            return SG_LIB_CAT_OTHER;
-        }
-        res = scsi_pt_close_device(sg_fd);
-        if (res < 0) {
-            pr2serr("close error: %s\n", safe_strerror(-res));
-            return sg_convert_errno(-res);
+            res = SG_LIB_CAT_OTHER;
+            goto err_out;
         }
     }
 
-open_rw:
-    if ((sg_fd = scsi_pt_open_device(op->device_name, 0 /* RW */, vb)) < 0) {
-        pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
-                op->device_name, safe_strerror(-sg_fd));
-        return sg_convert_errno(-sg_fd);
+open_rw:                /* if not already open */
+    if (sg_fd < 0) {
+        sg_fd = scsi_pt_open_device(op->device_name, false /* RW */, vb);
+        if (sg_fd < 0) {
+            pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
+                    op->device_name, safe_strerror(-sg_fd));
+            res = sg_convert_errno(-sg_fd);
+            goto err_out;
+        }
+        ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
+        if (NULL == ptvp) {
+            pr2serr("Out of memory (rw)\n");
+            res = sg_convert_errno(ENOMEM);
+            goto err_out;
+        }
     }
     if (op->opcode >= 0)
         rep_opts = ((op->servact >= 0) ? 2 : 1);
     if (op->do_taskman) {
         rq_len = (op->do_repd ? 16 : 4);
-        res = do_rstmf(sg_fd, op->do_repd, rsoc_buff, rq_len, &act_len, true,
+        res = do_rstmf(ptvp, op->do_repd, rsoc_buff, rq_len, &act_len, true,
                        vb);
     } else {
         rq_len = MX_ALLOC_LEN;
-        res = do_rsoc(sg_fd, op->do_rctd, rep_opts, op->opcode, op->servact,
+        res = do_rsoc(ptvp, op->do_rctd, rep_opts, op->opcode, op->servact,
                       rsoc_buff, rq_len, &act_len, true, vb);
     }
     if (res) {
@@ -1123,7 +1169,7 @@ open_rw:
             hex2stdout(rsoc_buff, len, 1);
             goto err_out;
         }
-        list_all_codes(rsoc_buff, len, op, sg_fd);
+        list_all_codes(rsoc_buff, len, op, ptvp);
     } else {    /* asked about specific command */
         cd_len = sg_get_unaligned_be16(rsoc_buff + 2);
         len = cd_len + 4;
@@ -1139,11 +1185,15 @@ open_rw:
         }
         list_one(rsoc_buff, cd_len, rep_opts, op);
     }
+fini:
     res = 0;
 
 err_out:
     if (free_rsoc_buff)
         free(free_rsoc_buff);
-    scsi_pt_close_device(sg_fd);
+    if (ptvp)
+        destruct_scsi_pt_obj(ptvp);
+    if (sg_fd >= 0)
+        scsi_pt_close_device(sg_fd);
     return res;
 }

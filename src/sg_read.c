@@ -93,7 +93,9 @@ static int verbose = 0;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
-static void install_handler (int sig_num, void (*sig_handler) (int sig))
+
+static void
+install_handler (int sig_num, void (*sig_handler) (int sig))
 {
     struct sigaction sigact;
 
@@ -106,7 +108,8 @@ static void install_handler (int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-static void print_stats(int iters, const char * str)
+static void
+print_stats(int iters, const char * str)
 {
     if (orig_count > 0) {
         if (0 != dd_count)
@@ -121,7 +124,8 @@ static void print_stats(int iters, const char * str)
         pr2serr("%s commands issued: %d\n", (str ? str : ""), iters);
 }
 
-static void interrupt_handler(int sig)
+static void
+interrupt_handler(int sig)
 {
     struct sigaction sigact;
 
@@ -134,14 +138,16 @@ static void interrupt_handler(int sig)
     kill (getpid (), sig);
 }
 
-static void siginfo_handler(int sig)
+static void
+siginfo_handler(int sig)
 {
     if (sig) { ; }      /* unused, dummy to suppress warning */
     pr2serr("Progress report, continuing ...\n");
     print_stats(0, NULL);
 }
 
-static int dd_filetype(const char * filename)
+static int
+dd_filetype(const char * filename)
 {
     struct stat st;
 
@@ -157,7 +163,8 @@ static int dd_filetype(const char * filename)
     return FT_OTHER;
 }
 
-static void usage()
+static void
+usage()
 {
     pr2serr("Usage: sg_read  [blk_sgio=0|1] [bpt=BPT] [bs=BS] "
             "[cdbsz=6|10|12|16]\n"
@@ -166,7 +173,8 @@ static void usage()
             "                [mmap=0|1] [no_dfxer=0|1] [odir=0|1] "
             "[skip=SKIP]\n"
             "                [time=TI] [verbose=VERB] [--help] "
-            "[--version]\n"
+            "[--verbose]\n"
+            "                [--version] "
             "  where:\n"
             "    blk_sgio 0->normal IO for block devices, 1->SCSI commands "
             "via SG_IO\n"
@@ -197,15 +205,16 @@ static void usage()
             "    time     0->do nothing(def), 1->time from 1st cmd, 2->time "
             "from 2nd, ...\n"
             "    verbose  increase level of verbosity (def: 0)\n"
-            "    --help   print this usage message then exit\n"
-            "    --version  print version number then exit\n\n"
+            "    --help|-h    print this usage message then exit\n"
+            "    --verbose|-v   increase level of verbosity (def: 0)\n"
+            "    --version|-V   print version number then exit\n\n"
             "Issue SCSI READ commands, each starting from the same logical "
             "block address\n");
 }
 
-static int sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz,
-                             unsigned int blocks, int64_t start_block,
-                             bool write_true, bool fua, bool dpo)
+static int
+sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
+                  int64_t start_block, bool write_true, bool fua, bool dpo)
 {
     int sz_ind;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -276,10 +285,10 @@ static int sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz,
 /* -3 medium/hardware error, -2 -> not ready, 0 -> successful,
    1 -> recoverable (ENOMEM), 2 -> try again (e.g. unit attention),
    3 -> try again (e.g. aborted command), -1 -> other unrecoverable error */
-static int sg_bread(int sg_fd, uint8_t * buff, int blocks,
-                    int64_t from_block, int bs, int cdbsz,
-                    bool fua, bool dpo, bool * diop, bool do_mmap,
-                    bool no_dxfer)
+static int
+sg_bread(int sg_fd, uint8_t * buff, int blocks, int64_t from_block, int bs,
+         int cdbsz, bool fua, bool dpo, bool * diop, bool do_mmap,
+         bool no_dxfer)
 {
     int k;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
@@ -366,12 +375,27 @@ static int sg_bread(int sg_fd, uint8_t * buff, int blocks,
     return 0;
 }
 
+/* Returns the number of times 'ch' is found in string 's' given the
+ * string's length. */
+static int
+num_chs_in_str(const char * s, int slen, int ch)
+{
+    int res = 0;
+
+    while (--slen >= 0) {
+        if (ch == s[slen])
+            ++res;
+    }
+    return res;
+}
+
 #define STR_SZ 1024
 #define INF_SZ 512
 #define EBUFF_SZ 768
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     bool count_given = false;
     bool dio_tmp;
@@ -382,6 +406,8 @@ int main(int argc, char * argv[])
     bool dpo = false;
     bool fua = false;
     bool no_dxfer = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int bs = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
     int dio_incomplete = 0;
@@ -390,6 +416,7 @@ int main(int argc, char * argv[])
     int ret = 0;
     int scsi_cdbsz = DEF_SCSI_CDBSZ;
     int res, k, t, buf_sz, iters, infd, blocks, flags, blocks_per, err;
+    int n, keylen;
     size_t psz;
     int64_t skip = 0;
     char * key;
@@ -420,6 +447,7 @@ int main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
+        keylen = strlen(key);
         if (0 == strcmp(key,"blk_sgio"))
             do_blk_sgio = !! sg_get_num(buf);
         else if (0 == strcmp(key,"bpt")) {
@@ -476,20 +504,66 @@ int main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key,"time"))
             do_time = sg_get_num(buf);
-        else if (0 == strncmp(key, "verb", 4))
+        else if (0 == strncmp(key, "verb", 4)) {
+            verbose_given = true;
             verbose = sg_get_num(buf);
-        else if (0 == strncmp(key, "--help", 6)) {
+        } else if (0 == strncmp(key, "--help", 6)) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--vers", 6)) {
-            pr2serr( ME ": %s\n", version_str);
-            return 0;
+        } else if (0 == strncmp(key, "--verb", 6)) {
+            verbose_given = true;
+            ++verbose;
+        } else if (0 == strncmp(key, "--vers", 6))
+            version_given = true;
+        else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
+            res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'h');
+            if (n > 0) {
+                usage();
+                return 0;
+            }
+            n = num_chs_in_str(key + 1, keylen - 1, 'v');
+            if (n > 0)
+                verbose_given = true;
+            verbose += n;
+            res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'V');
+            if (n > 0)
+                version_given = true;
+            res += n;
+            if (res < (keylen - 1)) {
+                pr2serr("Unrecognised short option in '%s', try '--help'\n",
+                        key);
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else {
             pr2serr( "Unrecognized argument '%s'\n", key);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr( ME ": %s\n", version_str);
+        return 0;
+    }
+
     if (bs <= 0) {
         bs = DEF_BLOCK_SIZE;
         if ((dd_count > 0) && (bpt > 0))

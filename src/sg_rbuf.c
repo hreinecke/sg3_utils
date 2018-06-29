@@ -50,14 +50,12 @@
 #define RB_OPCODE 0x3C
 #define RB_CMD_LEN 10
 
-/* #define SG_DEBUG */
-
 #ifndef SG_FLAG_MMAP_IO
 #define SG_FLAG_MMAP_IO 4
 #endif
 
 
-static const char * version_str = "5.04 20180523";
+static const char * version_str = "5.05 20180627";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -81,11 +79,12 @@ struct opts_t {
     bool do_mmap;
     bool do_quick;
     bool do_time;
-    bool do_version;
+    bool verbose_given;
+    bool version_given;
     bool opt_new;
     int do_buffer;
     int do_help;
-    int do_verbose;
+    int verbose;
     int64_t do_size;
     const char * device_name;
 };
@@ -141,16 +140,16 @@ usage_old()
 }
 
 static void
-usage_for(const struct opts_t * optsp)
+usage_for(const struct opts_t * op)
 {
-    if (optsp->opt_new)
+    if (op->opt_new)
         usage();
     else
         usage_old();
 }
 
 static int
-new_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
+new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
     int64_t nn;
@@ -168,67 +167,68 @@ new_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
             n = sg_get_num(optarg);
             if (n < 0) {
                 pr2serr("bad argument to '--buffer'\n");
-                usage_for(optsp);
+                usage_for(op);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_buffer = n;
+            op->do_buffer = n;
             break;
         case 'd':
-            optsp->do_dio = true;
+            op->do_dio = true;
             break;
         case 'e':
-            optsp->do_echo = true;
+            op->do_echo = true;
             break;
         case 'h':
         case '?':
-            ++optsp->do_help;
+            ++op->do_help;
             break;
         case 'm':
-            optsp->do_mmap = true;
+            op->do_mmap = true;
             break;
         case 'N':
             break;      /* ignore */
         case 'O':
-            optsp->opt_new = false;
+            op->opt_new = false;
             return 0;
         case 'q':
-            optsp->do_quick = true;
+            op->do_quick = true;
             break;
         case 's':
            nn = sg_get_llnum(optarg);
            if (nn < 0) {
                 pr2serr("bad argument to '--size'\n");
-                usage_for(optsp);
+                usage_for(op);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            optsp->do_size = nn;
+            op->do_size = nn;
             break;
         case 't':
-            optsp->do_time = true;
+            op->do_time = true;
             break;
         case 'v':
-            ++optsp->do_verbose;
+            op->verbose_given = true;
+            ++op->verbose;
             break;
         case 'V':
-            optsp->do_version = true;
+            op->version_given = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
-            if (optsp->do_help)
+            if (op->do_help)
                 break;
-            usage_for(optsp);
+            usage_for(op);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == optsp->device_name) {
-            optsp->device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
             for (; optind < argc; ++optind)
                 pr2serr("Unexpected extra argument: %s\n", argv[optind]);
-            usage_for(optsp);
+            usage_for(op);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -236,7 +236,7 @@ new_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-old_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
+old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     bool jmp_out;
     int k, plen, num;
@@ -252,34 +252,35 @@ old_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
             for (--plen, ++cp, jmp_out = false; plen > 0; --plen, ++cp) {
                 switch (*cp) {
                 case 'd':
-                    optsp->do_dio = true;
+                    op->do_dio = true;
                     break;
                 case 'e':
-                    optsp->do_echo = true;
+                    op->do_echo = true;
                     break;
                 case 'h':
                 case '?':
-                    ++optsp->do_help;
+                    ++op->do_help;
                     break;
                 case 'm':
-                    optsp->do_mmap = true;
+                    op->do_mmap = true;
                     break;
                 case 'N':
-                    optsp->opt_new = true;
+                    op->opt_new = true;
                     return 0;
                 case 'O':
                     break;
                 case 'q':
-                    optsp->do_quick = true;
+                    op->do_quick = true;
                     break;
                 case 't':
-                    optsp->do_time = true;
+                    op->do_time = true;
                     break;
                 case 'v':
-                    ++optsp->do_verbose;
+                    op->verbose_given = true;
+                    ++op->verbose;
                     break;
                 case 'V':
-                    optsp->do_version = true;
+                    op->version_given = true;
                     break;
                 default:
                     jmp_out = true;
@@ -291,36 +292,36 @@ old_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
             if (plen <= 0)
                 continue;
             if (0 == strncmp("b=", cp, 2)) {
-                num = sscanf(cp + 2, "%d", &optsp->do_buffer);
-                if ((1 != num) || (optsp->do_buffer <= 0)) {
+                num = sscanf(cp + 2, "%d", &op->do_buffer);
+                if ((1 != num) || (op->do_buffer <= 0)) {
                     printf("Couldn't decode number after 'b=' option\n");
-                    usage_for(optsp);
+                    usage_for(op);
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_buffer *= 1024;
+                op->do_buffer *= 1024;
             }
             else if (0 == strncmp("s=", cp, 2)) {
                 nn = sg_get_llnum(optarg);
                 if (nn < 0) {
                     printf("Couldn't decode number after 's=' option\n");
-                    usage_for(optsp);
+                    usage_for(op);
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                optsp->do_size = nn;
-                optsp->do_size *= 1024 * 1024;
+                op->do_size = nn;
+                op->do_size *= 1024 * 1024;
             } else if (0 == strncmp("-old", cp, 4))
                 ;
             else if (jmp_out) {
                 pr2serr("Unrecognized option: %s\n", cp);
-                usage_for(optsp);
+                usage_for(op);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == optsp->device_name)
-            optsp->device_name = cp;
+        } else if (0 == op->device_name)
+            op->device_name = cp;
         else {
             pr2serr("too many arguments, got: %s, not expecting: %s\n",
-                    optsp->device_name, cp);
-            usage_for(optsp);
+                    op->device_name, cp);
+            usage_for(op);
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -328,22 +329,22 @@ old_parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
 }
 
 static int
-parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
+parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int res;
     char * cp;
 
     cp = getenv("SG3_UTILS_OLD_OPTS");
     if (cp) {
-        optsp->opt_new = false;
-        res = old_parse_cmd_line(optsp, argc, argv);
-        if ((0 == res) && optsp->opt_new)
-            res = new_parse_cmd_line(optsp, argc, argv);
+        op->opt_new = false;
+        res = old_parse_cmd_line(op, argc, argv);
+        if ((0 == res) && op->opt_new)
+            res = new_parse_cmd_line(op, argc, argv);
     } else {
-        optsp->opt_new = true;
-        res = new_parse_cmd_line(optsp, argc, argv);
-        if ((0 == res) && (! optsp->opt_new))
-            res = old_parse_cmd_line(optsp, argc, argv);
+        op->opt_new = true;
+        res = new_parse_cmd_line(op, argc, argv);
+        if ((0 == res) && (! op->opt_new))
+            res = old_parse_cmd_line(op, argc, argv);
     }
     return res;
 }
@@ -352,7 +353,7 @@ parse_cmd_line(struct opts_t * optsp, int argc, char * argv[])
 int
 main(int argc, char * argv[])
 {
-#ifdef SG_DEBUG
+#ifdef DEBUG
     bool clear = true;
 #endif
     bool dio_incomplete = false;
@@ -385,13 +386,29 @@ main(int argc, char * argv[])
         usage_for(op);
         return 0;
     }
-    if (op->do_version) {
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (NULL == op->device_name) {
-        pr2serr("No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -431,7 +448,7 @@ main(int argc, char * argv[])
     io_hdr.cmdp = rb_cdb;
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
-    if (op->do_verbose) {
+    if (op->verbose) {
         pr2serr("    Read buffer (%sdescriptor) cdb: ",
                 (op->do_echo ? "echo " : ""));
         for (k = 0; k < RB_CMD_LEN; ++k)
@@ -447,14 +464,14 @@ main(int argc, char * argv[])
         return SG_LIB_CAT_OTHER;
     }
 
-    if (op->do_verbose > 2)
+    if (op->verbose > 2)
         pr2serr("      duration=%u ms\n", io_hdr.duration);
     /* now for the error processing */
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_RECOVERED:
         sg_chk_n_print3("READ BUFFER descriptor, continuing", &io_hdr,
-                        op->do_verbose > 1);
+                        op->verbose > 1);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
         __attribute__((fallthrough));
@@ -465,7 +482,7 @@ main(int argc, char * argv[])
         break;
     default: /* won't bother decoding other categories */
         sg_chk_n_print3("READ BUFFER descriptor error", &io_hdr,
-                        op->do_verbose > 1);
+                        op->verbose > 1);
         if (rawp) free(rawp);
         return (res >= 0) ? res : SG_LIB_CAT_OTHER;
     }
@@ -545,7 +562,7 @@ main(int argc, char * argv[])
         rb_cdb[0] = RB_OPCODE;
         rb_cdb[1] = op->do_echo ? RB_MODE_ECHO_DATA : RB_MODE_DATA;
         sg_put_unaligned_be24((uint32_t)buf_size, rb_cdb + 6);
-#ifdef SG_DEBUG
+#ifdef DEBUG
         memset(rbBuff, 0, buf_size);
 #endif
 
@@ -567,7 +584,7 @@ main(int argc, char * argv[])
             io_hdr.flags |= SG_FLAG_DIRECT_IO;
         else if (op->do_quick)
             io_hdr.flags |= SG_FLAG_NO_DXFER;
-        if (op->do_verbose > 1) {
+        if (op->verbose > 1) {
             pr2serr("    Read buffer (%sdata) cdb: ",
                     (op->do_echo ? "echo " : ""));
             for (j = 0; j < RB_CMD_LEN; ++j)
@@ -590,7 +607,7 @@ main(int argc, char * argv[])
             return SG_LIB_CAT_OTHER;
         }
 
-        if (op->do_verbose > 2)
+        if (op->verbose > 2)
             pr2serr("      duration=%u ms\n", io_hdr.duration);
         /* now for the error processing */
         res = sg_err_category3(&io_hdr);
@@ -599,11 +616,11 @@ main(int argc, char * argv[])
             break;
         case SG_LIB_CAT_RECOVERED:
             sg_chk_n_print3("READ BUFFER data, continuing", &io_hdr,
-                            op->do_verbose > 1);
+                            op->verbose > 1);
             break;
         default: /* won't bother decoding other categories */
             sg_chk_n_print3("READ BUFFER data error", &io_hdr,
-                            op->do_verbose > 1);
+                            op->verbose > 1);
             if (rawp) free(rawp);
             return (res >= 0) ? res : SG_LIB_CAT_OTHER;
         }
@@ -611,7 +628,7 @@ main(int argc, char * argv[])
             ((io_hdr.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
             dio_incomplete = true;  /* flag that dio not done (completely) */
 
-#ifdef SG_DEBUG
+#ifdef DEBUG
         if (clear) {
             for (j = 0; j < buf_size; ++j) {
                 if (rbBuff[j] != 0) {
@@ -658,7 +675,7 @@ main(int argc, char * argv[])
         perror("close error");
         return sg_convert_errno(err);
     }
-#ifdef SG_DEBUG
+#ifdef DEBUG
     if (clear)
         printf("read buffer always zero\n");
     else

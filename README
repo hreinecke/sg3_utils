@@ -203,6 +203,12 @@ and disable the creation of the shared library (libsgutils<num>.so) this
 invocation could be used: "./configure --prefix=/usr --disable-shared".
 To reduce the size of an executable as well try this:
 "./configure --prefix=/usr --disable-shared --disable-scsistrings".
+Also --disable-shared will produce (realtively) "static" executables in
+the src directory that are easier to debug. And
+"./configure --enable-debug" will compile with more debug type options,
+including more compiler checks and defining "DEBUG" within the src and
+lib source files. Most utilities in the src directory set '-vv' (i.e.
+equivalent to calling "--verbose" twice) when "DEBUG" is set.
 
 In Linux there are package build files for "rpm" based and for "deb" based
 systems. The 'sg3_utils.spec' file in the main directory can be used like
@@ -513,4 +519,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-26th March 2018
+28th June 2018

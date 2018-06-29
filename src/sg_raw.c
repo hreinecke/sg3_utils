@@ -37,7 +37,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.26 (2018-05-19)"
+#define SG_RAW_VERSION "0.4.27 (2018-06-27)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -76,7 +76,8 @@ struct opts_t {
     bool do_enumerate;
     bool no_sense;
     bool do_help;
-    bool do_version;
+    bool verbose_given;
+    bool version_given;
     int cdb_length;
     int datain_len;
     int dataout_len;
@@ -423,10 +424,11 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
             op->timeout = n;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         case 'w':       /* -r and -R already in use, this is --raw */
             ++op->raw;
@@ -437,7 +439,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
     }
 
     if (optind >= argc) {
-        pr2serr("No device specified\n");
+        pr2serr("No device specified\n\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     op->device_name = argv[optind];
@@ -670,14 +672,32 @@ main(int argc, char *argv[])
     memset(op, 0, sizeof(opts));
     op->timeout = DEFAULT_TIMEOUT;
     ret = parse_cmd_line(op, argc, argv);
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr_version();
+        goto done;
+    }
+
     if (ret != 0) {
         usage();
         goto done;
     } else if (op->do_help) {
         usage();
-        goto done;
-    } else if (op->do_version) {
-        pr_version();
         goto done;
     } else if (op->do_enumerate)
         goto done;

@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.02 20180532";
+static const char * version_str = "4.03 20180627";
 
 #define ME "sg_readcap: "
 
@@ -65,9 +65,10 @@ struct opts_t {
     bool do_pmi;
     bool do_raw;
     bool o_readonly;
-    bool do_version;
     bool do_zbc;
     bool opt_new;
+    bool verbose_given;
+    bool version_given;
     int do_help;
     int do_hex;
     int do_lba;
@@ -214,10 +215,11 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->o_readonly = true;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         case 'z':
             op->do_zbc = true;
@@ -299,10 +301,11 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->o_readonly = true;
                     break;
                 case 'v':
+                    op->verbose_given = true;
                     ++op->verbose;
                     break;
                 case 'V':
-                    op->do_version = true;
+                    op->version_given = true;
                     break;
                 case 'z':
                     op->do_zbc = true;
@@ -420,13 +423,29 @@ main(int argc, char * argv[])
         usage_for(op);
         return 0;
     }
-    if (op->do_version) {
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
 
     if (NULL == op->device_name) {
-        pr2serr("No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }

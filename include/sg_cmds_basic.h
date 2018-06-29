@@ -14,11 +14,10 @@
  * the sg_set_warnings_strm() function. If not given sg_warnings_strm
  * defaults to stderr.
  * If 'noisy' is false and 'verbose' is zero then following functions should
- * not output anything to sg_warnings_strm. If 'noisy' is true and
- * 'verbose' is zero then Unit Attention, Recovered, Medium and Hardware
- * errors (sense keys) send output to sg_warnings_strm. Increasing values
- * of 'verbose' send increasing amounts of (debug) output to
- * sg_warnings_strm.
+ * not output anything to sg_warnings_strm. If 'noisy' is true and 'verbose'
+ * is zero then Unit Attention, Recovered, Medium and Hardware errors (sense
+ * keys) send output to sg_warnings_strm. Increasing values of 'verbose'
+ * send increasing amounts of (debug) output to sg_warnings_strm.
  */
 
 #include <stdint.h>
@@ -31,7 +30,8 @@ extern "C" {
 /* Functions with the "_pt" suffix take a pointer to an object (derived from)
  * sg_pt_base rather than an open file descriptor as their first argument.
  * That object is assumed to be constructed and have a device file descriptor
- * associated with it. Caller is responsible for lifetime of ptp. */
+ * associated with it. clear_scsi_pt_obj() is called at the start of each
+ * "_pt" function. Caller is responsible for lifetime of ptp. */
 
 struct sg_pt_base;
 
@@ -169,6 +169,11 @@ int sg_ll_readcap_16(int sg_fd, bool pmi, uint64_t llba, void * resp,
 int sg_ll_report_luns(int sg_fd, int select_report, void * resp,
                       int mx_resp_len, bool noisy, int verbose);
 
+/* Similar to sg_ll_report_luns(). See note above about "_pt" suffix. */
+int sg_ll_report_luns_pt(struct sg_pt_base * ptp, int select_report,
+                         void * resp, int mx_resp_len, bool noisy,
+                         int verbose);
+
 /* Invokes a SCSI REQUEST SENSE command. Return of 0 -> success,
  * SG_LIB_CAT_INVALID_OP -> Request Sense not supported??,
  * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_ABORTED_COMMAND,
@@ -210,6 +215,10 @@ int sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
  * SG_LIB_CAT_ABORTED_COMMAND, -1 -> other failure */
 int sg_ll_test_unit_ready(int sg_fd, int pack_id, bool noisy, int verbose);
 
+/* Similar to sg_ll_test_unit_ready(). See note above about "_pt" suffix. */
+int sg_ll_test_unit_ready_pt(struct sg_pt_base * ptp, int pack_id,
+                             bool noisy, int verbose);
+
 /* Invokes a SCSI TEST UNIT READY command.
  * 'pack_id' is just for diagnostics, safe to set to 0.
  * Looks for progress indicator if 'progress' non-NULL;
@@ -247,6 +256,11 @@ struct sg_simple_inquiry_resp {
  * a negated errno or -1 -> other errors */
 int sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
                       bool noisy, int verbose);
+
+/* Similar to sg_simple_inquiry(). See note above about "_pt" suffix. */
+int sg_simple_inquiry_pt(struct sg_pt_base * ptvp,
+                         struct sg_simple_inquiry_resp * inq_data, bool noisy,
+                         int verbose);
 
 /* MODE SENSE commands yield a response that has header then zero or more
  * block descriptors followed by mode pages. In most cases users are

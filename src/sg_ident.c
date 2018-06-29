@@ -31,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.21 20180522";
+static const char * version_str = "1.22 20180626";
 
 #define ME "sg_ident: "
 
@@ -115,16 +115,18 @@ usage(void)
 int
 main(int argc, char * argv[])
 {
+    bool ascii = false;
+    bool do_clear = false;
+    bool raw = false;
+    bool do_set = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int sg_fd, res, c, ii_len;
     uint8_t rdi_buff[REPORT_ID_INFO_SANITY_LEN + 4];
     char b[80];
     uint8_t * bp = NULL;
     int itype = 0;
     int verbose = 0;
-    bool ascii = false;
-    bool do_clear = false;
-    bool raw = false;
-    bool do_set = false;
     const char * device_name = NULL;
     int ret = 0;
 
@@ -161,11 +163,12 @@ main(int argc, char * argv[])
             do_set = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -185,8 +188,29 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

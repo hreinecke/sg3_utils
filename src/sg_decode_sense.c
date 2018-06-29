@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.17 20180602";
+static const char * version_str = "1.18 20180626";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
 
@@ -56,7 +56,8 @@ struct opts_t {
     bool do_hex;
     bool no_space;
     bool do_status;
-    bool do_version;
+    bool verbose_given;
+    bool version_given;
     bool err_given;
     bool file_given;
     const char * fname;
@@ -184,10 +185,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->sstatus = ui;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         case 'w':
             op->wfname = optarg;
@@ -215,7 +217,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                     pr2serr("'--nospace' concat_buff overflow\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                if (op->do_version)
+                if (op->version_given)
                     pr2serr("'--nospace' and found whitespace so "
                             "concatenate\n");
                 strcat(concat_buff, avp);
@@ -441,14 +443,32 @@ main(int argc, char *argv[])
     memset(op, 0, sizeof(opts));
     memset(b, 0, sizeof(b));
     ret = parse_cmd_line(op, argc, argv);
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
+    }
     if (ret != 0) {
         usage();
         return ret;
     } else if (op->do_help) {
         usage();
-        return 0;
-    } else if (op->do_version) {
-        pr2serr("version: %s\n", version_str);
         return 0;
     }
 

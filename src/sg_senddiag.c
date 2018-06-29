@@ -31,7 +31,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.62 20180523";
+static const char * version_str = "0.63 20180628";
 
 #define ME "sg_senddiag: "
 
@@ -66,15 +66,16 @@ struct opts_t {
     bool do_pf;
     bool do_raw;
     bool do_uoff;
-    bool do_version;
     bool opt_new;
+    bool verbose_given;
+    bool version_given;
     int do_help;
     int do_hex;
     int maxlen;
     int page_code;
     int do_selftest;
     int timeout;
-    int do_verbose;
+    int verbose;
     const char * device_name;
     const char * raw_arg;
 };
@@ -246,10 +247,11 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_uoff = true;
             break;
         case 'v':
-            ++op->do_verbose;
+            op->verbose_given = true;
+            ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -333,10 +335,11 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                         jmp_out = true;
                     break;
                 case 'v':
-                    ++op->do_verbose;
+                    op->verbose_given = true;
+                    ++op->verbose;
                     break;
                 case 'V':
-                    op->do_version = true;
+                    op->version_given = true;
                     break;
                 case '?':
                     ++op->do_help;
@@ -696,10 +699,27 @@ main(int argc, char * argv[])
             usage_old();
         return 0;
     }
-    if (op->do_version) {
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
+
     rsp_buff_size = op->maxlen;
 
     if (NULL == op->device_name) {
@@ -707,14 +727,14 @@ main(int argc, char * argv[])
             list_page_codes();
             return 0;
         }
-        pr2serr("No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n\n");
         if (op->opt_new)
             usage();
         else
             usage_old();
         return SG_LIB_SYNTAX_ERROR;
     }
-    vb = op->do_verbose;
+    vb = op->verbose;
     if (op->do_raw) {
         read_in = sg_memalign(op->maxlen, 0, &free_read_in, vb > 3);
         if (NULL == read_in) {

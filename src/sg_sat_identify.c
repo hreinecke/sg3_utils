@@ -70,7 +70,9 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+static void
+usage()
 {
     pr2serr("Usage: sg_sat_identify [--ck_cond] [--extend] [--help] [--hex] "
             "[--ident]\n"
@@ -101,7 +103,8 @@ static void usage()
             "support the SCSI ATA\nPASS-THROUGH(32) command.\n");
 }
 
-static void dStrRaw(const uint8_t * str, int len)
+static void
+dStrRaw(const uint8_t * str, int len)
 {
     int k;
 
@@ -109,9 +112,10 @@ static void dStrRaw(const uint8_t * str, int len)
         printf("%c", str[k]);
 }
 
-static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
-                           bool ck_cond, bool extend, bool do_ident,
-                           int do_hex, bool do_raw, int verbose)
+static int
+do_identify_dev(int sg_fd, bool do_packet, int cdb_len, bool ck_cond,
+                bool extend, bool do_ident, int do_hex, bool do_raw,
+                int verbose)
 {
     bool t_type = false;/* false -> 512 byte blocks,
                            true -> device's LB size */
@@ -385,7 +389,8 @@ static int do_identify_dev(int sg_fd, bool do_packet, int cdb_len,
     return 0;
 }
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     bool do_packet = false;
     bool do_ident = false;
@@ -393,6 +398,8 @@ int main(int argc, char * argv[])
     bool o_readonly = false;
     bool ck_cond = false;    /* set to true to read register(s) back */
     bool extend = false;    /* set to true to send 48 bit LBA with command */
+    bool verbose_given = false;
+    bool version_given = false;
     int c, res;
     int sg_fd = -1;
     int cdb_len = SAT_ATA_PASS_THROUGH16_LEN;
@@ -448,11 +455,12 @@ int main(int argc, char * argv[])
             o_readonly = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -471,9 +479,29 @@ int main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
+    }
 
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return 1;
     }
