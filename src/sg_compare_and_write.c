@@ -54,7 +54,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.24 20180512";
+static const char * version_str = "1.25 20180625";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -100,6 +100,8 @@ struct caw_flags {
 
 struct opts_t {
         bool quiet;
+        bool verbose_given;
+        bool version_given;
         bool wfn_given;
         int numblocks;
         int verbose;
@@ -162,7 +164,11 @@ usage()
                 "                            (2 * NUM * 512) or 1024 when "
                 "NUM is 1\n"
                 "\n"
-                "Performs a SCSI COMPARE AND WRITE operation.\n");
+                "Performs a SCSI COMPARE AND WRITE operation. Sends a double "
+                "size\nbuffer, the first half is used to compare what is at "
+                "LBA for NUM\nblocks. If and only if the comparsion is "
+                "equal, then the second\nhalf of the buffer is written to "
+                "LBA for NUM blocks.\n");
 }
 
 static int
@@ -246,11 +252,12 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                         }
                         break;
                 case 'v':
+                        op->verbose_given = true;
                         ++op->verbose;
                         break;
                 case 'V':
-                        pr2serr(ME "version: %s\n", version_str);
-                        exit(0);
+                        op->version_given = true;
+                        break;
                 case 'w':
                         op->flags.wrprotect = sg_get_num(optarg);
                         if (op->flags.wrprotect >> 3) {
@@ -472,7 +479,30 @@ main(int argc, char * argv[])
                 goto out;
         }
 
+#ifdef DEBUG
+        pr2serr("In DEBUG mode, ");
+        if (op->verbose_given && op->version_given) {
+                pr2serr("but override: '-vV' given, zero verbose and "
+                        "continue\n");
+                op->verbose_given = false;
+                op->version_given = false;
+                op->verbose = 0;
+        } else if (! op->verbose_given) {
+                pr2serr("set '-vv'\n");
+                op->verbose = 2;
+        } else
+                pr2serr("keep verbose=%d\n", op->verbose);
+#else
+        if (op->verbose_given && op->version_given)
+                pr2serr("Not in DEBUG mode, so '-vV' has no special "
+                        "action\n");
+#endif
+        if (op->version_given) {
+                pr2serr(ME "version: %s\n", version_str);
+                return 0;
+        }
         vb = op->verbose;
+
         if (vb) {
                 pr2serr("Running COMPARE AND WRITE command with the "
                         "following options:\n  in=%s ", op->ifn);

@@ -38,12 +38,11 @@
    and the optional list identifier passed as the list_id argument.
 */
 
-static const char * version_str = "1.22 20180512";
+static const char * version_str = "1.23 20180625";
 
 
 #define MAX_XFER_LEN 10000
 
-/* #define SG_DEBUG */
 
 #define ME "sg_copy_results: "
 
@@ -306,9 +305,12 @@ main(int argc, char * argv[])
 {
     bool do_hex = false;
     bool o_readonly = false;
-    int sg_fd, res, c, k;
+    bool verbose_given = false;
+    bool version_given = false;
+    int res, c, k;
     int ret = 1;
     int sa = 3;
+    int sg_fd = -1;
     int verbose = 0;
     int xfer_len = 520;
     uint32_t list_id = 0;
@@ -360,10 +362,11 @@ main(int argc, char * argv[])
             break;
         case 'v':
             ++verbose;
+            verbose_given = true;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         case 'x':
             xfer_len = sg_get_num(optarg);
             if (-1 == xfer_len) {
@@ -390,8 +393,29 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -458,11 +482,13 @@ main(int argc, char * argv[])
 finish:
     if (free_cprb)
         free(free_cprb);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr(ME "close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            ret = sg_convert_errno(-res);
+    if (sg_fd >= 0) {
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0) {
+            pr2serr(ME "close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
     }
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_copy_results failed: ", ret))

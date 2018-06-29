@@ -272,11 +272,16 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     uint32_t n;
     uint16_t sct_sc;
     const uint8_t * up = ((const uint8_t *)cmdp) + SG_NVME_PT_OPCODE;
+    char nam[64];
 
+    if (vb)
+        sg_get_nvme_opcode_name(*up, true, sizeof(nam), nam);
+    else
+        nam[0] = '\0';
     cmdp->timeout_ms = (time_secs < 0) ? (-time_secs) : (1000 * time_secs);
     ptp->os_err = 0;
     if (vb > 2) {
-        pr2ws("NVMe command:\n");
+        pr2ws("NVMe Admin command: %s\n", nam);
         hex2stderr((const uint8_t *)cmdp, cmd_len, 1);
         if ((vb > 3) && (! is_read) && dp) {
             uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
@@ -297,8 +302,8 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     if (res < 0) {  /* OS error (errno negated) */
         ptp->os_err = -res;
         if (vb > 1) {
-            pr2ws("%s: ioctl opcode=0x%x failed: %s "
-                  "(errno=%d)\n", __func__, *up, strerror(-res), -res);
+            pr2ws("%s: ioctl for %s [0x%x] failed: %s "
+                  "(errno=%d)\n", __func__, nam, *up, strerror(-res), -res);
         }
         return res;
     }
@@ -329,8 +334,8 @@ do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
         if (vb > 1) {
             char b[80];
 
-            pr2ws("%s: ioctl opcode=0x%x failed: NVMe status: %s [0x%x]\n",
-                   __func__, *up,
+            pr2ws("%s: ioctl for %s [0x%x] failed, status: %s [0x%x]\n",
+                   __func__, nam, *up,
                   sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b), sct_sc);
         }
         return SG_LIB_NVME_STATUS;      /* == SCSI_PT_DO_NVME_STATUS */

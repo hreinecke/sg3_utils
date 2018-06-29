@@ -1,18 +1,19 @@
-.TH SG_OPCODES "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_OPCODES "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
 .B sg_opcodes
 [\fI\-\-alpha\fR] [\fI\-\-compact\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-mask\fR] [\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP\fR]
-[\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR]
-[\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-hex\fR] [\fI\-\-mask\fR] [\fI\-\-mlu\fR] [\fI\-\-no-inquiry\fR]
+[\fI\-\-opcode=OP\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR]
+[\fI\-\-repd\fR] [\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_opcodes
-[\fI\-a\fR] [\fI\-c\fR] [\fI\-e\fR] [\fI\-H\fR] [\fI\-m\fR] [\fI\-n\fR]
-[\fI\-o=OP\fR] [\fI\-p=DT\fR] [\fI\-q\fR] [\fI\-R\fR] [\fI\-s=SA\fR]
-[\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] \fIDEVICE\fR
+[\fI\-a\fR] [\fI\-c\fR] [\fI\-e\fR] [\fI\-H\fR] [\fI\-m\fR] [\fI\-M\fR]
+[\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-p=DT\fR] [\fI\-q\fR] [\fI\-R\fR]
+[\fI\-s=SA\fR] [\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -83,6 +84,14 @@ be set. And "0" means the corresponding position in the cdb must not
 be set. For "0" mask positions that a user tries to set in a cdb, the
 device may either ignore it or report an error, typically with a
 sense key of "illegal request".
+.TP
+\fB\-M\fR, \fB\-\-mlu\fR
+additionally prints out an indication (0 or 1) whether the command
+effects all logical units in the containing target. MLU (Multiple Logical
+Units) is a bit in the REPORT SUPPORTED OPERATION CODES response
+introduced by proposal 18-045r1 (and possibly in spc5r20). Without
+the option, the default output format which lists all opcodes, does
+not include a MLU indication.
 .TP
 \fB\-n\fR, \fB\-\-no-inquiry\fR
 Prior to calling a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT
@@ -295,7 +304,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2017 Douglas Gilbert
+Copyright \(co 2004\-2018 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

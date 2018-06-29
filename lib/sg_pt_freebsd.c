@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_freebsd version 1.31 20180615 */
+/* sg_pt_freebsd version 1.32 20180627 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1125,9 +1125,13 @@ nvme_pt_low(struct freebsd_dev_channel *fdc_p, void * dxferp, uint32_t len,
     sg_put_unaligned_le16(npcp->cpl.cid, fdc_p->cq_dw0_3 + 12);
     sg_put_unaligned_le16(*((const uint16_t *)&(npcp->cpl.status)),
                           fdc_p->cq_dw0_3 + SG_NVME_PT_CQ_STATUS_P);
-    if (sct_sc && (vb > 1))
-        pr2ws("%s: opcode=0x%x, status: %s\n", __func__, opcode,
+    if (sct_sc && (vb > 1)) {
+        char nam[64];
+ 
+        sg_get_nvme_opcode_name(opcode, true, sizeof(nam), nam);
+        pr2ws("%s: %s [0x%x], status: %s\n", __func__, nam, opcode,
               sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b));
+    }
     return sct_sc;
 }
 

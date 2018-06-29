@@ -35,12 +35,10 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.19 20180523";
+static const char * version_str = "1.20 20180628";
 
 
 #define MAX_XFER_LEN (15 * 1024)
-
-/* #define SG_DEBUG */
 
 #define ME "sg_write_long: "
 
@@ -104,6 +102,8 @@ main(int argc, char * argv[])
     bool cor_dis = false;
     bool got_stdin;
     bool pblock = false;
+    bool verbose_given = false;
+    bool version_given = false;
     bool wr_uncor = false;
     int res, c, infd, offset;
     int sg_fd = -1;
@@ -156,11 +156,12 @@ main(int argc, char * argv[])
             do_16 = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         case 'w':
             wr_uncor = true;
             break;
@@ -190,8 +191,29 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

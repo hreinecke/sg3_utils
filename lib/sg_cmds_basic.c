@@ -38,7 +38,7 @@
 #endif
 
 
-static const char * const version_str = "1.88 20180603";
+static const char * const version_str = "1.89 20180623";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -440,6 +440,7 @@ sg_ll_inquiry_pt(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
                  int mx_resp_len, int timeout_secs, int * residp, bool noisy,
                  int verbose)
 {
+    clear_scsi_pt_obj(ptvp);
     return sg_ll_inquiry_com(ptvp, false, evpd, pg_op, resp, mx_resp_len,
                              timeout_secs, residp, noisy, verbose);
 
@@ -487,6 +488,48 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     return ret;
 }
 
+/* Similar to sg_simple_inquiry() but takes pointer to pt object rather
+ * than device file descriptor. */
+int
+sg_simple_inquiry_pt(struct sg_pt_base * ptvp,
+                     struct sg_simple_inquiry_resp * inq_data,
+                     bool noisy, int verbose)
+{
+    int ret;
+    uint8_t * inq_resp = NULL;
+    uint8_t * free_irp = NULL;
+
+    if (inq_data) {
+        memset(inq_data, 0, sizeof(* inq_data));
+        inq_data->peripheral_qualifier = 0x3;
+        inq_data->peripheral_type = 0x1f;
+    }
+    inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, verbose > 4);
+    if (NULL == inq_resp) {
+        pr2ws("%s: out of memory\n", __func__);
+        return sg_convert_errno(ENOMEM);
+    }
+    ret = sg_ll_inquiry_pt(ptvp, false, 0, inq_resp, SAFE_STD_INQ_RESP_LEN,
+                           0, NULL, noisy, verbose);
+
+    if (inq_data && (0 == ret)) {
+        inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
+        inq_data->peripheral_type = inq_resp[0] & 0x1f;
+        inq_data->byte_1 = inq_resp[1];
+        inq_data->version = inq_resp[2];
+        inq_data->byte_3 = inq_resp[3];
+        inq_data->byte_5 = inq_resp[5];
+        inq_data->byte_6 = inq_resp[6];
+        inq_data->byte_7 = inq_resp[7];
+        memcpy(inq_data->vendor, inq_resp + 8, 8);
+        memcpy(inq_data->product, inq_resp + 16, 16);
+        memcpy(inq_data->revision, inq_resp + 32, 4);
+    }
+    if (free_irp)
+        free(free_irp);
+    return ret;
+}
+
 /* Invokes a SCSI TEST UNIT READY command.
  * 'pack_id' is just for diagnostics, safe to set to 0.
  * Looks for progress indicator if 'progress' non-NULL;
@@ -509,6 +552,7 @@ sg_ll_test_unit_ready_progress_pt(struct sg_pt_base * ptvp, int pack_id,
         pr2ws("\n");
     }
 
+    clear_scsi_pt_obj(ptvp);
     set_scsi_pt_cdb(ptvp, tur_cdb, sizeof(tur_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_packet_id(ptvp, pack_id);
@@ -573,14 +617,23 @@ sg_ll_test_unit_ready(int sg_fd, int pack_id, bool noisy, int verbose)
     return ret;
 }
 
+int
+sg_ll_test_unit_ready_pt(struct sg_pt_base * ptvp, int pack_id, bool noisy,
+                         int verbose)
+{
+    return sg_ll_test_unit_ready_progress_pt(ptvp, pack_id, NULL, noisy,
+                                             verbose);
+}
+
 /* Invokes a SCSI REQUEST SENSE command. Returns 0 when successful, various
  * SG_LIB_CAT_* positive values or -1 -> other errors */
-int
-sg_ll_request_sense_pt(struct sg_pt_base * ptvp, bool desc, void * resp,
-                       int mx_resp_len, bool noisy, int verbose)
+static int
+sg_ll_request_sense_com(struct sg_pt_base * ptvp, int sg_fd, bool desc,
+                        void * resp, int mx_resp_len, bool noisy, int verbose)
 {
-    static const char * const rq_s = "request sense";
+    bool ptvp_given = false;
     int k, ret, res, sense_cat;
+    static const char * const rq_s = "request sense";
     uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -599,6 +652,13 @@ sg_ll_request_sense_pt(struct sg_pt_base * ptvp, bool desc, void * resp,
         pr2ws("\n");
     }
 
+    if (ptvp)
+        ptvp_given = true;
+    else {
+        ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+        if (NULL == ptvp)
+            return sg_convert_errno(ENOMEM);
+    }
     set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
@@ -626,6 +686,8 @@ sg_ll_request_sense_pt(struct sg_pt_base * ptvp, bool desc, void * resp,
         } else
             ret = 0;
     }
+    if ((! ptvp_given) && ptvp)
+        destruct_scsi_pt_obj(ptvp);
     return ret;
 }
 
@@ -633,30 +695,31 @@ int
 sg_ll_request_sense(int sg_fd, bool desc, void * resp, int mx_resp_len,
                     bool noisy, int verbose)
 {
-    int ret;
-    struct sg_pt_base * ptvp;
+    return sg_ll_request_sense_com(NULL, sg_fd, desc, resp, mx_resp_len,
+                                   noisy, verbose);
+}
 
-    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
-    if (NULL == ptvp)
-        return sg_convert_errno(ENOMEM);
-    ret = sg_ll_request_sense_pt(ptvp, desc, resp, mx_resp_len, noisy,
-                                 verbose);
-    destruct_scsi_pt_obj(ptvp);
-    return ret;
+int
+sg_ll_request_sense_pt(struct sg_pt_base * ptvp, bool desc, void * resp,
+                       int mx_resp_len, bool noisy, int verbose)
+{
+    clear_scsi_pt_obj(ptvp);
+    return sg_ll_request_sense_com(ptvp, -1, desc, resp, mx_resp_len,
+                                   noisy, verbose);
 }
 
 /* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
-int
-sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
-                  bool noisy, int verbose)
+static int
+sg_ll_report_luns_com(struct sg_pt_base * ptvp, int sg_fd, int select_report,
+                      void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const report_luns_s = "report luns";
+    bool ptvp_given = false;
     int k, ret, res, sense_cat;
     uint8_t rl_cdb[REPORT_LUNS_CMDLEN] =
                          {REPORT_LUNS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
-    struct sg_pt_base * ptvp;
 
     rl_cdb[2] = select_report & 0xff;
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rl_cdb + 6);
@@ -667,7 +730,9 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
         pr2ws("\n");
     }
 
-    if (NULL == ((ptvp = create_pt_obj(report_luns_s))))
+    if (ptvp)
+        ptvp_given = true;
+    else if (NULL == ((ptvp = create_pt_obj(report_luns_s))))
         return sg_convert_errno(ENOMEM);
     set_scsi_pt_cdb(ptvp, rl_cdb, sizeof(rl_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
@@ -689,6 +754,31 @@ sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
         }
     } else
         ret = 0;
-    destruct_scsi_pt_obj(ptvp);
+    if ((! ptvp_given) && ptvp)
+        destruct_scsi_pt_obj(ptvp);
     return ret;
+}
+
+/* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors,
+ * Expects sg_fd to be >= 0 representing an open device fd. */
+int
+sg_ll_report_luns(int sg_fd, int select_report, void * resp, int mx_resp_len,
+                  bool noisy, int verbose)
+{
+    return sg_ll_report_luns_com(NULL, sg_fd, select_report, resp,
+                                 mx_resp_len, noisy, verbose);
+}
+
+
+/* Invokes a SCSI REPORT LUNS command. Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors.
+ * Expects a non-NULL ptvp containing an open device fd. */
+int
+sg_ll_report_luns_pt(struct sg_pt_base * ptvp, int select_report,
+                     void * resp, int mx_resp_len, bool noisy, int verbose)
+{
+    clear_scsi_pt_obj(ptvp);
+    return sg_ll_report_luns_com(ptvp, -1, select_report, resp,
+                                 mx_resp_len, noisy, verbose);
 }

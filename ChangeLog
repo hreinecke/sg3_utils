@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180615] [svn: r778]
+Changelog for sg3_utils-1.43 [20180629] [svn: r779]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -104,6 +104,7 @@ Changelog for sg3_utils-1.43 [20180615] [svn: r778]
   - sgm_dd: add --dry-run and --verbose options
   - sg_opcode: add '--enumerate' and '--pdt=' options
     - support CDLP (command duration limit page)
+    - support MLU, Multiple Logical Units (18-045r1)
     - check resid and trim response if necessary
     - report when --no-inquiry is ignored
   - sg_raw: add --enumerate option
@@ -135,7 +136,9 @@ Changelog for sg3_utils-1.43 [20180615] [svn: r778]
   - sg_lib: add SSC maintenance in/out sa names
     - enhance exit status values and associated
       strings, add SG_LIB_OS_BASE_ERR (50)
-    - add sg_ll_inquiry_v2() and sg_ll_inquiry_pt()
+    - add sg_ll_inquiry_v2(), sg_ll_inquiry_pt() and
+      sg_simple_inquiry_pt()
+    - add sg_ll_report_luns_pt()
     - add sg_ll_log_sense_v2()
     - add sg_ll_mode_sense10_v2()
     - add sg_ll_mode_select6_v2() and
@@ -202,16 +205,18 @@ Changelog for sg3_utils-1.43 [20180615] [svn: r778]
   - gcc 7.2 cleanups (sysmacros.h etc)
   - clang --analyze static checker clean ups
   - shellcheck cleanup on scripts
-  - --disable-linuxbsg to ./configure still accepted
-    but now ignored, Linux sg v3 or v4 interface
-    decision made at runtime
+  - ./configure automake utility:
+    - option --enable-debug added for testing
+    - option --disable-linuxbsg retired, still accepted
+      but now ignored, Linux sg v3 or v4 interface
+      decision made at runtime
+    - Info section now printed at end of ./configure
   - automake: add AM_PROG_AR to configure.ac
     - upgrade to version 1.15
     - various configure.ac and Makefile.am cleanups
     - add SG_LIB_ANDROID build 'define'. If defined then
       SG_LIB_LINUX is also defined, so test for Android
       before Linux if need to differentiate
-    - Info section now printed at end of ./configure
   - update BSD license from 3 to 2 clause aka FreeBSD
     license (without reference to FreeBSD project)
   - debian: bump compat file contents from 7 to 10

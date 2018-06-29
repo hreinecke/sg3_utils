@@ -66,6 +66,8 @@ struct opts_t {
     bool readonly;
     bool readwrite_force;/* set when '-yy' given. Ooverrides environment
                             variable SG_PERSIST_IN_RDONLY and opens RW */
+    bool verbose_given;
+    bool version_given;
     int hex;
     int num_transportids;
     int prin_sa;
@@ -1094,11 +1096,12 @@ main(int argc, char * argv[])
             op->param_unreg = true;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            op->version_given = true;
+            break;
         case 'X':
             if (0 != build_transportid(optarg, op)) {
                 pr2serr("bad argument to '--transport-id'\n");
@@ -1150,6 +1153,27 @@ main(int argc, char * argv[])
     }
     if (help > 0) {
         usage(help);
+        return 0;
+    }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and "
+                "continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr("version: %s\n", version_str);
         return 0;
     }
 

@@ -31,7 +31,7 @@
 
 */
 
-static const char * version_str = "0.48 20180510";    /* mmc6r02 */
+static const char * version_str = "0.49 20180626";    /* mmc6r02 */
 
 #define MX_ALLOC_LEN 8192
 #define NAME_BUFF_SZ 64
@@ -947,17 +947,19 @@ list_known(bool brief)
 int
 main(int argc, char * argv[])
 {
+    bool brief = false;
+    bool inner_hex = false;
+    bool list = false;
+    bool do_raw = false;
+    bool readonly = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int sg_fd, res, c, len;
     int peri_type = 0;
     int rt = 0;
     int starting = 0;
     int verbose = 0;
-    bool brief = false;
     int do_hex = 0;
-    bool inner_hex = false;
-    bool list = false;
-    bool do_raw = false;
-    bool readonly = false;
     const char * device_name = NULL;
     char buff[64];
     const char * cp;
@@ -1013,11 +1015,12 @@ main(int argc, char * argv[])
             }
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -1035,6 +1038,26 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
     }
 
     if (list) {

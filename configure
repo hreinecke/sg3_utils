@@ -635,6 +635,8 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+DEBUG_FALSE
+DEBUG_TRUE
 OS_ANDROID_FALSE
 OS_ANDROID_TRUE
 OS_WIN32_CYGWIN_FALSE
@@ -783,6 +785,7 @@ with_aix_soname
 with_gnu_ld
 with_sysroot
 enable_libtool_lock
+enable_debug
 enable_linuxbsg
 enable_win32_spt_direct
 enable_scsistrings
@@ -1442,6 +1445,7 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
+  --enable-debug    Turn on debugging
   --disable-linuxbsg      option ignored, this is placeholder
   --enable-win32-spt-direct
                           enable Win32 SPT Direct
@@ -12716,6 +12720,26 @@ else
 fi
 
 
+# Check whether --enable-debug was given.
+if test "${enable_debug+set}" = set; then :
+  enableval=$enable_debug; case "${enableval}" in
+		  yes) debug=true ;;
+		  no)  debug=false ;;
+		  *) as_fn_error $? "bad value ${enableval} for --enable-debug" "$LINENO" 5 ;;
+	       esac
+else
+  debug=false
+fi
+
+ if test x$debug = xtrue; then
+  DEBUG_TRUE=
+  DEBUG_FALSE='#'
+else
+  DEBUG_TRUE='#'
+  DEBUG_FALSE=
+fi
+
+
 # Check whether --enable-linuxbsg was given.
 if test "${enable_linuxbsg+set}" = set; then :
   enableval=$enable_linuxbsg;
@@ -12934,6 +12958,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${OS_ANDROID_TRUE}" && test -z "${OS_ANDROID_FALSE}"; then
   as_fn_error $? "conditional \"OS_ANDROID\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${DEBUG_TRUE}" && test -z "${DEBUG_FALSE}"; then
+  as_fn_error $? "conditional \"DEBUG\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

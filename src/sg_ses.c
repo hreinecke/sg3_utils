@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.39 20180523";    /* ses4r02 */
+static const char * version_str = "2.40 20180628";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -135,7 +135,6 @@ struct opts_t {
     bool do_data;       /* flag if --data= option has been used */
     bool do_list;
     bool do_status;     /* want to read from DEVICE (or user data) */
-    bool do_version;
     bool eiioe_auto;    /* Element Index Includes Overall (status) Element */
     bool eiioe_force;
     bool ind_given;     /* '--index=...' or '-I ...' */
@@ -146,6 +145,8 @@ struct opts_t {
     bool page_code_given;       /* or suitable abbreviation */
     bool quiet;         /* exit status unaltered by --quiet */
     bool seid_given;
+    bool verbose_given;
+    bool version_given;
     bool warn;
     int byte1;          /* (origin 0 so second byte) in Control dpage */
     int dev_slot_num;
@@ -1323,10 +1324,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             }
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             return 0;
         case 'w':
             op->warn = true;
@@ -5499,20 +5501,37 @@ main(int argc, char * argv[])
     op->ind_indiv_last = -1;
     op->maxlen = MX_ALLOC_LEN;
     res = parse_cmd_line(op, argc, argv);
+    vb = op->verbose;
     if (res) {
         ret = SG_LIB_SYNTAX_ERROR;
-        vb = op->verbose;
-        goto early_out;
-    }
-    vb = op->verbose;
-    if (op->do_version) {
-        pr2serr("version: %s\n", version_str);
         goto early_out;
     }
     if (op->do_help) {
         usage(op->do_help);
         goto early_out;
     }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr("version: %s\n", version_str);
+        goto early_out;
+    }
+
+    vb = op->verbose;   /* may have changed */
     if (op->enumerate || op->do_list) {
         enumerate_work(op);
         goto early_out;

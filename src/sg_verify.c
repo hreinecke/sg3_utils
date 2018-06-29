@@ -37,7 +37,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.24 20180523";    /* sbc4r15 */
+static const char * version_str = "1.25 20180628";    /* sbc4r15 */
 
 #define ME "sg_verify: "
 
@@ -131,7 +131,9 @@ main(int argc, char * argv[])
     bool got_stdin = false;
     bool quiet = false;
     bool readonly = false;
+    bool verbose_given = false;
     bool verify16 = false;
+    bool version_given = false;
     int res, c, num, nread, infd;
     int sg_fd = -1;
     int bpc = 128;
@@ -241,11 +243,12 @@ main(int argc, char * argv[])
             verify16 = false;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -264,6 +267,27 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (ndo > 0) {
         if (0 == bytchk)
             bytchk = 1;

@@ -38,7 +38,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.50 20180522";
+static const char * version_str = "1.51 20180626";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -86,7 +86,9 @@ struct opts_t {
         bool do_rcap16;         /* -l */
         bool resize;            /* -r */
         bool rto_req;           /* -R, deprecated, prefer fmtpinfo */
+        bool verbose_given;
         bool verify;            /* -y */
+        bool version_given;
         int blk_size;           /* -s value */
         int ffmt;               /* -t value */
         int fmtpinfo;
@@ -973,11 +975,12 @@ main(int argc, char **argv)
                         }
                         break;
                 case 'v':
+                        op->verbose_given = true;
                         op->verbose++;
                         break;
                 case 'V':
-                        pr2serr("sg_format version: %s\n", version_str);
-                        return 0;
+                        op->version_given = true;
+                        break;
                 case 'w':
                         op->fwait = true;
                         break;
@@ -1008,6 +1011,27 @@ main(int argc, char **argv)
                                 argv[optind]);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
+        }
+#ifdef DEBUG
+        pr2serr("In DEBUG mode, ");
+        if (op->verbose_given && op->version_given) {
+                pr2serr("but override: '-vV' given, zero verbose and "
+                        "continue\n");
+                op->verbose_given = false;
+                op->version_given = false;
+                op->verbose = 0;
+        } else if (! op->verbose_given) {
+                pr2serr("set '-vv'\n");
+                op->verbose = 2;
+        } else
+                pr2serr("keep verbose=%d\n", op->verbose);
+#else
+        if (op->verbose_given && op->version_given)
+                pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+        if (op->version_given) {
+                pr2serr("sg_format version: %s\n", version_str);
+                return 0;
         }
         if (NULL == op->device_name) {
                 pr2serr("no DEVICE name given\n\n");

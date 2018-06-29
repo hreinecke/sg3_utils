@@ -68,7 +68,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.65 20180523";
+static const char * version_str = "0.66 20180628";
 
 #define ME "sg_xcopy: "
 
@@ -1303,6 +1303,8 @@ main(int argc, char * argv[])
     bool list_id_given = false;
     bool on_src = false;
     bool on_src_dst_given = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, k, n, keylen, infd, outfd, xcopy_fd;
     int blocks = 0;
     int bpt = DEF_BLOCKS_PER_TRANSFER;
@@ -1469,12 +1471,11 @@ main(int argc, char * argv[])
                 return SG_LIB_CONTRADICT;
             }
             on_src_dst_given = true;
-        } else if (0 == strncmp(key, "--verb", 6))
+        } else if (0 == strncmp(key, "--verb", 6)) {
+            verbose_given = true;
             verbose += 1;
-        else if (0 == strncmp(key, "--vers", 6)) {
-            pr2serr(ME "%s\n", version_str);
-            return 0;
-        }
+        } else if (0 == strncmp(key, "--vers", 6))
+            version_given = true;
         else if (0 == strncmp(key, "--xcopy", 7))
             ;   /* ignore; for compatibility with ddpt */
         /* look for short options that start with a single '-', they can be
@@ -1486,11 +1487,13 @@ main(int argc, char * argv[])
             res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
             verbose += n;
+            if (n > 0)
+                verbose_given = true;
             res += n;
-            if (num_chs_in_str(key + 1, keylen - 1, 'V')) {
-                pr2serr("%s\n", version_str);
-                return -1;
-            }
+            n = num_chs_in_str(key + 1, keylen - 1, 'V');
+            if (n > 0)
+                version_given = true;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'x');
             /* accept and ignore; for compatibility with ddpt */
             res += n;
@@ -1513,6 +1516,27 @@ main(int argc, char * argv[])
         usage(num_help);
         return 0;
     }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "%s\n", version_str);
+        return 0;
+    }
+
     if (! on_src_dst_given) {
         if (ixcf.xcopy_given == oxcf.xcopy_given) {
             char * csp;

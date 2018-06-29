@@ -42,7 +42,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.15 20180523";    /* ses4r02 */
+static const char * version_str = "1.16 20180628";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -481,6 +481,8 @@ main(int argc, char * argv[])
 {
     bool last, got_stdin, is_reg;
     bool want_file = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, c, len, k, n, rsp_len, resid, act_len, din_len, verb;
     int sg_fd = -1;
     int infd = -1;
@@ -612,11 +614,12 @@ main(int argc, char * argv[])
             }
             break;
         case 'v':
+            verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -643,6 +646,27 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        op->verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
     }
 
     if (NULL == device_name) {

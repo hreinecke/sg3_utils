@@ -35,7 +35,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.11 20180523";
+static const char * version_str = "1.12 20180628";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -134,6 +134,8 @@ int
 main(int argc, char * argv[])
 {
     bool all = false;
+    bool verbose_given = false;
+    bool version_given = false;
     bool zid_given = false;
     int res, c, n;
     int sg_fd = -1;
@@ -171,11 +173,12 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         case 'z':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
@@ -205,13 +208,34 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
+    }
+
     if ((! zid_given) && (! all)) {
-        pr2serr("either the --zone=ID or --all option is required\n");
+        pr2serr("either the --zone=ID or --all option is required\n\n");
         usage();
         return SG_LIB_CONTRADICT;
     }
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

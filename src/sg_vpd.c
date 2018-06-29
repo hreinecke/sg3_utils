@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.44 20180528";  /* spc5r19 + sbc4r15 */
+static const char * version_str = "1.45 20180628";  /* spc5r19 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -109,6 +109,8 @@ struct opts_t {
     bool do_force;
     bool do_long;
     bool do_quiet;
+    bool verbose_given;
+    bool version_given;
     int do_hex;
     int vpd_pn;
     int do_ident;
@@ -3688,11 +3690,12 @@ main(int argc, char * argv[])
             ++op->do_raw;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            op->version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -3711,6 +3714,28 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
+    }
+
     if (op->do_enum) {
         if (op->device_name)
             pr2serr("Device name %s ignored when --enumerate given\n",

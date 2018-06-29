@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.63 20180523";
+static const char * version_str = "1.64 20180626";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -77,10 +77,11 @@ struct opts_t {
     bool do_list;
     bool do_llbaa;
     bool do_six;
-    bool do_version;
     bool o_readwrite;
     bool subpg_code_given;
     bool opt_new;
+    bool verbose_given;
+    bool version_given;
     int do_all;
     int do_help;
     int do_hex;
@@ -301,10 +302,11 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_six = true;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         case 'w':
             op->o_readwrite = true;
@@ -391,10 +393,11 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_raw += 2;
                     break;
                 case 'v':
+                    op->verbose_given = true;
                     ++op->verbose;
                     break;
                 case 'V':
-                    op->do_version = true;
+                    op->version_given = true;
                     break;
                 case '?':
                     ++op->do_help;
@@ -1005,7 +1008,23 @@ main(int argc, char * argv[])
         usage_for(op);
         return 0;
     }
-    if (op->do_version) {
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }

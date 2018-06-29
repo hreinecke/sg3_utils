@@ -29,9 +29,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-
-static const char * scsi_pt_version_str = "3.07 20180603";
-
+static const char * scsi_pt_version_str = "3.08 20180627";
 
 
 const char *

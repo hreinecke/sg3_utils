@@ -30,7 +30,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.25 20180523";
+static const char * version_str = "1.26 20180628";
 
 #define ME "sg_wr_mode: "
 
@@ -56,7 +56,9 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+
+static void
+usage()
 {
     pr2serr("Usage: sg_wr_mode [--contents=H,H...] [--dbd] [--force] "
             "[--help]\n"
@@ -106,8 +108,9 @@ static void usage()
  * quoted. For stdin (indicated by *inp=='-') there should be either
  * one entry per line, a comma separated list or space separated list.
  * Returns 0 if ok, or sg3_utils error code if error. */
-static int build_mode_page(const char * inp, uint8_t * mp_arr,
-                           int * mp_arr_len, int max_arr_len)
+static int
+build_mode_page(const char * inp, uint8_t * mp_arr, int * mp_arr_len,
+                int max_arr_len)
 {
     int in_len, k, j, m;
     unsigned int h;
@@ -253,8 +256,9 @@ static int build_mode_page(const char * inp, uint8_t * mp_arr,
 /* Read hex numbers from command line (comma separated list).
  * Can also be (single) space separated list but needs to be quoted on the
  * command line. Returns 0 if ok, or 1 if error. */
-static int build_mask(const char * inp, uint8_t * mask_arr,
-                      int * mask_arr_len, int max_arr_len)
+static int
+build_mask(const char * inp, uint8_t * mask_arr, int * mask_arr_len,
+           int max_arr_len)
 {
     int in_len, k;
     unsigned int h;
@@ -311,7 +315,8 @@ static int build_mask(const char * inp, uint8_t * mask_arr,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     bool dbd = false;
     bool force = false;
@@ -320,6 +325,8 @@ int main(int argc, char * argv[])
     bool mode_6 = false;        /* so default is mode_10 */
     bool rtd = false;   /* added in spc5r11 */
     bool save = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, c, num, alloc_len, off, pdt, k, md_len, hdr_len, bd_len;
     int mask_in_len;
     int sg_fd = -1;
@@ -417,11 +424,12 @@ int main(int argc, char * argv[])
             save = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -440,6 +448,28 @@ int main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
         pr2serr("missing device name!\n\n");
         usage();

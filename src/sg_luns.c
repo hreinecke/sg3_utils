@@ -32,7 +32,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.41 20180522";
+static const char * version_str = "1.42 20180626";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -368,6 +368,8 @@ main(int argc, char * argv[])
     bool test_linux_out = false;
 #endif
     bool trunc;
+    bool verbose_given = false;
+    bool version_given = false;
     int sg_fd, k, m, off, res, c, list_len, len_cap, luns;
     int decode_arg = 0;
     int do_hex = 0;
@@ -446,11 +448,12 @@ main(int argc, char * argv[])
             test_arg = optarg;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -468,6 +471,26 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
     }
 
     if (test_arg) {

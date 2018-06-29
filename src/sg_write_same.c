@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.24 20180523";
+static const char * version_str = "1.25 20180628";
 
 
 #define ME "sg_write_same: "
@@ -85,6 +85,8 @@ struct opts_t {
     bool lbdata;
     bool pbdata;
     bool unmap;
+    bool verbose_given;
+    bool version_given;
     bool want_ws10;
     int grpnum;
     int numblocks;
@@ -412,11 +414,12 @@ main(int argc, char * argv[])
             op->unmap = true;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr(ME "version: %s\n", version_str);
-            return 0;
+            op->version_given = true;
+            break;
         case 'w':
             op->wrprotect = sg_get_num(optarg);
             if ((op->wrprotect < 0) || (op->wrprotect > 7))  {
@@ -453,8 +456,30 @@ main(int argc, char * argv[])
         pr2serr("only one '--10', '--16' or '--32' please\n");
         return SG_LIB_CONTRADICT;
     }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr(ME "version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }

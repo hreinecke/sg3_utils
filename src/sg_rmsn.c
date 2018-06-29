@@ -31,7 +31,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.17 20180513";
+static const char * version_str = "1.18 20180628";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -65,6 +65,8 @@ int main(int argc, char * argv[])
 {
     bool raw = false;
     bool readonly = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, c, sn_len, n;
     int sg_fd = -1;
     int ret = 0;
@@ -93,11 +95,12 @@ int main(int argc, char * argv[])
             readonly = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -115,6 +118,26 @@ int main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
     }
 
     if (NULL == device_name) {

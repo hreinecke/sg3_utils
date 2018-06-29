@@ -66,7 +66,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.12 20180319";
+static const char * version_str = "1.13 20180629";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -158,16 +158,18 @@ enum myQDiscipline {MYQD_LOW,   /* favour completions over new cmds */
 
 struct opts_t {
     vector<const char *> dev_names;
+    bool block;
+    bool generic_pt;
+    bool no_xfer;
+    bool verbose_given;
+    bool version_given;
     int direct;
     int maxq_per_thread;
     int num_per_thread;
-    bool block;
-    bool generic_pt;
     uint64_t lba;
     unsigned int hi_lba;        /* last one, inclusive range */
     vector<unsigned int> hi_lbas; /* only used when hi_lba=-1 */
     int lb_sz;
-    bool no_xfer;
     int stats;
     int verbose;
     int wait_ms;
@@ -1127,11 +1129,12 @@ main(int argc, char * argv[])
             op->c2e = SCSI_TUR;
             break;
         case 'v':
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr_lk("version: %s\n", version_str);
-            return 0;
+            op->version_given = true;
+            break;
         case 'w':
             if ((isdigit(*optarg) || ('-' == *optarg))) {
                 if ('-' == *optarg)
@@ -1157,6 +1160,26 @@ main(int argc, char * argv[])
             for (; optind < argc; ++optind)
                 op->dev_names.push_back(argv[optind]);
         }
+    }
+#ifdef DEBUG
+    pr2serr_lk("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr_lk("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr_lk("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr_lk("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr_lk("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
+        pr2serr_lk("version: %s\n", version_str);
+        return 0;
     }
 
     if (0 == op->dev_names.size()) {

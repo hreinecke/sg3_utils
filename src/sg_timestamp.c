@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.10 20180523";
+static const char * version_str = "1.11 20180628";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -316,6 +316,8 @@ main(int argc, char * argv[])
     bool no_timestamp = false;
     bool readonly = false;
     bool secs_given = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, c;
     int sg_fd = 1;
     int elapsed = 0;
@@ -385,11 +387,12 @@ main(int argc, char * argv[])
             do_srep = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage(1);
@@ -410,6 +413,27 @@ main(int argc, char * argv[])
     }
     if (do_help) {
         usage(do_help);
+        return 0;
+    }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
         return 0;
     }
 

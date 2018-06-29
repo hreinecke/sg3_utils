@@ -97,6 +97,15 @@ AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 AM_CONDITIONAL(OS_ANDROID, [echo $host_os | grep 'android' > /dev/null])
 
+AC_ARG_ENABLE([debug],
+	      [  --enable-debug    Turn on debugging],
+	      [case "${enableval}" in
+		  yes) debug=true ;;
+		  no)  debug=false ;;
+		  *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+	       esac],[debug=false])
+AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
 AC_ARG_ENABLE([linuxbsg],
   AC_HELP_STRING([--disable-linuxbsg], [option ignored, this is placeholder]),
   [AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [option ignored], )], [])

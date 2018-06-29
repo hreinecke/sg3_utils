@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.17 20180523";
+static const char * version_str = "1.18 20180628";
 
 #define BPI (signed)(sizeof(int))
 
@@ -386,6 +386,8 @@ void usage ()
 
 int main (int argc, char * argv[])
 {
+        bool verbose_given = true;
+        bool version_given = true;
         int sg_fd, res;
         const char * device_name = NULL;
         int times = 1;
@@ -431,11 +433,12 @@ int main (int argc, char * argv[])
                         }
                         break;
                 case 'v':
+                        verbose_given = true;
                         verbose++;
                         break;
                 case 'V':
-                        pr2serr(ME "version: %s\n", version_str);
-                        return 0;
+                        version_given = true;
+                        break;
                 case 'w':
                         addwrite = sg_get_num(optarg);
                         if (-1 == addwrite) {
@@ -488,6 +491,29 @@ int main (int argc, char * argv[])
                         return SG_LIB_SYNTAX_ERROR;
                 }
         }
+
+#ifdef DEBUG
+        pr2serr("In DEBUG mode, ");
+        if (verbose_given && version_given) {
+                pr2serr("but override: '-vV' given, zero verbose and "
+                        "continue\n");
+                verbose_given = false;
+                version_given = false;
+                verbose = 0;
+        } else if (! verbose_given) {
+                pr2serr("set '-vv'\n");
+                verbose = 2;
+        } else
+                pr2serr("keep verbose=%d\n", verbose);
+#else
+        if (verbose_given && version_given)
+                pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+        if (version_given) {
+                pr2serr(ME "version: %s\n", version_str);
+                return 0;
+        }
+
         if (NULL == device_name) {
                 pr2serr("no device name given\n");
                 usage();

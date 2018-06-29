@@ -41,7 +41,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.41 20180523";
+static const char * version_str = "3.43 20180628";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -76,11 +76,12 @@ struct opts_t {
     bool do_low;
     bool do_progress;
     bool do_time;
-    bool do_version;
     bool opts_new;
+    bool verbose_given;
+    bool version_given;
     int do_help;
     int do_number;
-    int do_verbose;
+    int verbose;
     const char * device_name;
 };
 
@@ -184,10 +185,11 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_time = true;
             break;
         case 'v':
-            ++op->do_verbose;
+            op->verbose_given = true;
+            ++op->verbose;
             break;
         case 'V':
-            op->do_version = true;
+            op->version_given = true;
             break;
         default:
             pr2serr("unrecognised option code %c [0x%x]\n", c, c);
@@ -242,10 +244,11 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_time = true;
                     break;
                 case 'v':
-                    ++op->do_verbose;
+                    op->verbose_given = true;
+                    ++op->verbose;
                     break;
                 case 'V':
-                    op->do_version = true;
+                    op->version_given = true;
                     break;
                 case '?':
                     usage_old();
@@ -308,35 +311,29 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 
 /* Returns number of TURs performed */
 static int
-loop_turs(int sg_fd, struct loop_res_t * resp, struct opts_t * op)
+loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
+          struct opts_t * op)
 {
     int k, res;
-    int vb = op->do_verbose;
+    int vb = op->verbose;
     char b[80];
 
     if (op->do_low) {
-        int err, rs, n, sense_cat;
-        struct sg_pt_base * pbp;
+        int rs, n, sense_cat;
         uint8_t cdb[6];
         uint8_t sense_b[32];
 
-        pbp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
-        err = 0;
-        if ((NULL == pbp) || ((err = get_scsi_pt_os_err(pbp)))) {
-            resp->ret = sg_convert_errno(err ? err : ENOMEM);
-            return 0;
-        }
         for (k = 0; k < op->do_number; ++k) {
             /* Might get Unit Attention on first invocation */
             memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
-            set_scsi_pt_cdb(pbp, cdb, sizeof(cdb));
-            set_scsi_pt_sense(pbp, sense_b, sizeof(sense_b));
-            rs = do_scsi_pt(pbp, -1, DEF_PT_TIMEOUT, vb);
-            n = sg_cmds_process_resp(pbp, "Test unit ready", rs,
+            set_scsi_pt_cdb(ptvp, cdb, sizeof(cdb));
+            set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+            rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, vb);
+            n = sg_cmds_process_resp(ptvp, "Test unit ready", rs,
                                      SG_NO_DATA_IN, sense_b,
                                      (0 == k), vb, &sense_cat);
             if (-1 == n) {
-                resp->ret = sg_convert_errno(get_scsi_pt_os_err(pbp));
+                resp->ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
                 return k;
             } else if (-2 == n) {
                 switch (sense_cat) {
@@ -369,14 +366,13 @@ loop_turs(int sg_fd, struct loop_res_t * resp, struct opts_t * op)
                     break;
                 }
             }
-            clear_scsi_pt_obj(pbp);
+            clear_scsi_pt_obj(ptvp);
         }
-        destruct_scsi_pt_obj(pbp);
         return k;
     } else {
         for (k = 0; k < op->do_number; ++k) {
             /* Might get Unit Attention on first invocation */
-            res = sg_ll_test_unit_ready(sg_fd, k, (0 == k), vb);
+            res = sg_ll_test_unit_ready_pt(ptvp, k, (0 == k), vb);
             if (res) {
                 ++resp->num_errs;
                 resp->ret = res;
@@ -401,8 +397,10 @@ int
 main(int argc, char * argv[])
 {
     bool start_tm_valid = false;
-    int sg_fd, k, res, progress, pr, rem, num_done;
+    int k, res, progress, pr, rem, num_done;
+    int err = 0;
     int ret = 0;
+    int sg_fd = -1;
     int64_t elapsed_usecs = 0;
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
     struct timespec start_tm, end_tm;
@@ -411,6 +409,7 @@ main(int argc, char * argv[])
 #endif
     struct loop_res_t loop_res;
     struct loop_res_t * resp = &loop_res;
+    struct sg_pt_base * ptvp = NULL;
     struct opts_t opts;
     struct opts_t * op = &opts;
 
@@ -425,7 +424,23 @@ main(int argc, char * argv[])
         usage_for(op);
         return 0;
     }
-    if (op->do_version) {
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (op->verbose_given && op->version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (op->verbose_given && op->version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
@@ -437,18 +452,25 @@ main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
-                                     op->do_verbose)) < 0) {
-        pr2serr("sg_turs: error opening file: %s: %s\n", op->device_name,
-                safe_strerror(-sg_fd));
-        return sg_convert_errno(-sg_fd);
+                                     op->verbose)) < 0) {
+        pr2serr("%s: error opening file: %s: %s\n", __func__,
+                op->device_name, safe_strerror(-sg_fd));
+        ret = sg_convert_errno(-sg_fd);
+        goto fini;
+    }
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
+    if ((NULL == ptvp) || ((err = get_scsi_pt_os_err(ptvp)))) {
+        pr2serr("%s: unable to construct pt object\n", __func__);
+        ret = sg_convert_errno(err ? err : ENOMEM);
+        goto fini;
     }
     if (op->do_progress) {
         for (k = 0; k < op->do_number; ++k) {
             if (k > 0)
                 sleep_for(30);
             progress = -1;
-            res = sg_ll_test_unit_ready_progress(sg_fd, k, &progress,
-                     (1 == op->do_number), op->do_verbose);
+            res = sg_ll_test_unit_ready_progress_pt(ptvp, k, &progress,
+                             (1 == op->do_number), op->verbose);
             if (progress < 0) {
                 ret = res;
                 break;
@@ -482,12 +504,11 @@ main(int argc, char * argv[])
         start_tm_valid = false;
 #endif
 
-        num_done = loop_turs(sg_fd, resp, op);
+        num_done = loop_turs(ptvp, resp, op);
 
         if (op->do_time && start_tm_valid) {
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
             if (start_tm.tv_sec || start_tm.tv_nsec) {
-                int err;
 
                 res = clock_gettime(CLOCK_MONOTONIC, &end_tm);
                 if (res < 0) {
@@ -524,6 +545,10 @@ main(int argc, char * argv[])
             printf("Completed %d Test Unit Ready commands with %d errors\n",
                    op->do_number, resp->num_errs);
     }
-    sg_cmds_close_device(sg_fd);
+fini:
+    if (ptvp)
+        destruct_scsi_pt_obj(ptvp);
+    if (sg_fd >= 0)
+        sg_cmds_close_device(sg_fd);
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

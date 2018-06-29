@@ -47,7 +47,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.05 20180513";
+static const char * version_str = "1.06 20180628";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -136,6 +136,8 @@ main(int argc, char * argv[])
     bool prefetch = false;
     bool readonly = false;
     bool start_tm_valid = false;
+    bool verbose_given = false;
+    bool version_given = false;
     int res, c;
     int sg_fd = -1;
     int first_err = 0;
@@ -235,11 +237,12 @@ main(int argc, char * argv[])
             cdb10 = true;
             break;
         case 'v':
+            verbose_given = true;
             ++verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         case 'w':
             l = sg_get_num(optarg);
             if (-1 == l) {
@@ -266,6 +269,27 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
     }
 
     if (NULL == device_name) {

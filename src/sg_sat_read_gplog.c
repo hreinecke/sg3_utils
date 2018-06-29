@@ -52,7 +52,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.19 20180513";
+static const char * version_str = "1.20 20180628";
 
 struct opts_t {
     bool ck_cond;
@@ -329,6 +329,8 @@ do_read_gplog(int sg_fd, int ata_cmd, uint8_t *inbuff,
 int
 main(int argc, char * argv[])
 {
+    bool verbose_given = false;
+    bool version_given = false;
     int c, ret, res, n;
     int sg_fd = -1;
     int ata_cmd = ATA_READ_LOG_EXT;
@@ -395,11 +397,12 @@ main(int argc, char * argv[])
             op->rdonly = true;
             break;
         case 'v':
+            verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            pr2serr("version: %s\n", version_str);
-            return 0;
+            version_given = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             usage();
@@ -420,8 +423,29 @@ main(int argc, char * argv[])
         }
     }
 
+#ifdef DEBUG
+    pr2serr("In DEBUG mode, ");
+    if (verbose_given && version_given) {
+        pr2serr("but override: '-vV' given, zero verbose and continue\n");
+        verbose_given = false;
+        version_given = false;
+        op->verbose = 0;
+    } else if (! verbose_given) {
+        pr2serr("set '-vv'\n");
+        op->verbose = 2;
+    } else
+        pr2serr("keep verbose=%d\n", op->verbose);
+#else
+    if (verbose_given && version_given)
+        pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
+#endif
+    if (version_given) {
+        pr2serr("version: %s\n", version_str);
+        return 0;
+    }
+
     if (NULL == op->device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("Missing device name!\n\n");
         usage();
         return 1;
     }
