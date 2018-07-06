@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180629] [svn: r779]
+Changelog for sg3_utils-1.43 [20180706] [svn: r780]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -178,6 +178,7 @@ Changelog for sg3_utils-1.43 [20180629] [svn: r779]
       defines to help with decoding corner cases
     - identify vendor specific sense data (response
       code 0x7f), print contents in hex
+  - sg_pr2serr.h: add sg_scnpr() [like lk scnprintf()]
   - sg_pt: add construct_scsi_pt_obj_with_fd()
     - add pt_device_is_nvme(), get_pt_nvme_nsid()
     - add check_pt_file_handle()
@@ -190,7 +191,8 @@ Changelog for sg3_utils-1.43 [20180629] [svn: r779]
   - sg_sat_identify: expand to take --len=32
   - sg_pt: add dummy pt_device_is_nvme()
   - rescan-scsi-bus.sh: harden code
-    - fixes from Suse; bump version to: 20160511
+    - fixes from Suse; bump version
+    - bump version to 20180615
     - add to install list in Makefile, hope it does
       not clash with other package providing it
     - add --ignore-rev to ignore revision change

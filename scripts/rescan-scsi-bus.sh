@@ -1,10 +1,10 @@
 #!/bin/bash
 # Script to rescan SCSI bus, using the scsi add-single-device mechanism.
 # (c) 1998--2010 Kurt Garloff <kurt@garloff.de>, GNU GPL v2 or v3
-# (c) 2006--2015 Hannes Reinecke, GNU GPL v2 or later
+# (c) 2006--2018 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20160511"
+VERSION="20180615"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -1102,6 +1102,7 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--help:          print this usage message then exit"
     echo "--hosts=LIST:    Scan only host(s) in LIST"
     echo "--ids=LIST:      Scan only target ID(s) in LIST"
+    echo "--ignore-rev:    Ignore the revision change"
     echo "--issue-lip:     same as -i"
     echo "--issue-lip-wait=SECS:     same as -I"
     echo "--largelun:      Tell kernel to support LUNs > 7 even on SCSI2 devs"
@@ -1116,7 +1117,6 @@ if test @$1 = @--help -o @$1 = @-h -o @$1 = @-?; then
     echo "--update:        same as -u"
     echo "--version:       same as -V"
     echo "--wide:          same as -w"
-    echo "--ignore-rev:    Ignore the revision change"
     echo ""
     echo "Host numbers may thus be specified either directly on cmd line (deprecated)"
     echo "or with the --hosts=LIST parameter (recommended)."
@@ -1183,42 +1183,42 @@ while test ! -z "$opt" -a -z "${opt##-*}"; do
   opt=${opt#-}
   case "$opt" in
     a) existing_targets=;;  #Scan ALL targets when specified
+    c) opt_channelsearch="0 1" ;;
     d) debug=1 ;;
     f) flush=1 ;;
+    i) lipreset=0 ;;
+    I) shift; lipreset=$opt ;;
     l) lunsearch=`seq 0 7` ;;
     L) lunsearch=`seq 0 $2`; shift ;;
     m) mp_enable=1 ;;
-    w) opt_idsearch=`seq 0 15` ;;
-    c) opt_channelsearch="0 1" ;;
     r) remove=1 ;;
     s) resize=1; mp_enable=1 ;;
-    i) lipreset=0 ;;
-    I) shift; lipreset=$opt ;;
     u) update=1 ;;
+    w) opt_idsearch=`seq 0 15` ;;
     -alltargets)  existing_targets=;;
-    -flush)       flush=1 ;;
-    -remove)      remove=1 ;;
-    -forcerescan) remove=1; forcerescan=1 ;;
-    -forceremove) remove=1; forceremove=1 ;;
-    -hosts=*)     arg=${opt#-hosts=};   hosts=`expandlist $arg` ;;
+    -attachpq3) scan_flags=$(($scan_flags|0x1000000)) ;;
     -channels=*)  arg=${opt#-channels=};opt_channelsearch=`expandlist $arg` ;; 
-    -ids=*)   arg=${opt#-ids=};         opt_idsearch=`expandlist $arg` ; filter_ids=1;;
-    -luns=*)  arg=${opt#-luns=};        lunsearch=`expandlist $arg` ;; 
     -color) setcolor ;;
-    -nooptscan) optscan=0 ;;
+    -flush)       flush=1 ;;
+    -forceremove) remove=1; forceremove=1 ;;
+    -forcerescan) remove=1; forcerescan=1 ;;
+    -hosts=*)     arg=${opt#-hosts=};   hosts=`expandlist $arg` ;;
+    -ids=*)   arg=${opt#-ids=};         opt_idsearch=`expandlist $arg` ; filter_ids=1;;
+    -ignore-rev) ignore_rev=1;;
     -issue-lip) lipreset=0 ;;
     -issue-lip-wait) lipreset=${opt#-issue-lip-wait=};;
-    -sync) sync=2 ;;
-    -nosync) sync=0 ;;
+    -largelun) scan_flags=$(($scan_flags|0x200)) ;;
+    -luns=*)  arg=${opt#-luns=};        lunsearch=`expandlist $arg` ;; 
     -multipath) mp_enable=1 ;;
-    -attachpq3) scan_flags=$(($scan_flags|0x1000000)) ;;
+    -nooptscan) optscan=0 ;;
+    -nosync) sync=0 ;;
+    -remove)      remove=1 ;;
     -reportlun2) scan_flags=$(($scan_flags|0x20000)) ;;
     -resize) resize=1;;
-    -largelun) scan_flags=$(($scan_flags|0x200)) ;;
     -sparselun) scan_flags=$((scan_flags|0x40)) ;;
+    -sync) sync=2 ;;
     -update) update=1;;
     -wide) opt_idsearch=`seq 0 15` ;;
-    -ignore-rev) ignore_rev=1;;
     *) echo "Unknown option -$opt !" ;;
   esac
   shift

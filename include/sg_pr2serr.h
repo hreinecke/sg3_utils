@@ -14,6 +14,16 @@
  * depends on the external variable sg_warnings_strm which can be set
  * with sg_set_warnings_strm(). By default it uses stderr. */
 
+/* With regard to sg_scnpr():
+ * Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
+ * functions. Returns number of chars placed in cp excluding the
+ * trailing null char. So for cp_max_len > 0 the return value is always
+ * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars are
+ * written to cp. Note this means that when cp_max_len = 1, this function
+ * assumes that cp[0] is the null character and does nothing (and returns
+ * 0). Linux kernel has a similar function called  scnprintf().  */
+
+
 #include <stdio.h>
 
 #ifdef __cplusplus
@@ -27,10 +37,18 @@ int pr2serr(const char * fmt, ...)
 
 int pr2ws(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
+
+int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
+                 __attribute__ ((format (printf, 3, 4)));
+
 #else
+
 int pr2serr(const char * fmt, ...);
 
 int pr2ws(const char * fmt, ...);
+
+int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...);
+
 #endif
 
 

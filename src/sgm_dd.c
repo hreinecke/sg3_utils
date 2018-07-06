@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.57 20180626";
+static const char * version_str = "1.58 20180705";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -240,19 +240,19 @@ dd_filetype_str(int ft, char * buff)
     int off = 0;
 
     if (FT_DEV_NULL & ft)
-        off += snprintf(buff + off, 32, "null device ");
+        off += sg_scnpr(buff + off, 32, "null device ");
     if (FT_SG & ft)
-        off += snprintf(buff + off, 32, "SCSI generic (sg) device ");
+        off += sg_scnpr(buff + off, 32, "SCSI generic (sg) device ");
     if (FT_BLOCK & ft)
-        off += snprintf(buff + off, 32, "block device ");
+        off += sg_scnpr(buff + off, 32, "block device ");
     if (FT_ST & ft)
-        off += snprintf(buff + off, 32, "SCSI tape device ");
+        off += sg_scnpr(buff + off, 32, "SCSI tape device ");
     if (FT_RAW & ft)
-        off += snprintf(buff + off, 32, "raw device ");
+        off += sg_scnpr(buff + off, 32, "raw device ");
     if (FT_OTHER & ft)
-        off += snprintf(buff + off, 32, "other (perhaps ordinary file) ");
+        off += sg_scnpr(buff + off, 32, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
-        snprintf(buff + off, 32, "unable to 'stat' file ");
+        sg_scnpr(buff + off, 32, "unable to 'stat' file ");
     return buff;
 }
 
