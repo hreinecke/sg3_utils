@@ -37,7 +37,9 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
 #include "sg_lib.h"
+#include "sg_pr2serr.h"
 #include "sg_io_linux.h"
 
 /* This program performs a ATA PASS-THROUGH (16) SCSI command in order
@@ -57,7 +59,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.06 20180220";
+static const char * version_str = "1.07 20180706";
 
 
 #if 0
@@ -77,19 +79,19 @@ sg_sat_decode_fixed_sense(const uint8_t * sp, int slen, char * bp,
         (SPC_SK_RECOVERED_ERROR != (0xf & sp[2])) ||
         (0 != sp[12]) || (ASCQ_ATA_PT_INFO_AVAILABLE != sp[13]))
         return 0;
-    n = snprintf(bp, max_blen, "error=0x%x, status=0x%x, device=0x%x, "
+    n = sg_scnpr(bp, max_blen, "error=0x%x, status=0x%x, device=0x%x, "
                  "sector_count(7:0)=0x%x%c\n", sp[3], sp[4], sp[5], sp[6],
                  ((0x40 & sp[8]) ? '+' : ' '));
     if (n >= max_blen)
         return max_blen - 1;
-    n += snprintf(bp + n, max_blen - n, "extend=%d, log_index=0x%x, "
+    n += sg_scnpr(bp + n, max_blen - n, "extend=%d, log_index=0x%x, "
                   "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n",
                   (!!(0x80 & sp[8])), (0xf & sp[8]), sp[9], sp[10], sp[11],
                   ((0x20 & sp[8]) ? '+' : ' '));
     if (n >= max_blen)
         return max_blen - 1;
     if (verbose)
-        n += snprintf(bp + n, max_blen - n, "  sector_count_upper_nonzero="
+        n += sg_scnpr(bp + n, max_blen - n, "  sector_count_upper_nonzero="
                       "%d, lba_upper_nonzero=%d\n", !!(0x40 & sp[8]),
                       !!(0x20 & sp[8]));
     return (n >= max_blen) ? max_blen - 1 : n;

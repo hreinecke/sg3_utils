@@ -28,6 +28,7 @@
 #endif
 
 #include "sg_lib.h"
+#include "sg_pr2serr.h"
 
 /* Uncomment the next two undefs to force use of the generic (i.e. shifting)
  * unaligned functions (i.e. sg_get_* and sg_put_*). Use "-b 16|32|64
@@ -41,7 +42,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.10 20180311";
+static const char * version_str = "1.11 20180706";
 
 
 #define MAX_LINE_LEN 1024
@@ -185,37 +186,18 @@ usage()
 
 }
 
-/* Want safe, 'n += snprintf(b + n ...)' like function. If cp_max_len is 1
- * then assume cp is pointing to a null char and do nothing. Returns number
- * number of chars placed in cp excluding the trailing null char. So for
- * cp_max_len > 0 the return value is always < cp_max_len; for cp_max_len
- * <= 0 the return value is 0 (and no chars are written to cp). */
-static int
-my_snprintf(char * cp, int cp_max_len, const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    if (cp_max_len < 2)
-        return 0;
-    va_start(args, fmt);
-    n = vsnprintf(cp, cp_max_len, fmt, args);
-    va_end(args);
-    return (n < cp_max_len) ? n : (cp_max_len - 1);
-}
-
-char *
+static char *
 get_exit_status_str(int exit_status, bool longer, int b_len, char * b)
 {
     int n;
 
-    n = my_snprintf(b, b_len, "  ES=%d: ", exit_status);
+    n = sg_scnpr(b, b_len, "  ES=%d: ", exit_status);
     if (n >= (b_len - 1))
         return b;
     if (sg_exit2str(exit_status, longer, b_len - n, b + n)) {
         n = (int)strlen(b);
         if (n < (b_len - 1))
-            my_snprintf(b + n, b_len - n, " [ok=true]");
+            sg_scnpr(b + n, b_len - n, " [ok=true]");
         return b;
     } else
         snprintf(b, b_len, "  No ES string for %d%s", exit_status,
@@ -225,7 +207,7 @@ get_exit_status_str(int exit_status, bool longer, int b_len, char * b)
 
 static uint8_t arr[64];
 
-#define OFF 7	/* in byteswap mode, can test different alignments (def: 8) */
+#define OFF 7   /* in byteswap mode, can test different alignments (def: 8) */
 
 int
 main(int argc, char * argv[])
@@ -384,83 +366,83 @@ main(int argc, char * argv[])
 
     if (do_printf) {
         ++did_something;
-        printf("Testing my_snprintf():\n");
+        printf("Testing sg_scnpr():\n");
         b[0] = '\0';
         len = b_len;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = -1;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 0;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 1;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 2;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 3;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 4;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 5;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 6;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
 
         b[0] = '\0';
         len = 7;
-        n = my_snprintf(b, len, "%s", "test");
-        printf("my_snprintf(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
+        n = sg_scnpr(b, len, "%s", "test");
+        printf("sg_scnpr(,%d,,\"test\") -> %d; strlen(b) -> %u\n",
                len, n, (uint32_t)strlen(b));
         if (strlen(b) > 0)
             printf("Resulting string: %s\n", b);
