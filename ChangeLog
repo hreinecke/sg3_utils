@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180706] [svn: r780]
+Changelog for sg3_utils-1.43 [20180708] [svn: r781]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -173,6 +173,8 @@ Changelog for sg3_utils-1.43 [20180706] [svn: r780]
     - implement 'format' argument in dStrHexStr()
     - add read buffer(16) command mode names
     - add Microcode activation sense descriptor spc5r10
+    - add SG_LIB_OK_TRUE(0) and SG_LIB_OK_FALSE(36)
+      non "error" code defines for exit status
     - add SG_LIB_LBA_OUT_OF_RANGE error code
     - add SG_LIB_UNBOUNDED_32BIT (_16BIT and _64BIT)
       defines to help with decoding corner cases
