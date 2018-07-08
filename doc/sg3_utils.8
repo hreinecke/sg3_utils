@@ -264,7 +264,9 @@ and a short explanatory string will be output to stdout.
 The exit status values are:
 .TP
 .B 0
-success
+success. Also used for some utilities that wish to return a boolean value
+for the "true" case (and that no error has occurred). The false case is
+conveyed by exit status 36.
 .TP
 .B 1
 syntax error. Either illegal command line options, options with bad
@@ -393,6 +395,10 @@ like "shouldn't/can't get here". Perhaps the author should be informed.
 .TP
 .B 33
 the command sent to \fIDEVICE\fR has timed out.
+.TP
+.B 36
+no error has occurred plus the utility wants to convey a boolean value
+of false. The corresponding true value is conveyed by a 0 exit status.
 .TP
 .B 40
 the command sent to \fIDEVICE\fR has received an "aborted command" sense

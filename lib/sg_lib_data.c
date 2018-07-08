@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.51 20180705";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.52 20180708";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1741,7 +1741,7 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
  * for any executable (that fails). The convention is 0 means no error and
  * that in Unix the exit status is an (unsigned) 8 bit value. */
 struct sg_value_2names_t sg_exit_str_arr[] = {
-    {0,  "No errors", NULL},
+    {0,  "No errors", "may also convey true"},
     {1,  "Syntax error", "command line options (usually)"},
     {2,  "Device not ready", "type: sense key"},
     {3,  "Medium or hardware error", "type: sense key (plus blank check for "
@@ -1770,6 +1770,7 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {31, "Contradict", "command line options contradict or select bad mode"},
     {32, "Logic error", "unexpected situation, contact author"},
     {33, "SCSI command timeout", NULL},         /* OS timed out command */
+    {36, "No errors (false)", NULL},
     {40, "Aborted command, protection error", NULL},
     {41, "Aborted command, protection error with Info field", NULL},
     {47, "flock (Unix system call) error", NULL},       /* ddpt */

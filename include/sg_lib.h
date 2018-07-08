@@ -410,61 +410,64 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
  * These may be used as exit status values (from a process). Notice that
  * some of the lower values correspond to SCSI sense key values. */
 #define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
+#define SG_LIB_OK_TRUE SG_LIB_CAT_CLEAN  /* No error, reporting true */
 /* Value 1 left unused for utilities to use SG_LIB_SYNTAX_ERROR */
-#define SG_LIB_CAT_NOT_READY 2  /* sense key, unit stopped? */
-                                /*       [sk,asc,ascq: 0x2,*,*] */
-#define SG_LIB_CAT_MEDIUM_HARD 3 /* medium or hardware error, blank check */
-                                /*       [sk,asc,ascq: 0x3/0x4/0x8,*,*] */
-#define SG_LIB_CAT_ILLEGAL_REQ 5 /* Illegal request (other than invalid */
-                                /* opcode):   [sk,asc,ascq: 0x5,*,*] */
-#define SG_LIB_CAT_UNIT_ATTENTION 6 /* sense key, device state changed */
-                                /*       [sk,asc,ascq: 0x6,*,*] */
+#define SG_LIB_CAT_NOT_READY 2  /* sense key, unit stopped?
+                                 *       [sk,asc,ascq: 0x2,*,*] */
+#define SG_LIB_CAT_MEDIUM_HARD 3 /* medium or hardware error, blank check
+                                  *       [sk,asc,ascq: 0x3/0x4/0x8,*,*] */
+#define SG_LIB_CAT_ILLEGAL_REQ 5 /* Illegal request (other than invalid
+                                  * opcode):   [sk,asc,ascq: 0x5,*,*] */
+#define SG_LIB_CAT_UNIT_ATTENTION 6 /* sense key, device state changed
+                                     *       [sk,asc,ascq: 0x6,*,*] */
         /* was SG_LIB_CAT_MEDIA_CHANGED earlier [sk,asc,ascq: 0x6,0x28,*] */
-#define SG_LIB_CAT_DATA_PROTECT 7 /* sense key, media write protected? */
-                                /*       [sk,asc,ascq: 0x7,*,*] */
-#define SG_LIB_CAT_INVALID_OP 9 /* (Illegal request,) Invalid opcode: */
-                                /*       [sk,asc,ascq: 0x5,0x20,0x0] */
-#define SG_LIB_CAT_COPY_ABORTED 10 /* sense key, some data transferred */
-                                /*       [sk,asc,ascq: 0xa,*,*] */
-#define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer */
-                                /*       [sk,asc,ascq: 0xb,! 0x10,*] */
-#define SG_LIB_CAT_MISCOMPARE 14 /* sense key, probably verify */
-                                /*       [sk,asc,ascq: 0xe,*,*] */
+#define SG_LIB_CAT_DATA_PROTECT 7 /* sense key, media write protected?
+                                   *       [sk,asc,ascq: 0x7,*,*] */
+#define SG_LIB_CAT_INVALID_OP 9 /* (Illegal request,) Invalid opcode:
+                                 *       [sk,asc,ascq: 0x5,0x20,0x0] */
+#define SG_LIB_CAT_COPY_ABORTED 10 /* sense key, some data transferred
+                                    *       [sk,asc,ascq: 0xa,*,*] */
+#define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer
+                                       *       [sk,asc,ascq: 0xb,! 0x10,*] */
+#define SG_LIB_CAT_MISCOMPARE 14 /* sense key, probably verify
+                                  *       [sk,asc,ascq: 0xe,*,*] */
 #define SG_LIB_FILE_ERROR 15    /* device or other file problem */
-#define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense" */
-                                /*       [sk,asc,ascq: 0x0,*,*] */
-#define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err */
-                                /*       [sk,asc,ascq: 0x1,*,*] */
-#define SG_LIB_LBA_OUT_OF_RANGE 22 /* Illegal request, LBA Out Of Range */
-                                   /*    [sk,asc,ascq: 0x5,0x21,0x0] */
+#define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense"
+                                 *       [sk,asc,ascq: 0x0,*,*] */
+#define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err
+                                 *       [sk,asc,ascq: 0x1,*,*] */
+#define SG_LIB_LBA_OUT_OF_RANGE 22 /* Illegal request, LBA Out Of Range
+                                    *    [sk,asc,ascq: 0x5,0x21,0x0] */
 #define SG_LIB_CAT_RES_CONFLICT SAM_STAT_RESERVATION_CONFLICT
-                                /* 24: this is a SCSI status, not sense. */
-                                /* It indicates reservation by another */
-                                /* machine blocks this command */
-#define SG_LIB_CAT_CONDITION_MET 25 /* SCSI status, not sense key. */
-                                    /* Only from PRE-FETCH (SBC-4) */
+                                /* 24: this is a SCSI status, not sense.
+                                 * It indicates reservation by another
+                                 * machine blocks this command */
+#define SG_LIB_CAT_CONDITION_MET 25 /* SCSI status, not sense key.
+                                     * Only from PRE-FETCH (SBC-4) */
 #define SG_LIB_CAT_BUSY       26 /* SCSI status, not sense. Invites retry */
 #define SG_LIB_CAT_TS_FULL    27 /* SCSI status, not sense. Wait then retry */
 #define SG_LIB_CAT_ACA_ACTIVE 28 /* SCSI status; ACA seldom used */
 #define SG_LIB_CAT_TASK_ABORTED 29 /* SCSI status, this command aborted by? */
 #define SG_LIB_CONTRADICT 31    /* error involving two or more cl options */
 #define SG_LIB_LOGIC_ERROR 32   /* unexpected situation in code */
-#define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF) */
-                                /*       [sk,asc,ascq: 0xb,0x10,*] */
-/* 47: flock error in ddpt */
+#define SG_LIB_OK_FALSE 36      /* no error, reporting false (cf. no error,
+                                 * reporting true is SG_LIB_OK_TRUE(0) ) */
+#define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF)
+                                  *       [sk,asc,ascq: 0xb,0x10,*] */
+/* 47: flock error used in ddpt utility */
 #define SG_LIB_NVME_STATUS 48   /* NVMe Status Field (SF) other than 0 */
-#define SG_LIB_WILD_RESID 49    /* Residual value for data-in transfer of a */
-                                /* SCSI command is nonsensical */
-#define SG_LIB_OS_BASE_ERR 50   /* in Linux: values found in: */
-                                /* include/uapi/asm-generic/errno-base.h */
-                                /* Example: ENOMEM reported as 62 (=50+12) */
-                                /* if errno > 46 then use this value */
+#define SG_LIB_WILD_RESID 49    /* Residual value for data-in transfer of a
+                                 * SCSI command is nonsensical */
+#define SG_LIB_OS_BASE_ERR 50   /* in Linux: values found in:
+                                 * include/uapi/asm-generic/errno-base.h
+                                 * Example: ENOMEM reported as 62 (=50+12)
+                                 * if errno > 46 then use this value */
 /* 51-->96 set aside for Unix errno values shifted by SG_LIB_OS_BASE_ERR */
 #define SG_LIB_CAT_MALFORMED 97 /* Response to SCSI command malformed */
 #define SG_LIB_CAT_SENSE 98     /* Something else is in the sense buffer */
-#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred */
-                                /* (e.g. a transport or driver error) */
-/* 100 to 120 (inclusive) used by ddpt */
+#define SG_LIB_CAT_OTHER 99     /* Some other error/warning has occurred
+                                 * (e.g. a transport or driver error) */
+/* 100 to 120 (inclusive) used by ddpt utility */
 #define SG_LIB_UNUSED_ABOVE 120  /* Put extra errors in holes below this */
 
 /* Returns a SG_LIB_CAT_* value. If cannot decode sense_buffer or a less
