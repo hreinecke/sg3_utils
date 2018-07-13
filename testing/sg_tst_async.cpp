@@ -66,7 +66,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.13 20180629";
+static const char * version_str = "1.14 20180712";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -503,7 +503,7 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
     int vb = op->verbose;
     int num_errs = 0;
     int thr_sync_starts = 0;
-    struct sg_pt_base * pbp = NULL;
+    struct sg_pt_base * ptp = NULL;
     uint8_t cdb[6];
     uint8_t sense_b[32];
     char b[120];
@@ -518,9 +518,9 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
         goto err_out;
     }
 
-    pbp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
+    ptp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
     err = 0;
-    if ((NULL == pbp) || ((err = get_scsi_pt_os_err(pbp)))) {
+    if ((NULL == ptp) || ((err = get_scsi_pt_os_err(ptp)))) {
         ret = sg_convert_errno(err ? err : ENOMEM);
         sg_exit2str(ret, true, sizeof(b), b);
         pr2serr_lk("id=%d: construct_scsi_pt_obj_with_fd: %s\n", id, b);
@@ -529,15 +529,15 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
     for (k = 0; k < op->num_per_thread; ++k) {
         /* Might get Unit Attention on first invocation */
         memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
-        set_scsi_pt_cdb(pbp, cdb, sizeof(cdb));
-        set_scsi_pt_sense(pbp, sense_b, sizeof(sense_b));
+        set_scsi_pt_cdb(ptp, cdb, sizeof(cdb));
+        set_scsi_pt_sense(ptp, sense_b, sizeof(sense_b));
         ++thr_sync_starts;
-        rs = do_scsi_pt(pbp, -1, DEF_PT_TIMEOUT, vb);
-        n = sg_cmds_process_resp(pbp, "Test unit ready", rs,
+        rs = do_scsi_pt(ptp, -1, DEF_PT_TIMEOUT, vb);
+        n = sg_cmds_process_resp(ptp, "Test unit ready", rs,
                                  SG_NO_DATA_IN, sense_b,
                                  (0 == k), vb, &sense_cat);
         if (-1 == n) {
-            ret = sg_convert_errno(get_scsi_pt_os_err(pbp));
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptp));
             sg_exit2str(ret, true, sizeof(b), b);
             pr2serr_lk("id=%d: do_scsi_pt: %s\n", id, b);
             goto err_out;
@@ -567,11 +567,11 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
                 break;
             }
         }
-        clear_scsi_pt_obj(pbp);
+        clear_scsi_pt_obj(ptp);
     }
 err_out:
-    if (pbp)
-        destruct_scsi_pt_obj(pbp);
+    if (ptp)
+        destruct_scsi_pt_obj(ptp);
     if (num_errs > 0)
         pr2serr_lk("id=%d: number of errors: %d\n", id, num_errs);
     sync_starts += thr_sync_starts;

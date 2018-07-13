@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180708] [svn: r781]
+Changelog for sg3_utils-1.43 [20180712] [svn: r782]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -88,6 +88,7 @@ Changelog for sg3_utils-1.43 [20180708] [svn: r781]
   - sg_turs+sg_requests: make both accept '--num=NUM'
     and '--number=NUM' for mutual compatibility
   - sg_turs: add --low option
+    - fix exit status when not ready in single case
   - sg_zone: fix debug cdb naming
     - add --sequentialize, --count=ZC options, zbc2r01b
   - sg_reset_wp add --count=ZC option, zbc2r01b
@@ -150,6 +151,7 @@ Changelog for sg3_utils-1.43 [20180708] [svn: r781]
     - add sg_ll_get_lba_status32()
     - add sg_ll_format_unit_v2()
     - add sg_ll_test_unit_ready_progress_pt()
+    - add sg_ll_start_stop_unit_pt()
     - add sg_ll_request_sense_pt()
     - add sg_ll_send_diag_pt(), sg_ll_receive_diag_pt()
     - add sg_get_sfs_name() for spc5r11 (Feature sets)

@@ -41,7 +41,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.43 20180628";
+static const char * version_str = "3.44 20180712";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -343,6 +343,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                 case SG_LIB_CAT_NOT_READY:
                     ++resp->num_errs;
                     if (1 ==  op->do_number) {
+                        resp->ret = sense_cat;
                         printf("device not ready\n");
                         resp->reported = true;
                     }
@@ -544,6 +545,8 @@ main(int argc, char * argv[])
             (! resp->reported))
             printf("Completed %d Test Unit Ready commands with %d errors\n",
                    op->do_number, resp->num_errs);
+        if (1 == op->do_number)
+            ret = resp->ret;
     }
 fini:
     if (ptvp)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Douglas Gilbert.
+ * Copyright (c) 2013-2018 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.02 20140828";
+static const char * version_str = "1.03 20180712";
 static const char * util_name = "sg_tst_context";
 
 /* This is a test program for checking that file handles keep their
@@ -90,13 +90,14 @@ static mutex console_mutex;
 static unsigned int even_notreadys;
 static unsigned int odd_notreadys;
 static unsigned int ebusy_count;
+static int verbose;
 
 
 static void
 usage(void)
 {
     printf("Usage: %s [-e] [-h] [-n <n_per_thr>] [-N] [-R] [-s]\n"
-           "                      [-t <num_thrs>] [-V] <disk_device>\n",
+           "                      [-t <num_thrs>] [-v] [-V] <disk_device>\n",
            util_name);
     printf("  where\n");
     printf("    -e                use O_EXCL on open (def: don't)\n");
@@ -112,6 +113,7 @@ usage(void)
            "per thread)\n");
     printf("    -t <num_thrs>     number of threads (def: %d)\n",
            DEF_NUM_THREADS);
+    printf("    -v                increase verbosity\n");
     printf("    -V                print version number then exit\n\n");
     printf("Test if file handles keep context through to their responses. "
            "Sends\nTEST UNIT READY commands on even threads (origin 0) and "
@@ -179,17 +181,16 @@ pt_cat_no_good(int cat, struct sg_pt_base * ptp, const unsigned char * sbp)
 /* Returns 0 for good, 1024 for a sense key of NOT_READY, or a negative
  * errno */
 static int
-do_tur(int pt_fd, int id)
+do_tur(struct sg_pt_base * ptp, int id)
 {
     int slen, res, cat;
-    struct sg_pt_base * ptp = NULL;
     unsigned char turCmdBlk [TUR_CMD_LEN] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     unsigned char sense_buffer[64];
 
-    ptp = construct_scsi_pt_obj();
+    clear_scsi_pt_obj(ptp);
     set_scsi_pt_cdb(ptp, turCmdBlk, sizeof(turCmdBlk));
     set_scsi_pt_sense(ptp, sense_buffer, sizeof(sense_buffer));
-    res = do_scsi_pt(ptp, pt_fd, 20 /* secs timeout */, 1);
+    res = do_scsi_pt(ptp, -1, 20 /* secs timeout */, verbose);
     if (res) {
         {
             lock_guard<mutex> lg(console_mutex);
@@ -219,27 +220,24 @@ do_tur(int pt_fd, int id)
     }
     res = 0;
 err:
-    if (ptp)
-        destruct_scsi_pt_obj(ptp);
     return res;
 }
 
 /* Returns 0 for good, 1024 for a sense key of NOT_READY, or a negative
  * errno */
 static int
-do_ssu(int pt_fd, int id, bool start)
+do_ssu(struct sg_pt_base * ptp, int id, bool start)
 {
     int slen, res, cat;
-    struct sg_pt_base * ptp = NULL;
     unsigned char ssuCmdBlk [SSU_CMD_LEN] = {0x1b, 0x0, 0x0, 0x0, 0x0, 0x0};
     unsigned char sense_buffer[64];
 
     if (start)
         ssuCmdBlk[4] |= 0x1;
-    ptp = construct_scsi_pt_obj();
+    clear_scsi_pt_obj(ptp);
     set_scsi_pt_cdb(ptp, ssuCmdBlk, sizeof(ssuCmdBlk));
     set_scsi_pt_sense(ptp, sense_buffer, sizeof(sense_buffer));
-    res = do_scsi_pt(ptp, pt_fd, 40 /* secs timeout */, 1);
+    res = do_scsi_pt(ptp, -1, 40 /* secs timeout */, verbose);
     if (res) {
         {
             lock_guard<mutex> lg(console_mutex);
@@ -269,8 +267,6 @@ do_ssu(int pt_fd, int id, bool start)
     }
     res = 0;
 err:
-    if (ptp)
-        destruct_scsi_pt_obj(ptp);
     return res;
 }
 
@@ -278,12 +274,13 @@ static void
 work_thread(const char * dev_name, int id, int num, bool share,
             int pt_fd, int nonblock, int oexcl, bool ready_after)
 {
+    bool started = true;
+    int k;
+    int res = 0;
     unsigned int thr_even_notreadys = 0;
     unsigned int thr_odd_notreadys = 0;
     unsigned int thr_ebusy_count = 0;
-    int k;
-    int res = 0;
-    bool started = true;
+    struct sg_pt_base * ptp = NULL;
     char ebuff[EBUFF_SZ];
 
     {
@@ -292,14 +289,14 @@ work_thread(const char * dev_name, int id, int num, bool share,
         cerr << "Enter work_thread id=" << id << " num=" << num << " share="
              << share << endl;
     }
-    if (! share) {
-        int open_flags = O_RDWR;
+    if (! share) {      /* ignore passed ptp, make this thread's own */
+        int oflags = O_RDWR;
 
         if (nonblock)
-            open_flags |= O_NONBLOCK;
+            oflags |= O_NONBLOCK;
         if (oexcl)
-            open_flags |= O_EXCL;
-        while (((pt_fd = scsi_pt_open_flags(dev_name, open_flags, 0)) < 0)
+            oflags |= O_EXCL;
+        while (((pt_fd = scsi_pt_open_flags(dev_name, oflags, verbose)) < 0)
                && (-EBUSY == pt_fd)) {
             ++thr_ebusy_count;
             this_thread::yield();       // give other threads a chance
@@ -316,16 +313,27 @@ work_thread(const char * dev_name, int id, int num, bool share,
             ebusy_count += thr_ebusy_count;
         }
     }
+    /* The instance of 'struct sg_pt_base' is local to this thread but the
+     * pt_fd it contains may be shared, depending on the 'share' boolean. */
+    ptp = construct_scsi_pt_obj_with_fd(pt_fd, verbose);
+    if (NULL == ptp) {
+        fprintf(stderr, "work_thread id=%d: "
+                "construct_scsi_pt_obj_with_fd() failed, memory?\n", id);
+        return;
+    }
     for (k = 0; k < num; ++k) {
         if (0 == (id % 2)) {
-            res = do_tur(pt_fd, id);
+            /* Even thread ids do TEST UNIT READYs */
+            res = do_tur(ptp, id);
             if (1024 == res) {
                 ++thr_even_notreadys;
                 res = 0;
             }
         } else {
+            /* Odd thread ids do START STOP UNITs, alternating between
+             * starts and stops */
             started = (0 == (k % 2));
-            res = do_ssu(pt_fd, id, started);
+            res = do_ssu(ptp, id, started);
             if (1024 == res) {
                 ++thr_odd_notreadys;
                 res = 0;
@@ -334,10 +342,12 @@ work_thread(const char * dev_name, int id, int num, bool share,
         if (res)
             break;
         if (ready_after && (! started))
-            do_ssu(pt_fd, id, true);
+            do_ssu(ptp, id, true);
     }
-    if (! share)
-        scsi_pt_close_device(pt_fd);
+    if (ptp)
+        destruct_scsi_pt_obj(ptp);
+    if ((! share) && (pt_fd >= 0))
+        close(pt_fd);
 
     {
         lock_guard<mutex> lg(count_mutex);
@@ -351,7 +361,8 @@ work_thread(const char * dev_name, int id, int num, bool share,
 
         if (k < num)
             cerr << "thread id=" << id << " FAILed at iteration: " << k
-                 << "  [negated errno: " << res << "]\n";
+                 << "  [negated errno: " << res << " <"
+                 <<  safe_strerror(-res) << ">]" << endl;
         else
             cerr << "thread id=" << id << " normal exit" << '\n';
     }
@@ -380,9 +391,14 @@ main(int argc, char * argv[])
             return 0;
         } else if (0 == memcmp("-n", argv[k], 2)) {
             ++k;
-            if ((k < argc) && isdigit(*argv[k]))
-                num_per_thread = atoi(argv[k]);
-            else
+            if ((k < argc) && isdigit(*argv[k])) {
+                num_per_thread = sg_get_num(argv[k]);
+                if (num_per_thread<= 0) {
+                    fprintf(stderr, "want positive integer for number "
+                            "per thread\n");
+                    return 1;
+                }
+            } else
                 break;
         } else if (0 == memcmp("-N", argv[k], 2))
             ++nonblock;
@@ -396,7 +412,9 @@ main(int argc, char * argv[])
                 num_threads = atoi(argv[k]);
             else
                 break;
-        } else if (0 == memcmp("-V", argv[k], 2)) {
+        } else if (0 == memcmp("-v", argv[k], 2))
+            ++verbose;
+        else if (0 == memcmp("-V", argv[k], 2)) {
             printf("%s version: %s\n", util_name, version_str);
             return 0;
         } else if (*argv[k] == '-') {
@@ -418,14 +436,14 @@ main(int argc, char * argv[])
     }
     try {
         if (share) {
-            int open_flags = O_RDWR;
+            int oflags = O_RDWR;
 
             if (nonblock)
-                open_flags |= O_NONBLOCK;
+                oflags |= O_NONBLOCK;
             if (oexcl)
-                open_flags |= O_EXCL;
-            while (((pt_fd = scsi_pt_open_flags(dev_name, open_flags, 0)) < 0)
-                   && (-EBUSY == pt_fd)) {
+                oflags |= O_EXCL;
+            while (((pt_fd = scsi_pt_open_flags(dev_name, oflags, verbose))
+                    < 0) && (-EBUSY == pt_fd)) {
                 ++ebusy_count;
                 sleep(0);                   // process yield ??
             }
@@ -435,14 +453,17 @@ main(int argc, char * argv[])
                 perror(ebuff);
                 return 1;
             }
+            /* Tried calling construct_scsi_pt_obj_with_fd() here but that
+             * doesn't work since 'struct sg_pt_base' objects aren't
+             * thread-safe without user space intervention (e.g. mutexes). */
         }
 
         vector<thread *> vt;
 
         for (k = 0; k < num_threads; ++k) {
-            thread * tp = new thread {work_thread, dev_name, k, num_per_thread,
-                                      share, pt_fd, nonblock, oexcl,
-                                      ready_after};
+            thread * tp = new thread {work_thread, dev_name, k,
+                                      num_per_thread, share, pt_fd, nonblock,
+                                      oexcl, ready_after};
             vt.push_back(tp);
         }
 
@@ -475,5 +496,7 @@ main(int argc, char * argv[])
     catch(...) {
         cerr << "got another exception: " << '\n';
     }
+    if (pt_fd >= 0)
+        close(pt_fd);
     return 0;
 }

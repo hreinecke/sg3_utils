@@ -19,7 +19,10 @@ extern "C" {
  * structure "derived" (using a C++ term) from this one. It compiles
  * because 'struct sg_pt_base' is only referenced (by pointer: 'objp')
  * in this interface. An instance of this structure represents the
- * context of one SCSI command. */
+ * context of one SCSI command.
+ * If an instance of sg_pt_base is shared across several threads then
+ * it is up to the application to take care of multi-threaded issues
+ * with that instance. */
 struct sg_pt_base;
 
 
