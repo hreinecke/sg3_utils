@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -924,6 +925,23 @@ sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
     return ret;
 }
 
+int
+sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
+                      int power_cond, bool noflush__fl, bool loej, bool start,
+                      bool noisy, int verbose)
+{
+    int ret;
+    struct sg_pt_base * ptvp;
+
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+    if (NULL == ptvp)
+        return sg_convert_errno(ENOMEM);
+    ret = sg_ll_start_stop_unit_pt(ptvp, immed, pc_mod__fl_num, power_cond,
+                                   noflush__fl, loej, start, noisy, verbose);
+    destruct_scsi_pt_obj(ptvp);
+    return ret;
+}
+
 /* Invokes a SCSI START STOP UNIT command (SBC + MMC).
  * Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors.
@@ -933,13 +951,12 @@ sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
  * pc_mod__fl_num and noflush__fl arguments to this function.
  *  */
 int
-sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
-                      int power_cond, bool noflush__fl, bool loej, bool start,
-                      bool noisy, int verbose)
+sg_ll_start_stop_unit_pt(struct sg_pt_base * ptvp, bool immed,
+                         int pc_mod__fl_num, int power_cond, bool noflush__fl,
+                         bool loej, bool start, bool noisy, int verbose)
 {
     static const char * const cdb_name_s = "start stop unit";
     int k, res, ret, sense_cat;
-    struct sg_pt_base * ptvp;
     uint8_t ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
 
@@ -960,11 +977,10 @@ sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
         pr2ws("\n");
     }
 
-    if (NULL == ((ptvp = create_pt_obj(cdb_name_s))))
-        return -1;
+    clear_scsi_pt_obj(ptvp);
     set_scsi_pt_cdb(ptvp, ssuBlk, sizeof(ssuBlk));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    res = do_scsi_pt(ptvp, sg_fd, START_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, -1, START_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, cdb_name_s, res, SG_NO_DATA_IN, sense_b,
                                noisy, verbose, &sense_cat);
     if (-1 == ret)
@@ -981,7 +997,6 @@ sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
         }
     } else
             ret = 0;
-    destruct_scsi_pt_obj(ptvp);
     return ret;
 }
 

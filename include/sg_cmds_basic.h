@@ -199,6 +199,12 @@ int sg_ll_start_stop_unit(int sg_fd, bool immed, int pc_mod__fl_num,
                           int power_cond, bool noflush__fl, bool loej,
                           bool start, bool noisy, int verbose);
 
+/* Similar to sg_ll_start_stop_unit(). See note above about "_pt" suffix. */
+int sg_ll_start_stop_unit_pt(struct sg_pt_base * ptp, bool immed,
+                             int pc_mod__fl_num, int power_cond,
+                             bool noflush__fl, bool loej, bool start,
+                             bool noisy, int verbose);
+
 /* Invokes a SCSI SYNCHRONIZE CACHE (10) command. Return of 0 -> success,
  * SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_ABORTED_COMMAND,
  * SG_LIB_CAT_INVALID_OP -> cdb not supported,
