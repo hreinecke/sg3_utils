@@ -28,9 +28,9 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.18 20180626";
+static const char * version_str = "1.19 20180714";
 
-#define MAX_SENSE_LEN 1024 /* max descriptor format actually: 256+8 */
+#define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
 
 static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
@@ -428,7 +428,6 @@ write2wfn(FILE * fp, struct opts_t * op)
 int
 main(int argc, char *argv[])
 {
-    bool ok;
     int k, err;
     int ret = 0;
     unsigned int ui;
@@ -476,8 +475,7 @@ main(int argc, char *argv[])
         char d[128];
         const int dlen = sizeof(d);
 
-        ok = sg_exit2str(op->es_val, op->verbose > 1, dlen, d);
-        if (! ok)
+        if (! sg_exit2str(op->es_val, op->verbose > 1, dlen, d))
             snprintf(d, dlen, "Unable to decode exit status %d", op->es_val);
         if (1 & op->verbose) /* odd values of verbose print to stderr */
             pr2serr("%s\n", d);

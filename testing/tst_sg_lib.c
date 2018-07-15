@@ -19,7 +19,7 @@
 
 #include <time.h>
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && ! defined(SG_LIB_FREEBSD)
 #include <byteswap.h>
 #endif
 
@@ -42,7 +42,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.11 20180706";
+static const char * version_str = "1.11 20180715";
 
 
 #define MAX_LINE_LEN 1024
@@ -160,26 +160,27 @@ usage()
             "[--printf]\n"
             "                  [--sense] [--unaligned] [--verbose] "
             "[--version]\n"
-#ifdef __GNUC__
-            "  where: --byteswap=B|-b B    B is 16, 32 or 64; tests "
-            "NUM byteswaps\n"
-            "                              compared to sg_unaligned "
+            "  where:\n"
+#if defined(__GNUC__) && ! defined(SG_LIB_FREEBSD)
+            "    --byteswap=B|-b B    B is 16, 32 or 64; tests NUM "
+            "byteswaps\n"
+            "                         compared to sg_unaligned "
             "equivalent\n"
-            "         --exit|-e          test exit status strings\n"
+            "    --exit|-e          test exit status strings\n"
 #else
-            "  where: --exit|-e          test exit status strings\n"
+            "    --exit|-e          test exit status strings\n"
 #endif
-            "         --help|-h          print out usage message\n"
-            "         --hex2|-H          test hex2* variants\n"
-            "         --leadin=STR|-l STR    every line output by --sense "
+            "    --help|-h          print out usage message\n"
+            "    --hex2|-H          test hex2* variants\n"
+            "    --leadin=STR|-l STR    every line output by --sense "
             "should\n"
-            "                                be prefixed by STR\n"
-            "         --num=NUM|-n NUM    number of iterations (def=1)\n"
-            "         --printf|-p        test library printf variants\n"
-            "         --sense|-s         test sense data handling\n"
-            "         --unaligned|-u     test unaligned data handling\n"
-            "         --verbose|-v       increase verbosity\n"
-            "         --version|-V       print version string and exit\n\n"
+            "                           be prefixed by STR\n"
+            "    --num=NUM|-n NUM    number of iterations (def=1)\n"
+            "    --printf|-p        test library printf variants\n"
+            "    --sense|-s         test sense data handling\n"
+            "    --unaligned|-u     test unaligned data handling\n"
+            "    --verbose|-v       increase verbosity\n"
+            "    --version|-V       print version string and exit\n\n"
             "Test various parts of sg_lib, see options. Sense data tests "
             "overlap\nsomewhat with examples/sg_sense_test .\n"
            );
@@ -297,6 +298,8 @@ main(int argc, char * argv[])
     }
 
     if (do_exit_status) {
+        ++did_something;
+
         printf("Test Exit Status strings (add -v for long version):\n");
         printf("  No error (es=0): %s\n",
                sg_get_category_sense_str(0, b_len, b, vb));
@@ -315,6 +318,7 @@ main(int argc, char * argv[])
         printf("%s\n", get_exit_status_str(8, (vb > 0), b_len, b));
         printf("%s\n", get_exit_status_str(25, (vb > 0), b_len, b));
         printf("%s\n", get_exit_status_str(33, (vb > 0), b_len, b));
+        printf("%s\n", get_exit_status_str(36, (vb > 0), b_len, b));
         printf("%s\n", get_exit_status_str(48, (vb > 0), b_len, b));
         printf("%s\n", get_exit_status_str(50, (vb > 0), b_len, b));
         printf("%s\n", get_exit_status_str(51, (vb > 0), b_len, b));
@@ -551,7 +555,7 @@ main(int argc, char * argv[])
         printf("  u64r[v=8 bytes]=0x%" PRIx64 "\n\n", u64r);
     }
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && ! defined(SG_LIB_FREEBSD)
     if (byteswap_sz > 0) {
         uint32_t elapsed_msecs;
         uint16_t count16 = 0;
