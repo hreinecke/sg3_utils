@@ -8,10 +8,10 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 # the default C compiler is clang. Swap the comment marks (lines starting
 # with '#') on the next 4 (non-blank) lines.
 # CC = gcc
-CC = clang
+# CC = clang
 
 # LD = gcc
-LD = clang
+# LD = clang
 
 EXECS = sg_sense_test sg_chk_asc sg_tst_nvme tst_sg_lib
 	
@@ -54,17 +54,17 @@ clean:
 	/bin/rm -f *.o $(EXECS) $(EXTRAS) core .depend
 
 sg_sense_test: sg_sense_test.o $(D_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
+	$(CC) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
 # building sg_chk_asc depends on a prior successful make in ../lib
 sg_chk_asc: sg_chk_asc.o $(D_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
+	$(CC) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
 sg_tst_nvme: sg_tst_nvme.o $(D_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
+	$(CC) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
 tst_sg_lib: tst_sg_lib.o $(D_FILES)
-	$(LD) -o $@ $(LDFLAGS) $@.o $(D_FILES)
+	$(CC) -o $@ $(LDFLAGS) $@.o $(D_FILES)
 
 install: $(EXECS)
 	install -d $(INSTDIR)

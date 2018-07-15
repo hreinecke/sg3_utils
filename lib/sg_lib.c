@@ -1910,9 +1910,9 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char *b)
     b[0] = '\0';
     if (exit_status < 0)
         return false;
-    else if ((0 == exit_status) || (SG_LIB_OK_FALSE)) {
+    else if ((0 == exit_status) || (SG_LIB_OK_FALSE == exit_status)) {
         if (longer)
-            snprintf(b, b_len, "%s", ess->name);
+            goto fini;
         return true;
     }
 
@@ -1926,6 +1926,7 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char *b)
                  exit_status - 128);
         return true;
     }
+fini:
     for ( ; ess->name; ++ess) {
         if (exit_status == ess->value)
             break;
@@ -1946,7 +1947,7 @@ sg_if_can2fp(const char * leadin, int exit_status, FILE * fp)
     char b[256];
     const char * s = leadin ? leadin : "";
 
-    if ((0 == exit_status) || (SG_LIB_OK_FALSE))
+    if ((0 == exit_status) || (SG_LIB_OK_FALSE == exit_status))
         return true;    /* don't print anything */
     else if (sg_exit2str(exit_status, false, sizeof(b), b)) {
         fprintf(fp, "%s%s\n", s, b);

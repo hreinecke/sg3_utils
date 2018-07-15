@@ -4,8 +4,8 @@ PREFIX=/usr/local
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
-CC = gcc
-LD = gcc
+CC = clang
+LD = clang
 
 EXECS = hxascdmp
 
