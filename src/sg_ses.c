@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.40 20180628";    /* ses4r02 */
+static const char * version_str = "2.41 20180716";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -45,9 +45,11 @@ static const char * version_str = "2.40 20180628";    /* ses4r02 */
 #define MIN_DATA_IN_SZ 8192     /* use max(MIN_DATA_IN_SZ, op->maxlen) for
                                  * the size of data_arr */
 #define MX_DATA_IN_LINES (16 * 1024)
-#define MX_JOIN_ROWS 260        /* element index fields in dpages are only 8
+#define MX_JOIN_ROWS 520        /* element index fields in dpages are only 8
                                  * bit, and index 0xff (255) is sometimes used
-                                 * for 'not applicable' */
+                                 * for 'not applicable'. However this limit
+                                 * can bypassed with sub-enclosure numbers.
+                                 * So try higher figure. */
 #define MX_DATA_IN_DESCS 32
 #define NUM_ACTIVE_ET_AESP_ARR 32
 
@@ -207,7 +209,7 @@ struct type_desc_hdr_t {
  * page. Note that the array of these struct instances is built such that
  * the array index is equal to the 'ei_ioe' (element index that includes
  * overall elements). */
-struct join_row_t {
+struct join_row_t {  /* this struct is 72 bytes long on Intel "64" bit arch */
     int th_i;           /* type header index (origin 0) */
     int indiv_i;        /* individual (element) index, -1 for overall
                          * instance, otherwise origin 0 */
