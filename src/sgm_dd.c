@@ -66,7 +66,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.58 20180705";
+static const char * version_str = "1.59 20180724";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -752,7 +752,7 @@ main(int argc, char * argv[])
 
     for (k = 1; k < argc; k++) {
         if (argv[k])
-            strncpy(str, argv[k], STR_SZ);
+            snprintf(str, STR_SZ, "%s", argv[k]);
         else
             continue;
         for (key = str, buf = key; *buf && *buf != '=';)
@@ -807,7 +807,7 @@ main(int argc, char * argv[])
                 pr2serr("Second 'if=' argument??\n");
                 return SG_LIB_CONTRADICT;
             } else
-                strncpy(inf, buf, INOUTF_SZ);
+                snprintf(inf, INOUTF_SZ, "%s", buf);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &in_flags)) {
                 pr2serr(ME "bad argument to 'iflag'\n");
@@ -818,7 +818,7 @@ main(int argc, char * argv[])
                 pr2serr("Second 'of=' argument??\n");
                 return SG_LIB_CONTRADICT;
             } else
-                strncpy(outf, buf, INOUTF_SZ);
+                snprintf(outf, INOUTF_SZ, "%s", buf);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &out_flags)) {
                 pr2serr(ME "bad argument to 'oflag'\n");

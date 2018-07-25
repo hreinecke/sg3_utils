@@ -60,7 +60,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.67 20180627";
+static const char * version_str = "5.68 20180724";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1253,7 +1253,7 @@ main(int argc, char * argv[])
                 pr2serr("Second 'if=' argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else
-                strncpy(inf, buf, INOUTF_SZ);
+                snprintf(inf, INOUTF_SZ, "%s", buf);
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &rcoll.in_flags)) {
                 pr2serr("%sbad argument to 'iflag='\n", my_name);
@@ -1270,7 +1270,7 @@ main(int argc, char * argv[])
                 pr2serr("Second 'of=' argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else
-                strncpy(outf, buf, INOUTF_SZ);
+                snprintf(outf, INOUTF_SZ, "%s", buf);
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &rcoll.out_flags)) {
                 pr2serr("%sbad argument to 'oflag='\n", my_name);

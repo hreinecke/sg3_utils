@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.25 20180628";
+static const char * version_str = "1.26 20180723";
 
 
 #define ME "sg_write_same: "
@@ -357,7 +357,8 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'i':
-            strncpy(op->ifilename, optarg, sizeof(op->ifilename));
+            strncpy(op->ifilename, optarg, sizeof(op->ifilename) - 1);
+            op->ifilename[sizeof(op->ifilename) - 1] = '\0';
             if_given = true;
             break;
         case 'l':
