@@ -45,7 +45,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.15 20171019";
+static const char * version_str = "1.16 20180724";
 
 #define ME "sg_map26: "
 
@@ -60,8 +60,8 @@ static const char * version_str = "1.15 20171019";
 #define NT_REG 8
 #define NT_DIR 9
 
-#define NAME_LEN_MAX 260
-#define D_NAME_LEN_MAX 516
+#define NAME_LEN_MAX 256
+#define D_NAME_LEN_MAX 520
 
 #ifndef SCSI_CHANGER_MAJOR
 #define SCSI_CHANGER_MAJOR 86
@@ -344,9 +344,8 @@ nd_match_scandir_select(const struct dirent * s)
         }
         if ((! symlnk) && (-1 == nd_match.majj) && (-1 == nd_match.minn))
                 return 1;
-        strncpy(name, nd_match.dir_name, NAME_LEN_MAX);
-        strcat(name, "/");
-        strncat(name, s->d_name, NAME_LEN_MAX);
+        snprintf(name, sizeof(name), "%.*s/%.*s", NAME_LEN_MAX,
+                 nd_match.dir_name, NAME_LEN_MAX, s->d_name);
         memset(&st, 0, sizeof(st));
         if (stat(name, &st) < 0)
                 return 0;
@@ -374,7 +373,7 @@ list_matching_nodes(const char * dir_name, int file_type, int majj, int minn,
         struct dirent ** namelist;
         int num, k;
 
-        strncpy(nd_match.dir_name, dir_name, D_NAME_LEN_MAX);
+        strncpy(nd_match.dir_name, dir_name, D_NAME_LEN_MAX - 1);
         nd_match.file_type = file_type;
         nd_match.majj = majj;
         nd_match.minn = minn;
@@ -1066,7 +1065,7 @@ main(int argc, char * argv[])
 
                 switch (c) {
                 case 'd':
-                        strncpy(device_dir, optarg, sizeof(device_dir));
+                        strncpy(device_dir, optarg, sizeof(device_dir) - 1);
                         do_dev_dir = true;
                         break;
                 case 'g':

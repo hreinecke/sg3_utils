@@ -53,7 +53,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.32 20180523";
+static const char * version_str = "1.33 20180724";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -487,7 +487,7 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"fua"))
             fua = !! sg_get_num(buf);
         else if (strcmp(key,"if") == 0)
-            strncpy(inf, buf, INF_SZ);
+            strncpy(inf, buf, INF_SZ - 1);
         else if (0 == strcmp(key,"mmap"))
             do_mmap = !! sg_get_num(buf);
         else if (0 == strcmp(key,"no_dxfer"))
@@ -495,7 +495,7 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"odir"))
             do_odir = !! sg_get_num(buf);
         else if (strcmp(key,"of") == 0)
-            strncpy(outf, buf, INF_SZ);
+            strncpy(outf, buf, INF_SZ - 1);
         else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1 == skip) {

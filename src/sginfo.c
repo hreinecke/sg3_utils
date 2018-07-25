@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.40 [20180219]";
+static const char * version_str = "2.41 [20180724]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3390,7 +3390,7 @@ static Sg_map sg_map_arr[MAX_SG_DEVS + 1];
 static void
 show_devices(int raw)
 {
-    int k, j, fd, err, bus;
+    int k, j, fd, err, bus, n;
     My_scsi_idlun m_idlun;
     char name[MDEV_NAME_SZ];
     char dev_name[MDEV_NAME_SZ + 6];
@@ -3462,8 +3462,12 @@ show_devices(int raw)
         sg_map_arr[j].channel = (m_idlun.mux4 >> 16) & 0xff;
         sg_map_arr[j].lun = (m_idlun.mux4 >> 8) & 0xff;
         sg_map_arr[j].target_id = m_idlun.mux4 & 0xff;
-        tmpptr=(char *)malloc(strlen(dev_name)+1);
-        strncpy(tmpptr,dev_name,strlen(dev_name)+1);
+        n = strlen(dev_name);
+        /* memory leak ... no free()s for this malloc() */
+        tmpptr = (char *)malloc(n + 1);
+        snprintf(tmpptr, n + 1, "%.*s", n, dev_name);
+        /* strncpy(tmpptr,dev_name,strlen(dev_name)+1); */
+
         sg_map_arr[j].dev_name = tmpptr;
 #if 0
         printf("[scsi%d ch=%d id=%d lun=%d %s] ", sg_map_arr[j].bus,

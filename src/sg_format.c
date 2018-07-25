@@ -38,7 +38,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.51 20180626";
+static const char * version_str = "1.52 20180723";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -821,7 +821,7 @@ main(int argc, char **argv)
 {
         bool prob = false;
         int fd, res, calc_len, bd_len, dev_specific_param;
-        int offset, j, n, bd_blk_len, len, pdt, rsp_len;
+        int offset, j, bd_blk_len, pdt, rsp_len, vb;
         int resid = 0;
         int ret = 0;
         uint64_t ull;
@@ -1033,6 +1033,7 @@ main(int argc, char **argv)
                 pr2serr("sg_format version: %s\n", version_str);
                 return 0;
         }
+        vb = op->verbose;
         if (NULL == op->device_name) {
                 pr2serr("no DEVICE name given\n\n");
                 usage();
@@ -1080,7 +1081,7 @@ main(int argc, char **argv)
         }
 
         if ((fd = sg_cmds_open_device(op->device_name, false /* rw=false */,
-                                      op->verbose)) < 0) {
+                                      vb)) < 0) {
                 pr2serr("error opening device file: %s: %s\n",
                         op->device_name, safe_strerror(-fd));
                 return sg_convert_errno(-fd);
@@ -1116,13 +1117,13 @@ again_with_long_lba:
         if (op->mode6)
                 res = sg_ll_mode_sense6(fd, false /* DBD */, 0 /* current */,
                                         op->mode_page, 0 /* subpage */, dbuff,
-                                        MAX_BUFF_SZ, true, op->verbose);
+                                        MAX_BUFF_SZ, true, vb);
         else
                 res = sg_ll_mode_sense10_v2(fd, op->long_lba, false /* DBD */,
                                             0 /* current */, op->mode_page,
                                             0 /* subpage */, dbuff,
                                             MAX_BUFF_SZ, 0, &resid, true,
-                                            op->verbose);
+                                            vb);
         ret = res;
         if (res) {
                 if (SG_LIB_CAT_ILLEGAL_REQ == res) {
@@ -1135,12 +1136,11 @@ again_with_long_lba:
                                         "[mode_page %d not supported?]\n",
                                         (op->mode6 ? 6 : 10), op->mode_page);
                 } else {
-                        sg_get_category_sense_str(res, sizeof(b), b,
-                                                  op->verbose);
+                        sg_get_category_sense_str(res, sizeof(b), b, vb);
                         pr2serr("MODE SENSE (%d) command: %s\n",
                                 (op->mode6 ? 6 : 10), b);
                 }
-                if (0 == op->verbose)
+                if (0 == vb)
                         pr2serr("    try '-v' for more information\n");
                 goto out;
         }
@@ -1198,7 +1198,7 @@ again_with_long_lba:
                 ull = op->long_lba ? sg_get_unaligned_be64(dbuff + offset) :
                                  sg_get_unaligned_be32(dbuff + offset);
                 if ((! op->long_lba) && (0xffffffff == ull)) {
-                        if (op->verbose)
+                        if (vb)
                                 pr2serr("Mode sense number of blocks maxed "
                                         "out, set longlba\n");
                         op->long_lba = true;
@@ -1229,39 +1229,6 @@ again_with_long_lba:
               ((op->blk_size > 0) && (op->blk_size != bd_blk_len))))) {
                 /* want to run MODE SELECT */
 
-/* Working Draft SCSI Primary Commands - 3 (SPC-3)    pg 255
-**
-** If the SCSI device doesn't support changing its capacity by changing
-** the NUMBER OF BLOCKS field using the MODE SELECT command, the value
-** in the NUMBER OF BLOCKS field is ignored. If the device supports changing
-** its capacity by changing the NUMBER OF BLOCKS field, then the
-** NUMBER OF BLOCKS field is interpreted as follows:
-**      a) If the number of blocks is set to zero, the device shall retain
-**         its current capacity if the block size has not changed. If the
-**         number of blocks is set to zero and the block size has changed,
-**         the device shall be set to its maximum capacity when the new
-**         block size takes effect;
-**
-**      b) If the number of blocks is greater than zero and less than or
-**         equal to its maximum capacity, the device shall be set to that
-**         number of blocks. If the block size has not changed, the device
-**         shall not become format corrupted. This capacity setting shall be
-**         retained through power cycles, hard resets, logical unit resets,
-**         and I_T nexus losses;
-**
-**      c) If the number of blocks field is set to a value greater than the
-**         maximum capacity of the device and less than FFFF FFFFh, then the
-**         command is terminated with a CHECK CONDITION status. The sense key
-**         is set to ILLEGAL REQUEST. The device shall retain its previous
-**         block descriptor settings; or
-**
-**      d) If the number of blocks is set to FFFF FFFFh, the device shall be
-**         set to its maximum capacity. If the block size has not changed,
-**         the device shall not become format corrupted. This capacity setting
-**         shall be retained through power cycles, hard resets, logical unit
-**         resets, and I_T nexus losses.
-*/
-
                 if (prob) {
                         pr2serr("Need to perform MODE SELECT (to change "
                                 "number or blocks or block length)\n");
@@ -1270,19 +1237,18 @@ again_with_long_lba:
                         ret = SG_LIB_CAT_MALFORMED;
                         goto out;
                 }
-                if (op->blk_count != 0)  {
-                        len = (op->long_lba ? 8 : 4);
-                        for (j = 0; j < len; ++j) {
-                                n = (len - j - 1) * 8;
-                                dbuff[offset + j] =
-                                            (op->blk_count >> n) & 0xff;
-                        }
+                if (op->blk_count != 0)  { /* user supplied blk count */
+                        if (op->long_lba)
+                                sg_put_unaligned_be64(op->blk_count,
+                                                      dbuff + offset);
+                        else
+                                sg_put_unaligned_be32(op->blk_count,
+                                                      dbuff + offset);
                 } else if ((op->blk_size > 0) &&
-                           (op->blk_size != bd_blk_len)) {
-                        len = (op->long_lba ? 8 : 4);
-                        for (j = 0; j < len; ++j)
-                                dbuff[offset + j] = 0;
-                }
+                           (op->blk_size != bd_blk_len))
+                        /* 0 implies max capacity with new LB size */
+                        memset(dbuff + offset, 0, op->long_lba ? 8 : 4);
+
                 if ((op->blk_size > 0) && (op->blk_size != bd_blk_len)) {
                         if (op->long_lba)
                                 sg_put_unaligned_be32((uint32_t)op->blk_size,
@@ -1291,23 +1257,34 @@ again_with_long_lba:
                                 sg_put_unaligned_be24((uint32_t)op->blk_size,
                                                       dbuff + offset + 5);
                 }
-                if (op->dry_run)
+                if (op->dry_run) {
                         pr2serr("Due to --dry-run option bypass MODE "
                                 "SELECT(%d)command\n", (op->mode6 ? 6 : 10));
-                else if (op->mode6)
-                        res = sg_ll_mode_select6(fd, true /* PF */,
-                                                 true /* SP */, dbuff,
-                                                 calc_len, true, op->verbose);
-                else
-                        res = sg_ll_mode_select10(fd, true /* PF */,
-                                                  true /* SP */, dbuff,
-                                                  calc_len, true, op->verbose);
+                        res = 0;
+                } else {
+                        bool sp = true;   /* may not be able to save pages */
+
+again_sp_false:
+                        if (op->mode6)
+                                res = sg_ll_mode_select6(fd, true /* PF */,
+                                                         sp, dbuff, calc_len,
+                                                         true, vb);
+                        else
+                                res = sg_ll_mode_select10(fd, true /* PF */,
+                                                          sp, dbuff, calc_len,
+                                                          true, vb);
+                        if ((SG_LIB_CAT_ILLEGAL_REQ == res) && sp) {
+                                pr2serr("Try MODE SELECT again with SP=0 "
+                                        "this time\n");
+                                sp = false;
+                                goto again_sp_false;
+                        }
+                }
                 ret = res;
                 if (res) {
-                        sg_get_category_sense_str(res, sizeof(b), b,
-                                                  op->verbose);
+                        sg_get_category_sense_str(res, sizeof(b), b, vb);
                         pr2serr("MODE SELECT command: %s\n", b);
-                        if (0 == op->verbose)
+                        if (0 == vb)
                                 pr2serr("    try '-v' for more information\n");
                         goto out;
                 }
@@ -1364,7 +1341,7 @@ skip_f_unit_reconsider:
                 ret = res;
                 if (res) {
                         pr2serr("FORMAT UNIT failed\n");
-                        if (0 == op->verbose)
+                        if (0 == vb)
                                 pr2serr("    try '-v' for more "
                                         "information\n");
                 }
@@ -1399,7 +1376,7 @@ skip_f_med_reconsider:
         ret = res;
         if (res) {
                 pr2serr("FORMAT MEDIUM failed\n");
-                if (0 == op->verbose)
+                if (0 == vb)
                         pr2serr("    try '-v' for more "
                                 "information\n");
         }
@@ -1411,7 +1388,7 @@ out:
                 if (0 == ret)
                         ret = sg_convert_errno(-res);
         }
-        if (0 == op->verbose) {
+        if (0 == vb) {
                 if (! sg_if_can2stderr("sg_format failed: ", ret))
                         pr2serr("Some error occurred, try again with '-v' "
                                 "or '-vv' for more information\n");
