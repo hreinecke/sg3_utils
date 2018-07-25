@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "July 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
@@ -133,20 +133,22 @@ utilities (e.g. sg_turs(8) or sg_requests(8)). This option and \fI\-\-wait\fR
 are mutually exclusive.
 .TP
 \fB\-t\fR, \fB\-\-ffmt\fR=\fIFFMT\fR
-\fIFFMT\fR is placed in a field of the same name in the FORMAT UNIT cdb.
-The field was introduced in SBC\-4 revision 10. The default value is 0 which
-implies the former action which is typically to overwrite to all blocks on the
-\fIDEVICE\fR. That can take a long time (e.g. with hard disks over 10 TB in
-size).
+\fIFFMT\fR (fast format) is placed in a field of the same name in the FORMAT
+UNIT cdb. The field was introduced in SBC\-4 revision 10. The default value
+is 0 which implies the former action which is typically to overwrite to all
+blocks on the \fIDEVICE\fR. That can take a long time (e.g. with hard disks
+over 10 TB in size).
 .br
 \fIFFMT\fR has values 1 and 2 for fast format with 3 being reserved
-currently. The difference between 1 and 2 concerns read operations on LBAs to
-which no data has been written to, after the fast format. When \fIFFMT\fR
-is 1 the read operation should return "unspecified logical block data" and
-complete without error. When \fIFFMT\fR is 2 the read operation may
-yield check condition status with a sense key set to hardware error, medium
-error or command aborted. See SBC\-4 revision 10 section 4.35 for more
-details.
+currently. These two values include this description: "The device server
+initializes the medium ... without overwriting the medium (i.e. resources
+for managing medium access are initialized and the medium is not written)".
+The difference between 1 and 2 concerns read operations on LBAs to which no
+data has been written to, after the fast format. When \fIFFMT\fR is 1 the
+read operation should return "unspecified logical block data" and complete
+without error. When \fIFFMT\fR is 2 the read operation may yield check
+condition status with a sense key set to hardware error, medium error or
+command aborted. See SBC\-4 revision 10 section 4.35 for more details.
 .TP
 \fB\-f\fR, \fB\-\-fmtpinfo\fR=\fIFPI\fR
 sets the FMTPINFO field in the FORMAT UNIT cdb to a value between 0 and 3.
@@ -201,6 +203,12 @@ parameters (e.g. when '\-\-pie=PIE' is greater than zero).
 \fIMP\fR is a mode page number (0 to 62 inclusive) that will be used for
 reading and perhaps changing the device logical block size. The default
 is 1 which is the Read\-Write Error Recovery mode page.
+.br
+Preferably the chosen (or default) mode page should be saveable (i.e.
+accept the SP bit set in the MODE SELECT command used when the logical
+block size is being changed). Recent version of this utility will retry a
+MODE SELECT if the SP=1 variant fails with a sense key of ILLEGAL REQUEST.
+The retry that same MODE SELECT command with SP=0 .
 .TP
 \fB\-P\fR, \fB\-\-pfu\fR=\fIPFU\fR
 sets the "Protection Field Usage" field in the parameter block associated
@@ -285,7 +293,7 @@ format; 1 to partition a volume and 2 to do a default format then partition.
 where \fISECS\fR is the FORMAT UNIT or FORMAT MEDIUM command timeout in
 seconds. \fISECS\fR will only be used if it exceeds the internal timeout
 which is 20 seconds if the IMMED bit is set and 72000 seconds (20 hours)
-or higher if the IMMED bit is not set. If the didk unit exceeds 4 TB then
+or higher if the IMMED bit is not set. If the disk size exceeds 4 TB then
 the timeout value is increased to 144000 seconds (40 hours). And if it is
 greater than 8 TB then the timeout value is increased to 288000 seconds (80
 hours). If the timeout is exceeded then the operating system will typically

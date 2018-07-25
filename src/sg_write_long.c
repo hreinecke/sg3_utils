@@ -35,7 +35,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20180628";
+static const char * version_str = "1.21 20180723";
 
 
 #define MAX_XFER_LEN (15 * 1024)
@@ -139,7 +139,8 @@ main(int argc, char * argv[])
             usage();
             return 0;
         case 'i':
-            strncpy(file_name, optarg, sizeof(file_name));
+            strncpy(file_name, optarg, sizeof(file_name) - 1);
+            file_name[sizeof(file_name) - 1] = '\0';
             break;
         case 'l':
             ll = sg_get_llnum(optarg);

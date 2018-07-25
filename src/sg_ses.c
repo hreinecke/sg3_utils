@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.41 20180716";    /* ses4r02 */
+static const char * version_str = "2.42 20180724";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -984,6 +984,7 @@ parse_index(struct opts_t *op)
     const char * cc3p;
     const struct element_type_t * etp;
     char b[64];
+    const int blen = sizeof(b);
 
     op->ind_given = true;
     n2 = 0;
@@ -1011,20 +1012,19 @@ parse_index(struct opts_t *op)
         if (n2 > 0)
             op->ind_indiv_last = n2;
         n = cp - op->index_str;
-        if (n >= (int)sizeof(b)) {
+        if (n >= (blen - 1)) {
             pr2serr("bad argument to '--index', string prior to comma too "
                     "long\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     } else {    /* no comma found in index_str */
         n = strlen(op->index_str);
-        if (n >= (int)sizeof(b)) {
+        if (n >= (blen - 1)) {
             pr2serr("bad argument to '--index', string too long\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    strncpy(b, op->index_str, n);
-    b[n] = '\0';
+    snprintf(b, blen, "%.*s", n, op->index_str);
     if (0 == strcmp("-1", b)) {
         if (cp) {
             pr2serr("bad argument to '--index', unexpected '-1' type header "
