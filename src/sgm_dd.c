@@ -52,9 +52,11 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/sysmacros.h>
-#include <sys/types.h>  /* needed for lseek64() */
-#include <linux/major.h>
-#include <linux/fs.h>   /* <sys/mount.h> */
+#ifndef major
+#include <sys/types.h>
+#endif
+#include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
+#include <linux/fs.h>           /* for BLKSSZGET and friends */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -66,7 +68,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.59 20180724";
+static const char * version_str = "1.60 20180811";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

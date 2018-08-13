@@ -55,7 +55,6 @@
 #include <sys/types.h>
 #endif
 #include <linux/major.h>
-#include <linux/fs.h>   /* <sys/mount.h> */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -68,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.67 20180705";
+static const char * version_str = "0.68 20180811";
 
 #define ME "sg_xcopy: "
 

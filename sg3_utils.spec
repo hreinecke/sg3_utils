@@ -8,7 +8,7 @@ Group: Utilities/System
 Source: ftp://sg.danny.cz/sg/p/sg3_utils-%{version}.tgz
 Url: http://sg.danny.cz/sg/sg3_utils.html
 Provides: sg_utils
-BuildRequires: libtool
+# BuildRequires: libtool
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Packager: Douglas Gilbert <dgilbert@interlog.com>
 
@@ -49,6 +49,10 @@ developing applications.
 %build
 %configure
 
+# Don't use rpath!
+sed -i 's|^hardcode_libdir_flag_spec=.*|hardcode_libdir_flag_spec=""|g' libtool
+sed -i 's|^runpath_var=LD_RUN_PATH|runpath_var=DIE_RPATH_DIE|g' libtool
+
 %install
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
         rm -rf $RPM_BUILD_ROOT
@@ -80,7 +84,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Mon Jul 16 2018 - dgilbert at interlog dot com
+* Wed Aug 08 2018 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.43
 

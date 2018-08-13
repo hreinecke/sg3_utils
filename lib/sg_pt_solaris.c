@@ -5,7 +5,7 @@
  * license that can be found in the BSD_LICENSE file.
  */
 
-/* sg_pt_solaris version 1.09 20180202 */
+/* sg_pt_solaris version 1.10 20180808 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,7 +98,7 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
     ptp = (struct sg_pt_solaris_scsi *)
           calloc(1, sizeof(struct sg_pt_solaris_scsi));
     if (ptp) {
-        ptp->dev_fd = (dev_fd < 0) ? -1 : devfd;
+        ptp->dev_fd = (dev_fd < 0) ? -1 : dev_fd;
         ptp->is_nvme = false;
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
         ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
@@ -112,16 +112,7 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
 struct sg_pt_base *
 construct_scsi_pt_obj()
 {
-    struct sg_pt_solaris_scsi * ptp;
-
-    ptp = (struct sg_pt_solaris_scsi *)
-          calloc(1, sizeof(struct sg_pt_solaris_scsi));
-    if (ptp) {
-        ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
-        ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
-        ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
-    }
-    return (struct sg_pt_base *)ptp;
+    return construct_scsi_pt_obj_with_fd(-1, 0);
 }
 
 void
@@ -320,6 +311,14 @@ get_scsi_pt_result_category(const struct sg_pt_base * vp)
         return SCSI_PT_RESULT_STATUS;
     else
         return SCSI_PT_RESULT_GOOD;
+}
+
+uint32_t
+get_pt_result(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+
+    return (uint32_t)ptp->uscsi.uscsi_status;
 }
 
 int

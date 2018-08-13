@@ -49,7 +49,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.96 20180626";    /* SPC-5 rev 19 */
+static const char * version_str = "1.97 20180801";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1525,9 +1525,9 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
          * Reference the 3rd byte of the first Identification descriptor
          * of a page 83 reply to determine whether the reply is compliant
          * with SCSI-2 or SPC-2/3 specifications.  A zero value in the
-         * 3rd byte indicates an SPC-2/3 conformant reply ( the field is
+         * 3rd byte indicates an SPC-2/3 conforming reply ( the field is
          * reserved ).  This byte will be non-zero for a SCSI-2
-         * conformant page 83 reply from these EMC Symmetrix models since
+         * conforming page 83 reply from these EMC Symmetrix models since
          * the 7th byte of the reply corresponds to the 4th and 5th
          * nibbles of the 6-byte OUI for EMC, that is, 0x006048.
          */
@@ -1911,7 +1911,7 @@ export_dev_ids(uint8_t * buff, int len, int verbose)
                 break;
             if ((2 == c_set) || (3 == c_set)) { /* ASCII or UTF-8 */
                 k = encode_whitespaces(ip, i_len);
-                /* udev-conformant character encoding */
+                /* udev-conforming character encoding */
                 if (k > 0) {
                     printf("SCSI_IDENT_%s_VENDOR=", assoc_str);
                     for (m = 0; m < k; ++m) {
@@ -1936,7 +1936,7 @@ export_dev_ids(uint8_t * buff, int len, int verbose)
             printf("SCSI_IDENT_%s_T10=", assoc_str);
             if ((2 == c_set) || (3 == c_set)) {
                 k = encode_whitespaces(ip, i_len);
-                /* udev-conformant character encoding */
+                /* udev-conforming character encoding */
                 for (m = 0; m < k; ++m) {
                     if ((ip[m] >= '0' && ip[m] <= '9') ||
                         (ip[m] >= 'A' && ip[m] <= 'Z') ||
@@ -3584,7 +3584,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
                 k = encode_whitespaces((uint8_t *)obuff, len);
                 if (k > 0) {
                     printf("SCSI_IDENT_SERIAL=");
-                    /* udev-conformant character encoding */
+                    /* udev-conforming character encoding */
                     for (m = 0; m < k; ++m) {
                         if ((obuff[m] >= '0' && obuff[m] <= '9') ||
                             (obuff[m] >= 'A' && obuff[m] <= 'Z') ||

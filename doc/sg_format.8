@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "July 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
@@ -9,7 +9,7 @@ sg_format \- format, resize a SCSI disk or format a tape
 [\fI\-\-ip\-def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR]
 [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR] [\fI\-\-quick\fR]
 [\fI\-\-resize\fR] [\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
-[\fI\-\-size=SIZE\fR] [\fI\-\-tape=FM\fR] [\fI\-\-timeout=SECS\fR]
+[\fI\-\-size=LB_SZ\fR] [\fI\-\-tape=FM\fR] [\fI\-\-timeout=SECS\fR]
 [\fI\-\-verbose\fR] [\fI\-\-verify\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
@@ -32,7 +32,8 @@ stroking" (see NOTES section). Resizing the block count while not changing
 the block size may not require a format operation. The SBC\-2 standard (see
 www.t10.org) has obsoleted the "format device" mode page. Many of the low
 level details found in that mode page are now left up to the discretion of
-the manufacturer.
+the manufacturer. There is a Format Status log page which reports on the
+previous successful format operation(s).
 .PP
 When this utility is used without options (i.e. it is only given a
 \fIDEVICE\fR argument) it prints out the existing block size and block count
@@ -44,19 +45,21 @@ the NOTES section). This usage will not modify the disk.
 When this utility is used with the "\-\-format" (or "\-F") option it will
 attempt to format the given DEVICE. In the absence of the \fI\-\-quick\fR
 option there is a 15 second pause during which time the user is invited
-thrice (5 seconds apart) to abort sg_format. This occurs just prior the
-SCSI FORMAT UNIT command being issued. See the NOTES section for more
-information.
+thrice (5 seconds apart) to abort sg_format. This occurs just prior the SCSI
+FORMAT UNIT command being issued. See the NOTES section for more information.
 .PP
-Protection information is optional and is made up of one or more protection
-intervals, each made up of 8 bytes associated with each logical block. Four
-protection types are defined with protection type 0 being no protection
-intervals. See the PROTECTION INFORMATION section below for more information.
+Protection information (PI) is optional and is made up of one or more
+protection intervals, each made up of 8 bytes associated with a logical
+block. When PI is active each logical block will have 1, 2, 4, 8, etc
+protection intervals (i.e. a power of two), interleaved with (and following)
+the user data to which they refer. Four protection types are defined with
+protection type 0 being no protection intervals. See the PROTECTION
+INFORMATION section below for more information.
 .PP
 When the \fI\-\-tape=FM\fR option is given then the SCSI FORMAT MEDIUM
-command is sent to the \fIDEVICE\fR. FORMAT MEDIUM is defined in SSC
-document and prepares a volume for use which may include partitioning the
-medium. See the section below on TAPE for more information.
+command is sent to the \fIDEVICE\fR. FORMAT MEDIUM is defined in the SSC
+documents at T10 and prepares a volume for use. That may include
+partitioning the medium. See the section below on TAPE for more information.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -135,9 +138,10 @@ are mutually exclusive.
 \fB\-t\fR, \fB\-\-ffmt\fR=\fIFFMT\fR
 \fIFFMT\fR (fast format) is placed in a field of the same name in the FORMAT
 UNIT cdb. The field was introduced in SBC\-4 revision 10. The default value
-is 0 which implies the former action which is typically to overwrite to all
+is 0 which implies the former action which is typically to overwrite all
 blocks on the \fIDEVICE\fR. That can take a long time (e.g. with hard disks
-over 10 TB in size).
+over 10 TB in size that can be days). With \fIFFMT\fR set that time may be
+reduced to minutes. So it is worth trying if it is available.
 .br
 \fIFFMT\fR has values 1 and 2 for fast format with 3 being reserved
 currently. These two values include this description: "The device server
@@ -148,14 +152,14 @@ data has been written to, after the fast format. When \fIFFMT\fR is 1 the
 read operation should return "unspecified logical block data" and complete
 without error. When \fIFFMT\fR is 2 the read operation may yield check
 condition status with a sense key set to hardware error, medium error or
-command aborted. See SBC\-4 revision 10 section 4.35 for more details.
+command aborted. See SBC\-4 revision 15 section 4.35 for more details.
 .TP
 \fB\-f\fR, \fB\-\-fmtpinfo\fR=\fIFPI\fR
 sets the FMTPINFO field in the FORMAT UNIT cdb to a value between 0 and 3.
 The default value is 0. The FMTPINFO field from SBC\-3 revision 16 is a 2
-bit field (bits 7 and 6 of byte 1 in the cdb). Prior to that it was a single
-bit field (bit 7 of byte 1 in the cdb) and there was an accompanying bit
-called RTO_REQ (bit 6 of byte 1 in the cdb). The deprecated
+bit field (bits 7 and 6 of byte 1 in the cdb). Prior to that revision it was
+a single bit field (bit 7 of byte 1 in the cdb) and there was an accompanying
+bit called RTO_REQ (bit 6 of byte 1 in the cdb). The deprecated
 options "\-\-pinfo" and "\-\-rto\-req" represent the older usage. This
 option should be used in their place. See the PROTECTION INFORMATION section
 below for more information.
@@ -208,7 +212,7 @@ Preferably the chosen (or default) mode page should be saveable (i.e.
 accept the SP bit set in the MODE SELECT command used when the logical
 block size is being changed). Recent version of this utility will retry a
 MODE SELECT if the SP=1 variant fails with a sense key of ILLEGAL REQUEST.
-The retry that same MODE SELECT command with SP=0 .
+That retry will use the same MODE SELECT command but with SP=0 .
 .TP
 \fB\-P\fR, \fB\-\-pfu\fR=\fIPFU\fR
 sets the "Protection Field Usage" field in the parameter block associated
@@ -251,7 +255,7 @@ This option should be used with the \fI\-\-count=COUNT\fR option.
 The contents of all logical blocks on the media remain unchanged when
 this option is used. This means that any resize operation can be
 reversed. This option cannot be used together with either \fI\-\-format\fR
-or a \fI\-\-size=SIZE\fR whose argument is different to the existing block
+or a \fI\-\-size=LB_SZ\fR whose argument is different to the existing block
 size.
 .TP
 \fB\-R\fR, \fB\-\-rto_req\fR
@@ -271,17 +275,21 @@ Use 6 byte variants of MODE SENSE and MODE SELECT. The default action
 is to use the 10 byte variants. Some MO drives need this option set
 when doing a format.
 .TP
-\fB\-s\fR, \fB\-\-size\fR=\fISIZE\fR
-where \fISIZE\fR is the block size (i.e. number of bytes in each block) to
-format the device to. The default value is whatever is currently reported
-by the block descriptor in a MODE SENSE command. If the block size given by
-this option is different from the current value then a MODE SELECT command
-is used to change it prior to the FORMAT UNIT command being started (as
-recommended in the draft standard). Many SCSI disks have 512 byte sectors
-by default and allow up to 16 bytes extra in a sector (i.e. 528 byte
-sectors).  If the given size in unacceptable with the disk, most likely
-an "Invalid field in parameter list" message will appear in sense
-data (requires the use of '\-v' to decode sense data).
+\fB\-s\fR, \fB\-\-size\fR=\fILB_SZ\fR
+where \fILB_SZ\fR is the logical block size (i.e. number of user bytes in each
+block) to format the device to. The default value is whatever is currently
+reported by the block descriptor in a MODE SENSE command. If the block size
+given by this option is different from the current value then a MODE SELECT
+command is used to change it prior to the FORMAT UNIT command being
+started (as recommended in the SBC standards). Some SCSI disks have 512 byte
+logical blocks by default and allow an alternate logical block size of 4096
+bytes. If the given size in unacceptable to the disk, most likely an "Invalid
+field in parameter list" message will appear in sense data (requires the
+use of '\-v' to decode sense data).
+.br
+Note that formatting a disk to add or remove protection information is not
+regarded as a change to its logical block size so this option should not
+be used.
 .TP
 \fB\-T\fR, \fB\-\-tape\fR=\fIFM\fR
 will send a FORMAT MEDIUM command to the \fIDEVICE\fR with its FORMAT field
@@ -322,8 +330,8 @@ FORMAT UNIT or FORMAT MEDIUM command waits until the format operation
 completes before returning its response. This can be many hours on large
 disks. See the \fI\-\-timeout=SECS\fR option.
 .SH LISTS
-The SBC\-3 draft (revision 36) defines PLIST, CLIST, DLIST and GLIST in
-section 4.13 on "Medium defects". Briefly, the PLIST is the "primary"
+The SBC\-3 draft (revision 20) defines PLIST, CLIST, DLIST and GLIST in
+section 4.10 on "Medium defects". Briefly, the PLIST is the "primary"
 list of manufacturer detected defects, the CLIST ("certification" list)
 contains those detected during the format operation, the DLIST is a list of
 defects that can be given to the format operation. The GLIST is the grown
@@ -331,6 +339,10 @@ list which starts in the format process as CLIST+DLIST and can "grow" later
 due to automatic reallocation (see the ARRE and AWRE bits in the
 Read\-Write Error Recovery mode page (see sdparm(8))) and use of the
 SCSI REASSIGN BLOCKS command (see sg_reassign(8)).
+.PP
+By the SBC\-3 standard (following draft revision 36) the CLIST and DLIST
+had been removed, leaving PLIST and GLIST. Only PLIST and GLIST are found
+in the SBC\-4 drafts.
 .PP
 The CMPLST bit (controlled by the \fI\-\-cmplst=\fR0|1 option) determines
 whether the existing GLIST, when the format operation is invoked,
@@ -344,7 +356,8 @@ list (i.e. DLIST).
 Protection Information (PI) is additional information held with logical
 blocks so that an application and/or host bus adapter can check the
 correctness of those logical blocks. PI is placed in one or more
-protection intervals beside each logical block. A protection interval
+protection intervals interleaved in each logical block. Each protection
+interval follows the user data to which it refers. A protection interval
 contains 8 bytes made up of a 2 byte "logical block guard" (CRC), a 2
 byte "logical block application guard", and a 4 byte "logical block
 reference tag". Devices with 512 byte logical block size typically have
@@ -354,13 +367,13 @@ intervals spread across its logical block data for a total size of 4160
 bytes. Note that for all other purposes the logical block size is considered
 to be 512 and 4096 bytes respectively.
 .PP
-SBC\-3 drafts have added several "protection types" to the PI introduced in
-the SBC\-2 standard. SBC\-3 defines 4 protection types (types 0 to 3) with
-protection type 0 meaning no PI is maintained. While a device may support
-one or more protection types, it can only be formatted with 1 of the 4. To
-change a device's protection type, it must be re\-formatted. For more
-information see the Protection Information in section 4.22 of draft SBC\-3
-revision 36.
+The SBC\-3 standard have added several "protection types" to the PI
+introduced in the SBC\-2 standard. SBC\-3 defines 4 protection types (types
+0 to 3) with protection type 0 meaning no PI is maintained. While a device
+may support one or more protection types, it can only be formatted with 1
+of the 4. To change a device's protection type, it must be re\-formatted.
+For more information see the Protection Information in section 4.22 of
+draft SBC\-4 revision 15.
 .PP
 A device that supports PI information (i.e. supports one or more protection
 types 1, 2 and 3) sets the "PROTECT" bit in its standard INQUIRY response. It
@@ -432,10 +445,10 @@ a device while it is being formatted.
 When the block size (i.e. the number of bytes in each block) is changed
 on a disk two SCSI commands must be sent: a MODE SELECT to change the block
 size followed by a FORMAT command. If the MODE SELECT command succeeds and
-the FORMAT fails then the disk may be in a state that the draft standard
+the FORMAT fails then the disk may be in a state that the standard
 calls "format corrupt". A block descriptor in a subsequent MODE SENSE
 will report the requested new block size while a READ CAPACITY command
-will report the existing (i.e. different) block size. Alternatively
+will report the existing (i.e. previous) block size. Alternatively
 the READ CAPACITY command may fail, reporting the device is not ready,
 potentially requiring a format. The solution to this situation is to
 do a format again (and this time the new block size does not have to
@@ -451,8 +464,11 @@ the manufacturer's maximum recommended value. To see exactly which SCSI
 commands are being executed and parameters passed add the "\-vvv" option to
 the sg_format command line.
 .PP
-Short stroking is a technique to trade off capacity for performance. Rotating
-disk performance is usually highest on the outer tracks (i.e. lower logical
+Short stroking is a technique to trade off capacity for performance on
+hard disks. "Hard" disk is often used to mean a storage device with
+spinning platters which contain the user data. Solid State Disk (SSD) is
+the newer form of storage device that contains no moving parts. Hard disk
+performance is usually highest on the outer tracks (usually the lower logical
 block addresses) so by resizing or reformatting a disk to a smaller capacity,
 average performance will usually be increased.
 .PP

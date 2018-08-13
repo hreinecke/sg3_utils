@@ -1,4 +1,4 @@
-.TH SG_DD "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_DD "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -6,13 +6,13 @@ devices
 .B sg_dd
 [\fIbs=BS\fR] [\fIconv=CONV\fR] [\fIcount=COUNT\fR] [\fIibs=BS\fR]
 [\fIif=IFILE\fR] [\fIiflag=FLAGS\fR] [\fIobs=BS\fR] [\fIof=OFILE\fR]
-[\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-dry\-run\fR]
-[\fI\-\-help\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR]
 .PP
 [\fIblk_sgio=\fR{0|1}] [\fIbpt=BPT\fR] [\fIcdbsz=\fR{6|10|12|16}]
 [\fIcoe=\fR{0|1|2|3}] [\fIcoe_limit=CL\fR] [\fIdio=\fR{0|1}]
 [\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR{0|1}]
-[\fItime=\fR{0|1}] [\fIverbose=VERB\fR] [\fI\-V\fR]
+[\fItime=\fR{0|1}] [\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR] [\fI\-V\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -52,20 +52,20 @@ is directly to the underlying device). Default is 0. See the 'sgio' flag.
 .TP
 \fBbpt\fR=\fIBPT\fR
 each IO transaction will be made using \fIBPT\fR blocks (or less if near
-the end of the copy). Default is 128 for block sizes less that 2048
+the end of the copy). Default is 128 for logical block sizes less that 2048
 bytes, otherwise the default is 32. So for bs=512 the reads and writes
 will each convey 64 KiB of data by default (less if near the end of the
 transfer or memory restrictions). When cd/dvd drives are accessed, the
-block size is typically 2048 bytes and bpt defaults to 32 which again
-implies 64 KiB transfers. The block layer when the blk_sgio=1 option
+logical block size is typically 2048 bytes and bpt defaults to 32 which
+again implies 64 KiB transfers. The block layer when the blk_sgio=1 option
 is used has relatively low upper limits for transfer sizes (compared
 to sg device nodes, see /sys/block/<dev_name>/queue/max_sectors_kb ).
 .TP
 \fBbs\fR=\fIBS\fR
 where \fIBS\fR
 .B must
-be the block size of the physical device (if either the input or output
-files are accessed via SCSI commands). Note that this differs from
+be the logical block size of the physical device (if either the input or
+output files are accessed via SCSI commands). Note that this differs from
 .B dd(1)
 which permits \fIBS\fR to be an integral multiple. Default is 512 which
 is usually correct for disks but incorrect for cdroms (which normally

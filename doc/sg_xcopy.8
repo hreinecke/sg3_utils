@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_XCOPY "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -50,21 +50,21 @@ ODX is a market name and stands for Offloaded Data Xfer (i.e. transfer).
 .TP
 \fBbpt\fR=\fIBPT\fR
 each IO transaction will be made using \fIBPT\fR blocks (or less if near
-the end of the copy). Default is 128 for block sizes less that 2048
+the end of the copy). Default is 128 for logical block sizes less that 2048
 bytes, otherwise the default is 32. So for bs=512 the reads and writes
 will each convey 64 KiB of data by default (less if near the end of the
 transfer or memory restrictions). When cd/dvd drives are accessed, the
-block size is typically 2048 bytes and bpt defaults to 32 which again
+logical block size is typically 2048 bytes and bpt defaults to 32 which again
 implies 64 KiB transfers.
 .TP
 \fBbs\fR=\fIBS\fR
 where \fIBS\fR
 .B must
-be the block size of the physical device (if either the input or output
-files are accessed via SCSI commands). Note that this differs from
+be the logical block size of the physical device (if either the input or
+output files are accessed via SCSI commands). Note that this differs from
 .B dd(1)
 which permits \fIBS\fR to be an integral multiple. Defaults to the
-device block size.
+device logical block size.
 .TP
 \fBcat\fR={0|1}
 sets the SCSI EXTENDED COPY command segment descriptor CAT bit to 0 or
@@ -223,9 +223,9 @@ has no affect; for compatibility with ddpt.
 .SH HANDLING OF RESIDUAL DATA
 The \fIpad\fR and \fIcat\fR bits control the handling of residual
 data. As the data can be specified either in terms of source or target
-block size and both might have different block sizes residual data is
-likely to happen in these cases.
-If both block sizes are identical these bits have no effect as
+logical block size and both might have different block sizes residual data
+is likely to happen in these cases.
+If both logical block sizes are identical these bits have no effect as
 residual data will not occur.
 .PP
 If none of these bits are set, the EXTENDED COPY command will be
@@ -343,7 +343,7 @@ Written by Hannes Reinecke and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2017 Hannes Reinecke and Douglas Gilbert
+Copyright \(co 2000\-2018 Hannes Reinecke and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

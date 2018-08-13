@@ -1,4 +1,4 @@
-.TH SG_GET_LBA_STATUS "8" "September 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_get_lba_status \- send SCSI GET LBA STATUS(16 or 32) command
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ sg_get_lba_status \- send SCSI GET LBA STATUS(16 or 32) command
 .\" Add any additional description here
 .PP
 Send the SCSI GET LBA STATUS(16) or GET LBA STATUS(32) command to the
-\fIDEVICE\fR and outputs the response. The 16 byte command variant was
+\fIDEVICE\fR and output the response. The 16 byte command variant was
 introduced in (draft) SBC\-3 revision 20 and devices that support logical
 block provisioning should support this command. The GET LBA STATUS(32)
 command was added in (draft) SBC\-4 revision 14.
@@ -55,6 +55,9 @@ where \fIEI\fR is the element identifier of the physical element for which
 the LBAs shall be reported based on the value in the report type field (i.e.
 \fIRT\fR). This option is only active with the SCSI GET LBA STATUS(32)
 command (i.e. it is ignored if the GET LBA STATUS(16) command is sent).
+.br
+Valid element identifiers are non\-zero. The default value of \fIEI\fR is 0
+which means in the context that no element identifier is specified.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -83,9 +86,13 @@ The default is to open it read\-write.
 \fB\-t\fR, \fB\-\-report\-type\fR=\fIRT\fR
 where \fIRT\fR is 0 for report all LBAs; 1 for report LBAs using non\-zero
 provisioning status; 2 for report LBAs that are mapped; 3 for report LBAs
-that are de\-allocated; 4 for report LBAs that are anchored; 5 for report
+that are de\-allocated; 4 for report LBAs that are anchored; 16 for report
 LBAs that may return an unrecovered error. The REPORT TYPE field was added
 to the GET LBA STATUS cdb in sbc4r12.
+.br
+Since the REPORT TYPE field is newer than the command, the response contains
+the RTP bit to indicate whether or not the \fIDEVICE\fR acts on the REPORT
+TYE field (set when it does act on it, clear otherwise).
 .TP
 \fB\-s\fR, \fB\-\-scan\-len\fR=\fISL\fR
 where \fISL\fR is the scan length which is the maximum number of contiguous
@@ -93,6 +100,10 @@ logical blocks to be scanned for logical blocks that meet the given report
 type (i.e. \fIRT\fR). This option is only active with the SCSI GET LBA
 STATUS(32) command (i.e. it is ignored if the GET LBA STATUS(16) command is
 sent).
+.br
+The default value of \fISL\fR is 0 which should be interpreted by the
+\fIDEVICE\fR as there is no limits to the number of LBAs that shall be
+scanned.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Additional output
@@ -115,7 +126,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2017 Douglas Gilbert
+Copyright \(co 2009\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

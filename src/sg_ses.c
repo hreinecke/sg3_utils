@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.42 20180724";    /* ses4r02 */
+static const char * version_str = "2.43 20180810";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -4106,8 +4106,12 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         goto fini;
     } else if (op->do_hex) {
         if (op->do_hex > 2) {
-            if (4 == op->do_hex)
-                printf("\n# %s:\n", cp);
+            if (op->do_hex > 3) {
+                if (4 == op->do_hex)
+                    printf("\n# %s:\n", cp);
+                else
+                    printf("\n# %s [0x%x]:\n", cp, page_code);
+            }
             hex2stdout(resp, resp_len, -1);
          } else {
             printf("# Response in hex for %s:\n", cp);
