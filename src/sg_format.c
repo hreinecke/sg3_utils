@@ -38,7 +38,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.52 20180723";
+static const char * version_str = "1.53 20180809";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -156,7 +156,7 @@ usage()
                "[--pinfo]\n"
                "            [--poll=PT] [--quick] [--resize] [--rto_req] "
                "[--security]\n"
-               "            [--six] [--size=SIZE] [--tape=FM] "
+               "            [--six] [--size=LB_SZ] [--tape=FM] "
                "[--timeout=SECS] [--verbose]\n"
                "            [--verify] [--version] [--wait] DEVICE\n"
                "  where:\n"
@@ -209,7 +209,7 @@ usage()
                "    --six|-6        use 6 byte MODE SENSE/SELECT to probe "
                "disk\n"
                "                    (def: use 10 byte MODE SENSE/SELECT)\n"
-               "    --size=SIZE|-s SIZE    bytes per logical block, "
+               "    --size=LB_SZ|-s LB_SZ    bytes per logical block, "
                "defaults to DEVICE's\n"
                "                           current logical block size. Only "
                "needed to\n"

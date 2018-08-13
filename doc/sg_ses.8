@@ -1,4 +1,4 @@
-.TH SG_SES "8" "July 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SES "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -212,8 +212,9 @@ which is fine for a single dpage response. When all dpages are dumped (e.g.
 with \fI\-\-page=all\fR) then the quad H form adds the name of each dpage
 following a hash mark ('#'). The \fI\-\-data=\fR option parser ignores
 everything from and including a hash mark to the end of the line. Hence the
-output of the quad H form is still parsable plus it is easier to users to
-view and possibly edit.
+output of the quad H form is still parsable plus it is easier for users to
+view and possibly edit. \fI\-HHHHH\fR (that is 5) adds the page code in
+hex after the page's name in the comment.
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIIIA\fR
 where \fIIIA\fR is either an individual index (II) or an Element type

@@ -48,9 +48,11 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <sys/sysmacros.h>
-#include <sys/types.h>  /* needed for lseek64() */
-#include <linux/fs.h>   /* <sys/mount.h> */
-#include <linux/major.h>
+#ifndef major
+#include <sys/types.h>
+#endif
+#include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
+#include <linux/fs.h>           /* for BLKSSZGET and friends */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -62,7 +64,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.03 20180723";
+static const char * version_str = "6.04 20180811";
 
 
 #define ME "sg_dd: "

@@ -1,6 +1,6 @@
-.TH SG_DECODE_SENSE "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
-sg_decode_sense \- decode SCSI sense data
+sg_decode_sense \- decode SCSI sense and related data
 .SH SYNOPSIS
 .B sg_decode_sense
 [\fI\-\-binary=FN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=FN\fR]
@@ -12,12 +12,12 @@ sg_decode_sense \- decode SCSI sense data
 This utility takes SCSI sense data in binary or as a sequence of
 ASCII hexadecimal bytes and decodes it. The primary reference for the
 decoding is SPC\-4 ANSI INCITS 513\-2015 and the most recent draft
-SPC\-5 revision 8 which can be found at http://www.t10.org and other
+SPC\-5 revision 19 which can be found at http://www.t10.org and other
 locations on the internet.
 .PP
 SCSI sense data is often found in kernel log files as a result of
-something going wrong but may just be informative. It is often shown as
-a sequence of hexadecimal bytes, starting with 70, 71, 72, 73, f0 or f1.
+something going wrong or may be an informative warning. It is often shown
+as a sequence of hexadecimal bytes, starting with 70, 71, 72, 73, f0 or f1.
 Sense data could be up to 252 bytes long but typically is much shorter
 than that, 18 bytes long is often seen and is usually associated with
 the older "fixed" format sense data.
@@ -34,11 +34,12 @@ If the \fI\-\-cdb\fR option is given then rather than viewing the given hex
 arguments as sense data, it is viewed as a SCSI command descriptor
 block (CDB). In this case the command name is printed out. That name is
 based on the first hex byte given (know as the opcode) and optionally on
-another field called the "service action". 
+another field called the "service action".
 .PP
 Another alternate action is when the \fI\-\-err=ES\fR is given. \fIES\fR
-is assumed to be an "exit status" value between 0 and 255. A descriptive
-string is printed. Other options are ignored apart from \fI\-\-verbose\fR.
+is assumed to be an "exit status" value between 0 and 255 from one of the
+utilities in this package. A descriptive string is printed. Other options
+are ignored apart from \fI\-\-verbose\fR.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -111,8 +112,9 @@ SCSI device (logical unit). This utility accesses a library associated
 with this package. Amongst other things the library decodes SCSI sense
 data.
 .PP
-T10 defined SCSI command names given a CDB can be decoded using the sg_raw
-utility with the '\-vvv' option.
+The sg_raw utility takes a ASCII hexadecimal sequence representing a SCSI
+CDB. When sg_raw is given the '\-vvv' option, it will attempt to decode the
+CDB name.
 .SH EXAMPLES
 Sense data is often printed out in kernel logs and sometimes on the
 command line when verbose or debug flags are given. It will be at least

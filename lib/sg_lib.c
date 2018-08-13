@@ -37,6 +37,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <unistd.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -3525,7 +3526,6 @@ sg_lib_version()
    Set text mode on fd. Does nothing in Unix. Returns negative number on
    failure. */
 
-#include <unistd.h>
 #include <fcntl.h>
 
 int

@@ -33,7 +33,7 @@
  * device.
  */
 
-static const char * version_str = "1.17 20180626";
+static const char * version_str = "1.18 20180812";      /* sbc4r15 */
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -85,7 +85,8 @@ usage()
             "add_status>\n"
             "                      use twice ('-bb') for given LBA "
             "provisioning status\n"
-            "    --element-id=EI|-e EI      EI is the element identifier\n"
+            "    --element-id=EI|-e EI      EI is the element identifier "
+            "(def: 0)\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
             "    --lba=LBA|-l LBA    starting LBA (logical block address) "
@@ -102,10 +103,11 @@ usage()
             "                                2-> LBAs that are mapped\n"
             "                                3-> LBAs that are deallocated\n"
             "                                4-> LBAs that are anchored\n"
-            "                                5-> LBAs that may return "
+            "                                16-> LBAs that may return "
             "unrecovered error\n"
-            "    --scan-len=SL|-s SL      SL in maximum scan length "
-            "(unit: logical blocks)\n"
+            "    --scan-len=SL|-s SL    SL in maximum scan length (unit: "
+            "logical blocks)\n"
+            "                           (def: 0 which implies no limit)\n"
             "    --verbose|-v      increase verbosity\n"
             "    --version|-V      print version string and exit\n\n"
             "Performs a SCSI GET LBA STATUS(16) or GET LBA STATUS(32) "

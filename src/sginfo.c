@@ -122,7 +122,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.41 [20180724]";
+static const char * version_str = "2.42 [20180811]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3434,6 +3434,9 @@ show_devices(int raw)
         }
         if ( isdigit(entry->d_name[strlen(entry->d_name)-1]) ) {
             continue;
+        }
+        if ( strncmp("snapshot",entry->d_name,8) == 0 ) {
+                continue;
         }
 
         snprintf(dev_name, sizeof(dev_name),"/dev/%s",entry->d_name);
