@@ -28,13 +28,14 @@
  */
 
 #define _POSIX_C_SOURCE 200809L         /* for posix_memalign() */
-#define __STDC_FORMAT_MACROS 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+#define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 #include <errno.h>
 #include <unistd.h>
@@ -3351,9 +3352,6 @@ pr2serr(const char * fmt, ...)
 #include <sys/param.h>
 #elif defined(SG_LIB_WIN32)
 #include <windows.h>
-
-static bool got_page_size = false;
-static uint32_t win_page_size;
 #endif
 
 uint32_t
@@ -3362,6 +3360,9 @@ sg_get_page_size(void)
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     return sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
 #elif defined(SG_LIB_WIN32)
+    static bool got_page_size = false;
+    static uint32_t win_page_size;
+
     if (! got_page_size) {
         SYSTEM_INFO si;
 

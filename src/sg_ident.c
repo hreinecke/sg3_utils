@@ -31,7 +31,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.22 20180626";
+static const char * version_str = "1.23 20180814";
 
 #define ME "sg_ident: "
 
@@ -109,7 +109,9 @@ usage(void)
             "    --verbose|-v    increase verbosity of output\n"
             "    --version|-V    print version string and exit\n\n"
             "Performs a SCSI REPORT (or SET) IDENTIFYING INFORMATION "
-            "command\n");
+            "command. When no\noptions are given then REPORT IDENTIFYING "
+            "INFORMATION is sent and the\nresponse is output in "
+            "hexadecimal with ASCII to the right.\n");
 }
 
 int
