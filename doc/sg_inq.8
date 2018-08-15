@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "March 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_INQ "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -56,7 +56,7 @@ In some operating systems a NVMe device (e.g. SSD) may be given as the
 The reference document used for interpreting an INQUIRY is T10/BSR INCITS
 502 Revision 19 which is draft SPC\-5 revision 19, 14 February 2018). It can
 be found at http://www.t10.org . Obsolete and reserved items in the standard
-INQUIRY response output are displayed in brackets.
+INQUIRY response output are displayed in square brackets.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -83,9 +83,9 @@ set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
 conjunction with the \fI\-\-page=PG\fR option where \fIPG\fR specifies the
 SCSI command opcode to query. When used twice (e.g. '\-cc') this utility
 forms a list by looping over all 256 opcodes (0 to 255 inclusive) only
-outputting a line for found commands. The CmdDt bit is now obsolete.
-It has been replaced by the REPORT SUPPORTED OPERATION CODES command,
-see the sg_opcodes(8) utility.
+outputting a line for commands that are found. The CmdDt bit is now
+obsolete; it has been replaced by the REPORT SUPPORTED OPERATION CODES
+command, see the sg_opcodes(8) utility.
 .TP
 \fB\-d\fR, \fB\-\-descriptors\fR
 decodes and prints the version descriptors found in a standard INQUIRY
@@ -131,18 +131,18 @@ given to the \fI\-\-page=PG\fR option.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 rather than decode a standard INQUIRY response, a VPD page or command
-support data; print out the response in hex to stdout. Error messages and
-warnings are typically output to stderr. When used twice with the ATA
-Information VPD page [0x89] decodes the start of the response then outputs
-the ATA IDENTIFY (PACKET) DEVICE response in hexadecimal bytes (not 16 bit
-words). When used three times with the ATA Information VPD page [0x89] or
-the \fI\-\-ata\fR option, this utility outputs the ATA IDENTIFY (PACKET)
-DEVICE response in hexadecimal words suitable for input
+support data; print out the response in hex and send the output to stdout.
+Error messages and warnings are typically output to stderr. When used twice
+with the ATA Information VPD page [0x89] decodes the start of the response
+then outputs the ATA IDENTIFY (PACKET) DEVICE response in hexadecimal
+bytes (not 16 bit words). When used three times with the ATA Information VPD
+page [0x89] or the \fI\-\-ata\fR option, this utility outputs the ATA
+IDENTIFY (PACKET) DEVICE response in hexadecimal words suitable for input
 to 'hdparm \-\-Istdin'.  See note below.
 .br
 To generate output suitable for placing in a file that can be used by a
 later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
-option (e.g. 'sg_inq \-p di -HHHH /dev/sg3 > dev_id.hex').
+option (e.g. 'sg_inq \-p di \-HHHH /dev/sg3 > dev_id.hex').
 .TP
 \fB\-i\fR, \fB\-\-id\fR
 prints the device identification VPD page [0x83].
@@ -152,17 +152,17 @@ prints the device identification VPD page [0x83].
 ASCII hexadecimal or binary representing an INQUIRY (including VPD page)
 response. This utility will then decode that response. It is preferable to
 also supply the \fI\-\-page=PG\fR option, if not this utility will attempt
-to guess which VPD page (or standard INQUIRY) the response is associated
+to guess which VPD page (or standard INQUIRY) that the response is associated
 with. The hexadecimal should be arranged as 1 or 2 digits representing a
 byte each of which is whitespace or comma separated. Anything from and
-including a hash mark to the end of line is ignored. If the \fI\-\-raw\fR
+including a hash mark to the end of a line is ignored. If the \fI\-\-raw\fR
 option is also given then \fIFN\fR is treated as binary.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
-This is the (maximum) length of the response to be sent by the device.
-The default value of \fILEN\fR is 0 which is interpreted as: first request
-is for 36 bytes and if necessary execute another INQUIRY if the "additional
+This is the (maximum) length of the response returned by the device. The
+default value of \fILEN\fR is 0 which is interpreted as: first request is
+for 36 bytes and if necessary execute another INQUIRY if the "additional
 length" field in the response indicates that more than 36 bytes is available.
 .br
 If \fILEN\fR is greater than 0 then only one INQUIRY command is performed.
@@ -179,7 +179,7 @@ this option has the same action as the \fI\-\-len=LEN\fR option above. It has
 been added for compatibility with the sg_vpd, sg_modes and sg_logs utilities.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
-Switch to older style options. Please use as first option.
+Switch to older style options. Please use as first option on the command line.
 .TP
 \fB\-o\fR, \fB\-\-only\fR
 Do not attempt to additionally retrieve the serial number VPD page (0x80) to
@@ -212,15 +212,15 @@ If \fIPG\fR is not found in the 'Supported VPD pages' VPD page (0x0) then
 EDOM is returned. To bypass this check use the \fI\-\-force\fR option.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-in the absence of \fI\-\-inhex=FN\fR then output response in binary.
+in the absence of \fI\-\-inhex=FN\fR then the output response is in binary.
 The output should be piped to a file or another utility when this option is
 used. The binary is sent to stdout, and errors are sent to stderr.
 .br
-if used with \fI\-\-inhex=FN\fR then the contents of \fIFN\fR is treated as
+If used with \fI\-\-inhex=FN\fR then the contents of \fIFN\fR is treated as
 binary.
 .TP
 \fB\-s\fR, \fB\-\-vendor\fR
-output a standard INQUIRY response's vendor specific field from offset 36
+output a standard INQUIRY response's vendor specific fields from offset 36
 to 55 in ASCII. When used twice (i.e. '\-ss') also output the vendor
 specific field from offset 96 in ASCII. This is only done if the data
 passes some simple sanity checks.
@@ -239,15 +239,16 @@ defaults to zero which is the "Supported VPD pages" VPD page. A more up to
 date decoding of VPD pages can be found in the sg_vpd(8) utility.
 .SH NOTES
 Some devices with weak SCSI command set implementations lock up when they
-receive commands they don't understand (or even response lengths that they
-don't expect). Such devices need to be treated carefully, use the '\-\-len=36'
-option. Without this option this utility will issue an initial standard
-INQUIRY requesting 36 bytes of response data. If the device indicates it
-could have supplied more data then a second INQUIRY is issued to fetch the
-longer response. That second command may lock up faulty devices.
+receive commands they don't understand (and some lock up if they receive
+response lengths that they don't expect). Such devices need to be treated
+carefully, use the '\-\-len=36' option. Without this option this utility will
+issue an initial standard INQUIRY requesting 36 bytes of response data. If
+the device indicates it could have supplied more data then a second INQUIRY
+is issued to fetch the longer response. That second command may lock up
+faulty devices.
 .PP
 ATA or ATAPI devices that use a SCSI to ATA Translation layer (see
-SAT at www.t10.org) may support the ATA Information VPD page. This
+SAT at www.t10.org) may support the SCSI ATA INFORMATION VPD page. This
 returns the IDENTIFY (PACKET) DEVICE response amongst other things.
 The ATA Information VPD page can be fetched with '\-\-page=ai'.
 .PP
@@ -262,8 +263,8 @@ being used for access and the SCSI ports VPD page (0x88) to show all
 available ports on the device.
 .PP
 In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
-and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
+a SCSI generic (sg) device. In the 2.6 series and later block devices (e.g.
+disks and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
 will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
 device names may be used as well (e.g. "/dev/st0m").
 .PP
@@ -358,14 +359,15 @@ Equivalent to \fI\-\-ata\fR in the OPTIONS section.
 .TP
 \fB\-b\fR
 decodes the Block Limits VPD page [0xb0].  Equivalent to '\-\-page=bl' in
-the OPTIONS section. This page is defined in SBC\-2 (see www.t10.org).
+the OPTIONS section. This page is defined in SBC\-2 (see www.t10.org) and
+later.
 .TP
 \fB\-B\fR=\fI0|1\fR
 equivalent to \fI\-\-block=0|1\fR in OPTIONS section.
 .TP
 \fB\-c\fR
 set the Command Support Data (CmdDt) bit (defaults to clear(0)). Used in
- conjunction with the \fI\-p=VPD_PG\fR option to specify the SCSI command
+conjunction with the \fI\-p=VPD_PG\fR option to specify the SCSI command
 opcode to query. Equivalent to \fI\-\-cmddt\fR in the OPTIONS section.
 .TP
 \fB\-cl\fR

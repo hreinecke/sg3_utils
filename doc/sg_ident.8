@@ -1,4 +1,4 @@
-.TH SG_IDENT "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_IDENT "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_ident \- send SCSI REPORT/SET IDENTIFYING INFORMATION command
 .SH SYNOPSIS
@@ -36,8 +36,8 @@ Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-A\fR, \fB\-\-ascii\fR
 invokes the Report Identifying Information command and if anything is
-found interprets it as ASCII (or UTF\-8 depending on the locale)
-and prints the information to stdout.
+found interprets it as ASCII (or UTF\-8 which is locale dependent) and
+prints the information to stdout.
 .TP
 \fB\-C\fR, \fB\-\-clear\fR
 invokes the Set Identifying Information command with an information length
@@ -111,7 +111,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2012 Douglas Gilbert
+Copyright \(co 2005\-2018 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
