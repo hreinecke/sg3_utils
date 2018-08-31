@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.55 20180814";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.56 20180831";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1670,8 +1670,8 @@ struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
     {0x11e,18, "Boot partition write prohibited"},
     {0x11f, 5, "Invalid controller identifier"},
     {0x120, 5, "Invalid secondary controller state"},
-    {0x121, 5, "Invalid number of controller resorces"},
-    {0x122, 5, "Invalid resorce identifier"},
+    {0x121, 5, "Invalid number of controller resources"},
+    {0x122, 5, "Invalid resource identifier"},
 
     /* Command specific status values, Status Code Type (SCT): 1h
      * for NVM (I/O) Command Set */
