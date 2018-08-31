@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180815] [svn: r787]
+Changelog for sg3_utils-1.43 [20180831] [svn: r788]
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -19,9 +19,11 @@ Changelog for sg3_utils-1.43 [20180815] [svn: r787]
       > 4 TB and 80 hours if > 8 TB
     - when changing block size allow for Mode Select
       rejecting SP=1 (Save Page): repeat with SP=0
+    - FFMT tweaks: default CMPLST to false, shorten poll
+    - make all data-in and data-out buffers page aligned
   - sg_decode sense: add --cdb and --err=ES options
   - sg_ses: handle 2 bit EIIOE field in aes dpage
-    - increase join array size from 260 to 520 elements 
+    - increase join array size from 260 to 520 elements
     - add --quiet option to suppress messages
     - expand join handling of SAS connectors and others
     - expand join debug code
@@ -72,11 +74,9 @@ Changelog for sg3_utils-1.43 [20180815] [svn: r787]
     - add --long which decodes more of the NVMe Identify
       command responses
   - sg_inq+sg_vpd: update Extended inquiry data vpd
-    page (spc5r09)
+    page (spc5r09 and 17-142r5)
     - block limits and block limit extension VPD pages:
       add extra info about corner cases
-    - add enclosure services device characteristics
-      VPD page (T10/170-142r1 --> ses4r02 ??)
     - add maximum inquiry|mode_page change logs fields
       to extended inquiry vpd page (spc5r17)
     - both now return EDOM (adjusted sg error code) when

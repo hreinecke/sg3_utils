@@ -38,7 +38,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.53 20180809";
+static const char * version_str = "1.55 20180830";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -51,8 +51,10 @@ static const char * version_str = "1.53 20180809";
 #define VLONG_FORMAT_TIMEOUT    (80 * 3600)       /* 3 days, 8 hours */
 
 #define POLL_DURATION_SECS 60
+#define POLL_DURATION_FFMT_SECS 10
 #define DEF_POLL_TYPE_RS false     /* false -> test unit ready;
                                       true -> request sense */
+#define MAX_BUFF_SZ     252
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -71,7 +73,8 @@ static const char * version_str = "1.53 20180809";
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 struct opts_t {
-        bool cmplst;             /* -C value */
+        bool cmplst;            /* -C value */
+        bool cmplst_given;
         bool dcrt;              /* -D */
         bool dry_run;           /* -d */
         bool early;             /* -e */
@@ -89,8 +92,8 @@ struct opts_t {
         bool verbose_given;
         bool verify;            /* -y */
         bool version_given;
-        int blk_size;           /* -s value */
-        int ffmt;               /* -t value */
+        int lblk_sz;            /* -s value */
+        int ffmt;               /* -t value; fast_format if > 0 */
         int fmtpinfo;
         int format;             /* -F */
         int mode_page;          /* -M value */
@@ -105,8 +108,6 @@ struct opts_t {
         const char * device_name;
 };
 
-#define MAX_BUFF_SZ     252
-static uint8_t dbuff[MAX_BUFF_SZ];
 
 
 static struct option long_options[] = {
@@ -162,7 +163,7 @@ usage()
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
-               "(default: 1)\n"
+               "(def: 1; if FFMT: 0)\n"
                "    --count=COUNT|-c COUNT    number of blocks to report "
                "after format or\n"
                "                              resize. Format default is "
@@ -173,9 +174,12 @@ usage()
                "don't format)\n"
                "    --early|-e      exit once format started (user can "
                "monitor progress)\n"
-               "    --ffmt=FFMT|-t FFMT      fast format (def: 0 -> "
-               "possibly overwrite\n"
-               "                             whole medium)\n"
+               "    --ffmt=FFMT|-t FFMT    fast format (def: 0 -> slow, "
+               "may visit every\n"
+               "                           block). 1 and 2 are fast formats; "
+               "1: after\n"
+               "                           format, unwritten data read "
+               "without error\n"
                "    --fmtpinfo=FPI|-f FPI    FMTPINFO field value "
                "(default: 0)\n"
                "    --format|-F     do FORMAT UNIT (default: report current "
@@ -299,69 +303,83 @@ scsi_format_unit(int fd, const struct opts_t * op)
 {
         bool need_hdr, longlist, ip_desc;
         bool immed = ! op->fwait;
-        int res, progress, pr, rem, verb, fmt_pl_sz, off, resp_len, timeout;
+        int res, progress, pr, rem, param_sz, off, resp_len, tmout;
+        int poll_wait_secs;
+        int vb = op->verbose;
         const int SH_FORMAT_HEADER_SZ = 4;
-        const int LO_FORMAT_HEADER_SZ = 8;
+        const int LONG_FORMAT_HEADER_SZ = 8;
         const int INIT_PATTERN_DESC_SZ = 4;
-        uint8_t fmt_pl[LO_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ];
-        uint8_t reqSense[MAX_BUFF_SZ];
+        const int max_param_sz = LONG_FORMAT_HEADER_SZ + INIT_PATTERN_DESC_SZ;
+        uint8_t * param;
+        uint8_t * free_param = NULL;
         char b[80];
 
-        memset(fmt_pl, 0, sizeof(fmt_pl));
+        param = sg_memalign(max_param_sz, 0, &free_param, false);
+        if (NULL == param) {
+                pr2serr("%s: unable to obtain heap for parameter list\n",
+                        __func__);
+                return sg_convert_errno(ENOMEM);
+        }
         if (immed)
-                timeout = SHORT_TIMEOUT;
+                tmout = SHORT_TIMEOUT;
         else {
                 if (op->total_byte_count > EIGHT_TBYTE)
-                        timeout = VLONG_FORMAT_TIMEOUT;
+                        tmout = VLONG_FORMAT_TIMEOUT;
                 else if (op->total_byte_count > FOUR_TBYTE)
-                        timeout = LONG_FORMAT_TIMEOUT;
+                        tmout = LONG_FORMAT_TIMEOUT;
                 else
-                        timeout = FORMAT_TIMEOUT;
+                        tmout = FORMAT_TIMEOUT;
         }
-        if (op->timeout > timeout)
-                timeout = op->timeout;
-        longlist = (op->pie > 0);
+        if (op->timeout > tmout)
+                tmout = op->timeout;
+        longlist = (op->pie > 0);  /* only set LONGLIST if PI_EXPONENT>0 */
         ip_desc = (op->ip_def || op->sec_init);
-        off = longlist ? LO_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
-        fmt_pl[0] = op->pfu & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
-        fmt_pl[1] = (immed ? 0x2 : 0); /* FOV=0, [DPRY,DCRT,STPF,IP=0] */
+        off = longlist ? LONG_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
+        param[0] = op->pfu & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
+        param[1] = (immed ? 0x2 : 0); /* FOV=0, [DPRY,DCRT,STPF,IP=0] */
         if (op->dcrt)
-                fmt_pl[1] |= 0xa0;     /* FOV=1, DCRT=1 */
+                param[1] |= 0xa0;     /* FOV=1, DCRT=1 */
         if (ip_desc) {
-                fmt_pl[1] |= 0x88;     /* FOV=1, IP=1 */
+                param[1] |= 0x88;     /* FOV=1, IP=1 */
                 if (op->sec_init)
-                        fmt_pl[off + 0] = 0x20; /* SI=1 in IP desc */
+                        param[off + 0] = 0x20; /* SI=1 in IP desc */
         }
         if (longlist)
-                fmt_pl[3] = (op->pie & 0xf);/* PROTECTION_INTERVAL_EXPONENT */
+                param[3] = (op->pie & 0xf);/* PROTECTION_INTERVAL_EXPONENT */
         /* with the long parameter list header, P_I_INFORMATION is always 0 */
 
         need_hdr = (immed || op->cmplst || op->dcrt || ip_desc ||
                     (op->pfu > 0) || (op->pie > 0));
-        fmt_pl_sz = 0;
-        if (need_hdr)
-                fmt_pl_sz = off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0);
+        param_sz = need_hdr ?
+                    (off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0)) : 0;
 
         if (op->dry_run) {
                 res = 0;
                 pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
                         "command\n");
-                if (op->verbose) {
-                        pr2serr("FU would have received: fmt_pl: ");
-                        hex2stderr(fmt_pl, sizeof(fmt_pl), -1);
-                        pr2serr("  fmtpinfo=0x%x, longlist=%d, need_hdr=%d, "
-                                "cmplst=%d, ffmt=%d, timeout=%d\n",
+                if (vb) {
+                        if (need_hdr) {
+                                pr2serr("  FU would have received parameter "
+                                        "list: ");
+                                hex2stderr(param, max_param_sz, -1);
+                        } else
+                                pr2serr("  FU would not have received a "
+                                        "parameter list\n");
+                        pr2serr("  FU cdb fields: fmtpinfo=0x%x, "
+                                "longlist=%d, fmtdata=%d, cmplst=%d, "
+                                "ffmt=%d [timeout=%d secs]\n",
                                 op->fmtpinfo, longlist, need_hdr, op->cmplst,
-                                op->ffmt, timeout);
+                                op->ffmt, tmout);
                 }
         } else
                 res = sg_ll_format_unit_v2(fd, op->fmtpinfo, longlist,
-                                        need_hdr/* FMTDATA*/, op->cmplst,
-                                        0 /* DEFECT_LIST_FORMAT */, op->ffmt,
-                                        timeout, fmt_pl, fmt_pl_sz, true,
-                                        op->verbose);
+                                           need_hdr, op->cmplst, 0, op->ffmt,
+                                           tmout, param, param_sz, true, vb);
+        if (free_param)
+            free(free_param);
+
         if (res) {
-                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+                sg_get_category_sense_str(res, sizeof(b), b, vb);
                 pr2serr("Format unit command: %s\n", b);
                 return res;
         }
@@ -383,13 +401,14 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 printf("No point in polling for progress, so exit\n");
                 return 0;
         }
-        verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
+        poll_wait_secs = op->ffmt ? POLL_DURATION_FFMT_SECS :
+                                    POLL_DURATION_SECS;
         if (! op->poll_type) {
                 for(;;) {
-                        sleep_for(POLL_DURATION_SECS);
+                        sleep_for(poll_wait_secs);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
-                                                             true, verb);
+                                             true, (vb > 1) ? (vb - 1) : 0);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
@@ -400,19 +419,28 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 }
         }
         if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
+                uint8_t * reqSense;
+                uint8_t * free_reqSense = NULL;
+
+                reqSense = sg_memalign(MAX_BUFF_SZ, 0, &free_reqSense, false);
+                if (NULL == reqSense) {
+                        pr2serr("%s: unable to obtain heap for Request "
+                                "Sense\n", __func__);
+                        return sg_convert_errno(ENOMEM);
+                }
                 for(;;) {
-                        sleep_for(POLL_DURATION_SECS);
-                        memset(reqSense, 0x0, sizeof(reqSense));
-                        res = sg_ll_request_sense(fd, false /* desc */,
-                                                  reqSense, sizeof(reqSense),
-                                                  false, verb);
+                        sleep_for(poll_wait_secs);
+                        memset(reqSense, 0x0, MAX_BUFF_SZ);
+                        res = sg_ll_request_sense(fd, false, reqSense,
+                                                  MAX_BUFF_SZ, false,
+                                                  (vb > 1) ? (vb - 1) : 0);
                         if (res) {
                                 pr2serr("polling with Request Sense command "
                                         "failed [res=%d]\n", res);
                                 break;
                         }
                         resp_len = reqSense[7] + 8;
-                        if (verb) {
+                        if (vb > 1) {
                                 pr2serr("Parameter data in hex:\n");
                                 hex2stderr(reqSense, resp_len, 1);
                         }
@@ -427,44 +455,9 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         } else
                                 break;
                 }
+                if (free_reqSense)
+                        free(free_reqSense);
         }
-#if 0
-        for (k = 0; k < num_rs; ++k) {
-                if (k > 0)
-                        sleep_for(30);
-                memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-                res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff,
-                                          maxlen, true, op->verbose);
-                if (res) {
-                        ret = res;
-                        sg_get_category_sense_str(res, sizeof(b), b,
-                                                  op->verbose);
-                        pr2serr("Request Sense command: %s\n", b);
-                        break;
-                }
-                /* "Additional sense length" same in descriptor and fixed */
-                resp_len = requestSenseBuff[7] + 8;
-                if (op->verbose > 1) {
-                        pr2serr("Parameter data in hex\n");
-                        hex2stderr(requestSenseBuff, resp_len, 1);
-                }
-                progress = -1;
-                sg_get_sense_progress_fld(requestSenseBuff, resp_len,
-                                          &progress);
-                if (progress < 0) {
-                        ret = res;
-                        if (op->verbose > 1)
-                                pr2serr("No progress indication found, "
-                                        "iteration %d\n", k + 1);
-                                /* N.B. exits first time there isn't a
-                                 * progress indication */
-                        break;
-                } else
-                        printf("Progress indication: %d.%02d%% done\n",
-                               (progress * 100) / 65536,
-                               ((progress * 100) % 65536) / 656);
-        }
-#endif
         printf("FORMAT UNIT Complete\n");
         return 0;
 }
@@ -473,33 +466,33 @@ scsi_format_unit(int fd, const struct opts_t * op)
 static int
 scsi_format_medium(int fd, const struct opts_t * op)
 {
-        int res, progress, pr, rem, verb, resp_len, timeout;
+        int res, progress, pr, rem, resp_len, tmout;
+        int vb = op->verbose;
         bool immed = ! op->fwait;
-        uint8_t reqSense[MAX_BUFF_SZ];
         char b[80];
 
         if (immed)
-                timeout = SHORT_TIMEOUT;
+                tmout = SHORT_TIMEOUT;
         else {
                 if (op->total_byte_count > EIGHT_TBYTE)
-                        timeout = VLONG_FORMAT_TIMEOUT;
+                        tmout = VLONG_FORMAT_TIMEOUT;
                 else if (op->total_byte_count > FOUR_TBYTE)
-                        timeout = LONG_FORMAT_TIMEOUT;
+                        tmout = LONG_FORMAT_TIMEOUT;
                 else
-                        timeout = FORMAT_TIMEOUT;
+                        tmout = FORMAT_TIMEOUT;
         }
-        if (op->timeout > timeout)
-                timeout = op->timeout;
+        if (op->timeout > tmout)
+                tmout = op->timeout;
         if (op->dry_run) {
                 res = 0;
                 pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
                         "command\n");
         } else
                 res = sg_ll_format_medium(fd, op->verify, immed,
-                                          0xf & op->tape, NULL, 0, timeout,
-                                          true, op->verbose);
+                                          0xf & op->tape, NULL, 0, tmout,
+                                          true, vb);
         if (res) {
-                sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+                sg_get_category_sense_str(res, sizeof(b), b, vb);
                 pr2serr("Format medium command: %s\n", b);
                 return res;
         }
@@ -520,13 +513,12 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 printf("No point in polling for progress, so exit\n");
                 return 0;
         }
-        verb = (op->verbose > 1) ? (op->verbose - 1) : 0;
         if (! op->poll_type) {
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
-                                                             true, verb);
+                                             true, (vb > 1) ? (vb - 1) : 0);
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
@@ -537,19 +529,28 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 }
         }
         if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
+                uint8_t * reqSense;
+                uint8_t * free_reqSense = NULL;
+
+                reqSense = sg_memalign(MAX_BUFF_SZ, 0, &free_reqSense, false);
+                if (NULL == reqSense) {
+                        pr2serr("%s: unable to obtain heap for Request "
+                                "Sense\n", __func__);
+                        return sg_convert_errno(ENOMEM);
+                }
                 for(;;) {
                         sleep_for(POLL_DURATION_SECS);
-                        memset(reqSense, 0x0, sizeof(reqSense));
-                        res = sg_ll_request_sense(fd, false /* desc */,
-                                                  reqSense, sizeof(reqSense),
-                                                  false, verb);
+                        memset(reqSense, 0x0, MAX_BUFF_SZ);
+                        res = sg_ll_request_sense(fd, false, reqSense,
+                                                  MAX_BUFF_SZ, false,
+                                                  (vb > 1) ? (vb - 1) : 0);
                         if (res) {
                                 pr2serr("polling with Request Sense command "
                                         "failed [res=%d]\n", res);
                                 break;
                         }
                         resp_len = reqSense[7] + 8;
-                        if (verb) {
+                        if (vb > 1) {
                                 pr2serr("Parameter data in hex:\n");
                                 hex2stderr(reqSense, resp_len, 1);
                         }
@@ -564,6 +565,8 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         } else
                                 break;
                 }
+                if (free_reqSense)
+                        free(free_reqSense);
         }
         printf("FORMAT MEDIUM Complete\n");
         return 0;
@@ -633,23 +636,31 @@ get_lu_name(const uint8_t * bp, int u_len, char * b, int b_len)
 #define VPD_SUPPORTED_VPDS 0x0
 #define VPD_UNIT_SERIAL_NUM 0x80
 #define VPD_DEVICE_ID 0x83
+#define MAX_VPD_RESP_LEN 256
 
 static int
 print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
              const struct opts_t * op)
 {
-        int res, k, n, verb, pdt, has_sn, has_di;
-        uint8_t b[256];
-        char a[256];
+        int k, n, verb, pdt, has_sn, has_di;
+        int res = 0;
+        uint8_t  * b;
+        uint8_t  * free_b = NULL;
+        char a[MAX_VPD_RESP_LEN];
         char pdt_name[64];
 
         verb = (op->verbose > 1) ? op->verbose - 1 : 0;
         memset(sinq_resp, 0, max_rlen);
-        res = sg_ll_inquiry(fd, false /* cmddt */, false /* evpd */,
-                            0 /* pg_op */, b, SAFE_STD_INQ_RESP_LEN, true,
-                            verb);
+        b = sg_memalign(MAX_VPD_RESP_LEN, 0, &free_b, false);
+        if (NULL == b) {
+                res = sg_convert_errno(ENOMEM);
+                goto out;
+        }
+        /* Standard INQUIRY */
+        res = sg_ll_inquiry(fd, false, false, 0, b, SAFE_STD_INQ_RESP_LEN,
+                            true, verb);
         if (res)
-                return res;
+                goto out;
         n = b[4] + 5;
         if (n > SAFE_STD_INQ_RESP_LEN)
                 n = SAFE_STD_INQ_RESP_LEN;
@@ -668,19 +679,21 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
         } else {
                 pr2serr("Short INQUIRY response: %d bytes, expect at least "
                         "36\n", n);
-                return SG_LIB_CAT_OTHER;
+                res = SG_LIB_CAT_OTHER;
+                goto out;
         }
         res = sg_ll_inquiry(fd, false, true, VPD_SUPPORTED_VPDS, b,
                             SAFE_STD_INQ_RESP_LEN, true, verb);
         if (res) {
                 if (op->verbose)
                         pr2serr("VPD_SUPPORTED_VPDS gave res=%d\n", res);
-                return 0;
+                res = 0;
+                goto out;
         }
         if (VPD_SUPPORTED_VPDS != b[1]) {
                 if (op->verbose)
                         pr2serr("VPD_SUPPORTED_VPDS corrupted\n");
-                return 0;
+                goto out;
         }
         n = sg_get_unaligned_be16(b + 2);
         if (n > (SAFE_STD_INQ_RESP_LEN - 4))
@@ -691,7 +704,7 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
                                 if (op->verbose)
                                         pr2serr("VPD_SUPPORTED_VPDS "
                                                 "dis-ordered\n");
-                                return 0;
+                                goto out;
                         }
                         ++has_sn;
                 } else if (VPD_DEVICE_ID == b[4 + k]) {
@@ -701,46 +714,51 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
         }
         if (has_sn) {
                 res = sg_ll_inquiry(fd, false, true /* evpd */,
-                                    VPD_UNIT_SERIAL_NUM, b, sizeof(b), true,
-                                    verb);
+                                    VPD_UNIT_SERIAL_NUM, b, MAX_VPD_RESP_LEN,
+                                    true, verb);
                 if (res) {
                         if (op->verbose)
                                 pr2serr("VPD_UNIT_SERIAL_NUM gave res=%d\n",
                                         res);
-                        return 0;
+                        res = 0;
+                        goto out;
                 }
                 if (VPD_UNIT_SERIAL_NUM != b[1]) {
                         if (op->verbose)
                                 pr2serr("VPD_UNIT_SERIAL_NUM corrupted\n");
-                        return 0;
+                        goto out;
                 }
                 n = sg_get_unaligned_be16(b + 2);
-                if (n > (int)(sizeof(b) - 4))
-                        n = (sizeof(b) - 4);
+                if (n > (int)(MAX_VPD_RESP_LEN - 4))
+                        n = (MAX_VPD_RESP_LEN - 4);
                 printf("      Unit serial number: %.*s\n", n,
                        (const char *)(b + 4));
         }
         if (has_di) {
                 res = sg_ll_inquiry(fd, false, true /* evpd */, VPD_DEVICE_ID,
-                                    b, sizeof(b), true, verb);
+                                    b, MAX_VPD_RESP_LEN, true, verb);
                 if (res) {
                         if (op->verbose)
                                 pr2serr("VPD_DEVICE_ID gave res=%d\n", res);
-                        return 0;
+                        res = 0;
+                        goto out;
                 }
                 if (VPD_DEVICE_ID != b[1]) {
                         if (op->verbose)
                                 pr2serr("VPD_DEVICE_ID corrupted\n");
-                        return 0;
+                        goto out;
                 }
                 n = sg_get_unaligned_be16(b + 2);
-                if (n > (int)(sizeof(b) - 4))
-                        n = (sizeof(b) - 4);
+                if (n > (int)(MAX_VPD_RESP_LEN - 4))
+                        n = (MAX_VPD_RESP_LEN - 4);
                 n = strlen(get_lu_name(b, n + 4, a, sizeof(a)));
                 if (n > 0)
                         printf("      LU name: %.*s\n", n, a);
         }
-        return 0;
+out:
+        if (free_b)
+                free(free_b);
+        return res;
 }
 
 #define RCAP_REPLY_LEN 32
@@ -750,16 +768,24 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
 static int
 print_read_cap(int fd, struct opts_t * op)
 {
-        int res;
-        uint8_t resp_buff[RCAP_REPLY_LEN];
+        int res = 0;
+        uint8_t * resp_buff;
+        uint8_t * free_resp_buff = NULL;
         unsigned int last_blk_addr, block_size;
         uint64_t llast_blk_addr;
         int64_t ll;
         char b[80];
 
+        resp_buff = sg_memalign(RCAP_REPLY_LEN, 0, &free_resp_buff, false);
+        if (NULL == resp_buff) {
+                pr2serr("%s: unable to obtain heap\n", __func__);
+                res = -1;
+                goto out;
+        }
         if (op->do_rcap16) {
                 res = sg_ll_readcap_16(fd, false /* pmi */, 0 /* llba */,
-                                       resp_buff, 32, true, op->verbose);
+                                       resp_buff, RCAP_REPLY_LEN, true,
+                                       op->verbose);
                 if (0 == res) {
                         llast_blk_addr = sg_get_unaligned_be64(resp_buff + 0);
                         block_size = sg_get_unaligned_be32(resp_buff + 8);
@@ -784,7 +810,8 @@ print_read_cap(int fd, struct opts_t * op)
                         ll = (int64_t)(llast_blk_addr + 1) * block_size;
                         if (ll > op->total_byte_count)
                                 op->total_byte_count = ll;
-                        return (int)block_size;
+                        res = (int)block_size;
+                        goto out;
                 }
         } else {
                 res = sg_ll_readcap_10(fd, false /* pmi */, 0 /* lba */,
@@ -797,7 +824,8 @@ print_read_cap(int fd, struct opts_t * op)
                                         printf("Read Capacity (10) response "
                                                "indicates that Read Capacity "
                                                "(16) is required\n");
-                                return -2;
+                                res = -2;
+                                goto out;
                         }
                         printf("Read Capacity (10) results:\n");
                         printf("   Number of logical blocks=%u\n",
@@ -807,33 +835,204 @@ print_read_cap(int fd, struct opts_t * op)
                         ll = (int64_t)(last_blk_addr + 1) * block_size;
                         if (ll > op->total_byte_count)
                                 op->total_byte_count = ll;
-                        return (int)block_size;
+                        res = (int)block_size;
+                        goto out;
                 }
         }
         sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
         pr2serr("READ CAPACITY (%d): %s\n", (op->do_rcap16 ? 16 : 10), b);
-        return -1;
+        res = -1;
+out:
+        if (free_resp_buff)
+                free(free_resp_buff);
+        return res;
 }
 
-
-int
-main(int argc, char **argv)
+/* Use MODE SENSE(6 or 10) to fetch blocks descriptor(s), if any. Analyze
+ * the first block descriptor and if required, start preparing for a
+ * MODE SELECT(6 or 10). Returns 0 on success. */
+static int
+fetch_block_desc(int fd, uint8_t * dbuff, int * calc_lenp, int * bd_lb_szp,
+                 struct opts_t * op)
 {
-        bool prob = false;
-        int fd, res, calc_len, bd_len, dev_specific_param;
-        int offset, j, bd_blk_len, pdt, rsp_len, vb;
+        bool first = true;
+        bool prob;
+        int bd_lbsz, bd_len, dev_specific_param, offset, res, rq_lb_sz;
+        int rsp_len;
         int resid = 0;
-        int ret = 0;
+        int vb = op->verbose;
         uint64_t ull;
         int64_t ll;
-        struct opts_t * op;
-        uint8_t inq_resp[SAFE_STD_INQ_RESP_LEN];
-        struct opts_t opts;
         char b[80];
 
-        op = &opts;
-        memset(op, 0, sizeof(opts));
-        op->cmplst = true;
+again_with_long_lba:
+        memset(dbuff, 0, MAX_BUFF_SZ);
+        if (op->mode6)
+                res = sg_ll_mode_sense6(fd, false /* DBD */, 0 /* current */,
+                                        op->mode_page, 0 /* subpage */, dbuff,
+                                        MAX_BUFF_SZ, true, vb);
+        else
+                res = sg_ll_mode_sense10_v2(fd, op->long_lba, false /* DBD */,
+                                            0 /* current */, op->mode_page,
+                                            0 /* subpage */, dbuff,
+                                            MAX_BUFF_SZ, 0, &resid, true,
+                                            vb);
+        if (res) {
+                if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+                        if (op->long_lba && (! op->mode6))
+                                pr2serr("bad field in MODE SENSE (%d) "
+                                        "[longlba flag not supported?]\n",
+                                        (op->mode6 ? 6 : 10));
+                        else
+                                pr2serr("bad field in MODE SENSE (%d) "
+                                        "[mode_page %d not supported?]\n",
+                                        (op->mode6 ? 6 : 10), op->mode_page);
+                } else {
+                        sg_get_category_sense_str(res, sizeof(b), b, vb);
+                        pr2serr("MODE SENSE (%d) command: %s\n",
+                                (op->mode6 ? 6 : 10), b);
+                }
+                if (0 == vb)
+                        pr2serr("    try '-v' for more information\n");
+                return res;
+        }
+        rsp_len = (resid > 0) ? (MAX_BUFF_SZ - resid) : MAX_BUFF_SZ;
+        if (rsp_len < 0) {
+                pr2serr("%s: resid=%d implies negative response "
+                        "length of %d\n", __func__, resid, rsp_len);
+                return SG_LIB_WILD_RESID;
+        }
+        *calc_lenp = sg_msense_calc_length(dbuff, rsp_len, op->mode6, &bd_len);
+        if (op->mode6) {
+                if (rsp_len < 4) {
+                        pr2serr("%s: MS(6) response length too short (%d)\n",
+                                __func__, rsp_len);
+                        return SG_LIB_CAT_MALFORMED;
+                }
+                dev_specific_param = dbuff[2];
+                op->long_lba = false;
+                offset = 4;
+                /* prepare for mode select */
+                dbuff[0] = 0;
+                dbuff[1] = 0;
+                dbuff[2] = 0;
+        } else {        /* MODE SENSE(10) */
+                if (rsp_len < 8) {
+                        pr2serr("%s: MS(10) response length too short (%d)\n",
+                                __func__, rsp_len);
+                        return SG_LIB_CAT_MALFORMED;
+                }
+                dev_specific_param = dbuff[3];
+                op->long_lba = !! (dbuff[4] & 1);
+                offset = 8;
+                /* prepare for mode select */
+                dbuff[0] = 0;
+                dbuff[1] = 0;
+                dbuff[2] = 0;
+                dbuff[3] = 0;
+        }
+        if (rsp_len < *calc_lenp) {
+                pr2serr("%s: MS response length truncated (%d < %d)\n",
+                        __func__, rsp_len, *calc_lenp);
+                return SG_LIB_CAT_MALFORMED;
+        }
+        if ((offset + bd_len) < *calc_lenp)
+                dbuff[offset + bd_len] &= 0x7f;  /* clear PS bit in mpage */
+        prob = false;
+        bd_lbsz = 0;
+        *bd_lb_szp = bd_lbsz;
+        rq_lb_sz = op->lblk_sz;
+        if (first) {
+                first = false;
+                printf("Mode Sense (block descriptor) data, prior to "
+                       "changes:\n");
+        }
+        if (dev_specific_param & 0x40)
+                printf("  <<< Write Protect (WP) bit set >>>\n");
+        if (bd_len > 0) {
+                ull = op->long_lba ? sg_get_unaligned_be64(dbuff + offset) :
+                                 sg_get_unaligned_be32(dbuff + offset);
+                bd_lbsz = op->long_lba ?
+                                 sg_get_unaligned_be32(dbuff + offset + 12) :
+                                 sg_get_unaligned_be24(dbuff + offset + 5);
+                *bd_lb_szp = bd_lbsz;
+                if (! op->long_lba) {
+                        if (0xffffffff == ull) {
+                                if (vb)
+                                        pr2serr("block count maxed out, set "
+                                                "<<longlba>>\n");
+                                op->long_lba = true;
+                                op->mode6 = false;
+                                op->do_rcap16 = true;
+                                goto again_with_long_lba;
+                        } else if ((rq_lb_sz > 0) && (rq_lb_sz < bd_lbsz) &&
+                                   (((ull * bd_lbsz) / rq_lb_sz) >=
+                                    0xffffffff)) {
+                                if (vb)
+                                        pr2serr("number of blocks will max "
+                                                "out, set <<longlba>>\n");
+                                op->long_lba = true;
+                                op->mode6 = false;
+                                op->do_rcap16 = true;
+                                goto again_with_long_lba;
+                        }
+                }
+                if (op->long_lba) {
+                        printf("  <<< longlba flag set (64 bit lba) >>>\n");
+                        if (bd_len != 16)
+                                prob = true;
+                } else if (bd_len != 8)
+                        prob = true;
+                printf("  Number of blocks=%" PRIu64 " [0x%" PRIx64 "]\n",
+                       ull, ull);
+                printf("  Block size=%d [0x%x]\n", bd_lbsz, bd_lbsz);
+                ll = (int64_t)ull * bd_lbsz;
+                if (ll > op->total_byte_count)
+                        op->total_byte_count = ll;
+        } else {
+                printf("  No block descriptors present\n");
+                prob = true;
+        }
+        if (op->resize || (op->format && ((op->blk_count != 0) ||
+              ((rq_lb_sz > 0) && (rq_lb_sz != bd_lbsz))))) {
+                /* want to run MODE SELECT, prepare now */
+
+                if (prob) {
+                        pr2serr("Need to perform MODE SELECT (to change "
+                                "number or blocks or block length)\n");
+                        pr2serr("but (single) block descriptor not found "
+                                "in earlier MODE SENSE\n");
+                        return SG_LIB_CAT_MALFORMED;
+                }
+                if (op->blk_count != 0)  { /* user supplied blk count */
+                        if (op->long_lba)
+                                sg_put_unaligned_be64(op->blk_count,
+                                                      dbuff + offset);
+                        else
+                                sg_put_unaligned_be32(op->blk_count,
+                                                      dbuff + offset);
+                } else if ((rq_lb_sz > 0) && (rq_lb_sz != bd_lbsz))
+                        /* 0 implies max capacity with new LB size */
+                        memset(dbuff + offset, 0, op->long_lba ? 8 : 4);
+
+                if ((rq_lb_sz > 0) && (rq_lb_sz != bd_lbsz)) {
+                        if (op->long_lba)
+                                sg_put_unaligned_be32((uint32_t)rq_lb_sz,
+                                                      dbuff + offset + 12);
+                        else
+                                sg_put_unaligned_be24((uint32_t)rq_lb_sz,
+                                                      dbuff + offset + 5);
+                }
+        }
+        return 0;
+}
+
+static int
+parse_cmd_line(struct opts_t * op, int argc, char **argv)
+{
+        int j;
+
+        op->cmplst = true;      /* will be set false if FFMT > 0 */
         op->mode_page = RW_ERROR_RECOVERY_PAGE;
         op->poll_type = DEF_POLL_TYPE_RS;
         op->tape = -1;
@@ -866,6 +1065,7 @@ main(int argc, char **argv)
                                         "or 1\n");
                                 return SG_LIB_SYNTAX_ERROR;
                         }
+                        op->cmplst_given = true;
                         op->cmplst = !! j;
                         break;
                 case 'd':
@@ -890,7 +1090,7 @@ main(int argc, char **argv)
                         break;
                 case 'h':
                         usage();
-                        return 0;
+                        return SG_LIB_OK_FALSE;
                 case 'I':
                         op->ip_def = true;
                         break;
@@ -943,8 +1143,8 @@ main(int argc, char **argv)
                         op->rto_req = true;
                         break;
                 case 's':
-                        op->blk_size = sg_get_num(optarg);
-                        if (op->blk_size <= 0) {
+                        op->lblk_sz = sg_get_num(optarg);
+                        if (op->lblk_sz <= 0) {
                                 pr2serr("bad argument to '--size', want arg "
                                         "> 0\n");
                                 return SG_LIB_SYNTAX_ERROR;
@@ -1031,9 +1231,8 @@ main(int argc, char **argv)
 #endif
         if (op->version_given) {
                 pr2serr("sg_format version: %s\n", version_str);
-                return 0;
+                return SG_LIB_OK_FALSE;
         }
-        vb = op->verbose;
         if (NULL == op->device_name) {
                 pr2serr("no DEVICE name given\n\n");
                 usage();
@@ -1060,7 +1259,7 @@ main(int argc, char **argv)
                                 "0)\n");
                         usage();
                         return SG_LIB_CONTRADICT;
-                } else if (0 != op->blk_size) {
+                } else if (0 != op->lblk_sz) {
                         pr2serr("'--resize' not compatible with '--size'\n");
                         usage();
                         return SG_LIB_CONTRADICT;
@@ -1079,18 +1278,54 @@ main(int argc, char **argv)
                 if (op->rto_req)
                         op->fmtpinfo |= 1;
         }
+        if ((op->ffmt > 0) && (! op->cmplst_given))
+                op->cmplst = false; /* SBC-4 silent; FFMT&&CMPLST unlikely */
+        return 0;
+}
 
-        if ((fd = sg_cmds_open_device(op->device_name, false /* rw=false */,
-                                      vb)) < 0) {
+
+int
+main(int argc, char **argv)
+{
+        int bd_lb_sz, calc_len, pdt, res, rq_lb_sz, vb;
+        int fd = -1;
+        int ret = 0;
+        const int dbuff_sz = MAX_BUFF_SZ;
+        const int inq_resp_sz = SAFE_STD_INQ_RESP_LEN;
+        struct opts_t * op;
+        uint8_t * dbuff;
+        uint8_t * free_dbuff = NULL;
+        uint8_t * inq_resp;
+        uint8_t * free_inq_resp = NULL;
+        struct opts_t opts;
+        char b[80];
+
+        op = &opts;
+        memset(op, 0, sizeof(opts));
+        ret = parse_cmd_line(op, argc, argv);
+        if (ret)
+                return (SG_LIB_OK_FALSE == ret) ? 0 : ret;
+        vb = op->verbose;
+
+        dbuff = sg_memalign(dbuff_sz, 0, &free_dbuff, false);
+        inq_resp = sg_memalign(inq_resp_sz, 0, &free_inq_resp, false);
+        if ((NULL == dbuff) || (NULL == inq_resp)) {
+                pr2serr("Unable to allocate heap\n");
+                ret = sg_convert_errno(ENOMEM);
+                goto out;
+        }
+
+        if ((fd = sg_cmds_open_device(op->device_name, false, vb)) < 0) {
                 pr2serr("error opening device file: %s: %s\n",
                         op->device_name, safe_strerror(-fd));
-                return sg_convert_errno(-fd);
+                ret = sg_convert_errno(-fd);
+                goto out;
         }
 
         if (op->format > 2)
                 goto format_only;
 
-        ret = print_dev_id(fd, inq_resp, sizeof(inq_resp), op);
+        ret = print_dev_id(fd, inq_resp, inq_resp_sz, op);
         if (ret)
                 goto out;
         pdt = 0x1f & inq_resp[0];
@@ -1112,154 +1347,17 @@ main(int argc, char **argv)
                 goto format_med;
         }
 
-again_with_long_lba:
-        memset(dbuff, 0, MAX_BUFF_SZ);
-        if (op->mode6)
-                res = sg_ll_mode_sense6(fd, false /* DBD */, 0 /* current */,
-                                        op->mode_page, 0 /* subpage */, dbuff,
-                                        MAX_BUFF_SZ, true, vb);
-        else
-                res = sg_ll_mode_sense10_v2(fd, op->long_lba, false /* DBD */,
-                                            0 /* current */, op->mode_page,
-                                            0 /* subpage */, dbuff,
-                                            MAX_BUFF_SZ, 0, &resid, true,
-                                            vb);
-        ret = res;
-        if (res) {
-                if (SG_LIB_CAT_ILLEGAL_REQ == res) {
-                        if (op->long_lba && (! op->mode6))
-                                pr2serr("bad field in MODE SENSE (%d) "
-                                        "[longlba flag not supported?]\n",
-                                        (op->mode6 ? 6 : 10));
-                        else
-                                pr2serr("bad field in MODE SENSE (%d) "
-                                        "[mode_page %d not supported?]\n",
-                                        (op->mode6 ? 6 : 10), op->mode_page);
-                } else {
-                        sg_get_category_sense_str(res, sizeof(b), b, vb);
-                        pr2serr("MODE SENSE (%d) command: %s\n",
-                                (op->mode6 ? 6 : 10), b);
-                }
-                if (0 == vb)
-                        pr2serr("    try '-v' for more information\n");
+        ret = fetch_block_desc(fd, dbuff, &calc_len, &bd_lb_sz, op);
+        if (ret)
                 goto out;
-        }
-        rsp_len = (resid > 0) ? (MAX_BUFF_SZ - resid) : MAX_BUFF_SZ;
-        if (rsp_len < 0) {
-                pr2serr("%s: resid=%d implies negative response "
-                        "length of %d\n", __func__, resid, rsp_len);
-                ret = SG_LIB_WILD_RESID;
-                goto out;
-        }
-        calc_len = sg_msense_calc_length(dbuff, rsp_len, op->mode6, &bd_len);
-        if (op->mode6) {
-                if (rsp_len < 4) {
-                        pr2serr("%s: MS(6) response length too short (%d)\n",
-                                __func__, rsp_len);
-                        ret = -1;
-                        goto out;
-                }
-                dev_specific_param = dbuff[2];
-                op->long_lba = false;
-                offset = 4;
-                /* prepare for mode select */
-                dbuff[0] = 0;
-                dbuff[1] = 0;
-                dbuff[2] = 0;
-        } else {        /* MODE SENSE(10) */
-                if (rsp_len < 8) {
-                        pr2serr("%s: MS(10) response length too short (%d)\n",
-                                __func__, rsp_len);
-                        ret = -1;
-                        goto out;
-                }
-                dev_specific_param = dbuff[3];
-                op->long_lba = !! (dbuff[4] & 1);
-                offset = 8;
-                /* prepare for mode select */
-                dbuff[0] = 0;
-                dbuff[1] = 0;
-                dbuff[2] = 0;
-                dbuff[3] = 0;
-        }
-        if (rsp_len < calc_len) {
-                pr2serr("%s: MS response length truncated (%d < %d)\n",
-                        __func__, rsp_len, calc_len);
-                goto out;
-        }
-        if ((offset + bd_len) < calc_len)
-                dbuff[offset + bd_len] &= 0x7f;  /* clear PS bit in mpage */
-        prob = false;
-        bd_blk_len = 0;
-        printf("Mode Sense (block descriptor) data, prior to changes:\n");
-        if (dev_specific_param & 0x40)
-                printf("  <<< Write Protect (WP) bit set >>>\n");
-        if (bd_len > 0) {
-                ull = op->long_lba ? sg_get_unaligned_be64(dbuff + offset) :
-                                 sg_get_unaligned_be32(dbuff + offset);
-                if ((! op->long_lba) && (0xffffffff == ull)) {
-                        if (vb)
-                                pr2serr("Mode sense number of blocks maxed "
-                                        "out, set longlba\n");
-                        op->long_lba = true;
-                        op->mode6 = false;
-                        op->do_rcap16 = true;
-                        goto again_with_long_lba;
-                }
-                bd_blk_len = op->long_lba ?
-                                 sg_get_unaligned_be32(dbuff + offset + 12) :
-                                 sg_get_unaligned_be24(dbuff + offset + 5);
-                if (op->long_lba) {
-                        printf("  <<< longlba flag set (64 bit lba) >>>\n");
-                        if (bd_len != 16)
-                                prob = true;
-                } else if (bd_len != 8)
-                        prob = true;
-                printf("  Number of blocks=%" PRIu64 " [0x%" PRIx64 "]\n",
-                       ull, ull);
-                printf("  Block size=%d [0x%x]\n", bd_blk_len, bd_blk_len);
-                ll = (int64_t)ull * bd_blk_len;
-                if (ll > op->total_byte_count)
-                        op->total_byte_count = ll;
-        } else {
-                printf("  No block descriptors present\n");
-                prob = true;
-        }
+
+        rq_lb_sz = op->lblk_sz;
         if (op->resize || (op->format && ((op->blk_count != 0) ||
-              ((op->blk_size > 0) && (op->blk_size != bd_blk_len))))) {
+              ((rq_lb_sz > 0) && (rq_lb_sz != bd_lb_sz))))) {
                 /* want to run MODE SELECT */
-
-                if (prob) {
-                        pr2serr("Need to perform MODE SELECT (to change "
-                                "number or blocks or block length)\n");
-                        pr2serr("but (single) block descriptor not found "
-                                "in earlier MODE SENSE\n");
-                        ret = SG_LIB_CAT_MALFORMED;
-                        goto out;
-                }
-                if (op->blk_count != 0)  { /* user supplied blk count */
-                        if (op->long_lba)
-                                sg_put_unaligned_be64(op->blk_count,
-                                                      dbuff + offset);
-                        else
-                                sg_put_unaligned_be32(op->blk_count,
-                                                      dbuff + offset);
-                } else if ((op->blk_size > 0) &&
-                           (op->blk_size != bd_blk_len))
-                        /* 0 implies max capacity with new LB size */
-                        memset(dbuff + offset, 0, op->long_lba ? 8 : 4);
-
-                if ((op->blk_size > 0) && (op->blk_size != bd_blk_len)) {
-                        if (op->long_lba)
-                                sg_put_unaligned_be32((uint32_t)op->blk_size,
-                                                      dbuff + offset + 12);
-                        else
-                                sg_put_unaligned_be24((uint32_t)op->blk_size,
-                                                      dbuff + offset + 5);
-                }
                 if (op->dry_run) {
                         pr2serr("Due to --dry-run option bypass MODE "
-                                "SELECT(%d)command\n", (op->mode6 ? 6 : 10));
+                                "SELECT(%d) command\n", (op->mode6 ? 6 : 10));
                         res = 0;
                 } else {
                         bool sp = true;   /* may not be able to save pages */
@@ -1300,11 +1398,11 @@ again_sp_false:
                 }
                 if (res < 0)
                         ret = -1;
-                if ((res > 0) && (bd_blk_len > 0) &&
-                    (res != (int)bd_blk_len)) {
+                if ((res > 0) && (bd_lb_sz > 0) &&
+                    (res != (int)bd_lb_sz)) {
                         printf("  Warning: mode sense and read capacity "
                                "report different block sizes [%d,%d]\n",
-                               bd_blk_len, res);
+                               bd_lb_sz, res);
                         printf("           Probably needs format\n");
                 }
                 if ((PDT_TAPE == pdt) || (PDT_MCHANGER == pdt) ||
@@ -1382,11 +1480,17 @@ skip_f_med_reconsider:
         }
 
 out:
-        res = sg_cmds_close_device(fd);
-        if (res < 0) {
-                pr2serr("close error: %s\n", safe_strerror(-res));
-                if (0 == ret)
-                        ret = sg_convert_errno(-res);
+        if (free_dbuff)
+                free(free_dbuff);
+        if (free_inq_resp)
+                free(free_inq_resp);
+        if (fd >= 0) {
+            res = sg_cmds_close_device(fd);
+            if (res < 0) {
+                    pr2serr("close error: %s\n", safe_strerror(-res));
+                    if (0 == ret)
+                            ret = sg_convert_errno(-res);
+            }
         }
         if (0 == vb) {
                 if (! sg_if_can2stderr("sg_format failed: ", ret))

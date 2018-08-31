@@ -1903,7 +1903,7 @@ main(int argc, char * argv[])
     ret = res;
 
 fini:
-    /* file handles not explicity closed; let process cleanup do that */
+    /* file handles not explicitly closed; let process cleanup do that */
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_xcopy failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "

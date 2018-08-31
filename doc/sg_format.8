@@ -67,27 +67,27 @@ option name.
 .TP
 \fB\-C\fR, \fB\-\-cmplst\fR={0|1}
 sets the CMPLST ("complete list") bit in the FORMAT UNIT cdb to 0 or 1.
-The default is 1 in which case the existing GLIST (grown list) is ignored.
-If the value is 0 then the existing GLIST is taken into account. See the
-LISTS section below. In most cases this bit should be left set; some MO
-disk drives need this bit cleared.
+If the value is 0 then the existing GLIST (grown list) is taken into account.
+If the value is 1 then the existing GLIST is ignored. CMPLST defaults to 1
+apart from when the \fI\-\-ffmt=FFMT\fR option's value is non\-zero in which
+case CMPLST defaults to 0. See the LISTS section below. In most cases this
+bit should be left at its default value.
 .TP
 \fB\-c\fR, \fB\-\-count\fR=\fICOUNT\fR
 where \fICOUNT\fR is the number of blocks to be formatted or media to be
 resized to. Can be used with either \fI\-\-format\fR or \fI\-\-resize\fR.
 With \fI\-\-format\fR this option need not be given in which case it is
-assumed to be zero. With \fI\-\-format\fR the interpretation of \fICOUNT\fR
-is:
+assumed to be zero.
+.br
+With \fI\-\-format\fR the interpretation of \fICOUNT\fR is:
 .br
   (\fICOUNT\fR > 0) : only format the first \fICOUNT\fR blocks and READ
-.br
-                CAPACITY will report \fICOUNT\fR blocks after format
+CAPACITY will report \fICOUNT\fR blocks after format
 .br
   (\fICOUNT\fR = 0) and block size unchanged : use existing block count
 .br
   (\fICOUNT\fR = 0) and block size changed : recommended maximum block
-.br
-                                       count for new block size
+count for new block size
 .br
   (\fICOUNT\fR = \-1) : use recommended maximum block count
 .br
@@ -97,14 +97,12 @@ With \fI\-\-resize\fR this option must be given and \fICOUNT\fR has this
 interpretation:
 .br
   (\fICOUNT\fR > 0) : after resize READ CAPACITY will report \fICOUNT\fR
-.br
-                blocks
+blocks
 .br
   (\fICOUNT\fR = 0) : after resize READ CAPACITY will report 0 blocks
 .br
   (\fICOUNT\fR = \-1) : after resize READ CAPACITY will report its
-.br
-                 maximum number of blocks
+maximum number of blocks
 .br
   (\fICOUNT\fR < \-1) : illegal
 .br
@@ -128,12 +126,12 @@ would do that is also bypassed when the dry run option is given.
 .TP
 \fB\-e\fR, \fB\-\-early\fR
 during a format operation, The default action of this utility is to poll the
-disk every 60 seconds to determine the progress of the format operation until
-it is finished. When this option is given this utility will exit "early",
-that is as soon as the format operation has commenced. Then the user can
-monitor the progress of the ongoing format operation with other
-utilities (e.g. sg_turs(8) or sg_requests(8)). This option and \fI\-\-wait\fR
-are mutually exclusive.
+disk every 60 seconds (or every 10 seconds if \fIFFMT\fR is non\-zero) to
+determine the progress of the format operation until it is finished. When this
+option is given this utility will exit "early", that is as soon as the format
+operation has commenced. Then the user can monitor the progress of the ongoing
+format operation with other utilities (e.g. sg_turs(8) or sg_requests(8)).
+This option and \fI\-\-wait\fR are mutually exclusive.
 .TP
 \fB\-t\fR, \fB\-\-ffmt\fR=\fIFFMT\fR
 \fIFFMT\fR (fast format) is placed in a field of the same name in the FORMAT
@@ -420,14 +418,15 @@ When the \fI\-\-format\fR option is given without the \fI\-\-wait\fR option
 then the SCSI FORMAT UNIT command is issued with the IMMED bit set which
 causes the SCSI command to return after it has started the format operation.
 The \fI\-\-early\fR option will cause sg_format to exit at that point.
-Otherwise the \fIDEVICE\fR is polled every 60 seconds with TEST UNIT READY
-or REQUEST SENSE commands until it reports an "all clear" (i.e. the format
-operation has completed). Normally these polling commands will result in a
-progress indicator (expressed as a percentage) being output to the screen.
-If the user gets bored watching the progress report then sg_format process
-can be terminated (e.g. with control\-C) without affecting the format
-operation which continues. However a target or device reset (or a power
-cycle) will probably cause the device to become "format corrupt".
+Otherwise the \fIDEVICE\fR is polled every 60 seconds or every 10 seconds
+if \fIFFMT\fR is non\-zero. The poll is with TEST UNIT READY or REQUEST SENSE
+commands until one reports an "all clear" (i.e. the format operation has
+completed). Normally these polling commands will result in a progress
+indicator (expressed as a percentage) being output to the screen. If the user
+gets bored watching the progress report then sg_format process can be
+terminated (e.g. with control\-C) without affecting the format operation
+which continues. However a target or device reset (or a power cycle) will
+probably cause the device to become "format corrupt".
 .PP
 When the \fI\-\-format\fR (or \fI\-\-tape\fR) and \fI\-\-wait\fR options are
 both given then this utility may take a long time to return. In this case
@@ -463,6 +462,11 @@ to '\-1'. So a \-\-count=\-1 causes the block count to be set back to
 the manufacturer's maximum recommended value. To see exactly which SCSI
 commands are being executed and parameters passed add the "\-vvv" option to
 the sg_format command line.
+.PP
+The FMTDATA field shown in the FORMAT UNIT cdb does not have a corresponding
+option in this utility. When set in the cdb it indicates an additional
+parameter list will be sent to the \fIDEVICE\fR along with the cdb. It is set
+as required, basically when any field in the parameter list header is set.
 .PP
 Short stroking is a technique to trade off capacity for performance on
 hard disks. "Hard" disk is often used to mean a storage device with
@@ -604,6 +608,17 @@ To format with type 3 protection:
 .PP
 For the disk shown above this will probably fail because the Extended inquiry
 VPD page showed only types 1 and 2 protection are supported.
+.PP
+Here are examples of using fast format (FFMT field in FORMAT UNIT cdb) to
+quickly switch between 512 and 4096 byte logical block size. Assume disk
+starts with 4096 byte logical block size and all important data has been
+backed up.
+.PP
+   # sg_format \-\-format \-\-ffmt=1 \-\-size=512 \-\-count=\-1 /dev/sdd
+.PP
+Now /dev/sdd should have 512 byte logical block size. And to switch it back:
+.PP
+   # sg_format \-\-format \-\-ffmt=1 \-\-size=4096 \-\-count=\-1 /dev/sdd
 .SH EXIT STATUS
 The exit status of sg_format is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the

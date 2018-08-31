@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.45 20180628";  /* spc5r19 + sbc4r15 */
+static const char * version_str = "1.46 20180828";  /* spc5r19 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -48,7 +48,7 @@ static const char * version_str = "1.45 20180628";  /* spc5r19 + sbc4r15 */
 #define VPD_DEVICE_ID 0x83
 #define VPD_SOFTW_INF_ID 0x84
 #define VPD_MAN_NET_ADDR 0x85
-#define VPD_EXT_INQ 0x86
+#define VPD_EXT_INQ 0x86                /* Extended Inquiry */
 #define VPD_MODE_PG_POLICY 0x87
 #define VPD_SCSI_PORTS 0x88
 #define VPD_ATA_INFO 0x89
@@ -66,7 +66,6 @@ static const char * version_str = "1.45 20180628";  /* spc5r19 + sbc4r15 */
 #define VPD_BLOCK_DEV_CHARS 0xb1        /* SBC-3 */
 #define VPD_MAN_ASS_SN 0xb1             /* SSC-3, ADC-2 */
 #define VPD_SECURITY_TOKEN 0xb1         /* OSD */
-#define VPD_ES_DEV_CHARS 0xb1           /* SES-4 */
 #define VPD_TA_SUPPORTED 0xb2           /* SSC-3 */
 #define VPD_LB_PROVISIONING 0xb2        /* SBC-3 */
 #define VPD_REFERRALS 0xb3              /* SBC-3 */
@@ -206,8 +205,6 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_DTDE_ADDRESS, 0, 1, "dtde",
      "Data transfer device element address (SSC)"},
     {VPD_EXT_INQ, 0, -1, "ei", "Extended inquiry data"},
-    {VPD_ES_DEV_CHARS, 0, PDT_SES, "esdc",
-     "Enclosure services device characteristics"},
     {VPD_IMP_OP_DEF, 0, -1, "iod",
      "Implemented operating definition (obsolete)"},
     {VPD_LB_PROTECTION, 0, 0, "lbpro", "Logical block protection (SSC)"},
@@ -1269,6 +1266,7 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
         printf("  POA_SUP=%d\n", !!(b[12] & 0x80));     /* spc4r32 */
         printf("  HRA_SUP=%d\n", !!(b[12] & 0x40));     /* spc4r32 */
         printf("  VSA_SUP=%d\n", !!(b[12] & 0x20));     /* spc4r32 */
+        printf("  DMS_VALID=%d\n", !!(b[12] & 0x10));   /* 17-142r5 */
         printf("  Maximum supported sense data length=%d\n",
                b[13]); /* spc4r34 */
         printf("  IBS=%d\n", !!(b[14] & 0x80));     /* spc5r09 */
@@ -1280,6 +1278,13 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
                sg_get_unaligned_be16(b + 15));      /* spc5r17 */
         printf("  Maximum mode page change logs=%u\n",
                sg_get_unaligned_be16(b + 17));      /* spc5r17 */
+        printf("  DM_MD_4=%d\n", !!(b[19] & 0x80)); /* 17-142r5 */
+        printf("  DM_MD_5=%d\n", !!(b[19] & 0x40)); /* 17-142r5 */
+        printf("  DM_MD_6=%d\n", !!(b[19] & 0x20)); /* 17-142r5 */
+        printf("  DM_MD_7=%d\n", !!(b[19] & 0x10)); /* 17-142r5 */
+        printf("  DM_MD_D=%d\n", !!(b[19] & 0x8));  /* 17-142r5 */
+        printf("  DM_MD_E=%d\n", !!(b[19] & 0x4));  /* 17-142r5 */
+        printf("  DM_MD_F=%d\n", !!(b[19] & 0x2));  /* 17-142r5 */
         return;
     }
     printf("  ACTIVATE_MICROCODE=%d SPT=%d GRD_CHK=%d APP_CHK=%d "
@@ -1300,8 +1305,9 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
     printf("  Multi I_T nexus microcode download=%d\n", b[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            sg_get_unaligned_be16(b + 10));    /* spc4r27 */
-    printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
-           !!(b[12] & 0x80), !!(b[12] & 0x40), !!(b[12] & 0x20));
+    printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d DMS_VALID=%d\n",
+           !!(b[12] & 0x80), !!(b[12] & 0x40), !!(b[12] & 0x20),
+           !!(b[12] & 0x10));                   /* spc4r32 + 17-142r5 */
     printf("  Maximum supported sense data length=%d\n", b[13]); /* spc4r34 */
     printf("  IBS=%d IAS=%d SAC=%d NRD1=%d NRD0=%d\n", !!(b[14] & 0x80),
            !!(b[14] & 0x40), !!(b[14] & 0x4), !!(b[14] & 0x2),
@@ -1310,6 +1316,11 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
            sg_get_unaligned_be16(b + 15));        /* spc5r17 */
     printf("  Maximum mode page change logs=%u\n",
            sg_get_unaligned_be16(b + 17));        /* spc5r17 */
+    printf("  DM_MD_4=%d DM_MD_5=%d DM_MD_6=%d DM_MD_7=%d\n",
+           !!(b[19] & 0x80), !!(b[19] & 0x40), !!(b[19] & 0x20),
+           !!(b[19] & 0x10));                     /* 17-142r5 */
+    printf("  DM_MD_D=%d DM_MD_E=%d DM_MD_F=%d\n",
+           !!(b[19] & 0x8), !!(b[19] & 0x4), !!(b[19] & 0x2));
 }
 
 /* VPD_SOFTW_INF_ID */
@@ -2327,22 +2338,6 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex, int pdt)
     case PDT_TAPE: case PDT_MCHANGER: case PDT_ADC:
         printf("  Manufacturer-assigned serial number: %.*s\n",
                len - 4, buff + 4);
-        break;
-    case PDT_SES:       /* T10/17-142r1 -> ses4r02 ?? */
-        if (len < 8) {
-            pr2serr("Enclosure service device characteristics VPD page "
-                    "length too short=%d\n", len);
-            return;
-        }
-        printf("  SESDNLD=%d\n", !! (0x2 & buff[4]));
-        printf("  SPCDNLD=%d\n", !! (0x1 & buff[4]));
-        printf("  DMAS=%d\n", !! (0x80 & buff[6]));
-        printf("  DMSAS=%d\n", !! (0x40 & buff[6]));
-        printf("  DMOAS=%d\n", !! (0x20 & buff[6]));
-        printf("  DMOSAS=%d\n", !! (0x10 & buff[6]));
-        printf("  DMOSASDS=%d\n", !! (0x8 & buff[6]));
-        printf("  DMOSDS=%d\n", !! (0x4 & buff[6]));
-        printf("  ADMS=%d\n", !! (0x1 & buff[6]));
         break;
     default:
         pr2serr("  Unable to decode pdt=0x%x, in hex:\n", pdt);

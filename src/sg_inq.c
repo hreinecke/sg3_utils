@@ -49,7 +49,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.97 20180801";    /* SPC-5 rev 19 */
+static const char * version_str = "1.98 20180828";    /* SPC-5 rev 19 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -85,7 +85,7 @@ static const char * version_str = "1.97 20180801";    /* SPC-5 rev 19 */
 #define VPD_DEVICE_ID  0x83
 #define VPD_SOFTW_INF_ID 0x84
 #define VPD_MAN_NET_ADDR  0x85
-#define VPD_EXT_INQ  0x86
+#define VPD_EXT_INQ  0x86               /* Extended Inquiry */
 #define VPD_MODE_PG_POLICY  0x87
 #define VPD_SCSI_PORTS  0x88
 #define VPD_ATA_INFO  0x89
@@ -100,7 +100,6 @@ static const char * version_str = "1.97 20180801";    /* SPC-5 rev 19 */
 #define VPD_BLOCK_LIMITS 0xb0
 #define VPD_BLOCK_DEV_CHARS 0xb1
 #define VPD_MAN_ASS_SN 0xb1
-#define VPD_ES_DEV_CHARS 0xb1
 #define VPD_LB_PROVISIONING 0xb2
 #define VPD_REFERRALS 0xb3
 #define VPD_SUP_BLOCK_LENS 0xb4         /* sbc4r01 */
@@ -189,8 +188,6 @@ static struct svpd_values_name_t vpd_pg[] = {
      "identification, target device only"},
 #endif
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
-    {VPD_ES_DEV_CHARS, 0, PDT_SES, 0, "esdc",
-     "Enclosure services device characteristics (SES-4)"},
     {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv", "Logical block provisioning "
      "(SBC)"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},
@@ -1180,8 +1177,6 @@ static struct vpd_name vpd_name_arr[] = {
     {VPD_REFERRALS, 0, "Referrals (sbc3)"},
     {0xb0, PDT_TAPE, "Sequential access device capabilities (ssc3)"},
     {0xb2, PDT_TAPE, "TapeAlert supported flags (ssc3)"},
-    {VPD_ES_DEV_CHARS, PDT_SES,
-     "Enclosure services device characteristics (ses4)"},
     {0xb0, PDT_OSD, "OSD information (osd)"},
     {0xb1, PDT_OSD, "Security token (osd)"},
     /* 0xc0 to 0xff are vendor specific */
@@ -2177,8 +2172,9 @@ decode_x_inq_vpd(uint8_t * buff, int len, int do_hex)
     printf("  Multi I_T nexus microcode download=%d\n", buff[9] & 0xf);
     printf("  Extended self-test completion minutes=%d\n",
            sg_get_unaligned_be16(buff + 10));     /* spc4r27 */
-    printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d\n",      /* spc4r32 */
-           !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20));
+    printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d DMS_VALID=%d\n",
+           !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20),
+           !!(buff[12] & 0x10));                /* spc4r32 + 17-142r5 */
     printf("  Maximum supported sense data length=%d\n",
            buff[13]); /* spc4r34 */
     /* All byte 14 bits added in spc5r09 */
@@ -2189,6 +2185,11 @@ decode_x_inq_vpd(uint8_t * buff, int len, int do_hex)
            sg_get_unaligned_be16(buff + 15));     /* spc5r17 */
     printf("  Maximum mode page change logs=%u\n",
            sg_get_unaligned_be16(buff + 17));     /* spc5r17 */
+    printf("  DM_MD_4=%d DM_MD_5=%d DM_MD_6=%d DM_MD_7=%d\n",
+           !!(buff[19] & 0x80), !!(buff[19] & 0x40), !!(buff[19] & 0x20),
+           !!(buff[19] & 0x10));                     /* 17-142r5 */
+    printf("  DM_MD_D=%d DM_MD_E=%d DM_MD_F=%d\n",
+           !!(buff[19] & 0x8), !!(buff[19] & 0x4), !!(buff[19] & 0x2));
 }
 
 /* VPD_SOFTW_INF_ID [0x84] */
@@ -2486,7 +2487,6 @@ decode_b0_vpd(uint8_t * buff, int len, int do_hex)
 
 /* VPD_BLOCK_DEV_CHARS sbc */
 /* VPD_MAN_ASS_SN ssc */
-/* VPD_ES_DEV_CHARS ses-4 */
 static void
 decode_b1_vpd(uint8_t * buff, int len, int do_hex)
 {
@@ -2552,8 +2552,6 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex)
             printf("  Manufacturer-assigned serial number: %.*s\n",
                    len - 4, buff + 4);
             break;
-        case PDT_SES:   /* VPD_ES_DEV_CHARS implemented in sg_vpd, not here */
-            /* fall through */
         default:
             printf("  Unable to decode pdt=0x%x, in hex:\n", pdt);
             hex2stdout(buff, len, 0);

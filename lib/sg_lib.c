@@ -1997,11 +1997,11 @@ sg_convert_errno(int os_err_num)
 
 static const char * const bad_sense_cat = "Bad sense category";
 
-/* Yield string associated with sense category. Returns 'buff' (or pointer
- * to "Bad sense category" if 'buff' is NULL). If sense_cat unknown then
- * yield "Sense category: <sense_cat)val>" string. The original 'sense
+/* Yield string associated with sense category. Returns 'b' (or pointer
+ * to "Bad sense category" if 'b' is NULL). If sense_cat unknown then
+ * yield "Sense category: <sense_cat_val>" string. The original 'sense
  * category' concept has been expanded to most detected errors and is
- * returned by these utilties as their exit status value (an (unsigned)
+ * returned by these utilities as their exit status value (an (unsigned)
  * 8 bit value where 0 means good (i.e. no errors)).  Uses sg_exit2str()
  * function. */
 const char *

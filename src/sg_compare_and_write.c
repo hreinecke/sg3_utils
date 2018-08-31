@@ -166,7 +166,7 @@ usage()
                 "\n"
                 "Performs a SCSI COMPARE AND WRITE operation. Sends a double "
                 "size\nbuffer, the first half is used to compare what is at "
-                "LBA for NUM\nblocks. If and only if the comparsion is "
+                "LBA for NUM\nblocks. If and only if the comparison is "
                 "equal, then the second\nhalf of the buffer is written to "
                 "LBA for NUM blocks.\n");
 }
