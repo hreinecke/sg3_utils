@@ -332,7 +332,7 @@ const char * sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len,
  * structures that are sent across the wire. The 'FIS register' structure is
  * used to move a command from a SATA host to device, but the ATA 'command'
  * is not the first byte. So it is harder to say what will happen if a
- * FIS structure is presented as a SCSI command, hopfully there is a low
+ * FIS structure is presented as a SCSI command, hopefully there is a low
  * probability this function will yield true in that case. */
 bool sg_is_scsi_cdb(const uint8_t * cdbp, int clen);
 
@@ -364,7 +364,7 @@ extern FILE * sg_warnings_strm;
 
 void sg_set_warnings_strm(FILE * warnings_strm);
 
-/* The following "print" functions send ACSII to 'sg_warnings_strm' file
+/* The following "print" functions send ASCII to 'sg_warnings_strm' file
  * descriptor (default value is stderr). 'leadin' is string prepended to
  * each line printed out, NULL treated as "". */
 void sg_print_command(const uint8_t * command);
@@ -560,7 +560,7 @@ bool sg_is_big_endian();
 
 /* Returns true if byte sequence starting at bp with a length of b_len is
  * all zeros (for sg_all_zeros()) or all 0xff_s (for sg_all_ffs());
- * otherwise returns false. If bp is NULL ir b_len <= 0 returns false. */
+ * otherwise returns false. If bp is NULL or b_len <= 0 returns false. */
 bool sg_all_zeros(const uint8_t * bp, int b_len);
 bool sg_all_ffs(const uint8_t * bp, int b_len);
 

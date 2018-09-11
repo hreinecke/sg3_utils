@@ -569,7 +569,10 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 sg_scan_SOURCES = $(am__append_2) $(am__append_4) $(am__append_6)
 @DEBUG_FALSE@DBG_CFLAGS = 
-@DEBUG_TRUE@DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+
+# This is active if --enable-debug given to ./configure
+# removed -Wduplicated-branches because needs gcc-8
+@DEBUG_TRUE@DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
 @DEBUG_FALSE@DBG_CPPFLAGS = 
 @DEBUG_TRUE@DBG_CPPFLAGS = -DDEBUG
 

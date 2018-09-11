@@ -47,7 +47,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.06 20180628";
+static const char * version_str = "1.07 20180911";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -131,6 +131,7 @@ int
 main(int argc, char * argv[])
 {
     bool cdb10 = false;
+    bool count_given = false;
     bool do_time = false;
     bool immed = false;
     bool prefetch = false;
@@ -184,6 +185,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             count = (uint32_t)l;
+            count_given = true;
             break;
         case 'g':
             l = sg_get_num(optarg);
@@ -339,6 +341,7 @@ main(int argc, char * argv[])
             lba_n = lba;
         res = sg_ll_pre_fetch_x(sg_fd, ! prefetch, ! cdb10, immed, lba_n,
                                 numblocks, grpnum, 0, (verbose > 0), verbose);
+        ret = res;      /* last command executed sets exit status */
         if (SG_LIB_CAT_CONDITION_MET == res)
             ++num_cond_met;
         else if (res) {
@@ -385,8 +388,9 @@ main(int argc, char * argv[])
                "%" PRId64 "\n", elapsed_usecs, b, elapsed_usecs / count);
     }
 
-    printf("Command count=%u, number of condition_mets=%u, number of "
-           "goods=%u\n", count, num_cond_met, num_good);
+    if (count_given && verbose_given)
+        printf("Command count=%u, number of condition_mets=%u, number of "
+               "goods=%u\n", count, num_cond_met, num_good);
     if (first_err) {
         bool printed;
 

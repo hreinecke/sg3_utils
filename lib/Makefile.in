@@ -350,8 +350,9 @@ libsgutils2_la_SOURCES = sg_lib.c sg_lib_data.c sg_cmds_basic.c \
 	$(am__append_4) $(am__append_5) $(am__append_6)
 @DEBUG_FALSE@DBG_CFLAGS = 
 
-# This does nothing at the moment but may be useful for adding
-@DEBUG_TRUE@DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+# This is active if --enable-debug given to ./configure
+# removed -Wduplicated-branches because needs gcc-8
+@DEBUG_TRUE@DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
 @DEBUG_FALSE@DBG_CPPFLAGS = 
 @DEBUG_TRUE@DBG_CPPFLAGS = -DDEBUG
 

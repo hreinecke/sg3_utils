@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.11 20180628";
+static const char * version_str = "1.12 20180910";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -97,7 +97,7 @@ usage(int num)
             "                     DEVICE\n"
            );
     pr2serr("  where:\n"
-            "    --elapsed|-e       show time as '<n> days hh.mm.ss.xxx' "
+            "    --elapsed|-e       show time as '<n> days hh:mm:ss.xxx' "
             "where\n"
             "                       '.xxx' is the remainder milliseconds. "
             "Don't show\n"

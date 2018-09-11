@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "September 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
@@ -406,6 +406,15 @@ default value of \fIPFU\fR (in \fI\-\-pfu=PFU\fR) is 0. So if neither
 \fI\-\-fmtpinfo=FPI\fR nor \fI\-\-pfu=PFU\fR are given then protection
 type 0 (i.e. no protection information) is chosen.
 .SH NOTES
+After a format that changes the logical block size or the number of logical
+blocks on a disk, the operating system may need to be told to re\-initialize
+its setting for that disk. In Linux that can be done with:
+.br
+    echo 1 > /sys/block/sd{letter(s)}/device/rescan
+.br
+where "letter(s)" will be between 'a' and 'zzz'. The lsscsi utility in Linux
+can be used to check the various namings of a disk.
+.PP
 The SBC\-2 standard states that the REQUEST SENSE command should be used
 for obtaining progress indication when the format command is underway.
 However, tests on a selection of disks shows that TEST UNIT READY
@@ -614,11 +623,11 @@ quickly switch between 512 and 4096 byte logical block size. Assume disk
 starts with 4096 byte logical block size and all important data has been
 backed up.
 .PP
-   # sg_format \-\-format \-\-ffmt=1 \-\-size=512 \-\-count=\-1 /dev/sdd
+   # sg_format \-\-format \-\-ffmt=1 \-\-size=512 /dev/sdd
 .PP
 Now /dev/sdd should have 512 byte logical block size. And to switch it back:
 .PP
-   # sg_format \-\-format \-\-ffmt=1 \-\-size=4096 \-\-count=\-1 /dev/sdd
+   # sg_format \-\-format \-\-ffmt=1 \-\-size=4096 /dev/sdd
 .SH EXIT STATUS
 The exit status of sg_format is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
@@ -637,4 +646,4 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .B sg_turs(8), sg_requests(8), sg_inq(8), sg_modes(8), sg_vpd(8),
 .B sg_reassign(8), sg_readcap(8), sg3_utils(8),
 .B sg_sanitize(8) [all in sg3_utils],
-.B mt(mt\-st), sdparm(8), scsiformat (old), hdparm(8)
+.B lsscsi(8), mt(mt\-st), sdparm(8), scsiformat (old), hdparm(8)

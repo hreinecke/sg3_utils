@@ -34,7 +34,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.68 20180626";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.69 20180911";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -79,11 +79,10 @@ static const char * version_str = "1.68 20180626";    /* spc5r19 + sbc4r11 */
 #define VP_NONE   (-1)
 #define VP_SEAG   0
 #define VP_HITA   1
-#define VP_WDC    2
-#define VP_TOSH   3
-#define VP_SMSTR  4
-#define VP_LTO5   5
-#define VP_LTO6   6
+#define VP_TOSH   2
+#define VP_SMSTR  3
+#define VP_LTO5   4
+#define VP_LTO6   5
 #define VP_ALL    99
 
 #define MVP_OFFSET 8
@@ -92,7 +91,6 @@ static const char * version_str = "1.68 20180626";    /* spc5r19 + sbc4r11 */
 #define MVP_STD    (1 << (MVP_OFFSET - 1))
 #define MVP_SEAG   (1 << (VP_SEAG + MVP_OFFSET))
 #define MVP_HITA   (1 << (VP_HITA + MVP_OFFSET))
-#define MVP_WDC    (1 << (VP_WDC + MVP_OFFSET))
 #define MVP_TOSH   (1 << (VP_TOSH + MVP_OFFSET))
 #define MVP_SMSTR  (1 << (VP_SMSTR + MVP_OFFSET))
 #define MVP_LTO5   (1 << (VP_LTO5 + MVP_OFFSET))
@@ -110,6 +108,7 @@ static const char * version_str = "1.68 20180626";    /* spc5r19 + sbc4r11 */
 static uint8_t * rsp_buff;
 static uint8_t * free_rsp_buff;
 static const int rsp_buff_sz = MX_ALLOC_LEN + 4;
+static const int parr_sz = 4096;
 
 static struct option long_options[] = {
         {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
@@ -303,6 +302,10 @@ static bool show_seagate_cache_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
 static bool show_seagate_factory_page(const uint8_t * resp, int len,
                                       const struct opts_t * op);
+static bool show_hgst_perf_page(const uint8_t * resp, int len,
+                                const struct opts_t * op);
+static bool show_hgst_misc_page(const uint8_t * resp, int len,
+                                const struct opts_t * op);
 
 /* elements in page_number/subpage_number order */
 static struct log_elem log_arr[] = {
@@ -410,7 +413,7 @@ static struct log_elem log_arr[] = {
      "ie", show_ie_page},               /* 0x2f, 0  */
 /* vendor specific */
     {0x30, 0, 0, PDT_DISK, MVP_HITA, "Performance counters (Hitachi)",
-     "pc_hi", NULL},                             /* 0x30, 0  SBC */
+     "pc_hi", show_hgst_perf_page},     /* 0x30, 0  SBC */
     {0x30, 0, 0, PDT_TAPE, OVP_LTO, "Tape usage (lto-5, 6)", "tu_",
      show_tape_usage_page},             /* 0x30, 0  SSC */
     {0x31, 0, 0, PDT_TAPE, OVP_LTO, "Tape capacity (lto-5, 6)",
@@ -426,7 +429,7 @@ static struct log_elem log_arr[] = {
     {0x37, 0, 0, PDT_DISK, MVP_SEAG, "Cache (seagate)", "c_se",
      show_seagate_cache_page},          /* 0x37, 0  SBC */
     {0x37, 0, 0, PDT_DISK, MVP_HITA, "Miscellaneous (hitachi)", "mi_hi",
-     NULL},                             /* 0x37, 0  SBC */
+     show_hgst_misc_page},                             /* 0x37, 0  SBC */
     {0x37, 0, 0, PDT_TAPE, MVP_LTO5, "Performance characteristics "
      "(lto-5)", "pc_", NULL},                             /* 0x37, 0  SSC */
     {0x38, 0, 0, PDT_TAPE, MVP_LTO5, "Blocks/bytes transferred "
@@ -456,7 +459,7 @@ static struct log_elem log_arr[] = {
 static struct vp_name_t vp_arr[] = {
     {VP_SEAG, "sea", "Seagate", "SEAGATE", NULL},
     {VP_HITA, "hit", "Hitachi", "HGST", NULL},
-    {VP_WDC, "wdc", "WDC", "WDC", NULL},
+    {VP_HITA, "wdc", "WDC/Hitachi", "WDC", NULL},
     {VP_TOSH, "tos", "Toshiba", "TOSHIBA", NULL},
     {VP_SMSTR, "smstr", "SmrtStor (Sandisk)", "SmrtStor", NULL},
     {VP_LTO5, "lto5", "LTO-5 (tape drive consortium)", NULL, NULL},
@@ -2341,6 +2344,82 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
     }
     return true;
+}
+
+/* 0x30 */
+static bool
+show_hgst_perf_page(const uint8_t * resp, int len, const struct opts_t * op)
+{
+    bool valid = false;
+    int num, pl, pc;
+    const uint8_t * bp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
+        printf("HGST/WDC performance counters page [0x30]\n");
+    num = len - 4;
+    if (num < 0x30) {
+        printf("HGST/WDC performance counters page too short (%d) < 48\n",
+               num);
+        return valid;
+    }
+    bp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pl = bp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw(bp, pl);
+                break;
+            } else if (op->do_hex) {
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0:
+            valid = true;
+            printf("  Zero Seeks = %u\n", sg_get_unaligned_be16(bp + 4));
+            printf("  Seeks >= 2/3 = %u\n", sg_get_unaligned_be16(bp + 6));
+            printf("  Seeks >= 1/3 and < 2/3 = %u\n",
+                   sg_get_unaligned_be16(bp + 8));
+            printf("  Seeks >= 1/6 and < 1/3 = %u\n",
+                   sg_get_unaligned_be16(bp + 10));
+            printf("  Seeks >= 1/12 and < 1/6 = %u\n",
+                   sg_get_unaligned_be16(bp + 12));
+            printf("  Seeks > 0 and < 1/12 = %u\n",
+                   sg_get_unaligned_be16(bp + 14));
+            printf("  Overrun Counter = %u\n",
+                   sg_get_unaligned_be16(bp + 20));
+            printf("  Underrun Counter = %u\n",
+                   sg_get_unaligned_be16(bp + 22));
+            printf("  Device Cache Full Read Hits = %u\n",
+                   sg_get_unaligned_be32(bp + 24));
+            printf("  Device Cache Partial Read Hits = %u\n",
+                   sg_get_unaligned_be32(bp + 28));
+            printf("  Device Cache Write Hits = %u\n",
+                   sg_get_unaligned_be32(bp + 32));
+            printf("  Device Cache Fast Writes = %u\n",
+                   sg_get_unaligned_be32(bp + 36));
+            printf("  Device Cache Read Misses = %u\n",
+                   sg_get_unaligned_be32(bp + 40));
+            break;
+        default:
+            valid = false;
+            printf("  Unknown HGST/WDC parameter code = 0x%x", pc);
+            break;
+        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        bp += pl;
+    }
+    return valid;
 }
 
 /* Tape capacity: vendor specific (LTO-5 and LTO-6 ?): 0x31 */
@@ -6497,6 +6576,73 @@ skip:
     return true;
 }
 
+/* 0x37 */
+static bool
+show_hgst_misc_page(const uint8_t * resp, int len, const struct opts_t * op)
+{
+    bool valid = false;
+    int num, pl, pc;
+    const uint8_t * bp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
+        printf("HGST/WDC miscellaneous page [0x37]\n");
+    num = len - 4;
+    if (num < 0x30) {
+        printf("HGST/WDC miscellaneous page too short (%d) < 48\n", num);
+        return valid;
+    }
+    bp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pl = bp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw(bp, pl);
+                break;
+            } else if (op->do_hex) {
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0:
+            valid = true;
+            printf("  Power on hours = %u\n", sg_get_unaligned_be32(bp + 4));
+            printf("  Total Bytes Read = %" PRIu64 "\n",
+                   sg_get_unaligned_be64(bp + 8));
+            printf("  Total Bytes Written = %" PRIu64 "\n",
+                   sg_get_unaligned_be64(bp + 16));
+            printf("  Max Drive Temp (Celsius) = %u\n", bp[24]);
+            printf("  GList Size = %u\n", sg_get_unaligned_be16(bp + 25));
+            printf("  Number of Information Exceptions = %u\n", bp[27]);
+            printf("  MED EXC = %u\n", !! (0x80 & bp[28]));
+            printf("  HDW EXC = %u\n", !! (0x40 & bp[28]));
+            printf("  Total Read Commands = %" PRIu64 "\n",
+                   sg_get_unaligned_be64(bp + 29));
+            printf("  Total Write Commands = %" PRIu64 "\n",
+                   sg_get_unaligned_be64(bp + 37));
+            printf("  Flash Correction Count = %u\n",
+                   sg_get_unaligned_be16(bp + 46));
+            break;
+        default:
+            valid = false;
+            printf("  Unknown HGST/WDC parameter code = 0x%x", pc);
+            break;
+        }
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        bp += pl;
+    }
+    return valid;
+}
+
 /* 0x3e */
 static bool
 show_seagate_factory_page(const uint8_t * resp, int len,
@@ -6704,6 +6850,8 @@ main(int argc, char * argv[])
     int in_len = -1;
     int sg_fd = -1;
     int ret = 0;
+    uint8_t * parr;
+    uint8_t * free_parr = NULL;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts;
     struct opts_t * op;
@@ -7024,24 +7172,32 @@ main(int argc, char * argv[])
     if (op->do_all && (pg_len > 1)) {
         int my_len = pg_len;
         bool spf;
-        uint8_t parr[1024];
 
+        parr = sg_memalign(parr_sz, 0, &free_parr, false);
+        if (NULL == parr) {
+            pr2serr("Unable to allocate heap for parr\n");
+            ret = sg_convert_errno(ENOMEM);
+            goto err_out;
+        }
         spf = !!(rsp_buff[0] & 0x40);
-        if (my_len > (int)sizeof(parr)) {
+        if (my_len > parr_sz) {
             pr2serr("Unexpectedly large page_len=%d, trim to %d\n", my_len,
-                    (int)sizeof(parr));
-            my_len = sizeof(parr);
+                    parr_sz);
+            my_len = parr_sz;
         }
         memcpy(parr, rsp_buff + 4, my_len);
         for (k = 0; k < my_len; ++k) {
-            if (! op->do_raw)
-                printf("\n");
             op->pg_code = parr[k] & 0x3f;
             if (spf)
                 op->subpg_code = parr[++k];
             else
                 op->subpg_code = NOT_SPG_SUBPG;
 
+            /* Some devices include [pg_code, 0xff] for all pg_code > 0 */
+            if ((op->pg_code > 0) && (SUPP_SPGS_SUBPG == op->subpg_code))
+                continue;       /* skip since no new information */
+            if (! op->do_raw)
+                printf("\n");
             res = do_logs(sg_fd, rsp_buff, resp_len, op);
             if (0 == res) {
                 pg_len = sg_get_unaligned_be16(rsp_buff + 2);
@@ -7087,6 +7243,8 @@ main(int argc, char * argv[])
 err_out:
     if (free_rsp_buff)
         free(free_rsp_buff);
+    if (free_parr)
+        free(free_parr);
     if (sg_fd >= 0)
         sg_cmds_close_device(sg_fd);
     if (0 == vb) {

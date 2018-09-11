@@ -17,7 +17,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.56 20180831";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.58 20180911";/* spc5r19, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
