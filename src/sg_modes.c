@@ -30,10 +30,11 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.64 20180626";
+static const char * version_str = "1.66 20180909";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
+#define UNLIKELY_ABOVE_LEN 512
 #define PG_CODE_ALL 0x3f
 #define PG_CODE_MASK 0x3f
 #define PG_CODE_MAX 0x3f
@@ -43,6 +44,44 @@ static const char * version_str = "1.64 20180626";
 
 #define EBUFF_SZ 256
 
+
+struct opts_t {
+    bool do_dbd;
+    bool do_dbout;
+    bool do_examine;
+    bool do_flexible;
+    bool do_list;
+    bool do_llbaa;
+    bool do_six;
+    bool o_readwrite;
+    bool subpg_code_given;
+    bool opt_new;
+    bool verbose_given;
+    bool version_given;
+    int do_all;
+    int do_help;
+    int do_hex;
+    int maxlen;
+    int do_raw;
+    int verbose;
+    int page_control;
+    int pg_code;
+    int subpg_code;
+    const char * device_name;
+    const char * page_acron;
+};
+
+struct page_code_desc {
+    int page_code;
+    int subpage_code;
+    const char * acron;
+    const char * desc;
+};
+
+struct pc_desc_group {
+    struct page_code_desc * pcdp;
+    const char * group_name;
+};
 
 static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
@@ -69,30 +108,165 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-struct opts_t {
-    bool do_dbd;
-    bool do_dbout;
-    bool do_examine;
-    bool do_flexible;
-    bool do_list;
-    bool do_llbaa;
-    bool do_six;
-    bool o_readwrite;
-    bool subpg_code_given;
-    bool opt_new;
-    bool verbose_given;
-    bool version_given;
-    int do_all;
-    int do_help;
-    int do_hex;
-    int maxlen;
-    int do_raw;
-    int verbose;
-    int page_control;
-    int pg_code;
-    int subpg_code;
-    const char * device_name;
+static struct page_code_desc pc_desc_common[] = {
+    {0x0, 0x0, "ua", "Unit Attention condition [vendor specific format]"},
+    {0x2, 0x0, "dr", "Disconnect-Reconnect"},
+    {0x9, 0x0, "pd", "Peripheral device (obsolete)"},
+    {0xa, 0x0, "co", "Control"},
+    {0xa, 0x1, "coe", "Control extension"},
+    {0xa, 0x3, "cdla", "Command duration limit A"},
+    {0xa, 0x4, "cdlb", "Command duration limit B"},
+    {0x15, 0x0, "ext_", "Extended"},
+    {0x16, 0x0, "edts", "Extended device-type specific"},
+    {0x18, 0x0, "pslu", "Protocol specific lu"},
+    {0x19, 0x0, "pspo", "Protocol specific port"},
+    {0x1a, 0x0, "po", "Power condition"},
+    {0x1a, 0x1, "ps", "Power consumption"},
+    {0x1c, 0x0, "ie", "Informational exceptions control"},
+    {PG_CODE_ALL, 0x0, "asmp", "[yields all supported pages]"},
+    {PG_CODE_ALL, SPG_CODE_ALL,"asmsp",
+        "[yields all supported pages and subpages]"},
+    {0x0, 0x0, NULL, NULL},
 };
+
+static struct page_code_desc pc_desc_disk[] = {
+    {0x1, 0x0, "rw", "Read-Write error recovery"},
+    {0x3, 0x0, "fo", "Format (obsolete)"},
+    {0x4, 0x0, "rd", "Rigid disk geometry (obsolete)"},
+    {0x5, 0x0, "fg", "Flexible geometry (obsolete)"},
+    {0x7, 0x0, "ve", "Verify error recovery"},
+    {0x8, 0x0, "ca", "Caching"},
+    {0xa, 0x2, "atag", "Application tag"},
+    {0xa, 0x5, "ioad", "IO advice hints grouping"}, /* added sbc4r06 */
+    {0xa, 0x6, "bop", "Background operation control"}, /* added sbc4r07 */
+    {0xa, 0xf1, "pat", "Parallel ATA control (SAT)"},
+    {0xb, 0x0, "mts", "Medium types supported (obsolete)"},
+    {0xc, 0x0, "not", "Notch and partition (obsolete)"},
+    {0xd, 0x0, "pco", "Power condition (obsolete, moved to 0x1a)"},
+    {0x10, 0x0, "xo", "XOR control"}, /* obsolete in sbc3r32 */
+    {0x1a, 0xf1, "apo", "ATA Power condition"},
+    {0x1c, 0x1, "bc", "Background control"},
+    {0x1c, 0x2, "lbp", "Logical block provisioning"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_tape[] = {
+    {0x1, 0x0, "rw", "Read-Write error recovery"},
+    {0xa, 0xf0, "cdp", "Control data protection"},
+    {0xf, 0x0, "dac", "Data Compression"},
+    {0x10, 0x0, "dc", "Device configuration"},
+    {0x10, 0x1, "dcs", "Device configuration extension"},
+    {0x11, 0x0, "mpa", "Medium Partition [1]"},
+    {0x12, 0x0, "mpa2", "Medium Partition [2]"},
+    {0x13, 0x0, "mpa3", "Medium Partition [3]"},
+    {0x14, 0x0, "mpar", "Medium Partition [4]"},
+    {0x1c, 0x0, "ie", "Informational exceptions control (tape version)"},
+    {0x1d, 0x0, "mco", "Medium configuration"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_cddvd[] = {
+    {0x1, 0x0, "rw", "Read-Write error recovery"},
+    {0x3, 0x0, "mrw", "Mount Rainer rewritable"},
+    {0x5, 0x0, "wp", "Write parameters"},
+    {0x7, 0x0, "ve", "Verify error recovery"},
+    {0x8, 0x0, "ca", "Caching"},
+    {0xd, 0x0, "cddp", "CD device parameters (obsolete)"},
+    {0xe, 0x0, "cda", "CD audio"},
+    {0x1a, 0x0, "po", "Power condition (mmc)"},
+    {0x1c, 0x0, "ffrc", "Fault/failure reporting control (mmc)"},
+    {0x1d, 0x0, "tp", "Timeout and protect"},
+    {0x2a, 0x0, "cms", "MM capabilities and mechanical status (obsolete)"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_smc[] = {
+    {0x1d, 0x0, "eaa", "Element address assignment"},
+    {0x1e, 0x0, "tgp", "Transport geometry parameters"},
+    {0x1f, 0x0, "dcs", "Device capabilities"},
+    {0x1f, 0x41, "edc", "Extended device capabilities"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_scc[] = {
+    {0x1b, 0x0, "sslm", "LUN mapping"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_ses[] = {
+    {0x14, 0x0, "esm", "Enclosure services management"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_rbc[] = {
+    {0x6, 0x0, "rbc", "RBC device parameters"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_adc[] = {
+    /* {0xe, 0x0, "ADC device configuration"}, */
+    {0xe, 0x1, "adtd", "Target device"},
+    {0xe, 0x2, "addp", "DT device primary port"},
+    {0xe, 0x3, "adlu", "Logical unit"},
+    {0xe, 0x4, "adts", "Target device serial number"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+
+/* Transport reated mode pages */
+static struct page_code_desc pc_desc_t_fcp[] = {
+    {0x18, 0x0, "pl", "LU control"},
+    {0x19, 0x0, "pp", "Port control"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_t_spi4[] = {
+    {0x18, 0x0, "luc", "LU control"},
+    {0x19, 0x0, "pp", "Port control short format"},
+    {0x19, 0x1, "mc", "Margin control"},
+    {0x19, 0x2, "stc", "Saved training configuration value"},
+    {0x19, 0x3, "ns", "Negotiated settings"},
+    {0x19, 0x4, "rtc", "Report transfer capabilities"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_t_sas[] = {
+    {0x18, 0x0, "pslu", "Protocol specific logical unit (SAS)"},
+    {0x19, 0x0, "pspo", "Protocol specific port (SAS)"},
+    {0x19, 0x1, "pcd", "Phy control and discover (SAS)"},
+    {0x19, 0x2, "spc", "Shared port control (SAS)"},
+    {0x19, 0x3, "sep", "Enhanced phy control (SAS)"},
+    {0x19, 0x4, "oobm", "Out of band management control (SAS)"}, /* spl5r01 */
+    {0x0, 0x0, NULL, NULL},
+};
+
+static struct page_code_desc pc_desc_t_adc[] = {
+    {0xe, 0x1, "addt", "Target device"},
+    {0xe, 0x2, "addp", "DT device primary port"},
+    {0xe, 0x3, "adlu", "Logical unit"},
+    {0x18, 0x0, "pslu", "Protocol specific lu"},
+    {0x19, 0x0, "pspo", "Protocol specific port"},
+    {0x0, 0x0, NULL, NULL},
+};
+
+struct pc_desc_group pcd_gr_arr[] = {
+    {pc_desc_common, "common"},
+    {pc_desc_disk, "disk"},
+    {pc_desc_tape, "tape"},
+    {pc_desc_cddvd, "cd/dvd"},
+    {pc_desc_smc, "media changer"},
+    {pc_desc_scc, "scsi controller"},
+    {pc_desc_ses, "enclosure"},
+    {pc_desc_rbc, "reduced block"},
+    {pc_desc_adc, "adc"},
+    {pc_desc_t_fcp, "transport: FCP"},
+    {pc_desc_t_spi4, "transport: SPI"},
+    {pc_desc_t_sas, "transport: SAS"},
+    {pc_desc_t_adc, "transport: ADC"},
+
+    {NULL, NULL},
+};
+
 
 
 static void
@@ -130,7 +304,8 @@ usage()
            "length in cdb)\n"
            "                           (def: 0 -> 4096 or 252 (for MODE "
            "SENSE 6) bytes)\n"
-           "    --page=PG|-p PG    page code to fetch (def: 63)\n"
+           "    --page=PG|-p PG    page code to fetch (def: 63). May be "
+           "acronym\n"
            "    --page=PG,SPG|-p PG,SPG\n"
            "                       page code and subpage code to fetch "
            "(defs: 63,0)\n"
@@ -176,7 +351,7 @@ usage_old()
            "10 cdb)\n"
            "   -m=LEN    max response length (allocation length in cdb)\n"
            "             (def: 0 -> 4096 or 252 (for MODE SENSE 6) bytes)\n"
-           "   -p=PG     page code in hex (def: 3f)\n"
+           "   -p=PG     page code in hex (def: 3f). No acronym allowed\n"
            "   -p=PG,SPG    both in hex, (defs: 3f,0)\n"
            "   -r    mode page output to stdout, a byte per line in "
            "ASCII hex\n"
@@ -187,6 +362,48 @@ usage_old()
            "   -N|--new     use new interface\n"
            "   -?    output this usage message\n\n"
            "Performs a SCSI MODE SENSE (10 or 6) command\n");
+}
+
+static void
+enum_pc_desc(void)
+{
+    bool first = true;
+    const struct pc_desc_group * pcd_grp = pcd_gr_arr;
+    char b[128];
+
+    for ( ; pcd_grp->pcdp; ++pcd_grp) {
+        const struct page_code_desc * pcdp = pcd_grp->pcdp;
+
+        if (first)
+            first = false;
+        else
+            printf("\n");
+        printf("Mode pages group: %s:\n", pcd_grp->group_name);
+        for ( ; pcdp->acron; ++pcdp) {
+            if (pcdp->subpage_code > 0)
+                snprintf(b, sizeof(b), "[0x%x,0x%x]", pcdp->page_code,
+                         pcdp->subpage_code);
+            else
+                snprintf(b, sizeof(b), "[0x%x]", pcdp->page_code);
+            printf("  %s: %s  %s\n", pcdp->acron, pcdp->desc, b);
+        }
+    }
+}
+
+static const struct page_code_desc *
+find_pc_desc(const char * acron)
+{
+    const struct pc_desc_group * pcd_grp = pcd_gr_arr;
+
+    for ( ; pcd_grp->pcdp; ++pcd_grp) {
+        const struct page_code_desc * pcdp = pcd_grp->pcdp;
+
+        for ( ; pcdp->acron; ++pcdp) {
+            if (0 == strcmp(acron, pcdp->acron))
+                return pcdp;
+        }
+    }
+    return NULL;
 }
 
 static void
@@ -273,24 +490,47 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->opt_new = false;
             return 0;
         case 'p':
-            cp = strchr(optarg, ',');
-            n = sg_get_num_nomult(optarg);
-            if ((n < 0) || (n > 63)) {
-                pr2serr("Bad argument to '--page='\n");
-                usage();
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            if (cp) {
-                nn = sg_get_num_nomult(cp + 1);
-                if ((nn < 0) || (nn > 255)) {
-                    pr2serr("Bad second value in argument to '--page='\n");
+            if (isalpha(optarg[0])) {
+                const struct page_code_desc * pcdp;
+
+                op->page_acron = optarg;
+                if (0 == memcmp("xxx", optarg, 3)) {
+                    enum_pc_desc();
+                    return SG_LIB_OK_FALSE;     /* for quick exit */
+                }
+                pcdp = find_pc_desc(optarg);
+                if (pcdp) {
+                    if (pcdp->subpage_code > 0) {
+                        op->subpg_code = pcdp->subpage_code;
+                        op->subpg_code_given = true;
+                    }
+                    op->pg_code = pcdp->page_code;
+                } else {
+                    pr2serr(" Couldn't match acronym '%s', try '-p xxx' for "
+                            "list\n", optarg);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else {
+                cp = strchr(optarg, ',');
+                n = sg_get_num_nomult(optarg);
+                if ((n < 0) || (n > 63)) {
+                    pr2serr("Bad argument to '--page='\n");
                     usage();
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                op->subpg_code = nn;
-                op->subpg_code_given = true;
+                if (cp) {
+                    nn = sg_get_num_nomult(cp + 1);
+                    if ((nn < 0) || (nn > 255)) {
+                        pr2serr("Bad second value in argument to "
+                                "'--page='\n");
+                        usage();
+                        return SG_LIB_SYNTAX_ERROR;
+                    }
+                    op->subpg_code = nn;
+                    op->subpg_code_given = true;
+                }
+                op->pg_code = n;
             }
-            op->pg_code = n;
             break;
         case 'r':
             ++op->do_raw;
@@ -342,6 +582,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     bool jmp_out;
     int k, plen, num, n;
+    char pc1;
     unsigned int u, uu;
     const char * cp;
 
@@ -428,6 +669,13 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 }
                 op->maxlen = n;
             } else if (0 == strncmp("p=", cp, 2)) {
+                pc1 = *(cp + 2);
+                if (isalpha(pc1) && ((islower(pc1) && (pc1 > 'f')) ||
+                                     (isupper(pc1) && (pc1 > 'F')))) {
+                    pr2serr("Old format doesn't accept mode page acronyms: "
+                            "%s\n", cp + 2);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
                 if (NULL == strchr(cp + 2, ',')) {
                     num = sscanf(cp + 2, "%x", &u);
                     if ((1 != num) || (u > 63)) {
@@ -517,107 +765,18 @@ dStrRaw(const uint8_t * str, int len)
         printf("%c", str[k]);
 }
 
+static int
+count_desc_elems(const struct page_code_desc * pcdp)
+{
+    int k;
 
-struct page_code_desc {
-    int page_code;
-    int subpage_code;
-    const char * desc;
-};
-
-static struct page_code_desc pc_desc_common[] = {
-    {0x0, 0x0, "Unit Attention condition [vendor specific format]"},
-    {0x2, 0x0, "Disconnect-Reconnect"},
-    {0x9, 0x0, "Peripheral device (obsolete)"},
-    {0xa, 0x0, "Control"},
-    {0xa, 0x1, "Control extension"},
-    {0xa, 0x3, "Command duration limit A"},
-    {0xa, 0x4, "Command duration limit B"},
-    {0x15, 0x0, "Extended"},
-    {0x16, 0x0, "Extended device-type specific"},
-    {0x18, 0x0, "Protocol specific lu"},
-    {0x19, 0x0, "Protocol specific port"},
-    {0x1a, 0x0, "Power condition"},
-    {0x1a, 0x1, "Power consumption"},
-    {0x1c, 0x0, "Informational exceptions control"},
-    {PG_CODE_ALL, 0x0, "[yields all supported pages]"},
-    {PG_CODE_ALL, SPG_CODE_ALL, "[yields all supported pages and subpages]"},
-};
-
-static struct page_code_desc pc_desc_disk[] = {
-    {0x1, 0x0, "Read-Write error recovery"},
-    {0x3, 0x0, "Format (obsolete)"},
-    {0x4, 0x0, "Rigid disk geometry (obsolete)"},
-    {0x5, 0x0, "Flexible geometry (obsolete)"},
-    {0x7, 0x0, "Verify error recovery"},
-    {0x8, 0x0, "Caching"},
-    {0xa, 0x2, "Application tag"},
-    {0xa, 0x5, "IO advice hints grouping"}, /* added sbc4r06 */
-    {0xa, 0x6, "Background operation control"}, /* added sbc4r07 */
-    {0xa, 0xf1, "Parallel ATA control (SAT)"},
-/*  {0xa, 0xf2, "Reserved (SATA control) (SAT)"}, // proposed + dropped ?? */
-    {0xb, 0x0, "Medium types supported (obsolete)"},
-    {0xc, 0x0, "Notch and partition (obsolete)"},
-    {0xd, 0x0, "Power condition (obsolete, moved to 0x1a)"},
-    {0x10, 0x0, "XOR control"}, /* obsolete in sbc3r32 */
-    {0x1a, 0xf1, "ATA Power condition"},
-    {0x1c, 0x1, "Background control"},
-    {0x1c, 0x2, "Logical block provisioning"},
-};
-
-static struct page_code_desc pc_desc_tape[] = {
-    {0x1, 0x0, "Read-Write error recovery"},
-    {0xa, 0xf0, "Control data protection"},
-    {0xf, 0x0, "Data Compression"},
-    {0x10, 0x0, "Device configuration"},
-    {0x10, 0x1, "Device configuration extension"},
-    {0x11, 0x0, "Medium Partition [1]"},
-    {0x12, 0x0, "Medium Partition [2]"},
-    {0x13, 0x0, "Medium Partition [3]"},
-    {0x14, 0x0, "Medium Partition [4]"},
-    {0x1c, 0x0, "Informational exceptions control (tape version)"},
-    {0x1d, 0x0, "Medium configuration"},
-};
-
-static struct page_code_desc pc_desc_cddvd[] = {
-    {0x1, 0x0, "Read-Write error recovery"},
-    {0x3, 0x0, "MRW"},
-    {0x5, 0x0, "Write parameters"},
-    {0x7, 0x0, "Verify error recovery"},
-    {0x8, 0x0, "Caching"},
-    {0xd, 0x0, "CD device parameters (obsolete)"},
-    {0xe, 0x0, "CD audio"},
-    {0x1a, 0x0, "Power condition (mmc)"},
-    {0x1c, 0x0, "Fault/failure reporting control (mmc)"},
-    {0x1d, 0x0, "Timeout and protect"},
-    {0x2a, 0x0, "MM capabilities and mechanical status (obsolete)"},
-};
-
-static struct page_code_desc pc_desc_smc[] = {
-    {0x1d, 0x0, "Element address assignment"},
-    {0x1e, 0x0, "Transport geometry parameters"},
-    {0x1f, 0x0, "Device capabilities"},
-    {0x1f, 0x41, "Extended device capabilities"},
-};
-
-static struct page_code_desc pc_desc_scc[] = {
-    {0x1b, 0x0, "LUN mapping"},
-};
-
-static struct page_code_desc pc_desc_ses[] = {
-    {0x14, 0x0, "Enclosure services management"},
-};
-
-static struct page_code_desc pc_desc_rbc[] = {
-    {0x6, 0x0, "RBC device parameters"},
-};
-
-static struct page_code_desc pc_desc_adc[] = {
-    /* {0xe, 0x0, "ADC device configuration"}, */
-    {0xe, 0x1, "Target device"},
-    {0xe, 0x2, "DT device primary port"},
-    {0xe, 0x3, "Logical unit"},
-    {0xe, 0x4, "Target device serial number"},
-};
+    for (k = 0; k < 1024; ++k, ++pcdp) {
+        if (NULL == pcdp->acron)
+            return k;
+    }
+    pr2serr("%s: sanity check trip, invalid pc_desc table\n", __func__);
+    return k;
+}
 
 /* Returns pointer to base of table for scsi_ptype or pointer to common
  * table if scsi_ptype is -1. Yields numbers of elements in returned
@@ -629,70 +788,40 @@ get_mpage_tbl_size(int scsi_ptype, int * sizep)
     switch (scsi_ptype)
     {
         case -1:        /* common list */
-            *sizep = SG_ARRAY_SIZE(pc_desc_common);
+            *sizep = count_desc_elems(pc_desc_common);
             return &pc_desc_common[0];
         case PDT_DISK:         /* disk (direct access) type devices */
         case PDT_WO:
         case PDT_OPTICAL:
-            *sizep = SG_ARRAY_SIZE(pc_desc_disk);
+            *sizep = count_desc_elems(pc_desc_disk);
             return &pc_desc_disk[0];
         case PDT_TAPE:         /* tape devices */
         case PDT_PRINTER:
-            *sizep = SG_ARRAY_SIZE(pc_desc_tape);
+            *sizep = count_desc_elems(pc_desc_tape);
             return &pc_desc_tape[0];
         case PDT_MMC:         /* cd/dvd/bd devices */
-            *sizep = SG_ARRAY_SIZE(pc_desc_cddvd);
+            *sizep = count_desc_elems(pc_desc_cddvd);
             return &pc_desc_cddvd[0];
         case PDT_MCHANGER:         /* medium changer devices */
-            *sizep = SG_ARRAY_SIZE(pc_desc_smc);
+            *sizep = count_desc_elems(pc_desc_smc);
             return &pc_desc_smc[0];
         case PDT_SAC:       /* storage array devices */
-            *sizep = SG_ARRAY_SIZE(pc_desc_scc);
+            *sizep = count_desc_elems(pc_desc_scc);
             return &pc_desc_scc[0];
         case PDT_SES:       /* enclosure services devices */
-            *sizep = SG_ARRAY_SIZE(pc_desc_ses);
+            *sizep = count_desc_elems(pc_desc_ses);
             return &pc_desc_ses[0];
         case PDT_RBC:       /* simplified direct access device */
-            *sizep = SG_ARRAY_SIZE(pc_desc_rbc);
+            *sizep = count_desc_elems(pc_desc_rbc);
             return &pc_desc_rbc[0];
         case PDT_ADC:       /* automation device/interface */
-            *sizep = SG_ARRAY_SIZE(pc_desc_adc);
+            *sizep = count_desc_elems(pc_desc_adc);
             return &pc_desc_adc[0];
     }
     *sizep = 0;
     return NULL;
 }
 
-static struct page_code_desc pc_desc_t_fcp[] = {
-    {0x18, 0x0, "LU control"},
-    {0x19, 0x0, "Port control"},
-};
-
-static struct page_code_desc pc_desc_t_spi4[] = {
-    {0x18, 0x0, "LU control"},
-    {0x19, 0x0, "Port control short format"},
-    {0x19, 0x1, "Margin control"},
-    {0x19, 0x2, "Saved training configuration value"},
-    {0x19, 0x3, "Negotiated settings"},
-    {0x19, 0x4, "Report transfer capabilities"},
-};
-
-static struct page_code_desc pc_desc_t_sas[] = {
-    {0x18, 0x0, "Protocol specific logical unit (SAS)"},
-    {0x19, 0x0, "Protocol specific port (SAS)"},
-    {0x19, 0x1, "Phy control and discover (SAS)"},
-    {0x19, 0x2, "Shared port control (SAS)"},
-    {0x19, 0x3, "Enhanced phy control (SAS)"},
-    {0x19, 0x4, "Out of band management control (SAS)"},        /* spl5r01 */
-};
-
-static struct page_code_desc pc_desc_t_adc[] = {
-    {0xe, 0x1, "Target device"},
-    {0xe, 0x2, "DT device primary port"},
-    {0xe, 0x3, "Logical unit"},
-    {0x18, 0x0, "Protocol specific lu"},
-    {0x19, 0x0, "Protocol specific port"},
-};
 
 static struct page_code_desc *
 get_mpage_trans_tbl_size(int t_proto, int * sizep)
@@ -700,16 +829,16 @@ get_mpage_trans_tbl_size(int t_proto, int * sizep)
     switch (t_proto)
     {
         case TPROTO_FCP:
-            *sizep = SG_ARRAY_SIZE(pc_desc_t_fcp);
+            *sizep = count_desc_elems(pc_desc_t_fcp);
             return &pc_desc_t_fcp[0];
         case TPROTO_SPI:
-            *sizep = SG_ARRAY_SIZE(pc_desc_t_spi4);
+            *sizep = count_desc_elems(pc_desc_t_spi4);
             return &pc_desc_t_spi4[0];
         case TPROTO_SAS:
-            *sizep = SG_ARRAY_SIZE(pc_desc_t_sas);
+            *sizep = count_desc_elems(pc_desc_t_sas);
             return &pc_desc_t_sas[0];
         case TPROTO_ADT:
-            *sizep = SG_ARRAY_SIZE(pc_desc_t_adc);
+            *sizep = count_desc_elems(pc_desc_t_adc);
             return &pc_desc_t_adc[0];
     }
     *sizep = 0;
@@ -893,11 +1022,19 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
               const struct opts_t * op)
 {
     bool header_printed;
-    int k, res, mresp_len, len, resid;
+    int k, mresp_len, len, resid;
+    int res = 0;
+    const int mx_len = op->do_six ? DEF_6_ALLOC_LEN : DEF_ALLOC_LEN;
     const char * cp;
-    uint8_t rbuf[256];
+    uint8_t * rbuf;
+    uint8_t * free_rbuf = NULL;
 
-    mresp_len = (op->do_raw || op->do_hex) ? sizeof(rbuf) : 4;
+    rbuf = sg_memalign(mx_len, 0, &free_rbuf, false);
+    if (NULL == rbuf) {
+        pr2serr("%s: out of heap\n", __func__);
+        return sg_convert_errno(ENOMEM);
+    }
+    mresp_len = (op->do_raw || op->do_hex) ? mx_len : 4;
     for (header_printed = false, k = 0; k < PG_CODE_MAX; ++k) {
         resid = 0;
         if (op->do_six) {
@@ -906,10 +1043,10 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again without the '-6' switch for a 10 "
                         "byte MODE SENSE command\n");
-                return res;
+                goto out;
             } else if (SG_LIB_CAT_NOT_READY == res) {
                 pr2serr("MODE SENSE (6) failed, device not ready\n");
-                return res;
+                goto out;
             }
         } else {
             res = sg_ll_mode_sense10_v2(sg_fd, 0, 0, 0, k, 0, rbuf, mresp_len,
@@ -917,22 +1054,22 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
             if (SG_LIB_CAT_INVALID_OP == res) {
                 pr2serr(">>>>>> try again with a '-6' switch for a 6 byte "
                         "MODE SENSE command\n");
-                return res;
+                goto out;
             } else if (SG_LIB_CAT_NOT_READY == res) {
                 pr2serr("MODE SENSE (10) failed, device not ready\n");
-                return res;
+                goto out;
             }
         }
         if (0 == res) {
             len = sg_msense_calc_length(rbuf, mresp_len, op->do_six, NULL);
             if (resid > 0) {
-                    mresp_len -= resid;
-                    if (mresp_len < 0) {
-                            pr2serr("%s: MS(10) resid=%d implies negative "
-                                    "response length (%d)\n", __func__,
-                                    resid, mresp_len);
-                            return SG_LIB_WILD_RESID;
-                    }
+                mresp_len -= resid;
+                if (mresp_len < 0) {
+                    pr2serr("%s: MS(10) resid=%d implies negative response "
+                            "length (%d)\n", __func__, resid, mresp_len);
+                    res = SG_LIB_WILD_RESID;
+                    goto out;
+                }
             }
             if (len > mresp_len)
                 len = mresp_len;
@@ -963,6 +1100,9 @@ examine_pages(int sg_fd, int inq_pdt, bool encserv, bool mchngr,
                     b);
         }
     }
+out:
+    if (free_rbuf)
+        free(free_rbuf);
     return res;
 }
 
@@ -982,7 +1122,7 @@ main(int argc, char * argv[])
     bool mchngr = false;
     uint8_t uc;
     int k, num, len, res, md_len, bd_len, page_num, resid;
-    int density_code_off, t_proto, inq_pdt, num_ua_pages;
+    int density_code_off, t_proto, inq_pdt, num_ua_pages, vb;
     int sg_fd = -1;
     int ret = 0;
     int rsp_buff_sz = DEF_ALLOC_LEN;
@@ -1003,7 +1143,7 @@ main(int argc, char * argv[])
     op->pg_code = -1;
     res = parse_cmd_line(op, argc, argv);
     if (res)
-        return res;
+        return (SG_LIB_OK_FALSE == res) ? 0 : res;
     if (op->do_help) {
         usage_for(op);
         return 0;
@@ -1028,6 +1168,15 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
+    vb = op->verbose;
+    if (vb && op->page_acron) {
+        pr2serr("page acronynm: '%s' maps to page_code=0x%x",
+                op->page_acron, op->pg_code);
+        if (op->subpg_code > 0)
+            pr2serr(", subpage_code=0x%x\n", op->subpg_code);
+        else
+            pr2serr("\n");
+    }
 
     if (NULL == op->device_name) {
         if (op->do_list) {
@@ -1046,7 +1195,7 @@ main(int argc, char * argv[])
             }
             return 0;
         }
-        pr2serr("No DEVICE argument given\n");
+        pr2serr("No DEVICE argument given\n\n");
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1089,14 +1238,14 @@ main(int argc, char * argv[])
     }
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, ! op->o_readwrite,
-                                     op->verbose)) < 0) {
+                                     vb)) < 0) {
         pr2serr("error opening file: %s: %s\n", op->device_name,
                 safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto fini;
     }
 
-    if ((res = sg_simple_inquiry(sg_fd, &inq_out, true, op->verbose))) {
+    if ((res = sg_simple_inquiry(sg_fd, &inq_out, true, vb))) {
         pr2serr("%s doesn't respond to a SCSI INQUIRY\n", op->device_name);
         ret = (res > 0) ? res : sg_convert_errno(-res);
         goto fini;
@@ -1143,7 +1292,7 @@ main(int argc, char * argv[])
     if (op->do_six) {
         res = sg_ll_mode_sense6(sg_fd, op->do_dbd, op->page_control,
                                 op->pg_code, op->subpg_code, rsp_buff,
-                                rsp_buff_sz, true, op->verbose);
+                                rsp_buff_sz, true, vb);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again without the '-6' switch for a 10 byte "
                     "MODE SENSE command\n");
@@ -1151,7 +1300,7 @@ main(int argc, char * argv[])
         res = sg_ll_mode_sense10_v2(sg_fd, op->do_llbaa, op->do_dbd,
                                     op->page_control, op->pg_code,
                                     op->subpg_code, rsp_buff, rsp_buff_sz,
-                                    0, &resid, true, op->verbose);
+                                    0, &resid, true, vb);
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr(">>>>>> try again with a '-6' switch for a 6 byte MODE "
                     "SENSE command\n");
@@ -1167,7 +1316,7 @@ main(int argc, char * argv[])
             pr2serr("invalid field in cdb (perhaps page 0x%x not "
                     "supported)\n", op->pg_code);
     } else if (res) {
-        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+        sg_get_category_sense_str(res, sizeof(b), b, vb);
         pr2serr("%s\n", b);
     }
     ret = res;
@@ -1368,10 +1517,10 @@ main(int argc, char * argv[])
                            pg_control_str_arr[op->page_control]);
             }
             num = (len > md_len) ? md_len : len;
-            if ((k > 0) && (num > 256)) {
-                num = 256;
-                pr2serr(">>> page length (%d) > 256 bytes, unlikely trim\n"
-                        "    Try '-f' option\n", len);
+            if ((k > 0) && (num > UNLIKELY_ABOVE_LEN)) {
+                num = UNLIKELY_ABOVE_LEN;
+                pr2serr(">>> page length (%d) > %d bytes, unlikely, trim\n"
+                        "    Try '-f' option\n", len, num);
             }
             hex2stdout(bp, num , 1);
             bp += len;
@@ -1384,7 +1533,7 @@ fini:
         sg_cmds_close_device(sg_fd);
     if (free_rsp_buff)
         free(free_rsp_buff);
-    if (0 == op->verbose) {
+    if (0 == vb) {
         if (! sg_if_can2stderr("sg_modes failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");

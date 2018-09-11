@@ -1,4 +1,4 @@
-.TH SG_SEEK "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SEEK "8" "September 2018" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
 sg_seek \- send SCSI SEEK, PRE-FETCH(10) or PRE-FETCH(16) command
 .SH SYNOPSIS
@@ -29,7 +29,7 @@ blocks did not fit (IMMED=0) or would not fit (IMMED=1) then status GOOD
 is returned. So if a disk has a large cache and PRE\-FETCH is used sparingly
 then the command is more likely to return CONDITION MET than GOOD. This
 presents some SCSI sub\-systems with problems as due to its rareness they
-mishandle CONDITION MET and treat it as an error.
+mishandle CONDITION MET and treat it as an error (see NOTES section below).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -119,10 +119,20 @@ set the next command's logical block address back to \fILBA\fR. Whether
 this "reset\-to\-LBA" action occurs depends on the values \fINC\fR and
 \fISB\fR.
 .SH NOTES
-As of Linux kernel 4.15 the CONDITION MET status is logged as an error.
+Prior to Linux kernel 4.17 the CONDITION MET status was logged as an error.
+Recent versions of FreeBSD handle the CONDITION MET status properly.
+.PP
+If either the \fI\-\-count=NC\fR or \fI\-\-verbose\fR option is given then
+a summary line like the following is output:
+.PP
+    Command count=5, number of condition_mets=3, number of goods=2
+.PP
+before the utility exits.
 .SH EXIT STATUS
-The exit status of sg_stream_ctl is 0 when it is successful. Otherwise see
-the sg3_utils(8) man page.
+The exit status of sg_seek is 0 (GOOD) or 25 (CONDITION_MET) when this
+utility is successful. If multiple commands are executed (e.g. when \fINC\fR
+is greater than 1) then the result of the last executed SEEK or PRE\-FETCH
+command sets the exit status. Otherwise see the sg3_utils(8) man page.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

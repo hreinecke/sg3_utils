@@ -38,7 +38,7 @@
 
 */
 
-static const char * version_str = "1.46 20180828";  /* spc5r19 + sbc4r15 */
+static const char * version_str = "1.48 20180910";  /* spc5r19 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2294,12 +2294,13 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex, int pdt)
             printf("  Nominal rotation rate: %u rpm\n", u);
         u = buff[6];
         k = SG_ARRAY_SIZE(product_type_arr);
+        printf("  Product type: ");
         if (u < k)
-            printf("  Product type: %s\n", product_type_arr[u]);
+            printf("%s\n", product_type_arr[u]);
         else if (u < 0xf0)
-            printf("  Product type: Reserved [0x%x]\n", u);
+            printf("Reserved [0x%x]\n", u);
         else
-            printf("  Product type: Vendor specific [0x%x]\n", u);
+            printf("Vendor specific [0x%x]\n", u);
         printf("  WABEREQ=%d\n", (buff[7] >> 6) & 0x3);
         printf("  WACEREQ=%d\n", (buff[7] >> 4) & 0x3);
         u = buff[7] & 0xf;

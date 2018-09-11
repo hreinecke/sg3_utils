@@ -107,7 +107,7 @@ int sg_ll_mode_select6_v2(int sg_fd, bool pf, bool rtd, bool sp,
  * -1 -> other failure */
 int sg_ll_mode_select10(int sg_fd, bool pf, bool sp, void * paramp,
                         int param_len, bool noisy, int verbose);
-/* v2 adds RTD (revert to defaults) bi, added in spc5r11 */
+/* v2 adds RTD (revert to defaults) bit, added in spc5r11 */
 int sg_ll_mode_select10_v2(int sg_fd, bool pf, bool rtd, bool sp,
                            void * paramp, int param_len, bool noisy,
                            int verbose);
@@ -291,8 +291,8 @@ int sg_msense_calc_length(const uint8_t * resp, int resp_len,
 
 /* Fetches current, changeable, default and/or saveable modes pages as
  * indicated by pcontrol_arr for given pg_code and sub_pg_code. If
- * mode6==0 then use MODE SENSE (10) else use MODE SENSE (6). If
- * flexible set and mode data length seems wrong then try and
+ * mode6 is true then use MODE SENSE (6) else use MODE SENSE (10). If
+ * flexible true and mode data length seems wrong then try and
  * fix (compensating hack for bad device or driver). pcontrol_arr
  * should have 4 elements for output of current, changeable, default
  * and saved values respectively. Each element should be NULL or

@@ -1334,7 +1334,10 @@ sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
         switch (descp[0]) {
         case 0:
             n += sg_scnpr(b + n, blen - n, "Information: ");
-            if ((add_d_len >= 10) && (0x80 & descp[2])) {
+            if (add_d_len >= 10) {
+                if (! (0x80 & descp[2]))
+                    n += sg_scnpr(b + n, blen - n, "Valid=0 (-> vendor "
+                                  "specific) ");
                 n += sg_scnpr(b + n, blen - n, "0x");
                 for (j = 0; j < 8; ++j)
                     n += sg_scnpr(b + n, blen - n, "%02x", descp[4 + j]);

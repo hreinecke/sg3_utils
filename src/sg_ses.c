@@ -1082,11 +1082,11 @@ parse_index(struct opts_t *op)
         if (NULL == cp)
             op->ind_indiv = -1;
     } else { /* element type abbreviation perhaps followed by <num> */
-        int blen = strlen(b);
+        int b_len = strlen(b);
 
         for (etp = element_type_arr; etp->desc; ++etp) {
             n = strlen(etp->abbrev);
-            if ((n == blen) && (0 == strncmp(b, etp->abbrev, n)))
+            if ((n == b_len) && (0 == strncmp(b, etp->abbrev, n)))
                 break;
         }
         if (NULL == etp->desc) {
@@ -1094,7 +1094,7 @@ parse_index(struct opts_t *op)
                     "use '--enumerate' to see possibles\n", b);
             return SG_LIB_SYNTAX_ERROR;
         }
-        if ((int)strlen(b) > n) {
+        if (b_len > n) {
             n = sg_get_num_nomult(b + n);
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad element type abbreviation <num> for '--index', "

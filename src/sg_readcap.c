@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.03 20180627";
+static const char * version_str = "4.04 20180911";
 
 #define ME "sg_readcap: "
 
@@ -512,9 +512,9 @@ main(int argc, char * argv[])
                            "before delay=0x%" PRIx32 "\n", op->llba,
                            last_blk_addr);
                 else
-                    printf("   Last logical block address=%" PRIu32 " (0x%"
-                           PRIx32 "), Number of blocks=%" PRIu32 "\n",
-                           last_blk_addr, last_blk_addr, last_blk_addr + 1);
+                    printf("   Last LBA=%" PRIu32 " (0x%" PRIx32 "), Number "
+                           "of logical blocks=%" PRIu32 "\n", last_blk_addr,
+                            last_blk_addr, last_blk_addr + 1);
                 printf("   Logical block length=%u bytes\n", block_size);
                 if (! op->do_pmi) {
                     uint64_t total_sz = last_blk_addr + 1;
@@ -609,9 +609,9 @@ main(int argc, char * argv[])
                        "before delay=0x%" PRIx64 "\n", op->llba,
                        llast_blk_addr);
             else
-                printf("   Last logical block address=%" PRIu64 " (0x%"
-                       PRIx64 "), Number of logical blocks=%" PRIu64 "\n",
-                       llast_blk_addr, llast_blk_addr, llast_blk_addr + 1);
+                printf("   Last LBA=%" PRIu64 " (0x%" PRIx64 "), Number of "
+                       "logical blocks=%" PRIu64 "\n", llast_blk_addr,
+                       llast_blk_addr, llast_blk_addr + 1);
             printf("   Logical block length=%" PRIu32 " bytes\n", block_size);
             lbppbe = resp_buff[13] & 0xf;
             printf("   Logical blocks per physical block exponent=%d",
@@ -621,7 +621,7 @@ main(int argc, char * argv[])
                        block_size * (1 << lbppbe));
             else
                 printf("\n");
-            printf("   Lowest aligned logical block address=%d\n",
+            printf("   Lowest aligned LBA=%d\n",
                    ((resp_buff[14] & 0x3f) << 8) + resp_buff[15]);
             if (! op->do_pmi) {
                 uint64_t total_sz = llast_blk_addr + 1;
@@ -634,12 +634,20 @@ main(int argc, char * argv[])
                         (double)(1000000000L);
                 printf("Hence:\n");
 #ifdef SG_LIB_MINGW
-                printf("   Device size: %" PRIu64 " bytes, %g MiB, %g GB\n",
+                printf("   Device size: %" PRIu64 " bytes, %g MiB, %g GB",
                        total_sz, sz_mb, sz_gb);
 #else
                 printf("   Device size: %" PRIu64 " bytes, %.1f MiB, %.2f "
-                       "GB\n", total_sz, sz_mb, sz_gb);
+                       "GB", total_sz, sz_mb, sz_gb);
 #endif
+                if (sz_gb > 2000) {
+#ifdef SG_LIB_MINGW
+                    printf(", %g TB", sz_gb / 1000);
+#else
+                    printf(", %.2f TB", sz_gb / 1000);
+#endif
+                }
+                printf("\n");
             }
             goto fini;
         } else if (SG_LIB_CAT_ILLEGAL_REQ == res)

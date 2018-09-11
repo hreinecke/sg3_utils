@@ -2,7 +2,8 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.43 [20180831] [svn: r788]
+Changelog for sg3_utils-1.43 [20180911] [svn: r789]
+  - release 1.43 20180911 svn rev 789
   - sg_write_x: where x can be normal, atomic, or(write),
     same, scattered, or stream writes with 16 or 32 byte
     cdbs (sbc4r04 for atomic, sbc4r11 for scattered)
@@ -85,6 +86,7 @@ Changelog for sg3_utils-1.43 [20180831] [svn: r788]
       Vpd Pages page and fetch requested page directly
   - sg_vpd: 3 party copy VPD page improvements
     - fully implement Device constituents VPD page
+    - decode some WDC/Hitachi vendor VPD pages
     - improve handling of unknown pages
   - sg_reassign+sg_write_same: fix ULONG_MAX problem
   - sg_rdac: add sanity checks for -f=lun value
@@ -124,6 +126,7 @@ Changelog for sg3_utils-1.43 [20180831] [svn: r788]
       statuses and the additional status (sbc4r12)
     - decode completion condition (sbc4r14)
   - sg_modes: add Out of band management control mpage
+    - accept acronym for page/subpage codes
   - sg_rep_zones: expand --help option information
   - sg_unmap: add --all=ST,RN[,LA] option to unmap
     large contiguous segments of a disk/ssd

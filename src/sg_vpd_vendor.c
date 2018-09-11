@@ -51,11 +51,13 @@
 #define VPD_VP_HP3PAR 4
 #define VPD_VP_IBM_LTO 5
 #define VPD_VP_HP_LTO 6
-#define VPD_VP_NVME 7
-#define VPD_VP_SG 8     /* this package/library as a vendor */
+#define VPD_VP_WDC_HITACHI 7
+#define VPD_VP_NVME 8
+#define VPD_VP_SG 9     /* this package/library as a vendor */
 
 
 /* vendor VPD pages */
+#define VPD_V_HIT_PG3 0x3
 #define VPD_V_HP3PAR 0xc0
 #define VPD_V_FIRM_SEA  0xc0
 #define VPD_V_UPR_EMC  0xc0
@@ -82,6 +84,8 @@
 #define VPD_V_VAC_RDAC 0xc9
 #define VPD_V_RVSI_RDAC 0xca
 #define VPD_V_SAID_RDAC 0xd0
+#define VPD_V_HIT_PG_D1 0xd1
+#define VPD_V_HIT_PG_D2 0xd2
 
 #ifndef SG_NVME_VPD_NICR
 #define SG_NVME_VPD_NICR 0xde   /* NVME Identify Controller Response */
@@ -142,13 +146,15 @@ struct svpd_vp_name_t {
 static struct svpd_vp_name_t vp_arr[] = {
     {VPD_VP_DDS, "dds", "DDS tape family from IBM"},
     {VPD_VP_EMC, "emc", "EMC (company)"},
+    {VPD_VP_WDC_HITACHI, "hit", "WDC/Hitachi disk"},
     {VPD_VP_HP3PAR, "hp3par", "3PAR array (HP was Left Hand)"},
-    {VPD_VP_IBM_LTO, "ibm_lto", "IBM LTO tape/systems"},
     {VPD_VP_HP_LTO, "hp_lto", "HP LTO tape/systems"},
+    {VPD_VP_IBM_LTO, "ibm_lto", "IBM LTO tape/systems"},
+    {VPD_VP_NVME, "nvme", "NVMe related"},
     {VPD_VP_RDAC, "rdac", "RDAC array (NetApp E-Series)"},
     {VPD_VP_SEAGATE, "sea", "Seagate disk"},
-    {VPD_VP_NVME, "nvme", "NVMe related"},
     {VPD_VP_SG, "sg", "sg3_utils extensions"},
+    {VPD_VP_WDC_HITACHI, "wdc", "WDC/Hitachi disk"},
     {0, NULL, NULL},
 };
 
@@ -169,7 +175,6 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
      "configuration data (IBM LTO)"},
     {VPD_V_EDID_RDAC, VPD_VP_RDAC, 0, "edid", "Extended device "
      "identification (RDAC)"},
-    {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "prm4", "Feature Parameters (RDAC)"},
     {VPD_V_FIRM_SEA, VPD_VP_SEAGATE, 0, "firm", "Firmware numbers "
      "(Seagate)"},
     {VPD_V_FVER_LTO, VPD_VP_HP_LTO, 0, "frl", "Firmware revision level "
@@ -190,6 +195,7 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {SG_NVME_VPD_NICR, VPD_VP_SG, 0, "nicr",
      "NVMe Identify Controller Response (sg3_utils)"},
     {VPD_V_PCA_LTO, VPD_VP_HP_LTO, 1, "pca", "PCA revision level (HP LTO)"},
+    {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "prm4", "Feature Parameters (RDAC)"},
     {VPD_V_RVSI_RDAC, VPD_VP_RDAC, 0, "rvsi", "Replicated volume source "
      "identifier (RDAC)"},
     {VPD_V_SAID_RDAC, VPD_VP_RDAC, 0, "said", "Storage array world wide "
@@ -198,6 +204,11 @@ static struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_SVER_RDAC, VPD_VP_RDAC, 0, "swr4", "Software version (RDAC)"},
     {VPD_V_UPR_EMC, VPD_VP_EMC, 0, "upr", "Unit path report (EMC)"},
     {VPD_V_VAC_RDAC, VPD_VP_RDAC, 0, "vac1", "Volume access control (RDAC)"},
+    {VPD_V_HIT_PG3, VPD_VP_WDC_HITACHI, 0, "wp3", "Page 0x3 (WDC/Hitachi)"},
+    {VPD_V_HIT_PG_D1, VPD_VP_WDC_HITACHI, 0, "wpd1",
+     "Page 0xd1 (WDC/Hitachi)"},
+    {VPD_V_HIT_PG_D2, VPD_VP_WDC_HITACHI, 0, "wpd2",
+     "Page 0xd2 (WDC/Hitachi)"},
     {0, 0, 0, NULL, NULL},
 };
 
@@ -1307,6 +1318,69 @@ decode_ibm_lto_dsn(uint8_t * buff, int len)
     printf("  Reported serial number: %.12s\n", buff + 16);
 }
 
+static void
+decode_vpd_3_hit(uint8_t * b, int blen)
+{
+    uint16_t plen = sg_get_unaligned_be16(b + 2);
+
+    if ((plen < 184) || (blen < 184)) {
+        pr2serr("Hitachi VPD page 0x3 length (%u) shorter than %u\n",
+                plen + 4, 184 + 4);
+        return;
+    }
+    printf("  ASCII uCode Identifier: %.12s\n", b + 24);
+    printf("  ASCII servo P/N: %.4s\n", b + 36);
+    printf("  Major Version: %.2s\n", b + 40);
+    printf("  Minor Version: %.2s\n", b + 42);
+    printf("  User Count: %.4s\n", b + 44);
+    printf("  Build Number: %.4s\n", b + 48);
+    printf("  Build Date String: %.32s\n", b + 52);
+    printf("  Product ID: %.8s\n", b + 84);
+    printf("  Interface ID: %.8s\n", b + 92);
+    printf("  Code Type: %.8s\n", b + 100);
+    printf("  User Name: %.12s\n", b + 108);
+    printf("  Machine Name: %.16s\n", b + 120);
+    printf("  Directory Name: %.32s\n", b + 136);
+    printf("  Operating state: %u\n", sg_get_unaligned_be32(b + 168));
+    printf("  Functional Mode: %u\n", sg_get_unaligned_be32(b + 172));
+    printf("  Degraded Reason: %u\n", sg_get_unaligned_be32(b + 176));
+    printf("  Broken Reason: %u\n", sg_get_unaligned_be32(b + 180));
+    printf("  Code Mode: %u\n", sg_get_unaligned_be32(b + 184));
+    printf("  Revision: %.4s\n", b + 188);
+}
+
+static void
+decode_vpd_d1_hit(uint8_t * b, int blen)
+{
+    uint16_t plen = sg_get_unaligned_be16(b + 2);
+
+    if ((plen < 80) || (blen < 80)) {
+        pr2serr("Hitachi VPD page 0xd1 length (%u) shorter than %u\n",
+                plen + 4, 80 + 4);
+        return;
+    }
+    printf("  ASCII Media Disk Definition: %.16s\n", b + 4);
+    printf("  ASCII Motor Serial Number: %.16s\n", b + 20);
+    printf("  ASCII Flex Assembly Serial Number: %.16s\n", b + 36);
+    printf("  ASCII Actuator Serial Number: %.16s\n", b + 52);
+    printf("  ASCII Device Enclosure Serial Number: %.16s\n", b + 68);
+}
+
+static void
+decode_vpd_d2_hit(uint8_t * b, int blen)
+{
+    uint16_t plen = sg_get_unaligned_be16(b + 2);
+
+    if ((plen < 52) || (blen < 52)) {
+        pr2serr("Hitachi VPD page 0xd2 length (%u) shorter than %u\n",
+                plen + 4, 52 + 4);
+        return;
+    }
+    printf("  ASCII HDC Version: %.16s\n", b + 5);
+    printf("  ASCII Card Serial Number: %.16s\n", b + 22);
+    printf("  ASCII Card Assembly Part Number: %.16s\n", b + 39);
+}
+
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_CAT_OTHER for
    unsupported page */
 int
@@ -1319,6 +1393,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
     uint8_t * rp;
 
     switch (op->vpd_pn) {
+    case 0x3:
     case 0xc0:
     case 0xc1:
     case 0xc2:
@@ -1329,6 +1404,8 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
     case 0xc9:
     case 0xca:
     case 0xd0:
+    case 0xd1:
+    case 0xd2:
         break;
     default:    /* not known so return prior to fetching page */
         return SG_LIB_CAT_OTHER;
@@ -1355,6 +1432,12 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
             hex2stdout(rp, len, ((1 == op->do_hex) ? 0 : -1));
         else {
             switch(op->vpd_pn) {
+                case 0x3:
+                    if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
+                        decode_vpd_3_hit(rp, len);
+                    else
+                        hex2stdout(rp, len, 0);
+                    break;
                 case 0xc0:
                     if (VPD_VP_SEAGATE == op->vend_prod_num)
                         decode_firm_vpd_c0_sea(rp, len);
@@ -1438,6 +1521,18 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
                 case 0xd0:
                     if (VPD_VP_RDAC == op->vend_prod_num)
                         decode_rdac_vpd_d0(rp, len);
+                    else
+                        hex2stdout(rp, len, 0);
+                    break;
+                case 0xd1:
+                    if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
+                        decode_vpd_d1_hit(rp, len);
+                    else
+                        hex2stdout(rp, len, 0);
+                    break;
+                case 0xd2:
+                    if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
+                        decode_vpd_d2_hit(rp, len);
                     else
                         hex2stdout(rp, len, 0);
                     break;
