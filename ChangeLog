@@ -2,6 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.44 [20180912] [svn: r791]
+  - same code as release 1.43 20180911 svn rev 789;
+    new release due to sync problem with git mirror at:
+    https://github.com/hreinecke/sg3_utils
+    that has a v1.43 tag dated 20160217 [svn: r663]
+
 Changelog for sg3_utils-1.43 [20180911] [svn: r789]
   - release 1.43 20180911 svn rev 789
   - sg_write_x: where x can be normal, atomic, or(write),
