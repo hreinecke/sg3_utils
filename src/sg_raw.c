@@ -456,7 +456,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
 
-        if (op->cdb_length > MAX_SCSI_CDBSZ) {
+        if (op->cdb_length >= MAX_SCSI_CDBSZ) {
             pr2serr("CDB too long (max. %d bytes)\n", MAX_SCSI_CDBSZ);
             return SG_LIB_SYNTAX_ERROR;
         }

@@ -5314,7 +5314,7 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         if (op->ind_indiv_last <= op->ind_indiv)
             break;
     }   /* end of loop over join array */
-    if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
+    if ((k >= MX_JOIN_ROWS) || (NULL == jrp->enc_statp)) {
         if (op->desc_name)
             pr2serr("descriptor name: %s not found (check the 'ed' page "
                     "[0x7])\n", op->desc_name);
