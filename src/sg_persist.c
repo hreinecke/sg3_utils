@@ -826,7 +826,7 @@ decode_file_tids(const char * fnp, struct opts_t * op)
                     pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
-                tid_arr[off + k] = h;
+                op->transportid_arr[off + k] = h;
                 lcp = strpbrk(lcp, " ,\t");
                 if (NULL == lcp)
                     break;
