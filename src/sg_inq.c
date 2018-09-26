@@ -3430,7 +3430,6 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                         break;
                 case 6: desc_p = "vendor specific (6)"; break;
                 case 7: desc_p = "reserved (7)"; break;
-                default: desc_p = "impossible value > 7"; break;
                 }
                 if (prnt_cmd) {
                     printf("  Support field: %s [", desc_p);
