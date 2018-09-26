@@ -7159,7 +7159,7 @@ main(int argc, char * argv[])
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
                 pr2serr("log_select: device not ready\n");
-            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            else if (SG_LIB_CAT_ILLEGAL_REQ == k)
                 pr2serr("log_select: field in cdb illegal\n");
             else if (SG_LIB_CAT_INVALID_OP == k)
                 pr2serr("log_select: not supported\n");
