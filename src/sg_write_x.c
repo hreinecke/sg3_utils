@@ -673,8 +673,10 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
     if (cp) {   /* copy from first non whitespace ... */
         memcpy(c, lcp, cp - lcp);  /* ... to just prior to first '#' */
         c[cp - lcp] = '\0';
-    } else
-        strcpy(c, lcp);         /* ... to end of line, including null */
+    } else {
+        /* ... to end of line, including null */
+        snprintf(c, sizeof(c)/sizeof(char), "%s", lcp);
+    }
     ll = sg_get_llnum(bp);
     ok = ((-1 != ll) || all_ascii_f_s(bp, 16));
     if (! ok) {
