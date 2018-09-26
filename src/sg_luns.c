@@ -308,9 +308,6 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                 }
             }
             break;
-        default:
-            printf("%s<<%s: faulty logic>>\n", l_leadin, __func__);
-            break;
         }
         if (next_level)
             continue;
