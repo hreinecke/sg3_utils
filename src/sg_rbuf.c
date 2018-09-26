@@ -683,5 +683,5 @@ main(int argc, char * argv[])
     else
         printf("read buffer non-zero\n");
 #endif
-    return (res >= 0) ? res : SG_LIB_CAT_OTHER;
+    return res;
 }
