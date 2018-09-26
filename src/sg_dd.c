@@ -981,7 +981,7 @@ err_out:
         }
         return may_coe ? 0 : ret;
     } else
-        return ret ? ret : -1;
+        return ret;
 }
 
 
