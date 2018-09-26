@@ -1244,9 +1244,6 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
             case 7:
                 printf(" [protection types 1, 2 and 3 supported]\n");
                 break;
-            default:
-                printf("\n");
-                break;
             }
         } else
             printf("\n");
@@ -2031,8 +2028,6 @@ decode_proto_lu_vpd(uint8_t * buff, int len, int do_hex)
             continue;
         if (2 == do_hex)
             hex2stdout(bp + 8, desc_len, 1);
-        else if (do_hex > 2)
-            hex2stdout(bp, bump, 1);
         else {
             switch (proto) {
             case TPROTO_SAS:
@@ -2082,8 +2077,6 @@ decode_proto_port_vpd(uint8_t * buff, int len, int do_hex)
             continue;
         if (2 == do_hex)
             hex2stdout(bp + 8, desc_len, 1);
-        else if (do_hex > 2)
-            hex2stdout(bp, bump, 1);
         else {
             switch (proto) {
             case TPROTO_SAS:    /* page added in spl3r02 */
