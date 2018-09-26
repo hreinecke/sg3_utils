@@ -907,11 +907,6 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             return 0;
         } else
             return 0;     /* nothing to do */
-        if (dout_len > 0) {
-            if (vb)
-                pr2ws("%s: dout given but PF clear\n", __func__);
-            return SCSI_PT_DO_BAD_PARAMS;
-        }
     }
     if (dout_len < 4) {
         if (vb)
