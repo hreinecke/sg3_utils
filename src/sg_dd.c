@@ -1464,7 +1464,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                         "\n", (uint64_t)offset);
         }
     }
-    if (ofp->flock) {
+    if ((ofp->flock) && (outfd >= 0)) {
         res = flock(outfd, LOCK_EX | LOCK_NB);
         if (res < 0) {
             close(outfd);
