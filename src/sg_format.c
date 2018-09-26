@@ -707,12 +707,6 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
                 n = (SAFE_STD_INQ_RESP_LEN - 4);
         for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
                 if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
-                        if (has_di) {
-                                if (op->verbose)
-                                        pr2serr("VPD_SUPPORTED_VPDS "
-                                                "dis-ordered\n");
-                                goto out;
-                        }
                         ++has_sn;
                 } else if (VPD_DEVICE_ID == b[4 + k]) {
                         ++has_di;
