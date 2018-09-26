@@ -1858,3 +1858,9 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
 };
 
 #endif           /* (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME)) */
+
+size_t sg_lib_scsi_status_sense_arr_len(void)
+{
+    return sizeof(sg_lib_scsi_status_sense_arr)/
+        sizeof(struct sg_lib_4tuple_u8) - 1;
+}

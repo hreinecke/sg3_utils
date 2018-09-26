@@ -2614,6 +2614,9 @@ sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
         return false;
     } else if (ind >= k)
         return false;
+    /* Check whether `ind` is out of index of sg_lib_scsi_status_sense_arr */
+    if (ind >= (int) sg_lib_scsi_status_sense_arr_len())
+        return false;
     mp = sg_lib_scsi_status_sense_arr + ind;
     if (status_p)
         *status_p = mp->t1;
