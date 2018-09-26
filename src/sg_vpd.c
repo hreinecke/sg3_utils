@@ -1969,9 +1969,9 @@ decode_3party_copy_vpd(uint8_t * buff, int len, int do_hex, int pdt,
                 printf("  Maximum identified concurrent copies: %u\n", u);
                 u = sg_get_unaligned_be32(bp + 12);
                 printf("  Maximum segment length: %u\n", u);
-                ull = (1 << bp[16]); /* field is power of 2 */
+                ull = (1 << bp[16]) & UINT64_MAX; /* field is power of 2 */
                 printf("  Data segment granularity: %" PRIu64 "\n", ull);
-                ull = (1 << bp[17]);
+                ull = (1 << bp[17]) & UINT64_MAX;
                 printf("  Inline data granularity: %" PRIu64 "\n", ull);
                 break;
             case 0x9101:
@@ -1983,7 +1983,7 @@ decode_3party_copy_vpd(uint8_t * buff, int len, int do_hex, int pdt,
                 printf(" Held data:\n");
                 u = sg_get_unaligned_be32(bp + 4);
                 printf("  Held data limit: %u\n", u);
-                ull = (1 << bp[8]);
+                ull = (1 << bp[8]) & UINT64_MAX;
                 printf("  Held data granularity: %" PRIu64 "\n", ull);
                 break;
             default:
