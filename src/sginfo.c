@@ -1759,6 +1759,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
+                /* fall through */
             case 5:     /* physical sector */
                 while (len > 0) {
                     snprintf((char *)cbuffer1, 40, "%6d:%2u:%5d",
@@ -1777,6 +1778,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
+                /* fall through */
             case 0:     /* lba (32 bit) */
                 while (len > 0) {
                     printf("%10d", getnbyte(df, 4));
@@ -1790,6 +1792,7 @@ trytenbyte:
                     else
                         printf("|");
                 }
+                /* fall through */
             case 3:     /* lba (64 bit) */
                 while (len > 0) {
                     printf("%15" PRId64 , getnbyte_ll(df, 8));
