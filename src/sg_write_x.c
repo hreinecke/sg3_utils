@@ -752,10 +752,6 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
             } else if (up)
                 sg_put_unaligned_be16((uint16_t)ll, up + 18);
             break;
-        default:
-            pr2serr("%s: k=%d should not be >= 3\n", __func__, k);
-            ok = false;
-            break;
         }
         if (! ok)
             break;
@@ -776,13 +772,9 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
             if (up)
                 sg_put_unaligned_be16((uint16_t)DEF_TM, up + 18);
             break;
-        default:
-            pr2serr("%s: k=%d should not be >= 3\n", __func__, k);
-            ok = false;
-            break;
         }
     }
-    return ok ? 0 : SG_LIB_SYNTAX_ERROR;
+    return 0;
 }
 
 /* Read pairs or quintets from a scat_file and places them in a T10 scatter
