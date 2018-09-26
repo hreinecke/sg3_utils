@@ -1409,9 +1409,6 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             else if (1 == n) {
                 op->page_code_given = true;
                 op->page_code = pc;
-            } else {
-                pr2serr("No dpage found --data= argument\n");
-                goto err_help;
             }
             if (op->verbose > 3) {
                 int k;
@@ -2435,9 +2432,6 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
         else if (conn_type < 0x20)
             snprintf(buff, buff_len, "unknown internal wide connector type: "
                      "0x%x", conn_type);
-        else if (conn_type < 0x30)
-            snprintf(buff, buff_len, "unknown internal connector to end "
-                     "device, type: 0x%x", conn_type);
         else if (conn_type < 0x3f)
             snprintf(buff, buff_len, "reserved for internal connector, "
                      "type: 0x%x", conn_type);
@@ -2640,8 +2634,6 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         case 3:
             printf("%slast 3 bytes (hex): %02x %02x %02x\n", pad, statp[1],
                    statp[2], statp[3]);
-            break;
-        default:
             break;
         }
         break;
@@ -4264,8 +4256,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         subenc_nickname_sdg(resp, resp_len);
         break;
     default:
-        printf("Cannot decode response from diagnostic "
-               "page: %s\n", (cp ? cp : "<unknown>"));
+        printf("Cannot decode response from diagnostic page: %s\n", cp);
         hex2stdout(resp, resp_len, 0);
     }
 
