@@ -388,8 +388,8 @@ void usage ()
 
 int main (int argc, char * argv[])
 {
-        bool verbose_given = true;
-        bool version_given = true;
+        bool verbose_given = false;
+        bool version_given = false;
         int sg_fd, res;
         const char * device_name = NULL;
         int times = 1;
