@@ -1431,7 +1431,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
     if (0 == res) {
         vnp = svpd_get_v_detail(op->vpd_pn, op->vend_prod_num, 0xf & rp[0]);
         if (vnp && vnp->name)
-            strcpy(name, vnp->name);
+            snprintf(name, sizeof(name)/sizeof(char), "%s", vnp->name);
         else
             snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x",
                      op->vpd_pn);
