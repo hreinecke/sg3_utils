@@ -547,7 +547,6 @@ sg_decode_transportid_str(const char * lip, uint8_t * bp, int bplen,
     }
     if (NULL == lip)
         lip = "";
-    bump = TRANSPORT_ID_MIN_LEN; /* should be overwritten in all loop paths */
     for (k = 0, n = 0; bplen > 0; ++k, bp += bump, bplen -= bump) {
         if ((k > 0) && only_one)
             break;
@@ -1875,9 +1874,6 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
             sg_scnpr(b + r, blen - r, "%s  lba=0x%x\n", lip,
                      sg_get_unaligned_be24(sbp + 1) & 0x1fffff);
         n += sg_scnpr(cbp + n, cblen - n, "%s\n", b);
-        len = sb_len;
-        if (len > 32)
-            len = 32;   /* trim in case there is a lot of rubbish */
     }
 check_raw:
     if (raw_sinfo) {
