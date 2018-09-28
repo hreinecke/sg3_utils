@@ -1281,6 +1281,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
                 perror(ME "SG_SET_RESERVED_SIZE error");
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
+                close(infd);
                 if (FT_BLOCK & *in_typep)
                     pr2serr(ME "SG_IO unsupported on this block device\n");
                 else
@@ -1313,6 +1314,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
                     snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
                              "required position on %s", inf);
                     perror(ebuff);
+                    close(infd);
                     goto file_err;
                 }
                 if (vb)
@@ -1346,6 +1348,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
 file_err:
     return -SG_LIB_FILE_ERROR;
 other_err:
+    close(infd);
     return -SG_LIB_CAT_OTHER;
 }
 
@@ -1403,6 +1406,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                 perror(ME "SG_SET_RESERVED_SIZE error");
             res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
+                close(outfd);
                 pr2serr(ME "sg driver prior to 3.x.y\n");
                 goto file_err;
             }
@@ -1452,6 +1456,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                 snprintf(ebuff, EBUFF_SZ,
                     ME "couldn't seek to required position on %s", outf);
                 perror(ebuff);
+                close(outfd);
                 goto file_err;
             }
             if (vb)
@@ -1474,6 +1479,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
 file_err:
     return -SG_LIB_FILE_ERROR;
 other_err:
+    close(outfd);
     return -SG_LIB_CAT_OTHER;
 }
 

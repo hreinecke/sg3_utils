@@ -1827,6 +1827,7 @@ trytenbyte:
         }
     }
     printf("\n");
+    free(headsp);
     return status;
 }
 
