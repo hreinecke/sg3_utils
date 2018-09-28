@@ -2152,14 +2152,11 @@ sg_get_command_size(uint8_t opcode)
     switch ((opcode >> 5) & 0x7) {
     case 0:
         return 6;
-    case 1: case 2: case 6: case 7:
-        return 10;
     case 3: case 5:
         return 12;
-        break;
     case 4:
         return 16;
-    default:
+    default:        /* 1, 2, 6, 7 */
         return 10;
     }
 }
@@ -2295,9 +2292,6 @@ sg_get_opcode_name(uint8_t cmd_byte0, int peri_type, int buff_len,
     case 6:
     case 7:
         sg_scnpr(buff, buff_len, "Vendor specific [0x%x]", (int)cmd_byte0);
-        break;
-    default:
-        sg_scnpr(buff, buff_len, "Opcode=0x%x", (int)cmd_byte0);
         break;
     }
 }
