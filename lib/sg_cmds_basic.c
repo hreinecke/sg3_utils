@@ -377,6 +377,13 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, bool cmddt, bool evpd, int pg_op,
     uint8_t sense_b[SENSE_BUFF_LEN];
     uint8_t * up;
 
+    if (resp == NULL) {
+        if (verbose)
+            pr2ws("Got NULL `resp` pointer");
+        return SG_LIB_CAT_MALFORMED;
+    }
+
+
     if (cmddt)
         inq_cdb[1] |= 0x2;
     if (evpd)
