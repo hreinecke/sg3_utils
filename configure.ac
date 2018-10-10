@@ -1,4 +1,4 @@
-AC_INIT(sg3_utils, 1.44, dgilbert@interlog.com)
+AC_INIT(sg3_utils, 1.45, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE

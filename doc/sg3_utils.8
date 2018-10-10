@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "September 2018" "sg3_utils\-1.44" SG3_UTILS
+.TH SG3_UTILS "8" "October 2018" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -235,8 +235,8 @@ The NVME\-MI SES Send and SES Receive commands correspond to the SCSI
 SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS commands respectively.
 There are however a few other commands that need to be translated, the
 most important of which is the SCSI INQUIRY command to the NVMe Identify
-controller/namespace. Version 1.43 of these utilities contain a small
-SNTL (SCSI to NVMe Translation Layer) to take care of these details.
+controller/namespace. Starting in version 1.43 these utilities contain a
+small SNTL (SCSI to NVMe Translation Layer) to take care of these details.
 .PP
 As a side effect of this "juggling" if the sg_inq utility is used (without
 the \-\-page= option) on a NVMe \fIDEVICE\fR then the actual NVMe

@@ -66,13 +66,13 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.14 20180712";
+static const char * version_str = "1.16 20181001";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
  * driver. Each thread opens 1 file descriptor to the next sg device (1
  * or more can be given on the command line) and then starts up to 16
- * commands while checking with the poll command (or
+ * commands or more while checking with the poll command (or
  * ioctl(SG_GET_NUM_WAITING) ) for the completion of those commands. Each
  * command has a unique "pack_id" which is a sequence starting at 1.
  * Either TEST UNIT UNIT, READ(16) or WRITE(16) commands are issued.
@@ -118,7 +118,7 @@ using namespace std::chrono;
 #define DEF_NO_XFER 0
 #define DEF_LBA 1000
 
-#define MAX_Q_PER_FD 16     /* sg driver per file descriptor limit */
+#define MAX_Q_PER_FD 16383      /* sg driver per file descriptor limit */
 #define MAX_CONSEC_NOMEMS 16
 #define URANDOM_DEV "/dev/urandom"
 
@@ -170,6 +170,7 @@ struct opts_t {
     unsigned int hi_lba;        /* last one, inclusive range */
     vector<unsigned int> hi_lbas; /* only used when hi_lba=-1 */
     int lb_sz;
+    int num_lbs;
     int stats;
     int verbose;
     int wait_ms;
@@ -177,6 +178,8 @@ struct opts_t {
     blkLQDiscipline blqd;
     myQDiscipline myqd;
 };
+
+static struct opts_t a_opts;
 
 #if 0
 class Rand_uint {
@@ -249,11 +252,11 @@ usage(void)
     printf("Usage: %s [--direct] [--force] [--generic-pt] [--help]\n"
            "                    [--lba=LBA+] [--maxqpt=QPT] [--numpt=NPT] "
            "[--noxfer]\n"
-           "                    [--qat=AT] [-qfav=FAV] [--read] [--szlb=LB] "
-           "[--stats]\n"
-           "                    [--tnum=NT] [--tur] [--verbose] [--version] "
-           "[--wait=MS]\n"
-           "                    [--write] <sg_disk_device>*\n",
+           "                    [--qat=AT] [-qfav=FAV] [--read] "
+           "[--szlb=LB[,NLBS]]\n"
+           "                    [--stats] [--tnum=NT] [--tur] [--verbose] "
+           "[--version]\n"
+           "                    [--wait=MS] [--write] <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
     printf("    --direct|-d     do direct_io (def: indirect)\n");
@@ -262,7 +265,7 @@ usage(void)
     printf("                    WARNING: <lba> written to if '-W' given\n");
     printf("    --generic-pt|-g    use generic passthru in sg3_utils "
            "instead\n");
-    printf("                       of Linux sg driver and SG_IO ioctl "
+    printf("                       of Linux sg driver assuming /dev/sg* "
            "(def)\n");
     printf("    --help|-h       print this usage message then exit\n");
     printf("    --lba=LBA|-l LBA    logical block to access (def: %u)\n",
@@ -283,7 +286,9 @@ usage(void)
            "                         FAV=2: favour submissions (larger q, "
            "default)\n");
     printf("    --read|-R       do READs (def: TUR)\n");
-    printf("    --szlb=LB|-s LB    logical block size (def: 512)\n");
+    printf("    --szlb=LB[,NLBS]|    LB is logical block size (def: 512)\n");
+    printf("         -s LB[,NLBS]    NLBS is number of logical blocks (def: "
+           "1)\n");
     printf("    --stats|-S      show more statistics on completion\n");
     printf("    --tnum=NT|-t NT    number of threads (def: %d)\n",
            DEF_NUM_THREADS);
@@ -296,7 +301,7 @@ usage(void)
     printf("Multiple threads send READ(16), WRITE(16) or TEST UNIT READY "
            "(TUR) SCSI\ncommands. There can be 1 or more <sg_disk_device>s "
            "and each thread takes\nthe next in a round robin fashion. "
-           "Each thread queues up to 16 commands.\nOne block is transferred "
+           "Each thread queues up to NT commands.\nOne block is transferred "
            "by each READ and WRITE; zeros are written. If a\nlogical block "
            "range is given, a uniform distribution generates a pseudo\n"
            "random sequence of LBAs.\n");
@@ -600,7 +605,7 @@ work_thread(int id, struct opts_t * op)
     Rand_uint * ruip = NULL;
     struct pollfd  pfd[1];
     list<pair<uint8_t *, uint8_t *> > free_lst;   /* of aligned lb buffers */
-    map<int, uint8_t *> pi_2_buff;    /* pack_id -> lb buffer */
+    map<int, pair<uint8_t *, uint8_t *> > pi2buff;/* pack_id -> lb buffer */
     map<int, uint64_t> pi_2_lba;            /* pack_id -> LBA */
 
     /* device name and hi_lba may depend on id */
@@ -613,11 +618,11 @@ work_thread(int id, struct opts_t * op)
 
     if (vb) {
         if ((vb > 1) && hi_lba)
-            pr2serr_lk("Enter work_thread id=%d using %s\n"
+            pr2serr_lk("Enter work_t_id=%d using %s\n"
                        "    LBA range: 0x%x to 0x%x (inclusive)\n",
                        id, dev_name, (unsigned int)op->lba, hi_lba);
         else
-            pr2serr_lk("Enter work_thread id=%d using %s\n", id, dev_name);
+            pr2serr_lk("Enter work_t_id=%d using %s\n", id, dev_name);
     }
     if (op->generic_pt) {
         work_sync_thread(id, dev_name, hi_lba, op);
@@ -666,13 +671,15 @@ work_thread(int id, struct opts_t * op)
             pack_id = uniq_pack_id.fetch_add(1);
             if (is_rw) {    /* get new lb buffer or one from free list */
                 if (free_lst.empty()) {
-                    lbp = sg_memalign(op->lb_sz, 0, &free_lbp, vb);
+                    lbp = sg_memalign(op->lb_sz * op->num_lbs, 0, &free_lbp,
+                                      vb > 6);
                     if (NULL == lbp) {
                         err = "out of memory";
                         break;
                     }
                 } else {
                     lbp = free_lst.back().first;
+                    free_lbp = free_lst.back().second;
                     free_lst.pop_back();
                 }
             } else
@@ -687,14 +694,15 @@ work_thread(int id, struct opts_t * op)
                     lba = op->lba;
             } else
                 lba = 0;
-            if (start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp, op->lb_sz,
-                              sg_flags, thr_start_eagain_count)) {
+            if (start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
+                              op->lb_sz * op->num_lbs, sg_flags,
+                              thr_start_eagain_count)) {
                 err = "start_sg3_cmd()";
                 break;
             }
             ++thr_async_starts;
             ++num_outstanding;
-            pi_2_buff[pack_id] = lbp;
+            pi2buff[pack_id] = make_pair(lbp, free_lbp);
             if (ruip)
                 pi_2_lba[pack_id] = lba;
         }
@@ -770,16 +778,17 @@ work_thread(int id, struct opts_t * op)
             }
             ++thr_async_finishes;
             --num_outstanding;
-            auto p = pi_2_buff.find(pack_id);
+            auto p = pi2buff.find(pack_id);
 
-            if (p == pi_2_buff.end()) {
+            if (p == pi2buff.end()) {
                 snprintf(ebuff, sizeof(ebuff), "pack_id=%d from "
                          "finish_sg3_cmd() not found\n", pack_id);
                 if (! err)
                     err = ebuff;
             } else {
-                lbp = p->second;
-                pi_2_buff.erase(p);
+                lbp = p->second.first;
+                free_lbp = p->second.second;
+                pi2buff.erase(p);
                 if (lbp)
                     free_lst.push_front(make_pair(lbp, free_lbp));
             }
@@ -805,25 +814,27 @@ work_thread(int id, struct opts_t * op)
 
     if (err || (k < npt)) {
         if (k < npt)
-            pr2serr_lk("thread id=%d FAILed at iteration %d%s%s\n", id, k,
+            pr2serr_lk("t_id=%d FAILed at iteration %d%s%s\n", id, k,
                        (err ? ", Reason: " : ""), (err ? err : ""));
         else
-            pr2serr_lk("thread id=%d FAILed on last%s%s\n", id,
+            pr2serr_lk("t_id=%d FAILed on last%s%s\n", id,
                        (err ? ", Reason: " : ""), (err ? err : ""));
     }
-    n = pi_2_buff.size();
+    n = pi2buff.size();
     if (n > 0)
-        pr2serr_lk("thread id=%d Still %d elements in pi_2_buff map on "
+        pr2serr_lk("t_id=%d Still %d elements in pi2buff map on "
                    "exit\n", id, n);
     for (k = 0; ! free_lst.empty(); ++k) {
         lbp = free_lst.back().first;
         free_lbp = free_lst.back().second;
         free_lst.pop_back();
+        if (vb > 6)
+            pr2serr_lk("t_id=%d freeing %p (free_ %p)\n", id, lbp, free_lbp);
         if (free_lbp)
             free(free_lbp);
     }
     if ((vb > 2) && (k > 0))
-        pr2serr_lk("thread id=%d Maximum number of READ/WRITEs queued: %d\n",
+        pr2serr_lk("t_id=%d Maximum number of READ/WRITEs queued: %d\n",
                    id, k);
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
@@ -977,19 +988,19 @@ main(int argc, char * argv[])
     int num_threads = DEF_NUM_THREADS;
     char b[128];
     struct timespec start_tm, end_tm;
-    struct opts_t opts;
     struct opts_t * op;
     const char * cp;
     const char * dev_name;
 
-    op = &opts;
-    memset(op, 0, sizeof(opts));
+    op = &a_opts;
+    memset(op, 0, sizeof(*op));
     op->direct = DEF_DIRECT;
     op->lba = DEF_LBA;
     op->hi_lba = 0;
     op->lb_sz = DEF_LB_SZ;
     op->maxq_per_thread = MAX_Q_PER_FD;
     op->num_per_thread = DEF_NUM_PER_THREAD;
+    op->num_lbs = 1;
     op->no_xfer = !! DEF_NO_XFER;
     op->verbose = 0;
     op->wait_ms = DEF_WAIT_MS;
@@ -1113,6 +1124,15 @@ main(int argc, char * argv[])
                 pr2serr_lk("--szlb= expects a number\n");
                 return 1;
             }
+            if ((cp = strchr(optarg, ','))) {
+                n = sg_get_num(cp + 1);
+                if (n < 1) {
+                    pr2serr_lk("could not decode 2nd part of "
+                               "--szlb=LBS,NLBS\n");
+                    return 1;
+                }
+                op->num_lbs = n;
+            }
             break;
         case 'S':
             ++op->stats;
@@ -1194,6 +1214,8 @@ main(int argc, char * argv[])
 
     try {
         struct stat a_stat;
+        unsigned int last_lba;
+        unsigned int blk_sz;
 
         for (k = 0; k < (int)op->dev_names.size(); ++k) {
             dev_name = op->dev_names[k];
@@ -1225,10 +1247,7 @@ main(int argc, char * argv[])
                     return 2;
                 }
             }
-            if (UINT_MAX == op->hi_lba) {
-                unsigned int last_lba;
-                unsigned int blk_sz;
-
+            if ((SCSI_WRITE16 == op->c2e) || (SCSI_READ16 == op->c2e)) {
                 res = do_read_capacity(dev_name, op->block, &last_lba,
                                        &blk_sz);
                 if (2 == res)
@@ -1238,11 +1257,20 @@ main(int argc, char * argv[])
                     pr2serr_lk("READ CAPACITY(10) failed on %s\n", dev_name);
                     return 1;
                 }
-                op->hi_lbas.push_back(last_lba);
-                if (blk_sz != (unsigned int)op->lb_sz)
-                    pr2serr_lk(">>> warning: Logical block size (%d) of %s\n"
+                if (blk_sz != (unsigned int)op->lb_sz) {
+                    pr2serr_lk(">>> Logical block size (%d) of %s\n"
                                "    differs from command line option (or "
                                "default)\n", blk_sz, dev_name);
+                    if (force)
+                        pr2serr_lk("Ignoring due to --force option\n");
+                    else {
+                        pr2serr_lk("Exiting due to block size discrepancy, "
+                                   "use --force to override\n");
+                        return 1;
+                    }
+                }
+                if (UINT_MAX == op->hi_lba)
+                    op->hi_lbas.push_back(last_lba);
             }
         }
 

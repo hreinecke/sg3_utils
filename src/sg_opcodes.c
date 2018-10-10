@@ -31,7 +31,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.62 20180626";    /* spc5r19+ */
+static const char * version_str = "0.64 20180926";    /* spc5r19+ */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -852,11 +852,13 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
          struct opts_t * op)
 {
     bool valid = false;
-    int k;
+    int k, mlu;
     uint8_t * bp;
     const char * cp;
     const char * dlp;
+    const char * mlu_p;
     char name_buff[NAME_BUFF_SZ];
+    char b[64];
 
 
     printf("\n  Opcode=0x%.2x", op->opcode);
@@ -903,8 +905,27 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         dlp = "reserved [CDLP=3]";
         break;
     }
-    printf("  Command %s, [%s]\n", cp, dlp);
-    printf("  Multiple Logical Units (MLU): %d\n", !! (rsoc_buff[1] & 0x20));
+    printf("  Command is %s, [%s]\n", cp, dlp);
+    mlu = 0x3 & (rsoc_buff[1] >> 5);
+    switch (mlu) {
+    case 0:
+        mlu_p = "not reported";
+        break;
+    case 1:
+        mlu_p = "affects only this logical unit";
+        break;
+    case 2:
+        mlu_p = "affects more than 1, but not all LUs in this target";
+        break;
+    case 3:
+        mlu_p = "affects all LUs in this target";
+        break;
+    default:
+        snprintf(b, sizeof(b), "reserved [MLU=%d]", mlu);
+        mlu_p = b;
+        break;
+    }
+    printf("  Multiple Logical Units (MLU): %s\n", mlu_p);
     if (valid) {
         printf("  Usage data: ");
         bp = rsoc_buff + 4;
