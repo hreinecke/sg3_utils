@@ -36,7 +36,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.43 20180810";    /* ses4r02 */
+static const char * version_str = "2.44 20181010";    /* ses4r02 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -70,7 +70,7 @@ static const char * version_str = "2.43 20180810";    /* ses4r02 */
 #define ELEM_DESC_DPC 0x7
 #define SHORT_ENC_STATUS_DPC 0x8
 #define ENC_BUSY_DPC 0x9
-#define ADD_ELEM_STATUS_DPC 0xa
+#define ADD_ELEM_STATUS_DPC 0xa /* Additional Element Status dpage code */
 #define SUBENC_HELP_TEXT_DPC 0xb
 #define SUBENC_STRING_DPC 0xc
 #define SUPPORTED_SES_DPC 0xd   /* should be 0x1 <= dpc <= 0x2f */
@@ -108,6 +108,7 @@ static const char * version_str = "2.43 20180810";    /* ses4r02 */
 #define SAS_CONNECTOR_ETC 0x19
 #define LAST_ETC SAS_CONNECTOR_ETC      /* adjust as necessary */
 
+#define TPROTO_PCIE_PS_NVME 1   /* NVMe regarded as subset of PCIe */
 #define NUM_ETC (LAST_ETC + 1)
 
 #define DEF_CLEAR_VAL 0
@@ -1378,7 +1379,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         op->do_raw = 0;
-        if (op->arr_len > 3) {
+	/* struct data_in_desc_t stuff does not apply when --control */
+        if (op->do_status && (op->arr_len > 3)) {
             int off;
             int pc = 0;
             const uint8_t * bp = op->data_arr + DATA_IN_OFF;
@@ -3476,9 +3478,9 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         if (len < 6)
             break;
         pcie_pt = (ae_bp[5] >> 5) & 0x7;
-        if (1 == pcie_pt)
+        if (TPROTO_PCIE_PS_NVME == pcie_pt)
             printf("%sPCIe protocol type: NVMe\n", pad);
-        else {
+        else {  /* no others currently defined */
             printf("%sTransport protocol: PCIe subprotocol=0x%x not "
                    "decoded\n", pad, pcie_pt);
             if (op->verbose)
@@ -3490,7 +3492,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                ae_bp[5] & 1);
         printf(", device slot number: %d\n", ae_bp[7]);
 
-        pcie_vid = sg_get_unaligned_le16(ae_bp + 10);
+        pcie_vid = sg_get_unaligned_le16(ae_bp + 10);   /* N.B. LE */
         printf("%sPCIe vendor id: 0x%" PRIx16 "%s\n", pad, pcie_vid,
                (0xffff == pcie_vid) ? " (not reported)" : "");
         printf("%sserial number: %.20s\n", pad, ae_bp + 12);
@@ -3505,14 +3507,14 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                    (int)psn_valid, (int)bdf_valid, (int)cid_valid);
             if (cid_valid)      /* N.B. little endian */
                 printf("%s  controller id: 0x%" PRIx16 "\n", pad,
-                       sg_get_unaligned_le16(aep + 1));
+                       sg_get_unaligned_le16(aep + 1)); /* N.B. LEndian */
             if (bdf_valid)
                 printf("%s  bus number: 0x%x, device number: 0x%x, "
                        "function number: 0x%x\n", pad, aep[4],
                        (aep[5] >> 3) & 0x1f, 0x7 & aep[5]);
             if (psn_valid)      /* little endian, top 3 bits assumed zero */
                 printf("%s  physical slot number: 0x%" PRIx16 "\n", pad,
-                       0x1fff & sg_get_unaligned_le16(aep + 6));
+                       0x1fff & sg_get_unaligned_le16(aep + 6)); /* N.B. LE */
         }
         break;
     default:
@@ -3524,7 +3526,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
     }
 }
 
-/* ADD_ELEM_STATUS_DPC [0xa]
+/* ADD_ELEM_STATUS_DPC [0xa] Additional Element Status dpage
  * Previously called "Device element status descriptor". Changed "device"
  * to "additional" to allow for SAS expander and SATA devices */
 static void
@@ -5704,7 +5706,7 @@ main(int argc, char * argv[])
             uint16_t oacs;
 
             nvmsr = enc_stat_rsp[253];
-            oacs = sg_get_unaligned_le16(enc_stat_rsp + 256);
+            oacs = sg_get_unaligned_le16(enc_stat_rsp + 256);   /* N.B. LE */
             if (vb > 3)
                 pr2serr("NVMe Identify ctl response: nvmsr=%u, oacs=0x%x\n",
                         nvmsr, oacs);
