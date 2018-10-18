@@ -2,11 +2,12 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20181010] [svn: r793]
+Changelog for sg3_utils-1.45 [20181018] [svn: r794]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (18-102r0)
-  - testing/sg_tst_async: fix fee_list issue
+  - testing/sg_tst_async: fix free_list issue
+  - testing/sg_tst_ioctl: new test program
 
 Changelog for sg3_utils-1.44 [20180912] [svn: r791]
   - same code as release 1.43 20180911 svn rev 789;

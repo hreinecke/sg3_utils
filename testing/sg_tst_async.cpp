@@ -66,7 +66,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.16 20181001";
+static const char * version_str = "1.16 20181012";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -139,9 +139,11 @@ static mutex rand_lba_mutex;
 static atomic<int> async_starts(0);
 static atomic<int> sync_starts(0);
 static atomic<int> async_finishes(0);
-static atomic<int> ebusy_count(0);
+static atomic<int> start_ebusy_count(0);
+static atomic<int> start_e2big_count(0);
 static atomic<int> start_eagain_count(0);
 static atomic<int> fin_eagain_count(0);
+static atomic<int> start_edom_count(0);
 static atomic<int> uniq_pack_id(1);
 static atomic<int> generic_errs(0);
 
@@ -372,7 +374,8 @@ get_urandom_uint(void)
 static int
 start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
               uint8_t * lbp, int xfer_bytes, int flags,
-              unsigned int & eagains)
+              unsigned int & eagains, unsigned int & ebusy,
+              unsigned int & e2big, unsigned int & edom)
 {
     struct sg_io_hdr pt;
     uint8_t turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
@@ -425,12 +428,18 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
             this_thread::yield();
             continue;
-        }
-        if (EAGAIN == errno) {
+        } else if (EAGAIN == errno) {
             ++eagains;
             this_thread::yield();
             continue;
-        }
+        } else if (EBUSY == errno) {
+            ++ebusy;
+            this_thread::yield();
+            continue;
+        } else if (E2BIG == errno)
+            ++e2big;
+        else if (EDOM == errno)
+            ++edom;
         pr_errno_lk(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
         return -1;
     }
@@ -589,7 +598,10 @@ work_thread(int id, struct opts_t * op)
     int thr_async_finishes = 0;
     int vb = op->verbose;
     unsigned int thr_start_eagain_count = 0;
+    unsigned int thr_start_ebusy_count = 0;
+    unsigned int thr_start_e2big_count = 0;
     unsigned int thr_fin_eagain_count = 0;
+    unsigned int thr_start_edom_count = 0;
     unsigned int seed = 0;
     unsigned int hi_lba;
     int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
@@ -696,7 +708,8 @@ work_thread(int id, struct opts_t * op)
                 lba = 0;
             if (start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
                               op->lb_sz * op->num_lbs, sg_flags,
-                              thr_start_eagain_count)) {
+                              thr_start_eagain_count, thr_start_ebusy_count,
+                              thr_start_e2big_count, thr_start_edom_count)) {
                 err = "start_sg3_cmd()";
                 break;
             }
@@ -839,7 +852,10 @@ work_thread(int id, struct opts_t * op)
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
     start_eagain_count += thr_start_eagain_count;
+    start_ebusy_count += thr_start_ebusy_count;
+    start_e2big_count += thr_start_e2big_count;
     fin_eagain_count += thr_fin_eagain_count;
+    start_edom_count += thr_start_edom_count;
 }
 
 #define INQ_REPLY_LEN 96
@@ -1325,11 +1341,13 @@ main(int argc, char * argv[])
             cout << "Number of async_finishes: " << async_finishes.load() <<
                     endl;
             cout << "Last pack_id: " << n << endl;
-            cout << "Number of EBUSYs: " << ebusy_count.load() << endl;
+            cout << "Number of EBUSYs: " << start_ebusy_count.load() << endl;
             cout << "Number of start EAGAINs: " << start_eagain_count.load()
                  << endl;
             cout << "Number of finish EAGAINs: " << fin_eagain_count.load()
                  << endl;
+            cout << "Number of E2BIGs: " << start_e2big_count.load() << endl;
+            cout << "Number of EDOMs: " << start_edom_count.load() << endl;
         }
     }
     catch(system_error& e)  {

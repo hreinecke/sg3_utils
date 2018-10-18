@@ -14,7 +14,7 @@ LD = gcc
 # LD = clang
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
-	sg_tst_nvme tst_sg_lib
+	sg_tst_nvme sg_tst_ioctl tst_sg_lib
 	
 EXTRAS =
 
@@ -70,6 +70,9 @@ sg_queue_tst: sg_queue_tst.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 bsg_queue_tst: bsg_queue_tst.o $(LIBFILESOLD)
+	$(LD) -o $@ $(LDFLAGS) $^ 
+
+sg_tst_ioctl: sg_tst_ioctl.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 # building sg_chk_asc depends on a prior successful make in ../lib
