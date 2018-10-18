@@ -17,16 +17,16 @@
    The default behaviour is to "queue at head" which is useful for
    error processing but not for streaming READ and WRITE commands.
 
-*  Copyright (C) 2010 D. Gilbert
+*  Copyright (C) 2010-2018 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
 *  any later version.
 
-   Invocation: sg_queue_tst [-t] <sg_device>
+   Invocation: sg_queue_tst [-l=Q_LEN] [-t] <sg_device>
         -t      queue at tail
 
-   Version 0.91 (20160528)
+   Version 0.92 (20181011)
 
 */
 
@@ -45,6 +45,9 @@
 #define SG_FLAG_Q_AT_HEAD 0x20
 #endif
 
+#define DEF_Q_LEN 16    /* max in sg v3 and earlier */
+#define MAX_Q_LEN 256
+
 
 int main(int argc, char * argv[])
 {
@@ -53,18 +56,28 @@ int main(int argc, char * argv[])
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
                                 {0x1d, 0, 0, 0, 0, 0};
-    uint8_t inqBuff[16][INQ_REPLY_LEN];
-    sg_io_hdr_t io_hdr[16];
+    uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
+    sg_io_hdr_t io_hdr[MAX_Q_LEN];
     sg_io_hdr_t rio_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    uint8_t sense_buffer[16][SENSE_BUFFER_LEN];
+    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
     int q_at_tail = 0;
+    int q_len = DEF_Q_LEN;
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-t", argv[k], 2))
             ++q_at_tail;
-        else if (*argv[k] == '-') {
+        else if (0 == memcmp("-l=", argv[k], 3)) {
+            q_len = atoi(argv[k] + 3);
+            if ((q_len > 511) || (q_len < 1)) {
+                printf("Expect -l= to take a number (q length) between 1 "
+                       "and 511\n");
+                file_name = 0;
+                break;
+            }
+
+        } else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
             break;
@@ -78,8 +91,10 @@ int main(int argc, char * argv[])
         }
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_queue_tst [-t] <sg_device>'\n"
-               "where:\n      -t   queue_at_tail (def: q_at_head)\n");
+        printf("Usage: 'sg_queue_tst [-l=Q_LEN] [-t] <sg_device>'\n"
+               "where:\n      -l=Q_LEN    queue length, between 1 and 511 "
+               "(def: 16)\n"
+               "      -t   queue_at_tail (def: q_at_head)\n");
         return 1;
     }
 
@@ -91,7 +106,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    for (k = 0; k < 16; ++k) {
+    for (k = 0; k < q_len; ++k) {
         /* Prepare INQUIRY command */
         memset(&io_hdr[k], 0, sizeof(sg_io_hdr_t));
         io_hdr[k].interface_id = 'S';
@@ -126,7 +141,7 @@ int main(int argc, char * argv[])
         }
     }
     /* sleep(3); */
-    for (k = 0; k < 16; ++k) {
+    for (k = 0; k < q_len; ++k) {
         memset(&rio_hdr, 0, sizeof(sg_io_hdr_t));
         rio_hdr.interface_id = 'S';
         if (read(sg_fd, &rio_hdr, sizeof(sg_io_hdr_t)) < 0) {
