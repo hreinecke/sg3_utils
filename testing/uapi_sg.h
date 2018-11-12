@@ -1,28 +1,6 @@
-PROPS-END
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _UAPI_SCSI_SG_H
 #define _UAPI_SCSI_SG_H
-
-/*
- * Want to block the original sg.h header from also being included. That
- * causes lots of multiple definition errors. This will only work if this
- * header is included _before_ the original sg.h header .
- */
-#define _SCSI_GENERIC_H		/* original kernel header guard */
-#define _SCSI_SG_H		/* glibc header guard */
-
-/*
- * Other UAPI headers include linux/compiler.h to resolve "__" types but that
- * doesn't always work, perhaps in the future. Fall back to linux/types.h .
- */
-/* #include <linux/compiler.h> */
-#include <linux/types.h>
-#include <linux/major.h>
-
-/* Still problems with __user so define to nothing */
-#define __user
-
-#include <linux/bsg.h>
 
 /*
  * History:
@@ -35,7 +13,7 @@ PROPS-END
  * Version 2 and 3 extensions to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- *  Version: 3.9.01 (20181014)
+ *  Version: 3.9.02 (20181104)
  *  This version is for Linux 2.6, 3 and 4 series kernels.
  *
  * Documentation
@@ -49,6 +27,11 @@ PROPS-END
  * For utility and test programs see: http://sg.danny.cz/sg/sg3_utils.html
  */
 
+#include <linux/types.h>
+#include <linux/major.h>
+
+/* bsg.h contains the sg v4 use space interface structure. */
+#include <linux/bsg.h>
 
 /*
  * Same structure as used by readv() call. It defines one scatter-gather
@@ -66,7 +49,7 @@ typedef struct sg_io_hdr {
 	int dxfer_direction;	/* [i] data transfer direction  */
 	unsigned char cmd_len;	/* [i] SCSI command length */
 	unsigned char mx_sb_len;/* [i] max length to write to sbp */
-	unsigned short iovec_count;	/* [i] 0 implies no scatter gather */
+	unsigned short iovec_count;	/* [i] 0 implies no sgat list */
 	unsigned int dxfer_len;	/* [i] byte count of data transfer */
 	/* points to data transfer memory or scatter gather list */
 	void __user *dxferp;	/* [i], [*io] */
@@ -110,7 +93,7 @@ typedef struct sg_io_hdr {
 #define SG_FLAG_MMAP_IO 4	/* request memory mapped IO */
 /* no transfer of kernel buffers to/from user space; to debug indirect IO */
 #define SG_FLAG_NO_DXFER 0x10000
-/* defaults: for sg driver: Q_AT_HEAD; for block layer: Q_AT_TAIL */
+/* defaults: for sg driver (v3): Q_AT_HEAD; for block layer: Q_AT_TAIL */
 #define SG_FLAG_Q_AT_TAIL 0x10
 #define SG_FLAG_Q_AT_HEAD 0x20
 
@@ -131,6 +114,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_IMMED 0x400	/* for polling with SG_IOR else ignored */
 #define SGV4_FLAG_ASYNC 0x800	/* make sync ioctl (e.g. SG_IO) async */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
+#define SGV4_FLAG_SHARE 0x2000	/* share IO buffer, already setup or err */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER
 
 /* following 'info' values are OR-ed together */
@@ -143,6 +127,7 @@ typedef struct sg_io_hdr {
 #define SG_INFO_DIRECT_IO 0x2	/* direct IO requested and performed */
 #define SG_INFO_MIXED_IO 0x4	/* part direct, part indirect IO */
 #define SG_INFO_DEVICE_DETACHING 0x8	/* completed successfully but ... */
+#define SG_INFO_ANOTHER_WAITING 0x10	/* needs SG_CTL_FLAGM_CHECK_FOR_MORE */
 
 
 typedef struct sg_scsi_id {	/* used by SG_GET_SCSI_ID ioctl() */
@@ -187,12 +172,28 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIM_TOT_FD_THRESH	0x4	/* tot_fd_thresh field valid */
 #define SG_SEIM_CTL_FLAGS	0x8	/* ctl_flags_mask bits in ctl_flags */
 #define SG_SEIM_MINOR_INDEX	0x10	/* sg device minor index number */
-#define SG_SEIM_ALL_BITS	0x1f	/* should be OR of previous items */
+#define SG_SEIM_READ_VAL	0x20	/* write SG_SEIRV, read related */
+#define SG_SEIM_SHARE_FD	0x40	/* slave gives fd of master, sharing */
+#define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
+#define SG_SEIM_ALL_BITS	0xff	/* should be OR of previous items */
 
 #define SG_CTL_FLAGM_TIME_IN_NS	0x1	/* time: nanosecs (def: millisecs) */
-#define SG_CTL_FLAGM_TAG_FOR_PACK_ID	0x2
-#define SG_CTL_FLAGM_OTHER_OPENS	0x4 /* rd: other sg fd_s on this dev */
+#define SG_CTL_FLAGM_TAG_FOR_PACK_ID 0x2
+#define SG_CTL_FLAGM_OTHER_OPENS 0x4	/* rd: other sg fd_s on this dev */
 #define SG_CTL_FLAGM_ORPHANS	0x8	/* rd: orphaned requests on this fd */
+#define SG_CTL_FLAGM_Q_TAIL	0x10	/* used for future cmds on this fd */
+#define SG_CTL_FLAGM_UNSHARE	0x20	/* undo share after inflight cmd */
+#define SG_CTL_FLAGM_MASTER_FINI 0x40	/* share: master finished; 1: finish */
+#define SG_CTL_FLAGM_MASTER_ERR	0x80	/* rd: sharing, master got error */
+#define SG_CTL_FLAGM_CHECK_FOR_MORE 0x100 /* additional ready to read? */
+#define SG_CTL_FLAGM_ALL_BITS	0x1ff	/* should be OR of previous items */
+
+/* Write one of the following values to sg_extended_info::read_value, get... */
+#define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */
+#define SG_SEIRV_BOOL_MASK	0x1	/* get SG_CTL_FLAGM_ALL_BITS */
+#define SG_SEIRV_VERS_NUM	0x2	/* get driver version number as int */
+#define SG_SEIRV_FL_RQS		0x3	/* number of requests in free list */
+#define SG_SEIRV_DEV_FL_RQS	0x4	/* sum of rqs on all fds on this dev */
 
 /*
  * A pointer to the following structure is passed as the third argument to 
@@ -204,11 +205,11 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
  * back to the user space. If the same bit is set in both the *_wr_mask and
  * corresponding *_rd_mask fields, then the write action takes place before
  * the read action and no other operation will split the two. This structure
- * is padded to 64 bytes to allow for new values to be added in the future.
+ * is padded to 96 bytes to allow for new values to be added in the future.
  */
 struct sg_extended_info {
-	__u32	valid_wr_mask;	/* OR-ed SG_SEIM_* values */
-	__u32	valid_rd_mask;	/* OR-ed SG_SEIM_* values */
+	__u32	valid_wr_mask;	/* OR-ed SG_SEIM_* user->driver values */
+	__u32	valid_rd_mask;	/* OR-ed SG_SEIM_* driver->user values */
 	__u32	reserved_sz;	/* data/sgl size of pre-allocated request */
 	__u32	rq_rem_sgat_thresh;/* request re-use: clear data/sgat if > */
 	__u32	tot_fd_thresh;	/* total data/sgat for this fd, 0: no limit */
@@ -216,7 +217,10 @@ struct sg_extended_info {
 	__u32	ctl_flags_rd_mask;	/* OR-ed SG_CTL_FLAGM_* values */
 	__u32	ctl_flags;	/* bit values OR-ed, see SG_CTL_FLAGM_* */
 	__u32	minor_index;	/* rd: kernel's sg device minor number */
-	__u8	pad_to_64[28];	/* pad so struct is 64 bytes long */
+	__u32	read_value;	/* write known value, read back related */
+	__u32	share_fd;	/* slave provided fd of master */
+	__u32	sgat_elem_sz;	/* sgat element size (must be power of 2 */
+	__u8	pad_to_96[52];	/* pad so struct is 96 bytes long */
 };
 
 /*
@@ -242,12 +246,13 @@ struct sg_extended_info {
 #define SG_GET_RESERVED_SIZE 0x2272  /* actual size of reserved buffer */
 
 /*
- * SCSI_GENERIC_MAJOR has the value 0x15 so the author has no idea why
- * this driver has used 0x22 as its upper byte (when viewed as a __u16).
- * As the driver is 26 years old, SCSI_GENERIC_MAJOR may have been 0x22
- * at some point in the distant past.
+ * Historically the scsi/sg driver has used 0x22 as it ioctl base number.
+ * Add a define for that value and use it for several new ioctls added in
+ * version 3.9.01 sg driver.
  */
-#define SG_SET_GET_EXTENDED _IOWR(SCSI_GENERIC_MAJOR, 0x51,	\
+#define SG_IOCTL_MAGIC_NUM 0x22
+
+#define SG_SET_GET_EXTENDED _IOWR(SG_IOCTL_MAGIC_NUM, 0x51,	\
 				  struct sg_extended_info)
 
 /* The following ioctl has a 'sg_scsi_id_t *' object as its 3rd argument. */
@@ -330,7 +335,10 @@ struct sg_extended_info {
 
 #define SG_BIG_BUFF SG_DEF_RESERVED_SIZE    /* for backward compatibility */
 
-/* Alternate style type names, "..._t" variants preferred */
+/*
+ * Alternate style type names, "..._t" variants (as found in the
+ * 'typedef struct * {};' definitions above) are preferred to these:
+ */
 typedef struct sg_io_hdr Sg_io_hdr;
 typedef struct sg_io_vec Sg_io_vec;
 typedef struct sg_scsi_id Sg_scsi_id;
@@ -400,11 +408,11 @@ struct sg_header {
  * "write" terms are from the driver's POV, the _IO macros from users' POV.
  */
 /* via pointer reads sg v3 or v4 object, optionally writes tag, so _IOWR */
-#define SG_IOSUBMIT _IOWR(SCSI_GENERIC_MAJOR, 0x41, struct sg_io_v4)
+#define SG_IOSUBMIT _IOWR(SG_IOCTL_MAGIC_NUM, 0x41, struct sg_io_v4)
 /* via pointer optionally reads tag, writes sg v3 or v4 object, so _IOWR */
-#define SG_IORECEIVE _IOWR(SCSI_GENERIC_MAJOR, 0x42, struct sg_io_v4)
+#define SG_IORECEIVE _IOWR(SG_IOCTL_MAGIC_NUM, 0x42, struct sg_io_v4)
 /* via pointer reads v4 object (including tag), writes nothing, so _IOW */
-#define SG_IOABORT _IOW(SCSI_GENERIC_MAJOR, 0x43, struct sg_io_v4)
+#define SG_IOABORT _IOW(SG_IOCTL_MAGIC_NUM, 0x43, struct sg_io_v4)
 
 /* command queuing is always on when the new interface is used */
 #define SG_DEF_COMMAND_Q 0

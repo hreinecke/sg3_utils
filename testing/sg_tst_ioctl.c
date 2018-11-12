@@ -1,4 +1,3 @@
-PROPS-END
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -9,7 +8,20 @@ PROPS-END
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "uapi_sg.h"	/* local copy in this directory */
+/* Kernel uapi header contain __user decorations on user space pointers
+ * to indicate they are unsafe in the kernel space. However glibc takes
+ * all those __user decorations out from headers in /usr/include/linux .
+ * So to stop compile errors when directly importing include/uapi/scsi/sg.h
+ * undef __user before doing that include. */
+#define __user
+
+/* Want to block the original sg.h header from also being included. That
+ * causes lots of multiple definition errors. This will only work if this
+ * header is included _before_ the original sg.h header.  */
+#define _SCSI_GENERIC_H         /* original kernel header guard */
+#define _SCSI_SG_H              /* glibc header guard */
+
+#include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
 
 #include "sg_lib.h"
 #include "sg_io_linux.h"
@@ -29,8 +41,9 @@ PROPS-END
  * Invocation: sg_tst_ioctl [-l=Q_LEN] [-t] <sg_device>
  *      -t      queue at tail
  *
- *  Version 0.92 (20181018)
  */
+
+static const char * version_str = "Version: 0.96  20181106";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -50,11 +63,14 @@ PROPS-END
 #define DEF_Q_LEN 16    /* max in sg v3 and earlier */
 #define MAX_Q_LEN 256
 
+#define DEF_RESERVE_BUFF_SZ (256 * 1024)
+
 
 int main(int argc, char * argv[])
 {
     bool done;
     int sg_fd, k, ok, ver_num, pack_id, num_waiting, access_count;
+    int sg_fd2 = -1;
     uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
@@ -68,18 +84,32 @@ int main(int argc, char * argv[])
     int q_at_tail = 0;
     int q_len = DEF_Q_LEN;
     int sleep_secs = 0;
+    int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
+    int verbose = 0;
+    uint32_t cflags;
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
+    const char * second_fname = "/dev/sg2";
     struct sg_scsi_id ssi;
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-t", argv[k], 2))
             ++q_at_tail;
-        else if (0 == memcmp("-l=", argv[k], 3)) {
+        else if (0 == memcmp("-h", argv[k], 2)) {
+            file_name = 0;
+            break;
+        } else if (0 == memcmp("-l=", argv[k], 3)) {
             q_len = atoi(argv[k] + 3);
             if ((q_len > 511) || (q_len < 1)) {
                 printf("Expect -l= to take a number (q length) between 1 "
                        "and 511\n");
+                file_name = 0;
+                break;
+            }
+        } else if (0 == memcmp("-r=", argv[k], 3)) {
+            reserve_buff_sz = atoi(argv[k] + 3);
+            if (reserve_buff_sz < 0) {
+                printf("Expect -r= to take a number 0 or higher\n");
                 file_name = 0;
                 break;
             }
@@ -90,6 +120,18 @@ int main(int argc, char * argv[])
                 file_name = 0;
                 break;
             }
+        } else if (0 == memcmp("-vvvv", argv[k], 5))
+            verbose += 4;
+        else if (0 == memcmp("-vvv", argv[k], 4))
+            verbose += 3;
+        else if (0 == memcmp("-vv", argv[k], 3))
+            verbose += 2;
+        else if (0 == memcmp("-v", argv[k], 2))
+            verbose += 1;
+        else if (0 == memcmp("-V", argv[k], 2)) {
+            printf("%s\n", version_str);
+            file_name = 0;
+            break;
         } else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
@@ -104,11 +146,18 @@ int main(int argc, char * argv[])
         }
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_tst_ioctl [-l=Q_LEN] [-t] <sg_device>'\n where:\n"
+        printf("Usage: 'sg_tst_ioctl [-h] [-l=Q_LEN] [-t] [-v] [-V] "
+               "<sg_device>'\n"
+               " where:\n"
+               "      -h      help: print usage message then exit\n"
                "      -l=Q_LEN    queue length, between 1 and 511 "
                "(def: 16)\n"
+               "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
+               "KB)\n"
                "      -s=SEC    sleep between writes and reads (def: 0)\n"
-               "      -t   queue_at_tail (def: q_at_head)\n");
+               "      -t    queue_at_tail (def: q_at_head)\n"
+               "      -v    increase verbosity of output\n"
+               "      -V    print version string then exit\n");
         return 1;
     }
 
@@ -119,6 +168,9 @@ int main(int argc, char * argv[])
         perror(ebuff);
         return 1;
     }
+    if (verbose)
+        fprintf(stderr, "opened given file: %s successfully, fd=%d\n",
+                file_name, sg_fd);
 
     if (ioctl(sg_fd, SG_GET_VERSION_NUM, &ver_num) < 0) {
         pr2serr("ioctl(SG_GET_VERSION_NUM) failed, errno=%d %s\n", errno,
@@ -127,20 +179,37 @@ int main(int argc, char * argv[])
     }
     printf("Linux sg driver version: %d\n", ver_num);
 
+    if ((sg_fd2 = open(second_fname, O_RDWR)) < 0) {
+        snprintf(ebuff, EBUFF_SZ,
+                 "%s: error opening file: %s", __func__, second_fname);
+        perror(ebuff);
+        return 1;
+    }
+    if (verbose)
+        fprintf(stderr, "opened second file: %s successfully, fd=%d\n",
+                second_fname, sg_fd2);
+
     seip = &sei;
     memset(seip, 0, sizeof(*seip));
     seip->valid_wr_mask |= SG_SEIM_RESERVED_SIZE;
-    seip->reserved_sz = 64 * 1024 * 1024;
+    seip->reserved_sz = reserve_buff_sz;
+    seip->sgat_elem_sz = 64 * 1024;;
     seip->valid_rd_mask |= SG_SEIM_RESERVED_SIZE;
     seip->valid_rd_mask |= SG_SEIM_RQ_REM_THRESH;
     seip->valid_rd_mask |= SG_SEIM_TOT_FD_THRESH;
     seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
-    seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS;    /* this or previous optional */
+    seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
     seip->valid_rd_mask |= SG_SEIM_MINOR_INDEX;
+    seip->valid_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_OTHER_OPENS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_ORPHANS;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_Q_TAIL;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_UNSHARE;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_FINI;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_ERR;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_CHECK_FOR_MORE;
     seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
 
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
@@ -148,6 +217,7 @@ int main(int argc, char * argv[])
                 strerror(errno));
         goto out;
     }
+#if 1
     printf("SG_SET_GET_EXTENDED ioctl ok\n");
     if (SG_SEIM_RESERVED_SIZE & seip->valid_rd_mask)
         printf("  reserved size: %u\n", seip->reserved_sz);
@@ -159,24 +229,99 @@ int main(int argc, char * argv[])
         printf("  tot_fd_thresh: %u\n", seip->tot_fd_thresh);
     if ((SG_SEIM_CTL_FLAGS & seip->valid_rd_mask) ||
          (SG_SEIM_CTL_FLAGS & seip->valid_wr_mask)) {
+        cflags = seip->ctl_flags;
         if (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags_rd_mask)
             printf("  TIME_IN_NS: %s\n",
-                   (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags) ?
-                                                       "true" : "false");
+                   (SG_CTL_FLAGM_TIME_IN_NS & cflags) ? "true" : "false");
         if (SG_CTL_FLAGM_OTHER_OPENS & seip->ctl_flags_rd_mask)
             printf("  OTHER_OPENS: %s\n",
-                   (SG_CTL_FLAGM_OTHER_OPENS & seip->ctl_flags) ?
-                                                       "true" : "false");
+                   (SG_CTL_FLAGM_OTHER_OPENS & cflags) ? "true" : "false");
         if (SG_CTL_FLAGM_ORPHANS & seip->ctl_flags_rd_mask)
             printf("  ORPHANS: %s\n",
-                   (SG_CTL_FLAGM_ORPHANS & seip->ctl_flags) ?
-                                                       "true" : "false");
+                   (SG_CTL_FLAGM_ORPHANS & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_Q_TAIL & seip->ctl_flags_rd_mask)
+            printf("  Q_TAIL: %s\n",
+                   (SG_CTL_FLAGM_Q_TAIL & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_UNSHARE & seip->ctl_flags_rd_mask)
+            printf("  UNSHARE: %s\n",
+                   (SG_CTL_FLAGM_UNSHARE & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_MASTER_FINI & seip->ctl_flags_rd_mask)
+            printf("  MASTER_FINI: %s\n",
+                   (SG_CTL_FLAGM_MASTER_FINI & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_MASTER_ERR & seip->ctl_flags_rd_mask)
+            printf("  MASTER_ERR: %s\n",
+                   (SG_CTL_FLAGM_MASTER_ERR & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_CHECK_FOR_MORE & seip->ctl_flags_rd_mask)
+            printf("  CHECK_FOR_MORE: %s\n",
+                   (SG_CTL_FLAGM_CHECK_FOR_MORE & cflags) ? "true" : "false");
     }
     if (SG_SEIM_MINOR_INDEX & seip->valid_rd_mask)
         printf("  minor_index: %u\n", seip->minor_index);
     printf("\n");
-    printf("SG_IOSUBMIT value=0x%lx\n", SG_IOSUBMIT);
-    printf("SG_IORECEIVE value=0x%lx\n", SG_IORECEIVE);
+#endif
+
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
+    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_INT_MASK;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        goto out;
+    }
+    printf("SG_SET_GET_EXTENDED ioctl ok\n");
+    printf("  read_value[SG_SEIRV_INT_MASK]= %u\n", seip->read_value);
+
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
+    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_VERS_NUM;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        goto out;
+    }
+    printf("  read_value[SG_SEIRV_VERS_NUM]= %u\n", seip->read_value);
+
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
+    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_FL_RQS;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        goto out;
+    }
+    printf("  read_value[SG_SEIRV_FL_RQS]= %u\n", seip->read_value);
+
+#if 1
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
+    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_DEV_FL_RQS;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        goto out;
+    }
+    printf("  read_value[SG_SEIRV_DEV_FL_RQS]= %u\n", seip->read_value);
+#endif
+
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_SHARE_FD;
+    seip->valid_rd_mask |= SG_SEIM_SHARE_FD;
+#if 1
+    seip->share_fd = sg_fd2;
+#else
+    seip->share_fd = sg_fd;
+#endif
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0)
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) shared_fd=%d, failed errno=%d "
+                "%s\n", sg_fd2, errno, strerror(errno));
+    printf("  read back shared_fd= %u\n", seip->share_fd);
+
+    // printf("SG_IOSUBMIT value=0x%lx\n", SG_IOSUBMIT);
+    // printf("SG_IORECEIVE value=0x%lx\n", SG_IORECEIVE);
     if (ioctl(sg_fd, SG_GET_TRANSFORM, NULL) < 0)
         pr2serr("ioctl(SG_GET_TRANSFORM) fail expected, errno=%d %s\n",
                 errno, strerror(errno));
@@ -242,7 +387,7 @@ int main(int argc, char * argv[])
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                 errno, strerror(errno));
     else
-        printf("pack_id: %d\n", pack_id);
+        printf("first available pack_id: %d\n", pack_id);
     if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0)
         pr2serr("ioctl(SG_GET_NUM_WAITING) failed, errno=%d %s\n",
                 errno, strerror(errno));
@@ -255,7 +400,7 @@ int main(int argc, char * argv[])
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                 errno, strerror(errno));
     else
-        printf("pack_id: %d\n", pack_id);
+        printf("first available pack_id: %d\n", pack_id);
     if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0)
         pr2serr("ioctl(SG_GET_NUM_WAITING) failed, errno=%d %s\n",
                 errno, strerror(errno));
@@ -271,7 +416,7 @@ int main(int argc, char * argv[])
                 pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                         errno, strerror(errno));
             else
-                printf("pack_id: %d\n", pack_id);
+                printf("first available pack_id: %d\n", pack_id);
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0)
                 pr2serr("ioctl(SG_GET_NUM_WAITING) failed, errno=%d %s\n",
                         errno, strerror(errno));
@@ -306,7 +451,6 @@ int main(int argc, char * argv[])
         }
 
         if (ok) { /* output result if it is available */
-            /* if (0 == rio_hdr.pack_id) */
             if (0 == (rio_hdr.pack_id % 3))
                 printf("SEND DIAGNOSTIC %d duration=%u\n", rio_hdr.pack_id,
                        rio_hdr.duration);
@@ -318,5 +462,7 @@ int main(int argc, char * argv[])
 
 out:
     close(sg_fd);
+    if (sg_fd2 >= 0)
+        close(sg_fd2);
     return 0;
 }
