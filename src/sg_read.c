@@ -10,8 +10,8 @@
    multiple reads all starting from the same logical address. Its interface
    is a subset of another member of this package: sg_dd which is a
    "dd" variant. The input file can be a scsi generic device, a block device,
-   a raw device or a seekable file. Streams such as stdin are not acceptable.
-   The block size ('bs') is assumed to be 512 if not given.
+   or a seekable file. Streams such as stdin are not acceptable. The block
+   size ('bs') is assumed to be 512 if not given.
 
    This version should compile with Linux sg drivers with version numbers
    >= 30000 . For mmap-ed IO the sg version number >= 30122 .
@@ -75,7 +75,7 @@ static const char * version_str = "1.34 20180811";
 #define RAW_MAJOR 255   /*unlikey value */
 #endif
 
-#define FT_OTHER 1              /* filetype other than sg or raw device */
+#define FT_OTHER 1              /* filetype other than sg and ... */
 #define FT_SG 2                 /* filetype is sg char device */
 #define FT_RAW 4                /* filetype is raw char device */
 #define FT_BLOCK 8              /* filetype is block device */

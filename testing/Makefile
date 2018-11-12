@@ -14,7 +14,7 @@ LD = gcc
 # LD = clang
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
-	sg_tst_nvme sg_tst_ioctl tst_sg_lib
+	sg_tst_nvme sg_tst_ioctl tst_sg_lib sgs_dd
 	
 EXTRAS =
 
@@ -44,7 +44,9 @@ LDFLAGS =
 
 LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
 LIBFILESNEW = ../lib/sg_pt_linux_nvme.o ../lib/sg_lib.o ../lib/sg_lib_data.o \
-		../lib/sg_pt_linux.o ../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o
+		../lib/sg_pt_linux.o ../lib/sg_io_linux.o \
+		../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o \
+		../lib/sg_cmds_basic2.o
 
 all: $(EXECS)
 
@@ -84,6 +86,9 @@ sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)
 
 tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
+
+sgs_dd: sgs_dd.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) -pthread $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)

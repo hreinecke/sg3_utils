@@ -41,14 +41,15 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.21 (win32) 20180202";
+static const char * version_str = "1.22 (win32) 20181110";
 
-#define MAX_SCSI_ELEMS 2048
-#define MAX_ADAPTER_NUM 128
-#define MAX_PHYSICALDRIVE_NUM 1024
+#define MAX_SCSI_ELEMS 4096
+#define MAX_ADAPTER_NUM 256
+#define MAX_PHYSICALDRIVE_NUM 2048
 #define MAX_CDROM_NUM 512
 #define MAX_TAPE_NUM 512
 #define MAX_HOLE_COUNT 16
+#define MAX_GET_INQUIRY_DATA_SZ (32 * 1024)
 
 
 union STORAGE_DEVICE_DESCRIPTOR_DATA {
@@ -72,6 +73,7 @@ struct storage_elem {
 
 
 static struct storage_elem * storage_arr;
+static uint8_t * free_storage_arr;
 static int next_unused_elem = 0;
 static int verbose = 0;
 
@@ -314,13 +316,22 @@ enum_scsi_adapters(void)
     int hole_count = 0;
     HANDLE fh;
     ULONG dummy;
-    DWORD err;
+    DWORD err = 0;
     BYTE bus;
     BOOL success;
     char adapter_name[64];
-    char inqDataBuff[8192];
+    char * inq_dbp;
+    uint8_t * free_inq_dbp = NULL;
     PSCSI_ADAPTER_BUS_INFO  ai;
     char b[256];
+
+    inq_dbp = (char *)sg_memalign(MAX_GET_INQUIRY_DATA_SZ, 0, &free_inq_dbp,
+                                  false);
+    if (NULL == inq_dbp) {
+        pr2serr("%s: unable to allocate %d bytes on heap\n", __func__,
+                MAX_GET_INQUIRY_DATA_SZ);
+        return sg_convert_errno(ENOMEM);
+    }
 
     for (k = 0; k < MAX_ADAPTER_NUM; ++k) {
         snprintf(adapter_name, sizeof (adapter_name), "\\\\.\\SCSI%d:", k);
@@ -329,25 +340,25 @@ enum_scsi_adapters(void)
                         OPEN_EXISTING, 0, NULL);
         if (fh != INVALID_HANDLE_VALUE) {
             hole_count = 0;
-            success = DeviceIoControl(fh, IOCTL_SCSI_GET_INQUIRY_DATA,
-                                      NULL, 0, inqDataBuff,
-                                      sizeof(inqDataBuff), &dummy, NULL);
+            success = DeviceIoControl(fh, IOCTL_SCSI_GET_INQUIRY_DATA, NULL,
+                                      0, inq_dbp, MAX_GET_INQUIRY_DATA_SZ,
+                                      &dummy, NULL);
             if (success) {
                 PSCSI_BUS_DATA pbd;
                 PSCSI_INQUIRY_DATA pid;
                 int num_lus, off;
 
-                ai = (PSCSI_ADAPTER_BUS_INFO)inqDataBuff;
+                ai = (PSCSI_ADAPTER_BUS_INFO)inq_dbp;
                 for (bus = 0; bus < ai->NumberOfBusses; bus++) {
                     pbd = ai->BusData + bus;
                     num_lus = pbd->NumberOfLogicalUnits;
                     off = pbd->InquiryDataOffset;
                     for (j = 0; j < num_lus; ++j) {
                         if ((off < (int)sizeof(SCSI_ADAPTER_BUS_INFO)) ||
-                            (off > ((int)sizeof(inqDataBuff) -
+                            (off > (MAX_GET_INQUIRY_DATA_SZ -
                                     (int)sizeof(SCSI_INQUIRY_DATA))))
                             break;
-                        pid = (PSCSI_INQUIRY_DATA)(inqDataBuff + off);
+                        pid = (PSCSI_INQUIRY_DATA)(inq_dbp + off);
                         snprintf(b, sizeof(b) - 1, "SCSI%d:%d,%d,%d ", k,
                                  pid->PathId, pid->TargetId, pid->Lun);
                         printf("%-15s", b);
@@ -367,6 +378,7 @@ enum_scsi_adapters(void)
                 pr2serr("%s: IOCTL_SCSI_GET_INQUIRY_DATA failed err=%u\n\t%s",
                         adapter_name, (unsigned int)err,
                         get_err_str(err, sizeof(b), b));
+                err = SG_LIB_WINDOWS_ERR;
             }
             CloseHandle(fh);
         } else {
@@ -379,8 +391,11 @@ enum_scsi_adapters(void)
                         (unsigned int)err, get_err_str(err, sizeof(b), b));
             if (++hole_count >= MAX_HOLE_COUNT)
                 break;
+            /* hope problem is local to this adapter so continue to next */
         }
     }
+    if (free_inq_dbp)
+        free(free_inq_dbp);
     return 0;
 }
 
@@ -700,14 +715,17 @@ main(int argc, char * argv[])
         }
     }
 
-    storage_arr = (struct storage_elem *)calloc(sizeof(struct storage_elem) *
-		   			        MAX_SCSI_ELEMS, 1);
+    storage_arr = (struct storage_elem *)
+                  sg_memalign(sizeof(struct storage_elem) * MAX_SCSI_ELEMS, 0,
+                              &free_storage_arr, false);
     if (storage_arr) {
         ret = sg_do_wscan(vol_letter, show_bt, scsi_scan);
-        free(storage_arr);
+        if (free_storage_arr)
+            free(free_storage_arr);
     } else {
-        pr2serr("Failed to allocate storage_arr on heap\n");
-        ret = SG_LIB_SYNTAX_ERROR;
+        pr2serr("Failed to allocate storage_arr (%d bytes) on heap\n",
+                (int)(sizeof(struct storage_elem) * MAX_SCSI_ELEMS));
+        ret = sg_convert_errno(ENOMEM);
     }
     return ret;
 }

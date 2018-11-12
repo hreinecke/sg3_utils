@@ -8,12 +8,11 @@
  * any later version.
 
    This program is a specialisation of the Unix "dd" command in which
-   either the input or the output file is a scsi generic device or a
-   raw device. The block size ('bs') is assumed to be 512 if not given.
-   This program complains if 'ibs' or 'obs' are given with a value
-   that differs from 'bs' (or the default 512).
-   If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
-   not given or 'of=-' then stdout assumed.
+   either the input or the output file is a scsi generic device. The block
+   size ('bs') is assumed to be 512 if not given. This program complains if
+   'ibs' or 'obs' are given with a value that differs from 'bs' (or the
+   default, 512). If 'if' is not given or 'if=-' then stdin is assumed.
+   If 'of' is not given or 'of=-' then stdout assumed.
 
    A non-standard argument "bpt" (blocks per transfer) is added to control
    the maximum number of blocks in each transfer. The default value is 128.
@@ -68,7 +67,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.60 20180811";
+static const char * version_str = "1.61 20181030";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

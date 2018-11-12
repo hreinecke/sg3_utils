@@ -450,6 +450,8 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_CAT_TASK_ABORTED 29 /* SCSI status, this command aborted by? */
 #define SG_LIB_CONTRADICT 31    /* error involving two or more cl options */
 #define SG_LIB_LOGIC_ERROR 32   /* unexpected situation in code */
+#define SG_LIB_WINDOWS_ERR 34   /* Windows error number don't fit in 7 bits so
+				 * map to a single value for exit statuses */
 #define SG_LIB_OK_FALSE 36      /* no error, reporting false (cf. no error,
                                  * reporting true is SG_LIB_OK_TRUE(0) ) */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF)

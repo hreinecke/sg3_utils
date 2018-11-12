@@ -54,11 +54,27 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+/* Kernel uapi header contain __user decorations on user space pointers
+ * to indicate they are unsafe in the kernel space. However glibc takes
+ * all those __user decorations out from headers in /usr/include/linux .
+ * So to stop compile errors when directly importing include/uapi/scsi/sg.h
+ * undef __user before doing that include. */
+#define __user
+
+/* Want to block the original sg.h header from also being included. That
+ * causes lots of multiple definition errors. This will only work if this
+ * header is included _before_ the original sg.h header.  */
+#define _SCSI_GENERIC_H         /* original kernel header guard */
+#define _SCSI_SG_H              /* glibc header guard */
+
+#include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
 
 #include "sg_lib.h"
 #include "sg_io_linux.h"
@@ -66,7 +82,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.16 20181012";
+static const char * version_str = "1.21 20181107";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -114,7 +130,8 @@ using namespace std::chrono;
 #define DEF_TIMEOUT_MS 20000    /* 20 seconds */
 #define DEF_LB_SZ 512
 #define DEF_BLOCKING 0
-#define DEF_DIRECT 0            /* 1: direct_io [future maybe 2: mmap IO] */
+#define DEF_DIRECT false        /* true: direct_io */
+#define DEF_MMAP_IO false       /* true: mmap-ed IO with sg */
 #define DEF_NO_XFER 0
 #define DEF_LBA 1000
 
@@ -161,11 +178,15 @@ enum myQDiscipline {MYQD_LOW,   /* favour completions over new cmds */
 struct opts_t {
     vector<const char *> dev_names;
     bool block;
-    bool generic_pt;
+    bool cmd_time;
+    bool direct;
+    bool generic_sync;
+    bool mmap_io;
     bool no_xfer;
+    bool pack_id_force;
+    bool sg_vn_ge_30901;
     bool verbose_given;
     bool version_given;
-    int direct;
     int maxq_per_thread;
     int num_per_thread;
     uint64_t lba;
@@ -224,15 +245,23 @@ private:
 };
 
 static struct option long_options[] = {
+        {"cmd-time", no_argument, 0, 'c'},
+        {"cmd_time", no_argument, 0, 'c'},
         {"direct", no_argument, 0, 'd'},
         {"force", no_argument, 0, 'f'},
-        {"generic-pt", no_argument, 0, 'g'},
-        {"generic_pt", no_argument, 0, 'g'},
+        {"generic-sync", no_argument, 0, 'g'},
+        {"generic_sync", no_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"lba", required_argument, 0, 'l'},
         {"maxqpt", required_argument, 0, 'M'},
+        {"mmap-io", no_argument, 0, 'm'},
+        {"mmap_io", no_argument, 0, 'm'},
         {"numpt", required_argument, 0, 'n'},
+        {"num-pt", required_argument, 0, 'n'},
+        {"num_pt", required_argument, 0, 'n'},
         {"noxfer", no_argument, 0, 'N'},
+        {"pack-id", no_argument, 0, 'p'},
+        {"pack_id", no_argument, 0, 'p'},
         {"qat", required_argument, 0, 'q'},
         {"qfav", required_argument, 0, 'Q'},
         {"read", no_argument, 0, 'R'},
@@ -251,21 +280,24 @@ static struct option long_options[] = {
 static void
 usage(void)
 {
-    printf("Usage: %s [--direct] [--force] [--generic-pt] [--help]\n"
-           "                    [--lba=LBA+] [--maxqpt=QPT] [--numpt=NPT] "
-           "[--noxfer]\n"
-           "                    [--qat=AT] [-qfav=FAV] [--read] "
-           "[--szlb=LB[,NLBS]]\n"
-           "                    [--stats] [--tnum=NT] [--tur] [--verbose] "
-           "[--version]\n"
-           "                    [--wait=MS] [--write] <sg_disk_device>*\n",
+    printf("Usage: %s [--cmd-time] [--direct] [--force] [--generic-sync]\n"
+           "                    [--help] [--lba=LBA+] [--maxqpt=QPT] "
+           "[--mmap-io]\n"
+           "                    [--numpt=NPT] [--noxfer] [--pack-id] "
+           "[--qat=AT]\n"
+           "                    [-qfav=FAV] [--read] [--szlb=LB[,NLBS]] "
+           "[--stats]\n"
+           "                    [--tnum=NT] [--tur] [--verbose] [--version] "
+           "[--wait=MS]\n"
+           "                    [--write] <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
+    printf("    --cmd-time|-c    calculate per command average time (ns)\n");
     printf("    --direct|-d     do direct_io (def: indirect)\n");
     printf("    --force|-f      force: any sg device (def: only scsi_debug "
            "owned)\n");
     printf("                    WARNING: <lba> written to if '-W' given\n");
-    printf("    --generic-pt|-g    use generic passthru in sg3_utils "
+    printf("    --generic-sync|-g    use generic synchronous SG_IO ioctl "
            "instead\n");
     printf("                       of Linux sg driver assuming /dev/sg* "
            "(def)\n");
@@ -278,10 +310,14 @@ usage(void)
            "device\n");
     printf("    --maxqpt=QPT|-M QPT    maximum commands queued per thread "
            "(def:%d)\n", MAX_Q_PER_FD);
+    printf("    --mmap-io|-m         mmap-ed IO (1 cmd outstanding per "
+           "thread)\n");
     printf("    --numpt=NPT|-n NPT    number of commands per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
-    printf("    --noxfer|-N             no data xfer (def: xfer on READ and "
+    printf("    --noxfer|-N          no data xfer (def: xfer on READ and "
            "WRITE)\n");
+    printf("    --pack-id|-p         set FORCE_PACK_ID, pack-id input to "
+           "read/finish\n");
     printf("    --qat=AT|-q AT       AT=0: q_at_head; AT=1: q_at_tail\n");
     printf("    --qfav=FAV|-Q FAV    FAV=0: favour completions (smaller q),\n"
            "                         FAV=1: medium,\n"
@@ -370,7 +406,8 @@ get_urandom_uint(void)
 #define WRITE16_REPLY_LEN 512
 #define WRITE16_CMD_LEN 16
 
-/* Returns 0 if command injected okay, else -1 */
+/* Returns 0 if command injected okay, return -1 for error and 2 for
+ * not done due to queue data size limit struck. */
 static int
 start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
               uint8_t * lbp, int xfer_bytes, int flags,
@@ -436,9 +473,10 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
             ++ebusy;
             this_thread::yield();
             continue;
-        } else if (E2BIG == errno)
+        } else if (E2BIG == errno) {
             ++e2big;
-        else if (EDOM == errno)
+            return 2;
+        } else if (EDOM == errno)
             ++edom;
         pr_errno_lk(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
         return -1;
@@ -447,10 +485,12 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 }
 
 static int
-finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
-               unsigned int & eagains)
+finish_sg3_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
+               int & pack_id, int wait_ms, unsigned int & eagains,
+               unsigned int & nanosecs)
 {
-    int ok, res;
+    bool ok;
+    int res, k;
     struct sg_io_hdr pt;
     uint8_t sense_buffer[64];
     const char * np = NULL;
@@ -459,23 +499,36 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
     switch (cmd2exe) {
     case SCSI_TUR:
         np = "TEST UNIT READY";
+        pt.dxfer_direction = SG_DXFER_NONE;
         break;
     case SCSI_READ16:
         np = "READ(16)";
+        pt.dxfer_direction = SG_DXFER_FROM_DEV;
         break;
     case SCSI_WRITE16:
         np = "WRITE(16)";
+        pt.dxfer_direction = SG_DXFER_TO_DEV;
         break;
     }
     pt.interface_id = 'S';
     pt.mx_sb_len = sizeof(sense_buffer);
     pt.sbp = sense_buffer;
     pt.timeout = DEF_TIMEOUT_MS;
-    pt.pack_id = 0;
+    /* if SG_SET_FORCE_PACK_ID, then need to set pt.dxfer_direction */
+    pt.pack_id = pack_id;
 
+    k = 0;
     while (((res = read(sg_fd, &pt, sizeof(pt))) < 0) &&
            (EAGAIN == errno)) {
         ++eagains;
+        if (pack_id_force) {
+            ++k;
+            if (k > 10000) {
+                pr2serr_lk("%s: unable to find pack_id=%d\n", __func__,
+                           pack_id);
+                return -1;      /* crash out */
+            }
+        }
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
         else if (0 == wait_ms)
@@ -489,14 +542,14 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
     }
     /* now for the error processing */
     pack_id = pt.pack_id;
-    ok = 0;
+    ok = false;
     switch (sg_err_category3(&pt)) {
     case SG_LIB_CAT_CLEAN:
-        ok = 1;
+        ok = true;
         break;
     case SG_LIB_CAT_RECOVERED:
         pr2serr_lk("%s: Recovered error on %s, continuing\n", __func__, np);
-        ok = 1;
+        ok = true;
         break;
     default: /* won't bother decoding other categories */
         {
@@ -505,6 +558,8 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id, int wait_ms,
         }
         break;
     }
+    if (ok)
+        nanosecs = pt.duration;
     return ok ? 0 : -1;
 }
 
@@ -594,31 +649,38 @@ err_out:
 static void
 work_thread(int id, struct opts_t * op)
 {
+    bool is_rw = (SCSI_TUR != op->c2e);
+    bool need_finish, repeat;
+    int open_flags = O_RDWR;
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
     int vb = op->verbose;
+    int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
+    int num_waiting_read, num_to_read, sz, ern, encore_pack_id, ask, j;
+    int prev_pack_id;
     unsigned int thr_start_eagain_count = 0;
     unsigned int thr_start_ebusy_count = 0;
     unsigned int thr_start_e2big_count = 0;
     unsigned int thr_fin_eagain_count = 0;
     unsigned int thr_start_edom_count = 0;
     unsigned int seed = 0;
+    int needed_sz = op->lb_sz * op->num_lbs;
+    unsigned int nanosecs;
     unsigned int hi_lba;
-    int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
-    int num_waiting_read, num_to_read;
-    int open_flags = O_RDWR;
-    bool is_rw = (SCSI_TUR != op->c2e);
-    char ebuff[EBUFF_SZ];
     uint64_t lba;
+    uint64_t sum_nanosecs = 0;
     uint8_t * lbp;
     uint8_t * free_lbp = NULL;
+    uint8_t * wrkMmap = NULL;
     const char * dev_name;
     const char * err = NULL;
     Rand_uint * ruip = NULL;
+    char ebuff[EBUFF_SZ];
     struct pollfd  pfd[1];
     list<pair<uint8_t *, uint8_t *> > free_lst;   /* of aligned lb buffers */
     map<int, pair<uint8_t *, uint8_t *> > pi2buff;/* pack_id -> lb buffer */
     map<int, uint64_t> pi_2_lba;            /* pack_id -> LBA */
+    pair<uint8_t *, uint8_t *> encore_lbps;
 
     /* device name and hi_lba may depend on id */
     n = op->dev_names.size();
@@ -636,7 +698,7 @@ work_thread(int id, struct opts_t * op)
         else
             pr2serr_lk("Enter work_t_id=%d using %s\n", id, dev_name);
     }
-    if (op->generic_pt) {
+    if (op->generic_sync) {
         work_sync_thread(id, dev_name, hi_lba, op);
         return;
     }
@@ -648,6 +710,77 @@ work_thread(int id, struct opts_t * op)
         pr_errno_lk(errno, "%s: id=%d, error opening file: %s", __func__, id,
                     dev_name);
         return;
+    }
+    if (op->pack_id_force) {
+        k = 1;
+        if (ioctl(sg_fd, SG_SET_FORCE_PACK_ID, &k) < 0)
+            pr2serr_lk("ioctl(SG_SET_FORCE_PACK_ID) failed, errno=%d %s\n",
+                       errno, strerror(errno));
+    }
+    if (op->sg_vn_ge_30901) {
+        if (ioctl(sg_fd, SG_GET_RESERVED_SIZE, &k) >= 0) {
+            if (needed_sz > k)
+                ioctl(sg_fd, SG_SET_RESERVED_SIZE, &needed_sz);
+        }
+        if (op->cmd_time) {
+            struct sg_extended_info sei;
+            struct sg_extended_info * seip;
+
+            seip = &sei;
+            memset(seip, 0, sizeof(*seip));
+            seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
+            seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS;
+            seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+            if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
+                           errno, strerror(errno));
+            }
+            if (! (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags)) {
+                memset(seip, 0, sizeof(*seip));
+                seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS;
+                seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
+                seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+                seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+                if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0)
+                    pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, "
+                               "errno=%d %s\n", errno, strerror(errno));
+                else if (vb > 1)
+                    pr2serr_lk("t_id: %d: set TIME_IN_NS flag\n", id);
+            }
+        }
+    }
+    if (is_rw && op->mmap_io) {
+
+        if (ioctl(sg_fd, SG_GET_RESERVED_SIZE, &sz) < 0) {
+            pr2serr_lk("t_id=%d: ioctl(SG_GET_RESERVED_SIZE) errno=%d\n",
+                       id, errno);
+            return;
+        }
+        if (sz < needed_sz) {
+            sz = needed_sz;
+            if (ioctl(sg_fd, SG_SET_RESERVED_SIZE, &sz) < 0) {
+                pr2serr_lk("t_id=%d: ioctl(SG_SET_RESERVED_SIZE) errno=%d\n",
+                           id, errno);
+                return;
+            }
+            if (ioctl(sg_fd, SG_GET_RESERVED_SIZE, &sz) < 0) {
+                pr2serr_lk("t_id=%d: ioctl(SG_GET_RESERVED_SIZE) errno=%d\n",
+                           id, errno);
+                return;
+            }
+            if (sz < needed_sz) {
+                pr2serr_lk("t_id=%d: unable to grow reserve buffer to %d "
+                           "bytes\n", id, needed_sz);
+                return;
+            }
+        }
+        wrkMmap = (uint8_t *)mmap(NULL, needed_sz, PROT_READ | PROT_WRITE,
+                                  MAP_SHARED, sg_fd, 0);
+        if (MAP_FAILED == wrkMmap) {
+            ern = errno;
+            pr2serr_lk("t_id=%d: mmap() failed, errno=%d\n", id, ern);
+            return;
+        }
     }
     pfd[0].fd = sg_fd;
     pfd[0].events = POLLIN;
@@ -665,6 +798,8 @@ work_thread(int id, struct opts_t * op)
         sg_flags |= SG_FLAG_Q_AT_HEAD;
     if (op->direct)
         sg_flags |= SG_FLAG_DIRECT_IO;
+    if (op->mmap_io)
+        sg_flags |= SG_FLAG_MMAP_IO;
     if (op->no_xfer)
         sg_flags |= SG_FLAG_NO_DXFER;
     if (vb > 1)
@@ -673,6 +808,11 @@ work_thread(int id, struct opts_t * op)
                     ((SCSI_READ16 == op->c2e) ? "READ" : "WRITE")));
 
     npt = op->num_per_thread;
+    need_finish = false;
+    lba = 0;
+    pack_id = 0;
+    prev_pack_id = 0;
+    encore_pack_id = 0;
     /* main loop, continues until num_per_thread exhausted and there are
      * no more outstanding responses */
     for (k = 0, num_outstanding = 0; (k < npt) || num_outstanding;
@@ -680,7 +820,15 @@ work_thread(int id, struct opts_t * op)
         do_inc = 0;
         if ((num_outstanding < op->maxq_per_thread) && (k < npt)) {
             do_inc = 1;
-            pack_id = uniq_pack_id.fetch_add(1);
+            if (need_finish) {
+                pack_id = encore_pack_id;
+                need_finish = false;
+                repeat = true;
+            } else {
+                prev_pack_id = pack_id;
+                pack_id = uniq_pack_id.fetch_add(1);
+                repeat = false;
+            }
             if (is_rw) {    /* get new lb buffer or one from free list */
                 if (free_lst.empty()) {
                     lbp = sg_memalign(op->lb_sz * op->num_lbs, 0, &free_lbp,
@@ -689,38 +837,95 @@ work_thread(int id, struct opts_t * op)
                         err = "out of memory";
                         break;
                     }
-                } else {
+                } else if (! repeat) {
                     lbp = free_lst.back().first;
                     free_lbp = free_lst.back().second;
                     free_lst.pop_back();
+                } else {
+                    lbp = encore_lbps.first;
+                    free_lbp = encore_lbps.second;
+                    if (free_lst.size() > 1000) {
+                        static bool once = false;
+
+                        if (! once) {
+                            once = true;
+                            pr2serr_lk("id=%d: free_lst.size() over 1000\n",
+                                       id);
+                        }
+                    }
                 }
             } else
                 lbp = NULL;
             if (is_rw) {
                 if (ruip) {
-                    lba = ruip->get();  /* fetch a random LBA */
-                    if (vb > 3)
-                        pr2serr_lk("  id=%d: start IO at lba=0x%" PRIx64 "\n",
-                                   id, lba);
+                    if (! repeat) {
+                        lba = ruip->get();  /* fetch a random LBA */
+                        if (vb > 3)
+                            pr2serr_lk("  id=%d: start IO at lba=0x%" PRIx64
+                                       "\n", id, lba);
+                    }
                 } else
                     lba = op->lba;
             } else
                 lba = 0;
-            if (start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
-                              op->lb_sz * op->num_lbs, sg_flags,
-                              thr_start_eagain_count, thr_start_ebusy_count,
-                              thr_start_e2big_count, thr_start_edom_count)) {
-                err = "start_sg3_cmd()";
-                break;
+            if (vb > 4)
+                pr2serr_lk("t_id=%d: starting pack_id=%d\n", id, pack_id);
+            res = start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
+                                op->lb_sz * op->num_lbs, sg_flags,
+                                thr_start_eagain_count, thr_start_ebusy_count,
+                                thr_start_e2big_count, thr_start_edom_count);
+            if (res) {
+                if (res > 1) { /* here if E2BIG, start not done, try finish */
+                    do_inc = 0;
+                    need_finish = true;
+                    encore_pack_id = pack_id;
+                    pack_id = prev_pack_id;
+                    encore_lbps = make_pair(lbp, free_lbp);
+                    if (vb > 3)
+                        pr2serr_lk("t_id=%d: E2BIG hit, prev_pack_id=%d, "
+                                   "encore_pack_id=%d\n", id, prev_pack_id,
+                                   encore_pack_id);
+                } else {
+                    err = "start_sg3_cmd()";
+                    break;
+                }
+            } else {    /* no error */
+                ++thr_async_starts;
+                ++num_outstanding;
+                pi2buff[pack_id] = make_pair(lbp, free_lbp);
+                if (ruip)
+                    pi_2_lba[pack_id] = lba;
             }
-            ++thr_async_starts;
-            ++num_outstanding;
-            pi2buff[pack_id] = make_pair(lbp, free_lbp);
-            if (ruip)
-                pi_2_lba[pack_id] = lba;
+            if (pi2buff.size() > 1000) {
+                static bool once = false;
+
+                if (! once) {
+                    once = true;
+                    pr2serr_lk("id=%d: pi2buff.size() over 1000\n", id);
+                }
+            }
         }
         num_to_read = 0;
-        if ((num_outstanding >= op->maxq_per_thread) || (k >= npt)) {
+        if (need_finish) {
+            num_waiting_read = 0;
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting_read) < 0) {
+                err = "ioctl(SG_GET_NUM_WAITING) failed";
+                break;
+            } else if (vb > 3)
+                pr2serr_lk("t_id=%d: num_waiting_read=%d\n", id,
+                           num_waiting_read);
+            if (num_waiting_read > 0)
+                num_to_read = num_waiting_read;
+            else {
+                struct timespec tspec = {0, 100000 /* 100 usecs */};
+
+                nanosleep(&tspec, NULL);
+                if (vb > 3)
+                    pr2serr_lk("t_id=%d: E2BIG, 100 usecs sleep\n", id);
+                // err = "strange, E2BIG but nothing to read";
+                // break;
+            }
+        } else if ((num_outstanding >= op->maxq_per_thread) || (k >= npt)) {
             /* full queue or finished injecting */
             num_waiting_read = 0;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting_read) < 0) {
@@ -775,8 +980,17 @@ work_thread(int id, struct opts_t * op)
         }
 
         while (num_to_read-- > 0) {
-            if (finish_sg3_cmd(sg_fd, op->c2e, pack_id, op->wait_ms,
-                               thr_fin_eagain_count)) {
+            if (op->pack_id_force) {
+                j = pi2buff.size();
+                if (j > 0)
+                    pack_id = pi2buff.begin()->first;
+                else
+                    pack_id = -1;
+            } else
+                pack_id = -1;
+            ask = pack_id;
+            if (finish_sg3_cmd(sg_fd, op->c2e, op->pack_id_force, pack_id,
+                               op->wait_ms, thr_fin_eagain_count, nanosecs)) {
                 err = "finish_sg3_cmd()";
                 if (ruip && (pack_id > 0)) {
                     auto q = pi_2_lba.find(pack_id);
@@ -789,6 +1003,11 @@ work_thread(int id, struct opts_t * op)
                 }
                 break;
             }
+            if (vb > 4)
+                pr2serr_lk("t_id=%d: finishing pack_id ask=%d, got=%d\n", id,
+                           ask, pack_id);
+            if (op->cmd_time && op->sg_vn_ge_30901)
+                sum_nanosecs += nanosecs;
             ++thr_async_finishes;
             --num_outstanding;
             auto p = pi2buff.find(pack_id);
@@ -817,10 +1036,10 @@ work_thread(int id, struct opts_t * op)
             }
             if (err)
                 break;
-        }
+        }       /* end of while loop counting down num_to_read */
         if (err)
             break;
-    }
+    }           /* end of for loop over npt (number per thread) */
     close(sg_fd);       // sg driver will handle any commands "in flight"
     if (ruip)
         delete ruip;
@@ -840,11 +1059,14 @@ work_thread(int id, struct opts_t * op)
     for (k = 0; ! free_lst.empty(); ++k) {
         lbp = free_lst.back().first;
         free_lbp = free_lst.back().second;
+        free_lst.back().second = NULL;
         free_lst.pop_back();
         if (vb > 6)
             pr2serr_lk("t_id=%d freeing %p (free_ %p)\n", id, lbp, free_lbp);
-        if (free_lbp)
+        if (free_lbp) {
             free(free_lbp);
+            free_lbp = NULL;
+        }
     }
     if ((vb > 2) && (k > 0))
         pr2serr_lk("t_id=%d Maximum number of READ/WRITEs queued: %d\n",
@@ -856,6 +1078,10 @@ work_thread(int id, struct opts_t * op)
     start_e2big_count += thr_start_e2big_count;
     fin_eagain_count += thr_fin_eagain_count;
     start_edom_count += thr_start_edom_count;
+    if (op->cmd_time && op->sg_vn_ge_30901 && (npt > 0)) {
+        pr2serr_lk("t_id=%d average nanosecs per cmd: %" PRId64
+                   "\n", id, sum_nanosecs / npt);
+    }
 }
 
 #define INQ_REPLY_LEN 96
@@ -865,7 +1091,8 @@ work_thread(int id, struct opts_t * op)
  * in b (up to m_blen bytes). Does not use O_EXCL flag. Returns 0 on success,
  * else -1 . */
 static int
-do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
+do_inquiry_prod_id(const char * dev_name, int block, int & sg_ver_num,
+                   char * b, int b_mlen)
 {
     int sg_fd, ok, ret;
     struct sg_io_hdr pt;
@@ -882,6 +1109,8 @@ do_inquiry_prod_id(const char * dev_name, int block, char * b, int b_mlen)
         pr_errno_lk(errno, "%s: error opening file: %s", __func__, dev_name);
         return -1;
     }
+    if (ioctl(sg_fd, SG_GET_VERSION_NUM, &sg_ver_num) < 0)
+        sg_ver_num = 0;
     /* Prepare INQUIRY command */
     memset(&pt, 0, sizeof(pt));
     pt.interface_id = 'S';
@@ -998,6 +1227,7 @@ do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
 int
 main(int argc, char * argv[])
 {
+    bool maxq_per_thread_given = false;
     int k, n, c, res;
     int force = 0;
     int64_t ll;
@@ -1015,6 +1245,7 @@ main(int argc, char * argv[])
     op->hi_lba = 0;
     op->lb_sz = DEF_LB_SZ;
     op->maxq_per_thread = MAX_Q_PER_FD;
+    op->mmap_io = DEF_MMAP_IO;
     op->num_per_thread = DEF_NUM_PER_THREAD;
     op->num_lbs = 1;
     op->no_xfer = !! DEF_NO_XFER;
@@ -1029,20 +1260,23 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dfghl:M:n:Nq:Q:Rs:St:TvVw:W",
+        c = getopt_long(argc, argv, "cdfghl:mM:n:Npq:Q:Rs:St:TvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'c':
+            op->cmd_time = true;
+            break;
         case 'd':
-            op->direct = 1;
+            op->direct = true;
             break;
         case 'f':
             force = true;
             break;
         case 'g':
-            op->generic_pt = true;
+            op->generic_sync = true;
             break;
         case 'h':
         case '?':
@@ -1075,6 +1309,9 @@ main(int argc, char * argv[])
                 return 1;
             }
             break;
+        case 'm':
+            op->mmap_io = true;
+            break;
         case 'M':
             if (isdigit(*optarg)) {
                 n = atoi(optarg);
@@ -1083,6 +1320,7 @@ main(int argc, char * argv[])
                                MAX_Q_PER_FD);
                     return 1;
                 }
+                maxq_per_thread_given = true;
                 op->maxq_per_thread = n;
             } else {
                 pr2serr_lk("--maxqpt= expects a number\n");
@@ -1099,6 +1337,9 @@ main(int argc, char * argv[])
             break;
         case 'N':
             op->no_xfer = true;
+            break;
+        case 'p':
+            op->pack_id_force = true;
             break;
         case 'q':
             if (isdigit(*optarg)) {
@@ -1217,6 +1458,19 @@ main(int argc, char * argv[])
         pr2serr_lk("version: %s\n", version_str);
         return 0;
     }
+    if (op->mmap_io) {
+        if (maxq_per_thread_given && (op->maxq_per_thread > 1)) {
+            pr2serr_lk("With mmap_io selected, QPT cannot exceed 1\n");
+            return 1;
+        } else if (op->direct) {
+            pr2serr_lk("direct IO and mmap-ed IO cannot both be selected\n");
+            return 1;
+        } else if (op->generic_sync) {
+            pr2serr_lk("--generic-sync and and mmap-ed IO are compatible\n");
+            return 1;
+        } else
+            op->maxq_per_thread = 1;
+    }
 
     if (0 == op->dev_names.size()) {
         fprintf(stderr, "No sg_disk_device-s given\n\n");
@@ -1229,9 +1483,10 @@ main(int argc, char * argv[])
     }
 
     try {
-        struct stat a_stat;
+        int sg_ver_num;
         unsigned int last_lba;
         unsigned int blk_sz;
+        struct stat a_stat;
 
         for (k = 0; k < (int)op->dev_names.size(); ++k) {
             dev_name = op->dev_names[k];
@@ -1247,8 +1502,9 @@ main(int argc, char * argv[])
                            "if it is a BLOCK\ndevice, exiting ...\n");
                 return 1;
             }
+            res = do_inquiry_prod_id(dev_name, op->block, sg_ver_num,
+                                     b, sizeof(b));
             if (! force) {
-                res = do_inquiry_prod_id(dev_name, op->block, b, sizeof(b));
                 if (res) {
                     pr2serr_lk("INQUIRY failed on %s\n", dev_name);
                     return 1;
@@ -1263,6 +1519,12 @@ main(int argc, char * argv[])
                     return 2;
                 }
             }
+            if (sg_ver_num < 30000) {
+                pr2serr_lk("%s either not sg device or too old\n", dev_name);
+                return 2;
+            } else if (sg_ver_num >= 30901)
+                op->sg_vn_ge_30901 = true;
+
             if ((SCSI_WRITE16 == op->c2e) || (SCSI_READ16 == op->c2e)) {
                 res = do_read_capacity(dev_name, op->block, &last_lba,
                                        &blk_sz);
@@ -1312,12 +1574,12 @@ main(int argc, char * argv[])
             delete vt[k];
 
         n = uniq_pack_id.load() - 1;
-        if (((n > 0) || op->generic_pt) &&
+        if (((n > 0) || op->generic_sync) &&
             (0 == clock_gettime(CLOCK_MONOTONIC, &end_tm))) {
             struct timespec res_tm;
             double a, b;
 
-            if (op->generic_pt)
+            if (op->generic_sync)
                 n = op->num_per_thread * num_threads;
             res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
             res_tm.tv_nsec = end_tm.tv_nsec - start_tm.tv_nsec;
