@@ -38,12 +38,11 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
- * Invocation: sg_tst_ioctl [-l=Q_LEN] [-t] <sg_device>
- *      -t      queue at tail
+ * Invocation: See usage() function below.
  *
  */
 
-static const char * version_str = "Version: 0.96  20181106";
+static const char * version_str = "Version: 0.97  20181121";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -66,9 +65,33 @@ static const char * version_str = "Version: 0.96  20181106";
 #define DEF_RESERVE_BUFF_SZ (256 * 1024)
 
 
-int main(int argc, char * argv[])
+static void
+usage(void)
+{
+    printf("Usage: 'sg_tst_ioctl [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
+           "[-t]\n"
+           "       [-v] [-V] [-w] <sg_device>'\n"
+           " where:\n"
+           "      -h      help: print usage message then exit\n"
+           "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
+           "      -o      ioctls only, then exit\n"
+           "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
+           "KB)\n"
+           "      -s=SEC    sleep between writes and reads (def: 0)\n"
+           "      -t    queue_at_tail (def: q_at_head)\n"
+           "      -v    increase verbosity of output\n"
+           "      -V    print version string then exit\n"
+           "      -w    write (submit) only then exit\n");
+}
+
+
+int
+main(int argc, char * argv[])
 {
     bool done;
+    bool q_at_tail = false;
+    bool ioctl_only = false;
+    bool write_only = false;
     int sg_fd, k, ok, ver_num, pack_id, num_waiting, access_count;
     int sg_fd2 = -1;
     uint8_t inq_cdb[INQ_CMD_LEN] =
@@ -81,7 +104,6 @@ int main(int argc, char * argv[])
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
-    int q_at_tail = 0;
     int q_len = DEF_Q_LEN;
     int sleep_secs = 0;
     int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
@@ -94,7 +116,7 @@ int main(int argc, char * argv[])
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-t", argv[k], 2))
-            ++q_at_tail;
+            q_at_tail = true;
         else if (0 == memcmp("-h", argv[k], 2)) {
             file_name = 0;
             break;
@@ -106,7 +128,9 @@ int main(int argc, char * argv[])
                 file_name = 0;
                 break;
             }
-        } else if (0 == memcmp("-r=", argv[k], 3)) {
+        } else if (0 == memcmp("-o", argv[k], 2))
+            ioctl_only = true;
+        else if (0 == memcmp("-r=", argv[k], 3)) {
             reserve_buff_sz = atoi(argv[k] + 3);
             if (reserve_buff_sz < 0) {
                 printf("Expect -r= to take a number 0 or higher\n");
@@ -132,7 +156,9 @@ int main(int argc, char * argv[])
             printf("%s\n", version_str);
             file_name = 0;
             break;
-        } else if (*argv[k] == '-') {
+        } else if (0 == memcmp("-w", argv[k], 2))
+            write_only = true;
+        else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
             break;
@@ -146,18 +172,7 @@ int main(int argc, char * argv[])
         }
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_tst_ioctl [-h] [-l=Q_LEN] [-t] [-v] [-V] "
-               "<sg_device>'\n"
-               " where:\n"
-               "      -h      help: print usage message then exit\n"
-               "      -l=Q_LEN    queue length, between 1 and 511 "
-               "(def: 16)\n"
-               "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
-               "KB)\n"
-               "      -s=SEC    sleep between writes and reads (def: 0)\n"
-               "      -t    queue_at_tail (def: q_at_head)\n"
-               "      -v    increase verbosity of output\n"
-               "      -V    print version string then exit\n");
+        usage();
         return 1;
     }
 
@@ -294,7 +309,6 @@ int main(int argc, char * argv[])
     }
     printf("  read_value[SG_SEIRV_FL_RQS]= %u\n", seip->read_value);
 
-#if 1
     memset(seip, 0, sizeof(*seip));
     seip->valid_wr_mask |= SG_SEIM_READ_VAL;
     seip->valid_rd_mask |= SG_SEIM_READ_VAL;
@@ -305,7 +319,28 @@ int main(int argc, char * argv[])
         goto out;
     }
     printf("  read_value[SG_SEIRV_DEV_FL_RQS]= %u\n", seip->read_value);
-#endif
+
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
+    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_TRC_SZ;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        goto out;
+    }
+    printf("  read_value[SG_SEIRV_TRC_SZ]= %u\n", seip->read_value);
+
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
+    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_TRC_MAX_SZ;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        goto out;
+    }
+    printf("  read_value[SG_SEIRV_TRC_MAX_SZ]= %u\n", seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
     seip->valid_wr_mask |= SG_SEIM_SHARE_FD;
@@ -333,6 +368,9 @@ int main(int argc, char * argv[])
     else
         printf("SG_SET_TRANSFORM okay (does nothing)\n");
     printf("\n");
+
+    if (ioctl_only)
+        goto out;
 
     printf("start write() calls\n");
     for (k = 0; k < q_len; ++k) {
@@ -395,6 +433,9 @@ int main(int argc, char * argv[])
         printf("num_waiting: %d\n", num_waiting);
 
     sleep(sleep_secs);
+
+    if (write_only)
+        goto out;
 
     if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
