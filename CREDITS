@@ -11,6 +11,10 @@ Bart Van Assche <bart dot vanassche at sandisk dot com>
         configure.ac and Makefile.am cleanup plus sgp_dd code
         to replace pthread_cancel with pthread_kill [20180102]
 
+Bean Huo <beanhuo dot micron dot com>
+	sg_write_buffer: patch to allow comma or period separated bytes
+        (in decimal or hex) to be decoded when given as standard input.
+
 Brian Bunker <Brian dot Bunker at netapp dot com> contributed
         sg_read_block_limits and the target reset addition to sg_reset
         [20090615]
@@ -141,4 +145,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-2nd January 2018
+12th November 2018

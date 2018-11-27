@@ -13,7 +13,7 @@
  * Version 2 and 3 extensions to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- *  Version: 3.9.02 (20181104)
+ *   Version: 3.9.02 (20181118)
  *  This version is for Linux 2.6, 3 and 4 series kernels.
  *
  * Documentation
@@ -30,12 +30,12 @@
 #include <linux/types.h>
 #include <linux/major.h>
 
-/* bsg.h contains the sg v4 use space interface structure. */
+/* bsg.h contains the sg v4 user space interface structure. */
 #include <linux/bsg.h>
 
 /*
  * Same structure as used by readv() call. It defines one scatter-gather
- * element. "Scatter-gather" is abbreviated to "sgat" in thsi driver to
+ * element. "Scatter-gather" is abbreviated to "sgat" in this driver to
  * avoid confusion with this driver's name.
  */
 typedef struct sg_iovec	{
@@ -143,7 +143,7 @@ typedef struct sg_scsi_id {	/* used by SG_GET_SCSI_ID ioctl() */
 
 typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 	char req_state;	/* 0 -> not used, 1 -> written, 2 -> ready to read */
-	char orphan;	/* 0 -> normal request, 1 -> from interruped SG_IO */
+	char orphan;	/* 0 -> normal request, 1 -> from interrupted SG_IO */
 	char sg_io_owned;/* 0 -> complete with read(), 1 -> owned by SG_IO */
 	char problem;	/* 0 -> no problem detected, 1 -> error to report */
 	int pack_id;	/* pack_id associated with request */
@@ -182,11 +182,13 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_OTHER_OPENS 0x4	/* rd: other sg fd_s on this dev */
 #define SG_CTL_FLAGM_ORPHANS	0x8	/* rd: orphaned requests on this fd */
 #define SG_CTL_FLAGM_Q_TAIL	0x10	/* used for future cmds on this fd */
-#define SG_CTL_FLAGM_UNSHARE	0x20	/* undo share after inflight cmd */
-#define SG_CTL_FLAGM_MASTER_FINI 0x40	/* share: master finished; 1: finish */
-#define SG_CTL_FLAGM_MASTER_ERR	0x80	/* rd: sharing, master got error */
-#define SG_CTL_FLAGM_CHECK_FOR_MORE 0x100 /* additional ready to read? */
-#define SG_CTL_FLAGM_ALL_BITS	0x1ff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_IS_SHARE	0x20	/* rd: fd is master or slave share */
+#define SG_CTL_FLAGM_IS_MASTER	0x40	/* rd: this fd is share master */
+#define SG_CTL_FLAGM_UNSHARE	0x80	/* undo share after inflight cmd */
+#define SG_CTL_FLAGM_MASTER_FINI 0x100	/* share: master finished; 1: finish */
+#define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
+#define SG_CTL_FLAGM_CHECK_FOR_MORE 0x400 /* additional ready to read? */
+#define SG_CTL_FLAGM_ALL_BITS	0x7ff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */
@@ -194,6 +196,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_VERS_NUM	0x2	/* get driver version number as int */
 #define SG_SEIRV_FL_RQS		0x3	/* number of requests in free list */
 #define SG_SEIRV_DEV_FL_RQS	0x4	/* sum of rqs on all fds on this dev */
+#define SG_SEIRV_TRC_SZ		0x5	/* current size of trace buffer */
+#define SG_SEIRV_TRC_MAX_SZ	0x6	/* maximum size of trace buffer */
 
 /*
  * A pointer to the following structure is passed as the third argument to 

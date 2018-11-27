@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2018 D. Gilbert and P. Allworth
+ * Copyright (C) 2018 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -85,7 +85,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.02 20180912";
+static const char * version_str = "1.03 20181126";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -139,6 +139,7 @@ typedef struct global_collection
     int64_t skip;
     int in_type;
     int cdbsz_in;
+    int help;
     struct flags_t in_flags;
     int64_t in_blk;                 /* -\ next block address to read */
     int64_t in_count;               /*  | blocks remaining for next read */
@@ -149,6 +150,8 @@ typedef struct global_collection
     int outfd;
     int64_t seek;
     int out_type;
+    int out2fd;
+    int out2_type;
     int cdbsz_out;
     struct flags_t out_flags;
     int64_t out_blk;                /* -\ next block address to write */
@@ -174,6 +177,7 @@ typedef struct request_element
     int id;
     int infd;
     int outfd;
+    int out2fd;
     int64_t blk;
     int num_blks;
     uint8_t * buffp;
@@ -413,8 +417,10 @@ dd_filetype(const char * filename)
 }
 
 static void
-usage()
+usage(int pg_num)
 {
+    if (pg_num > 0)
+        goto page2;
     pr2serr("Usage: sgs_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
             " [iflag=FLAGS]\n"
             "               [obs=BS] [of=OFILE] [oflag=FLAGS] "
@@ -422,22 +428,12 @@ usage()
             "               [--help] [--version]\n\n");
     pr2serr("               [bpt=BPT] [cdbsz=6|10|12|16] [coe=0|1] "
             "[deb=VERB] [dio=0|1]\n"
-            "               [fua=0|1|2|3] [sync=0|1] [thr=THR] "
-            "[time=0|1] [verbose=VERB]\n"
-            "               [--dry-run] [--verbose]\n"
-            "  where:\n"
-            "    bpt         is blocks_per_transfer (default is 128)\n"
+            "               [fua=0|1|2|3] [of2=OFILE2] [sync=0|1] [thr=THR] "
+            "[time=0|1]\n"
+            "               [verbose=VERB] [--dry-run] [--verbose]\n"
+            "  where the main options (shown in first group above) are:\n"
             "    bs          must be device block size (default 512)\n"
-            "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
-            "    coe         continue on error, 0->exit (def), "
-            "1->zero + continue\n"
             "    count       number of blocks to copy (def: device size)\n"
-            "    deb         for debug, 0->none (def), > 0->varying degrees "
-            "of debug\n");
-    pr2serr("    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
-            "    fua         force unit access: 0->don't(def), 1->OFILE, "
-            "2->IFILE,\n"
-            "                3->OFILE+IFILE\n"
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,dio,direct,dpo,"
             "dsync,excl,\n"
@@ -450,6 +446,38 @@ usage()
             "                excl,fua,noshare,null]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
+            "    --help|-h      output this usage message then exit\n"
+            "    --version|-V   output version string then exit\n\n"
+            "Copy from IFILE to OFILE, similar to dd command. This utility "
+            "is specialized\nfor SCSI devices and uses multiple POSIX "
+            "threads. It expects one or both\nIFILE and OFILE to be SCSI "
+            "generic devices. If both are sg devices 'shared'\nmode is "
+            "selected unless 'noshare' is given to 'iflag=' or 'oflag='. "
+            "If\n'of2=OFLAG2' is given, the read-side is output to OFLAG2. "
+            "Without 'of2=' and\nwith IFILE and OFILE sg devices the copy "
+            "is via a single in-kernel buffer.\n"
+           );
+    return;
+page2:
+    pr2serr("Syntax:  sgs_dd [operands] [options]\n\n"
+            "  where: operands have the form name=value and are pecular to "
+            "'dd'\n       style commands, and options start with one or two "
+            "hyphens\n\n"
+            "  where the less used options (not shown on first help page) "
+            "are:\n"
+            "    bpt         is blocks_per_transfer (default is 128)\n"
+            "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
+            "    coe         continue on error, 0->exit (def), "
+            "1->zero + continue\n"
+            "    deb         for debug, 0->none (def), > 0->varying degrees "
+            "of debug\n"
+            "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
+            "    fua         force unit access: 0->don't(def), 1->OFILE, "
+            "2->IFILE,\n"
+            "                3->OFILE+IFILE\n"
+            "    of2         OFILE2 is regular file or pipe to output what is "
+            "read from the\n"
+            "                disk in the first half of each shared element\n"
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
@@ -458,12 +486,8 @@ usage()
             "throughput\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
-            "    --help|-h      output this usage message then exit\n"
             "    --verbose|-v   increase verbosity of utility\n"
-            "    --version|-V   output version string then exit\n\n"
-            "Copy from IFILE to OFILE, similar to dd command. This utility "
-            "is\nspecialized for SCSI devices, uses multiple POSIX threads. "
-            "It expects\n");
+           );
 }
 
 static void
@@ -565,7 +589,7 @@ sig_listen_thread(void * v_clp)
         if (shutting_down)
             break;
         if (SIGINT == sig_number) {
-            pr2serr("%sinterrupted by SIGINT\n", my_name);
+            pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
             guarded_stop_both(clp);
             pthread_cond_broadcast(&clp->out_sync_cv);
         }
@@ -573,7 +597,7 @@ sig_listen_thread(void * v_clp)
     return NULL;
 }
 
-static int
+static bool
 sg_share_prepare(int slave_writer_fd, int master_reader_fd, int id, bool vb_b)
 {
     struct sg_extended_info sei;
@@ -587,11 +611,11 @@ sg_share_prepare(int slave_writer_fd, int master_reader_fd, int id, bool vb_b)
     if (ioctl(slave_writer_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         if (vb_b)
             pr2serr_lk("tid=%d: ioctl(EXTENDED(shared_fd=%d), failed "
-		       "errno=%d %s\n", id, master_reader_fd, errno,
-		       strerror(errno));
-        return 1;
+                       "errno=%d %s\n", id, master_reader_fd, errno,
+                       strerror(errno));
+        return false;
     }
-    return 0;
+    return true;
 }
 
 static void
@@ -645,6 +669,7 @@ read_write_thread(void * v_tip)
     rep->bs = clp->bs;
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
+    rep->out2fd = clp->out2fd;
     rep->debug = clp->debug;
     rep->cdbsz_in = clp->cdbsz_in;
     rep->cdbsz_out = clp->cdbsz_out;
@@ -654,8 +679,8 @@ read_write_thread(void * v_tip)
         if (vb)
             pr2serr_lk("Skipping share on both IFILE and OFILE\n");
     } else
-        rep->has_share = !(sg_share_prepare(clp->outfd, clp->infd, rep->id,
-                           clp->debug));
+        rep->has_share = sg_share_prepare(clp->outfd, clp->infd, rep->id,
+                                          clp->debug);
     if (vb > 0)
         pr2serr_lk("starting thread %d, has_share=%s\n", rep->id,
                    (rep->has_share ? "true" : "false"));
@@ -915,7 +940,6 @@ sg_in_operation(Gbl_coll * clp, Rq_elem * rep)
 
     /* enters holding in_mutex */
     while (1) {
-// sleep(20);      // ************************   <<<<<<<<<<<<<<<<<<<<<    xxxxxxxxxxxxx
         res = sg_start_io(rep);
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
@@ -929,11 +953,9 @@ sg_in_operation(Gbl_coll * clp, Rq_elem * rep)
         }
         /* Now release in mutex to let other reads run in parallel */
         status = pthread_mutex_unlock(&clp->in_mutex);
-// sleep(20);      // ************************   <<<<<<<<<<<<<<<<<<<<<    xxxxxxxxxxxxx
         if (0 != status) err_exit(status, "unlock in_mutex");
 
         res = sg_finish_io(rep->wr, rep, &clp->aux_mutex);
-// sleep(6);      // ************************   <<<<<<<<<<<<<<<<<<<<<    xxxxxxxxxxxxx
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -994,9 +1016,9 @@ sg_out_operation(Gbl_coll * clp, Rq_elem * rep)
     int res;
     int status;
 
+
     /* enters holding out_mutex */
     while (1) {
-// sleep(10);      // ************************   <<<<<<<<<<<<<<<<<<<<<    xxxxxxxxxxxxx
         res = sg_start_io(rep);
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
@@ -1012,9 +1034,7 @@ sg_out_operation(Gbl_coll * clp, Rq_elem * rep)
         status = pthread_mutex_unlock(&clp->out_mutex);
         if (0 != status) err_exit(status, "unlock out_mutex");
 
-// sleep(10);      // ************************   <<<<<<<<<<<<<<<<<<<<<    xxxxxxxxxxxxx
         res = sg_finish_io(rep->wr, rep, &clp->aux_mutex);
-// sleep(6);      // ************************   <<<<<<<<<<<<<<<<<<<<<    xxxxxxxxxxxxx
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -1076,6 +1096,7 @@ sg_start_io(Rq_elem * rep)
     int res;
     struct sg_io_hdr * hp = &rep->io_hdr;
     const char * cp = "";
+    const char * c2p = "";
 
     if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk,
                           rep->wr, fua, dpo)) {
@@ -1097,21 +1118,22 @@ sg_start_io(Rq_elem * rep)
     hp->pack_id = (int)rep->blk;
     if (dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
-#if 1
     if (rep->has_share) {
-#else
-    if (rep->has_share && !wr) {        /* && !wr   is temporary xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx */
-#endif
         hp->flags |= SGV4_FLAG_SHARE;
         if (wr)
-                hp->flags |= SGV4_FLAG_NO_DXFER;
+            hp->flags |= SGV4_FLAG_NO_DXFER;
+        else if (rep->out2fd < 0)
+            hp->flags |= SGV4_FLAG_NO_DXFER;
+        if (hp->flags & SGV4_FLAG_NO_DXFER)
+            c2p = " and FLAG_NO_DXFER";
+
         cp = (wr ? " slave active" : " master active");
-    }
+    } else
         cp = (wr ? " slave not sharing" : " master not sharing");
-    if (rep->debug > 8) {
-        pr2serr_lk("%s tid=%d: SCSI %s%s, blk=%" PRId64 " num_blks=%d\n",
+    if (rep->debug > 3) {
+        pr2serr_lk("%s tid=%d: SCSI %s%s%s, blk=%" PRId64 " num_blks=%d\n",
                    __func__, rep->id, (rep->wr ? "WRITE" : "READ"), cp,
-                   rep->blk, rep->num_blks);
+                   c2p, rep->blk, rep->num_blks);
         sg_print_command(hp->cmdp);
     }
 
@@ -1134,7 +1156,7 @@ sg_start_io(Rq_elem * rep)
 static int
 sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 {
-    int res, status;
+    int res, err, status;
     struct sg_io_hdr io_hdr;
     struct sg_io_hdr * hp;
 #if 0
@@ -1162,31 +1184,31 @@ sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 
     res = sg_err_category3(hp);
     switch (res) {
-        case SG_LIB_CAT_CLEAN:
-            break;
-        case SG_LIB_CAT_RECOVERED:
-            sg_chk_n_print3((wr ? "writing continuing":
-                                       "reading continuing"), hp, false);
-            break;
-        case SG_LIB_CAT_ABORTED_COMMAND:
-        case SG_LIB_CAT_UNIT_ATTENTION:
-            if (rep->debug > 8)
-                sg_chk_n_print3((wr ? "writing": "reading"), hp, false);
-            return res;
-        case SG_LIB_CAT_NOT_READY:
-        default:
-            {
-                char ebuff[EBUFF_SZ];
+    case SG_LIB_CAT_CLEAN:
+        break;
+    case SG_LIB_CAT_RECOVERED:
+        sg_chk_n_print3((wr ? "writing continuing":
+                                   "reading continuing"), hp, false);
+        break;
+    case SG_LIB_CAT_ABORTED_COMMAND:
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        if (rep->debug > 3)
+            sg_chk_n_print3((wr ? "writing": "reading"), hp, false);
+        return res;
+    case SG_LIB_CAT_NOT_READY:
+    default:
+        {
+            char ebuff[EBUFF_SZ];
 
-                snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64,
-                         wr ? "writing": "reading", rep->blk);
-                status = pthread_mutex_lock(a_mutp);
-                if (0 != status) err_exit(status, "lock aux_mutex");
-                sg_chk_n_print3(ebuff, hp, false);
-                status = pthread_mutex_unlock(a_mutp);
-                if (0 != status) err_exit(status, "unlock aux_mutex");
-                return res;
-            }
+            snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64,
+                     wr ? "writing": "reading", rep->blk);
+            status = pthread_mutex_lock(a_mutp);
+            if (0 != status) err_exit(status, "lock aux_mutex");
+            sg_chk_n_print3(ebuff, hp, false);
+            status = pthread_mutex_unlock(a_mutp);
+            if (0 != status) err_exit(status, "unlock aux_mutex");
+            return res;
+        }
     }
 #if 0
     if (0 == (++testing % 100)) return -1;
@@ -1197,7 +1219,18 @@ sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
     else
         rep->dio_incomplete_count = 0;
     rep->resid = hp->resid;
-    if (rep->debug > 8)
+    if ((! wr) && (rep->out2fd >= 0)) {
+        status = pthread_mutex_lock(a_mutp);
+        if (0 != status) err_exit(status, "lock aux_mutex");
+	res = write(rep->out2fd, rep->buffp, rep->bs * rep->num_blks);
+        err = errno;
+        status = pthread_mutex_unlock(a_mutp);
+        if (0 != status) err_exit(status, "unlock aux_mutex");
+	if (res < 0)
+	    pr2serr_lk("%s: tid=%d: write(out2fd) failed: %s\n", __func__,
+		       rep->id, strerror(err));
+    }
+    if (rep->debug > 3)
         pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id,
                    wr ? "WRITE" : "READ");
     return 0;
@@ -1334,7 +1367,7 @@ sg_out_open(Gbl_coll *clp, const char *outf)
     }
     if (sg_prepare(fd, clp->bs, clp->bpt))
         return -SG_LIB_FILE_ERROR;
-    else if (gcoll.debug > 0)
+    else if (gcoll.debug > 1)
         pr2serr("Sharing writer's fd (%d) with reader (fd=%d) "
                 "successful\n", clp->infd, fd);
     return fd;
@@ -1359,6 +1392,7 @@ main(int argc, char * argv[])
     char * buf;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
+    char out2f[INOUTF_SZ];
     int res, k, err, keylen;
     int64_t in_num_sect = 0;
     int64_t out_num_sect = 0;
@@ -1383,6 +1417,7 @@ main(int argc, char * argv[])
     gcoll.cdbsz_out = DEF_SCSI_CDBSZ;
     inf[0] = '\0';
     outf[0] = '\0';
+    out2f[0] = '\0';
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -1459,6 +1494,12 @@ main(int argc, char * argv[])
                 pr2serr("%sbad argument to 'obs='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
+        } else if (strcmp(key,"of2") == 0) {
+            if ('\0' != out2f[0]) {
+                pr2serr("Second OFILE2 argument??\n");
+                return SG_LIB_CONTRADICT;
+            } else
+                strncpy(out2f, buf, INOUTF_SZ - 1);
         } else if (strcmp(key,"of") == 0) {
             if ('\0' != outf[0]) {
                 pr2serr("Second 'of=' argument??\n");
@@ -1494,10 +1535,8 @@ main(int argc, char * argv[])
             gcoll.dry_run += n;
             res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'h');
-            if (n > 0) {
-                usage();
-                return 0;
-            }
+            gcoll.help += n;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
             if (n > 0)
                 verbose_given = true;
@@ -1517,10 +1556,9 @@ main(int argc, char * argv[])
                    (0 == strncmp(key, "--dry_run", 9)))
             ++gcoll.dry_run;
         else if ((0 == strncmp(key, "--help", 6)) ||
-                   (0 == strcmp(key, "-?"))) {
-            usage();
-            return 0;
-        } else if (0 == strncmp(key, "--verb", 6)) {
+                   (0 == strcmp(key, "-?")))
+            ++gcoll.help;
+        else if (0 == strncmp(key, "--verb", 6)) {
             verbose_given = true;
             ++gcoll.debug;      /* --verbose */
         } else if (0 == strncmp(key, "--vers", 6))
@@ -1552,14 +1590,20 @@ main(int argc, char * argv[])
         pr2serr("%s%s\n", my_name, version_str);
         return 0;
     }
-
+    if (gcoll.help > 0) {
+        if (1 == gcoll.help)
+            usage(0);
+        else
+            usage(1);
+        return 0;
+    }
     if (gcoll.bs <= 0) {
         gcoll.bs = DEF_BLOCK_SIZE;
         pr2serr("Assume default 'bs' (block size) of %d bytes\n", gcoll.bs);
     }
     if ((ibs && (ibs != gcoll.bs)) || (obs && (obs != gcoll.bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
-        usage();
+        usage(0);
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((skip < 0) || (seek < 0)) {
@@ -1581,7 +1625,7 @@ main(int argc, char * argv[])
         gcoll.bpt = DEF_BLOCKS_PER_2048TRANSFER;
     if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
         pr2serr("too few or too many threads requested\n");
-        usage();
+        usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (gcoll.debug)
@@ -1695,6 +1739,17 @@ main(int argc, char * argv[])
             }
         }
     }
+    if (out2f[0]) {
+        gcoll.out2_type = dd_filetype(out2f);
+        if ((gcoll.out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
+            err = errno;
+            snprintf(ebuff, EBUFF_SZ, "could not open %s for writing", out2f);
+            perror(ebuff);
+            return sg_convert_errno(err);
+        }
+    } else
+        gcoll.out2fd = -1;
+
     if ((STDIN_FILENO == gcoll.infd) && (STDOUT_FILENO == gcoll.outfd)) {
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         pr2serr("For more information use '--help'\n");
@@ -1775,7 +1830,7 @@ main(int argc, char * argv[])
         else
             dd_count = out_num_sect;
     }
-    if (gcoll.debug > 1)
+    if (gcoll.debug > 2)
         pr2serr("Start of loop, count=%" PRId64 ", in_num_sect=%" PRId64
                 ", out_num_sect=%" PRId64 "\n", dd_count, in_num_sect,
                 out_num_sect);
@@ -1845,8 +1900,8 @@ main(int argc, char * argv[])
         status = pthread_create(&threads[0], NULL, read_write_thread,
                                 (void *)&ti);
         if (0 != status) err_exit(status, "pthread_create");
-        if (gcoll.debug)
-            pr2serr("Starting worker thread k=0\n");
+        if (gcoll.debug > 1)
+            pr2serr_lk("Starting worker thread k=0\n");
 
         /* wait for any broadcast */
         pthread_cleanup_push(cleanup_out, (void *)&gcoll);
@@ -1865,16 +1920,16 @@ main(int argc, char * argv[])
             status = pthread_create(&threads[k], NULL, read_write_thread,
                                     (void *)&tinfo);
             if (0 != status) err_exit(status, "pthread_create");
-            if (gcoll.debug)
-                pr2serr("Starting worker thread k=%d\n", k);
+            if (gcoll.debug > 1)
+                pr2serr_lk("Starting worker thread k=%d\n", k);
         }
 
         /* now wait for worker threads to finish */
         for (k = 0; k < num_threads; ++k) {
             status = pthread_join(threads[k], &vp);
             if (0 != status) err_exit(status, "pthread_join");
-            if (gcoll.debug)
-                pr2serr("Worker thread k=%d terminated\n", k);
+            if (gcoll.debug > 0)
+                pr2serr_lk("Worker thread k=%d terminated\n", k);
         }
     }   /* started worker threads and here after they have all exited */
 
@@ -1883,29 +1938,17 @@ main(int argc, char * argv[])
 
     if (do_sync) {
         if (FT_SG == gcoll.out_type) {
-            pr2serr(">> Synchronizing cache on %s\n", outf);
+            pr2serr_lk(">> Synchronizing cache on %s\n", outf);
             res = sg_ll_sync_cache_10(gcoll.outfd, 0, 0, 0, 0, 0, false, 0);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-                pr2serr("Unit attention(out), continuing\n");
+                pr2serr_lk("Unit attention(out), continuing\n");
                 res = sg_ll_sync_cache_10(gcoll.outfd, 0, 0, 0, 0, 0, false,
                                           0);
             }
             if (0 != res)
-                pr2serr("Unable to synchronize cache\n");
+                pr2serr_lk("Unable to synchronize cache\n");
         }
     }
-
-#if 0
-#if SG_LIB_ANDROID
-    /* Android doesn't have pthread_cancel() so use pthread_kill() instead.
-     * Also there is no need to link with -lpthread in Android */
-    status = pthread_kill(sig_listen_thread_id, SIGUSR1);
-    if (0 != status) err_exit(status, "pthread_kill");
-#else
-    status = pthread_cancel(sig_listen_thread_id);
-    if (0 != status) err_exit(status, "pthread_cancel");
-#endif
-#endif  /* #if 0, because always do pthread_kill(), see next */
 
     shutting_down = true;
     status = pthread_kill(sig_listen_thread_id, SIGINT);
@@ -1915,11 +1958,12 @@ main(int argc, char * argv[])
 
 fini:
 
-// sleep(20);              // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<  xxxxxxxxxxxxxx
     if (STDIN_FILENO != gcoll.infd)
         close(gcoll.infd);
     if ((STDOUT_FILENO != gcoll.outfd) && (FT_DEV_NULL != gcoll.out_type))
         close(gcoll.outfd);
+    if ((STDOUT_FILENO != gcoll.out2fd) && (FT_DEV_NULL != gcoll.out2_type))
+        close(gcoll.out2fd);
     res = exit_status;
     if ((0 != gcoll.out_count) && (0 == gcoll.dry_run)) {
         pr2serr(">>>> Some error occurred, remaining blocks=%" PRId64 "\n",

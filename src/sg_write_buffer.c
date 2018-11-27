@@ -38,7 +38,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.28 20180628";    /* spc5r19 */
+static const char * version_str = "1.29 20181112";    /* spc5r19 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -212,6 +212,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const char * file_name = NULL;
     uint8_t * dop = NULL;
+    uint8_t * read_buf = NULL;
     uint8_t * free_dop = NULL;
     char * cp;
     const struct mode_s * mp;
@@ -440,15 +441,53 @@ main(int argc, char * argv[])
                     }
                 }
             }
-            res = read(infd, dop, wb_len);
-            if (res < 0) {
-                ret = sg_convert_errno(errno);
-                snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
-                         file_name);
-                perror(ebuff);
-                if (! got_stdin)
-                    close(infd);
-                goto err_out;
+            if (infd == STDIN_FILENO) {
+                if (NULL == (read_buf = (uint8_t *)malloc(DEF_XFER_LEN))) {
+                    pr2serr(ME "out of memory\n");
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto err_out;
+                }
+                res = read(infd, read_buf, DEF_XFER_LEN);
+                if (res < 0) {
+                    snprintf(ebuff, EBUFF_SZ, ME "couldn't read from STDIN");
+                    perror(ebuff);
+                    ret = SG_LIB_FILE_ERROR;
+                    goto err_out;
+                }
+                char * pch;
+                int val = 0;
+                res = 0;
+                pch = strtok((char*)read_buf, ",. \n\t");
+                while (pch != NULL) {
+                    val = sg_get_num_nomult(pch);
+                    if (val >= 0 && val < 255) {
+                        dop[res] = val;
+                        res++;
+                    } else {
+                        pr2serr("Data read from STDIO is wrong.\nPlease "
+                                "input the data a byte at a time, the bytes "
+                                "should be separated\nby either space, or "
+                                "',' ( or by '.'), and the value per byte "
+                                "should\nbe between 0~255. Hexadecimal "
+                                "numbers should be preceded by either '0x' "
+                                "or\n'OX' (or have a trailing 'h' or "
+                                "'H').\n");
+                        ret = SG_LIB_SYNTAX_ERROR;
+                        goto err_out;
+                    }
+                    pch = strtok(NULL, ",. \n\t");
+                }
+            } else {
+                res = read(infd, dop, wb_len);
+                if (res < 0) {
+                    ret = sg_convert_errno(errno);
+                    snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
+                             file_name);
+                    perror(ebuff);
+                    if (! got_stdin)
+                        close(infd);
+                    goto err_out;
+                }
             }
             if (res < wb_len) {
                 if (wb_len_given) {
@@ -537,6 +576,8 @@ main(int argc, char * argv[])
 err_out:
     if (free_dop)
         free(free_dop);
+    if (read_buf)
+        free(read_buf);
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
