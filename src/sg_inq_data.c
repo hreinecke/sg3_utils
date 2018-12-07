@@ -1,14 +1,16 @@
-/* A utility program originally written for the Linux OS SCSI subsystem.
-*  Copyright (C) 2000-2018 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This is an auxiliary file holding data tables for the sg_inq utility.
-   It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
-
-*/
+/*
+ * A utility program originally written for the Linux OS SCSI subsystem.
+ *     Copyright (C) 2000-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This is an auxiliary file holding data tables for the sg_inq utility.
+ * It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
+ */
 
 #include <unistd.h>
 #include <fcntl.h>

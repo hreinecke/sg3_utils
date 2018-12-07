@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program send either device, bus or host resets to device,
  * or bus or host associated with the given sg device. This is a Linux
  * only utility (perhaps Android as well).

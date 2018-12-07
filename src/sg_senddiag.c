@@ -1,9 +1,12 @@
-/* A utility program originally written for the Linux OS SCSI subsystem
-*  Copyright (C) 2003-2018 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
+/*
+ * A utility program originally written for the Linux OS SCSI subsystem
+ *    Copyright (C) 2003-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
 
    This program issues the SCSI SEND DIAGNOSTIC command and in one case
    the SCSI RECEIVE DIAGNOSTIC command to list supported diagnostic pages.

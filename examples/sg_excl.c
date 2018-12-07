@@ -1,3 +1,28 @@
+/*
+ * Copyright (C) 2003-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This is a simple program that tests the O_EXCL flag in sg while
+ * executing a SCSI INQUIRY command and a
+ * TEST UNIT READY command using the SCSI generic (sg) driver
+ *
+ * Invocation: sg_excl [-x] <sg_device>
+ *
+ * Version 3.61 (20181207)
+ *
+ * 6 byte INQUIRY command:
+ * [0x12][   |lu][pg cde][res   ][al len][cntrl ]
+ *
+ * 6 byte TEST UNIT READY command:
+ * [0x00][   |lu][res   ][res   ][res   ][res   ]
+ *
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -11,27 +36,6 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* This is a simple program that tests the O_EXCL flag in sg while
-   executing a SCSI INQUIRY command and a
-   TEST UNIT READY command using the SCSI generic (sg) driver
-
-*  Copyright (C) 2003-2018 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   Invocation: sg_excl [-x] <sg_device>
-
-   Version 3.60 (20180220)
-
-6 byte INQUIRY command:
-[0x12][   |lu][pg cde][res   ][al len][cntrl ]
-
-6 byte TEST UNIT READY command:
-[0x00][   |lu][res   ][res   ][res   ][res   ]
-
-*/
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6

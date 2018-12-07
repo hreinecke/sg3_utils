@@ -13,7 +13,7 @@
  * Version 2 and 3 extensions to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- *   Version: 3.9.02 (20181118)
+ *   Version: 3.9.02 (20181203)
  *  This version is for Linux 2.6, 3 and 4 series kernels.
  *
  * Documentation
@@ -105,7 +105,7 @@ typedef struct sg_io_hdr {
  */
 #define SGV4_FLAG_DIRECT_IO SG_FLAG_DIRECT_IO
 #define SGV4_FLAG_MMAP_IO SG_FLAG_MMAP_IO
-#define SGV4_FLAG_SYNC 0x8	/* similar to ioctl(SG_IO) */
+#define SGV4_FLAG_V3_MAP 0x8		/* used internally */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
 /* Following 2 flags for request::tag (type: int) manipulations */

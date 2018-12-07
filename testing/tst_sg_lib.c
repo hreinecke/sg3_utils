@@ -3,6 +3,8 @@
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <unistd.h>
@@ -42,7 +44,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.11 20180715";
+static const char * version_str = "1.12 20181207";
 
 
 #define MAX_LINE_LEN 1024

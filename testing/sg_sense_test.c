@@ -4,6 +4,8 @@
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
 /* This is a simple program that tests the sense data descriptor format
@@ -24,7 +26,7 @@
 
 #define ME "sg_sense_test: "
 
-static const char * version_str = "2.03 20180220";
+static const char * version_str = "2.04 20181207";
 
 static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},

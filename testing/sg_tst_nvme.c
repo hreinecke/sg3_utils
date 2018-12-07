@@ -4,6 +4,8 @@
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * This program issues a NVMe Identify command (controller or namespace)
  * or a Device self-test command via the "SCSI" pass-through interface of
  * this packages sg_utils library. That interface is primarily shown in
@@ -37,7 +39,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.04 20180220";
+static const char * version_str = "1.05 20181207";
 
 
 #define ME "sg_tst_nvme: "

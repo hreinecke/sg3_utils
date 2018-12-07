@@ -7,6 +7,8 @@
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program was originally written with Linux 2.4 kernel series.
  * It now builds for the Linux 2.6, 3 and 4 kernel series and various other
  * operating systems.

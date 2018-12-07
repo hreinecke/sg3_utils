@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  *  This program outputs information provided by a SCSI REPORT SUPPORTED
  *  OPERATION CODES [0xa3/0xc] and REPORT SUPPORTED TASK MANAGEMENT
  *  FUNCTIONS [0xa3/0xd] commands.

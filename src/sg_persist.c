@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  *  This program issues the SCSI PERSISTENT IN and OUT commands.
  */
 

@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 1999-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
+ * device driver.
+ * This program does a SCSI inquiry command on the given device and
+ * outputs some of the result. This program highlights the use of the
+ * SCSI_IOCTL_SEND_COMMAND ioctl. This should be able to be applied to
+ * any SCSI device file descriptor (not just one related to sg). [Whether
+ * this is a good idea on a disk while it is mounted is debatable.
+ * No detrimental effects when this was tested ...]
+ *
+ * Version 0.16 20181207
+ */
+
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -10,25 +31,6 @@
 #include <sys/stat.h>
 #include <scsi/scsi.h>
 /* #include <scsi/scsi_ioctl.h> */ /* glibc hides this file sometimes */
-
-/* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
-   device driver.
-*  Copyright (C) 1999 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program does a SCSI inquiry command on the given device and
-   outputs some of the result. This program highlights the use of the
-   SCSI_IOCTL_SEND_COMMAND ioctl. This should be able to be applied to
-   any SCSI device file descriptor (not just one related to sg). [Whether
-   this is a good idea on a disk while it is mounted is debatable.
-   No detrimental effects when this was tested ...]
-
-Version 0.15 20160528
-*/
-
 
 typedef struct my_scsi_ioctl_command {
         unsigned int inlen;  /* _excluding_ scsi command length */

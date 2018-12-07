@@ -3,6 +3,8 @@
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <stdlib.h>
@@ -17,7 +19,7 @@
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.14 20140213";
+static const char * version_str = "1.15 20181207";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6

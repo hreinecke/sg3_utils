@@ -8,6 +8,8 @@
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program can be used to send raw SCSI commands (with an optional
  * data phase) through a Generic SCSI interface.
  */

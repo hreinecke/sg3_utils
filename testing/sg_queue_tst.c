@@ -1,3 +1,23 @@
+/*
+ * Copyright (C) 2010-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ *
+ * This program was used to test SCSI mid level queue ordering.
+ * The default behaviour is to "queue at head" which is useful for
+ * error processing but not for streaming READ and WRITE commands.
+ *
+ * Invocation: sg_queue_tst [-l=Q_LEN] [-t] <sg_device>
+ *      -t      queue at tail
+ *
+ * Version 0.93 (20181207)
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -13,22 +33,7 @@
 #include "sg_io_linux.h"
 #include "sg_linux_inc.h"
 
-/* This program was used to test SCSI mid level queue ordering.
-   The default behaviour is to "queue at head" which is useful for
-   error processing but not for streaming READ and WRITE commands.
 
-*  Copyright (C) 2010-2018 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   Invocation: sg_queue_tst [-l=Q_LEN] [-t] <sg_device>
-        -t      queue at tail
-
-   Version 0.92 (20181011)
-
-*/
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6

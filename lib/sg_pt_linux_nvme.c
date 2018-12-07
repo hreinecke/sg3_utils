@@ -4,6 +4,8 @@
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * The code to use the NVMe Management Interface (MI) SES pass-through
  * was provided by WDC in November 2017.
  */
