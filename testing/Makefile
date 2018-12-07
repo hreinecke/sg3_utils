@@ -4,15 +4,6 @@ PREFIX=/usr/local
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
-# In Linux the default C compiler is GCC while in FreeBSD (since release 10 ?)
-# the default C compiler is clang. Swap the comment marks (lines starting
-# with '#') on the next 4 (non-blank) lines.
-CC = gcc
-# CC = clang
-
-LD = gcc
-# LD = clang
-
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
 	sg_tst_nvme sg_tst_ioctl tst_sg_lib sgs_dd
 	
@@ -31,6 +22,8 @@ LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 ## CC = g++
 ## CC = clang
 ## CC = clang++
+
+LD = $(CC)
 
 CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
 # CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME -DDEBUG

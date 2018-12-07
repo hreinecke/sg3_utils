@@ -1,3 +1,32 @@
+/*
+ *   Copyright (C) 1999-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This is a simple program executing a SCSI INQUIRY command and a
+ * TEST UNIT READY command using the SCSI generic (sg) driver
+ * There is another variant of this program called "sg_simple2"
+ * which does not include the sg_lib.h header and logic and so has
+ * simpler but more primitive error processing.
+ * In the lk 2.6 series devices nodes such as /dev/sda also support
+ * the SG_IO ioctl.
+ *
+ *   Invocation: sg_simple1 [-x] <scsi_device>
+ *
+ *   Version 3.60 (20181207)
+ *
+ * 6 byte INQUIRY command:
+ * [0x12][   |lu][pg cde][res   ][al len][cntrl ]
+ *
+ * 6 byte TEST UNIT READY command:
+ * [0x00][   |lu][res   ][res   ][res   ][res   ]
+ *
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -10,31 +39,6 @@
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 
-/* This is a simple program executing a SCSI INQUIRY command and a
-   TEST UNIT READY command using the SCSI generic (sg) driver
-   There is another variant of this program called "sg_simple2"
-   which does not include the sg_lib.h header and logic and so has
-   simpler but more primitive error processing.
-   In the lk 2.6 series devices nodes such as /dev/sda also support
-   the SG_IO ioctl.
-
-*  Copyright (C) 1999-2007 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   Invocation: sg_simple1 [-x] <scsi_device>
-
-   Version 03.59 (20160528)
-
-6 byte INQUIRY command:
-[0x12][   |lu][pg cde][res   ][al len][cntrl ]
-
-6 byte TEST UNIT READY command:
-[0x00][   |lu][res   ][res   ][res   ][res   ]
-
-*/
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6

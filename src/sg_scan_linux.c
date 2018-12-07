@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program scans the "sg" device space (ie actual + simulated SCSI
  * generic devices). Optionally sg_scan can be given other device names
  * to scan (in place of the sg devices).

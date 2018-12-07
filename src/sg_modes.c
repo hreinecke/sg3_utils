@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  *  This program outputs information provided by a SCSI MODE SENSE command.
  *  Does 10 byte MODE SENSE commands by default, Trent Piepho added a "-6"
  *  switch for force 6 byte mode sense commands.
@@ -30,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.66 20180909";
+static const char * version_str = "1.67 20181203";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -133,7 +135,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x1, 0x0, "rw", "Read-Write error recovery"},
     {0x3, 0x0, "fo", "Format (obsolete)"},
     {0x4, 0x0, "rd", "Rigid disk geometry (obsolete)"},
-    {0x5, 0x0, "fg", "Flexible geometry (obsolete)"},
+    {0x5, 0x0, "fd", "Flexible disk (obsolete)"},
     {0x7, 0x0, "ve", "Verify error recovery"},
     {0x8, 0x0, "ca", "Caching"},
     {0xa, 0x2, "atag", "Application tag"},

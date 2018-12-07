@@ -4,6 +4,8 @@
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
 
     Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
     Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001

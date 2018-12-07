@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2003-2018 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
+ * device driver.
+ * This program will read a certain number of blocks of a given block size
+ * from a given sg device node and write what is retrieved out to a
+ * normal file. The purpose is to test the sg_iovec mechanism within the
+ * sg_io_hdr structure.
+ *
+ * Version 0.17 (20181207)
+ */
+
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -14,21 +33,6 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-/* Test code for D. Gilbert's extensions to the Linux OS SCSI generic ("sg")
-   device driver.
-*  Copyright (C) 2003-2018 D. Gilbert
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
-
-   This program will read a certain number of blocks of a given block size
-   from a given sg device node and write what is retrieved out to a
-   normal file. The purpose is to test the sg_iovec mechanism within the
-   sg_io_hdr structure.
-
-   Version 0.16 (20180219)
-*/
 
 
 #define ME "sg_iovec_tst: "

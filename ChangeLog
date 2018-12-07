@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20181127] [svn: r796]
+Changelog for sg3_utils-1.45 [20181207] [svn: r797]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (18-102r0)
@@ -13,6 +13,7 @@ Changelog for sg3_utils-1.45 [20181127] [svn: r796]
   - testing/sg_tst_async: fix free_list issue
   - testing/sg_tst_ioctl: for sg 3.9 driver
   - testing/sgs_dd: for share in sg 3.9.02 driver
+  - add: SPDX-License-Identifier: BSD-2-Clause
 
 Changelog for sg3_utils-1.44 [20180912] [svn: r791]
   - same code as release 1.43 20180911 svn rev 789;

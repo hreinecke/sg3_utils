@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program issues the SCSI command READ LONG to a given SCSI device.
  * It sends the command with the logical block address passed as the lba
  * argument, and the transfer length set to the xfer_len argument. the

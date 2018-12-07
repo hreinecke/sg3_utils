@@ -1,3 +1,16 @@
+/*
+ *  Copyright (C) 2018 D. Gilbert
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2, or (at your option)
+ *  any later version.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Invocation: See usage() function below.
+ *
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -31,18 +44,8 @@
 /* This program tests ioctl() calls added and modified in version 3.9 and
  * later of the Linux sg driver.  */
 
-/*
- *  Copyright (C) 2018 D. Gilbert
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2, or (at your option)
- *  any later version.
- *
- * Invocation: See usage() function below.
- *
- */
 
-static const char * version_str = "Version: 0.97  20181121";
+static const char * version_str = "Version: 0.98  20181207";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6

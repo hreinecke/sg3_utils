@@ -62,6 +62,8 @@
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * Michael Weller (eowmob at exp-math dot uni-essen dot de)
  *      11/23/94 massive extensions from 1.4a
  *      08/23/97 fix problems with defect lists

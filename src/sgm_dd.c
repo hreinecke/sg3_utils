@@ -6,6 +6,8 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
 
    This program is a specialisation of the Unix "dd" command in which
    either the input or the output file is a scsi generic device. The block

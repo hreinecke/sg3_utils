@@ -1,3 +1,32 @@
+/*
+ * A utility program for the Linux OS SCSI generic ("sg") device driver.
+ * Copyright (C) 1999-2018 D. Gilbert and P. Allworth
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This program is a specialization of the Unix "dd" command in which
+ * one or both of the given files is a scsi generic device or a raw
+ * device. A block size ('bs') is assumed to be 512 if not given. This
+ * program complains if 'ibs' or 'obs' are given with some other value
+ * than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
+ * 'of' is not given or 'of=-' then stdout assumed.  Multipliers:
+ *    'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
+ *    'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
+ *
+ * A non-standard argument "bpt" (blocks per transfer) is added to control
+ * the maximum number of blocks in each transfer. The default value is 128.
+ * For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
+ * in this case) are transferred to or from the sg device in a single SCSI
+ * command.
+ *
+ * This version should compile with Linux sg drivers with version numbers
+ * >= 30000 . This version uses queuing within the Linux sg driver.
+ */
+
 #define _XOPEN_SOURCE 500
 
 #include <unistd.h>
@@ -23,34 +52,8 @@ typedef uint8_t u_char;   /* horrible, for scsi.h */
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-/* A utility program for the Linux OS SCSI generic ("sg") device driver.
-*  Copyright (C) 1999-2018 D. Gilbert and P. Allworth
-*  This program is free software; you can redistribute it and/or modify
-*  it under the terms of the GNU General Public License as published by
-*  the Free Software Foundation; either version 2, or (at your option)
-*  any later version.
 
-   This program is a specialization of the Unix "dd" command in which
-   one or both of the given files is a scsi generic device or a raw
-   device. A block size ('bs') is assumed to be 512 if not given. This
-   program complains if 'ibs' or 'obs' are given with some other value
-   than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
-   'of' is not given or 'of=-' then stdout assumed.  Multipliers:
-      'c','C'  *1       'b','B' *512      'k' *1024      'K' *1000
-      'm' *(1024^2)     'M' *(1000^2)     'g' *(1024^3)  'G' *(1000^3)
-
-   A non-standard argument "bpt" (blocks per transfer) is added to control
-   the maximum number of blocks in each transfer. The default value is 128.
-   For example if "bs=512" and "bpt=32" then a maximum of 32 blocks (16KB
-   in this case) are transferred to or from the sg device in a single SCSI
-   command.
-
-   This version should compile with Linux sg drivers with version numbers
-   >= 30000 . This version uses queuing within the Linux sg driver.
-
-*/
-
-static char * version_str = "0.61 20180627";
+static char * version_str = "0.62 20181207";
 /* resurrected from "0.55 20020509" */
 
 #define DEF_BLOCK_SIZE 512

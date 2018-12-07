@@ -4,6 +4,8 @@
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * The utility can send six variants of the SCSI WRITE command: (normal)
  * WRITE(16 or 32), WRITE ATOMIC(16 or 32), ORWRITE(16 or 32),
  * WRITE SAME(16 or 32), WRITE SCATTERED (16 or 32) or WRITE

@@ -5,6 +5,8 @@
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program uses the SCSI command READ BUFFER on the given
  * device, first to find out how big it is and then to read that
  * buffer (data mode, buffer id 0).

@@ -4,6 +4,8 @@
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
  *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
  * This program issues the SCSI command WRITE AND VERIFY to a given SCSI
  * device. It sends the command with the logical block address passed as the
  * LBA argument, for the given number of blocks. The number of bytes sent is

@@ -25,18 +25,21 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-/* A utility program for the Linux OS SCSI subsystem.
-   *  Copyright (C) 2004-2010 D. Gilbert
-   *  This program is free software; you can redistribute it and/or modify
-   *  it under the terms of the GNU General Public License as published by
-   *  the Free Software Foundation; either version 2, or (at your option)
-   *  any later version.
-
-   This program issues the SCSI command RECEIVE COPY RESULTS to a given
-   SCSI device.
-   It sends the command with the service action passed as the sa argument,
-   and the optional list identifier passed as the list_id argument.
-*/
+/*
+ * A utility program for the Linux OS SCSI subsystem.
+ *  Copyright (C) 2004-2010 D. Gilbert
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This program issues the SCSI command RECEIVE COPY RESULTS to a given
+ * SCSI device.
+ * It sends the command with the service action passed as the sa argument,
+ * and the optional list identifier passed as the list_id argument.
+ */
 
 static const char * version_str = "1.23 20180625";
 

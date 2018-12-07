@@ -7,6 +7,8 @@
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
  * This program is a specialisation of the Unix "dd" command in which
  * one or both of the given files is a scsi generic device or a raw
  * device. A block size ('bs') is assumed to be 512 if not given. This

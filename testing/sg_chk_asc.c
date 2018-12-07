@@ -3,6 +3,8 @@
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <unistd.h>
@@ -25,7 +27,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static const char * version_str = "1.06 20180119";
+static const char * version_str = "1.07 20181207";
 
 
 #define MAX_LINE_LEN 1024
