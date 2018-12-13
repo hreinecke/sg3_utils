@@ -81,6 +81,9 @@
 /* option ignored */
 #undef IGNORE_LINUX_BSG
 
+/* even if Linux sg v4 available, use v3 instead */
+#undef IGNORE_LINUX_SGV4
+
 /* compile out NVMe support */
 #undef IGNORE_NVME
 

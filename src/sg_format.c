@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.55 20180830";
+static const char * version_str = "1.56 20181212";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -77,7 +77,6 @@ static const char * version_str = "1.55 20180830";
 struct opts_t {
         bool cmplst;            /* -C value */
         bool cmplst_given;
-        bool dcrt;              /* -D */
         bool dry_run;           /* -d */
         bool early;             /* -e */
         bool fwait;             /* -w (negate for immed) */
@@ -94,6 +93,7 @@ struct opts_t {
         bool verbose_given;
         bool verify;            /* -y */
         bool version_given;
+        int dcrt;              /* -D (can be given once or twice) */
         int lblk_sz;            /* -s value */
         int ffmt;               /* -t value; fast_format if > 0 */
         int fmtpinfo;
@@ -172,6 +172,8 @@ usage()
                "same as current\n"
                "    --dcrt|-D       disable certification (doesn't "
                "verify media)\n"
+               "                    use twice to enable certification and "
+               "set FOV bit\n"
                "    --dry-run|-d    bypass device modifying commands (i.e. "
                "don't format)\n"
                "    --early|-e      exit once format started (user can "
@@ -303,7 +305,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
 static int
 scsi_format_unit(int fd, const struct opts_t * op)
 {
-        bool need_hdr, longlist, ip_desc;
+        bool need_param_lst, longlist, ip_desc;
         bool immed = ! op->fwait;
         int res, progress, pr, rem, param_sz, off, resp_len, tmout;
         int poll_wait_secs;
@@ -339,8 +341,10 @@ scsi_format_unit(int fd, const struct opts_t * op)
         off = longlist ? LONG_FORMAT_HEADER_SZ : SH_FORMAT_HEADER_SZ;
         param[0] = op->pfu & 0x7;  /* PROTECTION_FIELD_USAGE (bits 2-0) */
         param[1] = (immed ? 0x2 : 0); /* FOV=0, [DPRY,DCRT,STPF,IP=0] */
-        if (op->dcrt)
+        if (1 == op->dcrt)
                 param[1] |= 0xa0;     /* FOV=1, DCRT=1 */
+        else if (op->dcrt > 1)
+                param[1] |= 0x80;     /* FOV=1, DCRT=0 */
         if (ip_desc) {
                 param[1] |= 0x88;     /* FOV=1, IP=1 */
                 if (op->sec_init)
@@ -350,9 +354,9 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 param[3] = (op->pie & 0xf);/* PROTECTION_INTERVAL_EXPONENT */
         /* with the long parameter list header, P_I_INFORMATION is always 0 */
 
-        need_hdr = (immed || op->cmplst || op->dcrt || ip_desc ||
-                    (op->pfu > 0) || (op->pie > 0));
-        param_sz = need_hdr ?
+        need_param_lst = (immed || op->cmplst || (op->dcrt > 0) || ip_desc ||
+                          (op->pfu > 0) || (op->pie > 0));
+        param_sz = need_param_lst ?
                     (off + (ip_desc ? INIT_PATTERN_DESC_SZ : 0)) : 0;
 
         if (op->dry_run) {
@@ -360,7 +364,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                 pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
                         "command\n");
                 if (vb) {
-                        if (need_hdr) {
+                        if (need_param_lst) {
                                 pr2serr("  FU would have received parameter "
                                         "list: ");
                                 hex2stderr(param, max_param_sz, -1);
@@ -370,13 +374,14 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         pr2serr("  FU cdb fields: fmtpinfo=0x%x, "
                                 "longlist=%d, fmtdata=%d, cmplst=%d, "
                                 "ffmt=%d [timeout=%d secs]\n",
-                                op->fmtpinfo, longlist, need_hdr, op->cmplst,
-                                op->ffmt, tmout);
+                                op->fmtpinfo, longlist, need_param_lst,
+                                op->cmplst, op->ffmt, tmout);
                 }
         } else
                 res = sg_ll_format_unit_v2(fd, op->fmtpinfo, longlist,
-                                           need_hdr, op->cmplst, 0, op->ffmt,
-                                           tmout, param, param_sz, true, vb);
+                                           need_param_lst, op->cmplst, 0,
+                                           op->ffmt, tmout, param, param_sz,
+                                           true, vb);
         if (free_param)
             free(free_param);
 
@@ -1074,7 +1079,7 @@ parse_cmd_line(struct opts_t * op, int argc, char **argv)
                         op->dry_run = true;
                         break;
                 case 'D':
-                        op->dcrt = true;
+                        ++op->dcrt;
                         break;
                 case 'e':
                         op->early = true;
@@ -1328,9 +1333,14 @@ main(int argc, char **argv)
                 goto format_only;
 
         ret = print_dev_id(fd, inq_resp, inq_resp_sz, op);
-        if (ret)
-                goto out;
-        pdt = 0x1f & inq_resp[0];
+        if (ret) {
+                if (op->dry_run) {
+                        pr2serr("INQUIRY failed, assume device is a disk\n");
+                        pdt = 0;
+                } else
+                        goto out;
+        } else
+                pdt = 0x1f & inq_resp[0];
         if (op->format) {
                 if ((PDT_DISK != pdt) && (PDT_OPTICAL != pdt) &&
                     (PDT_RBC != pdt)) {
@@ -1350,9 +1360,14 @@ main(int argc, char **argv)
         }
 
         ret = fetch_block_desc(fd, dbuff, &calc_len, &bd_lb_sz, op);
-        if (ret)
-                goto out;
-
+        if (ret) {
+                if (op->dry_run) {
+                        /* pick some numbers ... */
+                        calc_len = 1024 * 1024 * 1024;
+                        bd_lb_sz = 512;
+                } else
+                        goto out;
+        }
         rq_lb_sz = op->lblk_sz;
         if (op->resize || (op->format && ((op->blk_count != 0) ||
               ((rq_lb_sz > 0) && (rq_lb_sz != bd_lb_sz))))) {

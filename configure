@@ -791,6 +791,7 @@ enable_win32_spt_direct
 enable_scsistrings
 enable_nvme_supp
 enable_fast_lebe
+enable_linux_sgv4
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1453,6 +1454,8 @@ Optional Features:
                           strings
   --disable-nvme-supp     remove all or most NVMe code
   --disable-fast-lebe     use generic little-endian/big-endian code instead
+  --disable-linux-sgv4    for Linux sg driver avoid v4 interface even if
+                          available
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -12788,6 +12791,16 @@ if test "${enable_fast_lebe+set}" = set; then :
   enableval=$enable_fast_lebe;
 cat >>confdefs.h <<_ACEOF
 #define IGNORE_FAST_LEBE 1
+_ACEOF
+
+fi
+
+
+# Check whether --enable-linux-sgv4 was given.
+if test "${enable_linux_sgv4+set}" = set; then :
+  enableval=$enable_linux_sgv4;
+cat >>confdefs.h <<_ACEOF
+#define IGNORE_LINUX_SGV4 1
 _ACEOF
 
 fi

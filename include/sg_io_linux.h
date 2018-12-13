@@ -11,7 +11,7 @@
  */
 
 /*
- * Version 1.06 [20180119]
+ * Version 1.07 [20181211]
  */
 
 /*
@@ -159,6 +159,14 @@ struct sg_io_hdr;
    'sg_warnings_fd' and returns 0. */
 int sg_chk_n_print3(const char * leadin, struct sg_io_hdr * hp,
                     bool raw_sinfo);
+
+/* Returns 1 if no errors found and thus nothing printed; otherwise
+ * prints error/warning (prefix by 'leadin') to stderr (pr2ws) and
+ * returns 0. */
+int sg_linux_sense_print(const char * leadin, int scsi_status,
+                         int host_status, int driver_status,
+                         const uint8_t * sense_buffer, int sb_len,
+                         bool raw_sinfo);
 
 /* Calls sg_scsi_normalize_sense() after obtaining the sense buffer and
    its length from the struct sg_io_hdr pointer. If these cannot be

@@ -2,18 +2,25 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20181207] [svn: r797]
+Changelog for sg3_utils-1.45 [20181213] [svn: r797]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (18-102r0)
   - sg_write_buffer: allow comma and period separated
     lists when input from stdin
+  - sg_format: add --dcrt used twice (FOV=1 DCRT=0)
   - sg_scan (win32): expand limits for big arrays
   - rescan-scsi-bus: widen LUN 0 only scanning
   - testing/sg_tst_async: fix free_list issue
   - testing/sg_tst_ioctl: for sg 3.9 driver
   - testing/sgs_dd: for share in sg 3.9.02 driver
-  - add: SPDX-License-Identifier: BSD-2-Clause
+  - sg_io_linux (sg_lib): add sg_linux_sense_print()
+  - sg_pt_linux: uses sg v4 interface if sg driver
+    >= 4.0.0 . Force sg v3 always by building with
+    './configure --disable-linux-sgv4'
+    - add sg_linux_get_sg_version() function
+  - add: 'SPDX-License-Identifier: BSD-2-Clause'
+    or a small number of 'GPL-2.0-or-later'
 
 Changelog for sg3_utils-1.44 [20180912] [svn: r791]
   - same code as release 1.43 20180911 svn rev 789;

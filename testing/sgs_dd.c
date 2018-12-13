@@ -88,7 +88,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.04 20181207";
+static const char * version_str = "1.05 20181213";
 
 #ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -141,6 +141,8 @@ struct flags_t {
     bool fua;
     bool mmap;
     bool noshare;
+    bool v3;
+    bool v4;
 };
 
 typedef struct global_collection
@@ -195,6 +197,7 @@ typedef struct request_element
     uint8_t * buffp;
     uint8_t * alloc_bp;
     struct sg_io_hdr io_hdr;
+    struct sg_io_v4 io_hdr4;
     uint8_t cmd[MAX_SCSI_CDBSZ];
     uint8_t sb[SENSE_BUFF_LEN];
     int bs;
@@ -305,6 +308,17 @@ lk_chk_n_print3(const char * leadin, struct sg_io_hdr * hp, bool raw_sinfo)
 {
     pthread_mutex_lock(&strerr_mut);
     sg_chk_n_print3(leadin, hp, raw_sinfo);
+    pthread_mutex_unlock(&strerr_mut);
+}
+
+
+static void
+lk_chk_n_print4(const char * leadin, struct sg_io_v4 * h4p, bool raw_sinfo)
+{
+    pthread_mutex_lock(&strerr_mut);
+    sg_linux_sense_print(leadin, h4p->device_status, h4p->transport_status,
+                         h4p->driver_status, (const uint8_t *)h4p->response,
+                         h4p->response_len, raw_sinfo);
     pthread_mutex_unlock(&strerr_mut);
 }
 
@@ -474,13 +488,13 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [2fds,coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,null]\n"
+            "                dsync,excl,fua,mmap,noshare,null,v3,v4]\n"
             "    of          file or device to write to (def: stdout), "
             "OFILE of '.'\n"
             "                treated as /dev/null\n"
             "    oflag       comma separated list from: [2fds,append,coe,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,null]\n"
+            "                dsync,excl,fua,mmap,noshare,null,v3,v4]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -545,8 +559,12 @@ page3:
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
             "    noshare     if IFILE and OFILE are sg devices, don't set "
-            "up share\n"
+            "up sharing\n"
             "                (def: do)\n"
+            "    v3          use v3 sg interface which is the default (aslo "
+            "see v4)\n"
+            "    v4          use v4 sg interface (def: v3 unless other side "
+            "us v4)\n"
             "\n"
             "If both are sg devices 'shared' mode is selected unless "
             "'noshare' is given\nto 'iflag=' or 'oflag='. If 'of2=OFLAG2' "
@@ -916,6 +934,10 @@ fini:
     if (own_outfd)
         close(rep->outfd);
     pthread_cond_broadcast(&clp->out_sync_cv);
+    if ((0 == rep->id) && is_first) {
+        is_first = false;   /* allow rest of threads to start */
+        pthread_cond_broadcast(&clp->hold_1st_cv);
+    }
     return stop_after_write ? NULL : clp;
 }
 
@@ -1217,6 +1239,7 @@ sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep)
     }           /* end of while (1) loop */
 }
 
+/* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
 static int
 sg_start_io(Rq_elem * rep)
 {
@@ -1225,9 +1248,12 @@ sg_start_io(Rq_elem * rep)
     bool dpo = wr ? rep->out_flags.dpo : rep->in_flags.dpo;
     bool dio = wr ? rep->out_flags.dio : rep->in_flags.dio;
     bool mmap = wr ? rep->out_flags.mmap : rep->in_flags.mmap;
+    bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
     int cdbsz = wr ? rep->cdbsz_out : rep->cdbsz_in;
+    int flags = 0;
     int res, err;
     struct sg_io_hdr * hp = &rep->io_hdr;
+    struct sg_io_v4 * h4p = &rep->io_hdr4;
     const char * cp = "";
     const char * c2p = "";
     const char * c3p = "";
@@ -1238,6 +1264,33 @@ sg_start_io(Rq_elem * rep)
                    my_name, rep->blk, rep->num_blks);
         return -1;
     }
+    if (mmap && (rep->out2fd >= 0)) {
+        flags |= SG_FLAG_MMAP_IO;
+        c3p = " mmap";
+    }
+    if (dio)
+        flags |= SG_FLAG_DIRECT_IO;
+    if (rep->has_share) {
+        flags |= SGV4_FLAG_SHARE;
+        if (wr)
+            flags |= SGV4_FLAG_NO_DXFER;
+        else if (rep->out2fd < 0)
+            flags |= SGV4_FLAG_NO_DXFER;
+        if (flags & SGV4_FLAG_NO_DXFER)
+            c2p = " and FLAG_NO_DXFER";
+
+        cp = (wr ? " slave active" : " master active");
+    } else
+        cp = (wr ? " slave not sharing" : " master not sharing");
+    if (rep->debug > 3) {
+        pr2serr_lk("%s tid=%d: SCSI %s%s%s%s, blk=%" PRId64 " num_blks=%d\n",
+                   __func__, rep->id, (rep->wr ? "WRITE" : "READ"), cp,
+                   c2p, c3p, rep->blk, rep->num_blks);
+        lk_print_command(rep->cmd);
+    }
+    if (v4)
+        goto do_v4;
+
     memset(hp, 0, sizeof(struct sg_io_hdr));
     hp->interface_id = 'S';
     hp->cmd_len = cdbsz;
@@ -1250,30 +1303,7 @@ sg_start_io(Rq_elem * rep)
     hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
     hp->pack_id = (int)rep->blk;
-    if (mmap && (rep->out2fd >= 0)) {
-        hp->flags |= SG_FLAG_MMAP_IO;
-        c3p = " mmap";
-    }
-    if (dio)
-        hp->flags |= SG_FLAG_DIRECT_IO;
-    if (rep->has_share) {
-        hp->flags |= SGV4_FLAG_SHARE;
-        if (wr)
-            hp->flags |= SGV4_FLAG_NO_DXFER;
-        else if (rep->out2fd < 0)
-            hp->flags |= SGV4_FLAG_NO_DXFER;
-        if (hp->flags & SGV4_FLAG_NO_DXFER)
-            c2p = " and FLAG_NO_DXFER";
-
-        cp = (wr ? " slave active" : " master active");
-    } else
-        cp = (wr ? " slave not sharing" : " master not sharing");
-    if (rep->debug > 3) {
-        pr2serr_lk("%s tid=%d: SCSI %s%s%s%s, blk=%" PRId64 " num_blks=%d\n",
-                   __func__, rep->id, (rep->wr ? "WRITE" : "READ"), cp,
-                   c2p, c3p, rep->blk, rep->num_blks);
-        lk_print_command(hp->cmdp);
-    }
+    hp->flags = flags;
 
     while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
                          sizeof(struct sg_io_hdr))) < 0) &&
@@ -1288,6 +1318,37 @@ sg_start_io(Rq_elem * rep)
         return -1;
     }
     return 0;
+do_v4:
+    memset(h4p, 0, sizeof(struct sg_io_v4));
+    h4p->guard = 'Q';
+    h4p->request_len = cdbsz;
+    h4p->request = (uint64_t)rep->cmd;
+    if (wr) {
+        h4p->dout_xfer_len = rep->bs * rep->num_blks;
+        h4p->dout_xferp = (uint64_t)rep->buffp;
+    } else if (rep->num_blks > 0) {
+        h4p->din_xfer_len = rep->bs * rep->num_blks;
+        h4p->din_xferp = (uint64_t)rep->buffp;
+    }
+    h4p->max_response_len = sizeof(rep->sb);
+    h4p->response = (uint64_t)rep->sb;
+    h4p->timeout = DEF_TIMEOUT;
+    h4p->usr_ptr = (uint64_t)rep;
+    h4p->request_extra = rep->blk;/* N.B. blk --> pack_id --> request_extra */
+    h4p->flags = flags;
+    while (((res = ioctl(rep->wr ? rep->outfd : rep->infd, SG_IOSUBMIT,
+                         h4p)) < 0) && ((EINTR == errno) ||
+                                         (EAGAIN == errno)))
+        ;
+    err = errno;
+    if (res < 0) {
+        if (ENOMEM == err)
+            return 1;
+        pr2serr_lk("%s tid=%d: %s%s%s ioctl(2) failed: %s\n", __func__,
+                   rep->id, cp, c2p, c3p, strerror(err));
+        return -1;
+    }
+    return 0;
 }
 
 /* 0 -> successful, SG_LIB_CAT_UNIT_ATTENTION or SG_LIB_CAT_ABORTED_COMMAND
@@ -1296,13 +1357,17 @@ sg_start_io(Rq_elem * rep)
 static int
 sg_finish_io(bool wr, Rq_elem * rep)
 {
+    bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
     int res;
     struct sg_io_hdr io_hdr;
     struct sg_io_hdr * hp;
+    struct sg_io_v4 * h4p;
 #if 0
     static int testing = 0;     /* thread dubious! */
 #endif
 
+    if (v4)
+        goto do_v4;
     memset(&io_hdr, 0 , sizeof(struct sg_io_hdr));
     /* FORCE_PACK_ID active set only read packet with matching pack_id */
     io_hdr.interface_id = 'S';
@@ -1358,6 +1423,67 @@ sg_finish_io(bool wr, Rq_elem * rep)
     if (rep->debug > 3)
         pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id,
                    wr ? "WRITE" : "READ");
+    return 0;
+
+do_v4:
+    h4p = &rep->io_hdr4;
+    while (((res = ioctl(wr ? rep->outfd : rep->infd, SG_IORECEIVE,
+                         h4p)) < 0) && ((EINTR == errno) ||
+                                        (EAGAIN == errno)))
+        ;
+    if (res < 0) {
+        perror("finishing io on sg device, error");
+        return -1;
+    }
+    if (rep != (Rq_elem *)h4p->usr_ptr)
+        err_exit(0, "sg_finish_io: bad usr_ptr, request-response mismatch\n");
+    res = sg_err_category_new(h4p->device_status, h4p->transport_status,
+                              h4p->driver_status,
+                              (const uint8_t *)h4p->response,
+                              h4p->response_len);
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+        break;
+    case SG_LIB_CAT_RECOVERED:
+        lk_chk_n_print4((wr ? "writing continuing":
+                              "reading continuing"), h4p, false);
+        break;
+    case SG_LIB_CAT_ABORTED_COMMAND:
+    case SG_LIB_CAT_UNIT_ATTENTION:
+        if (rep->debug > 3)
+            lk_chk_n_print4((wr ? "writing": "reading"), h4p, false);
+        return res;
+    case SG_LIB_CAT_NOT_READY:
+    default:
+        {
+            char ebuff[EBUFF_SZ];
+
+            snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64,
+                     wr ? "writing": "reading", rep->blk);
+            lk_chk_n_print4(ebuff, h4p, false);
+            return res;
+        }
+    }
+#if 0
+    if (0 == (++testing % 100)) return -1;
+#endif
+    if ((wr ? rep->out_flags.dio : rep->in_flags.dio) &&
+        (h4p->info & SG_INFO_DIRECT_IO))
+        rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
+    else
+        rep->dio_incomplete_count = 0;
+    rep->resid = h4p->din_resid;
+    if (rep->debug > 3) {
+        pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id,
+                   wr ? "WRITE" : "READ");
+        if (rep->debug > 4)
+            pr2serr_lk(" info=0x%x sg_info_check=%d another_waiting=%d "
+                       "direct=%d detaching=%d\n", h4p->info,
+                       !!(h4p->info & SG_INFO_CHECK),
+                       !!(h4p->info & SG_INFO_ANOTHER_WAITING),
+                       !!(h4p->info & SG_INFO_DIRECT_IO),
+                       !!(h4p->info & SG_INFO_DEVICE_DETACHING));
+    }
     return 0;
 }
 
@@ -1439,6 +1565,10 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noshare = true;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "v3"))
+            fp->v3 = true;
+        else if (0 == strcmp(cp, "v4"))
+            fp->v4 = true;
         else {
             pr2serr("unrecognised flag: %s\n", cp);
             return false;
@@ -1841,6 +1971,13 @@ main(int argc, char * argv[])
             }
         }
         clp->infp = inf;
+        if ((clp->in_flags.v3 || clp->in_flags.v4) &&
+            (FT_SG != clp->in_type)) {
+            clp->in_flags.v3 = false;
+            clp->in_flags.v4 = false;
+            pr2serr("%siflag= v3 and v4 both ignored when IFILE is not sg "
+                    "device\n", my_name);
+        }
     }
     if (outf[0] && ('-' != outf[0])) {
         clp->out_type = dd_filetype(outf);
@@ -1899,6 +2036,31 @@ main(int argc, char * argv[])
             }
         }
         clp->outfp = outf;
+        if ((clp->out_flags.v3 || clp->out_flags.v4) &&
+            (FT_SG != clp->out_type)) {
+            clp->out_flags.v3 = false;
+            clp->out_flags.v4 = false;
+            pr2serr("%soflag= v3 and v4 both ignored when OFILE is not sg "
+                    "device\n", my_name);
+        }
+    }
+    if ((FT_SG == clp->in_type ) && (FT_SG == clp->out_type)) {
+        if (clp->in_flags.v4 && (! clp->out_flags.v3)) {
+            if (! clp->out_flags.v4) {
+                clp->out_flags.v4 = true;
+                if (clp->debug)
+                    pr2serr("Changing OFILE from v3 to v4, use oflag=v3 to "
+                            "force v3\n");
+            }
+        }
+        if (clp->out_flags.v4 && (! clp->in_flags.v3)) {
+            if (! clp->in_flags.v4) {
+                clp->in_flags.v4 = true;
+                if (clp->debug)
+                    pr2serr("Changing IFILE from v3 to v4, use iflag=v3 to "
+                            "force v3\n");
+            }
+        }
     }
     if (out2f[0]) {
         clp->out2_type = dd_filetype(out2f);

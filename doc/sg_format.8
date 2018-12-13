@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "September 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_FORMAT "8" "December 2018" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
@@ -113,10 +113,16 @@ See NOTES section below.
 \fB\-D\fR, \fB\-\-dcrt\fR
 this option sets the DCRT bit in the FORMAT UNIT command's parameter list
 header. It will "disable certification". Certification verifies that blocks
-are usable during the format process. Using this option may speed the format.
-The default action of this utility (i.e. when this option is not given) is
-to clear the DCRT bit thereby requesting "media certification". When the DCRT
-bit is set, the FOV bit must also be set hence sg_format does that.
+are usable during the format process. Using this option may speed the format
+but \fI\-\-ffmt=FFMT\fR, if available, would probably be better. The default
+action of this utility (i.e. when this option is not given) is to clear the
+DCRT bit thereby requesting "media certification" (also unless another
+option needs it, the FOV bit will be cleared). When the DCRT bit is set, the
+FOV bit must also be set hence sg_format does that.
+.br
+If this option is given twice then certification is enabled by clearing the
+DCRT bit and setting the FOV bit. Both these bits are found in the parameter
+list associated with the FORMAT UNIT cdb.
 .TP
 \fB\-d\fR, \fB\-\-dry\-run\fR
 this option will parse the command line, do all the preparation but bypass

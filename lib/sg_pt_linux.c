@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.43 20180603 */
+/* sg_pt_linux version 1.44 20181212 */
 
 
 #include <stdio.h>
@@ -54,6 +54,9 @@
 #endif
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
+
+/* sg driver displayed format: [x]xyyzz --> [x]x.[y]y.zz */
+#define SG_LINUX_SG_VER_V4 40000   /* lowest version in which v4 available */
 
 static const char * linux_host_bytes[] = {
     "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
@@ -482,11 +485,37 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
         sg_find_bsg_nvme_char_major(verbose);
     }
     ptp->dev_fd = dev_fd;
-    if (dev_fd >= 0)
+    if (dev_fd >= 0) {
         ptp->is_sg = check_file_type(dev_fd, &a_stat, &ptp->is_bsg,
                                      &ptp->is_nvme, &ptp->nvme_nsid,
                                      &ptp->os_err, verbose);
-    else {
+        if (ptp->is_sg) {
+            if (ioctl(dev_fd, SG_GET_VERSION_NUM, &ptp->sg_version) < 0) {
+                ptp->sg_version = 0;
+                if (verbose > 3)
+                    pr2ws("%s: ioctl(SG_GET_VERSION_NUM) failed: errno: %d "
+                          "[%s]\n", __func__, errno, safe_strerror(errno));
+            }
+            if (verbose > 4) {
+                int ver = ptp->sg_version;
+
+                if (ptp->sg_version >= SG_LINUX_SG_VER_V4) {
+#ifdef IGNORE_LINUX_SGV4
+                    pr2ws("%s: sg driver version %d.%02d.%02d but config "
+                          "override back to v3\n", __func__, ver / 10000,
+                          (ver / 100) % 100, ver % 100);
+#else
+                    pr2ws("%s: sg driver version %d.%02d.%02d so choose v4\n",
+                          __func__, ver / 10000, (ver / 100) % 100,
+                          ver % 100);
+#endif
+                } else if (verbose > 5)
+                    pr2ws("%s: sg driver version %d.%02d.%02d so choose v3\n",
+                          __func__, ver / 10000, (ver / 100) % 100,
+                          ver % 100);
+            }
+        }
+    } else {
         ptp->is_sg = false;
         ptp->is_bsg = false;
         ptp->is_nvme = false;
@@ -495,6 +524,14 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
         ptp->os_err = 0;
     }
     return ptp->os_err;
+}
+
+int
+sg_linux_get_sg_version(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return ptp->sg_version;
 }
 
 /* Valid file handles (which is the return value) are >= 0 . Returns -1
@@ -580,7 +617,7 @@ set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    ptp->io_hdr.spare_in = pack_id;
+    ptp->io_hdr.request_extra = pack_id;        /* was place in spare_in */
 }
 
 void
@@ -849,7 +886,7 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
         v3_hdr.sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
         v3_hdr.mx_sb_len = (uint8_t)ptp->io_hdr.max_response_len;
     }
-    v3_hdr.pack_id = (int)ptp->io_hdr.spare_in;
+    v3_hdr.pack_id = (int)ptp->io_hdr.request_extra;
     if (BSG_FLAG_Q_AT_HEAD & ptp->io_hdr.flags)
         v3_hdr.flags |= SG_FLAG_Q_AT_HEAD;      /* favour AT_HEAD */
     else if (BSG_FLAG_Q_AT_TAIL & ptp->io_hdr.flags)
@@ -857,7 +894,7 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
 
     if (NULL == v3_hdr.cmdp) {
         if (verbose)
-            pr2ws("No SCSI command (cdb) given\n");
+            pr2ws("No SCSI command (cdb) given [v3]\n");
         return SCSI_PT_DO_BAD_PARAMS;
     }
     /* io_hdr.timeout is in milliseconds, if greater than zero */
@@ -877,6 +914,28 @@ do_scsi_pt_v3(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
     ptp->io_hdr.duration = (__u32)v3_hdr.duration;
     ptp->io_hdr.din_resid = (__s32)v3_hdr.resid;
     /* v3_hdr.info not passed back since no mapping defined (yet) */
+    return 0;
+}
+
+/* Executes SCSI command using sg v4 interface */
+static int
+do_scsi_pt_v4(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
+              int verbose)
+{
+    if (0 == ptp->io_hdr.request) {
+        if (verbose)
+            pr2ws("No SCSI command (cdb) given [v4]\n");
+        return SCSI_PT_DO_BAD_PARAMS;
+    }
+    /* io_hdr.timeout is in milliseconds, if greater than zero */
+    ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) : DEF_TIMEOUT);
+    if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
+        ptp->os_err = errno;
+        if (verbose > 1)
+            pr2ws("ioctl(SG_IO v4) failed: %s (errno=%d)\n",
+                  safe_strerror(ptp->os_err), ptp->os_err);
+        return -ptp->os_err;
+    }
     return 0;
 }
 
@@ -922,36 +981,22 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
         return -ptp->os_err;
     if (ptp->is_nvme)
         return sg_do_nvme_pt(vp, -1, time_secs, verbose);
-    else if (sg_bsg_major <= 0)
+    else if (ptp->is_sg) {
+#ifdef IGNORE_LINUX_SGV4
+        return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+#else
+        if (ptp->sg_version >= SG_LINUX_SG_VER_V4)
+            return do_scsi_pt_v4(ptp, fd, time_secs, verbose);
+        else
+            return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
+#endif
+    } else if (sg_bsg_major <= 0)
         return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
     else if (ptp->is_bsg)
-        ; /* drop through to sg v4 implementation */
+        return do_scsi_pt_v4(ptp, fd, time_secs, verbose);
     else
         return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
 
-    if (! ptp->io_hdr.request) {
-        if (verbose)
-            pr2ws("No SCSI command (cdb) given (v4)\n");
-        return SCSI_PT_DO_BAD_PARAMS;
-    }
-    /* io_hdr.timeout is in milliseconds */
-    ptp->io_hdr.timeout = ((time_secs > 0) ? (time_secs * 1000) :
-                                             DEF_TIMEOUT);
-#if 0
-    /* sense buffer already zeroed */
-    if (ptp->io_hdr.response && (ptp->io_hdr.max_response_len > 0)) {
-        void * p;
-
-        p = (void *)(sg_uintptr_t)ptp->io_hdr.response;
-        memset(p, 0, ptp->io_hdr.max_response_len);
-    }
-#endif
-    if (ioctl(fd, SG_IO, &ptp->io_hdr) < 0) {
-        ptp->os_err = errno;
-        if (verbose > 1)
-            pr2ws("ioctl(SG_IO v4) failed: %s (errno=%d)\n",
-                  safe_strerror(ptp->os_err), ptp->os_err);
-        return -ptp->os_err;
-    }
+    pr2ws("%s: Should never reach this point\n", __func__);
     return 0;
 }

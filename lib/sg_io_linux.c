@@ -96,8 +96,9 @@ sg_print_driver_status(int driver_status)
 }
 
 /* Returns 1 if no errors found and thus nothing printed; otherwise
-   prints error/warning (prefix by 'leadin') and returns 0. */
-static int
+ * prints error/warning (prefix by 'leadin') to stderr (pr2ws) and
+ * returns 0. */
+int
 sg_linux_sense_print(const char * leadin, int scsi_status, int host_status,
                      int driver_status, const uint8_t * sense_buffer,
                      int sb_len, bool raw_sinfo)
