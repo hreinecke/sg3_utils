@@ -128,6 +128,10 @@ AC_ARG_ENABLE([fast-lebe],
   AC_HELP_STRING([--disable-fast-lebe], [use generic little-endian/big-endian code instead]),
   [AC_DEFINE_UNQUOTED(IGNORE_FAST_LEBE, 1, [use generic little-endian/big-endian instead], )], [])
 
+AC_ARG_ENABLE([linux-sgv4],
+  AC_HELP_STRING([--disable-linux-sgv4], [for Linux sg driver avoid v4 interface even if available]),
+  [AC_DEFINE_UNQUOTED(IGNORE_LINUX_SGV4, 1, [even if Linux sg v4 available, use v3 instead], )], [])
+
 
 AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile scripts/Makefile)
 

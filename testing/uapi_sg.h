@@ -105,16 +105,15 @@ typedef struct sg_io_hdr {
  */
 #define SGV4_FLAG_DIRECT_IO SG_FLAG_DIRECT_IO
 #define SGV4_FLAG_MMAP_IO SG_FLAG_MMAP_IO
-#define SGV4_FLAG_V3_MAP 0x8		/* used internally */
+#define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::request_attr set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
-/* Following 2 flags for request::tag (type: int) manipulations */
-#define SGV4_NO_TAG_REQUIRED 0x100	/* default: SG_IOS yields tag */
-#define SGV4_USE_GIVEN_TAG 0x200	/* SG_IOR selector else ignored */
+#define SGV4_FLAG_FIND_BY_TAG 0x100  /* in SG_IOR, def: find by pack_id */
+/* Flag value 0x200 not currently used */
 #define SGV4_FLAG_IMMED 0x400	/* for polling with SG_IOR else ignored */
-#define SGV4_FLAG_ASYNC 0x800	/* make sync ioctl (e.g. SG_IO) async */
+/* Flag value 0x800 not currently used */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
-#define SGV4_FLAG_SHARE 0x2000	/* share IO buffer, already setup or err */
+#define SGV4_FLAG_SHARE 0x2000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER
 
 /* following 'info' values are OR-ed together */
@@ -268,12 +267,16 @@ struct sg_extended_info {
 #define SG_GET_LOW_DMA 0x227a	/* 0-> use all ram for dma; 1-> low dma ram */
 
 /*
- * When SG_SET_FORCE_PACK_ID set to 1, pack_id is input to read() which
- * tries to fetch a packet with a matching pack_id, waits, or returns EAGAIN.
- * If pack_id is -1 then read oldest waiting. When ...FORCE_PACK_ID set to 0
- * then pack_id ignored by read() and oldest readable fetched.
+ * When SG_SET_FORCE_PACK_ID set to 1, pack_id (or tag) is input to read() or
+ * ioctl(SG_IO_RECEIVE). These functions wait until matching packet (request/
+ * command) is finished but they will return with EAGAIN quickly if the file
+ * descriptor was opened O_NONBLOCK or (in v4) if SGV4_FLAG_IMMED is given.
+ * The tag is used when SGV4_FLAG_FIND_BY_TAG is given (default: use pack_id).
+ * If pack_id or tag is -1 then read oldest waiting. When FORCE_PACK_ID is
+ * cleared to 0 the oldest readable request/command is fetched. In v4 the
+ * pack_id is placed in sg_io_v4::request_extra .
  */
-#define SG_SET_FORCE_PACK_ID 0x227b
+#define SG_SET_FORCE_PACK_ID 0x227b	/* pack_id or in v4 can be tag */
 #define SG_GET_PACK_ID 0x227c	/* Yields oldest readable pack_id (or -1) */
 
 #define SG_GET_NUM_WAITING 0x227d /* Number of commands awaiting read() */

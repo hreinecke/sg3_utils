@@ -42,6 +42,25 @@ extern "C" {
 #define BSG_FLAG_Q_AT_TAIL 0x10 /* default is Q_AT_HEAD */
 #define BSG_FLAG_Q_AT_HEAD 0x20
 
+#ifndef SGV4_FLAG_YIELD_TAG
+#define SGV4_FLAG_YIELD_TAG 0x8
+#endif
+#ifndef SGV4_FLAG_FIND_BY_TAG
+#define SGV4_FLAG_FIND_BY_TAG 0x100
+#endif
+#ifndef SGV4_FLAG_IMMED
+#define SGV4_FLAG_IMMED 0x400
+#endif
+#ifndef SGV4_FLAG_IMMED
+#define SGV4_FLAG_IMMED 0x400
+#endif
+#ifndef SGV4_FLAG_DEV_SCOPE
+#define SGV4_FLAG_DEV_SCOPE 0x1000
+#endif
+#ifndef SGV4_FLAG_SHARE
+#define SGV4_FLAG_SHARE 0x2000
+#endif
+
 struct sg_io_v4 {
         __s32 guard;            /* [i] 'Q' to differentiate from v3 */
         __u32 protocol;         /* [i] 0 -> SCSI , .... */
@@ -50,10 +69,10 @@ struct sg_io_v4 {
 
         __u32 request_len;      /* [i] in bytes */
         __u64 request;          /* [i], [*i] {SCSI: cdb} */
-        __u64 request_tag;      /* [i] {SCSI: task tag (only if flagged)} */
+        __u64 request_tag;      /* [i] {in sg 4.0+ this is out parameter} */
         __u32 request_attr;     /* [i] {SCSI: task attribute} */
         __u32 request_priority; /* [i] {SCSI: task priority} */
-        __u32 request_extra;    /* [i] {spare, for padding} */
+        __u32 request_extra;    /* [i] {used for pack_id} */
         __u32 max_response_len; /* [i] in bytes */
         __u64 response;         /* [i], [*o] {SCSI: (auto)sense data} */
 
@@ -106,6 +125,7 @@ struct sg_pt_linux_scsi {
     int dev_fd;                 /* -1 if not given (yet) */
     int in_err;
     int os_err;
+    int sg_version;     /* for deciding whether to use v3 or v4 interface */
     uint32_t nvme_nsid;         /* 1 to 0xfffffffe are possibly valid, 0
                                  * implies dev_fd is not a NVMe device
                                  * (is_nvme=false) or it is a NVMe char
@@ -159,6 +179,7 @@ extern long sg_lin_page_size;
 
 void sg_find_bsg_nvme_char_major(int verbose);
 int sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb);
+int sg_linux_get_sg_version(const struct sg_pt_base * vp);
 
 /* This trims given NVMe block device name in Linux (e.g. /dev/nvme0n1p5)
  * to the name of its associated char device (e.g. /dev/nvme0). If this
@@ -166,7 +187,6 @@ int sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb);
  * long as b_len is sufficient). Otherwise false is returned. */
 bool sg_get_nvme_char_devname(const char * nvme_block_devname, uint32_t b_len,
                               char * b);
-
 
 #ifdef __cplusplus
 }
