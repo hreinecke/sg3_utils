@@ -13,7 +13,7 @@
  * Version 2 and 3 extensions to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- *   Version: 3.9.02 (20181203)
+ *   Version: 4.0.02 (20181216)
  *  This version is for Linux 2.6, 3 and 4 series kernels.
  *
  * Documentation
@@ -105,11 +105,10 @@ typedef struct sg_io_hdr {
  */
 #define SGV4_FLAG_DIRECT_IO SG_FLAG_DIRECT_IO
 #define SGV4_FLAG_MMAP_IO SG_FLAG_MMAP_IO
-#define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::request_attr set after SG_IOS */
+#define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::request_tag set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
 #define SGV4_FLAG_FIND_BY_TAG 0x100  /* in SG_IOR, def: find by pack_id */
-/* Flag value 0x200 not currently used */
 #define SGV4_FLAG_IMMED 0x400	/* for polling with SG_IOR else ignored */
 /* Flag value 0x800 not currently used */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
@@ -124,7 +123,7 @@ typedef struct sg_io_hdr {
 #define SG_INFO_DIRECT_IO_MASK 0x6
 #define SG_INFO_INDIRECT_IO 0x0	/* data xfer via kernel buffers (or no xfer) */
 #define SG_INFO_DIRECT_IO 0x2	/* direct IO requested and performed */
-#define SG_INFO_MIXED_IO 0x4	/* part direct, part indirect IO */
+#define SG_INFO_MIXED_IO 0x4	/* not used, always 0 */
 #define SG_INFO_DEVICE_DETACHING 0x8	/* completed successfully but ... */
 #define SG_INFO_ANOTHER_WAITING 0x10	/* needs SG_CTL_FLAGM_CHECK_FOR_MORE */
 
@@ -194,7 +193,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_BOOL_MASK	0x1	/* get SG_CTL_FLAGM_ALL_BITS */
 #define SG_SEIRV_VERS_NUM	0x2	/* get driver version number as int */
 #define SG_SEIRV_FL_RQS		0x3	/* number of requests in free list */
-#define SG_SEIRV_DEV_FL_RQS	0x4	/* sum of rqs on all fds on this dev */
+#define SG_SEIRV_DEV_FL_RQS	0x4	/* sum(fl rqs) on all of dev's fds */
 #define SG_SEIRV_TRC_SZ		0x5	/* current size of trace buffer */
 #define SG_SEIRV_TRC_MAX_SZ	0x6	/* maximum size of trace buffer */
 
@@ -413,11 +412,18 @@ struct sg_header {
  * the sg_v3 interface (structure defined above) and the sg_v4 interface
  * (structure defined in <include/uapi/linux/bsg.h> ). Following "read" and
  * "write" terms are from the driver's POV, the _IO macros from users' POV.
+ *
+ * SG_IOSUBMIT and SG_IORECEIVE can take a pointer to a v4 or v3 interface
+ * which have different lengths (v4 is longer) but their definitions below
+ * encode v4's length into the ioctl number. So users of the v3 interface
+ * would be best to place a v3 structure inside (overwriting and at the start
+ * of) a v4 structure and pass a pointer to that v4 structure to the ioctl.
  */
 /* via pointer reads sg v3 or v4 object, optionally writes tag, so _IOWR */
 #define SG_IOSUBMIT _IOWR(SG_IOCTL_MAGIC_NUM, 0x41, struct sg_io_v4)
 /* via pointer optionally reads tag, writes sg v3 or v4 object, so _IOWR */
 #define SG_IORECEIVE _IOWR(SG_IOCTL_MAGIC_NUM, 0x42, struct sg_io_v4)
+
 /* via pointer reads v4 object (including tag), writes nothing, so _IOW */
 #define SG_IOABORT _IOW(SG_IOCTL_MAGIC_NUM, 0x43, struct sg_io_v4)
 

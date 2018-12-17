@@ -82,7 +82,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.22 20181207";
+static const char * version_str = "1.23 20181216";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -185,7 +185,9 @@ struct opts_t {
     bool no_xfer;
     bool pack_id_force;
     bool sg_vn_ge_30901;
+    bool submit;
     bool verbose_given;
+    bool v4;
     bool version_given;
     int maxq_per_thread;
     int num_per_thread;
@@ -245,6 +247,7 @@ private:
 };
 
 static struct option long_options[] = {
+        {"v4", no_argument, 0, '4'},
         {"cmd-time", no_argument, 0, 'c'},
         {"cmd_time", no_argument, 0, 'c'},
         {"direct", no_argument, 0, 'd'},
@@ -265,8 +268,9 @@ static struct option long_options[] = {
         {"qat", required_argument, 0, 'q'},
         {"qfav", required_argument, 0, 'Q'},
         {"read", no_argument, 0, 'R'},
-        {"szlb", required_argument, 0, 's'},
         {"stats", no_argument, 0, 'S'},
+        {"submit", no_argument, 0, 'u'},
+        {"szlb", required_argument, 0, 's'},
         {"tnum", required_argument, 0, 't'},
         {"tur", no_argument, 0, 'T'},
         {"verbose", no_argument, 0, 'v'},
@@ -285,11 +289,12 @@ usage(void)
            "[--mmap-io]\n"
            "                    [--numpt=NPT] [--noxfer] [--pack-id] "
            "[--qat=AT]\n"
-           "                    [-qfav=FAV] [--read] [--szlb=LB[,NLBS]] "
-           "[--stats]\n"
-           "                    [--tnum=NT] [--tur] [--verbose] [--version] "
-           "[--wait=MS]\n"
-           "                    [--write] <sg_disk_device>*\n",
+           "                    [-qfav=FAV] [--read] [--stats] [--submit]\n"
+           "                    [--szlb=LB[,NLBS]] [--tnum=NT] [--tur] "
+           "[--v4]\n"
+           "                    [--verbose] [--version] [--wait=MS] "
+           "[--write]\n"
+           "                    <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
     printf("    --cmd-time|-c    calculate per command average time (ns)\n");
@@ -324,13 +329,17 @@ usage(void)
            "                         FAV=2: favour submissions (larger q, "
            "default)\n");
     printf("    --read|-R       do READs (def: TUR)\n");
+    printf("    --stats|-S      show more statistics on completion\n");
+    printf("    --submit|-u     use SG_IOSUBMIT+SG_IORECEIVE instead of "
+           "write+read\n");
     printf("    --szlb=LB[,NLBS]|    LB is logical block size (def: 512)\n");
     printf("         -s LB[,NLBS]    NLBS is number of logical blocks (def: "
            "1)\n");
-    printf("    --stats|-S      show more statistics on completion\n");
     printf("    --tnum=NT|-t NT    number of threads (def: %d)\n",
            DEF_NUM_THREADS);
     printf("    --tur|-T        do TEST UNIT READYs (default is TURs)\n");
+    printf("    --v4|-4         use sg v4 interface (def: v3). If given "
+           "sets --submit\n");
     printf("    --verbose|-v    increase verbosity\n");
     printf("    --version|-V    print version number then exit\n");
     printf("    --wait=MS|-w MS    >0: poll(<wait_ms>); =0: poll(0); (def: "
@@ -410,11 +419,12 @@ get_urandom_uint(void)
  * not done due to queue data size limit struck. */
 static int
 start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
-              uint8_t * lbp, int xfer_bytes, int flags,
+              uint8_t * lbp, int xfer_bytes, int flags, bool submit,
               unsigned int & eagains, unsigned int & ebusy,
               unsigned int & e2big, unsigned int & edom)
 {
     struct sg_io_hdr pt;
+    struct sg_io_v4 p4t;
     uint8_t turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
     uint8_t r16CmdBlk[READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
@@ -422,46 +432,56 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     uint8_t sense_buffer[64];
     const char * np = NULL;
+    struct sg_io_hdr * ptp;
 
-    memset(&pt, 0, sizeof(pt));
+    if (submit) {       /* nest a v3 interface inside a store for v4 */
+        memset(&p4t, 0, sizeof(p4t));
+        ptp = (struct sg_io_hdr *)&p4t; /* p4t is larger than pt */
+    } else {
+        ptp = &pt;
+        memset(ptp, 0, sizeof(*ptp));
+    }
     switch (cmd2exe) {
     case SCSI_TUR:
         np = "TEST UNIT READY";
-        pt.cmdp = turCmdBlk;
-        pt.cmd_len = sizeof(turCmdBlk);
-        pt.dxfer_direction = SG_DXFER_NONE;
+        ptp->cmdp = turCmdBlk;
+        ptp->cmd_len = sizeof(turCmdBlk);
+        ptp->dxfer_direction = SG_DXFER_NONE;
         break;
     case SCSI_READ16:
         np = "READ(16)";
         if (lba > 0xffffffff)
             sg_put_unaligned_be32(lba >> 32, &r16CmdBlk[2]);
         sg_put_unaligned_be32(lba & 0xffffffff, &r16CmdBlk[6]);
-        pt.cmdp = r16CmdBlk;
-        pt.cmd_len = sizeof(r16CmdBlk);
-        pt.dxfer_direction = SG_DXFER_FROM_DEV;
-        pt.dxferp = lbp;
-        pt.dxfer_len = xfer_bytes;
+        ptp->cmdp = r16CmdBlk;
+        ptp->cmd_len = sizeof(r16CmdBlk);
+        ptp->dxfer_direction = SG_DXFER_FROM_DEV;
+        ptp->dxferp = lbp;
+        ptp->dxfer_len = xfer_bytes;
         break;
     case SCSI_WRITE16:
         np = "WRITE(16)";
         if (lba > 0xffffffff)
             sg_put_unaligned_be32(lba >> 32, &w16CmdBlk[2]);
         sg_put_unaligned_be32(lba & 0xffffffff, &w16CmdBlk[6]);
-        pt.cmdp = w16CmdBlk;
-        pt.cmd_len = sizeof(w16CmdBlk);
-        pt.dxfer_direction = SG_DXFER_TO_DEV;
-        pt.dxferp = lbp;
-        pt.dxfer_len = xfer_bytes;
+        ptp->cmdp = w16CmdBlk;
+        ptp->cmd_len = sizeof(w16CmdBlk);
+        ptp->dxfer_direction = SG_DXFER_TO_DEV;
+        ptp->dxferp = lbp;
+        ptp->dxfer_len = xfer_bytes;
         break;
     }
-    pt.interface_id = 'S';
-    pt.mx_sb_len = sizeof(sense_buffer);
-    pt.sbp = sense_buffer;      /* ignored .... */
-    pt.timeout = DEF_TIMEOUT_MS;
-    pt.pack_id = pack_id;
-    pt.flags = flags;
+    ptp->interface_id = 'S';
+    ptp->mx_sb_len = sizeof(sense_buffer);
+    ptp->sbp = sense_buffer;      /* ignored .... */
+    ptp->timeout = DEF_TIMEOUT_MS;
+    ptp->pack_id = pack_id;
+    ptp->flags = flags;
 
-    for (int k = 0; write(sg_fd, &pt, sizeof(pt)) < 0; ++k) {
+    for (int k = 0;
+         (submit ? ioctl(sg_fd, SG_IOSUBMIT, ptp) :
+                                write(sg_fd, ptp, sizeof(*ptp)) < 0);
+         ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
             this_thread::yield();
             continue;
@@ -486,39 +506,48 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
 static int
 finish_sg3_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
-               int & pack_id, int wait_ms, unsigned int & eagains,
-               unsigned int & nanosecs)
+               int & pack_id, bool receive, int wait_ms,
+               unsigned int & eagains, unsigned int & nanosecs)
 {
     bool ok;
     int res, k;
-    struct sg_io_hdr pt;
     uint8_t sense_buffer[64];
     const char * np = NULL;
+    struct sg_io_hdr pt;
+    struct sg_io_hdr * ptp;
+    struct sg_io_v4 p4t;
 
-    memset(&pt, 0, sizeof(pt));
+    if (receive) {      /* nest a v3 interface inside a store for v4 */
+        memset(&p4t, 0, sizeof(p4t));
+        ptp = (struct sg_io_hdr *)&p4t; /* p4t is larger than pt */
+    } else {
+        ptp = &pt;
+        memset(ptp, 0, sizeof(*ptp));
+    }
     switch (cmd2exe) {
     case SCSI_TUR:
         np = "TEST UNIT READY";
-        pt.dxfer_direction = SG_DXFER_NONE;
+        ptp->dxfer_direction = SG_DXFER_NONE;
         break;
     case SCSI_READ16:
         np = "READ(16)";
-        pt.dxfer_direction = SG_DXFER_FROM_DEV;
+        ptp->dxfer_direction = SG_DXFER_FROM_DEV;
         break;
     case SCSI_WRITE16:
         np = "WRITE(16)";
-        pt.dxfer_direction = SG_DXFER_TO_DEV;
+        ptp->dxfer_direction = SG_DXFER_TO_DEV;
         break;
     }
-    pt.interface_id = 'S';
-    pt.mx_sb_len = sizeof(sense_buffer);
-    pt.sbp = sense_buffer;
-    pt.timeout = DEF_TIMEOUT_MS;
-    /* if SG_SET_FORCE_PACK_ID, then need to set pt.dxfer_direction */
-    pt.pack_id = pack_id;
+    ptp->interface_id = 'S';
+    ptp->mx_sb_len = sizeof(sense_buffer);
+    ptp->sbp = sense_buffer;
+    ptp->timeout = DEF_TIMEOUT_MS;
+    /* if SG_SET_FORCE_PACK_ID, then need to set ptp->dxfer_direction */
+    ptp->pack_id = pack_id;
 
     k = 0;
-    while (((res = read(sg_fd, &pt, sizeof(pt))) < 0) &&
+    while ((((res = receive ? ioctl(sg_fd, SG_IORECEIVE, ptp) :
+                              read(sg_fd, ptp, sizeof(*ptp)))) < 0) &&
            (EAGAIN == errno)) {
         ++eagains;
         if (pack_id_force) {
@@ -541,9 +570,9 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
         return -1;
     }
     /* now for the error processing */
-    pack_id = pt.pack_id;
+    pack_id = ptp->pack_id;
     ok = false;
-    switch (sg_err_category3(&pt)) {
+    switch (sg_err_category3(ptp)) {
     case SG_LIB_CAT_CLEAN:
         ok = true;
         break;
@@ -554,12 +583,185 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
     default: /* won't bother decoding other categories */
         {
             lock_guard<mutex> lg(console_mutex);
-            sg_chk_n_print3(np, &pt, 1);
+            sg_chk_n_print3(np, ptp, 1);
         }
         break;
     }
     if (ok)
-        nanosecs = pt.duration;
+        nanosecs = ptp->duration;
+    return ok ? 0 : -1;
+}
+
+/* Returns 0 if command injected okay, return -1 for error and 2 for
+ * not done due to queue data size limit struck. */
+static int
+start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
+              uint8_t * lbp, int xfer_bytes, int flags, bool submit,
+              unsigned int & eagains, unsigned int & ebusy,
+              unsigned int & e2big, unsigned int & edom)
+{
+    struct sg_io_v4 p4t;
+    uint8_t turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
+    uint8_t r16CmdBlk[READ16_CMD_LEN] =
+                {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
+    uint8_t w16CmdBlk[WRITE16_CMD_LEN] =
+                {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
+    uint8_t sense_buffer[64];
+    const char * np = NULL;
+    struct sg_io_v4 * ptp;
+
+    if (! submit) {
+        pr2serr_lk("%s: logic error, submit must be true, isn't\n", __func__);
+        return -1;
+    }
+    ptp = &p4t;
+    memset(ptp, 0, sizeof(*ptp));
+    switch (cmd2exe) {
+    case SCSI_TUR:
+        np = "TEST UNIT READY";
+        ptp->request = (uint64_t)turCmdBlk;
+        ptp->request_len = sizeof(turCmdBlk);
+        break;
+    case SCSI_READ16:
+        np = "READ(16)";
+        if (lba > 0xffffffff)
+            sg_put_unaligned_be32(lba >> 32, &r16CmdBlk[2]);
+        sg_put_unaligned_be32(lba & 0xffffffff, &r16CmdBlk[6]);
+        ptp->request = (uint64_t)r16CmdBlk;
+        ptp->request_len = sizeof(r16CmdBlk);
+        ptp->din_xferp = (uint64_t)lbp;
+        ptp->din_xfer_len = xfer_bytes;
+        break;
+    case SCSI_WRITE16:
+        np = "WRITE(16)";
+        if (lba > 0xffffffff)
+            sg_put_unaligned_be32(lba >> 32, &w16CmdBlk[2]);
+        sg_put_unaligned_be32(lba & 0xffffffff, &w16CmdBlk[6]);
+        ptp->request = (uint64_t)w16CmdBlk;
+        ptp->request_len = sizeof(w16CmdBlk);
+        ptp->dout_xferp = (uint64_t)lbp;
+        ptp->dout_xfer_len = xfer_bytes;
+        break;
+    }
+    ptp->guard = 'Q';
+    ptp->max_response_len = sizeof(sense_buffer);
+    ptp->response = (uint64_t)sense_buffer;      /* ignored .... */
+    ptp->timeout = DEF_TIMEOUT_MS;
+    ptp->request_extra = pack_id;
+    ptp->flags = flags;
+
+    for (int k = 0; ioctl(sg_fd, SG_IOSUBMIT, ptp) < 0; ++k) {
+        if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
+            this_thread::yield();
+            continue;
+        } else if (EAGAIN == errno) {
+            ++eagains;
+            this_thread::yield();
+            continue;
+        } else if (EBUSY == errno) {
+            ++ebusy;
+            this_thread::yield();
+            continue;
+        } else if (E2BIG == errno) {
+            ++e2big;
+            return 2;
+        } else if (EDOM == errno)
+            ++edom;
+        pr_errno_lk(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
+        return -1;
+    }
+    return 0;
+}
+
+static int
+finish_sg4_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
+               int & pack_id, bool receive, int wait_ms,
+               unsigned int & eagains, unsigned int & nanosecs)
+{
+    bool ok;
+    int res, k;
+    uint8_t sense_buffer[64];
+    const char * np = NULL;
+    struct sg_io_v4 * ptp;
+    struct sg_io_v4 p4t;
+
+    if (! receive) {
+        pr2serr_lk("%s: logic error, receive must be true, isn't\n",
+                   __func__);
+        return -1;
+    }
+    ptp = &p4t;
+    memset(ptp, 0, sizeof(*ptp));
+    switch (cmd2exe) {
+    case SCSI_TUR:
+        np = "TEST UNIT READY";
+        break;
+    case SCSI_READ16:
+        np = "READ(16)";
+        break;
+    case SCSI_WRITE16:
+        np = "WRITE(16)";
+        break;
+    }
+    ptp->guard = 'S';
+    ptp->max_response_len = sizeof(sense_buffer);
+    ptp->response = (uint64_t)sense_buffer;
+    ptp->timeout = DEF_TIMEOUT_MS;
+    /* if SG_SET_FORCE_PACK_ID, then need to set ptp->dxfer_direction */
+    ptp->request_extra = pack_id;
+
+    k = 0;
+    while ((((res = ioctl(sg_fd, SG_IORECEIVE, ptp))) < 0) &&
+           (EAGAIN == errno)) {
+        ++eagains;
+        if (pack_id_force) {
+            ++k;
+            if (k > 10000) {
+                pr2serr_lk("%s: unable to find pack_id=%d\n", __func__,
+                           pack_id);
+                return -1;      /* crash out */
+            }
+        }
+        if (wait_ms > 0)
+            this_thread::sleep_for(milliseconds{wait_ms});
+        else if (0 == wait_ms)
+            this_thread::yield();
+        else if (-2 == wait_ms)
+            sleep(0);                   // process yield ??
+    }
+    if (res < 0) {
+        pr_errno_lk(errno, "%s: %s", __func__, np);
+        return -1;
+    }
+    /* now for the error processing */
+    pack_id = ptp->request_extra;
+    ok = false;
+    res = sg_err_category_new(ptp->device_status, ptp->transport_status,
+                              ptp->driver_status,
+                              (const uint8_t *)ptp->response,
+                              ptp->response_len);
+    switch (res) {
+    case SG_LIB_CAT_CLEAN:
+        ok = true;
+        break;
+    case SG_LIB_CAT_RECOVERED:
+        pr2serr_lk("%s: Recovered error on %s, continuing\n", __func__, np);
+        ok = true;
+        break;
+    default: /* won't bother decoding other categories */
+        {
+            lock_guard<mutex> lg(console_mutex);
+
+            sg_linux_sense_print(np, ptp->device_status,
+                                 ptp->transport_status,
+                                 ptp->driver_status,
+                                 (const uint8_t *)ptp->response,
+                                 ptp->response_len, true);
+        }
+        break;
+    }
+    if (ok)
+        nanosecs = ptp->duration;
     return ok ? 0 : -1;
 }
 
@@ -870,10 +1072,15 @@ work_thread(int id, struct opts_t * op)
                 lba = 0;
             if (vb > 4)
                 pr2serr_lk("t_id=%d: starting pack_id=%d\n", id, pack_id);
-            res = start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
-                                op->lb_sz * op->num_lbs, sg_flags,
-                                thr_start_eagain_count, thr_start_ebusy_count,
-                                thr_start_e2big_count, thr_start_edom_count);
+            res = (op->v4) ?
+                start_sg4_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
+                              op->lb_sz * op->num_lbs, sg_flags, op->submit,
+                              thr_start_eagain_count, thr_start_ebusy_count,
+                              thr_start_e2big_count, thr_start_edom_count)  :
+                start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
+                              op->lb_sz * op->num_lbs, sg_flags, op->submit,
+                              thr_start_eagain_count, thr_start_ebusy_count,
+                              thr_start_e2big_count, thr_start_edom_count);
             if (res) {
                 if (res > 1) { /* here if E2BIG, start not done, try finish */
                     do_inc = 0;
@@ -989,8 +1196,14 @@ work_thread(int id, struct opts_t * op)
             } else
                 pack_id = -1;
             ask = pack_id;
-            if (finish_sg3_cmd(sg_fd, op->c2e, op->pack_id_force, pack_id,
-                               op->wait_ms, thr_fin_eagain_count, nanosecs)) {
+            res = (op->v4) ?
+                    finish_sg4_cmd(sg_fd, op->c2e, op->pack_id_force, pack_id,
+                                   op->submit, op->wait_ms,
+                                   thr_fin_eagain_count, nanosecs)           :
+                    finish_sg3_cmd(sg_fd, op->c2e, op->pack_id_force, pack_id,
+                                   op->submit, op->wait_ms,
+                                   thr_fin_eagain_count, nanosecs);
+            if (res) {
                 err = "finish_sg3_cmd()";
                 if (ruip && (pack_id > 0)) {
                     auto q = pi_2_lba.find(pack_id);
@@ -1260,12 +1473,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "cdfghl:mM:n:Npq:Q:Rs:St:TvVw:W",
+        c = getopt_long(argc, argv, "4cdfghl:mM:n:Npq:Q:Rs:St:TuvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case '4':
+            op->v4 = true;
+            break;
         case 'c':
             op->cmd_time = true;
             break;
@@ -1405,6 +1621,9 @@ main(int argc, char * argv[])
         case 'T':
             op->c2e = SCSI_TUR;
             break;
+        case 'u':
+            op->submit = true;
+            break;
         case 'v':
             op->verbose_given = true;
             ++op->verbose;
@@ -1480,6 +1699,13 @@ main(int argc, char * argv[])
     if (op->hi_lba && (op->lba > op->hi_lba)) {
         cerr << "lba,hi_lba range is illegal" << endl;
         return 1;
+    }
+    if (op->v4) {
+        if (! op->submit) {
+            op->submit = true;
+            if (op->verbose > 1)
+                cerr << "when --v4 is given, --submit will be set" << endl;
+        }
     }
 
     try {

@@ -11,8 +11,8 @@
  *
  * This program is a specialisation of the Unix "dd" command in which
  * either the input or the output file is a scsi generic device, raw
- * device, a block device or a normal file. The block size ('bs') is
- * assumed to be 512 if not given. This program complains if 'ibs' or
+ * device, a block device or a normal file. The logical block size ('bs')
+ * is assumed to be 512 if not given. This program complains if 'ibs' or
  * 'obs' are given with a value that differs from 'bs' (or the default 512).
  * If 'if' is not given or 'if=-' then stdin is assumed. If 'of' is
  * not given or 'of=-' then stdout assumed.
@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.04 20180811";
+static const char * version_str = "6.05 20181213";
 
 
 #define ME "sg_dd: "
@@ -366,7 +366,7 @@ usage()
             "SG_IO\n"
             "    bpt         is blocks_per_transfer (default is 128 or 32 "
             "when BS>=2048)\n"
-            "    bs          block size (default is 512)\n");
+            "    bs          logical block size (default is 512)\n");
     pr2serr("    cdbsz       size of SCSI READ or WRITE cdb (default is "
             "10)\n"
             "    coe         0->exit on error (def), 1->continue on sg "
@@ -378,15 +378,16 @@ usage()
             "times\n"
             "                when COE>1 (default: 0 which is no limit)\n"
             "    count       number of blocks to copy (def: device size)\n"
-            "    dio         for direct IO, 1->attempt, 0->indirect IO (def)\n"
-            "    ibs         input block size (if given must be same as "
-            "'bs=')\n"
+            "    dio         for direct IO, 1->attempt, 0->indirect IO "
+            "(def)\n"
+            "    ibs         input logical block size (if given must be same "
+            "as 'bs=')\n"
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,dio,direct,"
             "dpo,dsync,excl,\n"
             "                flock,fua,nocache,null,sgio]\n"
-            "    obs         output block size (if given must be same as "
-            "'bs=')\n"
+            "    obs         output logical block size (if given must be "
+            "same as 'bs=')\n"
             "    odir        1->use O_DIRECT when opening block dev, "
             "0->don't(def)\n"
             "    of          file or device to write to (def: stdout), "
@@ -451,7 +452,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     }
     if (verbose)
         pr2serr("      number of blocks=%" PRId64 " [0x%" PRIx64 "], "
-                "block size=%d\n", *num_sect, *num_sect, *sect_sz);
+                "logical block size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
 }
 
@@ -477,7 +478,8 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
             pr2serr("      [bgs64] number of blocks=%" PRId64 " [0x%" PRIx64
-                    "], block size=%d\n", *num_sect, *num_sect, *sect_sz);
+                    "], logical block size=%d\n", *num_sect, *num_sect,
+                    *sect_sz);
  #else
         unsigned long ul;
 
@@ -488,7 +490,8 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *num_sect = (int64_t)ul;
         if (verbose)
             pr2serr("      [bgs] number of blocks=%" PRId64 " [0x%" PRIx64
-                    "],  block size=%d\n", *num_sect, *num_sect, *sect_sz);
+                    "],  logical block size=%d\n", *num_sect, *num_sect,
+                    *sect_sz);
  #endif
     }
     return 0;
@@ -1729,7 +1732,8 @@ main(int argc, char * argv[])
     }
     if (blk_sz <= 0) {
         blk_sz = DEF_BLOCK_SIZE;
-        pr2serr("Assume default 'bs' (block size) of %d bytes\n", blk_sz);
+        pr2serr("Assume default 'bs' ((logical) block size) of %d bytes\n",
+                blk_sz);
     }
     if ((ibs && (ibs != blk_sz)) || (obs && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -1826,15 +1830,15 @@ main(int argc, char * argv[])
                     pr2serr("Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
             } else if (in_sect_sz != blk_sz)
-                pr2serr(">> warning: block size on %s confusion: bs=%d, "
-                        "device claims=%d\n", inf, blk_sz, in_sect_sz);
+                pr2serr(">> warning: logical block size on %s confusion: "
+                        "bs=%d, device claims=%d\n", inf, blk_sz, in_sect_sz);
         } else if (FT_BLOCK & in_type) {
             if (0 != read_blkdev_capacity(infd, &in_num_sect, &in_sect_sz)) {
                 pr2serr("Unable to read block capacity on %s\n", inf);
                 in_num_sect = -1;
             }
             if (blk_sz != in_sect_sz) {
-                pr2serr("block size on %s confusion: bs=%d, device "
+                pr2serr("logical block size on %s confusion: bs=%d, device "
                         "claims=%d\n", inf, blk_sz, in_sect_sz);
                 in_num_sect = -1;
             }
@@ -1860,15 +1864,16 @@ main(int argc, char * argv[])
                     pr2serr("Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
             } else if (blk_sz != out_sect_sz)
-                pr2serr(">> warning: block size on %s confusion: bs=%d, "
-                        "device claims=%d\n", outf, blk_sz, out_sect_sz);
+                pr2serr(">> warning: logical block size on %s confusion: "
+                        "bs=%d, device claims=%d\n", outf, blk_sz,
+                        out_sect_sz);
         } else if (FT_BLOCK & out_type) {
             if (0 != read_blkdev_capacity(outfd, &out_num_sect,
                                           &out_sect_sz)) {
                 pr2serr("Unable to read block capacity on %s\n", outf);
                 out_num_sect = -1;
             } else if (blk_sz != out_sect_sz) {
-                pr2serr("block size on %s confusion: bs=%d, device "
+                pr2serr("logical block size on %s confusion: bs=%d, device "
                         "claims=%d\n", outf, blk_sz, out_sect_sz);
                 out_num_sect = -1;
             }
