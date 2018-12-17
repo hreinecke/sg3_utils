@@ -273,7 +273,8 @@ usage()
             "[--dry-run] [--verbose]\n\n"
             "  where:\n"
             "    bpt         is blocks_per_transfer (default is 128)\n"
-            "    bs          must be device block size (default 512)\n"
+            "    bs          must be device logical block size (default "
+            "512)\n"
             "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    dio         0->indirect IO on write, 1->direct IO on write\n"
@@ -363,7 +364,8 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
         if (verbose)
             pr2serr("      [bgs64] number of blocks=%" PRId64 " [0x%" PRIx64
-                    "], block size=%d\n", *num_sect, *num_sect, *sect_sz);
+                    "], logical block size=%d\n", *num_sect, *num_sect,
+                    *sect_sz);
  #else
         unsigned long ul;
 
@@ -374,7 +376,8 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *num_sect = (int64_t)ul;
         if (verbose)
             pr2serr("      [bgs] number of blocks=%" PRId64 " [0x%" PRIx64
-                    "], block size=%d\n", *num_sect, *num_sect, *sect_sz);
+                    "], logical block size=%d\n", *num_sect, *num_sect,
+                    *sect_sz);
  #endif
     }
     return 0;
@@ -913,7 +916,8 @@ main(int argc, char * argv[])
 
     if (blk_sz <= 0) {
         blk_sz = DEF_BLOCK_SIZE;
-        pr2serr("Assume default 'bs' (block size) of %d bytes\n", blk_sz);
+        pr2serr("Assume default 'bs' ((logical) block size) of %d bytes\n",
+                blk_sz);
     }
     if ((ibs && (ibs != blk_sz)) || (obs && (obs != blk_sz))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -1172,8 +1176,8 @@ main(int argc, char * argv[])
                 in_num_sect = -1;
             }
             if (blk_sz != in_sect_sz) {
-                pr2serr("block size on %s confusion; bs=%d, from device=%d\n",
-                        inf, blk_sz, in_sect_sz);
+                pr2serr("logical block size on %s confusion; bs=%d, from "
+                        "device=%d\n", inf, blk_sz, in_sect_sz);
                 in_num_sect = -1;
             }
         }
@@ -1202,8 +1206,8 @@ main(int argc, char * argv[])
                 out_num_sect = -1;
             }
             if (blk_sz != out_sect_sz) {
-                pr2serr("block size on %s confusion: bs=%d, from device=%d\n",
-                        outf, blk_sz, out_sect_sz);
+                pr2serr("logical block size on %s confusion: bs=%d, from "
+                        "device=%d\n", outf, blk_sz, out_sect_sz);
                 out_num_sect = -1;
             }
         }

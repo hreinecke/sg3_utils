@@ -11,8 +11,8 @@
  *
  * This program is a specialisation of the Unix "dd" command in which
  * one or both of the given files is a scsi generic device or a raw
- * device. A block size ('bs') is assumed to be 512 if not given. This
- * program complains if 'ibs' or 'obs' are given with some other value
+ * device. A logical block size ('bs') is assumed to be 512 if not given.
+ * This program complains if 'ibs' or 'obs' are given with some other value
  * than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
  * 'of' is not given or 'of=-' then stdout assumed.
  *
@@ -68,7 +68,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.69 20180811";
+static const char * version_str = "5.70 20181213";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -356,7 +356,8 @@ usage()
             "               [--dry-run] [--verbose]\n"
             "  where:\n"
             "    bpt         is blocks_per_transfer (default is 128)\n"
-            "    bs          must be device block size (default 512)\n"
+            "    bs          must be device logical block size (default "
+            "512)\n"
             "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
             "    coe         continue on error, 0->exit (def), "
             "1->zero + continue\n"
@@ -1369,7 +1370,8 @@ main(int argc, char * argv[])
 
     if (rcoll.bs <= 0) {
         rcoll.bs = DEF_BLOCK_SIZE;
-        pr2serr("Assume default 'bs' (block size) of %d bytes\n", rcoll.bs);
+        pr2serr("Assume default 'bs' ((logical) block size) of %d bytes\n",
+                rcoll.bs);
     }
     if ((ibs && (ibs != rcoll.bs)) || (obs && (obs != rcoll.bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -1569,8 +1571,8 @@ main(int argc, char * argv[])
                 in_num_sect = -1;
             }
             if (rcoll.bs != in_sect_sz) {
-                pr2serr("block size on %s confusion; bs=%d, from device=%d\n",
-                        inf, rcoll.bs, in_sect_sz);
+                pr2serr("logical block size on %s confusion; bs=%d, from "
+                        "device=%d\n", inf, rcoll.bs, in_sect_sz);
                 in_num_sect = -1;
             }
         }
@@ -1601,8 +1603,8 @@ main(int argc, char * argv[])
                 out_num_sect = -1;
             }
             if (rcoll.bs != out_sect_sz) {
-                pr2serr("block size on %s confusion: bs=%d, from device=%d\n",
-                        outf, rcoll.bs, out_sect_sz);
+                pr2serr("logical block size on %s confusion: bs=%d, from "
+                        "device=%d\n", outf, rcoll.bs, out_sect_sz);
                 out_num_sect = -1;
             }
         }

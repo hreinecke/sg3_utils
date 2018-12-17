@@ -11,7 +11,7 @@
  *
  * This program is a specialisation of the Unix "dd" command in which
  * one or both of the given files is a scsi generic device.
- * A block size ('bs') is assumed to be 512 if not given. This
+ * A logical block size ('bs') is assumed to be 512 if not given. This
  * program complains if 'ibs' or 'obs' are given with some other value
  * than 'bs'. If 'if' is not given or 'if=-' then stdin is assumed. If
  * 'of' is not given or 'of=-' then stdout assumed.
@@ -88,7 +88,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.05 20181213";
+static const char * version_str = "1.06 20181215";
 
 #ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -483,7 +483,8 @@ usage(int pg_num)
             "[time=0|1]\n"
             "               [verbose=VERB] [--dry-run] [--verbose]\n\n"
             "  where the main options (shown in first group above) are:\n"
-            "    bs          must be device block size (default 512)\n"
+            "    bs          must be device logical block size (default "
+            "512)\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [2fds,coe,defres,dio,"
@@ -846,6 +847,11 @@ read_write_thread(void * v_tip)
         rep->wr = true;
         status = pthread_mutex_lock(&clp->out_mutex);
         if (0 != status) err_exit(status, "lock out_mutex");
+
+        /* Make sure the OFILE (+ OFILE2) are in same sequence as IFILE */
+        if ((rep->out2fd < 0) && (FT_SG == clp->in_type) &&
+            (FT_SG == clp->out_type))
+            goto skip_force_out_sequence;
         if (share_and_of2 || (FT_DEV_NULL != clp->out_type)) {
             while ((! clp->out_stop) &&
                    ((rep->blk + seek_skip) != clp->out_blk)) {
@@ -856,6 +862,7 @@ read_write_thread(void * v_tip)
                 pthread_cleanup_pop(0);
             }
         }
+skip_force_out_sequence:
 
         if (clp->out_stop || (clp->out_count <= 0)) {
             if (! clp->out_stop)
@@ -1875,7 +1882,8 @@ main(int argc, char * argv[])
     }
     if (clp->bs <= 0) {
         clp->bs = DEF_BLOCK_SIZE;
-        pr2serr("Assume default 'bs' (block size) of %d bytes\n", clp->bs);
+        pr2serr("Assume default 'bs' ((logical) block size) of %d bytes\n",
+                clp->bs);
     }
     if ((ibs && (ibs != clp->bs)) || (obs && (obs != clp->bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -2103,8 +2111,8 @@ main(int argc, char * argv[])
                 in_num_sect = -1;
             }
             if (clp->bs != in_sect_sz) {
-                pr2serr("block size on %s confusion; bs=%d, from device=%d\n",
-                        inf, clp->bs, in_sect_sz);
+                pr2serr("logical block size on %s confusion; bs=%d, from "
+                        "device=%d\n", inf, clp->bs, in_sect_sz);
                 in_num_sect = -1;
             }
         }
@@ -2135,8 +2143,8 @@ main(int argc, char * argv[])
                 out_num_sect = -1;
             }
             if (clp->bs != out_sect_sz) {
-                pr2serr("block size on %s confusion: bs=%d, from device=%d\n",
-                        outf, clp->bs, out_sect_sz);
+                pr2serr("logical block size on %s confusion: bs=%d, from "
+                        "device=%d\n", outf, clp->bs, out_sect_sz);
                 out_num_sect = -1;
             }
         }
