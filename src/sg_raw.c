@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.27 (2018-06-27)"
+#define SG_RAW_VERSION "0.4.28 (2018-12-20)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -540,7 +540,7 @@ static uint8_t *
 fetch_dataout(struct opts_t * op, uint8_t ** free_buf, int * errp)
 {
     bool ok = false;
-    int fd, len, err;
+    int fd, len, tot_len, boff, err;
     uint8_t *buf = NULL;
 
     *free_buf = NULL;
@@ -574,28 +574,29 @@ fetch_dataout(struct opts_t * op, uint8_t ** free_buf, int * errp)
         }
     }
 
-    buf = sg_memalign(op->dataout_len, 0 /* page_size */, free_buf,
-                      op->verbose > 3);
+    tot_len = op->dataout_len;
+    buf = sg_memalign(tot_len, 0 /* page_size */, free_buf, op->verbose > 3);
     if (buf == NULL) {
-        pr2serr("sg_memalign: failed to get %d bytes of memory\n",
-                op->dataout_len);
+        pr2serr("sg_memalign: failed to get %d bytes of memory\n", tot_len);
         if (errp)
             *errp = sg_convert_errno(ENOMEM);
         goto bail;
     }
 
-    len = read(fd, buf, op->dataout_len);
-    if (len < 0) {
-        err = errno;
-        if (errp)
-            *errp = sg_convert_errno(err);
-        perror("Failed to read input data");
-        goto bail;
-    } else if (len < op->dataout_len) {
-        if (errp)
-            *errp = SG_LIB_FILE_ERROR;
-        pr2serr("EOF on input file/stream\n");
-        goto bail;
+    for (boff = 0; boff < tot_len; boff += len) {
+        len = read(fd, buf + boff , tot_len - boff);
+        if (len < 0) {
+            err = errno;
+            if (errp)
+                *errp = sg_convert_errno(err);
+            perror("Failed to read input data");
+            goto bail;
+        } else if (0 == len) {
+            if (errp)
+                *errp = SG_LIB_FILE_ERROR;
+            pr2serr("EOF on input file/stream at buffer offset %d\n", boff);
+            goto bail;
+        }
     }
     ok = true;
 

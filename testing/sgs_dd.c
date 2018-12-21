@@ -88,7 +88,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.06 20181215";
+static const char * version_str = "1.08 20181220";
 
 #ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -141,6 +141,7 @@ struct flags_t {
     bool fua;
     bool mmap;
     bool noshare;
+    bool noxfer;
     bool v3;
     bool v4;
 };
@@ -152,6 +153,7 @@ typedef struct global_collection
     int in_type;
     int cdbsz_in;
     int help;
+    int elem_sz;
     struct flags_t in_flags;
     int64_t in_blk;                   /* -\ next block address to read */
     int64_t in_count;                 /*  | blocks remaining for next read */
@@ -180,6 +182,7 @@ typedef struct global_collection
     int sum_of_resids;          /* -/ */
     int debug;          /* both -v and deb=VERB bump this field */
     int dry_run;
+    bool ofile_given;
     const char * infp;
     const char * outfp;
 } Gbl_coll;
@@ -240,7 +243,7 @@ static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
 static bool shutting_down = false;
 static bool do_sync = false;
-static bool do_time = false;
+static bool do_time = true;
 static Gbl_coll gcoll;
 static struct timeval start_tm;
 static int64_t dd_count = -1;
@@ -479,9 +482,10 @@ usage(int pg_num)
             "               [--help] [--version]\n\n");
     pr2serr("               [bpt=BPT] [cdbsz=6|10|12|16] [coe=0|1] "
             "[deb=VERB] [dio=0|1]\n"
-            "               [fua=0|1|2|3] [of2=OFILE2] [sync=0|1] [thr=THR] "
-            "[time=0|1]\n"
-            "               [verbose=VERB] [--dry-run] [--verbose]\n\n"
+            "               [elemsz_kb=ESK] [fua=0|1|2|3] [of2=OFILE2] "
+            "[sync=0|1]\n"
+            "               [thr=THR] [time=0|1] [verbose=VERB] [--dry-run] "
+            "[--verbose]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -489,13 +493,14 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [2fds,coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,null,v3,v4]\n"
-            "    of          file or device to write to (def: stdout), "
-            "OFILE of '.'\n"
-            "                treated as /dev/null\n"
+            "                dsync,excl,fua,mmap,noshare,noxfer,null,v3,v4]\n"
+            "    of          file or device to write to (def: /dev/null which "
+            "is different\n"
+            "                from dd that defaults to stdout). If 'of=.' "
+            "assumes /dev/null\n"
             "    oflag       comma separated list from: [2fds,append,coe,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,null,v3,v4]\n"
+            "                dsync,excl,fua,mmap,noshare,noxfer,null,v3,v4]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -503,7 +508,9 @@ usage(int pg_num)
             "Copy from IFILE to OFILE, similar to dd command. This utility "
             "is specialized\nfor SCSI devices and uses multiple POSIX "
             "threads. It expects one or both\nIFILE and OFILE to be sg "
-            "devices. Use '-hh' or '-hhh' for more information.\n"
+            "devices. It is Linux specific and uses the v4\nsg driver "
+            "'share' capbility if available (hence the 'sgs' part of its "
+            "name).\nUse '-hh' or '-hhh' for more information.\n"
            );
     return;
 page2:
@@ -520,6 +527,8 @@ page2:
             "    deb         for debug, 0->none (def), > 0->varying degrees "
             "of debug\n"
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
+            "    elemsz_kb    scatter gather list element size in kilobytes "
+            "(def: 32 [KB])\n"
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
@@ -530,8 +539,8 @@ page2:
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
             "max 16\n"
-            "    time        0->no timing(def), 1->time plus calculate "
-            "throughput\n"
+            "    time        0->no timing, 1->time plus calculate "
+            "throughput (def)\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
@@ -770,7 +779,7 @@ read_write_thread(void * v_tip)
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
     if (rep->in_flags.fds2 || rep->out_flags.fds2)
-        ;
+        ;       /* we are sharing a single pair of fd_s across all threads */
     else {
         int fd;
 
@@ -1255,6 +1264,7 @@ sg_start_io(Rq_elem * rep)
     bool dpo = wr ? rep->out_flags.dpo : rep->in_flags.dpo;
     bool dio = wr ? rep->out_flags.dio : rep->in_flags.dio;
     bool mmap = wr ? rep->out_flags.mmap : rep->in_flags.mmap;
+    bool noxfer = wr ? rep->out_flags.noxfer : rep->in_flags.noxfer;
     bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
     int cdbsz = wr ? rep->cdbsz_out : rep->cdbsz_in;
     int flags = 0;
@@ -1275,6 +1285,8 @@ sg_start_io(Rq_elem * rep)
         flags |= SG_FLAG_MMAP_IO;
         c3p = " mmap";
     }
+    if (noxfer)
+        flags |= SG_FLAG_NO_DXFER;
     if (dio)
         flags |= SG_FLAG_DIRECT_IO;
     if (rep->has_share) {
@@ -1496,7 +1508,8 @@ do_v4:
 
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
-sg_prepare(int fd, int bs, int bpt, bool def_res, uint8_t **mmpp)
+sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
+                  uint8_t **mmpp)
 {
     int res, t, num;
     uint8_t *mmp;
@@ -1505,6 +1518,27 @@ sg_prepare(int fd, int bs, int bpt, bool def_res, uint8_t **mmpp)
     if ((res < 0) || (t < 30902)) {
         pr2serr_lk("%ssg driver prior to 3.9.02\n", my_name);
         return 0;
+    }
+    if (elem_sz >= 4096) {
+        struct sg_extended_info sei;
+        struct sg_extended_info * seip;
+
+        seip = &sei;
+        memset(seip, 0, sizeof(*seip));
+        seip->valid_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
+        res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
+        if (res < 0)
+            pr2serr_lk("sgs_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
+                       "error: %s\n", __func__, strerror(errno));
+        if (elem_sz != (int)seip->sgat_elem_sz) {
+            memset(seip, 0, sizeof(*seip));
+            seip->valid_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
+            seip->sgat_elem_sz = elem_sz;
+            res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
+            if (res < 0)
+                pr2serr_lk("sgs_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
+                           "wr error: %s\n", __func__, strerror(errno));
+        }
     }
     if (! def_res) {
         num = bs * bpt;
@@ -1570,6 +1604,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->mmap = true;
         else if (0 == strcmp(cp, "noshare"))
             fp->noshare = true;
+        else if (0 == strcmp(cp, "noxfer"))
+            fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
         else if (0 == strcmp(cp, "v3"))
@@ -1620,7 +1656,8 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
         perror(ebuff);
         return -sg_convert_errno(err);;
     }
-    n = sg_prepare(fd, clp->bs, clp->bpt, clp->in_flags.defres, mmpp);
+    n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
+                         clp->elem_sz,  mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -1649,7 +1686,8 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare(fd, clp->bs, clp->bpt, clp->out_flags.defres, mmpp);
+    n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->out_flags.defres,
+                          clp->elem_sz, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -1698,7 +1736,8 @@ main(int argc, char * argv[])
     memset(thread_arr, 0, sizeof(thread_arr));
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
     clp->in_type = FT_OTHER;
-    clp->out_type = FT_OTHER;
+    /* change dd's default: if of=OFILE not given, assume /dev/null */
+    clp->out_type = FT_DEV_NULL;
     clp->cdbsz_in = DEF_SCSI_CDBSZ;
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
     inf[0] = '\0';
@@ -1751,6 +1790,13 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"dio")) {
             clp->in_flags.dio = !! sg_get_num(buf);
             clp->out_flags.dio = clp->in_flags.dio;
+        } else if (0 == strcmp(key,"elemsz_kb")) {
+            clp->elem_sz = sg_get_num(buf) * 1024;
+            if ((clp->elem_sz > 0) && (clp->elem_sz < 4096)) {
+                pr2serr("elemsz_kb cannot be less than 4 (4 KB = 4096 "
+                        "bytes)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key,"fua")) {
             n = sg_get_num(buf);
             if (n & 1)
@@ -1987,6 +2033,8 @@ main(int argc, char * argv[])
                     "device\n", my_name);
         }
     }
+    if (outf[0])
+        clp->ofile_given = true;
     if (outf[0] && ('-' != outf[0])) {
         clp->out_type = dd_filetype(outf);
 
@@ -2203,6 +2251,10 @@ main(int argc, char * argv[])
         pr2serr("Due to --dry-run option, bypass copy/read\n");
         goto fini;
     }
+    if (! clp->ofile_given)
+        pr2serr("of=OFILE not given so only read from IFILE, to output to "
+                "stdout use 'of=-'\n");
+
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
     status = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
