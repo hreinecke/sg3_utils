@@ -28,8 +28,11 @@
  * sgp_dd and sg_dd only perform special tasks when one or both of the given
  * devices belong to the Linux sg driver.
  *
- * sgs_dd further extends sgp_dd to use the experimental kernel buffer
+ * sgh_dd further extends sgp_dd to use the experimental kernel buffer
  * sharing feature added in 3.9.02 .
+ * N.B. This utility was previously called sgs_dd but there was already an
+ * archived version of a dd variant called sgs_dd so this utility name was
+ * renamed [20181221]
  */
 
 #define _XOPEN_SOURCE 600
@@ -88,7 +91,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.08 20181220";
+static const char * version_str = "1.08 20181221";
 
 #ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -250,7 +253,7 @@ static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
 static int exit_status = 0;
 
-static const char * my_name = "sgs_dd: ";
+static const char * my_name = "sgh_dd: ";
 
 
 #ifdef __GNUC__
@@ -475,7 +478,7 @@ usage(int pg_num)
     else if (pg_num > 1)
         goto page2;
 
-    pr2serr("Usage: sgs_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
+    pr2serr("Usage: sgh_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
             " [iflag=FLAGS]\n"
             "               [obs=BS] [of=OFILE] [oflag=FLAGS] "
             "[seek=SEEK] [skip=SKIP]\n"
@@ -514,7 +517,7 @@ usage(int pg_num)
            );
     return;
 page2:
-    pr2serr("Syntax:  sgs_dd [operands] [options]\n\n"
+    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n       style commands, and options start with one or two "
             "hyphens\n\n"
@@ -548,7 +551,7 @@ page2:
            );
     return;
 page3:
-    pr2serr("Syntax:  sgs_dd [operands] [options]\n\n"
+    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
             "  where: iflag=' and 'oflag=' arguments are listed below:\n"
             "    2fds        only 2 file descriptors (1 each for IFILE and "
             "OFILE) are\n"
@@ -1528,7 +1531,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
         seip->valid_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
-            pr2serr_lk("sgs_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
+            pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
                        "error: %s\n", __func__, strerror(errno));
         if (elem_sz != (int)seip->sgat_elem_sz) {
             memset(seip, 0, sizeof(*seip));
@@ -1536,7 +1539,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
             seip->sgat_elem_sz = elem_sz;
             res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
             if (res < 0)
-                pr2serr_lk("sgs_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
+                pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
                            "wr error: %s\n", __func__, strerror(errno));
         }
     }
@@ -1544,7 +1547,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
         num = bs * bpt;
         res = ioctl(fd, SG_SET_RESERVED_SIZE, &num);
         if (res < 0)
-            perror("sgs_dd: SG_SET_RESERVED_SIZE error");
+            perror("sgh_dd: SG_SET_RESERVED_SIZE error");
         else if (mmpp) {
             mmp = (uint8_t *)mmap(NULL, num, PROT_READ | PROT_WRITE,
                                   MAP_SHARED, fd, 0);
@@ -1558,7 +1561,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     t = 1;
     res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
     if (res < 0)
-        perror("sgs_dd: SG_SET_FORCE_PACK_ID error");
+        perror("sgh_dd: SG_SET_FORCE_PACK_ID error");
     return (res < 0) ? 0 : num;
 }
 
