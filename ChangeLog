@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20181220] [svn: r800]
+Changelog for sg3_utils-1.45 [20181222] [svn: r801]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (18-102r0)
@@ -15,6 +15,8 @@ Changelog for sg3_utils-1.45 [20181220] [svn: r800]
   - testing/sg_tst_async: fix free_list issue
   - testing/sg_tst_ioctl: for sg 3.9 driver
   - testing/sgs_dd: for share in sg 3.9.02 driver
+  - testing/sgh_dd: rename of sgs_dd to avoid ...
+  - testing/sgs_dd: from archive, for testing SIGPOLL
   - sg_io_linux (sg_lib): add sg_linux_sense_print()
   - sg_pt_linux: uses sg v4 interface if sg driver
     >= 4.0.0 . Force sg v3 always by building with

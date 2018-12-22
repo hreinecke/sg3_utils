@@ -5,7 +5,7 @@ INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
-	sg_tst_nvme sg_tst_ioctl tst_sg_lib sgs_dd
+	sg_tst_nvme sg_tst_ioctl tst_sg_lib sgh_dd sgs_dd
 	
 EXTRAS =
 
@@ -80,8 +80,11 @@ sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)
 tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sgs_dd: sgs_dd.o $(LIBFILESNEW)
+sgh_dd: sgh_dd.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) -pthread $^
+
+sgs_dd: sgs_dd.o $(LIBFILESOLD)
+	$(LD) -o $@ $(LDFLAGS) $^ 
 
 install: $(EXECS)
 	install -d $(INSTDIR)
