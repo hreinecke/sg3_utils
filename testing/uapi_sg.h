@@ -10,10 +10,11 @@
  *
  * Original driver (sg.h):
  *   Copyright (C) 1992 Lawrence Foard
- * Version 2 and 3 extensions to driver:
+ *
+ * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- *   Version: 4.0.02 (20181216)
+ * Version 4.0.02 (20181223)
  *  This version is for Linux 2.6, 3 and 4 series kernels.
  *
  * Documentation
@@ -30,7 +31,7 @@
 #include <linux/types.h>
 #include <linux/major.h>
 
-/* bsg.h contains the sg v4 user space interface structure. */
+/* bsg.h contains the sg v4 user space interface structure (sg_io_v4). */
 #include <linux/bsg.h>
 
 /*
@@ -173,7 +174,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIM_READ_VAL	0x20	/* write SG_SEIRV, read related */
 #define SG_SEIM_SHARE_FD	0x40	/* slave gives fd of master, sharing */
 #define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
-#define SG_SEIM_ALL_BITS	0xff	/* should be OR of previous items */
+#define SG_SEIM_CHG_SHARE_FD	0x100	/* master gives fd of new slave */
+#define SG_SEIM_ALL_BITS	0x1ff	/* should be OR of previous items */
 
 #define SG_CTL_FLAGM_TIME_IN_NS	0x1	/* time: nanosecs (def: millisecs) */
 #define SG_CTL_FLAGM_TAG_FOR_PACK_ID 0x2
@@ -198,7 +200,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_TRC_MAX_SZ	0x6	/* maximum size of trace buffer */
 
 /*
- * A pointer to the following structure is passed as the third argument to 
+ * A pointer to the following structure is passed as the third argument to
  * ioctl(SG_SET_GET_EXTENDED). Each bit in the *_wr_mask fields causes the
  * corresponding integer (e.g. reserved_sz) or bit (e.g. the
  * SG_CTL_FLAG_TIME_IN_NS bit in ctl_flags) to be read from the user space

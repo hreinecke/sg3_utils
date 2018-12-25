@@ -91,7 +91,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.08 20181221";
+static const char * version_str = "1.09 20181224";
 
 #ifdef __GNUC__
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -132,7 +132,6 @@ static const char * version_str = "1.08 20181221";
 #define EBUFF_SZ 768
 
 struct flags_t {
-    bool fds2;          /* flag is called '2fds' */
     bool append;
     bool coe;
     bool defres;        /* without this res_sz==bs*bpt */
@@ -145,6 +144,7 @@ struct flags_t {
     bool mmap;
     bool noshare;
     bool noxfer;
+    bool same_fds;
     bool v3;
     bool v4;
 };
@@ -179,15 +179,20 @@ typedef struct global_collection
     pthread_mutex_t out_mutex;        /*  | */
     pthread_cond_t out_sync_cv;       /*  | hold writes until "in order" */
     pthread_cond_t hold_1st_cv;       /* -/ wait for 1st thread to do 1 seg */
+    pthread_mutex_t out2_mutex;
     int bs;
     int bpt;
+    int outregfd;
+    int outreg_type;
     int dio_incomplete_count;   /* -\ */
     int sum_of_resids;          /* -/ */
     int debug;          /* both -v and deb=VERB bump this field */
     int dry_run;
     bool ofile_given;
+    bool ofile2_given;
     const char * infp;
     const char * outfp;
+    const char * out2fp;
 } Gbl_coll;
 
 typedef struct request_element
@@ -198,6 +203,7 @@ typedef struct request_element
     int infd;
     int outfd;
     int out2fd;
+    int outregfd;
     int64_t blk;
     int num_blks;
     uint8_t * buffp;
@@ -230,11 +236,11 @@ static pthread_t sig_listen_thread_id;
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static void sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep);
-static void sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep);
+static void sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, bool is_wr2);
 static bool normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks);
 static void normal_out_wr(Gbl_coll * clp, Rq_elem * rep, int blocks);
-static int sg_start_io(Rq_elem * rep);
-static int sg_finish_io(bool wr, Rq_elem * rep);
+static int sg_start_io(Rq_elem * rep, bool is_wr2);
+static int sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2);
 static int sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp,
                       int *mmap_len);
 static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
@@ -486,34 +492,38 @@ usage(int pg_num)
     pr2serr("               [bpt=BPT] [cdbsz=6|10|12|16] [coe=0|1] "
             "[deb=VERB] [dio=0|1]\n"
             "               [elemsz_kb=ESK] [fua=0|1|2|3] [of2=OFILE2] "
-            "[sync=0|1]\n"
-            "               [thr=THR] [time=0|1] [verbose=VERB] [--dry-run] "
-            "[--verbose]\n\n"
+            "[ofreg=OFREG]\n"
+            "               [sync=0|1] [thr=THR] [time=0|1] [verbose=VERB] "
+            "[--dry-run]\n"
+            "                [--verbose]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    if          file or device to read from (def: stdin)\n"
-            "    iflag       comma separated list from: [2fds,coe,defres,dio,"
+            "    iflag       comma separated list from: [coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,noxfer,null,v3,v4]\n"
-            "    of          file or device to write to (def: /dev/null which "
-            "is different\n"
-            "                from dd that defaults to stdout). If 'of=.' "
-            "assumes /dev/null\n"
-            "    oflag       comma separated list from: [2fds,append,coe,dio,"
+            "                dsync,excl,fua,mmap,noshare,noxfer,null,"
+            "same_fds,v3,v4]\n"
+            "    of          file or device to write to (def: /dev/null "
+            "N.B. different\n"
+            "                from dd it defaults to stdout). If 'of=.' "
+            "uses /dev/null\n"
+            "    of2         second file or device to write to (def: "
+            "/dev/null)\n"
+            "    oflag       comma separated list from: [append,coe,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,noxfer,null,v3,v4]\n"
+            "                dsync,excl,fua,mmap,noshare,noxfer,null,"
+            "same_fds,v3,v4]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
             "    --version|-V   output version string then exit\n\n"
-            "Copy from IFILE to OFILE, similar to dd command. This utility "
-            "is specialized\nfor SCSI devices and uses multiple POSIX "
-            "threads. It expects one or both\nIFILE and OFILE to be sg "
-            "devices. It is Linux specific and uses the v4\nsg driver "
-            "'share' capbility if available (hence the 'sgs' part of its "
-            "name).\nUse '-hh' or '-hhh' for more information.\n"
+            "Copy IFILE to OFILE, similar to dd command. This utility is "
+            "specialized for\nSCSI devices and uses multiple POSIX threads. "
+            "It expects one or both IFILE\nand OFILE to be sg devices. It "
+            "is Linux specific and uses the v4 sg driver\n'share' capability "
+            "if available. Use '-hh' or '-hhh' for more information.\n"
            );
     return;
 page2:
@@ -531,13 +541,13 @@ page2:
             "of debug\n"
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
             "    elemsz_kb    scatter gather list element size in kilobytes "
-            "(def: 32 [KB])\n"
+            "(def: 32[KB])\n"
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
-            "    of2         OFILE2 is regular file or pipe to output what is "
-            "read from the\n"
-            "                disk in the first half of each shared element\n"
+            "    ofreg       OFREG is regular file or pipe to send what is "
+            "read from\n"
+            "                IFILE in the first half of each shared element\n"
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
@@ -553,9 +563,6 @@ page2:
 page3:
     pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
             "  where: iflag=' and 'oflag=' arguments are listed below:\n"
-            "    2fds        only 2 file descriptors (1 each for IFILE and "
-            "OFILE) are\n"
-            "                used. Default: a pair of fd_s for each thread\n"
             "    append      append output to OFILE (assumes OFILE is "
             "regular file)\n"
             "    coe         continue of error (reading, fills with zeros)\n"
@@ -574,16 +581,21 @@ page3:
             "    noshare     if IFILE and OFILE are sg devices, don't set "
             "up sharing\n"
             "                (def: do)\n"
-            "    v3          use v3 sg interface which is the default (aslo "
+            "    same_fds    each thread use the same IFILE and OFILE(2) "
+            "file\n"
+            "                descriptors (def: each threads has own file "
+            "desciptors)\n"
+            "    v3          use v3 sg interface which is the default (also "
             "see v4)\n"
             "    v4          use v4 sg interface (def: v3 unless other side "
             "us v4)\n"
             "\n"
-            "If both are sg devices 'shared' mode is selected unless "
-            "'noshare' is given\nto 'iflag=' or 'oflag='. If 'of2=OFLAG2' "
-            "is given, the read-side is output\nto OFLAG2. Without 'of2=' "
-            "and with IFILE and OFILE sg devices the copy is\nvia a single "
-            "in-kernel buffer.\n"
+            "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
+            "OFILE are sg\ndevices 'shared' mode is selected unless "
+            "'noshare' is given to 'iflag=' or\n'oflag='. of2=OFILE2 uses "
+            "'oflag=FLAGS'. When sharing, the data stays in a\nsingle "
+            "in-kernel buffer which is copied (or mmap-ed) to the user "
+            "space\nif the 'ofreg=OFREG' is given.\n"
            );
 }
 
@@ -695,7 +707,7 @@ sig_listen_thread(void * v_clp)
 }
 
 static bool
-sg_share_prepare(int slave_writer_fd, int master_reader_fd, int id, bool vb_b)
+sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
 {
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
@@ -704,17 +716,16 @@ sg_share_prepare(int slave_writer_fd, int master_reader_fd, int id, bool vb_b)
     memset(seip, 0, sizeof(*seip));
     seip->valid_wr_mask |= SG_SEIM_SHARE_FD;
     seip->valid_rd_mask |= SG_SEIM_SHARE_FD;
-    seip->share_fd = master_reader_fd;
-    if (ioctl(slave_writer_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+    seip->share_fd = master_rd_fd;
+    if (ioctl(slave_wr_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(shared_fd=%d), failed "
-                   "errno=%d %s\n", id, master_reader_fd, errno,
+                   "errno=%d %s\n", id, master_rd_fd, errno,
                    strerror(errno));
         return false;
     }
     if (vb_b)
         pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(shared_fd)) ok, master_fd=%d, "
-                   "slave_fd=%d\n", __func__, id, master_reader_fd,
-                   slave_writer_fd);
+                   "slave_fd=%d\n", __func__, id, master_rd_fd, slave_wr_fd);
     return true;
 }
 
@@ -754,8 +765,9 @@ read_write_thread(void * v_tip)
     volatile bool stop_after_write = false;
     bool own_infd = false;
     bool own_outfd = false;
+    bool own_out2fd = false;
     bool is_first = true;
-    bool share_and_of2;
+    bool share_and_ofreg;
 
     tip = (Thread_info *)v_tip;
     clp = tip->gcp;
@@ -765,6 +777,8 @@ read_write_thread(void * v_tip)
     memset(rep, 0, sizeof(Rq_elem));
     /* Following clp members are constant during lifetime of thread */
     rep->id = tip->id;
+    if (vb > 0)
+        pr2serr_lk("Starting worker thread %d\n", rep->id);
     if (! clp->in_flags.mmap) {
         rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
                                  false);
@@ -776,12 +790,25 @@ read_write_thread(void * v_tip)
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
     rep->out2fd = clp->out2fd;
+    rep->outregfd = clp->outregfd;
     rep->debug = clp->debug;
     rep->cdbsz_in = clp->cdbsz_in;
     rep->cdbsz_out = clp->cdbsz_out;
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
-    if (rep->in_flags.fds2 || rep->out_flags.fds2)
+
+    if (rep->id > 0) {
+        /* wait for a broadcast on hold_1st_cv other than tid=0 thread so
+         * tide=0 can complete one READ/WRITE cycle (segment), makes infant
+         * mortality errors easier to analyze and fix. */
+        pthread_cleanup_push(cleanup_out, (void *)clp);
+        status = pthread_cond_wait(&clp->hold_1st_cv, &clp->out_mutex);
+        if (0 != status) err_exit(status, "cond hold_1st_cv");
+        pthread_cleanup_pop(0);
+        status = pthread_mutex_unlock(&clp->out_mutex);
+        if (0 != status) err_exit(status, "unlock out_mutex");
+    }
+    if (rep->in_flags.same_fds || rep->out_flags.same_fds)
         ;       /* we are sharing a single pair of fd_s across all threads */
     else {
         int fd;
@@ -808,12 +835,28 @@ read_write_thread(void * v_tip)
             if (vb > 2)
                 pr2serr_lk("thread=%d: opened local sg OFILE\n", rep->id);
         }
+        if ((FT_SG == clp->out2_type) && clp->out2fp) {
+            fd = sg_out_open(clp, clp->out2fp,
+                            (rep->out_flags.mmap ? &rep->buffp : NULL),
+                            (rep->out_flags.mmap ? &rep->mmap_len : NULL));
+            if (fd < 0)
+                goto fini;
+            rep->out2fd = fd;
+            own_out2fd = true;
+            if (vb > 2)
+                pr2serr_lk("thread=%d: opened local sg OFILE2\n", rep->id);
+        }
     }
     if (vb > 2) {
-        if (! own_infd)
-            pr2serr_lk("thread=%d: using global sg IFILE\n", rep->id);
-        if (! own_outfd)
-            pr2serr_lk("thread=%d: using global sg OFILE\n", rep->id);
+        if ((FT_SG == clp->in_type) && (! own_infd))
+            pr2serr_lk("thread=%d: using global sg IFILE, fd=%d\n", rep->id,
+                       rep->infd);
+        if ((FT_SG == clp-> out_type) && (! own_outfd))
+            pr2serr_lk("thread=%d: using global sg OFILE, fd=%d\n", rep->id,
+                       rep->outfd);
+        if ((FT_SG == clp->out2_type) && (! own_out2fd))
+            pr2serr_lk("thread=%d: using global sg OFILE2, fd=%d\n", rep->id,
+                       rep->out2fd);
     }
     if (rep->in_flags.noshare || rep->out_flags.noshare) {
         if (vb)
@@ -821,11 +864,11 @@ read_write_thread(void * v_tip)
                        rep->id);
     } else if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type))
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, rep->id,
-                                          rep->debug);
+                                          rep->debug > 9);
     if (vb > 0)
-        pr2serr_lk("starting thread %d, has_share=%s\n", rep->id,
+        pr2serr_lk("tid=%d, has_share=%s\n", rep->id,
                    (rep->has_share ? "true" : "false"));
-    share_and_of2 = (rep->has_share && (rep->out2fd >= 0));
+    share_and_ofreg = (rep->has_share && (rep->outregfd >= 0));
 
     /* vvvvvvvvvvvvvv  Main segment copy loop  vvvvvvvvvvvvvvvvvvvvvvv */
     while (1) {
@@ -860,11 +903,11 @@ read_write_thread(void * v_tip)
         status = pthread_mutex_lock(&clp->out_mutex);
         if (0 != status) err_exit(status, "lock out_mutex");
 
-        /* Make sure the OFILE (+ OFILE2) are in same sequence as IFILE */
-        if ((rep->out2fd < 0) && (FT_SG == clp->in_type) &&
+        /* Make sure the OFILE (+ OFREG) are in same sequence as IFILE */
+        if ((rep->outregfd < 0) && (FT_SG == clp->in_type) &&
             (FT_SG == clp->out_type))
             goto skip_force_out_sequence;
-        if (share_and_of2 || (FT_DEV_NULL != clp->out_type)) {
+        if (share_and_ofreg || (FT_DEV_NULL != clp->out_type)) {
             while ((! clp->out_stop) &&
                    ((rep->blk + seek_skip) != clp->out_blk)) {
                 /* if write would be out of sequence then wait */
@@ -898,28 +941,41 @@ skip_force_out_sequence:
         }
 
         pthread_cleanup_push(cleanup_out, (void *)clp);
-        if (share_and_of2) {
-            res = write(rep->out2fd, rep->buffp, rep->bs * rep->num_blks);
+        if (rep->outregfd >= 0) {
+            res = write(rep->outregfd, rep->buffp, rep->bs * rep->num_blks);
             err = errno;
             if (res < 0)
-                pr2serr_lk("%s: tid=%d: write(out2fd) failed: %s\n", __func__,
-                           rep->id, strerror(err));
+                pr2serr_lk("%s: tid=%d: write(outregfd) failed: %s\n",
+                           __func__, rep->id, strerror(err));
+            else if (rep->debug > 9)
+                pr2serr_lk("%s: tid=%d: write(outregfd), fd=%d, num_blks=%d"
+                           "\n", __func__, rep->id, rep->outregfd,
+                           rep->num_blks);
         }
+        /* Output to OFILE */
         if (FT_SG == clp->out_type)
-            sg_out_wr_cmd(clp, rep); /* releases out_mutex mid oper */
+            sg_out_wr_cmd(clp, rep, false); /* releases out_mutex mid oper */
         else if (FT_DEV_NULL == clp->out_type) {
             /* skip actual write operation */
             clp->out_rem_count -= blocks;
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
-        }
-        else {
+        } else {
             normal_out_wr(clp, rep, blocks);
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
         }
         pthread_cleanup_pop(0);
 
+        /* Output to OFILE2 if sg device */
+        if ((clp->out2fd >= 0) && (FT_SG == clp->out2_type)) {
+            pthread_cleanup_push(cleanup_out, (void *)clp);
+            status = pthread_mutex_lock(&clp->out2_mutex);
+            if (0 != status) err_exit(status, "lock out2_mutex");
+            sg_out_wr_cmd(clp, rep, true); /* releases out2_mutex mid oper */
+
+            pthread_cleanup_pop(0);
+        }
         // if ((! rep->has_share) && (FT_DEV_NULL != clp->out_type))
             pthread_cond_broadcast(&clp->out_sync_cv);
         if ((0 == rep->id) && is_first) {
@@ -952,6 +1008,8 @@ fini:
         close(rep->infd);
     if (own_outfd)
         close(rep->outfd);
+    if (own_out2fd)
+        close(rep->out2fd);
     pthread_cond_broadcast(&clp->out_sync_cv);
     if ((0 == rep->id) && is_first) {
         is_first = false;   /* allow rest of threads to start */
@@ -970,7 +1028,7 @@ normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks)
     /* enters holding in_mutex */
     while (((res = read(clp->infd, rep->buffp, blocks * clp->bs)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
-        ;
+        sched_yield();  /* another thread may be able to progress */
     if (res < 0) {
         if (clp->in_flags.coe) {
             memset(rep->buffp, 0, rep->num_blks * rep->bs);
@@ -1016,7 +1074,7 @@ normal_out_wr(Gbl_coll * clp, Rq_elem * rep, int blocks)
     /* enters holding out_mutex */
     while (((res = write(clp->outfd, rep->buffp, rep->num_blks * clp->bs))
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
-        ;
+        sched_yield();  /* another thread may be able to progress */
     if (res < 0) {
         if (clp->out_flags.coe) {
             pr2serr_lk("tid=%d: >> ignored error for out blk=%" PRId64
@@ -1122,7 +1180,7 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep)
     int status;
 
     while (1) {
-        res = sg_start_io(rep);
+        res = sg_start_io(rep, false);
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
@@ -1137,7 +1195,7 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep)
         status = pthread_mutex_unlock(&clp->in_mutex);
         if (0 != status) err_exit(status, "unlock in_mutex");
 
-        res = sg_finish_io(rep->wr, rep);
+        res = sg_finish_io(rep->wr, rep, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -1188,37 +1246,87 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep)
     }           /* end of while (1) loop */
 }
 
+static bool
+sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
+{
+    bool not_first = false;
+    int err = 0;
+    int master_fd = rep->infd;  /* in (READ) side is master */
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
+
+    seip = &sei;
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_CHG_SHARE_FD;
+    seip->valid_rd_mask |= SG_SEIM_CHG_SHARE_FD;
+    seip->share_fd = to_fd;
+    if (before) {
+        /* clear MASTER_FINI bit to put master in SG_RQ_SHR_SWAP state */
+        seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
+        seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS;
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MASTER_FINI;
+        seip->ctl_flags &= SG_CTL_FLAGM_MASTER_FINI;/* would be 0 anyway */
+    }
+    while ((ioctl(master_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
+           (EBUSY == errno)) {
+        err = errno;
+        if (! not_first) {
+            if (rep->debug > 9)
+                pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
+                           "failed errno=%d %s\n", rep->id, master_fd, err,
+                           strerror(err));
+            not_first = true;
+        }
+        err = 0;
+        sched_yield();  /* another thread may be able to progress */
+    }
+    if (err) {
+        pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), failed "
+                   "errno=%d %s\n", rep->id, master_fd, err, strerror(err));
+        return false;
+    }
+    if (rep->debug > 15)
+        pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(change_shared_fd)) ok, "
+                   "master_fd=%d, to_slave_fd=%d\n", __func__, rep->id,
+                   master_fd, to_fd);
+    return true;
+}
+
 /* Enters this function holding out_mutex */
 static void
-sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep)
+sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, bool is_wr2)
 {
     int res;
     int status;
+    pthread_mutex_t * mutexp = is_wr2 ? &clp->out2_mutex : &clp->out_mutex;
+
+    if (rep->has_share && is_wr2)
+        sg_wr_swap_share(rep, rep->out2fd, true);
 
     while (1) {
-        res = sg_start_io(rep);
+        res = sg_start_io(rep, is_wr2);
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
             pr2serr_lk("%soutputting from sg failed, blk=%" PRId64 "\n",
                        my_name, rep->blk);
-            status = pthread_mutex_unlock(&clp->out_mutex);
+            status = pthread_mutex_unlock(mutexp);
             if (0 != status) err_exit(status, "unlock out_mutex");
             guarded_stop_both(clp);
-            return;
+            goto fini;
         }
         /* Now release in mutex to let other reads run in parallel */
-        status = pthread_mutex_unlock(&clp->out_mutex);
+        status = pthread_mutex_unlock(mutexp);
         if (0 != status) err_exit(status, "unlock out_mutex");
 
-        res = sg_finish_io(rep->wr, rep);
+        res = sg_finish_io(rep->wr, rep, is_wr2);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
             /* try again with same addr, count info */
             /* now re-acquire out mutex for balance */
             /* N.B. This re-write could now be out of write sequence */
-            status = pthread_mutex_lock(&clp->out_mutex);
+            status = pthread_mutex_lock(mutexp);
             if (0 != status) err_exit(status, "lock out_mutex");
             break;      /* loops around */
         case SG_LIB_CAT_MEDIUM_HARD:
@@ -1227,7 +1335,7 @@ sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep)
                 if (exit_status <= 0)
                     exit_status = res;
                 guarded_stop_both(clp);
-                return;
+                goto fini;
             } else
                 pr2serr_lk(">> ignored error for out blk=%" PRId64 " for %d "
                            "bytes\n", rep->blk, rep->num_blks * rep->bs);
@@ -1238,29 +1346,34 @@ sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep)
 #endif
 #endif
         case 0:
-            status = pthread_mutex_lock(&clp->out_mutex);
-            if (0 != status) err_exit(status, "lock out_mutex");
-            if (rep->dio_incomplete_count || rep->resid) {
-                clp->dio_incomplete_count += rep->dio_incomplete_count;
-                clp->sum_of_resids += rep->resid;
+            if (! is_wr2) {
+                status = pthread_mutex_lock(mutexp);
+                if (0 != status) err_exit(status, "lock out_mutex");
+                if (rep->dio_incomplete_count || rep->resid) {
+                    clp->dio_incomplete_count += rep->dio_incomplete_count;
+                    clp->sum_of_resids += rep->resid;
+                }
+                clp->out_rem_count -= rep->num_blks;
+                status = pthread_mutex_unlock(mutexp);
+                if (0 != status) err_exit(status, "unlock out_mutex");
             }
-            clp->out_rem_count -= rep->num_blks;
-            status = pthread_mutex_unlock(&clp->out_mutex);
-            if (0 != status) err_exit(status, "unlock out_mutex");
-            return;
+            goto fini;
         default:
             pr2serr_lk("error finishing sg out command (%d)\n", res);
             if (exit_status <= 0)
                 exit_status = res;
             guarded_stop_both(clp);
-            return;
+            goto fini;
         }
     }           /* end of while (1) loop */
+fini:
+    if (rep->has_share && is_wr2)
+        sg_wr_swap_share(rep, rep->outfd, false);
 }
 
 /* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
 static int
-sg_start_io(Rq_elem * rep)
+sg_start_io(Rq_elem * rep, bool is_wr2)
 {
     bool wr = rep->wr;
     bool fua = wr ? rep->out_flags.fua : rep->in_flags.fua;
@@ -1271,20 +1384,28 @@ sg_start_io(Rq_elem * rep)
     bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
     int cdbsz = wr ? rep->cdbsz_out : rep->cdbsz_in;
     int flags = 0;
-    int res, err;
+    int res, err, fd;
     struct sg_io_hdr * hp = &rep->io_hdr;
     struct sg_io_v4 * h4p = &rep->io_hdr4;
     const char * cp = "";
     const char * c2p = "";
     const char * c3p = "";
+    const char * crwp;
 
+    if (wr) {
+        fd = is_wr2 ? rep->out2fd : rep->outfd;
+        crwp = is_wr2 ? "writing2" : "writing";
+    } else {
+        fd = rep->infd;
+        crwp = "reading";
+    }
     if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk,
                           wr, fua, dpo)) {
         pr2serr_lk("%sbad cdb build, start_blk=%" PRId64 ", blocks=%d\n",
                    my_name, rep->blk, rep->num_blks);
         return -1;
     }
-    if (mmap && (rep->out2fd >= 0)) {
+    if (mmap && (rep->outregfd >= 0)) {
         flags |= SG_FLAG_MMAP_IO;
         c3p = " mmap";
     }
@@ -1296,7 +1417,7 @@ sg_start_io(Rq_elem * rep)
         flags |= SGV4_FLAG_SHARE;
         if (wr)
             flags |= SGV4_FLAG_NO_DXFER;
-        else if (rep->out2fd < 0)
+        else if (rep->outregfd < 0)
             flags |= SGV4_FLAG_NO_DXFER;
         if (flags & SGV4_FLAG_NO_DXFER)
             c2p = " and FLAG_NO_DXFER";
@@ -1306,8 +1427,8 @@ sg_start_io(Rq_elem * rep)
         cp = (wr ? " slave not sharing" : " master not sharing");
     if (rep->debug > 3) {
         pr2serr_lk("%s tid=%d: SCSI %s%s%s%s, blk=%" PRId64 " num_blks=%d\n",
-                   __func__, rep->id, (rep->wr ? "WRITE" : "READ"), cp,
-                   c2p, c3p, rep->blk, rep->num_blks);
+                   __func__, rep->id, crwp, cp, c2p, c3p, rep->blk,
+                   rep->num_blks);
         lk_print_command(rep->cmd);
     }
     if (v4)
@@ -1327,10 +1448,9 @@ sg_start_io(Rq_elem * rep)
     hp->pack_id = (int)rep->blk;
     hp->flags = flags;
 
-    while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
-                         sizeof(struct sg_io_hdr))) < 0) &&
+    while (((res = write(fd, hp, sizeof(struct sg_io_hdr))) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
-        ;
+        sched_yield();  /* another thread may be able to progress */
     err = errno;
     if (res < 0) {
         if (ENOMEM == err)
@@ -1358,10 +1478,9 @@ do_v4:
     h4p->usr_ptr = (uint64_t)rep;
     h4p->request_extra = rep->blk;/* N.B. blk --> pack_id --> request_extra */
     h4p->flags = flags;
-    while (((res = ioctl(rep->wr ? rep->outfd : rep->infd, SG_IOSUBMIT,
-                         h4p)) < 0) && ((EINTR == errno) ||
-                                         (EAGAIN == errno)))
-        ;
+    while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
+        sched_yield();  /* another thread may be able to progress */
     err = errno;
     if (res < 0) {
         if (ENOMEM == err)
@@ -1377,17 +1496,25 @@ do_v4:
    -> try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
    -1 other errors */
 static int
-sg_finish_io(bool wr, Rq_elem * rep)
+sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2)
 {
     bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
-    int res;
+    int res, fd;
     struct sg_io_hdr io_hdr;
     struct sg_io_hdr * hp;
     struct sg_io_v4 * h4p;
+    const char *cp;
 #if 0
     static int testing = 0;     /* thread dubious! */
 #endif
 
+    if (wr) {
+        fd = is_wr2 ? rep->out2fd : rep->outfd;
+        cp = is_wr2 ? "writing2" : "writing";
+    } else {
+        fd = rep->infd;
+        cp = "reading";
+    }
     if (v4)
         goto do_v4;
     memset(&io_hdr, 0 , sizeof(struct sg_io_hdr));
@@ -1396,10 +1523,9 @@ sg_finish_io(bool wr, Rq_elem * rep)
     io_hdr.dxfer_direction = wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
     io_hdr.pack_id = (int)rep->blk;
 
-    while (((res = read(wr ? rep->outfd : rep->infd, &io_hdr,
-                        sizeof(struct sg_io_hdr))) < 0) &&
+    while (((res = read(fd, &io_hdr, sizeof(struct sg_io_hdr))) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
-        ;
+        sched_yield();  /* another thread may be able to progress */
     if (res < 0) {
         perror("finishing io on sg device, error");
         return -1;
@@ -1414,21 +1540,19 @@ sg_finish_io(bool wr, Rq_elem * rep)
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        lk_chk_n_print3((wr ? "writing continuing":
-                                   "reading continuing"), hp, false);
+        lk_chk_n_print3(cp, hp, false);
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
         if (rep->debug > 3)
-            lk_chk_n_print3((wr ? "writing": "reading"), hp, false);
+            lk_chk_n_print3(cp, hp, false);
         return res;
     case SG_LIB_CAT_NOT_READY:
     default:
         {
             char ebuff[EBUFF_SZ];
 
-            snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64,
-                     wr ? "writing": "reading", rep->blk);
+            snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64, cp, rep->blk);
             lk_chk_n_print3(ebuff, hp, false);
             return res;
         }
@@ -1443,16 +1567,14 @@ sg_finish_io(bool wr, Rq_elem * rep)
         rep->dio_incomplete_count = 0;
     rep->resid = hp->resid;
     if (rep->debug > 3)
-        pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id,
-                   wr ? "WRITE" : "READ");
+        pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id, cp);
     return 0;
 
 do_v4:
     h4p = &rep->io_hdr4;
-    while (((res = ioctl(wr ? rep->outfd : rep->infd, SG_IORECEIVE,
-                         h4p)) < 0) && ((EINTR == errno) ||
-                                        (EAGAIN == errno)))
-        ;
+    while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
+        sched_yield();  /* another thread may be able to progress */
     if (res < 0) {
         perror("finishing io on sg device, error");
         return -1;
@@ -1467,21 +1589,19 @@ do_v4:
     case SG_LIB_CAT_CLEAN:
         break;
     case SG_LIB_CAT_RECOVERED:
-        lk_chk_n_print4((wr ? "writing continuing":
-                              "reading continuing"), h4p, false);
+        lk_chk_n_print4(cp, h4p, false);
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
         if (rep->debug > 3)
-            lk_chk_n_print4((wr ? "writing": "reading"), h4p, false);
+            lk_chk_n_print4(cp, h4p, false);
         return res;
     case SG_LIB_CAT_NOT_READY:
     default:
         {
             char ebuff[EBUFF_SZ];
 
-            snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64,
-                     wr ? "writing": "reading", rep->blk);
+            snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64, cp, rep->blk);
             lk_chk_n_print4(ebuff, h4p, false);
             return res;
         }
@@ -1496,8 +1616,7 @@ do_v4:
         rep->dio_incomplete_count = 0;
     rep->resid = h4p->din_resid;
     if (rep->debug > 3) {
-        pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id,
-                   wr ? "WRITE" : "READ");
+        pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id, cp);
         if (rep->debug > 4)
             pr2serr_lk(" info=0x%x sg_info_check=%d another_waiting=%d "
                        "direct=%d detaching=%d\n", h4p->info,
@@ -1583,9 +1702,7 @@ process_flags(const char * arg, struct flags_t * fp)
         np = strchr(cp, ',');
         if (np)
             *np++ = '\0';
-        if (0 == strcmp(cp, "2fds"))
-            fp->fds2 = true;
-        else if (0 == strcmp(cp, "append"))
+        if (0 == strcmp(cp, "append"))
             fp->append = true;
         else if (0 == strcmp(cp, "coe"))
             fp->coe = true;
@@ -1611,6 +1728,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "same_fds"))
+            fp->same_fds = true;
         else if (0 == strcmp(cp, "v3"))
             fp->v3 = true;
         else if (0 == strcmp(cp, "v4"))
@@ -1657,7 +1776,7 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
         snprintf(ebuff, EBUFF_SZ, "%s: could not open %s for sg reading",
                  __func__, inf);
         perror(ebuff);
-        return -sg_convert_errno(err);;
+        return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
                          clp->elem_sz,  mmpp);
@@ -1706,18 +1825,19 @@ main(int argc, char * argv[])
 {
     bool verbose_given = false;
     bool version_given = false;
+    bool bpt_given = false;
+    bool cdbsz_given = false;
     int64_t skip = 0;
     int64_t seek = 0;
     int ibs = 0;
     int obs = 0;
-    int bpt_given = 0;
-    int cdbsz_given = 0;
     char str[STR_SZ];
     char * key;
     char * buf;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
     char out2f[INOUTF_SZ];
+    char outregf[INOUTF_SZ];
     int res, k, err, keylen;
     int64_t in_num_sect = 0;
     int64_t out_num_sect = 0;
@@ -1741,11 +1861,13 @@ main(int argc, char * argv[])
     clp->in_type = FT_OTHER;
     /* change dd's default: if of=OFILE not given, assume /dev/null */
     clp->out_type = FT_DEV_NULL;
+    clp->out2_type = FT_DEV_NULL;
     clp->cdbsz_in = DEF_SCSI_CDBSZ;
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
     inf[0] = '\0';
     outf[0] = '\0';
     out2f[0] = '\0';
+    outregf[0] = '\0';
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -1765,7 +1887,7 @@ main(int argc, char * argv[])
                 pr2serr("%sbad argument to 'bpt='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            bpt_given = 1;
+            bpt_given = true;
         } else if (0 == strcmp(key,"bs")) {
             clp->bs = sg_get_num(buf);
             if (-1 == clp->bs) {
@@ -1775,7 +1897,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key,"cdbsz")) {
             clp->cdbsz_in = sg_get_num(buf);
             clp->cdbsz_out = clp->cdbsz_in;
-            cdbsz_given = 1;
+            cdbsz_given = true;
         } else if (0 == strcmp(key,"coe")) {
             clp->in_flags.coe = !! sg_get_num(buf);
             clp->out_flags.coe = clp->in_flags.coe;
@@ -1835,6 +1957,12 @@ main(int argc, char * argv[])
                 return SG_LIB_CONTRADICT;
             } else
                 strncpy(out2f, buf, INOUTF_SZ - 1);
+        } else if (strcmp(key,"ofreg") == 0) {
+            if ('\0' != outregf[0]) {
+                pr2serr("Second OFREG argument??\n");
+                return SG_LIB_CONTRADICT;
+            } else
+                strncpy(outregf, buf, INOUTF_SZ - 1);
         } else if (strcmp(key,"of") == 0) {
             if ('\0' != outf[0]) {
                 pr2serr("Second 'of=' argument??\n");
@@ -1961,14 +2089,14 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((clp->in_flags.mmap || clp->out_flags.mmap) &&
-        (clp->in_flags.fds2 || clp->in_flags.fds2)) {
-        pr2serr("can't have both 'mmap' and '2fds' flags\n");
+        (clp->in_flags.same_fds || clp->in_flags.same_fds)) {
+        pr2serr("can't have both 'mmap' and 'same_fds' flags\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
        SG_IO ioctl. So reduce it in that case. */
-    if ((clp->bs >= 2048) && (0 == bpt_given))
+    if ((clp->bs >= 2048) && (! bpt_given))
         clp->bpt = DEF_BLOCKS_PER_2048TRANSFER;
     if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
         pr2serr("too few or too many threads requested\n");
@@ -2103,6 +2231,67 @@ main(int argc, char * argv[])
                     "device\n", my_name);
         }
     }
+
+    if (out2f[0])
+        clp->ofile2_given = true;
+    if (out2f[0] && ('-' != out2f[0])) {
+        clp->out2_type = dd_filetype(out2f);
+
+        if (FT_ST == clp->out2_type) {
+            pr2serr("%sunable to use scsi tape device %s\n", my_name, out2f);
+            return SG_LIB_FILE_ERROR;
+        }
+        else if (FT_SG == clp->out2_type) {
+            clp->out2fd = sg_out_open(clp, out2f, NULL, NULL);
+            if (clp->out2fd < 0)
+                return -clp->out2fd;
+        }
+        else if (FT_DEV_NULL == clp->out2_type)
+            clp->out2fd = -1; /* don't bother opening */
+        else {
+            if (FT_RAW != clp->out2_type) {
+                flags = O_WRONLY | O_CREAT;
+                if (clp->out_flags.direct)
+                    flags |= O_DIRECT;
+                if (clp->out_flags.excl)
+                    flags |= O_EXCL;
+                if (clp->out_flags.dsync)
+                    flags |= O_SYNC;
+                if (clp->out_flags.append)
+                    flags |= O_APPEND;
+
+                if ((clp->out2fd = open(out2f, flags, 0666)) < 0) {
+                    err = errno;
+                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
+                             "writing", my_name, out2f);
+                    perror(ebuff);
+                    return sg_convert_errno(err);
+                }
+            }
+            else {      /* raw output file */
+                if ((clp->out2fd = open(out2f, O_WRONLY)) < 0) {
+                    err = errno;
+                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for raw "
+                             "writing", my_name, out2f);
+                    perror(ebuff);
+                    return sg_convert_errno(err);
+                }
+            }
+            if (seek > 0) {
+                off64_t offset = seek;
+
+                offset *= clp->bs;       /* could exceed 32 bits here! */
+                if (lseek64(clp->out2fd, offset, SEEK_SET) < 0) {
+                    err = errno;
+                    snprintf(ebuff, EBUFF_SZ, "%scouldn't seek to required "
+                             "position on %s", my_name, out2f);
+                    perror(ebuff);
+                    return sg_convert_errno(err);
+                }
+            }
+        }
+        clp->out2fp = out2f;
+    }
     if ((FT_SG == clp->in_type ) && (FT_SG == clp->out_type)) {
         if (clp->in_flags.v4 && (! clp->out_flags.v3)) {
             if (! clp->out_flags.v4) {
@@ -2121,16 +2310,29 @@ main(int argc, char * argv[])
             }
         }
     }
-    if (out2f[0]) {
-        clp->out2_type = dd_filetype(out2f);
-        if ((clp->out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
+    if (outregf[0]) {
+        int ftyp = dd_filetype(outregf);
+
+        clp->outreg_type = ftyp;
+        if (! ((FT_OTHER == ftyp) || (FT_ERROR == ftyp) ||
+               (FT_DEV_NULL == ftyp))) {
+            pr2serr("File: %s can only be regular file or pipe (or "
+                    "/dev/null)\n", outregf);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        if ((clp->outregfd = open(outregf, O_WRONLY | O_CREAT, 0666)) < 0) {
             err = errno;
-            snprintf(ebuff, EBUFF_SZ, "could not open %s for writing", out2f);
+            snprintf(ebuff, EBUFF_SZ, "could not open %s for writing",
+                     outregf);
             perror(ebuff);
             return sg_convert_errno(err);
         }
+        if (clp->debug > 1)
+            pr2serr("ofreg=%s opened okay, fd=%d\n", outregf, clp->outregfd);
+        if (FT_ERROR == ftyp)
+            clp->outreg_type = FT_OTHER;        /* regular file created */
     } else
-        clp->out2fd = -1;
+        clp->outregfd = -1;
 
     if ((STDIN_FILENO == clp->infd) && (STDOUT_FILENO == clp->outfd)) {
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to stdout\n");
@@ -2247,6 +2449,8 @@ main(int argc, char * argv[])
     if (0 != status) err_exit(status, "init in_mutex");
     status = pthread_mutex_init(&clp->out_mutex, NULL);
     if (0 != status) err_exit(status, "init out_mutex");
+    status = pthread_mutex_init(&clp->out2_mutex, NULL);
+    if (0 != status) err_exit(status, "init out2_mutex");
     status = pthread_cond_init(&clp->out_sync_cv, NULL);
     if (0 != status) err_exit(status, "init out_sync_cv");
 
@@ -2284,17 +2488,6 @@ main(int argc, char * argv[])
         status = pthread_create(&tip->a_pthr, NULL, read_write_thread,
                                 (void *)tip);
         if (0 != status) err_exit(status, "pthread_create");
-        if (clp->debug > 1)
-            pr2serr_lk("Starting worker thread k=0 alone\n");
-
-        /* wait for a broadcast on hold_1st_cv, implies tid=0 thread has
-         * completed one READ/WRITE cycle (segment). */
-        pthread_cleanup_push(cleanup_out, (void *)clp);
-        status = pthread_cond_wait(&clp->hold_1st_cv, &clp->out_mutex);
-        if (0 != status) err_exit(status, "cond hold_1st_cv");
-        pthread_cleanup_pop(0);
-        status = pthread_mutex_unlock(&clp->out_mutex);
-        if (0 != status) err_exit(status, "unlock out_mutex");
 
         /* now start the rest of the threads */
         for (k = 1; k < num_threads; ++k) {
@@ -2304,8 +2497,6 @@ main(int argc, char * argv[])
             status = pthread_create(&tip->a_pthr, NULL, read_write_thread,
                                     (void *)tip);
             if (0 != status) err_exit(status, "pthread_create");
-            if (clp->debug > 1)
-                pr2serr_lk("Starting worker thread k=%d\n", k);
         }
 
         /* now wait for worker threads to finish */
@@ -2333,6 +2524,17 @@ main(int argc, char * argv[])
             if (0 != res)
                 pr2serr_lk("Unable to synchronize cache\n");
         }
+        if (FT_SG == clp->out2_type) {
+            pr2serr_lk(">> Synchronizing cache on %s\n", out2f);
+            res = sg_ll_sync_cache_10(clp->out2fd, 0, 0, 0, 0, 0, false, 0);
+            if (SG_LIB_CAT_UNIT_ATTENTION == res) {
+                pr2serr_lk("Unit attention(out2), continuing\n");
+                res = sg_ll_sync_cache_10(clp->out2fd, 0, 0, 0, 0, 0, false,
+                                          0);
+            }
+            if (0 != res)
+                pr2serr_lk("Unable to synchronize cache (of2)\n");
+        }
     }
 
     shutting_down = true;
@@ -2349,6 +2551,8 @@ fini:
         close(clp->outfd);
     if ((STDOUT_FILENO != clp->out2fd) && (FT_DEV_NULL != clp->out2_type))
         close(clp->out2fd);
+    if ((STDOUT_FILENO != clp->outregfd) && (FT_DEV_NULL != clp->outreg_type))
+        close(clp->outregfd);
     res = exit_status;
     if ((0 != clp->out_count) && (0 == clp->dry_run)) {
         pr2serr(">>>> Some error occurred, remaining blocks=%" PRId64 "\n",
