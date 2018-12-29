@@ -91,10 +91,12 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.09 20181224";
+static const char * version_str = "1.12 20181227";
 
 #ifdef __GNUC__
+#ifndef  __clang__
 #pragma GCC diagnostic ignored "-Wclobbered"
+#endif
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -178,7 +180,6 @@ typedef struct global_collection
     bool out_stop;                    /*  | */
     pthread_mutex_t out_mutex;        /*  | */
     pthread_cond_t out_sync_cv;       /*  | hold writes until "in order" */
-    pthread_cond_t hold_1st_cv;       /* -/ wait for 1st thread to do 1 seg */
     pthread_mutex_t out2_mutex;
     int bs;
     int bpt;
@@ -400,6 +401,20 @@ siginfo_handler(int sig)
     if (do_time)
         calc_duration_throughput(1);
     print_stats("  ");
+}
+
+static void
+siginfo2_handler(int sig)
+{
+    Gbl_coll * clp = &gcoll;
+
+    if (sig) { ; }      /* unused, dummy to suppress warning */
+    pr2serr("Progress report, continuing ...\n");
+    if (do_time)
+        calc_duration_throughput(1);
+    print_stats("  ");
+    pr2serr("Send broadcast on out_sync_cv condition variable\n");
+    pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
 static void
@@ -766,7 +781,6 @@ read_write_thread(void * v_tip)
     bool own_infd = false;
     bool own_outfd = false;
     bool own_out2fd = false;
-    bool is_first = true;
     bool share_and_ofreg;
 
     tip = (Thread_info *)v_tip;
@@ -797,17 +811,6 @@ read_write_thread(void * v_tip)
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
 
-    if (rep->id > 0) {
-        /* wait for a broadcast on hold_1st_cv other than tid=0 thread so
-         * tide=0 can complete one READ/WRITE cycle (segment), makes infant
-         * mortality errors easier to analyze and fix. */
-        pthread_cleanup_push(cleanup_out, (void *)clp);
-        status = pthread_cond_wait(&clp->hold_1st_cv, &clp->out_mutex);
-        if (0 != status) err_exit(status, "cond hold_1st_cv");
-        pthread_cleanup_pop(0);
-        status = pthread_mutex_unlock(&clp->out_mutex);
-        if (0 != status) err_exit(status, "unlock out_mutex");
-    }
     if (rep->in_flags.same_fds || rep->out_flags.same_fds)
         ;       /* we are sharing a single pair of fd_s across all threads */
     else {
@@ -865,7 +868,7 @@ read_write_thread(void * v_tip)
     } else if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type))
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, rep->id,
                                           rep->debug > 9);
-    if (vb > 0)
+    if (vb > 9)
         pr2serr_lk("tid=%d, has_share=%s\n", rep->id,
                    (rep->has_share ? "true" : "false"));
     share_and_ofreg = (rep->has_share && (rep->outregfd >= 0));
@@ -977,11 +980,7 @@ skip_force_out_sequence:
             pthread_cleanup_pop(0);
         }
         // if ((! rep->has_share) && (FT_DEV_NULL != clp->out_type))
-            pthread_cond_broadcast(&clp->out_sync_cv);
-        if ((0 == rep->id) && is_first) {
-            is_first = false;   /* allow rest of threads to start */
-            pthread_cond_broadcast(&clp->hold_1st_cv);
-        }
+        pthread_cond_broadcast(&clp->out_sync_cv);
         if (stop_after_write)
             break;
     } /* end of while loop which copies segments */
@@ -1011,10 +1010,6 @@ fini:
     if (own_out2fd)
         close(rep->out2fd);
     pthread_cond_broadcast(&clp->out_sync_cv);
-    if ((0 == rep->id) && is_first) {
-        is_first = false;   /* allow rest of threads to start */
-        pthread_cond_broadcast(&clp->hold_1st_cv);
-    }
     return stop_after_write ? NULL : clp;
 }
 
@@ -1527,7 +1522,7 @@ sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2)
            ((EINTR == errno) || (EAGAIN == errno)))
         sched_yield();  /* another thread may be able to progress */
     if (res < 0) {
-        perror("finishing io on sg device, error");
+        perror("finishing io [read(2)] on sg device, error");
         return -1;
     }
     if (rep != (Rq_elem *)io_hdr.usr_ptr)
@@ -1576,7 +1571,7 @@ do_v4:
            ((EINTR == errno) || (EAGAIN == errno)))
         sched_yield();  /* another thread may be able to progress */
     if (res < 0) {
-        perror("finishing io on sg device, error");
+        perror("finishing io [SG_IORECEIVE] on sg device, error");
         return -1;
     }
     if (rep != (Rq_elem *)h4p->usr_ptr)
@@ -1854,6 +1849,7 @@ main(int argc, char * argv[])
     actions.sa_flags = 0;
     actions.sa_handler = thread_exit_handler;
     sigaction(SIGUSR1, &actions, NULL);
+    sigaction(SIGUSR2, &actions, NULL);
 #endif
     memset(clp, 0, sizeof(*clp));
     memset(thread_arr, 0, sizeof(thread_arr));
@@ -2111,6 +2107,7 @@ main(int argc, char * argv[])
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
     install_handler(SIGUSR1, siginfo_handler);
+    install_handler(SIGUSR2, siginfo2_handler);
 
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
@@ -2488,6 +2485,14 @@ main(int argc, char * argv[])
         status = pthread_create(&tip->a_pthr, NULL, read_write_thread,
                                 (void *)tip);
         if (0 != status) err_exit(status, "pthread_create");
+
+        /* wait for any broadcast */
+        pthread_cleanup_push(cleanup_out, (void *)clp);
+        status = pthread_cond_wait(&clp->out_sync_cv, &clp->out_mutex);
+        if (0 != status) err_exit(status, "cond out_sync_cv");
+        pthread_cleanup_pop(0);
+        status = pthread_mutex_unlock(&clp->out_mutex);
+        if (0 != status) err_exit(status, "unlock out_mutex");
 
         /* now start the rest of the threads */
         for (k = 1; k < num_threads; ++k) {

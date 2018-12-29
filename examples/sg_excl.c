@@ -13,7 +13,7 @@
  *
  * Invocation: sg_excl [-x] <sg_device>
  *
- * Version 3.61 (20181207)
+ * Version 3.62 (20181227)
  *
  * 6 byte INQUIRY command:
  * [0x12][   |lu][pg cde][res   ][al len][cntrl ]
@@ -195,6 +195,7 @@ int main(int argc, char * argv[])
                "msg_status=%d\n", io_hdr.duration, io_hdr.resid,
                 (int)io_hdr.msg_status);
 
+    printf("Wait for 60 seconds with O_EXCL help on %s\n", file_name);
     sleep(60);
     close(sg_fd);
     return 0;
