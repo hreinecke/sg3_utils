@@ -27,7 +27,8 @@ LD = $(CC)
 
 CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
 # CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME -DDEBUG
-CFLAGS = -g -O2 -W -Wall 
+# CFLAGS = -g -O2 -W -Wall 
+CFLAGS = -g -O2 -W -Wall -DDEBUG
 # CFLAGS = -g -O2 -Wall -DSG_KERNEL_INCLUDES
 # CFLAGS = -g -O2 -Wall -pedantic 
 # CFLAGS = -Wall -W -pedantic -std=c11 --analyze
