@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- * Copyright (C) 2000-2018 D. Gilbert
+ * Copyright (C) 2000-2019 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.98 20180828";    /* SPC-5 rev 19 */
+static const char * version_str = "1.99 20190109";    /* SPC-5 rev 20 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2176,7 +2176,7 @@ decode_x_inq_vpd(uint8_t * buff, int len, int do_hex)
            sg_get_unaligned_be16(buff + 10));     /* spc4r27 */
     printf("  POA_SUP=%d HRA_SUP=%d VSA_SUP=%d DMS_VALID=%d\n",
            !!(buff[12] & 0x80), !!(buff[12] & 0x40), !!(buff[12] & 0x20),
-           !!(buff[12] & 0x10));                /* spc4r32 + 17-142r5 */
+           !!(buff[12] & 0x10));                /* spc5r20 */
     printf("  Maximum supported sense data length=%d\n",
            buff[13]); /* spc4r34 */
     /* All byte 14 bits added in spc5r09 */
@@ -2189,7 +2189,7 @@ decode_x_inq_vpd(uint8_t * buff, int len, int do_hex)
            sg_get_unaligned_be16(buff + 17));     /* spc5r17 */
     printf("  DM_MD_4=%d DM_MD_5=%d DM_MD_6=%d DM_MD_7=%d\n",
            !!(buff[19] & 0x80), !!(buff[19] & 0x40), !!(buff[19] & 0x20),
-           !!(buff[19] & 0x10));                     /* 17-142r5 */
+           !!(buff[19] & 0x10));                     /* spc5r20 */
     printf("  DM_MD_D=%d DM_MD_E=%d DM_MD_F=%d\n",
            !!(buff[19] & 0x8), !!(buff[19] & 0x4), !!(buff[19] & 0x2));
 }

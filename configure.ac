@@ -59,10 +59,22 @@ check_for_linux_nvme_headers() {
 		     ]])
 }
 
+check_for_linux_sg_v4_hdr() {
+	AC_EGREP_CPP(found,
+		[ # include <scsi/sg.h>
+		  #ifdef SG_IOSUBMIT
+		   found
+		  #endif
+		],
+		[AC_DEFINE_UNQUOTED(HAVE_LINUX_SG_V4_HDR, 1, [Have Linux sg v4 header]) ])
+
+}
+
 case "${host}" in
 	*-*-android*)
 		AC_DEFINE_UNQUOTED(SG_LIB_ANDROID, 1, [sg3_utils on android])
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
+		check_for_linux_sg_v4_hdr
 		check_for_linux_nvme_headers;;
         *-*-freebsd*|*-*-kfreebsd*-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
@@ -85,6 +97,7 @@ case "${host}" in
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)
                 AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
+		check_for_linux_sg_v4_hdr
                 check_for_linux_nvme_headers;;
 esac
 

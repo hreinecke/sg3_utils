@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 Douglas Gilbert.
+ * Copyright (c) 2013-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -44,7 +44,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.12 20181207";
+static const char * version_str = "1.13 20190108";
 
 
 #define MAX_LINE_LEN 1024
@@ -363,7 +363,7 @@ main(int argc, char * argv[])
         sg_print_sense(leadin, desc_sense_data5,
                        (int)sizeof(desc_sense_data5), vb);
         printf("\n");
-        printf("desc_sense UA subsidiary binfing changed test6\n");
+        printf("desc_sense UA subsidiary binding changed test6\n");
         sg_print_sense(leadin, desc_sense_data6,
                        (int)sizeof(desc_sense_data6), vb);
         printf("\n");

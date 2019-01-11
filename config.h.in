@@ -27,6 +27,9 @@
 /* Define to 1 if you have the <linux/nvme_ioctl.h> header file. */
 #undef HAVE_LINUX_NVME_IOCTL_H
 
+/* Have Linux sg v4 header */
+#undef HAVE_LINUX_SG_V4_HDR
+
 /* Define to 1 if you have the <linux/types.h> header file. */
 #undef HAVE_LINUX_TYPES_H
 

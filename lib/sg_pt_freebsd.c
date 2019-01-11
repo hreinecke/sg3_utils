@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2018 Douglas Gilbert.
+ * Copyright (c) 2005-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.32 20180627 */
+/* sg_pt_freebsd version 1.33 20190102 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1117,7 +1117,8 @@ nvme_pt_low(struct freebsd_dev_channel *fdc_p, void * dxferp, uint32_t len,
     err = ioctl(fdc_p->dev_fd, NVME_PASSTHROUGH_CMD, npcp);
     if (err < 0)
         return -errno;  /* Assume Unix error in normal place */
-    sct_sc = ((npcp->cpl.status.sct << 8) | npcp->cpl.status.sc);
+    sct_sc = (NVME_STATUS_GET_SCT(npcp->cpl.status) << 8) |
+	     NVME_STATUS_GET_SC(npcp->cpl.status);
     fdc_p->nvme_result = npcp->cpl.cdw0;
     sg_put_unaligned_le32(npcp->cpl.cdw0,
                           fdc_p->cq_dw0_3 + SG_NVME_PT_CQ_RESULT);

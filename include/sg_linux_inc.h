@@ -12,6 +12,7 @@
     #include <linux/../scsi/sg.h>
     #include <linux/../scsi/scsi.h>
   #else
+    #define __user
     #include <scsi/sg.h>
     #include <scsi/scsi.h>
   #endif

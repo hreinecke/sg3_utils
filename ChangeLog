@@ -2,18 +2,22 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20181228] [svn: r803]
+Changelog for sg3_utils-1.45 [20190110] [svn: r804]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
-  - sg_opcodes: expand MLU (18-102r0)
+  - sg_opcodes: expand MLU (spc5r20)
   - sg_write_buffer: allow comma and period separated
     lists when input from stdin
   - sg_format: add --dcrt used twice (FOV=1 DCRT=0)
   - sg_raw: fix --send bug when using stdin
+  - sg_vpd: 3pc VPD page add copy group descriptor
   - sg_scan (win32): expand limits for big arrays
+  - sg_lib: add sg_t10_uuid_desig2str()
+  - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - rescan-scsi-bus: widen LUN 0 only scanning
   - testing/sg_tst_async: fix free_list issue
   - testing/sg_tst_ioctl: for sg 4.0 driver
+  - testing/sg_tst_bidi: for sg 4.0 driver
   - testing/sgs_dd: for share in sg 4.0 driver
   - testing/sgh_dd: rename of sgs_dd to avoid ...
   - testing/sgs_dd: back from archive, for testing

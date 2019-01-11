@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2018 D. Gilbert
+ *  Copyright (C) 2004-2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.64 20180926";    /* spc5r19+ */
+static const char * version_str = "0.65 20190108";    /* spc5r20 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -59,7 +59,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"mask", no_argument, 0, 'm'},
-        {"mlu", no_argument, 0, 'M'},
+        {"mlu", no_argument, 0, 'M'},           /* added in spc5r20 */
         {"no-inquiry", no_argument, 0, 'n'},
         {"no_inquiry", no_argument, 0, 'n'},
         {"new", no_argument, 0, 'N'},
@@ -784,7 +784,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             else
                 printf(" %.2x     %.4s       %3d     %2d    %s\n", bp[0],
                        sa_buff, sg_get_unaligned_be16(bp + 6),
-                       (byt5 >> 2) & 0x3, name_buff);
+                       ((byt5 >> 4) & 0x3) /* MLU */, name_buff);
         }
         if (op->do_mask) {
             int cdb_sz;

@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -270,6 +270,18 @@ int sg_get_designation_descriptor_str(const char * leadin,
                                       const uint8_t * ddp, int dd_len,
                                       bool print_assoc, bool do_long,
                                       int blen, char * b);
+
+/* Expects a T10 UUID designator (as found in the Device Identification VPD
+ * page) pointed to by 'dp'. To not produce an error string in 'b', c_set
+ * should be 1 (binary) and dlen should be 18. Currently T10 only supports
+ * locally assigned UUIDs. Writes output to string 'b' of no more than blen
+ * bytes and returns the number of bytes actually written to 'b' but doesn't
+ * count the trailing null character it always appends (if blen > 0). 'lip'
+ * is lead-in string (on each line) than may be NULL. skip_prefix avoids
+ * outputing '   Locally assigned UUID: ' before the UUID. */
+int sg_t10_uuid_desig2str(const uint8_t * dp, int dlen, int c_set,
+			  bool do_long, bool skip_prefix,
+			  const char * lip, int blen, char * b);
 
 /* Yield string associated with peripheral device type (pdt). Returns
  * 'buff'. If 'pdt' out of range yields "bad pdt" string. */
