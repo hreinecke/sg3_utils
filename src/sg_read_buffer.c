@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2019 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.25 20180523";
+static const char * version_str = "1.26 20190108";      /* spc5r20 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -108,6 +108,7 @@ usage()
 #define MODE_DESCRIPTOR         3
 #define MODE_ECHO_BUFFER        0x0A
 #define MODE_ECHO_BDESC         0x0B
+#define MODE_READ_MICROCODE_ST  0x0F
 #define MODE_EN_EX_ECHO         0x1A
 #define MODE_ERR_HISTORY        0x1C
 
@@ -123,6 +124,8 @@ static struct mode_s {
         { "echo",       MODE_ECHO_BUFFER, "read data from echo buffer "
           "(spc-2)"},
         { "echo_desc",  MODE_ECHO_BDESC, "echo buffer descriptor (spc-2)"},
+        { "rd_microc_st",  MODE_READ_MICROCODE_ST, "read microcode status "
+          "(spc-5)"},
         { "en_ex",      MODE_EN_EX_ECHO,
           "enable expander communications protocol and echo buffer (spc-3)"},
         { "err_hist",   MODE_ERR_HISTORY, "error history (spc-4)"},

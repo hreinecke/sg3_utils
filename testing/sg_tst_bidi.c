@@ -1,5 +1,6 @@
+PROPS-END
 /*
- *  Copyright (C) 2018-2019 D. Gilbert
+ *  Copyright (C) 2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -20,8 +21,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
-#include <sys/socket.h> /* For passing fd_s via Unix sockets */
 
 #ifndef HAVE_LINUX_SG_V4_HDR
 
@@ -49,16 +48,21 @@
 #include "sg_linux_inc.h"
 #include "sg_pr2serr.h"
 
-/* This program tests ioctl() calls added and modified in version 4.0 and
- * later of the Linux sg driver.  */
+/* This program tests bidirectional (bidi) SCSI command support in version 4.0
+ * and later of the Linux sg driver. The SBC-3 command XDWRITEREAD(10) that
+ is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.02  20190106";
+static const char * version_str = "Version: 1.00  20190110";
 
 #define INQ_REPLY_LEN 96
+#define INQ_CMD_OP 0x12
 #define INQ_CMD_LEN 6
+#define SDIAG_CMD_OP 0x1d
 #define SDIAG_CMD_LEN 6
 #define SENSE_BUFFER_LEN 96
+#define XDWRITEREAD_10_OP 0x53
+#define XDWRITEREAD_10_LEN 10
 
 #define EBUFF_SZ 256
 
@@ -75,13 +79,11 @@ static const char * version_str = "Version: 1.02  20190106";
 
 #define DEF_RESERVE_BUFF_SZ (256 * 1024)
 
-static bool is_parent = false;
-static bool do_fork = false;
+
 static bool ioctl_only = false;
 static bool q_at_tail = false;
 static bool write_only = false;
 
-static int childs_pid = 0;
 static int q_len = DEF_Q_LEN;
 static int sleep_secs = 0;
 static int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
@@ -93,11 +95,10 @@ static const char * relative_cp = NULL;
 static void
 usage(void)
 {
-    printf("Usage: 'sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
+    printf("Usage: 'sg_tst_bidi [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
            "[-t]\n"
            "       [-v] [-V] [-w] <sg_device> [<sg_device2>]'\n"
            " where:\n"
-           "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
            "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
            "      -o      ioctls only, then exit\n"
@@ -110,110 +111,8 @@ usage(void)
            "      -w    write (submit) only then exit\n");
 }
 
-/* This function taken from Keith Parkard's blog dated 20121005 */
-static ssize_t
-sock_fd_write(int sock, const void *buf, ssize_t buflen, int fd)
-{
-    ssize_t     size;
-    struct msghdr   msg;
-    struct iovec    iov;
-    union {
-        struct cmsghdr  cmsghdr;
-        char        control[CMSG_SPACE(sizeof (int))];
-    } cmsgu;
-    struct cmsghdr  *cmsg;
-
-    iov.iov_base = (void *)buf; /* OS shouldn't write back in this */
-    iov.iov_len = buflen;
-
-    msg.msg_name = NULL;
-    msg.msg_namelen = 0;
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-
-    if (fd != -1) {
-        msg.msg_control = cmsgu.control;
-        msg.msg_controllen = sizeof(cmsgu.control);
-
-        cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_len = CMSG_LEN(sizeof (int));
-        cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type = SCM_RIGHTS;
-
-        printf ("passing fd %d\n", fd);
-        *((int *) CMSG_DATA(cmsg)) = fd;
-    } else {
-        msg.msg_control = NULL;
-        msg.msg_controllen = 0;
-        printf ("not passing fd\n");
-    }
-
-    size = sendmsg(sock, &msg, 0);
-
-    if (size < 0)
-        perror ("sendmsg");
-    return size;
-}
-
-/* This function taken from Keith Parkard's blog dated 2101205 */
-static ssize_t
-sock_fd_read(int sock, void *buf, ssize_t bufsize, int *fd)
-{
-    ssize_t     size;
-
-    if (fd) {
-        struct msghdr   msg;
-        struct iovec    iov;
-        union {
-            struct cmsghdr  cmsghdr;
-            char        control[CMSG_SPACE(sizeof (int))];
-        } cmsgu;
-        struct cmsghdr  *cmsg;
-
-        iov.iov_base = buf;
-        iov.iov_len = bufsize;
-
-        msg.msg_name = NULL;
-        msg.msg_namelen = 0;
-        msg.msg_iov = &iov;
-        msg.msg_iovlen = 1;
-        msg.msg_control = cmsgu.control;
-        msg.msg_controllen = sizeof(cmsgu.control);
-        size = recvmsg (sock, &msg, 0);
-        if (size < 0) {
-            perror ("recvmsg");
-            exit(1);
-        }
-        cmsg = CMSG_FIRSTHDR(&msg);
-        if (cmsg && cmsg->cmsg_len == CMSG_LEN(sizeof(int))) {
-            if (cmsg->cmsg_level != SOL_SOCKET) {
-                fprintf (stderr, "invalid cmsg_level %d\n",
-                     cmsg->cmsg_level);
-                exit(1);
-            }
-            if (cmsg->cmsg_type != SCM_RIGHTS) {
-                fprintf (stderr, "invalid cmsg_type %d\n",
-                     cmsg->cmsg_type);
-                exit(1);
-            }
-
-            *fd = *((int *) CMSG_DATA(cmsg));
-            printf ("received fd %d\n", *fd);
-        } else
-            *fd = -1;
-    } else {
-        size = read (sock, buf, bufsize);
-        if (size < 0) {
-            perror("read");
-            exit(1);
-        }
-    }
-    return size;
-}
-
 static int
-tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
-          int sock, const char * cp)
+tst_ioctl(int sg_fd, const char * fn2p, int sg_fd2, const char * cp)
 {
     uint32_t cflags;
     struct sg_extended_info sei;
@@ -383,15 +282,12 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
 #else
     seip->share_fd = sg_fd;
 #endif
-    if (do_fork && is_parent)
-        goto bypass_share;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("%sioctl(SG_SET_GET_EXTENDED) shared_fd=%d, failed errno=%d "
                 "%s\n", cp, sg_fd2, errno, strerror(errno));
     }
     printf("  %sshare successful, read back shared_fd= %d\n", cp,
            (int)seip->share_fd);
-bypass_share:
 
     // printf("SG_IOSUBMIT value=0x%lx\n", SG_IOSUBMIT);
     // printf("SG_IORECEIVE value=0x%lx\n", SG_IORECEIVE);
@@ -407,36 +303,6 @@ bypass_share:
         printf("%sSG_SET_TRANSFORM okay (does nothing)\n", cp);
     printf("\n");
 
-    /* test sending a sg file descriptor between 2 processes using UNIX
-     * sockets */
-    if (do_fork && is_parent && fnp && (sock >= 0)) { /* master/READ side */
-        int res;
-        int fd_ma = open(fnp, O_RDWR);
-
-        if (fd_ma < 0) {
-            pr2serr("%s: opening %s failed: %s\n", __func__, fnp,
-                    strerror(errno));
-            return 1;
-        }
-        res = sock_fd_write(sock, "boo", 4, fd_ma);
-        if (res < 0)
-            pr2serr("%s: sock_fd_write() failed\n", __func__);
-        else
-            printf("%s: sock_fd_write() returned: %d\n", __func__, res);
-    } else if (do_fork && !is_parent && fn2p && (sock >= 0)) {
-        int res, fd_ma;
-        /* int fd_sl = open(fn2p, O_RDWR); not needed */
-        uint8_t b[32];
-
-        fd_ma = -1;
-        res = sock_fd_read(sock, b, sizeof(b), &fd_ma);
-        if (res < 0)
-            pr2serr("%s: sock_fd_read() failed\n", __func__);
-        else
-            printf("%s: sock_fd_read() returned: %d, fd_ma=%d\n", __func__,
-                   res, fd_ma);
-        /* yes it works! */
-    }
     return 0;
 }
 
@@ -447,14 +313,16 @@ main(int argc, char * argv[])
     bool done;
     int sg_fd, k, ok, ver_num, pack_id, num_waiting, access_count;
     int sg_fd2 = -1;
-    int sock = -1;
     uint8_t inq_cdb[INQ_CMD_LEN] =
-                                {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
+                                {INQ_CMD_OP, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
-                                {0x1d, 0, 0, 0, 0, 0};
+                                {SDIAG_CMD_OP, 0, 0, 0, 0, 0};
+    uint8_t xdwrrd10_cdb[XDWRITEREAD_10_LEN] =
+                        {XDWRITEREAD_10_OP, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
     uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
-    sg_io_hdr_t io_hdr[MAX_Q_LEN];
-    sg_io_hdr_t rio_hdr;
+    struct sg_io_v4 io_v4[MAX_Q_LEN];
+    struct sg_io_v4 rio_v4;
+    struct sg_io_v4 * io_v4p;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
@@ -463,9 +331,7 @@ main(int argc, char * argv[])
     struct sg_scsi_id ssi;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == memcmp("-f", argv[k], 2))
-            do_fork = true;
-        else if (0 == memcmp("-h", argv[k], 2)) {
+        if (0 == memcmp("-h", argv[k], 2)) {
             file_name = 0;
             break;
         } else if (0 == memcmp("-l=", argv[k], 3)) {
@@ -559,53 +425,18 @@ main(int argc, char * argv[])
                     second_fname, sg_fd2);
     }
 
-    if (do_fork) {
-        int pid;
-        int sv[2];
-
-        if (socketpair(AF_LOCAL, SOCK_STREAM, 0, sv) < 0) {
-            perror("socketpair");
-            exit(1);
-        }
-        printf("socketpair: sv[0]=%d, sv[1]=%d sg_fd=%d\n", sv[0], sv[1],
-               sg_fd);
-        pid = fork();
-        if (pid < 0) {
-            perror("fork() failed");
-            goto out;
-        } else if (0 == pid) {
-            relative_cp = "child ";
-            is_parent = false;
-            close(sv[0]);
-            sock = sv[1];
-        } else {
-            relative_cp = "parent ";
-            is_parent = true;
-            childs_pid = pid;
-            close(sv[1]);
-            sock = sv[0];
-        }
-    }
-
-    cp = do_fork ? relative_cp : "";
-    if (tst_ioctl(file_name, sg_fd, second_fname, sg_fd2, sock, cp))
-        goto out;
-    if (ioctl_only)
-        goto out;
-
-    if (do_fork && !is_parent)
-        return 0;
-
+#if 0
     printf("start write() calls\n");
     for (k = 0; k < q_len; ++k) {
+        io_v4p = &io_v4[k];
         /* Prepare INQUIRY command */
-        memset(&io_hdr[k], 0, sizeof(sg_io_hdr_t));
-        io_hdr[k].interface_id = 'S';
-        /* io_hdr[k].iovec_count = 0; */  /* memset takes care of this */
-        io_hdr[k].mx_sb_len = (uint8_t)sizeof(sense_buffer);
+        memset(io_v4p, 0, sizeof(*io_v4p));
+        io_v4p->guard = 'Q';
+        /* io_v4p->iovec_count = 0; */  /* memset takes care of this */
+        io_v4p->max_response_len = sizeof(sense_buffer);
         if (0 == (k % 3)) {
-            io_hdr[k].cmd_len = sizeof(sdiag_cdb);
-            io_hdr[k].cmdp = sdiag_cdb;
+            io_v4p->request_len = XDWRITEREAD_10_LEN;
+            io_v4p->request = (uint64_t)xdwrrd10_cdb;
             io_hdr[k].dxfer_direction = SG_DXFER_NONE;
         } else {
             io_hdr[k].cmd_len = sizeof(inq_cdb);
@@ -631,6 +462,7 @@ main(int argc, char * argv[])
             return 1;
         }
     }
+#endif
 
     memset(&ssi, 0, sizeof(ssi));
     if (ioctl(sg_fd, SG_GET_SCSI_ID, &ssi) < 0)
@@ -661,8 +493,6 @@ main(int argc, char * argv[])
     if (write_only)
         goto out;
 
-    if (do_fork)
-        printf("\n\nFollowing starting with get_pack_id are all CHILD\n");
     if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                 errno, strerror(errno));
@@ -695,6 +525,7 @@ main(int argc, char * argv[])
             else
                 printf("access_count: %d\n", access_count);
         }
+#if 0
         memset(&rio_hdr, 0, sizeof(sg_io_hdr_t));
         rio_hdr.interface_id = 'S';
         if (read(sg_fd, &rio_hdr, sizeof(sg_io_hdr_t)) < 0) {
@@ -725,6 +556,7 @@ main(int argc, char * argv[])
                 printf("INQUIRY %d duration=%u\n", rio_hdr.pack_id,
                        rio_hdr.duration);
         }
+#endif
     }
 
 out:

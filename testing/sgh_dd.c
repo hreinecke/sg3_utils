@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018 D. Gilbert
+ * Copyright (C) 2018-2019 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -69,6 +69,7 @@
 #include "config.h"
 #endif
 
+#ifndef HAVE_LINUX_SG_V4_HDR
 /* Kernel uapi header contain __user decorations on user space pointers
  * to indicate they are unsafe in the kernel space. However glibc takes
  * all those __user decorations out from headers in /usr/include/linux .
@@ -84,6 +85,10 @@
 
 #include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
 
+#else
+#define __user
+#endif	/* end of: ifndef HAVE_LINUX_SG_V4_HDR */
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -91,7 +96,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.12 20181227";
+static const char * version_str = "1.14 20190107";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -1632,8 +1637,8 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     uint8_t *mmp;
 
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
-    if ((res < 0) || (t < 30902)) {
-        pr2serr_lk("%ssg driver prior to 3.9.02\n", my_name);
+    if ((res < 0) || (t < 40000)) {
+        pr2serr_lk("%ssg driver prior to 4.0.00\n", my_name);
         return 0;
     }
     if (elem_sz >= 4096) {
@@ -2087,6 +2092,11 @@ main(int argc, char * argv[])
     if ((clp->in_flags.mmap || clp->out_flags.mmap) &&
         (clp->in_flags.same_fds || clp->in_flags.same_fds)) {
         pr2serr("can't have both 'mmap' and 'same_fds' flags\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    if (((! clp->in_flags.noshare) && clp->in_flags.dio) ||
+        ((! clp->out_flags.noshare) && clp->out_flags.dio)) {
+        pr2serr("dio flag can only be used with noshare flag\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large

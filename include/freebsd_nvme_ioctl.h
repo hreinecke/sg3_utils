@@ -39,6 +39,11 @@ extern "C" {
 #define NVME_PASSTHROUGH_CMD    _IOWR('n', 0, struct nvme_pt_command)
 
 #if __FreeBSD_version < 1100110
+
+#define NVME_STATUS_GET_SC(st)  (st.sc)
+#define NVME_STATUS_GET_SCT(st)  (st.sct)
+
+
 struct nvme_command
 {
         /* dword 0 */
@@ -151,12 +156,14 @@ struct nvme_pt_command {
          */
         struct mtx *            driver_lock;
 };
-#else
+#else		/* not    __FreeBSD_version < 1100110 */
 #include <dev/nvme/nvme.h>
-#endif
+#endif		/* __FreeBSD_version < 1100110 */
 
+#ifndef nvme_completion_is_error
 #define nvme_completion_is_error(cpl)                                   \
         ((cpl)->status.sc != 0 || (cpl)->status.sct != 0)
+#endif
 
 #define NVME_CTRLR_PREFIX       "/dev/nvme"
 #define NVME_NS_PREFIX          "ns"

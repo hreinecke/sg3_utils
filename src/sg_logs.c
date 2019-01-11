@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2018 D. Gilbert
+ *  Copyright (C) 2000-2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.69 20180911";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.70 20190104";    /* spc5r19 + sbc4r11 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -57,6 +57,7 @@ static const char * version_str = "1.69 20180911";    /* spc5r19 + sbc4r11 */
 #define APP_CLIENT_LPAGE 0xf
 #define SELF_TEST_LPAGE 0x10
 #define SOLID_STATE_MEDIA_LPAGE 0x11
+#define REQ_RECOVERY_LPAGE 0x13
 #define BACKGROUND_SCAN_LPAGE 0x15
 #define SAT_ATA_RESULTS_LPAGE 0x16
 #define PROTO_SPECIFIC_LPAGE 0x18
@@ -363,7 +364,7 @@ static struct log_elem log_arr[] = {
      show_dt_device_status_page},       /* 0x11, 0x0  SSC,ADC */
     {0x12, 0, 0, PDT_TAPE, MVP_STD, "Tape alert response", "tar",
      show_tapealert_response_page},      /* 0x12, 0x0  SSC,ADC */
-    {0x13, 0, 0, PDT_TAPE, MVP_STD, "Requested recovery", "rr",
+    {REQ_RECOVERY_LPAGE, 0, 0, PDT_TAPE, MVP_STD, "Requested recovery", "rr",
      show_requested_recovery_page},     /* 0x13, 0x0  SSC,ADC */
     {0x14, 0, 0, PDT_TAPE, MVP_STD, "Device statistics", "ds",
      show_device_stats_page},           /* 0x14, 0x0  SSC,ADC */

@@ -1,33 +1,14 @@
-PROPS-END
-/* We need F_SETSIG, (signal redirect), so following define */
-#define _GNU_SOURCE 1
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <string.h>
-#include <ctype.h>
-#include <errno.h>
-#include <poll.h>
-#include <signal.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#include "sg_lib.h"
-#include "sg_linux_inc.h"
-#include "sg_io_linux.h"
-
-/* Test code for the extensions to the Linux OS SCSI generic ("sg")
+/*
+ * Test code for the extensions to the Linux OS SCSI generic ("sg")
  * device driver.
  * Copyright (C) 1999-2018 D. Gilbert and P. Allworth
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * This program is a specialization of the Unix "dd" command in which
  * one or both of the given files is a scsi generic device. A block size
@@ -52,8 +33,52 @@ PROPS-END
  * chosen. SIGIO is a synonym for SIGPOLL; SIGIO seems to be deprecated.
  */
 
+/* We need F_SETSIG, (signal redirect), so following define */
+#define _GNU_SOURCE 1
 
-static const char * version_str = "4.01 20181223";
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <string.h>
+#include <ctype.h>
+#include <errno.h>
+#include <poll.h>
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#ifndef HAVE_LINUX_SG_V4_HDR
+/* Kernel uapi header contain __user decorations on user space pointers
+ * to indicate they are unsafe in the kernel space. However glibc takes
+ * all those __user decorations out from headers in /usr/include/linux .
+ * So to stop compile errors when directly importing include/uapi/scsi/sg.h
+ * undef __user before doing that include. */
+#define __user
+
+/* Want to block the original sg.h header from also being included. That
+ * causes lots of multiple definition errors. This will only work if this
+ * header is included _before_ the original sg.h header.  */
+#define _SCSI_GENERIC_H         /* original kernel header guard */
+#define _SCSI_SG_H              /* glibc header guard */
+
+#include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
+
+#else
+#define __user
+#endif  /* end of: ifndef HAVE_LINUX_SG_V4_HDR */
+
+#include "sg_lib.h"
+#include "sg_linux_inc.h"
+#include "sg_io_linux.h"
+#include "sg_pr2serr.h"
+#include "sg_unaligned.h"
+
+
+static const char * version_str = "4.03 20190105";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -84,6 +109,15 @@ static const char * my_name = "sgs_dd";
 #define INOUTF_SZ 512
 #define EBUFF_SZ 512
 
+struct flags_t {
+    bool dio;
+    bool excl;
+    bool immed;
+    bool mmap;
+    bool noxfer;
+    bool v3;
+    bool v4;
+};
 
 typedef struct request_element
 {
@@ -94,7 +128,11 @@ typedef struct request_element
     int blk;
     int num_blks;
     uint8_t * buffp;
+    uint8_t * free_buffp;
     sg_io_hdr_t io_hdr;
+    struct sg_io_v4 io_v4;
+    struct flags_t * iflagp;
+    struct flags_t * oflagp;
     uint8_t cmd[S_RW_LEN];
     uint8_t sb[SENSE_BUFF_LEN];
     int result;
@@ -104,7 +142,6 @@ typedef struct request_collection
 {
     bool in_is_sg;
     bool out_is_sg;
-    bool dio;
     bool use_rt_sig;
     int infd;
     int in_blk;                 /* most recent read */
@@ -128,30 +165,35 @@ typedef struct request_collection
     int sigs_io_received;
     Rq_elem * rd_posp;
     Rq_elem * wr_posp;
+    struct flags_t iflag;
+    struct flags_t oflag;
     Rq_elem elem[SGQ_NUM_ELEMS];
 } Rq_coll;
+
+static bool sgs_old_sg_driver = false;
 
 
 static void
 usage(void)
 {
     printf("Usage: "
-           "sgs_dd  [if=<ifile>] [skip=<n>] [of=<ofile>] [seek=<n>]\n"
-           "               [bs=<num>] [bpt=<num>] [count=<n>]"
-           " [deb=<n>] [dio=0|1]\n"
-           "               [rt_sig=0|1] [--version]\n"
+           "sgs_dd  [bpt=BPT] [bs=BS] [count=NUM] [deb=DEB] [if=IFILE]\n"
+           "               [iflag=FLAGS] [of=OFILE] [oflag=FLAGS] "
+           "[rt_sig=0|1]\n"
+           "               [seek=SEEK] [skip=SKIP] [--version]\n"
            "where:\n"
            "  bpt      blocks_per_transfer (default: 65536/bs (or 128 for "
            "bs=512))\n"
-           "  bs       not just any block size, the logical block size of "
-           "device\n"
-           "  dio      direct IO, 1->attempt, 0->indirect IO (def)\n"
-           "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
+           "  bs       must be the logical block size of device (def: 512)\n"
            "  deb      debug: 0->no debug (def); > 0 -> more debug\n"
+           "  iflag    comma separated list from: dio,excl,immed,mmap,noxfer,"
+           "null,v3,v4\n"
+           "  oflag    same flags as iflag but bound to OFILE\n"
+           "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
            "  <other operands>     as per dd command\n\n");
     printf("dd clone for testing Linux sg driver SIGPOLL and friends. Either "
-           "'if' or 'of'\nmust be a scsi generic device. If 'of' not given "
-           "then /dev/null assumed.\n");
+           "IFILE or\nOFILE must be a scsi generic device. If OFILE not given "
+           "then /dev/null\nassumed.\n");
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -201,17 +243,19 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
 static int
 sg_start_io(Rq_coll * clp, Rq_elem * rep)
 {
-    sg_io_hdr_t * hp = &rep->io_hdr;
+    int fd = rep->wr ? clp->outfd : clp->infd;
+    struct flags_t * flagp = rep->wr ? rep->oflagp : rep->iflagp;
     int res;
+    sg_io_hdr_t * hp = &rep->io_hdr;
+    struct sg_io_v4 * h4p = &rep->io_v4;
 
     memset(rep->cmd, 0, sizeof(rep->cmd));
     rep->cmd[0] = rep->wr ? 0x2a : 0x28;
-    rep->cmd[2] = (uint8_t)((rep->blk >> 24) & 0xFF);
-    rep->cmd[3] = (uint8_t)((rep->blk >> 16) & 0xFF);
-    rep->cmd[4] = (uint8_t)((rep->blk >> 8) & 0xFF);
-    rep->cmd[5] = (uint8_t)(rep->blk & 0xFF);
-    rep->cmd[7] = (uint8_t)((rep->num_blks >> 8) & 0xff);
-    rep->cmd[8] = (uint8_t)(rep->num_blks & 0xff);
+    sg_put_unaligned_be32((uint32_t)rep->blk, rep->cmd + 2);
+    sg_put_unaligned_be16((uint16_t)rep->num_blks, rep->cmd + 7);
+    if (flagp->v4)
+        goto do_v4;
+
     memset(hp, 0, sizeof(sg_io_hdr_t));
     hp->interface_id = 'S';
     hp->cmd_len = sizeof(rep->cmd);
@@ -224,8 +268,14 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
     hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
     hp->pack_id = rep->blk;
-    if (clp->dio)
+    if (flagp->dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
+    if (flagp->noxfer)
+        hp->flags |= SG_FLAG_NO_DXFER;
+    if (flagp->immed)
+        hp->flags |= SGV4_FLAG_IMMED;
+    if (flagp->mmap)
+        hp->flags |= SG_FLAG_MMAP_IO;
 #ifdef SG_DEBUG
     fprintf(stderr, "%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
            rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
@@ -234,8 +284,8 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
             hp->dxfer_direction, hp->dxfer_len, hp->dxferp, hp->cmd_len);
 #endif
 
-    while (((res = write(rep->wr ? clp->outfd : clp->infd, hp,
-                         sizeof(sg_io_hdr_t))) < 0) && (EINTR == errno))
+    while (((res = write(fd, hp, sizeof(sg_io_hdr_t))) < 0) &&
+           (EINTR == errno))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -252,22 +302,73 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
     rep->state = SGQ_IO_STARTED;
     clp->sigs_waiting++;
     return 0;
+do_v4:
+    memset(h4p, 0, sizeof(struct sg_io_v4));
+    h4p->guard = 'Q';
+    h4p->request_len = sizeof(rep->cmd);
+    h4p->request = (uint64_t)rep->cmd;
+    if (rep->wr) {
+        h4p->dout_xfer_len = clp->bs * rep->num_blks;
+        h4p->dout_xferp = (uint64_t)rep->buffp;
+    } else if (rep->num_blks > 0) {
+        h4p->din_xfer_len = clp->bs * rep->num_blks;
+        h4p->din_xferp = (uint64_t)rep->buffp;
+    }
+    h4p->max_response_len = sizeof(rep->sb);
+    h4p->response = (uint64_t)rep->sb;
+    h4p->timeout = DEF_TIMEOUT;
+    h4p->usr_ptr = (uint64_t)rep;
+    h4p->request_extra = rep->blk;/* N.B. blk --> pack_id --> request_extra */
+    if (flagp->dio)
+        h4p->flags |= SG_FLAG_DIRECT_IO;
+    if (flagp->noxfer)
+        h4p->flags |= SG_FLAG_NO_DXFER;
+    if (flagp->immed)
+        h4p->flags |= SGV4_FLAG_IMMED;
+    if (flagp->mmap)
+        h4p->flags |= SG_FLAG_MMAP_IO;
+    while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) && (EINTR == errno))
+        ;
+    if (res < 0) {
+        if (ENOMEM == errno)
+            return 1;
+        if ((EDOM == errno) || (EAGAIN == errno)) {
+            rep->state = SGQ_IO_WAIT;   /* busy so wait */
+            return 0;
+        }
+        fprintf(stderr, "%s: ioctl(SG_IOSUBMIT): %s [%d]\n", __func__,
+                strerror(errno), errno);
+        rep->state = SGQ_IO_ERR;
+        return res;
+    }
+    rep->state = SGQ_IO_STARTED;
+    clp->sigs_waiting++;
+    return 0;
 }
 
 /* -1 -> unrecoverable error, 0 -> successful, 1 -> try again */
 static int
 sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
 {
+    bool dio = false;
+    bool is_v4 = wr ? clp->oflag.v4 : clp->iflag.v4;
+    int fd = wr ? clp->outfd : clp->infd;
     int res;
     sg_io_hdr_t io_hdr;
     sg_io_hdr_t * hp;
+    struct sg_io_v4 io_v4;
+    struct sg_io_v4 * h4p;
     Rq_elem * rep;
 
+    if (is_v4)
+        goto do_v4;
     memset(&io_hdr, 0 , sizeof(sg_io_hdr_t));
-    while (((res = read(wr ? clp->outfd : clp->infd, &io_hdr,
-                        sizeof(sg_io_hdr_t))) < 0) && (EINTR == errno))
+    while (((res = read(fd, &io_hdr, sizeof(sg_io_hdr_t))) < 0) &&
+           (EINTR == errno))
         ;
     rep = (Rq_elem *)io_hdr.usr_ptr;
+    if (rep)
+        dio = rep->wr ? clp->oflag.dio : clp->iflag.dio;
     if (res < 0) {
         fprintf(stderr, "%s: read(): %s [%d]\n", __func__, strerror(errno),
                 errno);
@@ -300,10 +401,65 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
             rep->state = SGQ_IO_ERR;
             return -1;
     }
-    if (clp->dio &&
-        ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
+    if (dio && ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         ++clp->dio_incomplete; /* count dios done as indirect IO */
     clp->sum_of_resids += hp->resid;
+    rep->state = SGQ_IO_FINISHED;
+#ifdef SG_DEBUG
+    fprintf(stderr, "%s: %s  ", __func__, wr ? "writing" : "reading");
+    fprintf(stderr, "    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
+#endif
+    return 0;
+do_v4:
+    memset(&io_v4, 0 , sizeof(io_v4));
+    io_v4.guard = 'Q';
+    while (((res = ioctl(fd, SG_IORECEIVE, &io_v4)) < 0) && (EINTR == errno))
+        ;
+    rep = (Rq_elem *)io_v4.usr_ptr;
+    if (res < 0) {
+        fprintf(stderr, "%s: ioctl(SG_IORECEIVE): %s [%d]\n", __func__,
+                strerror(errno),
+                errno);
+        if (rep)
+            rep->state = SGQ_IO_ERR;
+        return -1;
+    }
+    if (! (rep && (SGQ_IO_STARTED == rep->state))) {
+        fprintf(stderr, "%s: bad usr_ptr=0x%p\n", __func__, rep);
+        if (rep)
+            rep->state = SGQ_IO_ERR;
+        return -1;
+    }
+    memcpy(&rep->io_v4, &io_v4, sizeof(struct sg_io_v4));
+    h4p = &rep->io_v4;
+    if (repp)
+        *repp = rep;
+
+    res = sg_err_category_new(h4p->device_status, h4p->transport_status,
+                              h4p->driver_status,
+                              (const uint8_t *)h4p->response,
+                              h4p->response_len);
+    switch (res) {
+        case SG_LIB_CAT_CLEAN:
+            break;
+        case SG_LIB_CAT_RECOVERED:
+            fprintf(stderr, "Recovered error on block=%d, num=%d\n",
+                   rep->blk, rep->num_blks);
+            break;
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            return 1;
+        default:
+            sg_linux_sense_print(rep->wr ? "writing": "reading",
+                                 h4p->device_status, h4p->transport_status,
+                                 h4p->driver_status,
+                                 (const uint8_t *)h4p->response,
+                                 h4p->response_len, true);
+            rep->state = SGQ_IO_ERR;
+            return -1;
+    }
+    if (dio && ((h4p->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
+        ++clp->dio_incomplete; /* count dios done as indirect IO */
+    clp->sum_of_resids += h4p->din_resid;
     rep->state = SGQ_IO_FINISHED;
 #ifdef SG_DEBUG
     fprintf(stderr, "%s: %s  ", __func__, wr ? "writing" : "reading");
@@ -319,8 +475,12 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig)
 
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 30000)) {
-        fprintf(stderr, "sgs_dd: sg driver prior to 3.x.y\n");
+        fprintf(stderr, "sgs_dd: sg driver prior to 3.0.00\n");
         return 1;
+    }
+    else if (t < 40000) {
+        fprintf(stderr, "sgs_dd: warning: sg driver prior to 4.0.00\n");
+        sgs_old_sg_driver = true;
     }
     res = 0;
     t = bs * bpt;
@@ -343,10 +503,11 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig)
     return 0;
 }
 
-static void
+static int
 init_elems(Rq_coll * clp)
 {
     Rq_elem * rep;
+    int res = 0;
     int k;
 
     clp->wr_posp = &clp->elem[0]; /* making ring buffer */
@@ -357,8 +518,28 @@ init_elems(Rq_coll * clp)
     for (k = 0; k < SGQ_NUM_ELEMS; ++k) {
         rep = &clp->elem[k];
         rep->state = SGQ_FREE;
-        if (NULL == (rep->buffp = malloc(clp->bpt * clp->bs)))
+        rep->iflagp = &clp->iflag;
+        rep->oflagp = &clp->oflag;
+        rep->buffp = sg_memalign(clp->bpt * clp->bs, 0, &rep->free_buffp,
+                                 false);
+        if (NULL == rep->buffp) {
             fprintf(stderr, "out of memory creating user buffers\n");
+            res = -ENOMEM;
+        }
+    }
+    return res;
+}
+
+static void
+remove_elems(Rq_coll * clp)
+{
+    Rq_elem * rep;
+    int k;
+
+    for (k = 0; k < SGQ_NUM_ELEMS; ++k) {
+        rep = &clp->elem[k];
+        if (rep->free_buffp)
+            free(rep->free_buffp);
     }
 }
 
@@ -679,6 +860,49 @@ can_read_write(Rq_coll * clp)
     return SGQ_CAN_DO_NOTHING;
 }
 
+static bool
+process_flags(const char * arg, struct flags_t * fp)
+{
+    char buff[256];
+    char * cp;
+    char * np;
+
+    strncpy(buff, arg, sizeof(buff));
+    buff[sizeof(buff) - 1] = '\0';
+    if ('\0' == buff[0]) {
+        pr2serr("no flag found\n");
+        return false;
+    }
+    cp = buff;
+    do {
+        np = strchr(cp, ',');
+        if (np)
+            *np++ = '\0';
+        if (0 == strcmp(cp, "dio"))
+            fp->dio = true;
+        else if (0 == strcmp(cp, "excl"))
+            fp->excl = true;
+        else if (0 == strcmp(cp, "immed"))
+            fp->immed = true;
+        else if (0 == strcmp(cp, "mmap"))
+            fp->mmap = true;
+        else if (0 == strcmp(cp, "noxfer"))
+            fp->noxfer = true;
+        else if (0 == strcmp(cp, "null"))
+            ;
+        else if (0 == strcmp(cp, "v3"))
+            fp->v3 = true;
+        else if (0 == strcmp(cp, "v4"))
+            fp->v4 = true;
+        else {
+            pr2serr("unrecognised flag: %s\n", cp);
+            return false;
+        }
+        cp = np;
+    } while (cp);
+    return true;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -689,15 +913,14 @@ main(int argc, char * argv[])
     int ibs = 0;
     int obs = 0;
     int count = -1;
+    int in_num_sect = 0;
+    int out_num_sect = 0;
+    int res, k, in_sect_sz, out_sect_sz, crw, open_fl;
     char str[STR_SZ];
     char * key;
     char * buf;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
-    int res, k;
-    int in_num_sect = 0;
-    int out_num_sect = 0;
-    int in_sect_sz, out_sect_sz, crw;
     char ebuff[EBUFF_SZ];
     Rq_coll rcoll;
     Rq_coll * clp = &rcoll;
@@ -722,30 +945,38 @@ main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
-        if (strcmp(key,"if") == 0)
-            strncpy(inf, buf, INOUTF_SZ);
-        else if (strcmp(key,"of") == 0)
-            strncpy(outf, buf, INOUTF_SZ);
-        else if (0 == strcmp(key,"ibs"))
-            ibs = sg_get_num(buf);
-        else if (0 == strcmp(key,"obs"))
-            obs = sg_get_num(buf);
+        if (0 == strcmp(key,"bpt"))
+            clp->bpt = sg_get_num(buf);
         else if (0 == strcmp(key,"bs"))
             clp->bs = sg_get_num(buf);
-        else if (0 == strcmp(key,"bpt"))
-            clp->bpt = sg_get_num(buf);
-        else if (0 == strcmp(key,"skip"))
-            skip = sg_get_num(buf);
-        else if (0 == strcmp(key,"seek"))
-            seek = sg_get_num(buf);
         else if (0 == strcmp(key,"count"))
             count = sg_get_num(buf);
-        else if (0 == strcmp(key,"dio"))
-            clp->dio = !!sg_get_num(buf);
-        else if (0 == strcmp(key,"rt_sig"))
-            clp->use_rt_sig = !!sg_get_num(buf);
         else if (0 == strcmp(key,"deb"))
             clp->debug = sg_get_num(buf);
+        else if (0 == strcmp(key,"ibs"))
+            ibs = sg_get_num(buf);
+        else if (strcmp(key,"if") == 0)
+            strncpy(inf, buf, INOUTF_SZ);
+        else if (0 == strcmp(key, "iflag")) {
+            if (! process_flags(buf, &clp->iflag)) {
+                pr2serr("%sbad argument to 'iflag='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"obs"))
+            obs = sg_get_num(buf);
+        else if (strcmp(key,"of") == 0)
+            strncpy(outf, buf, INOUTF_SZ);
+        else if (0 == strcmp(key, "oflag")) {
+            if (! process_flags(buf, &clp->oflag)) {
+                pr2serr("%sbad argument to 'oflag='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"rt_sig"))
+            clp->use_rt_sig = !!sg_get_num(buf);
+        else if (0 == strcmp(key,"seek"))
+            seek = sg_get_num(buf);
+        else if (0 == strcmp(key,"skip"))
+            skip = sg_get_num(buf);
         else if ((0 == strcmp(key,"-V")) || (0 == strcmp(key,"--version"))) {
             fprintf(stderr, "%s: version: %s\n", my_name, version_str);
             return 0;
@@ -794,7 +1025,8 @@ main(int argc, char * argv[])
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
-        if ((clp->infd = open(inf, O_RDONLY)) < 0) {
+        open_fl = clp->iflag.excl ? O_EXCL : 0;
+        if ((clp->infd = open(inf, open_fl | O_RDONLY)) < 0) {
             snprintf(ebuff, EBUFF_SZ, "sgs_dd: could not open %s for reading",
                      inf);
             perror(ebuff);
@@ -816,7 +1048,9 @@ main(int argc, char * argv[])
         }
         else { /* looks like sg device so close then re-open it RW */
             close(clp->infd);
-            if ((clp->infd = open(inf, O_RDWR | O_NONBLOCK)) < 0) {
+            open_fl = clp->iflag.excl ? O_EXCL : 0;
+            open_fl |= (O_RDWR | O_NONBLOCK);
+            if ((clp->infd = open(inf, open_fl)) < 0) {
                 fprintf(stderr, "If %s is a sg device, need read+write "
                         "permissions, even to read it!\n", inf);
                 return 1;
@@ -824,10 +1058,17 @@ main(int argc, char * argv[])
             clp->in_is_sg = true;
             if (sz_reserve(clp->infd, clp->bs, clp->bpt, clp->use_rt_sig))
                 return 1;
+            if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
+                pr2serr("Unable to implement v4 flag because sg driver too "
+                        "old\n");
+                return 1;
+            }
         }
     }
     if (outf[0] && ('-' != outf[0])) {
-        if ((clp->outfd = open(outf, O_RDWR | O_NONBLOCK)) >= 0) {
+        open_fl = clp->oflag.excl ? O_EXCL : 0;
+        open_fl |= (O_RDWR | O_NONBLOCK);
+        if ((clp->outfd = open(outf, open_fl)) >= 0) {
             if (ioctl(clp->outfd, SG_GET_TIMEOUT, 0) < 0) {
                 /* not a scsi generic device so now try and open RDONLY */
                 close(clp->outfd);
@@ -837,10 +1078,19 @@ main(int argc, char * argv[])
                 if (sz_reserve(clp->outfd, clp->bs, clp->bpt,
                                clp->use_rt_sig))
                     return 1;
+                if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
+                    pr2serr("Unable to implement v4 flag because sg driver "
+                            "too old\n");
+                    return 1;
+                }
             }
         }
         if (! clp->out_is_sg) {
-            if ((clp->outfd = open(outf, O_WRONLY | O_CREAT, 0666)) < 0) {
+            if (clp->outfd >= 0)
+                close(clp->outfd);
+            open_fl = clp->oflag.excl ? O_EXCL : 0;
+            open_fl |= (O_WRONLY | O_CREAT);
+            if ((clp->outfd = open(outf, open_fl, 0666)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
                          "sgs_dd: could not open %s for writing", outf);
                 perror(ebuff);
@@ -938,7 +1188,8 @@ main(int argc, char * argv[])
     clp->out_count = count;
     clp->out_done_count = count;
     clp->out_blk = seek;
-    init_elems(clp);
+    res = init_elems(clp);
+    res = 0;
 
 /* vvvvvvvvvvvvvvvvv  Main Loop  vvvvvvvvvvvvvvvvvvvvvvvv */
     while (clp->out_done_count > 0) {
@@ -968,7 +1219,7 @@ main(int argc, char * argv[])
     if (0 != clp->out_count) {
         fprintf(stderr, "Some error occurred, remaining blocks=%d\n",
                 clp->out_count);
-        return 1;
+        res = 1;
     }
     fprintf(stderr, "%d+%d records in\n", count - clp->in_done_count,
            clp->in_partial);
@@ -983,5 +1234,6 @@ main(int argc, char * argv[])
     if (clp->debug > 0)
         fprintf(stderr, "SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
                clp->sigs_io_received, clp->sigs_rt_received);
-    return 0;
+    remove_elems(clp);
+    return res;
 }

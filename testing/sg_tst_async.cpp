@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 Douglas Gilbert.
+ * Copyright (c) 2014-2019 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,6 +61,8 @@
 #include "config.h"
 #endif
 
+#ifndef HAVE_LINUX_SG_V4_HDR
+
 /* Kernel uapi header contain __user decorations on user space pointers
  * to indicate they are unsafe in the kernel space. However glibc takes
  * all those __user decorations out from headers in /usr/include/linux .
@@ -76,13 +78,17 @@
 
 #include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
 
+#else
+#define __user
+#endif  /* end of: ifndef HAVE_LINUX_SG_V4_HDR */
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.23 20181216";
+static const char * version_str = "1.24 20190104";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg

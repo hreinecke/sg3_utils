@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2018 D. Gilbert
+ * Copyright (C) 2010-2019 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -15,19 +15,42 @@
  * Invocation: sg_queue_tst [-l=Q_LEN] [-t] <sg_device>
  *      -t      queue at tail
  *
- * Version 0.93 (20181207)
+ * Version 0.94 (20190109)
  */
 
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#ifndef HAVE_LINUX_SG_V4_HDR
+
+/* Kernel uapi header contain __user decorations on user space pointers
+ * to indicate they are unsafe in the kernel space. However glibc takes
+ * all those __user decorations out from headers in /usr/include/linux .
+ * So to stop compile errors when directly importing include/uapi/scsi/sg.h
+ * undef __user before doing that include. */
+#define __user
+
+/* Want to block the original sg.h header from also being included. That
+ * causes lots of multiple definition errors. This will only work if this
+ * header is included _before_ the original sg.h header.  */
+#define _SCSI_GENERIC_H         /* original kernel header guard */
+#define _SCSI_SG_H              /* glibc header guard */
+
+#include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
+
+#else
+#define __user
+#endif  /* end of: ifndef HAVE_LINUX_SG_V4_HDR */
 
 #include "sg_lib.h"
 #include "sg_io_linux.h"
@@ -53,9 +76,30 @@
 #define DEF_Q_LEN 16    /* max in sg v3 and earlier */
 #define MAX_Q_LEN 256
 
+static void
+set_nanosecs(int sg_fd)
+{
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
+
+    seip = &sei;
+    memset(seip, 0, sizeof(*seip));
+    seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
+    seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
+    seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+    seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        fprintf(stderr, "ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n",
+                errno, strerror(errno));
+    }
+}
+
 
 int main(int argc, char * argv[])
 {
+    bool q_at_tail = false;
+    bool dur_in_nanosecs = false;
     int sg_fd, k, ok;
     uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
@@ -67,12 +111,13 @@ int main(int argc, char * argv[])
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
-    int q_at_tail = 0;
     int q_len = DEF_Q_LEN;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == memcmp("-t", argv[k], 2))
-            ++q_at_tail;
+        if (0 == memcmp("-n", argv[k], 2))
+            dur_in_nanosecs = true;
+        else if (0 == memcmp("-t", argv[k], 2))
+            q_at_tail = true;
         else if (0 == memcmp("-l=", argv[k], 3)) {
             q_len = atoi(argv[k] + 3);
             if ((q_len > 511) || (q_len < 1)) {
@@ -96,10 +141,12 @@ int main(int argc, char * argv[])
         }
     }
     if (0 == file_name) {
-        printf("Usage: 'sg_queue_tst [-l=Q_LEN] [-t] <sg_device>'\n"
-               "where:\n      -l=Q_LEN    queue length, between 1 and 511 "
+        printf("Usage: 'sg_queue_tst [-l=Q_LEN] [-n] [-t] <sg_device>'\n"
+               "where:\n"
+               "      -l=Q_LEN    queue length, between 1 and 511 "
                "(def: 16)\n"
-               "      -t   queue_at_tail (def: q_at_head)\n");
+               "      -n    duration in nanosecs (def: milliseconds)\n"
+               "      -t    queue_at_tail (def: q_at_head)\n");
         return 1;
     }
 
@@ -110,6 +157,8 @@ int main(int argc, char * argv[])
         perror(ebuff);
         return 1;
     }
+    if (dur_in_nanosecs)
+        set_nanosecs(sg_fd);
 
     for (k = 0; k < q_len; ++k) {
         /* Prepare INQUIRY command */
@@ -172,11 +221,11 @@ int main(int argc, char * argv[])
         if (ok) { /* output result if it is available */
             /* if (0 == rio_hdr.pack_id) */
             if (0 == (rio_hdr.pack_id % 3))
-                printf("SEND DIAGNOSTIC %d duration=%u\n", rio_hdr.pack_id,
-                       rio_hdr.duration);
+                printf("SEND DIAGNOSTIC %d duration=%u %s\n", rio_hdr.pack_id,
+                       rio_hdr.duration, (dur_in_nanosecs ? "ns" : "ms"));
             else
-                printf("INQUIRY %d duration=%u\n", rio_hdr.pack_id,
-                       rio_hdr.duration);
+                printf("INQUIRY %d duration=%u %s\n", rio_hdr.pack_id,
+                       rio_hdr.duration, (dur_in_nanosecs ? "ns" : "ms"));
         }
     }
 

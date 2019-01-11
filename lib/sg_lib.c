@@ -756,6 +756,57 @@ sg_get_desig_type_str(int val)
         return NULL;
 }
 
+/* Expects a T10 UUID designator (as found in the Device Identification VPD
+ * page) pointed to by 'dp'. To not produce an error string in 'b', c_set
+ * should be 1 (binary) and dlen should be 18. Currently T10 only supports
+ * locally assigned UUIDs. Writes output to string 'b' of no more than blen
+ * bytes and returns the number of bytes actually written to 'b' but doesn't
+ * count the trailing null character it always appends (if blen > 0). 'lip'
+ * is lead-in string (on each line) than may be NULL. skip_prefix avoids
+ * outputing '   Locally assigned UUID: ' before the UUID. */
+int
+sg_t10_uuid_desig2str(const uint8_t *dp, int dlen, int c_set, bool do_long,
+                      bool skip_prefix, const char * lip /* lead-in */,
+                      int blen, char * b)
+{
+    int m;
+    int n = 0;
+
+    if (NULL == lip)
+        lip = "";
+    if (1 != c_set) {
+        n += sg_scnpr(b + n, blen - n, "%s      << expected binary "
+                      "code_set >>\n", lip);
+        n += hex2str(dp, dlen, lip, 0, blen - n, b + n);
+        return n;
+    }
+    if ((1 != ((dp[0] >> 4) & 0xf)) || (18 != dlen)) {
+        n += sg_scnpr(b + n, blen - n, "%s      << expected locally "
+                      "assigned UUID, 16 bytes long >>\n", lip);
+        n += hex2str(dp, dlen, lip, 0, blen - n, b + n);
+        return n;
+    }
+    if (skip_prefix) {
+        if (strlen(lip) > 0)
+            n += sg_scnpr(b + n, blen - n, "%s", lip);
+    } else
+        n += sg_scnpr(b + n, blen - n, "%s      Locally assigned UUID: ",
+                      lip);
+    for (m = 0; m < 16; ++m) {
+        if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
+            n += sg_scnpr(b + n, blen - n, "-");
+        n += sg_scnpr(b + n, blen - n, "%02x", (my_uint)dp[2 + m]);
+    }
+    n += sg_scnpr(b + n, blen - n, "\n");
+    if (do_long) {
+        n += sg_scnpr(b + n, blen - n, "%s      [0x", lip);
+        for (m = 0; m < 16; ++m)
+            n += sg_scnpr(b + n, blen - n, "%02x", (my_uint)dp[2 + m]);
+        n += sg_scnpr(b + n, blen - n, "]\n");
+    }
+    return n;
+}
+
 int
 sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
                                   int dd_len, bool print_assoc, bool do_long,
@@ -1104,32 +1155,8 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
                           sg_get_trans_proto_str(p_id, sizeof(e), e), lip);
         break;
     case 0xa: /* UUID identifier */
-        if (1 != c_set) {
-            n += sg_scnpr(b + n, blen - n, "%s      << expected binary "
-                          "code_set >>\n", lip);
-            n += hex2str(ip, dlen, lip, 0, blen - n, b + n);
-            break;
-        }
-        if ((1 != ((ip[0] >> 4) & 0xf)) || (18 != dlen)) {
-            n += sg_scnpr(b + n, blen - n, "%s      << expected locally "
-                          "assigned UUID, 16 bytes long >>\n", lip);
-            n += hex2str(ip, dlen, lip, 0, blen - n, b + n);
-            break;
-        }
-        n += sg_scnpr(b + n, blen - n, "%s      Locally assigned UUID: ",
-                      lip);
-        for (m = 0; m < 16; ++m) {
-            if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
-                n += sg_scnpr(b + n, blen - n, "-");
-            n += sg_scnpr(b + n, blen - n, "%02x", (my_uint)ip[2 + m]);
-        }
-        n += sg_scnpr(b + n, blen - n, "\n");
-        if (do_long) {
-            n += sg_scnpr(b + n, blen - n, "%s      [0x", lip);
-            for (m = 0; m < 16; ++m)
-                n += sg_scnpr(b + n, blen - n, "%02x", (my_uint)ip[2 + m]);
-            n += sg_scnpr(b + n, blen - n, "]\n");
-        }
+        n += sg_t10_uuid_desig2str(ip, dlen, c_set, do_long, false, lip,
+                                   blen - n, b + n);
         break;
     default: /* reserved */
         n += sg_scnpr(b + n, blen - n, "%s      reserved designator=0x%x\n",

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2018 Douglas Gilbert.
+ * Copyright (c) 2007-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.58 20180911";/* spc5r19, sbc4r15 */
+const char * sg_lib_version_str = "2.60 20190108";/* spc5r20, sbc4r15 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -275,6 +275,7 @@ struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
 /* Maintenance in [0xa3] service actions */
 struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0x0, PDT_SAC, "Report assigned/unassigned p_extent"},
+    {0x0, PDT_ADC, "Report automation device attributes"},
     {0x1, PDT_SAC, "Report component device"},
     {0x2, PDT_SAC, "Report component device attachments"},
     {0x3, PDT_SAC, "Report peripheral device"},
@@ -304,6 +305,7 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
 /* Maintenance out [0xa4] service actions */
 struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
     {0x0, PDT_SAC, "Add peripheral device / component device"},
+    {0x0, PDT_ADC, "Set automation device attribute"},
     {0x1, PDT_SAC, "Attach to component device"},
     {0x2, PDT_SAC, "Exchange p_extent"},
     {0x3, PDT_SAC, "Exchange peripheral device / component device"},
@@ -342,6 +344,7 @@ struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = {
 
 /* Service action out(12) [0xa9] service actions */
 struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
+    {0x1f, PDT_ADC, "Set medium attribute"},
     {0xff, 0, "Impossible command name"},
     {0xffff, 0, NULL},
 };
@@ -882,6 +885,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x21,0x06,"Attempt to read invalid data"},
     {0x21,0x07,"Read boundary violation"},
     {0x21,0x08,"Misaligned write command"},
+    {0x21,0x09,"Attempt to access gap zone"},
     {0x22,0x00,"Illegal function (use 20 00, 24 00, or 26 00)"},
     {0x23,0x00,"Invalid token operation, cause not reportable"},
     {0x23,0x01,"Invalid token operation, unsupported token type"},
@@ -928,6 +932,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x26,0x13,"Application tag mode page is invalid"},
     {0x26,0x14,"Tape stream mirroring prevented"},
     {0x26,0x15,"Copy source or copy destination not authorized"},
+    {0x26,0x16,"Fast copy not possible"},
     {0x27,0x00,"Write protected"},
     {0x27,0x01,"Hardware write protected"},
     {0x27,0x02,"Logical unit software write protected"},
@@ -989,6 +994,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x0F,"Stream not open"},
     {0x2C,0x10,"Unwritten data in zone"},
     {0x2C,0x11,"Descriptor format sense data required"},
+    {0x2C,0x12,"Zone is inactive"},
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2E,0x01,"Command timeout before processing"},

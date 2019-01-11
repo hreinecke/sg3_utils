@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.56 20181212";
+static const char * version_str = "1.57 20190107";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -238,7 +238,7 @@ usage()
                "\tExample: sg_format --format /dev/sdc\n\n"
                "This utility formats a SCSI disk [FORMAT UNIT] or resizes "
                "it. Alternatively\nif '--tape=FM' is given formats a tape "
-               "[FORMAT MEDIUM].\n");
+               "[FORMAT MEDIUM].\n\n");
         printf("WARNING: This utility will destroy all the data on "
                "DEVICE when '--format'\n\t or '--tape' is given. Check that "
                "you have specified the correct\n\t DEVICE.\n");
