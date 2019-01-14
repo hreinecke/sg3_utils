@@ -1279,7 +1279,7 @@ get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
     const struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (req_dinp) {
-        if (psp->is_read (&& psp->dxfer_len > 0))
+        if (psp->is_read && (psp->dxfer_len > 0))
             *req_dinp = psp->dxfer_len;
         else
             *req_dinp = 0;
@@ -1299,7 +1299,7 @@ get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
     const struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (act_dinp) {
-        if (psp->is_read (&& psp->dxfer_len > 0))
+        if (psp->is_read && (psp->dxfer_len > 0))
             *act_dinp = psp->dxfer_len - psp->resid;
         else
             *act_dinp = 0;
@@ -1342,6 +1342,15 @@ get_scsi_pt_sense_len(const struct sg_pt_base * vp)
     len = psp->sense_len - psp->sense_resid;
     return (len > 0) ? len : 0;
 }
+
+uint8_t *
+get_scsi_pt_sense_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_win32_scsi * psp = vp->implp;
+
+    return psp->sensep;
+}
+
 
 int
 get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))

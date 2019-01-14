@@ -346,7 +346,7 @@ get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
             *req_dinp = 0;
     }
     if (req_doutp) {
-        if ((ptp->dxfer_len > 0) && (USCSI_WRITE & flags))
+        if ((dxfer_len > 0) && (USCSI_WRITE & flags))
             *req_doutp = dxfer_len;
         else
             *req_doutp = 0;
@@ -368,7 +368,7 @@ get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
             *act_dinp = 0;
     }
     if (act_doutp) {
-        if ((ptp->dxfer_len > 0) && (USCSI_WRITE & flags))
+        if ((dxfer_len > 0) && (USCSI_WRITE & flags))
             *act_doutp = dxfer_len - ptp->uscsi.uscsi_resid;
         else
             *act_doutp = 0;
