@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000-2018 D. Gilbert
+ * Copyright (C) 2000-2019 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -42,7 +42,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.44 20180712";
+static const char * version_str = "3.45 20190113";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -330,9 +330,8 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
             set_scsi_pt_cdb(ptvp, cdb, sizeof(cdb));
             set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
             rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, vb);
-            n = sg_cmds_process_resp(ptvp, "Test unit ready", rs,
-                                     SG_NO_DATA_IN, sense_b,
-                                     (0 == k), vb, &sense_cat);
+            n = sg_cmds_process_resp(ptvp, "Test unit ready", rs, (0 == k),
+                                     vb, &sense_cat);
             if (-1 == n) {
                 resp->ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
                 return k;

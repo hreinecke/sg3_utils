@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2018 Douglas Gilbert.
+ * Copyright (c) 2005-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.44 20181212 */
+/* sg_pt_linux version 1.46 20190111 */
 
 
 #include <stdio.h>
@@ -680,15 +680,67 @@ set_scsi_pt_flags(struct sg_pt_base * vp, int flags)
     }
 }
 
+/* If supported it is the number of bytes requested to transfer less the
+ * number actually transferred. This it typically important for data-in
+ * transfers. For data-out (only) transfers, the 'dout_req_len -
+ * dout_act_len' is returned. For bidi transfer the "din" residual is
+ * returned. */
 /* N.B. Returns din_resid and ignores dout_resid */
 int
 get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if (NULL == ptp)
+    if ((NULL == ptp) || (ptp->nvme_direct))
         return 0;
-    return ptp->nvme_direct ? 0 : ptp->io_hdr.din_resid;
+    else if ((ptp->io_hdr.din_xfer_len > 0) &&
+             (ptp->io_hdr.dout_xfer_len > 0))
+        return ptp->io_hdr.din_resid;
+    else if (ptp->io_hdr.dout_xfer_len > 0)
+        return ptp->io_hdr.dout_resid;
+    return ptp->io_hdr.din_resid;
+}
+
+void
+get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
+                   int * req_doutp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (req_dinp) {
+	if (ptp->io_hdr.din_xfer_len > 0)
+	    *req_dinp = ptp->io_hdr.din_xfer_len;
+	else
+	    *req_dinp = 0;
+    }
+    if (req_doutp) {
+	if (ptp->io_hdr.dout_xfer_len > 0)
+	    *req_doutp = ptp->io_hdr.dout_xfer_len;
+	else
+	    *req_doutp = 0;
+    }
+}
+
+void
+get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
+                      int * act_doutp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (act_dinp) {
+	if (ptp->io_hdr.din_xfer_len > 0) {
+	    int res = ptp->io_hdr.din_xfer_len - ptp->io_hdr.din_resid;
+
+	    *act_dinp = (res > 0) ? res : 0;
+	} else
+	    *act_dinp = 0;
+    }
+    if (act_doutp) {
+	if (ptp->io_hdr.dout_xfer_len > 0)
+	    *act_doutp = ptp->io_hdr.dout_xfer_len - ptp->io_hdr.dout_resid;
+	else
+	    *act_doutp = 0;
+    }
 }
 
 int
@@ -719,6 +771,14 @@ get_scsi_pt_sense_len(const struct sg_pt_base * vp)
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     return ptp->io_hdr.response_len;
+}
+
+uint8_t *
+get_scsi_pt_sense_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return (uint8_t *)ptp->io_hdr.response;
 }
 
 int

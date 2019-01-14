@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.65 20190108";    /* spc5r20 */
+static const char * version_str = "0.66 20190113";    /* spc5r20 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -223,8 +223,7 @@ do_rsoc(struct sg_pt_base * ptvp, bool rctd, int rep_opts, int rq_opcode,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, DEF_TIMEOUT_SECS, verbose);
-    ret = sg_cmds_process_resp(ptvp, rsoc_s, res, mx_resp_len, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, rsoc_s, res, noisy, verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
@@ -278,8 +277,8 @@ do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, DEF_TIMEOUT_SECS, verbose);
-    ret = sg_cmds_process_resp(ptvp, rstmf_s, res, mx_resp_len, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, rstmf_s, res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {

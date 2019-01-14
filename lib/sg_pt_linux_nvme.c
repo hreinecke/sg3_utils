@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 Douglas Gilbert.
+ * Copyright (c) 2017-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.05 20180602 */
+/* sg_pt_linux_nvme version 1.06 20190113 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI

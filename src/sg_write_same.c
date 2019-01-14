@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2018 Douglas Gilbert.
+ * Copyright (c) 2009-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.26 20180723";
+static const char * version_str = "1.27 20190113";
 
 
 #define ME "sg_write_same: "
@@ -270,9 +270,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)dataoutp, op->xfer_len);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
-    ret = sg_cmds_process_resp(ptvp, "Write same", res, SG_NO_DATA_IN,
-                               sense_b, true /*noisy */, op->verbose,
-                               &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "Write same", res, true /*noisy */,
+                               op->verbose, &sense_cat);
     if (-1 == ret)
         get_scsi_pt_os_err(ptvp);
     else if (-2 == ret) {

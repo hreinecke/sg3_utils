@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Douglas Gilbert
+ * Copyright (c) 2018-2019 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.05 20181207";
+static const char * version_str = "1.06 20190113";
 
 
 #define ME "sg_tst_nvme: "
@@ -539,8 +539,7 @@ sg_scsi_inquiry(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, timeout_secs, vb);
-    ret = sg_cmds_process_resp(ptvp, "inquiry", res, mx_resp_len, sense_b,
-                               noisy, vb, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "inquiry", res, noisy, vb, &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
     if (residp)
         *residp = resid;

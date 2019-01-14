@@ -1,4 +1,3 @@
-PROPS-END
 /*
  *  Copyright (C) 2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
@@ -53,7 +52,7 @@ PROPS-END
  is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.00  20190110";
+static const char * version_str = "Version: 1.01  20190111";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_OP 0x12
@@ -316,7 +315,7 @@ main(int argc, char * argv[])
     uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {INQ_CMD_OP, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
-                                {SDIAG_CMD_OP, 0, 0, 0, 0, 0};
+                                {SDIAG_CMD_OP, 0x10 /* PF */, 0, 0, 0, 0};
     uint8_t xdwrrd10_cdb[XDWRITEREAD_10_LEN] =
                         {XDWRITEREAD_10_OP, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
     uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
@@ -425,7 +424,7 @@ main(int argc, char * argv[])
                     second_fname, sg_fd2);
     }
 
-#if 0
+#if 1
     printf("start write() calls\n");
     for (k = 0; k < q_len; ++k) {
         io_v4p = &io_v4[k];
@@ -437,26 +436,25 @@ main(int argc, char * argv[])
         if (0 == (k % 3)) {
             io_v4p->request_len = XDWRITEREAD_10_LEN;
             io_v4p->request = (uint64_t)xdwrrd10_cdb;
-            io_hdr[k].dxfer_direction = SG_DXFER_NONE;
+            // io_hdr[k].dxfer_direction = SG_DXFER_NONE;
         } else {
-            io_hdr[k].cmd_len = sizeof(inq_cdb);
-            io_hdr[k].cmdp = inq_cdb;
-            io_hdr[k].dxfer_direction = SG_DXFER_FROM_DEV;
-            io_hdr[k].dxfer_len = INQ_REPLY_LEN;
-            io_hdr[k].dxferp = inqBuff[k];
+            io_v4p->response_len = sizeof(inq_cdb);
+            io_v4p->response = inq_cdb;
+            io_v4p->din_xfer_len = INQ_REPLY_LEN;
+            io_v4p->din_xferp = (uint64_t)inqBuff[k];
         }
-        io_hdr[k].sbp = sense_buffer[k];
-        io_hdr[k].mx_sb_len = SENSE_BUFFER_LEN;
-        io_hdr[k].timeout = 20000;     /* 20000 millisecs == 20 seconds */
-        io_hdr[k].pack_id = k + 3;      /* so pack_id doesn't start at 0 */
+        io_v4p->response = (uint64_t)sense_buffer[k];
+        io_v4p->max_response_len = SENSE_BUFFER_LEN;
+        io_v4p->timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        io_v4p->request_extra = k + 3;  /* so pack_id doesn't start at 0 */
         /* default is to queue at head (in SCSI mid level) */
         if (q_at_tail)
-            io_hdr[k].flags |= SG_FLAG_Q_AT_TAIL;
+            io_v4p->flags |= SG_FLAG_Q_AT_TAIL;
         else
-            io_hdr[k].flags |= SG_FLAG_Q_AT_HEAD;
-        /* io_hdr[k].usr_ptr = NULL; */
+            io_v4p->flags |= SG_FLAG_Q_AT_HEAD;
+        /* io_v4p->usr_ptr = NULL; */
 
-        if (write(sg_fd, &io_hdr[k], sizeof(sg_io_hdr_t)) < 0) {
+        if (write(sg_fd, io_v4p, sizeof(* io_v4p)) < 0) {
             pr2serr("%ssg write errno=%d [%s]\n", cp, errno, strerror(errno));
             close(sg_fd);
             return 1;

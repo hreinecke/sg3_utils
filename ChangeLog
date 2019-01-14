@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190110] [svn: r804]
+Changelog for sg3_utils-1.45 [20190113] [svn: r805]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (spc5r20)
@@ -13,6 +13,8 @@ Changelog for sg3_utils-1.45 [20190110] [svn: r804]
   - sg_vpd: 3pc VPD page add copy group descriptor
   - sg_scan (win32): expand limits for big arrays
   - sg_lib: add sg_t10_uuid_desig2str()
+    - tweak sg_pt interface to better handle bidi
+    - sg_cmds_process_resp(): two arguments removed
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - rescan-scsi-bus: widen LUN 0 only scanning
   - testing/sg_tst_async: fix free_list issue

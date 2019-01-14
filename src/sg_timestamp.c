@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018 Douglas Gilbert.
+ * Copyright (c) 2015-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.12 20180910";
+static const char * version_str = "1.13 20180113";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -217,8 +217,8 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "report timestamp", res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "report timestamp", res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
@@ -280,8 +280,8 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, param_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "set timestamp", res, SG_NO_DATA_IN,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "set timestamp", res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {

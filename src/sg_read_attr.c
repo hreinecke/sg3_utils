@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 Douglas Gilbert.
+ * Copyright (c) 2016-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.11 20180523";
+static const char * version_str = "1.12 20190113";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -280,8 +280,8 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, op->maxlen);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, op->verbose);
-    ret = sg_cmds_process_resp(ptvp, "read attribute", res, op->maxlen,
-                               sense_b, noisy, op->verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "read attribute", res, noisy,
+                               op->verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
