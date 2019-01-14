@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 Douglas Gilbert.
+ * Copyright (c) 2016-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.09 20180625";
+static const char * version_str = "1.10 20190113";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -115,8 +115,8 @@ sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
     set_scsi_pt_cdb(ptvp, bcCDB, sizeof(bcCDB));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cmd_name, res, SG_NO_DATA_IN, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cmd_name, res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {

@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2018 Douglas Gilbert.
+ * Copyright (c) 2007-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -86,6 +86,14 @@ struct sg_lib_4tuple_u8 {
     uint8_t t2;
     uint8_t t3;
     uint8_t t4;
+};
+
+struct sg_cmd_response_t {
+    int din_len;
+    int dout_len;
+    int resid;
+    int resid2;
+    const uint8_t * sbp;
 };
 
 

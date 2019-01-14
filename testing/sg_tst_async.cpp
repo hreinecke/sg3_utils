@@ -811,7 +811,6 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
         ++thr_sync_starts;
         rs = do_scsi_pt(ptp, -1, DEF_PT_TIMEOUT, vb);
         n = sg_cmds_process_resp(ptp, "Test unit ready", rs,
-                                 SG_NO_DATA_IN, sense_b,
                                  (0 == k), vb, &sense_cat);
         if (-1 == n) {
             ret = sg_convert_errno(get_scsi_pt_os_err(ptp));

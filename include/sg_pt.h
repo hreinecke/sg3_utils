@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2018 Douglas Gilbert.
+ * Copyright (c) 2005-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -172,9 +172,12 @@ int do_scsi_pt(struct sg_pt_base * objp, int fd, int timeout_secs,
  * belongs to. */
 int get_scsi_pt_result_category(const struct sg_pt_base * objp);
 
-/* If not available return 0 which implies there is no residual
- * value. If supported the number of bytes actually sent back by
- * the device is 'dxfer_ilen - get_scsi_pt_len()' bytes.  */
+/* If not available return 0 which implies there is no residual value. If
+ * supported it is the number of bytes requested to transfer less the
+ * number actually transferred. This it typically important for data-in
+ * transfers. For data-out (only) transfers, the 'dout_req_len -
+ * dout_act_len' is returned. For bidi transfer the data-in residual is
+ * returned. */
 int get_scsi_pt_resid(const struct sg_pt_base * objp);
 
 /* Returns SCSI status value (from device that received the command). If an
@@ -190,6 +193,7 @@ uint32_t get_pt_result(const struct sg_pt_base * objp);
 /* Actual sense length returned. If sense data is present but
    actual sense length is not known, return 'max_sense_len' */
 int get_scsi_pt_sense_len(const struct sg_pt_base * objp);
+uint8_t * get_scsi_pt_sense_buf(const struct sg_pt_base * objp);
 
 /* If not available return 0 (for success). */
 int get_scsi_pt_os_err(const struct sg_pt_base * objp);
@@ -206,6 +210,15 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * objp,
  * that the lower layers (and hardware) took to execute the previous
  * command. */
 int get_scsi_pt_duration_ms(const struct sg_pt_base * objp);
+
+/* The two functions yield requested and actual data transfer lengths in
+ * bytes. The second argument is a pointer to the data-in length; the third
+ * argument is a pointer to the data-out length. The pointers may be NULL.
+ * The _actual_ values are related to resid (residual count from DMA) */
+void get_pt_req_lengths(const struct sg_pt_base * objp, int * req_dinp,
+		        int * req_doutp);
+void get_pt_actual_lengths(const struct sg_pt_base * objp, int * act_dinp,
+			   int * act_doutp);
 
 /* Return true if device associated with 'objp' uses NVMe command set. To
  * be useful (in modifying the type of command sent (SCSI or NVMe) then

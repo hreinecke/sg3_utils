@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_win32 version 1.28 20180615 */
+/* sg_pt_win32 version 1.29 20190111 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1271,6 +1271,47 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 
     return psp->resid;
 }
+
+void
+get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
+                   int * req_doutp)
+{
+    const struct sg_pt_win32_scsi * psp = vp->implp;
+
+    if (req_dinp) {
+        if (psp->is_read (&& psp->dxfer_len > 0))
+            *req_dinp = psp->dxfer_len;
+        else
+            *req_dinp = 0;
+    }
+    if (req_doutp) {
+        if ((! psp->is_read) && (psp->dxfer_len > 0))
+            *req_doutp = psp->dxfer_len;
+        else
+            *req_doutp = 0;
+    }
+}
+
+void
+get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
+                      int * act_doutp)
+{
+    const struct sg_pt_win32_scsi * psp = vp->implp;
+
+    if (act_dinp) {
+        if (psp->is_read (&& psp->dxfer_len > 0))
+            *act_dinp = psp->dxfer_len - psp->resid;
+        else
+            *act_dinp = 0;
+    }
+    if (act_doutp) {
+        if ((! psp->is_read) && (psp->dxfer_len > 0))
+            *act_doutp = psp->dxfer_len - psp->resid;
+        else
+            *act_doutp = 0;
+    }
+}
+
 
 int
 get_scsi_pt_status_response(const struct sg_pt_base * vp)

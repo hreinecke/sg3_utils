@@ -15,7 +15,7 @@
  * Invocation: sg_queue_tst [-l=Q_LEN] [-t] <sg_device>
  *      -t      queue at tail
  *
- * Version 0.94 (20190109)
+ * Version 0.95 (20190111)
  */
 
 #include <unistd.h>
@@ -104,7 +104,7 @@ int main(int argc, char * argv[])
     uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
-                                {0x1d, 0, 0, 0, 0, 0};
+                                {0x1d, 0x10 /* PF */, 0, 0, 0, 0};
     uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr[MAX_Q_LEN];
     sg_io_hdr_t rio_hdr;

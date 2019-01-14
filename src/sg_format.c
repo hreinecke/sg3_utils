@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2018  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2019  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.57 20190107";
+static const char * version_str = "1.58 20190113";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -281,8 +281,8 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
         set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, transfer_len);
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
-        ret = sg_cmds_process_resp(ptvp, "format medium", res, transfer_len,
-                                   sense_b, noisy, verbose, &sense_cat);
+        ret = sg_cmds_process_resp(ptvp, "format medium", res, noisy,
+                                   verbose, &sense_cat);
         if (-1 == ret)
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
         else if (-2 == ret) {

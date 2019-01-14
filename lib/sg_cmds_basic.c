@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2018 Douglas Gilbert.
+ * Copyright (c) 1999-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 #endif
 
 
-static const char * const version_str = "1.90 20180712";
+static const char * const version_str = "1.91 20190113";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -93,12 +93,22 @@ sg_cmds_close_device(int device_fd)
 
 static const char * const pass_through_s = "pass-through";
 
-static int
-sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
-                       const uint8_t * sbp, int slen, bool noisy,
-                       int verbose, int * o_sense_cat)
+static void
+sg_cmds_resid_print(const char * leadin, bool is_din, int num_req,
+                    int num_got)
 {
-    int scat, got;
+    pr2ws("    %s: %s requested %d bytes (data-%s  got %d "
+          "bytes%s\n", leadin, pass_through_s,num_req,
+          (is_din ? "in), got" : "out) but reported"), num_got,
+          (is_din ? "" : " sent"));
+}
+
+static int
+sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
+                       int req_dout_x, int act_dout_x, const uint8_t * sbp,
+                       int slen, bool noisy, int verbose, int * o_sense_cat)
+{
+    int scat;
     bool n = false;
     bool check_data_in = false;
     char b[512];
@@ -138,11 +148,27 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
         sg_get_sense_str(NULL, sbp, slen, (verbose > 1),
                          sizeof(b), b);
         pr2ws("%s", b);
-        if ((mx_di_len > 0) && (resid > 0)) {
-            got = mx_di_len - resid;
-            if ((verbose > 2) || check_data_in || (got > 0))
-                pr2ws("    %s requested %d bytes (data-in) but got %d "
-                      "bytes\n", pass_through_s, mx_di_len, got);
+        if (req_din_x > 0) {
+            if (act_din_x != req_din_x) {
+                if ((verbose > 2) || check_data_in || (act_din_x > 0))
+                    sg_cmds_resid_print(leadin, true, req_din_x, act_din_x);
+                if (act_din_x < 0) {
+                    if (verbose)
+                        pr2ws("    %s: %s can't get negative bytes, say it "
+                              "got none\n", leadin, pass_through_s);
+                }
+            }
+        }
+        if (req_dout_x > 0) {
+            if (act_dout_x != req_dout_x) {
+                if ((verbose > 1) && (act_dout_x > 0))
+                    sg_cmds_resid_print(leadin, false, req_dout_x, act_dout_x);
+                if (act_dout_x < 0) {
+                    if (verbose)
+                        pr2ws("    %s: %s can't send negative bytes, say it "
+                              "sent none\n", leadin, pass_through_s);
+                }
+            }
         }
     }
     if (o_sense_cat)
@@ -155,19 +181,18 @@ sg_cmds_process_helper(const char * leadin, int mx_di_len, int resid,
  * sense data is found it is decoded and output to sg_warnings_strm (def:
  * stderr); depending on the 'noisy' and 'verbose' settings. Returns -2 for
  * "sense" category (may not be fatal), -1 for failed, 0, or a positive
- * number. If 'mx_di_len > 0' then asks pass-through for resid and returns
- * (mx_di_len - resid); otherwise returns 0. So for data-in it should return
- * the actual number of bytes received. For data-out (to device) or no data
- * call with 'mx_di_len' set to 0 or less. If -2 returned then sense category
+ * number. If din type command (or bidi) returns actual number of bytes read
+ * (din_len - resid); otherwise returns 0. If -2 returned then sense category
  * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
  * categories also have data in bytes received; -2 is still returned. */
 int
 sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
-                     int pt_res, int mx_di_len, const uint8_t * sbp,
-                     bool noisy, int verbose, int * o_sense_cat)
+                     int pt_res, bool noisy, int verbose, int * o_sense_cat)
 {
-    int got, cat, duration, slen, resid, resp_code, sstat;
     bool transport_sense;
+    int cat, duration, slen, resp_code, sstat, req_din_x, req_dout_x;
+    int act_din_x, act_dout_x;
+    const uint8_t * sbp;
     char b[1024];
 
     if (NULL == leadin)
@@ -200,8 +225,10 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     }
     if ((verbose > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
         pr2ws("      duration=%d ms\n", duration);
-    resid = (mx_di_len > 0) ? get_scsi_pt_resid(ptvp) : 0;
+    get_pt_req_lengths(ptvp, &req_din_x, &req_dout_x);
+    get_pt_actual_lengths(ptvp, &act_din_x, &act_dout_x);
     slen = get_scsi_pt_sense_len(ptvp);
+    sbp = get_scsi_pt_sense_buf(ptvp);
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
     case SCSI_PT_RESULT_GOOD:
         if (sbp && (slen > 7)) {
@@ -217,21 +244,31 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                 }
             }
         }
-        if (mx_di_len > 0) {
-            got = mx_di_len - resid;
-            if ((verbose > 1) && (resid != 0))
-                pr2ws("    %s: %s requested %d bytes (data-in) but got %d "
-                      "bytes\n", leadin, pass_through_s, mx_di_len, got);
-            if (got >= 0)
-                return got;
-            else {
-                if (verbose)
-                    pr2ws("    %s: %s can't get negative bytes, say it got "
-                          "none\n", leadin, pass_through_s);
-                return 0;
+        if (req_din_x > 0) {
+            if (act_din_x != req_din_x) {
+                if ((verbose > 1) && (act_din_x >= 0))
+                    sg_cmds_resid_print(leadin, true, req_din_x, act_din_x);
+                if (act_din_x < 0) {
+                    if (verbose)
+                        pr2ws("    %s: %s can't get negative bytes, say it "
+                              "got none\n", leadin, pass_through_s);
+                    act_din_x = 0;
+                }
             }
-        } else
-            return 0;
+        }
+        if (req_dout_x > 0) {
+            if (act_dout_x != req_dout_x) {
+                if ((verbose > 1) && (act_dout_x >= 0))
+                    sg_cmds_resid_print(leadin, false, req_dout_x, act_dout_x);
+                if (act_dout_x < 0) {
+                    if (verbose)
+                        pr2ws("    %s: %s can't send negative bytes, say it "
+                              "sent none\n", leadin, pass_through_s);
+                    act_dout_x = 0;
+                }
+            }
+        }
+        return act_din_x;
     case SCSI_PT_RESULT_STATUS: /* other than GOOD and CHECK CONDITION */
         sstat = get_scsi_pt_status_response(ptvp);
         if (o_sense_cat) {
@@ -264,7 +301,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         return -1;
     case SCSI_PT_RESULT_SENSE:
-        return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp, slen,
+        return sg_cmds_process_helper(leadin, req_din_x, act_din_x,
+                                      req_dout_x, act_dout_x, sbp, slen,
                                       noisy, verbose, o_sense_cat);
     case SCSI_PT_RESULT_TRANSPORT_ERR:
         if (verbose || noisy) {
@@ -278,8 +316,9 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                             get_scsi_pt_status_response(ptvp)) && (slen > 0));
 #endif
         if (transport_sense)
-            return sg_cmds_process_helper(leadin, mx_di_len, resid, sbp,
-                                          slen, noisy, verbose, o_sense_cat);
+            return sg_cmds_process_helper(leadin, req_din_x, act_din_x,
+                                          req_dout_x, act_dout_x, sbp, slen,
+                                          noisy, verbose, o_sense_cat);
         else
             return -1;
     case SCSI_PT_RESULT_OS_ERR:
@@ -351,8 +390,8 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, bool cmddt, bool evpd, int pg_op,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, timeout_secs, verbose);
-    ret = sg_cmds_process_resp(ptvp, inquiry_s, res, mx_resp_len, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, inquiry_s, res, noisy, verbose,
+                               &sense_cat);
     resid = get_scsi_pt_resid(ptvp);
     if (residp)
         *residp = resid;
@@ -559,8 +598,7 @@ sg_ll_test_unit_ready_progress_pt(struct sg_pt_base * ptvp, int pack_id,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_packet_id(ptvp, pack_id);
     res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, tur_s, res, SG_NO_DATA_IN, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, tur_s, res, noisy, verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
@@ -665,8 +703,7 @@ sg_ll_request_sense_com(struct sg_pt_base * ptvp, int sg_fd, bool desc,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, rq_s, res, mx_resp_len, sense_b, noisy,
-                               verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, rq_s, res, noisy, verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
@@ -740,8 +777,8 @@ sg_ll_report_luns_com(struct sg_pt_base * ptvp, int sg_fd, int select_report,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, report_luns_s, res, mx_resp_len,
-                               sense_b, noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, report_luns_s, res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {

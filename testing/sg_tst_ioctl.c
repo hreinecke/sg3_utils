@@ -53,7 +53,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.02  20190106";
+static const char * version_str = "Version: 1.02  20190111";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -451,7 +451,7 @@ main(int argc, char * argv[])
     uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
-                                {0x1d, 0, 0, 0, 0, 0};
+                                {0x1d, 0x10 /* PF */, 0, 0, 0, 0};
     uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr[MAX_Q_LEN];
     sg_io_hdr_t rio_hdr;

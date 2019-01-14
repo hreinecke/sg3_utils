@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018 Douglas Gilbert.
+ * Copyright (c) 2017-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.19 20180628";
+static const char * version_str = "1.20 20190113";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1329,8 +1329,8 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
         pr2serr("%s:  dout_len==0, so empty dout buffer\n",
                 op->cdb_name);
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, vb);
-    ret = sg_cmds_process_resp(ptvp, op->cdb_name, res, SG_NO_DATA_IN,
-                               sense_b, true /*noisy */, vb, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, op->cdb_name, res, true /*noisy */, vb,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {

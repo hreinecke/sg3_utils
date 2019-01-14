@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 Douglas Gilbert.
+ * Copyright (c) 2014-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.12 20180628";
+static const char * version_str = "1.13 20190113";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -142,9 +142,8 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
     set_scsi_pt_cdb(ptvp, zo_cdb, sizeof(zo_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res,
-                               SG_NO_DATA_IN, sense_b, noisy, verbose,
-                               &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res, noisy,
+                               verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {

@@ -20,7 +20,7 @@
    The default behaviour is to "queue at head" which is useful for
    error processing but not for streaming READ and WRITE commands.
 
-*  Copyright (C) 2010-2016 D. Gilbert
+*  Copyright (C) 2010-2019 D. Gilbert
 *  This program is free software; you can redistribute it and/or modify
 *  it under the terms of the GNU General Public License as published by
 *  the Free Software Foundation; either version 2, or (at your option)
@@ -29,7 +29,7 @@
    Invocation: bsg_queue_tst [-t] <bsg_device>
         -t      queue at tail
 
-   Version 0.90 (20100324)
+   Version 0.91 (20190111)
 
 */
 
@@ -55,7 +55,7 @@ int main(int argc, char * argv[])
     uint8_t inq_cdb[INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
-                                {0x1d, 0, 0, 0, 0, 0};
+                                {0x1d, 0x10 /* PF */, 0, 0, 0, 0};
     uint8_t inqBuff[16][INQ_REPLY_LEN];
     struct sg_io_v4 io_hdr[16];
     struct sg_io_v4 rio_hdr;

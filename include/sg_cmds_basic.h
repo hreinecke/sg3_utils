@@ -2,7 +2,7 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -343,8 +343,8 @@ const char * sg_cmds_version();
  * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
  * categories also have data in bytes received; -2 is still returned. */
 int sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
-                         int pt_res, int mx_di_len, const uint8_t * sense_b,
-                         bool noisy, int verbose, int * o_sense_cat);
+                         int pt_res, bool noisy, int verbose,
+                         int * o_sense_cat);
 
 /* NVMe devices use a different command set. This function will return true
  * if the device associated with 'pvtp' is a NVME device, else it will

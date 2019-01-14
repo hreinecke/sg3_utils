@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Douglas Gilbert.
+ * Copyright (c) 2018-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.06 20180628";
+static const char * version_str = "1.07 20190113";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -139,8 +139,8 @@ sg_ll_get_stream_status(int sg_fd, uint16_t s_str_id, uint8_t * resp,
     set_scsi_pt_data_in(ptvp, resp, alloc_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cmd_name, res, alloc_len, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cmd_name, res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
@@ -205,8 +205,8 @@ sg_ll_stream_control(int sg_fd, uint32_t str_ctl, uint16_t str_id,
     set_scsi_pt_data_in(ptvp, resp, alloc_len);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cmd_name, res, alloc_len, sense_b,
-                               noisy, verbose, &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, cmd_name, res, noisy, verbose,
+                               &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
