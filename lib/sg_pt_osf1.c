@@ -523,6 +523,14 @@ get_scsi_pt_sense_len(const struct sg_pt_base * vp)
     return (len > 0) ? len : 0;
 }
 
+uint8_t *
+get_scsi_pt_sense_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    return ptp->sense;
+}
+
 int
 get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 {
