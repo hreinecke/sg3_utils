@@ -53,7 +53,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.02  20190111";
+static const char * version_str = "Version: 1.02  20190113";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -93,9 +93,9 @@ static const char * relative_cp = NULL;
 static void
 usage(void)
 {
-    printf("Usage: 'sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
+    printf("Usage: sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
            "[-t]\n"
-           "       [-v] [-V] [-w] <sg_device> [<sg_device2>]'\n"
+           "                    [-v] [-V] [-w] <sg_device> [<sg_device2>]\n"
            " where:\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
@@ -223,7 +223,7 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     memset(seip, 0, sizeof(*seip));
     seip->valid_wr_mask |= SG_SEIM_RESERVED_SIZE;
     seip->reserved_sz = reserve_buff_sz;
-    seip->sgat_elem_sz = 64 * 1024;;
+    seip->sgat_elem_sz = 64 * 1024;
     seip->valid_rd_mask |= SG_SEIM_RESERVED_SIZE;
     seip->valid_rd_mask |= SG_SEIM_RQ_REM_THRESH;
     seip->valid_rd_mask |= SG_SEIM_TOT_FD_THRESH;

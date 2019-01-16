@@ -1026,11 +1026,11 @@ main(int argc, char * argv[])
             }
             break;
         case 'v':
-            op->verbose_given = true;;
+            op->verbose_given = true;
             ++op->verbose;
             break;
         case 'V':
-            op->version_given = true;;
+            op->version_given = true;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
