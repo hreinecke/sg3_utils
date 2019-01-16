@@ -1435,7 +1435,7 @@ main(int argc, char * argv[])
                 snprintf(ebuff, EBUFF_SZ, "%scould not open %s for sg "
                          "reading", my_name, inf);
                 perror(ebuff);
-                return sg_convert_errno(err);;
+                return sg_convert_errno(err);
             }
             if (sg_prepare(clp->infd, clp->bs, clp->bpt))
                 return SG_LIB_FILE_ERROR;

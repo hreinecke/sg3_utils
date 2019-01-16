@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "December 2018" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_FORMAT "8" "January 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_format \- format, resize a SCSI disk or format a tape
 .SH SYNOPSIS
@@ -145,7 +145,7 @@ UNIT cdb. The field was introduced in SBC\-4 revision 10. The default value
 is 0 which implies the former action which is typically to overwrite all
 blocks on the \fIDEVICE\fR. That can take a long time (e.g. with hard disks
 over 10 TB in size that can be days). With \fIFFMT\fR set that time may be
-reduced to minutes. So it is worth trying if it is available.
+reduced to minutes or less. So it is worth trying if it is available.
 .br
 \fIFFMT\fR has values 1 and 2 for fast format with 3 being reserved
 currently. These two values include this description: "The device server
@@ -156,7 +156,7 @@ data has been written to, after the fast format. When \fIFFMT\fR is 1 the
 read operation should return "unspecified logical block data" and complete
 without error. When \fIFFMT\fR is 2 the read operation may yield check
 condition status with a sense key set to hardware error, medium error or
-command aborted. See SBC\-4 revision 15 section 4.35 for more details.
+command aborted. See draft SBC\-4 revision 16 section 4.34 for more details.
 .TP
 \fB\-f\fR, \fB\-\-fmtpinfo\fR=\fIFPI\fR
 sets the FMTPINFO field in the FORMAT UNIT cdb to a value between 0 and 3.
@@ -333,6 +333,10 @@ given then the "IMMED" bit is not set. If \fI\-\-wait\fR is given then the
 FORMAT UNIT or FORMAT MEDIUM command waits until the format operation
 completes before returning its response. This can be many hours on large
 disks. See the \fI\-\-timeout=SECS\fR option.
+.br
+Alternatively this option may be useful when used together with
+\fI\-\-ffmt=FFMT\fR (and \fIFFMT\fR greater than 0) since the fast format
+may only be a matter of seconds.
 .SH LISTS
 The SBC\-3 draft (revision 20) defines PLIST, CLIST, DLIST and GLIST in
 section 4.10 on "Medium defects". Briefly, the PLIST is the "primary"
@@ -376,8 +380,8 @@ introduced in the SBC\-2 standard. SBC\-3 defines 4 protection types (types
 0 to 3) with protection type 0 meaning no PI is maintained. While a device
 may support one or more protection types, it can only be formatted with 1
 of the 4. To change a device's protection type, it must be re\-formatted.
-For more information see the Protection Information in section 4.22 of
-draft SBC\-4 revision 15.
+For more information see the Protection Information in section 4.21 of
+draft SBC\-4 revision 16.
 .PP
 A device that supports PI information (i.e. supports one or more protection
 types 1, 2 and 3) sets the "PROTECT" bit in its standard INQUIRY response. It
@@ -634,6 +638,9 @@ backed up.
 Now /dev/sdd should have 512 byte logical block size. And to switch it back:
 .PP
    # sg_format \-\-format \-\-ffmt=1 \-\-size=4096 /dev/sdd
+.PP
+Since fast formats can be very quick (a matter of seconds) using the
+\-\-wait option may be appropriate
 .SH EXIT STATUS
 The exit status of sg_format is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
@@ -644,7 +651,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2018 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2019 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

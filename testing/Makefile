@@ -50,7 +50,7 @@ bsg: $(BSG_EXTRAS)
 
 
 depend dep:
-	for i in *.c; do $(CC) $(INCLUDES) $(CFLAGS) -M $$i; \
+	for i in *.c; do $(CC) $(CPPFLAGS) $(INCLUDES) $(CFLAGS) -M $$i; \
 	done > .depend
 
 clean:
@@ -87,7 +87,7 @@ sgh_dd: sgh_dd.o $(LIBFILESNEW)
 sgs_dd: sgs_dd.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
-sg_tst_bidi: sg_tst_bidi.o $(LIBFILESOLD)
+sg_tst_bidi: sg_tst_bidi.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 install: $(EXECS)

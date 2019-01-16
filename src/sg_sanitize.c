@@ -685,7 +685,7 @@ main(int argc, char * argv[])
                     snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
                              "reading", op->pattern_fn);
                     perror(ebuff);
-                    ret = sg_convert_errno(err);;
+                    ret = sg_convert_errno(err);
                     goto err_out;
                 } else if (sg_set_binary_mode(infd) < 0)
                     perror("sg_set_binary_mode");

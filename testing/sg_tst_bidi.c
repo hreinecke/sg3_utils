@@ -46,19 +46,18 @@
 #include "sg_io_linux.h"
 #include "sg_linux_inc.h"
 #include "sg_pr2serr.h"
+#include "sg_unaligned.h"
 
 /* This program tests bidirectional (bidi) SCSI command support in version 4.0
  * and later of the Linux sg driver. The SBC-3 command XDWRITEREAD(10) that
  is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.01  20190111";
+static const char * version_str = "Version: 1.02  20190115";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_OP 0x12
 #define INQ_CMD_LEN 6
-#define SDIAG_CMD_OP 0x1d
-#define SDIAG_CMD_LEN 6
 #define SENSE_BUFFER_LEN 96
 #define XDWRITEREAD_10_OP 0x53
 #define XDWRITEREAD_10_LEN 10
@@ -79,41 +78,46 @@ static const char * version_str = "Version: 1.01  20190111";
 #define DEF_RESERVE_BUFF_SZ (256 * 1024)
 
 
-static bool ioctl_only = false;
 static bool q_at_tail = false;
-static bool write_only = false;
-
 static int q_len = DEF_Q_LEN;
 static int sleep_secs = 0;
 static int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
 static int verbose = 0;
 
-static const char * relative_cp = NULL;
-
 
 static void
 usage(void)
 {
-    printf("Usage: 'sg_tst_bidi [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
-           "[-t]\n"
-           "       [-v] [-V] [-w] <sg_device> [<sg_device2>]'\n"
+    printf("Usage: sg_tst_bidi [-b=LB_SZ] [-d=DIO_BLKS] [-D] [-h] -l=LBA [-N] "
+           "[-q=Q_LEN]\n"
+           "                   [-Q] [-r=SZ] [-s=SEC] [-t] [-v] [-V] [-w] "
+           "<sg_device>\n"
            " where:\n"
-           "      -h      help: print usage message then exit\n"
-           "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
-           "      -o      ioctls only, then exit\n"
+           "      -b=LB_SZ    logical block size (def: 512 bytes)\n"
+           "      -d=DIO_BLKS    data in and out length (unit: logical "
+           "blocks; def: 1)\n"
+           "      -D    do direct IO (def: indirect which is also "
+           "fallback)\n"
+           "      -h    help: print usage message then exit\n"
+           "      -l=LBA    logical block address (LDA) of first modded "
+           "block\n"
+           "      -N    durations in nanoseconds (def: milliseconds)\n"
+           "      -q=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
+           "      -Q    quiet, suppress usual output\n"
            "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
            "KB)\n"
            "      -s=SEC    sleep between writes and reads (def: 0)\n"
            "      -t    queue_at_tail (def: q_at_head)\n"
            "      -v    increase verbosity of output\n"
            "      -V    print version string then exit\n"
-           "      -w    write (submit) only then exit\n");
+           "      -w    sets DISABLE WRITE bit on cdb to 0 (def: 1)\n\n"
+           "Warning: this test utility writes to location LBA and Q_LEN "
+           "following\nblocks using the XDWRITEREAD(10) SBC-3 command\n");
 }
 
 static int
-tst_ioctl(int sg_fd, const char * fn2p, int sg_fd2, const char * cp)
+ext_ioctl(int sg_fd, bool nanosecs)
 {
-    uint32_t cflags;
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
 
@@ -121,187 +125,21 @@ tst_ioctl(int sg_fd, const char * fn2p, int sg_fd2, const char * cp)
     memset(seip, 0, sizeof(*seip));
     seip->valid_wr_mask |= SG_SEIM_RESERVED_SIZE;
     seip->reserved_sz = reserve_buff_sz;
-    seip->sgat_elem_sz = 64 * 1024;;
     seip->valid_rd_mask |= SG_SEIM_RESERVED_SIZE;
-    seip->valid_rd_mask |= SG_SEIM_RQ_REM_THRESH;
-    seip->valid_rd_mask |= SG_SEIM_TOT_FD_THRESH;
     seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
-    seip->valid_rd_mask |= SG_SEIM_MINOR_INDEX;
-    seip->valid_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_OTHER_OPENS;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_ORPHANS;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_Q_TAIL;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_IS_SHARE;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_IS_MASTER;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_UNSHARE;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_FINI;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_ERR;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_CHECK_FOR_MORE;
-    seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
-
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-#if 1
-    printf("%sSG_SET_GET_EXTENDED ioctl ok\n", cp);
-    if (SG_SEIM_RESERVED_SIZE & seip->valid_rd_mask)
-        printf("  %sreserved size: %u\n", cp, seip->reserved_sz);
-    if (SG_SEIM_MINOR_INDEX & seip->valid_rd_mask)
-        printf("  %sminor index: %u\n", cp, seip->minor_index);
-    if (SG_SEIM_RQ_REM_THRESH & seip->valid_rd_mask)
-        printf("  %srq_rem_sgat_thresh: %u\n", cp, seip->rq_rem_sgat_thresh);
-    if (SG_SEIM_TOT_FD_THRESH & seip->valid_rd_mask)
-        printf("  %stot_fd_thresh: %u\n", cp, seip->tot_fd_thresh);
-    if ((SG_SEIM_CTL_FLAGS & seip->valid_rd_mask) ||
-         (SG_SEIM_CTL_FLAGS & seip->valid_wr_mask)) {
-        cflags = seip->ctl_flags;
-        if (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags_rd_mask)
-            printf("  %sTIME_IN_NS: %s\n", cp,
-                   (SG_CTL_FLAGM_TIME_IN_NS & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_OTHER_OPENS & seip->ctl_flags_rd_mask)
-            printf("  %sOTHER_OPENS: %s\n", cp,
-                   (SG_CTL_FLAGM_OTHER_OPENS & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_ORPHANS & seip->ctl_flags_rd_mask)
-            printf("  %sORPHANS: %s\n", cp,
-                   (SG_CTL_FLAGM_ORPHANS & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_Q_TAIL & seip->ctl_flags_rd_mask)
-            printf("  %sQ_TAIL: %s\n", cp,
-                   (SG_CTL_FLAGM_Q_TAIL & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_IS_SHARE & seip->ctl_flags_rd_mask)
-            printf("  %sIS_SHARE: %s\n", cp,
-                   (SG_CTL_FLAGM_IS_SHARE & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_IS_MASTER & seip->ctl_flags_rd_mask)
-            printf("  %sIS_MASTER: %s\n", cp,
-                   (SG_CTL_FLAGM_IS_MASTER & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_UNSHARE & seip->ctl_flags_rd_mask)
-            printf("  %sUNSHARE: %s\n", cp,
-                   (SG_CTL_FLAGM_UNSHARE & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_MASTER_FINI & seip->ctl_flags_rd_mask)
-            printf("  %sMASTER_FINI: %s\n", cp,
-                   (SG_CTL_FLAGM_MASTER_FINI & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_MASTER_ERR & seip->ctl_flags_rd_mask)
-            printf("  %sMASTER_ERR: %s\n", cp,
-                   (SG_CTL_FLAGM_MASTER_ERR & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_CHECK_FOR_MORE & seip->ctl_flags_rd_mask)
-            printf("  %sCHECK_FOR_MORE: %s\n", cp,
-                   (SG_CTL_FLAGM_CHECK_FOR_MORE & cflags) ? "true" : "false");
-    }
-    if (SG_SEIM_MINOR_INDEX & seip->valid_rd_mask)
-        printf("  %sminor_index: %u\n", cp, seip->minor_index);
-    printf("\n");
-#endif
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_INT_MASK;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_INT_MASK]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_BOOL_MASK;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_BOOL_MASK]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_VERS_NUM;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_VERS_NUM]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_FL_RQS;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_FL_RQS]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_DEV_FL_RQS;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_DEV_FL_RQS]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_TRC_SZ;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_TRC_SZ]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_TRC_MAX_SZ;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_TRC_MAX_SZ]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_SHARE_FD;
-    seip->valid_rd_mask |= SG_SEIM_SHARE_FD;
-#if 1
-    seip->share_fd = sg_fd2;
-#else
-    seip->share_fd = sg_fd;
-#endif
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("%sioctl(SG_SET_GET_EXTENDED) shared_fd=%d, failed errno=%d "
-                "%s\n", cp, sg_fd2, errno, strerror(errno));
-    }
-    printf("  %sshare successful, read back shared_fd= %d\n", cp,
-           (int)seip->share_fd);
-
-    // printf("SG_IOSUBMIT value=0x%lx\n", SG_IOSUBMIT);
-    // printf("SG_IORECEIVE value=0x%lx\n", SG_IORECEIVE);
-    if (ioctl(sg_fd, SG_GET_TRANSFORM, NULL) < 0)
-        pr2serr("ioctl(SG_GET_TRANSFORM) fail expected, errno=%d %s\n",
-                errno, strerror(errno));
+    if (nanosecs)
+        seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
     else
-        printf("%sSG_GET_TRANSFORM okay (does nothing)\n", cp);
-    if (ioctl(sg_fd, SG_SET_TRANSFORM, NULL) < 0)
-        pr2serr("ioctl(SG_SET_TRANSFORM) fail expected, errno=%d %s\n",
-                errno, strerror(errno));
-    else
-        printf("%sSG_SET_TRANSFORM okay (does nothing)\n", cp);
-    printf("\n");
+        seip->ctl_flags &= ~SG_CTL_FLAGM_TIME_IN_NS;
 
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        return 1;
+    }
     return 0;
 }
 
@@ -310,12 +148,20 @@ int
 main(int argc, char * argv[])
 {
     bool done;
-    int sg_fd, k, ok, ver_num, pack_id, num_waiting, access_count;
-    int sg_fd2 = -1;
-    uint8_t inq_cdb[INQ_CMD_LEN] =
-                                {INQ_CMD_OP, 0, 0, 0, INQ_REPLY_LEN, 0};
-    uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
-                                {SDIAG_CMD_OP, 0x10 /* PF */, 0, 0, 0, 0};
+    bool direct_io = false;
+    bool lba_given = false;
+    bool nanosecs = false;
+    bool quiet = false;
+    bool disable_write = true;
+    int k, j, ok, ver_num, pack_id, num_waiting, access_count, din_len;
+    int dout_len, cat;
+    int ret = 0;
+    int sg_fd = -1;
+    int lb_sz = 512;
+    int dio_blks = 1;
+    int dirio_count = 0;
+    int64_t lba = 0;
+    uint8_t inq_cdb[INQ_CMD_LEN] = {INQ_CMD_OP, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t xdwrrd10_cdb[XDWRITEREAD_10_LEN] =
                         {XDWRITEREAD_10_OP, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
     uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
@@ -323,26 +169,60 @@ main(int argc, char * argv[])
     struct sg_io_v4 rio_v4;
     struct sg_io_v4 * io_v4p;
     char * file_name = 0;
+    uint8_t * dinp;
+    uint8_t * free_dinp = NULL;
+    uint8_t * doutp;
+    uint8_t * free_doutp = NULL;
     char ebuff[EBUFF_SZ];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
-    const char * second_fname = NULL;
-    const char * cp;
     struct sg_scsi_id ssi;
 
     for (k = 1; k < argc; ++k) {
-        if (0 == memcmp("-h", argv[k], 2)) {
+        if (0 == memcmp("-b=", argv[k], 3)) {
+            lb_sz = atoi(argv[k] + 3);
+            if (lb_sz < 512 || (0 != (lb_sz % 512))) {
+                printf("Expect -b=LB_SZ be 512 or higher and a power of 2\n");
+                file_name = 0;
+                break;
+            }
+        } else if (0 == memcmp("-d=", argv[k], 3)) {
+            dio_blks = atoi(argv[k] + 3);
+            if ((dio_blks < 1) || (dio_blks > 0xffff)) {
+                fprintf(stderr, "Expect -d=DIO_BLKS to be 1 or greater and "
+                        "less than 65536\n");
+                file_name = 0;
+                break;
+            }
+        } else if (0 == memcmp("-D", argv[k], 2))
+            direct_io = true;
+        else if (0 == memcmp("-h", argv[k], 2)) {
             file_name = 0;
             break;
         } else if (0 == memcmp("-l=", argv[k], 3)) {
+            if (lba_given) {
+                pr2serr("can only give -l=LBA option once\n");
+                file_name = 0;
+                break;
+            }
+            lba = sg_get_llnum(argv[k] + 3);
+            if ((lba < 0) || (lba > 0xffffffff)) {
+                pr2serr("Expect -l= argument (LBA) to be non-negative and "
+                        "fit in 32 bits\n");
+                return -1;
+            }
+            lba_given = true;
+        } else if (0 == memcmp("-N", argv[k], 2))
+            nanosecs = true;
+        else if (0 == memcmp("-q=", argv[k], 3)) {
             q_len = atoi(argv[k] + 3);
             if ((q_len > 511) || (q_len < 1)) {
-                printf("Expect -l= to take a number (q length) between 1 "
+                printf("Expect -q= to take a number (q length) between 1 "
                        "and 511\n");
                 file_name = 0;
                 break;
             }
-        } else if (0 == memcmp("-o", argv[k], 2))
-            ioctl_only = true;
+        } else if (0 == memcmp("-Q", argv[k], 2))
+            quiet = true;
         else if (0 == memcmp("-r=", argv[k], 3)) {
             reserve_buff_sz = atoi(argv[k] + 3);
             if (reserve_buff_sz < 0) {
@@ -359,6 +239,8 @@ main(int argc, char * argv[])
             }
         } else if (0 == memcmp("-t", argv[k], 2))
             q_at_tail = true;
+        else if (0 == memcmp("-vvvvv", argv[k], 5))
+            verbose += 5;
         else if (0 == memcmp("-vvvv", argv[k], 5))
             verbose += 4;
         else if (0 == memcmp("-vvv", argv[k], 4))
@@ -372,7 +254,7 @@ main(int argc, char * argv[])
             file_name = 0;
             break;
         } else if (0 == memcmp("-w", argv[k], 2))
-            write_only = true;
+            disable_write = false;
         else if (*argv[k] == '-') {
             printf("Unrecognized switch: %s\n", argv[k]);
             file_name = 0;
@@ -380,8 +262,6 @@ main(int argc, char * argv[])
         }
         else if (0 == file_name)
             file_name = argv[k];
-        else if (NULL == second_fname)
-            second_fname = argv[k];
         else {
             printf("too many arguments\n");
             file_name = 0;
@@ -392,6 +272,28 @@ main(int argc, char * argv[])
         printf("No filename (sg device) given\n\n");
         usage();
         return 1;
+    }
+    if (! lba_given) {
+        pr2serr("Needs the -l=LBA 'option' to be given, hex numbers "
+                "prefixed by '0x';\nor with a trailing 'h'\n");
+        ret = 1;
+        goto out;
+    }
+    din_len = lb_sz * dio_blks;
+    dout_len = lb_sz * dio_blks;
+    dinp = sg_memalign(din_len * q_len, 0, &free_dinp, false);
+    if (NULL == dinp) {
+        fprintf(stderr, "Unable to allocate %d byte for din buffer\n",
+                din_len * q_len);
+        ret = 1;
+        goto out;
+    }
+    doutp = sg_memalign(dout_len * q_len, 0, &free_doutp, false);
+    if (NULL == doutp) {
+        fprintf(stderr, "Unable to allocate %d byte for dout buffer\n",
+                dout_len * q_len);
+        ret = 1;
+        goto out;
     }
 
     /* An access mode of O_RDWR is required for write()/read() interface */
@@ -411,35 +313,44 @@ main(int argc, char * argv[])
         goto out;
     }
     printf("Linux sg driver version: %d\n", ver_num);
+    if (ext_ioctl(sg_fd, nanosecs))
+        goto out;
 
-    if (second_fname) {
-        if ((sg_fd2 = open(second_fname, O_RDWR)) < 0) {
-            snprintf(ebuff, EBUFF_SZ,
-                     "%s: error opening file: %s", __func__, second_fname);
-            perror(ebuff);
-            return 1;
-        }
-        if (verbose)
-            fprintf(stderr, "opened second file: %s successfully, fd=%d\n",
-                    second_fname, sg_fd2);
-    }
-
-#if 1
     printf("start write() calls\n");
     for (k = 0; k < q_len; ++k) {
         io_v4p = &io_v4[k];
         /* Prepare INQUIRY command */
         memset(io_v4p, 0, sizeof(*io_v4p));
         io_v4p->guard = 'Q';
+        if (direct_io)
+            io_v4p->flags |= SG_FLAG_DIRECT_IO;
         /* io_v4p->iovec_count = 0; */  /* memset takes care of this */
-        io_v4p->max_response_len = sizeof(sense_buffer);
-        if (0 == (k % 3)) {
+        if (0 != (k % 64)) {
+            if (disable_write)
+                xdwrrd10_cdb[2] |= 0x4;
+            sg_put_unaligned_be16(dio_blks, xdwrrd10_cdb + 7);
+            sg_put_unaligned_be32(lba, xdwrrd10_cdb + 2);
+            if (verbose > 2) {
+                pr2serr("    %s cdb: ", "XDWRITE(10)");
+                for (j = 0; j < XDWRITEREAD_10_LEN; ++j)
+                    pr2serr("%02x ", xdwrrd10_cdb[j]);
+                pr2serr("\n");
+            }
             io_v4p->request_len = XDWRITEREAD_10_LEN;
             io_v4p->request = (uint64_t)xdwrrd10_cdb;
-            // io_hdr[k].dxfer_direction = SG_DXFER_NONE;
+            io_v4p->din_xfer_len = din_len;
+            io_v4p->din_xferp = (uint64_t)(dinp + (k * din_len));
+            io_v4p->dout_xfer_len = dout_len;
+            io_v4p->dout_xferp = (uint64_t)(doutp + (k * dout_len));
         } else {
-            io_v4p->response_len = sizeof(inq_cdb);
-            io_v4p->response = inq_cdb;
+            if (verbose > 2) {
+                pr2serr("    %s cdb: ", "INQUIRY");
+                for (j = 0; j < INQ_CMD_LEN; ++j)
+                    pr2serr("%02x ", inq_cdb[j]);
+                pr2serr("\n");
+            }
+            io_v4p->request_len = sizeof(inq_cdb);
+            io_v4p->request = (uint64_t)inq_cdb;
             io_v4p->din_xfer_len = INQ_REPLY_LEN;
             io_v4p->din_xferp = (uint64_t)inqBuff[k];
         }
@@ -454,13 +365,13 @@ main(int argc, char * argv[])
             io_v4p->flags |= SG_FLAG_Q_AT_HEAD;
         /* io_v4p->usr_ptr = NULL; */
 
-        if (write(sg_fd, io_v4p, sizeof(* io_v4p)) < 0) {
-            pr2serr("%ssg write errno=%d [%s]\n", cp, errno, strerror(errno));
+        if (ioctl(sg_fd, SG_IOSUBMIT, io_v4p) < 0) {
+            pr2serr("sg ioctl(SG_IOSUBMIT) errno=%d [%s]\n", errno,
+                    strerror(errno));
             close(sg_fd);
             return 1;
         }
     }
-#endif
 
     memset(&ssi, 0, sizeof(ssi));
     if (ioctl(sg_fd, SG_GET_SCSI_ID, &ssi) < 0)
@@ -486,10 +397,8 @@ main(int argc, char * argv[])
     else
         printf("num_waiting: %d\n", num_waiting);
 
-    sleep(sleep_secs);
-
-    if (write_only)
-        goto out;
+    if (sleep_secs > 0)
+        sleep(sleep_secs);
 
     if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
@@ -523,17 +432,21 @@ main(int argc, char * argv[])
             else
                 printf("access_count: %d\n", access_count);
         }
-#if 0
-        memset(&rio_hdr, 0, sizeof(sg_io_hdr_t));
-        rio_hdr.interface_id = 'S';
-        if (read(sg_fd, &rio_hdr, sizeof(sg_io_hdr_t)) < 0) {
-            perror("sg read error");
+        memset(&rio_v4, 0, sizeof(struct sg_io_v4));
+        rio_v4.guard = 'Q';
+        if (ioctl(sg_fd, SG_IORECEIVE, &rio_v4) < 0) {
+            perror("sg ioctl(SG_IORECEIVE) error");
             close(sg_fd);
             return 1;
         }
         /* now for the error processing */
         ok = 0;
-        switch (sg_err_category3(&rio_hdr)) {
+        cat = sg_err_category_new(rio_v4.device_status,
+                                  rio_v4.transport_status,
+                                  rio_v4.driver_status,
+                                  (const uint8_t *)rio_v4.response,
+                                  rio_v4.response_len);
+        switch (cat) {
         case SG_LIB_CAT_CLEAN:
             ok = 1;
             break;
@@ -542,24 +455,45 @@ main(int argc, char * argv[])
             ok = 1;
             break;
         default: /* won't bother decoding other categories */
-            sg_chk_n_print3("command error", &rio_hdr, 1);
+            sg_linux_sense_print(NULL, rio_v4.device_status,
+                                 rio_v4.transport_status,
+                                 rio_v4.driver_status,
+                                 (const uint8_t *)rio_v4.response,
+                                 rio_v4.response_len, true);
             break;
         }
-
-        if (ok) { /* output result if it is available */
-            if (0 == (rio_hdr.pack_id % 3))
-                printf("SEND DIAGNOSTIC %d duration=%u\n", rio_hdr.pack_id,
-                       rio_hdr.duration);
-            else
-                printf("INQUIRY %d duration=%u\n", rio_hdr.pack_id,
-                       rio_hdr.duration);
+        if ((rio_v4.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO)
+            ++dirio_count;
+        if (verbose > 3) {
+            pr2serr(">> din_resid=%d, dout_resid=%d, info=0x%x\n",
+                    rio_v4.din_resid, rio_v4.dout_resid, rio_v4.info);
+            if (rio_v4.response_len > 0) {
+                pr2serr("sense buffer: ");
+                hex2stderr(sense_buffer[k], rio_v4.response_len, -1);
+            }
         }
-#endif
+        if ((! quiet) && ok) { /* output result if it is available */
+            if (0 != ((rio_v4.request_extra - 3) % 64))
+                printf("XDWRITEREAD(10) %d duration=%u\n",
+                       rio_v4.request_extra, rio_v4.duration);
+            else
+                printf("INQUIRY %d duration=%u\n",
+                       rio_v4.request_extra,
+                       rio_v4.duration);
+        }
     }
+    if (direct_io && (dirio_count < q_len)) {
+        pr2serr("Direct IO requested %d times, done %d times\nMaybe need "
+                "'echo 1 > /proc/scsi/sg/allow_dio'\n", q_len, dirio_count);
+    }
+    ret = 0;
 
 out:
-    close(sg_fd);
-    if (sg_fd2 >= 0)
-        close(sg_fd2);
-    return 0;
+    if (sg_fd >= 0)
+        close(sg_fd);
+    if (free_dinp)
+        free(free_dinp);
+    if (free_doutp)
+        free(free_doutp);
+    return ret;
 }
