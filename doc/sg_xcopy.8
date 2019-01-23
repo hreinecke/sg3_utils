@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_XCOPY "8" "January 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -9,7 +9,7 @@ COPY (XCOPY)
 [\fIoflag=FLAGS\fR] [\fIseek=SEEK\fR] [\fIskip=SKIP\fR] [\fI\-\-help\fR]
 [\fI\-\-version\fR]
 .PP
-[\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1]
+[\fIapp=\fR0|1] [\fIbpt=BPT\fR] [\fIcat=\fR0|1] [\fIdc=\fR0|1] [\fIfco=\fR0|1]
 [\fIid_usage=\fR{hold|discard|disable}] [\fIlist_id=ID\fR] [\fIprio=PRIO\fR]
 [\fItime=\fR0|1] [\fIverbose=VERB\fR] [\fI\-\-on_dst|\-\-on_src\fR]
 [\fI\-\-verbose\fR]
@@ -18,14 +18,6 @@ COPY (XCOPY)
 .PP
 Copy data to and from any files. Specialized for "files" that are Linux SCSI
 devices that support the SCSI EXTENDED COPY (XCOPY) command.
-.PP
-During the draft stages of SPC\-4 the T10 committee has expanded the XCOPY
-command so that it now has two variants: "LID1" (for a List Identifier
-length of 1 byte) and "LID4" (for a List Identifier length of 4 bytes).
-This utility supports the older, LID1 variant which is also found in SPC\-3
-and earlier.  While the LID1 variant in SPC\-4 is command level (binary)
-compatible with XCOPY as defined in SPC\-3, some of the command naming has
-changed. This utility uses the older, SPC\-3 XCOPY names.
 .PP
 This utility
 has similar syntax and semantics to
@@ -42,11 +34,25 @@ with the \fI\-\-on_src\fR or \fIiflag=xflag\fR options which cause the XCOPY
 command to be sent to \fIIFILE\fR instead. Also see the section on
 ENVIRONMENT VARIABLES.
 .PP
+In the SPC\-4 standard the T10 committee has expanded the XCOPY command so
+that it now has two variants: "LID1" (for a List Identifier length of 1 byte)
+and "LID4" (for a List Identifier length of 4 bytes). This utility supports
+the older, LID1 variant which is also found in SPC\-3 and earlier. While the
+LID1 variant in SPC\-4 is command level (binary) compatible with XCOPY as
+defined in SPC\-3, some of the command naming has changed. This utility uses
+the older, SPC\-3 XCOPY names.
+.PP
 The ddpt utility supports the same xcopy(LID1) functionality as this utility
 with the same options and flags. Additionally ddpt supports a subset of
 xcopy(LID4) functionality variously called "xcopy version 2, lite" or ODX.
 ODX is a market name and stands for Offloaded Data Xfer (i.e. transfer).
 .SH OPTIONS
+.TP
+\fBapp\fR={0|1}
+if 1 start the destination of the copy at the end of OFILE. This assumes
+that OFILE is a regular file. The default is 0 in which case the destination
+of the copy starts at the beginning of OFILE (possibly offset be SEEK). This
+option cannot be used with the \fIseek=SEEK\fR option.
 .TP
 \fBbpt\fR=\fIBPT\fR
 each IO transaction will be made using \fIBPT\fR blocks (or less if near
@@ -73,16 +79,8 @@ the handling of residual data. See section
 .B HANDLING OF RESIDUAL DATA
 for details.
 .TP
-\fBdc\fR={0|1}
-sets the SCSI EXTENDED COPY command segment descriptor DC bit to 0 or
-1 (default: 0). The DC bit controls whether \fICOUNT\fR
-refers to the source (\fIdc=0\fR) or the target (\fIdc=1\fR) descriptor.
-.TP
 \fBconv\fR=\fBCONV\fR
 all \fBCONV\fR arguments are ignored.
-.TP
-\fBapp\fR=\fBAPPEND\fR
-all \fBAPPEND\fR arguments are ignored.
 .TP
 \fBcount\fR=\fICOUNT\fR
 copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
@@ -97,6 +95,19 @@ partition and \fICOUNT\fR is not given then the size of the partition
 rather than the size of the whole device is used. If \fICOUNT\fR is
 not given (or \fIcount=\-1\fR) and cannot be derived then an error
 message is issued and no copy takes place.
+.TP
+\fBdc\fR={0|1}
+sets the SCSI EXTENDED COPY command segment descriptor DC bit to 0 or
+1 (default: 0). The DC bit controls whether \fICOUNT\fR
+refers to the source (\fIdc=0\fR) or the target (\fIdc=1\fR) descriptor.
+.TP
+\fBfco\fR={0|1}
+sets the SCSI EXTENDED COPY command segment descriptor FCO bit to 0 or
+1 (default: 0). The Fast Copy Only (FCO) bit set will result in the
+copy being done but a technique faster than SCSI READ and WRITE commands.
+If the copy cannot but done in a faster manner then a sense key of "Copy
+aborted" with and additional sense of "Fast copy not possible" is
+returned.
 .TP
 \fBibs\fR=\fIBS\fR
 if given must be the same as \fIBS\fR given to 'bs=' option.
@@ -343,7 +354,7 @@ Written by Hannes Reinecke and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2018 Hannes Reinecke and Douglas Gilbert
+Copyright \(co 2000\-2019 Hannes Reinecke and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

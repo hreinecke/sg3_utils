@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.49 20190109";  /* spc5r20 + sbc4r15 */
+static const char * version_str = "1.50 20190119";  /* spc5r20 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -152,9 +152,10 @@ static int svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue,
 static int svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue,
                                  int off);
 
-static int decode_dev_ids(const char * print_if_found, uint8_t * buff,
-                          int len, int m_assoc, int m_desig_type,
-                          int m_code_set, const struct opts_t * op);
+static int decode_dev_ids(const char * print_if_found, int num_leading,
+                          uint8_t * buff, int len, int m_assoc,
+                          int m_desig_type, int m_code_set,
+                          const struct opts_t * op);
 
 uint8_t * rsp_buff;
 const int rsp_buff_sz = MX_ALLOC_LEN + 2;
@@ -746,23 +747,23 @@ decode_id_vpd(uint8_t * buff, int len, int subvalue,
     m_d = -1;
     m_cs = -1;
     if (0 == subvalue) {
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), b, blen,
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
                        VPD_ASSOC_LU, m_d, m_cs, op);
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), b, blen,
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b, blen,
                        VPD_ASSOC_TPORT, m_d, m_cs, op);
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), b, blen,
+        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0, b, blen,
                        VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     } else if (VPD_DI_SEL_AS_IS == subvalue)
-        decode_dev_ids(NULL, b, blen, m_a, m_d, m_cs, op);
+        decode_dev_ids(NULL, 0, b, blen, m_a, m_d, m_cs, op);
     else {
         if (VPD_DI_SEL_LU & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), b, blen,
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
                            VPD_ASSOC_LU, m_d, m_cs, op);
         if (VPD_DI_SEL_TPORT & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), b, blen,
-                           VPD_ASSOC_TPORT, m_d, m_cs, op);
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b,
+                           blen, VPD_ASSOC_TPORT, m_d, m_cs, op);
         if (VPD_DI_SEL_TARGET & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE),
+            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0,
                            b, blen, VPD_ASSOC_TDEVICE, m_d, m_cs, op);
     }
 }
@@ -925,8 +926,8 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, const struct opts_t * op)
             } else {
                 if ((0 == op->do_quiet) || (ip_tid_len > 0))
                     printf("    Target port descriptor(s):\n");
-                decode_dev_ids("SCSI Ports", bp + bump + 4, tpd_len,
-                               VPD_ASSOC_TPORT, -1, -1, op);
+                decode_dev_ids("", 2 /* leading spaces */, bp + bump + 4,
+                               tpd_len, VPD_ASSOC_TPORT, -1, -1, op);
             }
         }
         bump += tpd_len + 4;
@@ -1133,18 +1134,25 @@ decode_dev_ids_quiet(uint8_t * buff, int len, int m_assoc,
 /* Prints outs designation descriptors (dd_s)selected by association,
    designator type and/or code set. */
 static int
-decode_dev_ids(const char * print_if_found, uint8_t * buff, int len,
-               int m_assoc, int m_desig_type, int m_code_set,
+decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
+               int len, int m_assoc, int m_desig_type, int m_code_set,
                const struct opts_t * op)
 {
     int assoc, off, u, i_len;
     bool printed;
     const uint8_t * bp;
     char b[1024];
+    char sp[82];
 
     if (op->do_quiet)
         return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
                                     m_code_set);
+    if (num_leading > (int)(sizeof(sp) - 2))
+        num_leading = sizeof(sp) - 2;
+    if (num_leading > 0)
+        snprintf(sp, sizeof(sp), "%*c", num_leading, ' ');
+    else
+        sp[0] = '\0';
     if (buff[2] != 0) { /* all valid dd_s should have 0 in this byte */
         if (op->verbose)
             pr2serr("%s: designation descriptors byte 2 should be 0\n"
@@ -1166,11 +1174,12 @@ decode_dev_ids(const char * print_if_found, uint8_t * buff, int len,
         assoc = ((bp[1] >> 4) & 0x3);
         if (print_if_found && (! printed)) {
             printed = true;
-            printf("  %s:\n", print_if_found);
+	    if (strlen(print_if_found) > 0)
+                printf("  %s:\n", print_if_found);
         }
         if (NULL == print_if_found)
-            printf("  %s:\n", sg_get_desig_assoc_str(assoc));
-        sg_get_designation_descriptor_str("", bp, i_len + 4, false,
+            printf("  %s%s:\n", sp, sg_get_desig_assoc_str(assoc));
+        sg_get_designation_descriptor_str(sp, bp, i_len + 4, false,
                                           op->do_long, sizeof(b), b);
         printf("%s", b);
     }
@@ -1603,6 +1612,7 @@ decode_rod_descriptor(const uint8_t * buff, int len)
 {
     const uint8_t * bp = buff;
     int k, bump;
+    uint64_t ul;
 
     for (k = 0; k < len; k += bump, bp += bump) {
         bump = sg_get_unaligned_be16(bp + 2) + 4;
@@ -1613,26 +1623,46 @@ decode_rod_descriptor(const uint8_t * buff, int len)
                        sg_get_unaligned_be16(bp + 6));
                 printf("  Maximum Bytes in block ROD: %" PRIu64 "\n",
                        sg_get_unaligned_be64(bp + 8));
-                printf("  Optimal Bytes in block ROD transfer: %" PRIu64 "\n",
-                       sg_get_unaligned_be64(bp + 16));
-                printf("  Optimal Bytes to token per segment: %" PRIu64 "\n",
-                       sg_get_unaligned_be64(bp + 24));
-                printf("  Optimal Bytes from token per segment:"
-                       " %" PRIu64 "\n", sg_get_unaligned_be64(bp + 32));
+                ul = sg_get_unaligned_be64(bp + 16);
+                printf("  Optimal Bytes in block ROD transfer: ");
+                if (SG_LIB_UNBOUNDED_64BIT == ul)
+                    printf("-1 [no limit]\n");
+                else
+                    printf("%" PRIu64 "\n", ul);
+                ul = sg_get_unaligned_be64(bp + 24);
+                printf("  Optimal Bytes to token per segment: ");
+                if (SG_LIB_UNBOUNDED_64BIT == ul)
+                    printf("-1 [no limit]\n");
+                else
+                    printf("%" PRIu64 "\n", ul);
+                ul = sg_get_unaligned_be64(bp + 32);
+                printf("  Optimal Bytes from token per segment: ");
+                if (SG_LIB_UNBOUNDED_64BIT == ul)
+                    printf("-1 [no limit]\n");
+                else
+                    printf("%" PRIu64 "\n", ul);
                 break;
             case 1:
                 /* Stream ROD device type specific descriptor */
                 printf("  Maximum Bytes in stream ROD: %" PRIu64 "\n",
                        sg_get_unaligned_be64(bp + 8));
-                printf("  Optimal Bytes in stream ROD transfer:"
-                       " %" PRIu64 "\n", sg_get_unaligned_be64(bp + 16));
+                ul = sg_get_unaligned_be64(bp + 16);
+                printf("  Optimal Bytes in stream ROD transfer: ");
+                if (SG_LIB_UNBOUNDED_64BIT == ul)
+                    printf("-1 [no limit]\n");
+                else
+                    printf("%" PRIu64 "\n", ul);
                 break;
             case 3:
                 /* Copy manager ROD device type specific descriptor */
                 printf("  Maximum Bytes in processor ROD: %" PRIu64 "\n",
                        sg_get_unaligned_be64(bp + 8));
-                printf("  Optimal Bytes in processor ROD transfer:"
-                       " %" PRIu64 "\n", sg_get_unaligned_be64(bp + 16));
+                ul = sg_get_unaligned_be64(bp + 16);
+                printf("  Optimal Bytes in processor ROD transfer: ");
+                if (SG_LIB_UNBOUNDED_64BIT == ul)
+                    printf("-1 [no limit]\n");
+                else
+                    printf("%" PRIu64 "\n", ul);
                 break;
             default:
                 printf("  Unhandled descriptor (format %d, device type %d)\n",

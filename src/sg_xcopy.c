@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2018 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2019 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.68 20180811";
+static const char * version_str = "0.69 20190120";
 
 #define ME "sg_xcopy: "
 
@@ -172,6 +172,7 @@ static bool do_time = false;
 static bool start_tm_valid = false;
 static bool xcopy_flag_cat = false;
 static bool xcopy_flag_dc = false;
+static bool xcopy_flag_fco = false;     /* fast copy only, spc5r20 */
 static int blk_sz = 0;
 static int list_id_usage = -1;
 static int priority = 1;
@@ -533,6 +534,7 @@ primary_help:
             "    conv        ignored\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    dc          xcopy segment descriptor DC bit (default: 0)\n"
+            "    fco         xcopy segment descriptor FCO bit (default: 0)\n"
             "    ibs         input block size (if given must be same as "
             "'bs=')\n"
             "    id_usage    sets list_id_usage field to hold (0), "
@@ -596,6 +598,8 @@ scsi_encode_seg_desc(uint8_t *seg_desc, int seg_desc_type,
         seg_desc[1] |= 0x1;
     if (xcopy_flag_dc)
         seg_desc[1] |= 0x2;
+    if (xcopy_flag_fco)
+        seg_desc[1] |= 0x4;
     if (seg_desc_type == 0x02) {
         seg_desc_len = 0x18;
         seg_desc[4] = 0;
@@ -1260,6 +1264,8 @@ open_of(struct xcopy_fp_t * ofp, int vb)
         flags = O_RDWR | O_NONBLOCK;
         if (ofp->excl)
             flags |= O_EXCL;
+        if (ofp->append)
+            flags |= O_APPEND;
         if ((outfd = open(ofp->fname, flags)) < 0) {
             err = errno;
             snprintf(ebuff, EBUFF_SZ,
@@ -1409,6 +1415,13 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             xcopy_flag_dc = !! n;
+        } else if (0 == strcmp(key, "fco")) {
+            n = sg_get_num(buf);
+            if (n < 0 || n > 1) {
+                pr2serr(ME "bad argument to 'fco='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            xcopy_flag_fco = !! n;
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
         } else if (strcmp(key, "if") == 0) {

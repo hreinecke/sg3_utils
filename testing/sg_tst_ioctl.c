@@ -53,7 +53,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.02  20190113";
+static const char * version_str = "Version: 1.03  20190123";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -445,7 +445,7 @@ int
 main(int argc, char * argv[])
 {
     bool done;
-    int sg_fd, k, ok, ver_num, pack_id, num_waiting, access_count;
+    int sg_fd, k, ok, ver_num, pack_id, num_waiting;
     int sg_fd2 = -1;
     int sock = -1;
     uint8_t inq_cdb[INQ_CMD_LEN] =
@@ -689,11 +689,6 @@ main(int argc, char * argv[])
                         errno, strerror(errno));
             else
                 printf("num_waiting: %d\n", num_waiting);
-            if (ioctl(sg_fd, SG_GET_ACCESS_COUNT, &access_count) < 0)
-                pr2serr("ioctl(SG_GET_ACCESS_COUNT) failed, errno=%d %s\n",
-                        errno, strerror(errno));
-            else
-                printf("access_count: %d\n", access_count);
         }
         memset(&rio_hdr, 0, sizeof(sg_io_hdr_t));
         rio_hdr.interface_id = 'S';
