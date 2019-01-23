@@ -53,7 +53,7 @@
  is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.02  20190115";
+static const char * version_str = "Version: 1.03  20190122";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_OP 0x12
@@ -90,8 +90,9 @@ usage(void)
 {
     printf("Usage: sg_tst_bidi [-b=LB_SZ] [-d=DIO_BLKS] [-D] [-h] -l=LBA [-N] "
            "[-q=Q_LEN]\n"
-           "                   [-Q] [-r=SZ] [-s=SEC] [-t] [-v] [-V] [-w] "
-           "<sg_device>\n"
+           "                   [-Q] [-r=SZ] [-R=RC] [-s=SEC] [-t] [-v] [-V] "
+           "[-w]\n"
+           "                   <sg_or_bsg_device>\n"
            " where:\n"
            "      -b=LB_SZ    logical block size (def: 512 bytes)\n"
            "      -d=DIO_BLKS    data in and out length (unit: logical "
@@ -102,17 +103,23 @@ usage(void)
            "      -l=LBA    logical block address (LDA) of first modded "
            "block\n"
            "      -N    durations in nanoseconds (def: milliseconds)\n"
-           "      -q=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
+           "      -q=Q_LEN    queue length, between 1 and 511 (def: 16). "
+           " Calls\n"
+           "                  ioctl(SG_IO) when -q=1 else SG_IOSUBMIT "
+           "(async)\n"
            "      -Q    quiet, suppress usual output\n"
            "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
            "KB)\n"
+           "      -R=RC     repetition count (def: 0)\n"
            "      -s=SEC    sleep between writes and reads (def: 0)\n"
            "      -t    queue_at_tail (def: q_at_head)\n"
            "      -v    increase verbosity of output\n"
            "      -V    print version string then exit\n"
            "      -w    sets DISABLE WRITE bit on cdb to 0 (def: 1)\n\n"
            "Warning: this test utility writes to location LBA and Q_LEN "
-           "following\nblocks using the XDWRITEREAD(10) SBC-3 command\n");
+           "following\nblocks using the XDWRITEREAD(10) SBC-3 command. "
+           "When -q=1 does\nioctl(SG_IO) and that is only case when a "
+           "bsg device can be given.\n");
 }
 
 static int
@@ -153,9 +160,10 @@ main(int argc, char * argv[])
     bool nanosecs = false;
     bool quiet = false;
     bool disable_write = true;
-    int k, j, ok, ver_num, pack_id, num_waiting, access_count, din_len;
+    int k, j, ok, ver_num, pack_id, num_waiting, din_len;
     int dout_len, cat;
     int ret = 0;
+    int rep_count = 0;
     int sg_fd = -1;
     int lb_sz = 512;
     int dio_blks = 1;
@@ -175,7 +183,6 @@ main(int argc, char * argv[])
     uint8_t * free_doutp = NULL;
     char ebuff[EBUFF_SZ];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
-    struct sg_scsi_id ssi;
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-b=", argv[k], 3)) {
@@ -227,6 +234,13 @@ main(int argc, char * argv[])
             reserve_buff_sz = atoi(argv[k] + 3);
             if (reserve_buff_sz < 0) {
                 printf("Expect -r= to take a number 0 or higher\n");
+                file_name = 0;
+                break;
+            }
+        } else if (0 == memcmp("-R=", argv[k], 3)) {
+            rep_count = atoi(argv[k] + 3);
+            if (rep_count < 0) {
+                printf("Expect -R= to take a number 0 or higher\n");
                 file_name = 0;
                 break;
             }
@@ -312,14 +326,99 @@ main(int argc, char * argv[])
                 strerror(errno));
         goto out;
     }
-    printf("Linux sg driver version: %d\n", ver_num);
-    if (ext_ioctl(sg_fd, nanosecs))
+    if (! quiet)
+        printf("Linux sg driver version: %d\n", ver_num);
+    if ((q_len > 1) && ext_ioctl(sg_fd, nanosecs))
         goto out;
 
-    printf("start write() calls\n");
+
+    if (1 == q_len) {   /* do sync ioct(SG_IO) */
+        io_v4p = &io_v4[k];
+rep_sg_io:
+        memset(io_v4p, 0, sizeof(*io_v4p));
+        io_v4p->guard = 'Q';
+        if (direct_io)
+            io_v4p->flags |= SG_FLAG_DIRECT_IO;
+        if (disable_write)
+            xdwrrd10_cdb[2] |= 0x4;
+        sg_put_unaligned_be16(dio_blks, xdwrrd10_cdb + 7);
+        sg_put_unaligned_be32(lba, xdwrrd10_cdb + 2);
+        if (verbose > 2) {
+            pr2serr("    %s cdb: ", "XDWRITE(10)");
+            for (j = 0; j < XDWRITEREAD_10_LEN; ++j)
+                pr2serr("%02x ", xdwrrd10_cdb[j]);
+            pr2serr("\n");
+        }
+        io_v4p->request_len = XDWRITEREAD_10_LEN;
+        io_v4p->request = (uint64_t)xdwrrd10_cdb;
+        io_v4p->din_xfer_len = din_len;
+        io_v4p->din_xferp = (uint64_t)(dinp + (k * din_len));
+        io_v4p->dout_xfer_len = dout_len;
+        io_v4p->dout_xferp = (uint64_t)(doutp + (k * dout_len));
+        io_v4p->response = (uint64_t)sense_buffer[k];
+        io_v4p->max_response_len = SENSE_BUFFER_LEN;
+        io_v4p->timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        io_v4p->request_extra = 99;  /* so pack_id doesn't start at 0 */
+        /* default is to queue at head (in SCSI mid level) */
+        if (q_at_tail)
+            io_v4p->flags |= SG_FLAG_Q_AT_TAIL;
+        else
+            io_v4p->flags |= SG_FLAG_Q_AT_HEAD;
+        /* io_v4p->usr_ptr = NULL; */
+
+        if (ioctl(sg_fd, SG_IO, io_v4p) < 0) {
+            pr2serr("sg ioctl(SG_IO) errno=%d [%s]\n", errno,
+                    strerror(errno));
+            close(sg_fd);
+            return 1;
+        }
+        /* now for the error processing */
+        ok = 0;
+        rio_v4 = *io_v4p;
+        cat = sg_err_category_new(rio_v4.device_status,
+                                  rio_v4.transport_status,
+                                  rio_v4.driver_status,
+                                  (const uint8_t *)rio_v4.response,
+                                  rio_v4.response_len);
+        switch (cat) {
+        case SG_LIB_CAT_CLEAN:
+            ok = 1;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+            printf("Recovered error, continuing\n");
+            ok = 1;
+            break;
+        default: /* won't bother decoding other categories */
+            sg_linux_sense_print(NULL, rio_v4.device_status,
+                                 rio_v4.transport_status,
+                                 rio_v4.driver_status,
+                                 (const uint8_t *)rio_v4.response,
+                                 rio_v4.response_len, true);
+            break;
+        }
+        if ((rio_v4.info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO)
+            ++dirio_count;
+        if (verbose > 3) {
+            pr2serr(">> din_resid=%d, dout_resid=%d, info=0x%x\n",
+                    rio_v4.din_resid, rio_v4.dout_resid, rio_v4.info);
+            if (rio_v4.response_len > 0) {
+                pr2serr("sense buffer: ");
+                hex2stderr(sense_buffer[k], rio_v4.response_len, -1);
+            }
+        }
+        if ((! quiet) && ok)  /* output result if it is available */
+            printf("XDWRITEREAD(10) using ioctl(SG_IO) duration=%u\n",
+                   rio_v4.duration);
+        if (rep_count-- > 0)
+            goto rep_sg_io;
+        goto out;
+    }
+
+rep_async:
+    if (! quiet)
+        printf("start write() calls\n");
     for (k = 0; k < q_len; ++k) {
         io_v4p = &io_v4[k];
-        /* Prepare INQUIRY command */
         memset(io_v4p, 0, sizeof(*io_v4p));
         io_v4p->guard = 'Q';
         if (direct_io)
@@ -373,28 +472,34 @@ main(int argc, char * argv[])
         }
     }
 
-    memset(&ssi, 0, sizeof(ssi));
-    if (ioctl(sg_fd, SG_GET_SCSI_ID, &ssi) < 0)
-        pr2serr("ioctl(SG_GET_SCSI_ID) failed, errno=%d %s\n",
-                errno, strerror(errno));
-    else {
-        printf("host_no: %d\n", ssi.host_no);
-        printf("  channel: %d\n", ssi.channel);
-        printf("  scsi_id: %d\n", ssi.scsi_id);
-        printf("  lun: %d\n", ssi.lun);
-        printf("  pdt: %d\n", ssi.scsi_type);
-        printf("  h_cmd_per_lun: %d\n", ssi.h_cmd_per_lun);
-        printf("  d_queue_depth: %d\n", ssi.d_queue_depth);
+#if 0
+    {
+        struct sg_scsi_id ssi;
+
+        memset(&ssi, 0, sizeof(ssi));
+        if (ioctl(sg_fd, SG_GET_SCSI_ID, &ssi) < 0)
+            pr2serr("ioctl(SG_GET_SCSI_ID) failed, errno=%d %s\n",
+                    errno, strerror(errno));
+        else {
+            printf("host_no: %d\n", ssi.host_no);
+            printf("  channel: %d\n", ssi.channel);
+            printf("  scsi_id: %d\n", ssi.scsi_id);
+            printf("  lun: %d\n", ssi.lun);
+            printf("  pdt: %d\n", ssi.scsi_type);
+            printf("  h_cmd_per_lun: %d\n", ssi.h_cmd_per_lun);
+            printf("  d_queue_depth: %d\n", ssi.d_queue_depth);
+        }
     }
+#endif
     if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                 errno, strerror(errno));
-    else
+    else if (! quiet)
         printf("first available pack_id: %d\n", pack_id);
     if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0)
         pr2serr("ioctl(SG_GET_NUM_WAITING) failed, errno=%d %s\n",
                 errno, strerror(errno));
-    else
+    else if (! quiet)
         printf("num_waiting: %d\n", num_waiting);
 
     if (sleep_secs > 0)
@@ -403,34 +508,31 @@ main(int argc, char * argv[])
     if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                 errno, strerror(errno));
-    else
+    else if (! quiet)
         printf("first available pack_id: %d\n", pack_id);
     if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0)
         pr2serr("ioctl(SG_GET_NUM_WAITING) failed, errno=%d %s\n",
                 errno, strerror(errno));
-    else
+    else if (! quiet)
         printf("num_waiting: %d\n", num_waiting);
 
-    printf("\nstart read() calls\n");
+    if (! quiet)
+        printf("\nstart read() calls\n");
     for (k = 0, done = false; k < q_len; ++k) {
         if ((! done) && (k == q_len / 2)) {
             done = true;
-            printf("\n>>> half way through read\n");
+            if (! quiet)
+                printf("\n>>> half way through read\n");
             if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
                 pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",
                         errno, strerror(errno));
-            else
+            else if (! quiet)
                 printf("first available pack_id: %d\n", pack_id);
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0)
                 pr2serr("ioctl(SG_GET_NUM_WAITING) failed, errno=%d %s\n",
                         errno, strerror(errno));
-            else
+            else if (! quiet)
                 printf("num_waiting: %d\n", num_waiting);
-            if (ioctl(sg_fd, SG_GET_ACCESS_COUNT, &access_count) < 0)
-                pr2serr("ioctl(SG_GET_ACCESS_COUNT) failed, errno=%d %s\n",
-                        errno, strerror(errno));
-            else
-                printf("access_count: %d\n", access_count);
         }
         memset(&rio_v4, 0, sizeof(struct sg_io_v4));
         rio_v4.guard = 'Q';
@@ -486,6 +588,8 @@ main(int argc, char * argv[])
         pr2serr("Direct IO requested %d times, done %d times\nMaybe need "
                 "'echo 1 > /proc/scsi/sg/allow_dio'\n", q_len, dirio_count);
     }
+    if (rep_count-- > 0)
+        goto rep_async;
     ret = 0;
 
 out:

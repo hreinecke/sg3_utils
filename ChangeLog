@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190116] [svn: r807]
+Changelog for sg3_utils-1.45 [20190123] [svn: r808]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (spc5r20)
@@ -11,6 +11,8 @@ Changelog for sg3_utils-1.45 [20190116] [svn: r807]
   - sg_format: add --dcrt used twice (FOV=1 DCRT=0)
   - sg_raw: fix --send bug when using stdin
   - sg_vpd: 3pc VPD page add copy group descriptor
+  - sg_xcopy: add --fco (fast copy only) (spc5r20)
+    - implement --app=1 (append) on regular OFILE type
   - sg_scan (win32): expand limits for big arrays
   - sg_lib: add sg_t10_uuid_desig2str()
     - tweak sg_pt interface to better handle bidi
