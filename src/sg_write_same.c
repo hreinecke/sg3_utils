@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.27 20190113";
+static const char * version_str = "1.28 20190124";
 
 
 #define ME "sg_write_same: "
@@ -584,7 +584,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        wBuff = (uint8_t *)sg_memalign(op->xfer_len, 0, &free_wBuff, vb > 3);
+        wBuff = (uint8_t *)sg_memalign(op->xfer_len, 0, &free_wBuff, false);
         if (NULL == wBuff) {
             pr2serr("unable to allocate %d bytes of memory with "
                     "sg_memalign()\n", op->xfer_len);

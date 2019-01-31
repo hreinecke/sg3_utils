@@ -211,14 +211,18 @@ char * get_scsi_pt_transport_err_str(const struct sg_pt_base * objp,
  * command. */
 int get_scsi_pt_duration_ms(const struct sg_pt_base * objp);
 
+/* If not available return 0 otherwise return number of nanoseconds that the
+ * lower layers (and hardware) took to execute the command just completed. */
+uint64_t get_pt_duration_ns(const struct sg_pt_base * objp);
+
 /* The two functions yield requested and actual data transfer lengths in
  * bytes. The second argument is a pointer to the data-in length; the third
  * argument is a pointer to the data-out length. The pointers may be NULL.
  * The _actual_ values are related to resid (residual count from DMA) */
 void get_pt_req_lengths(const struct sg_pt_base * objp, int * req_dinp,
-		        int * req_doutp);
+                        int * req_doutp);
 void get_pt_actual_lengths(const struct sg_pt_base * objp, int * act_dinp,
-			   int * act_doutp);
+                           int * act_doutp);
 
 /* Return true if device associated with 'objp' uses NVMe command set. To
  * be useful (in modifying the type of command sent (SCSI or NVMe) then

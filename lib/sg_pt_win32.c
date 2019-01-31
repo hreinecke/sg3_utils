@@ -1360,6 +1360,14 @@ get_scsi_pt_duration_ms(const struct sg_pt_base * vp __attribute__ ((unused)))
     return -1;
 }
 
+/* If not available return 0 otherwise return number of nanoseconds that the
+ * lower layers (and hardware) took to execute the command just completed. */
+uint64_t
+get_pt_duration_ns(const struct sg_pt_base * vp __attribute__ ((unused)))
+{
+    return 0;
+}
+
 int
 get_scsi_pt_transport_err(const struct sg_pt_base * vp)
 {

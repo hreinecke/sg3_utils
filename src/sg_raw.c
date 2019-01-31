@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2018 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2019 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.28 (2018-12-20)"
+#define SG_RAW_VERSION "0.4.29 (2019-01-24)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -575,7 +575,7 @@ fetch_dataout(struct opts_t * op, uint8_t ** free_buf, int * errp)
     }
 
     tot_len = op->dataout_len;
-    buf = sg_memalign(tot_len, 0 /* page_size */, free_buf, op->verbose > 3);
+    buf = sg_memalign(tot_len, 0 /* page_size */, free_buf, false);
     if (buf == NULL) {
         pr2serr("sg_memalign: failed to get %d bytes of memory\n", tot_len);
         if (errp)
@@ -748,8 +748,7 @@ main(int argc, char *argv[])
     if (op->do_datain) {
         uint32_t din_len = op->datain_len;
 
-        dinp = sg_memalign(din_len, 0 /* page_size */, &wrkBuf,
-                           op->verbose > 3);
+        dinp = sg_memalign(din_len, 0 /* page_size */, &wrkBuf, false);
         if (dinp == NULL) {
             pr2serr("sg_memalign: failed to get %d bytes of memory\n",
                     din_len);

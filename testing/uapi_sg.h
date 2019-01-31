@@ -14,8 +14,8 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.03 (20181227)
- *  This version is for Linux 2.6, 3 and 4 series kernels.
+ * Version 4.0.05 (20190126)
+ *  This version is for Linux 2.6, 3, 4 and 5 series kernels.
  *
  * Documentation
  * =============
@@ -128,6 +128,7 @@ typedef struct sg_io_hdr {
 #define SG_INFO_MIXED_IO 0x4	/* not used, always 0 */
 #define SG_INFO_DEVICE_DETACHING 0x8	/* completed successfully but ... */
 #define SG_INFO_ANOTHER_WAITING 0x10	/* needs SG_CTL_FLAGM_CHECK_FOR_MORE */
+#define SG_INFO_ABORTED 0x20	/* this command has been aborted */
 
 
 typedef struct sg_scsi_id {	/* used by SG_GET_SCSI_ID ioctl() */
@@ -164,25 +165,24 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 /*
  * The following defines are for manipulating struct sg_extended_info which
  * is abbreviated to "SEI". A following "M" (i.e. "_SEIM_") indicates a
- * mask. Most mask values correspond to a integer (usually a __u32) apart
+ * mask. Most mask values correspond to a integer (usually a uint32_t) apart
  * from SG_SEIM_CTL_FLAGS which is for boolean values packed into an integer.
  * The mask values for those booleans start with "SG_CTL_FLAGM_". The scope
  * of these settings, like most other ioctls, is usually that of the file
  * descriptor the ioctl is executed on. The "rd:" indication means read-only,
  * attempts to write to them are ignored. "rd>" means action when reading.
  */
-#define SG_SEIM_RESERVED_SIZE	0x1	/* reserved_sz field valid */
-#define SG_SEIM_RQ_REM_THRESH	0x2	/* rq_rem_sgat_thresh field valid */
-#define SG_SEIM_TOT_FD_THRESH	0x4	/* tot_fd_thresh field valid */
-#define SG_SEIM_CTL_FLAGS	0x8	/* ctl_flags_mask bits in ctl_flags */
+#define SG_SEIM_CTL_FLAGS	0x1	/* ctl_flags_mask bits in ctl_flags */
+#define SG_SEIM_READ_VAL	0x2	/* write SG_SEIRV_*, read back value */
+#define SG_SEIM_RESERVED_SIZE	0x4	/* reserved_sz of reserve request */
+#define SG_SEIM_TOT_FD_THRESH	0x8	/* tot_fd_thresh of data buffers */
 #define SG_SEIM_MINOR_INDEX	0x10	/* sg device minor index number */
-#define SG_SEIM_READ_VAL	0x20	/* write SG_SEIRV_*, read back value */
-#define SG_SEIM_SHARE_FD	0x40	/* slave gives fd of master, sharing */
+#define SG_SEIM_SHARE_FD	0x20	/* slave gives fd of master: sharing */
+#define SG_SEIM_CHG_SHARE_FD	0x40	/* master gives fd of new slave */
 #define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
-#define SG_SEIM_CHG_SHARE_FD	0x100	/* master gives fd of new slave */
-#define SG_SEIM_ALL_BITS	0x1ff	/* should be OR of previous items */
+#define SG_SEIM_ALL_BITS	0xff	/* should be OR of previous items */
 
-/* flag and mask values for boolena fields follow */
+/* flag and mask values for boolean fields follow */
 #define SG_CTL_FLAGM_TIME_IN_NS	0x1	/* time: nanosecs (def: millisecs) */
 #define SG_CTL_FLAGM_TAG_FOR_PACK_ID 0x2 /* prefer tag over pack_id (def) */
 #define SG_CTL_FLAGM_OTHER_OPENS 0x4	/* rd: other sg fd_s on this dev */
@@ -218,19 +218,21 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
  * setting but no other operation will split the two. This structure is
  * padded to 96 bytes to allow for new values to be added in the future.
  */
+
+/* If both sei_wr_mask and sei_rd_mask are 0, this ioctl does nothing */
 struct sg_extended_info {
-	__u32	valid_wr_mask;	/* OR-ed SG_SEIM_* user->driver values */
-	__u32	valid_rd_mask;	/* OR-ed SG_SEIM_* driver->user values */
-	__u32	reserved_sz;	/* data/sgl size of pre-allocated request */
-	__u32	rq_rem_sgat_thresh;/* request re-use: clear data/sgat if > */
-	__u32	tot_fd_thresh;	/* total data/sgat for this fd, 0: no limit */
+	__u32	sei_wr_mask;	/* OR-ed SG_SEIM_* user->driver values */
+	__u32	sei_rd_mask;	/* OR-ed SG_SEIM_* driver->user values */
 	__u32	ctl_flags_wr_mask;	/* OR-ed SG_CTL_FLAGM_* values */
 	__u32	ctl_flags_rd_mask;	/* OR-ed SG_CTL_FLAGM_* values */
 	__u32	ctl_flags;	/* bit values OR-ed, see SG_CTL_FLAGM_* */
+	__u32	read_value;	/* write SG_SEIRV_*, read back related */
+
+	__u32	reserved_sz;	/* data/sgl size of pre-allocated request */
+	__u32	tot_fd_thresh;	/* total data/sgat for this fd, 0: no limit */
 	__u32	minor_index;	/* rd: kernel's sg device minor number */
-	__u32	read_value;	/* write known value, read back related */
-	__u32	share_fd;	/* slave provided fd of master */
-	__u32	sgat_elem_sz;	/* sgat element size (must be power of 2 */
+	__u32	share_fd;	/* SHARE_FD and CHG_SHARE_FD use this */
+	__u32	sgat_elem_sz;	/* sgat element size (must be power of 2) */
 	__u8	pad_to_96[52];	/* pad so struct is 96 bytes long */
 };
 
@@ -283,10 +285,10 @@ struct sg_extended_info {
  * file descriptor (default: use pack_id). If pack_id or tag is -1 then read
  * oldest waiting and this is the same action as when FORCE_PACK_ID is
  * clear on the parent file descriptor. In the v4 interface the pack_id is
- * placed in sg_io_v4::request_extra field .
+ * placed the in sg_io_v4::request_extra field .
  */
 #define SG_SET_FORCE_PACK_ID 0x227b	/* pack_id or in v4 can be tag */
-#define SG_GET_PACK_ID 0x227c	/* Yields oldest readable pack_id (or -1) */
+#define SG_GET_PACK_ID 0x227c  /* Yields oldest readable pack_id/tag, or -1 */
 
 #define SG_GET_NUM_WAITING 0x227d /* Number of commands awaiting read() */
 

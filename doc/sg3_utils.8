@@ -98,6 +98,15 @@ SCSI to NVMe Translation Layer within the underlying library).
 Several utilities have their own environment variable setting (e.g.
 sg_persist has SG_PERSIST_IN_RDONLY). See individual utility man pages
 for more information.
+.PP
+There is a Linux specific environment variable called SG3_UTILS_LINUX_NANO
+that if defined and the sg driver in the system is 4.0.0 or later, will
+show command durations in nanoseconds rather than the default milliseconds.
+Command durations are typically only shown if \-\-verbose is used 3 or more
+times. Due to an interface problem (a 32 bit integer that should be 64 bits
+with the benefit of hindsight) the maximum duration that can be represented
+in nanoseconds is about 4.2 seconds. If longer durations may occur then
+don't define this environment variable (or undefine it).
 .SH LINUX DEVICE NAMING
 Most disk block devices have names like /dev/sda, /dev/sdb, /dev/sdc, etc.
 SCSI disks in Linux have always had names like that but in recent Linux

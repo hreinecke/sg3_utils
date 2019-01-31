@@ -23,6 +23,8 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -40,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "1.91 20190113";
+static const char * const version_str = "1.93 20190128";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -190,7 +192,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, bool noisy, int verbose, int * o_sense_cat)
 {
     bool transport_sense;
-    int cat, duration, slen, resp_code, sstat, req_din_x, req_dout_x;
+    int cat, slen, resp_code, sstat, req_din_x, req_dout_x;
     int act_din_x, act_dout_x;
     const uint8_t * sbp;
     char b[1024];
@@ -223,8 +225,18 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         pr2ws("%s: %s timeout\n", leadin, pass_through_s);
         return -1;
     }
-    if ((verbose > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
-        pr2ws("      duration=%d ms\n", duration);
+    if (verbose > 2) {
+        uint64_t duration = get_pt_duration_ns(ptvp);
+
+        if (duration > 0)
+            pr2ws("      duration=%" PRIu64 " ns\n", duration);
+        else {
+            int d = get_scsi_pt_duration_ms(ptvp);
+
+            if (d != -1)
+                pr2ws("      duration=%u ms\n", (uint32_t)d);
+        }
+    }
     get_pt_req_lengths(ptvp, &req_din_x, &req_dout_x);
     get_pt_actual_lengths(ptvp, &act_din_x, &act_dout_x);
     slen = get_scsi_pt_sense_len(ptvp);
@@ -503,7 +515,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
         inq_data->peripheral_qualifier = 0x3;
         inq_data->peripheral_type = 0x1f;
     }
-    inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, verbose > 4);
+    inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, false);
     if (NULL == inq_resp) {
         pr2ws("%s: out of memory\n", __func__);
         return sg_convert_errno(ENOMEM);
@@ -545,7 +557,7 @@ sg_simple_inquiry_pt(struct sg_pt_base * ptvp,
         inq_data->peripheral_qualifier = 0x3;
         inq_data->peripheral_type = 0x1f;
     }
-    inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, verbose > 4);
+    inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, false);
     if (NULL == inq_resp) {
         pr2ws("%s: out of memory\n", __func__);
         return sg_convert_errno(ENOMEM);

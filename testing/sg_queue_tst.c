@@ -15,7 +15,7 @@
  * Invocation: sg_queue_tst [-l=Q_LEN] [-t] <sg_device>
  *      -t      queue at tail
  *
- * Version 0.95 (20190111)
+ * Version 0.96 (20190128)
  */
 
 #include <unistd.h>
@@ -84,8 +84,8 @@ set_nanosecs(int sg_fd)
 
     seip = &sei;
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
-    seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
+    seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+    seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
 
