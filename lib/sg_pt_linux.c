@@ -109,6 +109,10 @@ bool sg_bsg_nvme_char_major_checked = false;
 int sg_bsg_major = 0;
 volatile int sg_nvme_char_major = 0;
 
+bool sg_checked_version_num = false;
+int sg_driver_version_num = 0;
+bool sg_duration_set_nano = false;
+
 long sg_lin_page_size = 4096;   /* default, overridden with correct value */
 
 
@@ -470,6 +474,36 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     }
 }
 
+#ifndef SG_SET_GET_EXTENDED
+
+/* If both sei_wr_mask and sei_rd_mask are 0, this ioctl does nothing */
+struct sg_extended_info {
+    uint32_t   sei_wr_mask;    /* OR-ed SG_SEIM_* user->driver values */
+    uint32_t   sei_rd_mask;    /* OR-ed SG_SEIM_* driver->user values */
+    uint32_t   ctl_flags_wr_mask;      /* OR-ed SG_CTL_FLAGM_* values */
+    uint32_t   ctl_flags_rd_mask;      /* OR-ed SG_CTL_FLAGM_* values */
+    uint32_t   ctl_flags;      /* bit values OR-ed, see SG_CTL_FLAGM_* */
+    uint32_t   read_value;     /* write SG_SEIRV_*, read back related */
+
+    uint32_t   reserved_sz;    /* data/sgl size of pre-allocated request */
+    uint32_t   tot_fd_thresh;  /* total data/sgat for this fd, 0: no limit */
+    uint32_t   minor_index;    /* rd: kernel's sg device minor number */
+    uint32_t   share_fd;       /* SHARE_FD and CHG_SHARE_FD use this */
+    uint32_t   sgat_elem_sz;   /* sgat element size (must be power of 2) */
+    uint8_t    pad_to_96[52];  /* pad so struct is 96 bytes long */
+};
+
+#define SG_IOCTL_MAGIC_NUM 0x22
+
+#define SG_SET_GET_EXTENDED _IOWR(SG_IOCTL_MAGIC_NUM, 0x51,     \
+                                  struct sg_extended_info)
+
+#define SG_SEIM_CTL_FLAGS       0x1
+
+#define SG_CTL_FLAGM_TIME_IN_NS 0x1
+
+#endif
+
 /* Forget any previous dev_fd and install the one given. May attempt to
  * find file type (e.g. if pass-though) from OS so there could be an error.
  * Returns 0 for success or the same value as get_scsi_pt_os_err()
@@ -489,12 +523,15 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
         ptp->is_sg = check_file_type(dev_fd, &a_stat, &ptp->is_bsg,
                                      &ptp->is_nvme, &ptp->nvme_nsid,
                                      &ptp->os_err, verbose);
-        if (ptp->is_sg) {
+        if (ptp->is_sg && (! sg_checked_version_num)) {
             if (ioctl(dev_fd, SG_GET_VERSION_NUM, &ptp->sg_version) < 0) {
                 ptp->sg_version = 0;
                 if (verbose > 3)
                     pr2ws("%s: ioctl(SG_GET_VERSION_NUM) failed: errno: %d "
                           "[%s]\n", __func__, errno, safe_strerror(errno));
+            } else {    /* got version number */
+                sg_driver_version_num = ptp->sg_version;
+                sg_checked_version_num = true;
             }
             if (verbose > 4) {
                 int ver = ptp->sg_version;
@@ -513,6 +550,30 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
                     pr2ws("%s: sg driver version %d.%02d.%02d so choose v3\n",
                           __func__, ver / 10000, (ver / 100) % 100,
                           ver % 100);
+            }
+        } else if (ptp->is_sg)
+            ptp->sg_version = sg_driver_version_num;
+
+        if (ptp->is_sg && (ptp->sg_version >= SG_LINUX_SG_VER_V4) &&
+            getenv("SG3_UTILS_LINUX_NANO")) {
+            struct sg_extended_info sei;
+            struct sg_extended_info * seip = &sei;
+
+            memset(seip, 0, sizeof(*seip));
+            /* try to override default of milliseconds */
+            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+            seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+            if (ioctl(dev_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                if (verbose > 2)
+                    pr2ws("%s: unable to override milli --> nanoseconds: "
+                          "%s\n", __func__, safe_strerror(errno));
+            } else {
+                if (! sg_duration_set_nano)
+                    sg_duration_set_nano = true;
+                if (verbose > 5)
+                    pr2ws("%s: dev_fd=%d, succeeding in setting durations "
+                          "to nanoseconds\n", __func__, dev_fd);
             }
         }
     } else {
@@ -708,16 +769,16 @@ get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (req_dinp) {
-	if (ptp->io_hdr.din_xfer_len > 0)
-	    *req_dinp = ptp->io_hdr.din_xfer_len;
-	else
-	    *req_dinp = 0;
+        if (ptp->io_hdr.din_xfer_len > 0)
+            *req_dinp = ptp->io_hdr.din_xfer_len;
+        else
+            *req_dinp = 0;
     }
     if (req_doutp) {
-	if (ptp->io_hdr.dout_xfer_len > 0)
-	    *req_doutp = ptp->io_hdr.dout_xfer_len;
-	else
-	    *req_doutp = 0;
+        if (ptp->io_hdr.dout_xfer_len > 0)
+            *req_doutp = ptp->io_hdr.dout_xfer_len;
+        else
+            *req_doutp = 0;
     }
 }
 
@@ -728,18 +789,18 @@ get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (act_dinp) {
-	if (ptp->io_hdr.din_xfer_len > 0) {
-	    int res = ptp->io_hdr.din_xfer_len - ptp->io_hdr.din_resid;
+        if (ptp->io_hdr.din_xfer_len > 0) {
+            int res = ptp->io_hdr.din_xfer_len - ptp->io_hdr.din_resid;
 
-	    *act_dinp = (res > 0) ? res : 0;
-	} else
-	    *act_dinp = 0;
+            *act_dinp = (res > 0) ? res : 0;
+        } else
+            *act_dinp = 0;
     }
     if (act_doutp) {
-	if (ptp->io_hdr.dout_xfer_len > 0)
-	    *act_doutp = ptp->io_hdr.dout_xfer_len - ptp->io_hdr.dout_resid;
-	else
-	    *act_doutp = 0;
+        if (ptp->io_hdr.dout_xfer_len > 0)
+            *act_doutp = ptp->io_hdr.dout_xfer_len - ptp->io_hdr.dout_resid;
+        else
+            *act_doutp = 0;
     }
 }
 
@@ -786,7 +847,18 @@ get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return ptp->io_hdr.duration;
+    return sg_duration_set_nano ? (ptp->io_hdr.duration / 1000) :
+                                  ptp->io_hdr.duration;
+}
+
+/* If not available return 0 otherwise return number of nanoseconds that the
+ * lower layers (and hardware) took to execute the command just completed. */
+uint64_t
+get_pt_duration_ns(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return sg_duration_set_nano ? (uint32_t)ptp->io_hdr.duration : 0;
 }
 
 int

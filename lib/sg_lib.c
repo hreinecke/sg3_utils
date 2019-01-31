@@ -1914,7 +1914,7 @@ sg_print_sense(const char * leadin, const uint8_t * sbp, int sb_len,
     char *cp;
     uint8_t *free_cp;
 
-    cp = (char *)sg_memalign(pg_sz, pg_sz, &free_cp, 0);
+    cp = (char *)sg_memalign(pg_sz, pg_sz, &free_cp, false);
     if (NULL == cp)
         return;
     sg_get_sense_str(leadin, sbp, sb_len, raw_sinfo, pg_sz, cp);

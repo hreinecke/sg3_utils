@@ -53,7 +53,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.03  20190123";
+static const char * version_str = "Version: 1.03  20190128";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -221,16 +221,15 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
 
     seip = &sei;
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_RESERVED_SIZE;
+    seip->sei_wr_mask |= SG_SEIM_RESERVED_SIZE;
     seip->reserved_sz = reserve_buff_sz;
     seip->sgat_elem_sz = 64 * 1024;
-    seip->valid_rd_mask |= SG_SEIM_RESERVED_SIZE;
-    seip->valid_rd_mask |= SG_SEIM_RQ_REM_THRESH;
-    seip->valid_rd_mask |= SG_SEIM_TOT_FD_THRESH;
-    seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
-    seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
-    seip->valid_rd_mask |= SG_SEIM_MINOR_INDEX;
-    seip->valid_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
+    seip->sei_rd_mask |= SG_SEIM_RESERVED_SIZE;
+    seip->sei_rd_mask |= SG_SEIM_TOT_FD_THRESH;
+    seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+    seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
+    seip->sei_rd_mask |= SG_SEIM_MINOR_INDEX;
+    seip->sei_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_OTHER_OPENS;
@@ -251,16 +250,14 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     }
 #if 1
     printf("%sSG_SET_GET_EXTENDED ioctl ok\n", cp);
-    if (SG_SEIM_RESERVED_SIZE & seip->valid_rd_mask)
+    if (SG_SEIM_RESERVED_SIZE & seip->sei_rd_mask)
         printf("  %sreserved size: %u\n", cp, seip->reserved_sz);
-    if (SG_SEIM_MINOR_INDEX & seip->valid_rd_mask)
+    if (SG_SEIM_MINOR_INDEX & seip->sei_rd_mask)
         printf("  %sminor index: %u\n", cp, seip->minor_index);
-    if (SG_SEIM_RQ_REM_THRESH & seip->valid_rd_mask)
-        printf("  %srq_rem_sgat_thresh: %u\n", cp, seip->rq_rem_sgat_thresh);
-    if (SG_SEIM_TOT_FD_THRESH & seip->valid_rd_mask)
+    if (SG_SEIM_TOT_FD_THRESH & seip->sei_rd_mask)
         printf("  %stot_fd_thresh: %u\n", cp, seip->tot_fd_thresh);
-    if ((SG_SEIM_CTL_FLAGS & seip->valid_rd_mask) ||
-         (SG_SEIM_CTL_FLAGS & seip->valid_wr_mask)) {
+    if ((SG_SEIM_CTL_FLAGS & seip->sei_rd_mask) ||
+         (SG_SEIM_CTL_FLAGS & seip->sei_wr_mask)) {
         cflags = seip->ctl_flags;
         if (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags_rd_mask)
             printf("  %sTIME_IN_NS: %s\n", cp,
@@ -293,14 +290,14 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
             printf("  %sCHECK_FOR_MORE: %s\n", cp,
                    (SG_CTL_FLAGM_CHECK_FOR_MORE & cflags) ? "true" : "false");
     }
-    if (SG_SEIM_MINOR_INDEX & seip->valid_rd_mask)
+    if (SG_SEIM_MINOR_INDEX & seip->sei_rd_mask)
         printf("  %sminor_index: %u\n", cp, seip->minor_index);
     printf("\n");
 #endif
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_INT_MASK;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -310,8 +307,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_INT_MASK]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_BOOL_MASK;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -321,8 +318,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_BOOL_MASK]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_VERS_NUM;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -332,8 +329,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_VERS_NUM]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_FL_RQS;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -343,8 +340,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_FL_RQS]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_DEV_FL_RQS;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -354,8 +351,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_DEV_FL_RQS]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_TRC_SZ;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -365,8 +362,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_TRC_SZ]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_READ_VAL;
-    seip->valid_rd_mask |= SG_SEIM_READ_VAL;
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_TRC_MAX_SZ;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -376,8 +373,8 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_TRC_MAX_SZ]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_SHARE_FD;
-    seip->valid_rd_mask |= SG_SEIM_SHARE_FD;
+    seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
+    seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
 #if 1
     seip->share_fd = sg_fd2;
 #else
@@ -389,7 +386,7 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
         pr2serr("%sioctl(SG_SET_GET_EXTENDED) shared_fd=%d, failed errno=%d "
                 "%s\n", cp, sg_fd2, errno, strerror(errno));
     }
-    printf("  %sshare successful, read back shared_fd= %d\n", cp,
+    printf("  %sshare successful, read back previous shared_fd= %d\n", cp,
            (int)seip->share_fd);
 bypass_share:
 
@@ -440,6 +437,8 @@ bypass_share:
     return 0;
 }
 
+#include <linux/fs.h>
+#include <linux/blktrace_api.h>
 
 int
 main(int argc, char * argv[])
@@ -462,6 +461,10 @@ main(int argc, char * argv[])
     const char * cp;
     struct sg_scsi_id ssi;
 
+
+    if (sizeof(struct sg_extended_info) != 96)
+        pr2serr("Warning <<<< sizeof(struct sg_extended_info)=%zu not 96\n",
+                sizeof(struct sg_extended_info));
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-f", argv[k], 2))
             do_fork = true;

@@ -53,7 +53,7 @@
  is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.03  20190122";
+static const char * version_str = "Version: 1.04  20190128";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_OP 0x12
@@ -130,11 +130,11 @@ ext_ioctl(int sg_fd, bool nanosecs)
 
     seip = &sei;
     memset(seip, 0, sizeof(*seip));
-    seip->valid_wr_mask |= SG_SEIM_RESERVED_SIZE;
+    seip->sei_wr_mask |= SG_SEIM_RESERVED_SIZE;
     seip->reserved_sz = reserve_buff_sz;
-    seip->valid_rd_mask |= SG_SEIM_RESERVED_SIZE;
-    seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
-    seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
+    seip->sei_rd_mask |= SG_SEIM_RESERVED_SIZE;
+    seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+    seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS; /* this or previous optional */
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
     if (nanosecs)

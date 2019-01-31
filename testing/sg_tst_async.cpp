@@ -88,7 +88,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.24 20190104";
+static const char * version_str = "1.25 20190128";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -935,8 +935,8 @@ work_thread(int id, struct opts_t * op)
 
             seip = &sei;
             memset(seip, 0, sizeof(*seip));
-            seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
-            seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS;
+            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+            seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
             seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
             if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
                 pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
@@ -944,8 +944,8 @@ work_thread(int id, struct opts_t * op)
             }
             if (! (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags)) {
                 memset(seip, 0, sizeof(*seip));
-                seip->valid_rd_mask |= SG_SEIM_CTL_FLAGS;
-                seip->valid_wr_mask |= SG_SEIM_CTL_FLAGS;
+                seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
+                seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
                 seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
                 seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
                 if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0)
