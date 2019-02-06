@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.70 20190104";    /* spc5r19 + sbc4r11 */
+static const char * version_str = "1.72 20190203";    /* spc5r20 + sbc4r16 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -180,6 +180,7 @@ struct opts_t {
     int paramp;
     int no_inq;
     int dev_pdt;        /* from device or --pdt=DT */
+    int decod_subpg_code;
     const char * device_name;
     const char * in_fn;
     const char * pg_arg;
@@ -1868,6 +1869,7 @@ show_error_counter_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
     int num, pl, pc, pg_code;
+    uint64_t val;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -1921,8 +1923,13 @@ show_error_counter_page(const uint8_t * resp, int len,
         case 0x8015: printf("  Positioning errors [Hitachi]"); break;
         default: printf("  Reserved or vendor specific [0x%x]", pc); break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        printf("\n");
+        val = sg_get_unaligned_be(pl - 4, bp + 4);
+        printf(" = %" PRIu64 "", val);
+        if (val > (1UL << 40))
+            printf(" [%" PRIu64 " TB]\n",
+                   (val / (1000UL * 1000 * 1000 * 1000)));
+        else
+            printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -2884,8 +2891,9 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (bp[17] || bp[18])
                 printf("      [%s]\n", sg_get_asc_ascq_str(bp[17], bp[18],
                        sizeof(b), b));
+            else
+                printf("\n");
         }
-        printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -3212,87 +3220,123 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             }
             break;
         default:
-            if ((! is_smstr) || (param_len < 24)) {
+            if (is_smstr && (param_len >= 24)) {
+                switch (pc) {
+                case 0x1:
+                    cp = "Read error rate";
+                    break;
+                case 0x2:
+                    cp = "Flash rom check";
+                    break;
+                case 0x5:
+                    cp = "Realloc block count";
+                    break;
+                case 0x9:
+                    cp = "Power on hours";
+                    break;
+                case 0xc:
+                    cp = "Power cycles";
+                    break;
+                case 0xd:
+                    cp = "Ecc rate";
+                    break;
+                case 0x20:
+                    cp = "Write amp";
+                    break;
+                case 0xb1:      /* 177 */
+                    cp = "Percent life remaining";
+                    break;
+                case 0xb4:      /* 180 */
+                    cp = "Unused reserved block count";
+                    break;
+                case 0xb5:      /* 181 */
+                    cp = "Program fail count";
+                    break;
+                case 0xb6:      /* 182 */
+                    cp = "Erase fail count";
+                    break;
+                case 0xbe:      /* 190 */
+                    cp = "Drive temperature warn";
+                    break;
+                case 0xc2:      /* 194 */
+                    cp = "Drive temperature";
+                    break;
+                case 0xc3:      /* 195 */
+                    cp = "Uncorrected error count";
+                    break;
+                case 0xc6:      /* 198 */
+                    cp = "Offline scan uncorrected sector count";
+                    break;
+                case 0xe9:      /* 233 */
+                    cp = "Number of writes";
+                    break;
+                default:
+                    snprintf(bb, sizeof(bb), "parameter_code=0x%x (%d)",
+                             pc, pc);
+                    cp = bb;
+                    break;
+                }
+                if (cp && (param_len >= 24)) {
+                    if (! has_header) {
+                        has_header = true;
+                        printf("  Has|Ever  %% to  worst %%   Current      "
+                               "Worst  Threshold  Attribute\n");
+                        printf("   tripped  fail  to fail     "
+                               "value      value\n");
+                    }
+                    printf("   %2d %2d  %4d     %4d  %10u %10u %10u  %s",
+                           !!(0x80 & bp[4]), !!(0x40 & bp[4]), bp[5], bp[6],
+                           sg_get_unaligned_be32(bp + 8),
+                           sg_get_unaligned_be32(bp + 12),
+                           sg_get_unaligned_be32(bp + 16),
+                           cp);
+                    decoded = true;
+                }
+            } else if (VP_HITA == op->vend_prod_num) {
+                switch (pc) {
+                case 0x1:
+                    cp = "Remaining reserve 1";
+                    break;
+                case 0x2:
+                    cp = "Remaining reserve XOR";
+                    break;
+                case 0x3:
+                    cp = "XOR depletion";
+                    break;
+                case 0x4:
+                    cp = "Volatile memory backup failure";
+                    break;
+                case 0x5:
+                    cp = "Wear indicator";
+                    break;
+                case 0x6:
+                    cp = "System area wear indicator";
+                    break;
+                case 0x7:
+                    cp = "Channel hangs";
+                    break;
+                case 0x8:
+                    cp = "Flash scan failure";
+                    break;
+                default:
+                    decoded = false;
+                    break;
+                }
+                if (cp) {
+                    printf("  %s:\n", cp);
+                    printf("    SMART sense_code=0x%x sense_qualifier=0x%x "
+                           "threshold=%d%% trip=%d", bp[4], bp[5], bp[6],
+                           bp[7]);
+                }
+            } else
                 decoded = false;
-                break;
-            }
-            switch (pc) {
-            case 0x1:
-                cp = "Read error rate";
-                break;
-            case 0x2:
-                cp = "Flash rom check";
-                break;
-            case 0x5:
-                cp = "Realloc block count";
-                break;
-            case 0x9:
-                cp = "Power on hours";
-                break;
-            case 0xc:
-                cp = "Power cycles";
-                break;
-            case 0xd:
-                cp = "Ecc rate";
-                break;
-            case 0x20:
-                cp = "Write amp";
-                break;
-            case 0xb1:      /* 177 */
-                cp = "Percent life remaining";
-                break;
-            case 0xb4:      /* 180 */
-                cp = "Unused reserved block count";
-                break;
-            case 0xb5:      /* 181 */
-                cp = "Program fail count";
-                break;
-            case 0xb6:      /* 182 */
-                cp = "Erase fail count";
-                break;
-            case 0xbe:      /* 190 */
-                cp = "Drive temperature warn";
-                break;
-            case 0xc2:      /* 194 */
-                cp = "Drive temperature";
-                break;
-            case 0xc3:      /* 195 */
-                cp = "Uncorrected error count";
-                break;
-            case 0xc6:      /* 198 */
-                cp = "Offline scan uncorrected sector count";
-                break;
-            case 0xe9:      /* 233 */
-                cp = "Number of writes";
-                break;
-            default:
-                snprintf(bb, sizeof(bb), "parameter_code=0x%x (%d)",
-                         pc, pc);
-                cp = bb;
-                break;
-            }
             break;
         }               /* end of switch statement */
-        if (cp && (param_len >= 24)) {
-            if (! has_header) {
-                has_header = true;
-                printf("  Has|Ever  %% to  worst %%   Current      "
-                       "Worst  Threshold  Attribute\n");
-                printf("   tripped  fail  to fail     "
-                       "value      value\n");
-            }
-            printf("   %2d %2d  %4d     %4d  %10u %10u %10u  %s",
-                   !!(0x80 & bp[4]), !!(0x40 & bp[4]), bp[5], bp[6],
-                   sg_get_unaligned_be32(bp + 8),
-                   sg_get_unaligned_be32(bp + 12),
-                   sg_get_unaligned_be32(bp + 16),
-                   cp);
-            /* decoded = true; */
-        } else if ((! decoded) && full) {
+        if ((! decoded) && full) {
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
             hex2stdout(bp, param_len, 1);
-        }
-        printf("\n");
+        } else
+            printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -6589,7 +6633,8 @@ show_hgst_misc_page(const uint8_t * resp, int len, const struct opts_t * op)
     char str[PCB_STR_LEN];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("HGST/WDC miscellaneous page [0x37]\n");
+        printf("HGST/WDC miscellaneous page [0x37, 0x%x]\n",
+               op->decod_subpg_code);
     num = len - 4;
     if (num < 0x30) {
         printf("HGST/WDC miscellaneous page too short (%d) < 48\n", num);
@@ -6705,7 +6750,7 @@ skip:
 }
 
 static void
-decode_page_contents(const uint8_t * resp, int len, const struct opts_t * op)
+decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
 {
     int pg_code, subpg_code, vpn;
     bool spf;
@@ -6718,7 +6763,11 @@ decode_page_contents(const uint8_t * resp, int len, const struct opts_t * op)
     }
     spf = !!(resp[0] & 0x40);
     pg_code = resp[0] & 0x3f;
-    subpg_code = spf ? resp[1] : 0;
+    if ((VP_HITA == op->vend_prod_num) && (pg_code >= 0x30))
+        subpg_code = resp[1];	/* Hitachi don't set SPF on VS pages */
+    else
+        subpg_code = spf ? resp[1] : 0;
+    op->decod_subpg_code = subpg_code;
     if ((SUPP_SPGS_SUBPG == subpg_code) && (SUPP_PAGES_LPAGE != pg_code)) {
         done = show_supported_pgs_sub_page(resp, len, op);
         if (done)
@@ -6729,8 +6778,8 @@ decode_page_contents(const uint8_t * resp, int len, const struct opts_t * op)
     if (lep && lep->show_pagep)
         done = (*lep->show_pagep)(resp, len, op);
 
-    if (! done) {
-        if (spf)
+ if (! done) {
+        if (subpg_code > 0)
             printf("Unable to decode page = 0x%x, subpage = 0x%x, here is "
                    "hex:\n", pg_code, subpg_code);
         else

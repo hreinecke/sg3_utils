@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.05 (20190126)
+ * Version 4.0.06 (20190201)
  *  This version is for Linux 2.6, 3, 4 and 5 series kernels.
  *
  * Documentation
@@ -130,17 +130,19 @@ typedef struct sg_io_hdr {
 #define SG_INFO_ANOTHER_WAITING 0x10	/* needs SG_CTL_FLAGM_CHECK_FOR_MORE */
 #define SG_INFO_ABORTED 0x20	/* this command has been aborted */
 
-
-typedef struct sg_scsi_id {	/* used by SG_GET_SCSI_ID ioctl() */
+/*
+ * Pointer to object of this structure filled by ioctl(SG_GET_SCSI_ID). Last
+ * field changed in v4 driver, was 'int unused[2]' so remains the same size.
+ */
+typedef struct sg_scsi_id {
 	int host_no;	/* as in "scsi<n>" where 'n' is one of 0, 1, 2 etc */
 	int channel;
 	int scsi_id;	/* scsi id of target device */
-	int lun;
+	int lun;	/* lower 32 bits of internal 64 bit integer */
 	int scsi_type;	/* TYPE_... defined in scsi/scsi.h */
 	short h_cmd_per_lun;/* host (adapter) maximum commands per lun */
 	short d_queue_depth;/* device (or adapter) maximum queue length */
-	int minor_num;	/* new in sg v4 driver, example: 3 for /dev/sg3 */
-	int unused[1];	/* held in reserve, set 0 for now */
+	__u8 scsi_lun[8];  /* full 8 byte SCSI LUN [new v4 driver] */
 } sg_scsi_id_t;
 
 /* For backward compatibility v4 driver yields at most SG_MAX_QUEUE of these */
