@@ -98,7 +98,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.17 20190130";
+static const char * version_str = "1.18 20190204";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -154,6 +154,7 @@ struct flags_t {
     bool noshare;
     bool noxfer;
     bool same_fds;
+    bool swait;
     bool v3;
     bool v4;
 };
@@ -208,6 +209,8 @@ typedef struct request_element
 {       /* one instance per worker thread */
     bool wr;
     bool has_share;
+    bool swait; /* interleave READ WRITE async copy segment: READ submit,
+                 * WRITE submit, READ receive, WRITE receive */
     int id;
     int infd;
     int outfd;
@@ -242,7 +245,7 @@ typedef struct thread_info
     pthread_t a_pthr;
 } Thread_info;
 
-static atomic_int mono_pack_id;
+static atomic_int mono_pack_id = 0;
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
@@ -259,6 +262,7 @@ static int sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp,
                       int *mmap_len);
 static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
                        int *mmap_len);
+static void sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep);
 
 #define STRERR_BUFF_LEN 128
 
@@ -272,6 +276,7 @@ static struct timeval start_tm;
 static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
 static int exit_status = 0;
+static volatile bool swait_reported = false;
 
 static const char * my_name = "sgh_dd: ";
 
@@ -542,7 +547,7 @@ usage(int pg_num)
             "    oflag       comma separated list from: [append,coe,dio,"
             "direct,dpo,\n"
             "                dsync,excl,fua,mmap,noshare,noxfer,null,"
-            "same_fds,v3,v4]\n"
+            "same_fds,swait,v3,v4]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -615,10 +620,14 @@ page3:
             "file\n"
             "                descriptors (def: each threads has own file "
             "desciptors)\n"
+            "    swait       slave wait: issue WRITE on OFILE before READ "
+            "is finished;\n"
+            "                [oflag only] and IFILE and OFILE must be sg "
+            "devices\n"
             "    v3          use v3 sg interface which is the default (also "
             "see v4)\n"
             "    v4          use v4 sg interface (def: v3 unless other side "
-            "us v4)\n"
+            "is v4)\n"
             "\n"
             "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
             "OFILE are sg\ndevices 'shared' mode is selected unless "
@@ -791,6 +800,7 @@ read_write_thread(void * v_tip)
     Rq_elem rel;
     Rq_elem * rep = &rel;
     int sz, blocks, status, vb, err, res;
+    int num_sg = 0;
     int64_t seek_skip;
     volatile bool stop_after_write = false;
     bool own_infd = false;
@@ -828,9 +838,13 @@ read_write_thread(void * v_tip)
     rep->aen = clp->aen;
     rep->rep_count = 0;
 
-    if (rep->in_flags.same_fds || rep->out_flags.same_fds)
-        ;       /* we are sharing a single pair of fd_s across all threads */
-    else {
+    if (rep->in_flags.same_fds || rep->out_flags.same_fds) {
+        /* we are sharing a single pair of fd_s across all threads */
+        if (rep->out_flags.swait && (! swait_reported)) {
+            swait_reported = true;
+            pr2serr_lk("oflag=swait ignored because same_fds flag given\n");
+        }
+    } else {
         int fd;
 
         if ((FT_SG == clp->in_type) && clp->infp) {
@@ -841,6 +855,7 @@ read_write_thread(void * v_tip)
                 goto fini;
             rep->infd = fd;
             own_infd = true;
+            ++num_sg;
             if (vb > 2)
                 pr2serr_lk("thread=%d: opened local sg IFILE\n", rep->id);
         }
@@ -852,6 +867,7 @@ read_write_thread(void * v_tip)
                 goto fini;
             rep->outfd = fd;
             own_outfd = true;
+            ++num_sg;
             if (vb > 2)
                 pr2serr_lk("thread=%d: opened local sg OFILE\n", rep->id);
         }
@@ -865,6 +881,13 @@ read_write_thread(void * v_tip)
             own_out2fd = true;
             if (vb > 2)
                 pr2serr_lk("thread=%d: opened local sg OFILE2\n", rep->id);
+        }
+        if (rep->out_flags.swait) {
+            if (num_sg < 2)
+                pr2serr_lk("oflag=swait ignored since need both IFILE and "
+                           "OFILE to be sg devices\n");
+            else
+                rep->swait = true;
         }
     }
     if (vb > 2) {
@@ -909,9 +932,12 @@ read_write_thread(void * v_tip)
         clp->in_count -= blocks;
 
         pthread_cleanup_push(cleanup_in, (void *)clp);
-        if (FT_SG == clp->in_type)
-            sg_in_rd_cmd(clp, rep); /* unlocks in_mutex mid operation */
-        else {
+        if (FT_SG == clp->in_type) {
+            if (rep->swait)
+                sg_in_out_interleave(clp, rep);
+            else
+                sg_in_rd_cmd(clp, rep); /* unlocks in_mutex mid operation */
+        } else {
             stop_after_write = normal_in_rd(clp, rep, blocks);
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
@@ -938,8 +964,8 @@ read_write_thread(void * v_tip)
                 pthread_cleanup_pop(0);
             }
         }
-skip_force_out_sequence:
 
+skip_force_out_sequence:
         if (clp->out_stop || (clp->out_count <= 0)) {
             if (! clp->out_stop)
                 clp->out_stop = true;
@@ -974,9 +1000,13 @@ skip_force_out_sequence:
                            rep->num_blks);
         }
         /* Output to OFILE */
-        if (FT_SG == clp->out_type)
-            sg_out_wr_cmd(clp, rep, false); /* releases out_mutex mid oper */
-        else if (FT_DEV_NULL == clp->out_type) {
+        if (FT_SG == clp->out_type) {
+            if (rep->swait) {
+                status = pthread_mutex_unlock(&clp->out_mutex);
+                if (0 != status) err_exit(status, "unlock out_mutex");
+            } else
+                sg_out_wr_cmd(clp, rep, false); /* releases out_mutex */
+        } else if (FT_DEV_NULL == clp->out_type) {
             /* skip actual write operation */
             clp->out_rem_count -= blocks;
             status = pthread_mutex_unlock(&clp->out_mutex);
@@ -1441,7 +1471,7 @@ sg_start_io(Rq_elem * rep, bool is_wr2)
         cp = (wr ? " slave active" : " master active");
     } else
         cp = (wr ? " slave not sharing" : " master not sharing");
-    rep->rq_id = atomic_fetch_add(&mono_pack_id, 1);
+    rep->rq_id = atomic_fetch_add(&mono_pack_id, 1);    /* fetch before */
     if (rep->debug > 3) {
         pr2serr_lk("%s tid,rq_id=%d,%d: SCSI %s%s%s%s, blk=%" PRId64
                    " num_blks=%d\n", __func__, rep->id, rep->rq_id, crwp, cp,
@@ -1678,6 +1708,154 @@ do_v4:
     return 0;
 }
 
+/* Enter holding in_mutex, exits holding nothing */
+static void
+sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
+{
+    int res, pid_read, pid_write;
+    int status;
+
+    while (1) {
+        /* start READ */
+        res = sg_start_io(rep, false);
+        pid_read = rep->rq_id;
+        if (1 == res)
+            err_exit(ENOMEM, "sg interleave starting in command");
+        else if (res < 0) {
+            pr2serr_lk("tid=%d: inputting to sg failed, blk=%" PRId64 "\n",
+                       rep->id, rep->blk);
+            status = pthread_mutex_unlock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "unlock in_mutex");
+            guarded_stop_both(clp);
+            return;
+        }
+
+        /* start WRITE */
+        rep->wr = true;
+        rep->blk = clp->out_blk;
+        res = sg_start_io(rep, false);
+        pid_write = rep->rq_id;
+        if (1 == res)
+            err_exit(ENOMEM, "sg interleave starting out command");
+        else if (res < 0) {
+            pr2serr_lk("tid=%d: outputting to sg failed, blk=%" PRId64 "\n",
+                       rep->id, rep->blk);
+            status = pthread_mutex_unlock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "unlock in_mutex");
+            guarded_stop_both(clp);
+            return;
+        }
+        /* Now release in mutex to let other reads run in parallel */
+        status = pthread_mutex_unlock(&clp->in_mutex);
+        if (0 != status) err_exit(status, "unlock in_mutex");
+
+        /* finish READ */
+        rep->rq_id = pid_read;
+        rep->wr = false;
+        rep->blk = clp->in_blk;
+        res = sg_finish_io(rep->wr, rep, false);
+        switch (res) {
+        case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            /* try again with same addr, count info */
+            /* now re-acquire in mutex for balance */
+            /* N.B. This re-read could now be out of read sequence */
+            status = pthread_mutex_lock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "lock in_mutex");
+            break;      /* will loop again */
+        case SG_LIB_CAT_MEDIUM_HARD:
+            if (0 == clp->in_flags.coe) {
+                pr2serr_lk("%s: finishing in (medium)\n", __func__);
+                if (exit_status <= 0)
+                    exit_status = res;
+                guarded_stop_both(clp);
+                // return;
+                break;
+            } else {
+                memset(rep->buffp, 0, rep->num_blks * rep->bs);
+                pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
+                           " for %d bytes\n", rep->id, rep->blk,
+                           rep->num_blks * rep->bs);
+            }
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
+        case 0:
+            status = pthread_mutex_lock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "lock in_mutex");
+            if (rep->dio_incomplete_count || rep->resid) {
+                clp->dio_incomplete_count += rep->dio_incomplete_count;
+                clp->sum_of_resids += rep->resid;
+            }
+            clp->in_rem_count -= rep->num_blks;
+            status = pthread_mutex_unlock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "unlock in_mutex");
+            // return;
+            break;
+        default:
+            pr2serr_lk("%s: tid=%d: error finishing in (%d)\n", __func__,
+                       rep->id, res);
+            if (exit_status <= 0)
+                exit_status = res;
+            guarded_stop_both(clp);
+            // return;
+            break;
+        }
+
+        /* finish WRITE, no lock held */
+        rep->rq_id = pid_write;
+        rep->wr = true;
+        rep->blk = clp->out_blk;
+        res = sg_finish_io(rep->wr, rep, false);
+        switch (res) {
+        case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            /* try again with same addr, count info */
+            /* now re-acquire in mutex for balance */
+            /* N.B. This re-write could now be out of write sequence */
+            status = pthread_mutex_lock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "lock in_mutex");
+            break;      /* loops around */
+        case SG_LIB_CAT_MEDIUM_HARD:
+            if (0 == clp->out_flags.coe) {
+                pr2serr_lk("error finishing sg out command (medium)\n");
+                if (exit_status <= 0)
+                    exit_status = res;
+                guarded_stop_both(clp);
+                return;
+            } else
+                pr2serr_lk(">> ignored error for out blk=%" PRId64 " for %d "
+                           "bytes\n", rep->blk, rep->num_blks * rep->bs);
+#if defined(__GNUC__)
+#if (__GNUC__ >= 7)
+            __attribute__((fallthrough));
+            /* FALL THROUGH */
+#endif
+#endif
+        case 0:
+            status = pthread_mutex_lock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "lock in_mutex");
+            if (rep->dio_incomplete_count || rep->resid) {
+                clp->dio_incomplete_count += rep->dio_incomplete_count;
+                clp->sum_of_resids += rep->resid;
+            }
+            clp->out_rem_count -= rep->num_blks;
+            status = pthread_mutex_unlock(&clp->in_mutex);
+            if (0 != status) err_exit(status, "unlock out_mutex");
+            return;
+        default:
+            pr2serr_lk("error finishing sg out command (%d)\n", res);
+            if (exit_status <= 0)
+                exit_status = res;
+            guarded_stop_both(clp);
+            return;
+        }
+    }           /* end of while (1) loop */
+}
+
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
 sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
@@ -1780,6 +1958,8 @@ process_flags(const char * arg, struct flags_t * fp)
             ;
         else if (0 == strcmp(cp, "same_fds"))
             fp->same_fds = true;
+        else if (0 == strcmp(cp, "swait"))
+            fp->swait = true;
         else if (0 == strcmp(cp, "v3"))
             fp->v3 = true;
         else if (0 == strcmp(cp, "v4"))
@@ -2166,6 +2346,8 @@ main(int argc, char * argv[])
         usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (clp->in_flags.swait && (! clp->out_flags.swait))
+        pr2serr("iflag=swait is ignored, it should be oflag=swait\n");
     if (clp->debug)
         pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
                 PRId64 "\n", my_name, inf, skip, outf, seek, dd_count);

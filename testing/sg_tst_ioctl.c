@@ -53,7 +53,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.03  20190128";
+static const char * version_str = "Version: 1.04  20190201";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_LEN 6
@@ -647,6 +647,8 @@ main(int argc, char * argv[])
         printf("  pdt: %d\n", ssi.scsi_type);
         printf("  h_cmd_per_lun: %d\n", ssi.h_cmd_per_lun);
         printf("  d_queue_depth: %d\n", ssi.d_queue_depth);
+        printf("  SCSI 8 byte LUN: ");
+        hex2stdout(ssi.scsi_lun, 8, -1);
     }
     if (ioctl(sg_fd, SG_GET_PACK_ID, &pack_id) < 0)
         pr2serr("ioctl(SG_GET_PACK_ID) failed, errno=%d %s\n",

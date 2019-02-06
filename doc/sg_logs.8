@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_LOGS "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -279,14 +279,14 @@ outputs the transport ('Protocol specific port') log page. Equivalent to
 setting '\-\-page=18h'.
 .TP
 \fB\-M\fR, \fB\-\-vendor\fR=\fIVP\fR
-where \fIVP\fR is a vendor (e.g. "sea" for Seagate) or product (group)
-acronym (e.g. "lto5" for the 5th generation LTO (tape) consortium). Either
-the whole log page is vendor specific (e.g. page numbers 0x30 to 0x3f) or
-part of a T10 defined log page is vendor specific. For example SPC\-5
-defines parameter code 0x0 of page 0x2f (the Informational Exceptions log
-page) and states that the remaining parameter codes (i.e. 0x1 to 0xffff)
-are vendor specific. Using a \fIVP\fR of "xxx" will list the available
-acronyms.
+where \fIVP\fR is a vendor/manufacturer (e.g. "sea" for Seagate) or
+product (group) acronym (e.g. "lto5" for the 5th generation LTO (tape)
+consortium). Either the whole log page is vendor specific (e.g. page
+numbers 0x30 to 0x3f) or part of a T10 defined log page is vendor specific.
+For example SPC\-5 defines parameter code 0x0 of page 0x2f (the Informational
+Exceptions log page) and states that the remaining parameter codes (i.e. 0x1
+to 0xffff) are vendor specific. Using a \fIVP\fR of "xxx" will list the
+available acronyms.
 .br
 If this option is used with \fI\-\-page=PG\fR and \fIPG\fR is an acronym
 then this option is ignored. If \fIPG\fR is a number (e.g. 0xc0) then
@@ -478,7 +478,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2018 Douglas Gilbert
+Copyright \(co 2002\-2019 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1378,9 +1378,18 @@ decode_vpd_d2_hit(uint8_t * b, int blen)
                 plen + 4, 52 + 4);
         return;
     }
-    printf("  ASCII HDC Version: %.16s\n", b + 5);
-    printf("  ASCII Card Serial Number: %.16s\n", b + 22);
-    printf("  ASCII Card Assembly Part Number: %.16s\n", b + 39);
+    if ((blen - 4) == 120) {
+        printf("  HDC Version: %.*s\n", b[4], b + 5);
+        printf("  Card Serial Number: %.*s\n", b[24], b + 25);
+        printf("  NAND Flash Version: %.*s\n", b[44], b + 45);
+        printf("  Card Assembly Part Number: %.*s\n", b[64], b + 65);
+        printf("  Second Card Serial Number: %.*s\n", b[84], b + 85);
+        printf("  Second Card Assembly Part Number: %.*s\n", b[104], b + 105);
+    } else {
+        printf("  ASCII HDC Version: %.16s\n", b + 5);
+        printf("  ASCII Card Serial Number: %.16s\n", b + 22);
+        printf("  ASCII Card Assembly Part Number: %.16s\n", b + 39);
+    }
 }
 
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_CAT_OTHER for

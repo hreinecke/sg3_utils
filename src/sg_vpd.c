@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.50 20190119";  /* spc5r20 + sbc4r15 */
+static const char * version_str = "1.51 20190202";  /* spc5r20 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1174,7 +1174,7 @@ decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
         assoc = ((bp[1] >> 4) & 0x3);
         if (print_if_found && (! printed)) {
             printed = true;
-	    if (strlen(print_if_found) > 0)
+            if (strlen(print_if_found) > 0)
                 printf("  %s:\n", print_if_found);
         }
         if (NULL == print_if_found)
@@ -2840,7 +2840,7 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
         if (op->do_raw)
             dStrRaw(rp, len);
         else {
-            if ((2 == op->do_hex) || (3 == op->do_hex))
+            if (op->do_hex > 1)
                 hex2stdout(rp, len, -1);
             else if (VPD_ASCII_OP_DEF == op->vpd_pn)
                 hex2stdout(rp, len, 0);
