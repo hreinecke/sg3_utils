@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.51 20190202";  /* spc5r20 + sbc4r15 */
+static const char * version_str = "1.52 20190210";  /* spc5r20 + sbc4r15 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -292,8 +292,8 @@ usage()
             "    --version|-V    print version string and exit\n\n"
             "Fetch Vital Product Data (VPD) page using SCSI INQUIRY or "
             "decodes VPD\npage response held in file FN. To list available "
-            "pages use '-e'. Also\n'-p -1' yields the standard INQUIRY "
-            "response.\n");
+            "pages use '-e'. Also\n'-p -1' or '-p sinq' yields the standard "
+	    "INQUIRY response.\n");
 }
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as

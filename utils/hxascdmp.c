@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2014 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -14,12 +14,16 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
+#include <ctype.h>
+#include <errno.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #define DEF_BYTES_PER_LINE 16
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.15 20181207";
+static const char * version_str = "1.17 20190210";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6
@@ -71,6 +75,126 @@ num_chs_in_str(const char * s, int slen, int ch)
             ++res;
     }
     return res;
+}
+
+/* If the number in 'buf' can be decoded or the multiplier is unknown
+ * then -1LL is returned. Accepts a hex prefix (0x or 0X) or a decimal
+ * multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
+ * Main (SI) multipliers supported: K, M, G, T, P. Ignore leading spaces
+ * and tabs; accept comma, hyphen, space, tab and hash as terminator. */
+int64_t
+sg_get_llnum(const char * buf)
+{
+    int res, len, n;
+    int64_t num, ll;
+    uint64_t unum;
+    char * cp;
+    const char * b;
+    char c = 'c';
+    char c2 = '\0';     /* keep static checker happy */
+    char c3 = '\0';     /* keep static checker happy */
+    char lb[32];
+
+    if ((NULL == buf) || ('\0' == buf[0]))
+        return -1LL;
+    len = strlen(buf);
+    n = strspn(buf, " \t");
+    if (n > 0) {
+        if (n == len)
+            return -1LL;
+        buf += n;
+        len -= n;
+    }
+    /* following hack to keep C++ happy */
+    cp = strpbrk((char *)buf, " \t,#-");
+    if (cp) {
+        len = cp - buf;
+        n = (int)sizeof(lb) - 1;
+        len = (len < n) ? len : n;
+        memcpy(lb, buf, len);
+        lb[len] = '\0';
+        b = lb;
+    } else
+        b = buf;
+    if (('0' == b[0]) && (('x' == b[1]) || ('X' == b[1]))) {
+        res = sscanf(b + 2, "%" SCNx64 , &unum);
+        num = unum;
+    } else if ('H' == toupper((int)b[len - 1])) {
+        res = sscanf(b, "%" SCNx64 , &unum);
+        num = unum;
+    } else
+        res = sscanf(b, "%" SCNd64 "%c%c%c", &num, &c, &c2, &c3);
+    if (res < 1)
+        return -1LL;
+    else if (1 == res)
+        return num;
+    else {
+        if (res > 2)
+            c2 = toupper((int)c2);
+        if (res > 3)
+            c3 = toupper((int)c3);
+        switch (toupper((int)c)) {
+        case 'C':
+            return num;
+        case 'W':
+            return num * 2;
+        case 'B':
+            return num * 512;
+        case 'K':
+            if (2 == res)
+                return num * 1024;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1024;
+            return -1LL;
+        case 'M':
+            if (2 == res)
+                return num * 1048576;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1048576;
+            return -1LL;
+        case 'G':
+            if (2 == res)
+                return num * 1073741824;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1073741824;
+            return -1LL;
+        case 'T':
+            if (2 == res)
+                return num * 1099511627776LL;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000000LL;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1099511627776LL;
+            return -1LL;
+        case 'P':
+            if (2 == res)
+                return num * 1099511627776LL * 1024;
+            if (('B' == c2) || ('D' == c2))
+                return num * 1000000000000LL * 1000;
+            if (('I' == c2) && (4 == res) && ('B' == c3))
+                return num * 1099511627776LL * 1024;
+            return -1LL;
+        case 'X':
+            cp = (char *)strchr(b, 'x');
+            if (NULL == cp)
+                cp = (char *)strchr(b, 'X');
+            if (cp) {
+                ll = sg_get_llnum(cp + 1);
+                if (-1LL != ll)
+                    return num * ll;
+            }
+            return -1LL;
+        default:
+            fprintf(stderr, "unrecognized multiplier\n");
+            return -1LL;
+        }
+    }
 }
 
 static void
@@ -202,6 +326,8 @@ usage()
     fprintf(stderr, "    -H         print hex only (i.e. no ASCII "
             "to right)\n");
     fprintf(stderr, "    -N         no address, start in first column\n");
+    fprintf(stderr, "    -o=<off>    start decoding at byte <off>. Suffix "
+            "multipliers allowed\n");
     fprintf(stderr, "    -V         print version string then exits\n");
     fprintf(stderr, "    -?         print this usage message\n");
     fprintf(stderr, "    <file>+    reads file(s) and outputs each "
@@ -216,6 +342,7 @@ main(int argc, const char ** argv)
     char buff[8192];
     int num = 8192;
     long start = 0;
+    int64_t offset = 0;
     int res, k, u, len, n;
     int inFile = STDIN_FILENO;
     int doHelp = 0;
@@ -237,6 +364,15 @@ main(int argc, const char ** argv)
                 return 1;
             }
             bytes_per_line = u;
+        } else if (0 == strncmp("-o=", cp, 3)) {
+            int64_t off = sg_get_llnum(cp + 3);
+
+            if (off == -1) {
+                fprintf(stderr, "Bad value after '-o=' option\n");
+                usage();
+                return 1;
+            }
+            offset = off;
         } else if ((len > 1) && ('-' == cp[0]) && ('-' != cp[1])) {
             res = 0;
             n = num_chs_in_str(cp + 1, len - 1, 'h');
@@ -292,7 +428,21 @@ main(int argc, const char ** argv)
                 ret = 1;
             } else {
                 sg_set_binary_mode(inFile);
-                start = 0;
+                if (offset > 0) {
+                    int err;
+                    int64_t off_res;
+
+                    off_res = lseek(inFile, offset, SEEK_SET);
+                    if (off_res < 0) {
+                        err = errno;
+                        fprintf(stderr, "failed moving filepos: wanted=%"
+                                PRId64 " [0x%" PRIx64 "]\nlseek error: %s\n",
+                                offset, offset, strerror(err));
+                        goto fini1;
+                    }
+                    start = offset;
+                } else
+                    start = 0;
                 if (! doHex)
                     printf("ASCII hex dump of file: %s\n", argv[k]);
                 while ((res = read(inFile, buff, num)) > 0) {
@@ -303,10 +453,24 @@ main(int argc, const char ** argv)
                     start += (long)res;
                 }
             }
+fini1:
             close(inFile);
         }
     } else {
         sg_set_binary_mode(inFile);
+        if (offset > 0) {
+            start = offset;
+            do {        /* eat up offset bytes */
+                if ((res = read(inFile, buff,
+                                (num > offset ? offset : num))) > 0)
+                    offset -= res;
+                else {
+                    fprintf(stderr, "offset read() error: %s\n",
+                            strerror(errno));
+                     break;
+                }
+            } while (offset > 0);
+        }
         while ((res = read(inFile, buff, num)) > 0) {
             if (doHex)
                 dStrHexOnly(buff, res, start, noAddr);

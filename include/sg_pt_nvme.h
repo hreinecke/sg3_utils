@@ -2,7 +2,7 @@
 #define SG_PT_NVME_H
 
 /*
- * Copyright (c) 2017-2018 Douglas Gilbert.
+ * Copyright (c) 2017-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,9 +29,9 @@ extern "C" {
  * are exceptions, for example the EUI-64 identifiers in the Admin Identify
  * response are big endian.
  *
- * Code online (e.g. nvme-cli at github.com) seems to like packed strcutures,
- * the author prefers byte offset plus a range of unaligned integer builders
- * such as those in sg_unaligned.h .
+ * Code online (e.g. nvme-cli at github.com) seems to favour packed
+ * structures, while the author prefers byte offset plus a range of unaligned
+ * integer builders such as those in sg_unaligned.h .
  */
 
 #ifdef __GNUC__
@@ -183,8 +183,6 @@ struct sg_opcode_info_t {
 /* Vendor specific (sg3_utils) VPD pages */
 #define SG_NVME_VPD_NICR 0xde   /* NVME Identify controller response */
 
-extern struct sg_opcode_info_t sg_opcode_info_arr[];
-
 
 /* Given the NVMe Identify Controller response and optionally the NVMe
  * Identify Namespace response (NULL otherwise), generate the SCSI VPD
@@ -212,6 +210,10 @@ int sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
 int sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
                             const uint8_t * cdbp, const uint8_t * dop,
                             int do_len, struct sg_sntl_result_t * resp);
+
+/* Returns pointer to array of struct sg_opcode_info_t of SCSI commands
+ * translated to NVMe. */
+const struct sg_opcode_info_t * sg_get_opcode_translation(void);
 
 #ifdef __cplusplus
 }

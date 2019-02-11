@@ -1,10 +1,10 @@
-.TH HXASCDMP "1" "February 2014" "sg3_utils\-1.38" SG3_UTILS
+.TH HXASCDMP "1" "February 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 hxascdmp \- hexadecimal ASCII dump
 .SH SYNOPSIS
 .B hxascdmp
-[\fI\-b=BPL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-N\fR] [\fI\-V\fR]
-[\fIFILE+\fR]
+[\fI\-b=BPL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-N\fR] [\fI\-o=OFF\fR]
+[\fI\-V\fR] [\fIFILE+\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -45,6 +45,11 @@ end of each line).
 .TP
 \fB\-N\fR
 no address; so each line starts with the next hexadecimal byte.
+.TP
+\fB\-o\fR=\fIOFF\fR
+where \fIOFF\fR specifies the byte offset from the beginning of the pipe or
+the beginning of each file that the output starts. If the address is being
+printed out then it starts at \fIOFF\fR. The default is an \fIOFF\fR of 0 .
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
@@ -98,7 +103,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2014 Douglas Gilbert
+Copyright \(co 2004\-2019 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

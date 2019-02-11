@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.06 20190113 */
+/* sg_pt_linux_nvme version 1.07 20190210 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -1046,7 +1046,7 @@ sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     case 0: /* all commands */
         count = 0;
         bump = rctd ? 20 : 8;
-        for (offset = 4, oip = sg_opcode_info_arr;
+        for (offset = 4, oip = sg_get_opcode_translation();
              (oip->flags != 0xffff) && (offset < a_len); ++oip) {
             if (F_INV_OP & oip->flags)
                 continue;
@@ -1067,7 +1067,7 @@ sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     case 1: /* one command: opcode only */
     case 2: /* one command: opcode plus service action */
     case 3: /* one command: if sa==0 then opcode only else opcode+sa */
-        for (oip = sg_opcode_info_arr; oip->flags != 0xffff; ++oip) {
+        for (oip = sg_get_opcode_translation(); oip->flags != 0xffff; ++oip) {
             if ((req_opcode == oip->opcode) && (req_sa == oip->sa))
                 break;
         }
