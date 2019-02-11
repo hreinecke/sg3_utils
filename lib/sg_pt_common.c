@@ -64,7 +64,7 @@ static const char * nvme_scsi_vendor_str = "NVMe    ";
 #define F_INV_OP                0x200
 
 /* Table of SCSI operation code (opcodes) supported by SNTL */
-struct sg_opcode_info_t sg_opcode_info_arr[] =
+static struct sg_opcode_info_t sg_opcode_info_arr[] =
 {
     {0x0, 0, 0, {6,              /* TEST UNIT READY */
       0, 0, 0, 0, 0xc7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
@@ -92,7 +92,13 @@ struct sg_opcode_info_t sg_opcode_info_arr[] =
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} },
 };
 
-
+/* Returns pointer to array of struct sg_opcode_info_t of SCSI commands
+ * translated to NVMe. */
+const struct sg_opcode_info_t *
+sg_get_opcode_translation(void)
+{
+    return sg_opcode_info_arr;
+}
 
 /* Given the NVMe Identify controller response and optionally the NVMe
  * Identify namespace response (NULL otherwise), generate the SCSI VPD

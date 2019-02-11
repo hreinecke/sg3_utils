@@ -278,7 +278,7 @@ int sg_get_designation_descriptor_str(const char * leadin,
  * bytes and returns the number of bytes actually written to 'b' but doesn't
  * count the trailing null character it always appends (if blen > 0). 'lip'
  * is lead-in string (on each line) than may be NULL. skip_prefix avoids
- * outputing '   Locally assigned UUID: ' before the UUID. */
+ * outputting: '   Locally assigned UUID: ' before the UUID. */
 int sg_t10_uuid_desig2str(const uint8_t * dp, int dlen, int c_set,
 			  bool do_long, bool skip_prefix,
 			  const char * lip, int blen, char * b);

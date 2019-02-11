@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_win32 version 1.29 20190111 */
+/* sg_pt_win32 version 1.30 20190210 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2878,7 +2878,7 @@ sntl_rep_opcodes(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     case 0: /* all commands */
         count = 0;
         bump = rctd ? 20 : 8;
-        for (offset = 4, oip = sg_opcode_info_arr;
+        for (offset = 4, oip = sg_get_opcode_translation();
              (oip->flags != 0xffff) && (offset < a_len); ++oip) {
             if (F_INV_OP & oip->flags)
                 continue;
@@ -2899,7 +2899,7 @@ sntl_rep_opcodes(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     case 1: /* one command: opcode only */
     case 2: /* one command: opcode plus service action */
     case 3: /* one command: if sa==0 then opcode only else opcode+sa */
-        for (oip = sg_opcode_info_arr; oip->flags != 0xffff; ++oip) {
+        for (oip = sg_get_opcode_translation(); oip->flags != 0xffff; ++oip) {
             if ((req_opcode == oip->opcode) && (req_sa == oip->sa))
                 break;
         }

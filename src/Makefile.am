@@ -170,7 +170,7 @@ sg_test_rwbuf_LDADD = ../lib/libsgutils2.la
 
 sg_timestamp_LDADD = ../lib/libsgutils2.la
 
-sg_turs_LDADD = ../lib/libsgutils2.la
+sg_turs_LDADD = ../lib/libsgutils2.la @RT_LIB@
 
 sg_unmap_LDADD = ../lib/libsgutils2.la
 

@@ -8,7 +8,7 @@
  *
  * This program issues a NVMe Identify command (controller or namespace)
  * or a Device self-test command via the "SCSI" pass-through interface of
- * this packages sg_utils library. That interface is primarily shown in
+ * this package's sg_utils library. That interface is primarily shown in
  * the ../include/sg_pt.h header file.
  *
  */
