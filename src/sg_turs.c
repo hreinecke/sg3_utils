@@ -252,7 +252,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->version_given = true;
                     break;
                 case '?':
-                    usage_old();
+                    ++op->do_help;
                     return 0;
                 default:
                     jmp_out = true;
