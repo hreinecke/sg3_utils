@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190210] [svn: r811]
+Changelog for sg3_utils-1.45 [20190301] [svn: r812]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (spc5r20)
@@ -30,6 +30,7 @@ Changelog for sg3_utils-1.45 [20190210] [svn: r811]
     SIGPOLL (SIGIO) and realtime (RT) signals
   - sg_pt: add sg_get_opcode_translation() to replace
     global pointer to array: sg_opcode_info_arr[]
+    - extend small SNTL to support read capacity
   - utils/hxascdmp: add -o=<offset> option
   - sg_io_linux (sg_lib): add sg_linux_sense_print()
   - sg_pt_linux: uses sg v4 interface if sg driver

@@ -1,4 +1,4 @@
-.TH SG_XCOPY "8" "January 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_XCOPY "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_xcopy \- copy data to and from files and devices using SCSI EXTENDED
 COPY (XCOPY)
@@ -88,7 +88,7 @@ minimum (\fIIFILE\fR if \fIdc=0\fR or \fIOFILE\fR if \fIdc=1\fR)
 number of blocks that SCSI devices report from SCSI READ CAPACITY
 commands or that block devices (or their partitions) report. Normal
 files are not probed for their size. If \fIskip=SKIP\fR or
-\fIskip=SEEK\fR are given and the count is derived (i.e. not
+\fIseek=SEEK\fR are given and the count is derived (i.e. not
 explicitly given) then the derived count is scaled back so that the
 copy will not overrun the device. If the file name is a block device
 partition and \fICOUNT\fR is not given then the size of the partition

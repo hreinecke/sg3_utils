@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.07 20190210 */
+/* sg_pt_linux_nvme version 1.08 20190218 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -91,6 +91,10 @@
 #define SCSI_REP_SUP_TMFS_OPC  0xd
 #define SCSI_MODE_SENSE10_OPC  0x5a
 #define SCSI_MODE_SELECT10_OPC  0x55
+#define SCSI_READ_CAPACITY10_OPC  0x25
+#define SCSI_SERVICE_ACT_IN_OPC  0x9e
+#define SCSI_READ_CAPACITY16_SA  0x10
+#define SCSI_SA_MSK  0x1f
 
 /* Additional Sense Code (ASC) */
 #define NO_ADDITIONAL_SENSE 0x0
@@ -412,6 +416,20 @@ sntl_check_enclosure_override(struct sg_pt_linux_scsi * ptp, int vb)
     }
 }
 
+static int
+sntl_do_identify(struct sg_pt_linux_scsi * ptp, int cns, int nsid,
+                 int time_secs, int u_len, uint8_t * up, int vb)
+{
+    struct sg_nvme_passthru_cmd cmd;
+
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = 0x6;   /* Identify */
+    cmd.nsid = nsid;
+    cmd.cdw10 = cns;
+    cmd.addr = (uint64_t)(sg_uintptr_t)up;
+    cmd.data_len = u_len;
+    return do_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
+}
 
 /* Currently only caches associated identify controller response (4096 bytes).
  * Returns 0 on success; otherwise a positive value is returned */
@@ -421,7 +439,6 @@ sntl_cache_identity(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
     int ret;
     uint32_t pg_sz = sg_get_page_size();
     uint8_t * up;
-    struct sg_nvme_passthru_cmd cmd;
 
     up = sg_memalign(pg_sz, pg_sz, &ptp->free_nvme_id_ctlp, false);
     ptp->nvme_id_ctlp = up;
@@ -429,12 +446,8 @@ sntl_cache_identity(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
         pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
         return sg_convert_errno(ENOMEM);
     }
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x6;   /* Identify */
-    cmd.cdw10 = 0x1;    /* CNS=0x1 Identify controller */
-    cmd.addr = (uint64_t)(sg_uintptr_t)ptp->nvme_id_ctlp;
-    cmd.data_len = pg_sz;
-    ret = do_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
+    ret = sntl_do_identify(ptp, 0x1 /* CNS */, 0 /* nsid */, time_secs,
+                           pg_sz, up, vb);
     if (0 == ret)
         sntl_check_enclosure_override(ptp, vb);
     return (ret < 0) ? sg_convert_errno(-ret) : ret;
@@ -503,16 +516,9 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
                 nvme_id_ns = sg_memalign(pg_sz, pg_sz, &free_nvme_id_ns,
                                          false);
                 if (nvme_id_ns) {
-                    struct sg_nvme_passthru_cmd cmd;
-
-                    memset(&cmd, 0, sizeof(cmd));
-                    cmd.opcode = 0x6;   /* Identify */
-                    cmd.nsid = ptp->nvme_nsid;
-                    cmd.cdw10 = 0x0;    /* CNS=0x0 Identify namespace */
-                    cmd.addr = (uint64_t)(sg_uintptr_t)nvme_id_ns;
-                    cmd.data_len = pg_sz;
-                    res = do_nvme_admin_cmd(ptp, &cmd, nvme_id_ns, true,
-                                            time_secs, vb > 3);
+                    /* CNS=0x0 Identify namespace */
+                    res = sntl_do_identify(ptp, 0x0, ptp->nvme_nsid,
+                                           time_secs, pg_sz, nvme_id_ns, vb);
                     if (res) {
                         free(free_nvme_id_ns);
                         free_nvme_id_ns = NULL;
@@ -1158,6 +1164,74 @@ sntl_rep_tmfs(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     return 0;
 }
 
+static int
+sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
+              int time_secs, int vb)
+{
+    bool is_rcap10 = (SCSI_READ_CAPACITY10_OPC == cdbp[0]);
+    int res, n, len, alloc_len, dps;
+    uint8_t flbas, index, lbads;
+    uint32_t lbafx;     /* "x" is 0 to 15 in NVMe spec */
+    uint32_t pg_sz = sg_get_page_size();
+    uint64_t nsze;
+    uint8_t * bp;
+    uint8_t * up;
+    uint8_t * free_up = NULL;
+    uint8_t resp[32];
+
+    if (vb > 3)
+        pr2ws("%s: RCAP%d, time_secs=%d\n", __func__,
+              (is_rcap10 ? 10 : 16), time_secs);
+    up = sg_memalign(pg_sz, pg_sz, &free_up, false);
+    if (NULL == up) {
+        pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
+        return sg_convert_errno(ENOMEM);
+    }
+    res = sntl_do_identify(ptp, 0x0 /* CNS */, ptp->nvme_nsid, time_secs,
+                           pg_sz, up, vb);
+    if (res < 0) {
+        res = sg_convert_errno(-res);
+        goto fini;
+    }
+    memset(resp, 0, sizeof(*resp));
+    nsze = sg_get_unaligned_le64(up + 0);
+    flbas = up[26];
+    index = 128 + (4 * (flbas & 0xf));
+    lbafx = sg_get_unaligned_le32(up + index);
+    lbads = (lbafx >> 16) & 0xff;       /* bits 16 to 23 inclusive, pow2 */
+    if (is_rcap10) {
+        alloc_len = 8;  /* implicit, not in cdb */
+        if (nsze > 0xfffffffe)
+            sg_put_unaligned_be32(0xffffffff, resp + 0);
+        else
+            sg_put_unaligned_be32((uint32_t)nsze, resp + 0);
+        sg_put_unaligned_be32(1 << lbads, resp + 4);    /* LB size */
+    } else {
+        alloc_len = sg_get_unaligned_be32(cdbp + 10);
+        dps = up[29];
+        if (0x7 & dps) {
+            resp[12] = 0x1;
+            n = (0x7 & dps) - 1;
+            if (n > 0)
+                resp[12] |= (n + n);
+        }
+        sg_put_unaligned_be64(nsze, resp + 0);
+        sg_put_unaligned_be32(1 << lbads, resp + 8);    /* LB size */
+    }
+    len = ptp->io_hdr.din_xfer_len;
+    bp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp;
+    n = 16;
+    n = (n < alloc_len) ? n : alloc_len;
+    n = (n < len) ? n : len;
+    ptp->io_hdr.din_resid = len - n;
+    if (n > 0)
+        memcpy(bp, resp, n);
+fini:
+    if (free_up)
+        free(free_up);
+    return res;
+}
+
 /* Executes NVMe Admin command (or at least forwards it to lower layers).
  * Returns 0 for success, negative numbers are negated 'errno' values from
  * OS system calls. Positive return values are errors from this package.
@@ -1219,14 +1293,21 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
         case SCSI_MODE_SENSE10_OPC:
         case SCSI_MODE_SELECT10_OPC:
             return sntl_mode_ss(ptp, cdbp, time_secs, vb);
+        case SCSI_READ_CAPACITY10_OPC:
+            return sntl_readcap(ptp, cdbp, time_secs, vb);
+        case SCSI_SERVICE_ACT_IN_OPC:
+            if (SCSI_READ_CAPACITY16_SA == (cdbp[1] & SCSI_SA_MSK))
+                return sntl_readcap(ptp, cdbp, time_secs, vb);
+            goto fini;
         case SCSI_MAINT_IN_OPC:
-            sa = 0x1f & cdbp[1];        /* service action */
+            sa = SCSI_SA_MSK & cdbp[1];        /* service action */
             if (SCSI_REP_SUP_OPCS_OPC == sa)
                 return sntl_rep_opcodes(ptp, cdbp, time_secs, vb);
             else if (SCSI_REP_SUP_TMFS_OPC == sa)
                 return sntl_rep_tmfs(ptp, cdbp, time_secs, vb);
             /* fall through */
         default:
+fini:
             if (vb > 2) {
                 char b[64];
 

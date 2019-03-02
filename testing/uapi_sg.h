@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.06 (20190201)
+ * Version 4.0.06 (20190210)
  *  This version is for Linux 2.6, 3, 4 and 5 series kernels.
  *
  * Documentation
