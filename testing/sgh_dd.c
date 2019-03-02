@@ -98,13 +98,16 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.19 20190210";
+static const char * version_str = "1.20 20190212";
 
 #ifdef __GNUC__
 #ifndef  __clang__
 #pragma GCC diagnostic ignored "-Wclobbered"
 #endif
 #endif
+
+/* <<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>   xxxxxxxxxx   beware next line */
+#define SGH_DD_READ_COMPLET_AFTER 1
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -559,6 +562,10 @@ usage(int pg_num)
             "It expects one or both IFILE\nand OFILE to be sg devices. It "
             "is Linux specific and uses the v4 sg driver\n'share' capability "
             "if available. Use '-hh' or '-hhh' for more information.\n"
+#ifdef SGH_DD_READ_COMPLET_AFTER
+	    "\nIn this version oflag=swait does read completion _after_ "
+	    "write completion\n"
+#endif
            );
     return;
 page2:
@@ -1777,6 +1784,12 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
         status = pthread_mutex_unlock(&clp->in_mutex);
         if (0 != status) err_exit(status, "unlock in_mutex");
 
+#ifdef SGH_DD_READ_COMPLET_AFTER
+#warning "SGH_DD_READ_COMPLET_AFTER is set (testing)"
+	goto write_complet;
+read_complet:
+#endif
+
         /* finish READ */
         rep->rq_id = pid_read;
         rep->wr = false;
@@ -1832,6 +1845,12 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
             break;
         }
 
+
+#ifdef SGH_DD_READ_COMPLET_AFTER
+	return;
+
+write_complet:
+#endif
         /* finish WRITE, no lock held */
         rep->rq_id = pid_write;
         rep->wr = true;
@@ -1871,6 +1890,10 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
             clp->out_rem_count -= rep->num_blks;
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
+
+#ifdef SGH_DD_READ_COMPLET_AFTER
+	goto read_complet;
+#endif
             return;
         default:
             pr2serr_lk("error finishing sg out command (%d)\n", res);

@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SGP_DD "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sgp_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -61,7 +61,7 @@ copy \fICOUNT\fR blocks from \fIIFILE\fR to \fIOFILE\fR. Default is the
 minimum (of \fIIFILE\fR and \fIOFILE\fR) number of blocks that sg devices
 report from SCSI READ CAPACITY commands or that block devices (or their
 partitions) report. Normal files are not probed for their size. If
-\fIskip=SKIP\fR or \fIskip=SEEK\fR are given and the count is deduced (i.e.
+\fIskip=SKIP\fR or \fIseek=SEEK\fR are given and the count is deduced (i.e.
 not explicitly given) then that count is scaled back so that the copy will
 not overrun the device. If the file name is a block device partition and
 \fICOUNT\fR is not given then the size of the partition rather than the
@@ -314,7 +314,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2017 Douglas Gilbert
+Copyright \(co 2000\-2019 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

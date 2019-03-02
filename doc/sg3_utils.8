@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "January 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG3_UTILS "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -260,6 +260,12 @@ package assume they are talking to a SCSI device and decode any response
 accordingly. One easy way for users to see the underlying device is a
 NVMe device is the standard INQUIRY response Vendor Identification field
 of "NVMe    " (an 8 character long string with 4 spaces to the right).
+.PP
+The following SCSI commands are currently supported by the SNTL library:
+INQUIRY, MODE SELECT(10), MODE SENSE(10), READ CAPACITY(10 and 16),
+RECEIVE DIAGNOSTIC RESULTS, REQUEST SENSE, REPORT LUNS, REPORT SUPPORTED
+OPERATION CODES, REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS, SEND
+DIAGNOSTICS, and TEST UNIT READY.
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
@@ -406,6 +412,11 @@ like "shouldn't/can't get here". Perhaps the author should be informed.
 .TP
 .B 33
 the command sent to \fIDEVICE\fR has timed out.
+.TP
+.B 34
+this is a Windows only exit status and indicates that the Windows error
+number (32 bits) cannot meaningfully be mapped to an equivalent Unix error
+number returned as the exit status (7 bits).
 .TP
 .B 36
 no error has occurred plus the utility wants to convey a boolean value

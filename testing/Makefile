@@ -90,6 +90,7 @@ sgs_dd: sgs_dd.o $(LIBFILESOLD)
 sg_tst_bidi: sg_tst_bidi.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
+
 install: $(EXECS)
 	install -d $(INSTDIR)
 	for name in $^; \
