@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.08 20190218 */
+/* sg_pt_linux_nvme version 1.09 20190303 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -269,7 +269,7 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
  * absence of a Unix error. If time_secs is negative it is treated as
  * a timeout in milliseconds (of abs(time_secs) ). */
 static int
-do_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
+sg_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
                   struct sg_nvme_passthru_cmd *cmdp, void * dp, bool is_read,
                   int time_secs, int vb)
 {
@@ -428,7 +428,7 @@ sntl_do_identify(struct sg_pt_linux_scsi * ptp, int cns, int nsid,
     cmd.cdw10 = cns;
     cmd.addr = (uint64_t)(sg_uintptr_t)up;
     cmd.data_len = u_len;
-    return do_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
+    return sg_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
 }
 
 /* Currently only caches associated identify controller response (4096 bytes).
@@ -655,7 +655,7 @@ sntl_rluns(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     rl_doutp = (uint8_t *)calloc(num + 1, 8);
     if (NULL == rl_doutp) {
         pr2ws("%s: calloc() failed to get memory\n", __func__);
-        return -ENOMEM;
+        return sg_convert_errno(ENOMEM);
     }
     for (k = 0, up = rl_doutp + 8; k < num; ++k, up += 8)
         sg_put_unaligned_be16(k, up);
@@ -697,7 +697,7 @@ sntl_tur(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
     cmd.nsid = SG_NVME_BROADCAST_NSID;
     cmd.cdw10 = 0x2;    /* SEL=0 (current), Feature=2 Power Management */
     cmd.timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
-    res = do_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
+    res = sg_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
     if (0 != res) {
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
@@ -746,7 +746,7 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     cmd.nsid = SG_NVME_BROADCAST_NSID;
     cmd.cdw10 = 0x2;    /* SEL=0 (current), Feature=2 Power Management */
     cmd.timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
-    res = do_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
+    res = sg_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
     if (0 != res) {
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
@@ -881,7 +881,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             return 0;
         }
         sg_put_unaligned_le32(nvme_dst, cmd_up + SG_NVME_PT_CDW10);
-        res = do_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
+        res = sg_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
         if (0 != res) {
             if (SG_LIB_NVME_STATUS == res) {
                 mk_sense_from_nvme_status(ptp, vb);
@@ -944,7 +944,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     cmd.cdw10 = 0x0804;      /* NVMe Message Header */
     cmd.cdw11 = 0x9;         /* nvme_mi_ses_send; (0x8 -> mi_ses_recv) */
     cmd.cdw13 = n;
-    res = do_nvme_admin_cmd(ptp, &cmd, dop, false, time_secs, vb);
+    res = sg_nvme_admin_cmd(ptp, &cmd, dop, false, time_secs, vb);
     if (0 != res) {
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
@@ -1000,7 +1000,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     cmd.cdw11 = 0x8;         /* nvme_mi_ses_receive */
     cmd.cdw12 = dpg_cd;
     cmd.cdw13 = n;
-    res = do_nvme_admin_cmd(ptp, &cmd, dip, true, time_secs, vb);
+    res = sg_nvme_admin_cmd(ptp, &cmd, dip, true, time_secs, vb);
     if (0 != res) {
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
@@ -1046,7 +1046,7 @@ sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     arr = sg_memalign(pg_sz, pg_sz, &free_arr, false);
     if (NULL == arr) {
         pr2ws("%s: calloc() failed to get memory\n", __func__);
-        return -ENOMEM;
+        return sg_convert_errno(ENOMEM);
     }
     switch (reporting_opts) {
     case 0: /* all commands */
@@ -1164,6 +1164,12 @@ sntl_rep_tmfs(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     return 0;
 }
 
+/* Note that the "Returned logical block address" (RLBA) field in the SCSI
+ * READ CAPACITY (10+16) command's response provides the address of the _last_
+ * LBA (counting origin 0) which will be one less that the "size" in the
+ * NVMe Identify command response's NSZE field. One problem is that in
+ * some situations NSZE can be zero: temporarily set RLBA field to 0
+ * (implying a 1 LB logical units size) pending further research. */
 static int
 sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
               int time_secs, int vb)
@@ -1201,11 +1207,13 @@ sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     lbads = (lbafx >> 16) & 0xff;       /* bits 16 to 23 inclusive, pow2 */
     if (is_rcap10) {
         alloc_len = 8;  /* implicit, not in cdb */
-        if (nsze > 0xfffffffe)
+        if (nsze > 0xffffffff)
             sg_put_unaligned_be32(0xffffffff, resp + 0);
+        else if (0 == nsze)     /* no good answer here */
+            sg_put_unaligned_be32(0, resp + 0);
         else
-            sg_put_unaligned_be32((uint32_t)nsze, resp + 0);
-        sg_put_unaligned_be32(1 << lbads, resp + 4);    /* LB size */
+            sg_put_unaligned_be32((uint32_t)(nsze - 1), resp + 0);
+        sg_put_unaligned_be32(1 << lbads, resp + 4);    /* RLBA field */
     } else {
         alloc_len = sg_get_unaligned_be32(cdbp + 10);
         dps = up[29];
@@ -1215,8 +1223,11 @@ sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             if (n > 0)
                 resp[12] |= (n + n);
         }
-        sg_put_unaligned_be64(nsze, resp + 0);
-        sg_put_unaligned_be32(1 << lbads, resp + 8);    /* LB size */
+        if (0 == nsze)  /* no good answer here */
+            sg_put_unaligned_be64(0, resp + 0);
+        else
+            sg_put_unaligned_be64(nsze - 1, resp + 0);
+        sg_put_unaligned_be32(1 << lbads, resp + 8);    /* RLBA field */
     }
     len = ptp->io_hdr.din_xfer_len;
     bp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp;
@@ -1342,7 +1353,7 @@ fini:
         cmd.addr = (uint64_t)(sg_uintptr_t)ptp->io_hdr.dout_xferp;
         is_read = false;
     }
-    return do_nvme_admin_cmd(ptp, &cmd, dp, is_read, time_secs, vb);
+    return sg_nvme_admin_cmd(ptp, &cmd, dp, is_read, time_secs, vb);
 }
 
 #else           /* (HAVE_NVME && (! IGNORE_NVME)) [around line 140] */
