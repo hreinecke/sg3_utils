@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014 Douglas Gilbert.
+ * Copyright (c) 2013-2019 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,8 +45,9 @@
 #include <sys/stat.h>
 #include "sg_lib.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.08 20181207";
+static const char * version_str = "1.09 20190321";
 static const char * util_name = "sg_tst_excl2";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -209,10 +210,8 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
     char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;
 
-    r16CmdBlk[6] = w16CmdBlk[6] = (lba >> 24) & 0xff;
-    r16CmdBlk[7] = w16CmdBlk[7] = (lba >> 16) & 0xff;
-    r16CmdBlk[8] = w16CmdBlk[8] = (lba >> 8) & 0xff;
-    r16CmdBlk[9] = w16CmdBlk[9] = lba & 0xff;
+    sg_put_unaligned_be64(lba, r16CmdBlk + 2);
+    sg_put_unaligned_be64(lba, w16CmdBlk + 2);
     if (! block)
         open_flags |= O_NONBLOCK;
     if (excl)
@@ -267,15 +266,12 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             goto err;
         }
 
-        u = (lb[0] << 24) + (lb[1] << 16) + (lb[2] << 8) + lb[3];
+        u = sg_get_unaligned_be32(lb);
         // Assuming u starts test as even (probably 0), expect it to stay even
         if (0 == k)
             odd = (1 == (u % 2));
         ++u;
-        lb[0] = (u >> 24) & 0xff;
-        lb[1] = (u >> 16) & 0xff;
-        lb[2] = (u >> 8) & 0xff;
-        lb[3] = u & 0xff;
+	sg_put_unaligned_be32(u, lb);
 
         if (wait_ms > 0)       /* allow daylight for bad things ... */
             this_thread::sleep_for(milliseconds{wait_ms});

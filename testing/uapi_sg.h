@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.06 (20190210)
+ * Version 4.0.07 (20190320)
  *  This version is for Linux 2.6, 3, 4 and 5 series kernels.
  *
  * Documentation
@@ -90,8 +90,7 @@ typedef struct sg_io_hdr {
 /* following flag values can be OR-ed together in v3::flags or v4::flags */
 #define SG_FLAG_DIRECT_IO 1	/* default is indirect IO */
 /* SG_FLAG_UNUSED_LUN_INHIBIT is ignored in sg v4 driver */
-#define SG_FLAG_UNUSED_LUN_INHIBIT 2	/* default is overwrite lun in SCSI */
-				/* command block (when <= SCSI_2) */
+#define SG_FLAG_UNUSED_LUN_INHIBIT 2  /* ignored, was LUN overwrite in cdb */
 #define SG_FLAG_MMAP_IO 4	/* request memory mapped IO */
 /* no transfer of kernel buffers to/from user space; used for sharing */
 #define SG_FLAG_NO_DXFER 0x10000
@@ -110,12 +109,15 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::request_tag set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
-/* Flag values 0x100 and 0x200 not currently used */
+#define SGV4_FLAG_COMPLETE_B4  0x100
+#define SGV4_FLAG_SIG_ON_OTHER  0x200
 #define SGV4_FLAG_IMMED 0x400 /* for polling with SG_IOR, ignored in SG_IOS */
-/* Flag value 0x800 not currently used */
+#define SGV4_FLAG_STOP_IF 0x800    /* Stops sync mrq if error or warning */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
 #define SGV4_FLAG_SHARE 0x2000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
+#define SGV4_FLAG_DO_ON_OTHER 0x4000 /* available on either of shared pair */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
+#define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* n sg_io_v4s in data-in */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1
@@ -127,8 +129,8 @@ typedef struct sg_io_hdr {
 #define SG_INFO_DIRECT_IO 0x2	/* direct IO requested and performed */
 #define SG_INFO_MIXED_IO 0x4	/* not used, always 0 */
 #define SG_INFO_DEVICE_DETACHING 0x8	/* completed successfully but ... */
-#define SG_INFO_ANOTHER_WAITING 0x10	/* needs SG_CTL_FLAGM_CHECK_FOR_MORE */
-#define SG_INFO_ABORTED 0x20	/* this command has been aborted */
+#define SG_INFO_ABORTED 0x10	/* this command has been aborted */
+#define SG_INFO_MRQ_FINI 0x20	/* marks multi-reqs that have finished */
 
 /*
  * Pointer to object of this structure filled by ioctl(SG_GET_SCSI_ID). Last
@@ -196,8 +198,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 /* rd> 1: master finished 0: not; wr> 1: finish share post master */
 #define SG_CTL_FLAGM_MASTER_FINI 0x100	/* wr> 0: setup for repeat slave req */
 #define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
-#define SG_CTL_FLAGM_CHECK_FOR_MORE 0x400 /* additional ready to read? */
-#define SG_CTL_FLAGM_ALL_BITS	0x7ff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_ALL_BITS	0x3ff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */
@@ -207,6 +208,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_DEV_FL_RQS	0x4	/* sum(fl rqs) on all of dev's fds */
 #define SG_SEIRV_TRC_SZ		0x5	/* current size of trace buffer */
 #define SG_SEIRV_TRC_MAX_SZ	0x6	/* maximum size of trace buffer */
+#define SG_SEIRV_SUBMITTED	0x7	/* number of mrqs submitted+unread */
 
 /*
  * A pointer to the following structure is passed as the third argument to
