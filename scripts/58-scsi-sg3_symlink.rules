@@ -3,9 +3,7 @@
 ACTION=="remove", GOTO="sg3_utils_symlink_end"
 
 SUBSYSTEM!="block", GOTO="sg3_utils_symlink_end"
-
-# Skip symlink generation for multipath
-ENV{DM_MULTIPATH_DEVICE_PATH}=="1", GOTO="sg3_utils_symlink_end"
+ENV{UDEV_DISABLE_PERSISTENT_STORAGE_RULES_FLAG}=="1", GOTO="sg3_utils_symlink_end"
 
 # Select which identifier to use per default
 # 0: vpd page 0x80 identifier
