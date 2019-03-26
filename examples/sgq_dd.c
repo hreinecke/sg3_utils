@@ -1,6 +1,6 @@
 /*
  * A utility program for the Linux OS SCSI generic ("sg") device driver.
- * Copyright (C) 1999-2018 D. Gilbert and P. Allworth
+ * Copyright (C) 1999-2010 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -53,7 +53,7 @@ typedef uint8_t u_char;   /* horrible, for scsi.h */
 #include "sg_unaligned.h"
 
 
-static char * version_str = "0.62 20181207";
+static char * version_str = "0.63 20190324";
 /* resurrected from "0.55 20020509" */
 
 #define DEF_BLOCK_SIZE 512
@@ -67,7 +67,7 @@ static char * version_str = "0.62 20181207";
 #define SGP_READ10 0x28
 #define SGP_WRITE10 0x2a
 #define DEF_NUM_THREADS 4       /* actually degree of concurrency */
-#define MAX_NUM_THREADS 32
+#define MAX_NUM_THREADS 1024
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikey value */
@@ -244,7 +244,7 @@ usage()
            "         usually either 'if' or 'of' is a sg or raw device\n"
            " 'bpt' is blocks_per_transfer (default is 128)\n"
            " 'dio' is direct IO, 1->attempt, 0->indirect IO (def)\n"
-           " 'thr' is number of queues, must be > 0, default 4, max 32\n");
+           " 'thr' is number of queues, must be > 0, default 4, max 1024\n");
     fprintf(stderr, " 'coe' continue on sg error, 0->exit (def), "
            "1->zero + continue\n"
            " 'time' 0->no timing(def), 1->time plus calculate throughput\n"

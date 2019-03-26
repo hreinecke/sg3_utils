@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 Douglas Gilbert.
+ * Copyright (c) 2013-2019 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,10 +43,12 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
 #include "sg_lib.h"
 #include "sg_pt.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.06 20181207";
+static const char * version_str = "1.07 20190321";
 static const char * util_name = "sg_tst_excl3";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -54,7 +56,7 @@ static const char * util_name = "sg_tst_excl3";
  * to "break" O_EXCL. The strategy is to open a device O_EXCL|O_NONBLOCK
  * and do a double increment on a LB then close it from a single thread.
  * the remaining threads open that device O_NONBLOCK and do a read and
- * note of the number is odd. Assuming the count starts as an even
+ * note if the number is odd. Assuming the count starts as an even
  * (typically 0) then it should remain even. Odd instances
  * are counted and reported at the end of the program, after all threads
  * have completed.
@@ -215,10 +217,8 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
     char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;
 
-    r16CmdBlk[6] = w16CmdBlk[6] = (lba >> 24) & 0xff;
-    r16CmdBlk[7] = w16CmdBlk[7] = (lba >> 16) & 0xff;
-    r16CmdBlk[8] = w16CmdBlk[8] = (lba >> 8) & 0xff;
-    r16CmdBlk[9] = w16CmdBlk[9] = lba & 0xff;
+    sg_put_unaligned_be64(lba, r16CmdBlk + 2);
+    sg_put_unaligned_be64(lba, w16CmdBlk + 2);
     if (! block)
         open_flags |= O_NONBLOCK;
     if (excl)
@@ -273,7 +273,7 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
             goto err;
         }
 
-        u = (lb[0] << 24) + (lb[1] << 16) + (lb[2] << 8) + lb[3];
+	u = sg_get_unaligned_be32(lb);
         // Assuming u starts test as even (probably 0), expect it to stay even
         if (0 == k)
             odd = (1 == (u % 2));
@@ -288,10 +288,7 @@ do_rd_inc_wr_twice(const char * dev_name, int read_only, unsigned int lba,
         if (read_only)
             break;
         ++u;
-        lb[0] = (u >> 24) & 0xff;
-        lb[1] = (u >> 16) & 0xff;
-        lb[2] = (u >> 8) & 0xff;
-        lb[3] = u & 0xff;
+	sg_put_unaligned_be32(u, lb);
 
         /* Prepare WRITE_16 command */
         clear_scsi_pt_obj(ptp);

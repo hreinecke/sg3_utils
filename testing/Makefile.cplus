@@ -9,7 +9,8 @@ LD = g++
 ## CC = clang++
 ## LD = clang++
 
-EXECS = sg_tst_excl sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async
+EXECS = sg_tst_excl sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async \
+	sgh_dd
 
 EXTRAS =
 
@@ -30,8 +31,10 @@ CPPFLAGS = -std=c++11 -pthread -g -O2 -W -Wall -iquote ../include -D_REENTRANT $
 LDFLAGS = -std=c++11 -pthread
 
 LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
-LIBFILESNEW = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pt_linux.o ../lib/sg_pt_common.o \
-		../lib/sg_pt_linux_nvme.o ../lib/sg_io_linux.o ../lib/sg_cmds_basic.o
+LIBFILESNEW = ../lib/sg_pt_linux_nvme.o ../lib/sg_lib.o ../lib/sg_lib_data.o \
+                ../lib/sg_pt_linux.o ../lib/sg_io_linux.o \
+                ../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o \
+                ../lib/sg_cmds_basic2.o
 
 all: $(EXECS)
 
@@ -59,6 +62,9 @@ sg_tst_context: sg_tst_context.o $(LIBFILESNEW)
 
 sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
+
+sgh_dd: sgh_dd.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) -pthread $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)

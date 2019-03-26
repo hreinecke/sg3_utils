@@ -22,7 +22,7 @@
  * in this case) are transferred to or from the sg device in a single SCSI
  * command.
  *
- * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
+ * This version is designed for the linux kernel 2.4, 2.6, 3, 4 and 5 series.
  *
  * sgp_dd is a Posix threads specialization of the sg_dd utility. Both
  * sgp_dd and sg_dd only perform special tasks when one or both of the given
@@ -46,7 +46,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <stdatomic.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -66,6 +65,10 @@
 #include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
 #include <linux/fs.h>           /* for BLKSSZGET and friends */
 #include <sys/mman.h>           /* for mmap() system call */
+
+#include <vector>
+#include <array>
+#include <atomic>       // C++ header replacing <stdatomic.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -98,7 +101,9 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.20 20190212";
+using namespace std;
+
+static const char * version_str = "1.21 20190324";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -107,7 +112,7 @@ static const char * version_str = "1.20 20190212";
 #endif
 
 /* <<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>   xxxxxxxxxx   beware next line */
-#define SGH_DD_READ_COMPLET_AFTER 1
+// #define SGH_DD_READ_COMPLET_AFTER 1
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -125,7 +130,8 @@ static const char * version_str = "1.20 20190212";
 #define SGP_READ10 0x28
 #define SGP_WRITE10 0x2a
 #define DEF_NUM_THREADS 4
-#define MAX_NUM_THREADS SG_MAX_QUEUE
+#define MAX_NUM_THREADS 1024 /* was SG_MAX_QUEUE with v3 driver */
+#define DEF_NUM_MRQS 0
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikely value */
@@ -142,6 +148,8 @@ static const char * version_str = "1.20 20190212";
 #define DEV_NULL_MINOR_NUM 3
 
 #define EBUFF_SZ 768
+
+#define PROC_SCSI_SG_VERSION "/proc/scsi/sg/version"
 
 struct flags_t {
     bool append;
@@ -160,6 +168,7 @@ struct flags_t {
     bool swait;
     bool v3;
     bool v4;
+    bool v4_given;
 };
 
 typedef struct global_collection
@@ -177,6 +186,7 @@ typedef struct global_collection
     int in_partial;                   /*  | */
     bool in_stop;                     /*  | */
     pthread_mutex_t in_mutex;         /* -/ */
+    int nmrqs;                        /* Number of multi-reqs for sg v4 */
     int outfd;
     int64_t seek;
     int out_type;
@@ -212,10 +222,12 @@ typedef struct request_element
 {       /* one instance per worker thread */
     bool wr;
     bool has_share;
+    bool both_sg;
     bool swait; /* interleave READ WRITE async copy segment: READ submit,
                  * WRITE submit, READ receive, WRITE receive */
     int id;
     int infd;
+    int nmrqs;
     int outfd;
     int out2fd;
     int outregfd;
@@ -249,30 +261,39 @@ typedef struct thread_info
     pthread_t a_pthr;
 } Thread_info;
 
-static atomic_int mono_pack_id = 0;
-static atomic_long pos_index = 0;
+// typedef vector< pair<int, struct sg_io_v4> > mrq_arr_t;
+typedef array<uint8_t, 32> cmd_at;
+typedef pair< vector<struct sg_io_v4>, vector<cmd_at> >   mrq_arr_t;
+
+static atomic<int> mono_pack_id(0);
+static atomic<long int> pos_index(0);
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
-static void sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep);
-static void sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, bool is_wr2);
+static void sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr);
+static void sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr,
+                          bool is_wr2);
 static bool normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks);
 static void normal_out_wr(Gbl_coll * clp, Rq_elem * rep, int blocks);
-static int sg_start_io(Rq_elem * rep, bool is_wr2);
+static int sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2);
 static int sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2);
 static int sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp,
                       int *mmap_len);
 static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
                        int *mmap_len);
-static void sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep);
+static void sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep,
+                                 mrq_arr_t & def_arr);
+static int sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr);
 
 #define STRERR_BUFF_LEN 128
 
 static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
+static bool have_sg_version = false;
+static int sg_version = 0;
 static bool shutting_down = false;
 static bool do_sync = false;
 static bool do_time = true;
@@ -347,7 +368,6 @@ lk_chk_n_print3(const char * leadin, struct sg_io_hdr * hp, bool raw_sinfo)
     pthread_mutex_unlock(&strerr_mut);
 }
 
-
 static void
 lk_chk_n_print4(const char * leadin, struct sg_io_v4 * h4p, bool raw_sinfo)
 {
@@ -356,6 +376,57 @@ lk_chk_n_print4(const char * leadin, struct sg_io_v4 * h4p, bool raw_sinfo)
                          h4p->driver_status, (const uint8_t *)h4p->response,
                          h4p->response_len, raw_sinfo);
     pthread_mutex_unlock(&strerr_mut);
+}
+
+static void
+hex2stderr_lk(const uint8_t * b_str, int len, int no_ascii)
+{
+    pthread_mutex_lock(&strerr_mut);
+    hex2stderr(b_str, len, no_ascii);
+    pthread_mutex_unlock(&strerr_mut);
+}
+
+static void
+v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p)
+{
+    pthread_mutex_lock(&strerr_mut);
+    if (leadin)
+        pr2serr("%s\n", leadin);
+    if (('Q' != h4p->guard) || (0 != h4p->protocol) ||
+        (0 != h4p->subprotocol))
+        pr2serr("  <<<sg_io_v4 _NOT_ properly set>>>\n");
+    pr2serr("  pointers: cdb=%s  sense=%s  din=%s  dout=%s\n",
+            (h4p->request ? "y" : "NULL"), (h4p->response ? "y" : "NULL"),
+            (h4p->din_xferp ? "y" : "NULL"),
+            (h4p->dout_xferp ? "y" : "NULL"));
+    pr2serr("  lengths: cdb=%u  sense=%u  din=%u  dout=%u\n",
+            h4p->request_len, h4p->max_response_len, h4p->din_xfer_len,
+             h4p->dout_xfer_len);
+    pr2serr("  flags=0x%x  request_extra=0x%x   OUT--> response_len=%d\n",
+            h4p->flags, h4p->request_extra, h4p->response_len);
+    pr2serr("  driver_status=0x%x transport_status=0x%x device_status=0x%x\n",
+            h4p->driver_status, h4p->transport_status, h4p->device_status);
+    pr2serr("  info=0x%x  din_resid=%u  dout_resid=%u  spare_out=%u\n",
+            h4p->info, h4p->din_resid, h4p->dout_resid, h4p->spare_out);
+    pthread_mutex_unlock(&strerr_mut);
+}
+
+
+static void
+fetch_sg_version(void)
+{
+    FILE * fp;
+    char b[96];
+
+    have_sg_version = false;
+    sg_version = 0;
+    fp = fopen(PROC_SCSI_SG_VERSION, "r");
+    if (fp && fgets(b, sizeof(b) - 1, fp)) {
+        if (1 == sscanf(b, "%d", &sg_version))
+            have_sg_version = !!sg_version;
+    }
+    if (fp)
+        fclose(fp);
 }
 
 static void
@@ -530,10 +601,10 @@ usage(int pg_num)
     pr2serr("               [ae=AEN] [bpt=BPT] [cdbsz=6|10|12|16] [coe=0|1] "
             "[deb=VERB]\n"
             "               [dio=0|1] [elemsz_kb=ESK] [fua=0|1|2|3] "
-            "[of2=OFILE2]\n"
-            "               [ofreg=OFREG] [sync=0|1] [thr=THR] [time=0|1] "
-            "[verbose=VERB]\n"
-            "               [--dry-run] [--verbose]\n\n"
+            "[mrq=NRQS]\n"
+            "               [of2=OFILE2] [ofreg=OFREG] [sync=0|1] [thr=THR] "
+            "[time=0|1]\n"
+            "               [verbose=VERB] [--dry-run] [--verbose]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -563,8 +634,8 @@ usage(int pg_num)
             "is Linux specific and uses the v4 sg driver\n'share' capability "
             "if available. Use '-hh' or '-hhh' for more information.\n"
 #ifdef SGH_DD_READ_COMPLET_AFTER
-	    "\nIn this version oflag=swait does read completion _after_ "
-	    "write completion\n"
+            "\nIn this version oflag=swait does read completion _after_ "
+            "write completion\n"
 #endif
            );
     return;
@@ -577,6 +648,7 @@ page2:
             "are:\n"
             "    ae          abort every n commands (def: 0 --> don't abort "
             "any)\n"
+            "                [requires commands with > 1 ms duration]\n"
             "    bpt         is blocks_per_transfer (default is 128)\n"
             "    cdbsz       size of SCSI READ or WRITE cdb (default is 10)\n"
             "    coe         continue on error, 0->exit (def), "
@@ -589,6 +661,8 @@ page2:
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
+            "    mrq         even number of cmds placed in each sg call "
+            "(def: 0)\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
             "                IFILE in the first half of each shared element\n"
@@ -633,9 +707,9 @@ page3:
             "is finished;\n"
             "                [oflag only] and IFILE and OFILE must be sg "
             "devices\n"
-            "    v3          use v3 sg interface which is the default (also "
-            "see v4)\n"
-            "    v4          use v4 sg interface (def: v3 unless other side "
+            "    v3          use v3 sg interface (def: v3 unless sg driver "
+            "is v4)\n"
+            "    v4          use v4 sg interface (def: v3 unless sg driver "
             "is v4)\n"
             "\n"
             "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
@@ -816,6 +890,7 @@ read_write_thread(void * v_tip)
     bool own_outfd = false;
     bool own_out2fd = false;
     bool share_and_ofreg;
+    mrq_arr_t def_arr;  /* MRQ deferred array (vector) */
 
     tip = (Thread_info *)v_tip;
     clp = tip->gcp;
@@ -825,7 +900,7 @@ read_write_thread(void * v_tip)
     /* Following clp members are constant during lifetime of thread */
     rep->id = tip->id;
     if (vb > 0)
-        pr2serr_lk("Starting worker thread %d\n", rep->id);
+        pr2serr_lk("%d <-- Starting worker thread\n", rep->id);
     if (! clp->in_flags.mmap) {
         rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
                                  false);
@@ -843,8 +918,13 @@ read_write_thread(void * v_tip)
     rep->cdbsz_out = clp->cdbsz_out;
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
+    rep->nmrqs = clp->nmrqs;
     rep->aen = clp->aen;
     rep->rep_count = 0;
+
+    if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type) &&
+        (rep->infd != rep->outfd))
+        rep->both_sg = true;
 
     if (rep->in_flags.same_fds || rep->out_flags.same_fds) {
         /* we are sharing a single pair of fd_s across all threads */
@@ -924,16 +1004,18 @@ read_write_thread(void * v_tip)
     /* vvvvvvvvvvvvvv  Main segment copy loop  vvvvvvvvvvvvvvvvvvvvvvv */
     while (1) {
         rep->wr = false;
-        my_index = atomic_fetch_add(&pos_index, clp->bpt);
+        my_index = atomic_fetch_add(&pos_index, (long int)clp->bpt);
         /* Start of READ half of a segment */
         status = pthread_mutex_lock(&clp->in_mutex);
         if (0 != status) err_exit(status, "lock in_mutex");
+#if 0
         if (clp->in_stop || (clp->in_count <= 0)) {
             /* no more to do, exit loop then thread */
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
             break;
         }
+#endif
         if (dd_count >= 0) {
             if (my_index >= dd_count) {
                 status = pthread_mutex_unlock(&clp->in_mutex);
@@ -956,9 +1038,9 @@ read_write_thread(void * v_tip)
         pthread_cleanup_push(cleanup_in, (void *)clp);
         if (FT_SG == clp->in_type) {
             if (rep->swait)
-                sg_in_out_interleave(clp, rep);
+                sg_in_out_interleave(clp, rep, def_arr);
             else
-                sg_in_rd_cmd(clp, rep); /* unlocks in_mutex mid operation */
+                sg_in_rd_cmd(clp, rep, def_arr); /* unlocks in_mutex mid op */
         } else {
             stop_after_write = normal_in_rd(clp, rep, blocks);
             status = pthread_mutex_unlock(&clp->in_mutex);
@@ -988,6 +1070,7 @@ read_write_thread(void * v_tip)
         }
 
 skip_force_out_sequence:
+#if 0
         if (clp->out_stop || (clp->out_count <= 0)) {
             if (! clp->out_stop)
                 clp->out_stop = true;
@@ -995,6 +1078,7 @@ skip_force_out_sequence:
             if (0 != status) err_exit(status, "unlock out_mutex");
             break;
         }
+#endif
         if (stop_after_write)
             clp->out_stop = true;
 
@@ -1002,6 +1086,12 @@ skip_force_out_sequence:
         clp->out_count -= blocks;
 
         if (0 == rep->num_blks) {
+            if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
+                if (rep->debug)
+                    pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
+                               (uint32_t)def_arr.first.size());
+                sgh_do_def(rep, def_arr);
+            }
             clp->out_stop = true;
             stop_after_write = true;
             status = pthread_mutex_unlock(&clp->out_mutex);
@@ -1027,7 +1117,7 @@ skip_force_out_sequence:
                 status = pthread_mutex_unlock(&clp->out_mutex);
                 if (0 != status) err_exit(status, "unlock out_mutex");
             } else
-                sg_out_wr_cmd(clp, rep, false); /* releases out_mutex */
+                sg_out_wr_cmd(clp, rep, def_arr, false); /* release out_mtx */
         } else if (FT_DEV_NULL == clp->out_type) {
             /* skip actual write operation */
             clp->out_rem_count -= blocks;
@@ -1047,7 +1137,8 @@ skip_force_out_sequence:
             pthread_cleanup_push(cleanup_out, (void *)clp);
             status = pthread_mutex_lock(&clp->out2_mutex);
             if (0 != status) err_exit(status, "lock out2_mutex");
-            sg_out_wr_cmd(clp, rep, true); /* releases out2_mutex mid oper */
+            /* releases out2_mutex mid operation */
+            sg_out_wr_cmd(clp, rep, def_arr, true);
 
             pthread_cleanup_pop(0);
         }
@@ -1055,7 +1146,15 @@ skip_force_out_sequence:
         pthread_cond_broadcast(&clp->out_sync_cv);
         if (stop_after_write)
             break;
-    } /* end of while loop which copies segments */
+    }	/* ^^^^^^^^^^ end of main while loop which copies segments ^^^^^^ */
+#if 0
+    if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
+        if (rep->debug)
+            pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
+                       (uint32_t)def_arr.first.size());
+        sgh_do_def(rep, def_arr);
+    }
+#endif
 
     status = pthread_mutex_lock(&clp->in_mutex);
     if (0 != status) err_exit(status, "lock in_mutex");
@@ -1083,6 +1182,9 @@ fini:
     if (own_out2fd && (rep->out2fd >= 0))
         close(rep->out2fd);
     pthread_cond_broadcast(&clp->out_sync_cv);
+    if (rep->num_blks > 0)
+        pr2serr("%d <-- thread exiting with rep->num_blks=%d\n", rep->id,
+                rep->num_blks);
     return stop_after_write ? NULL : clp;
 }
 
@@ -1254,13 +1356,13 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
 
 /* Enters this function holding in_mutex */
 static void
-sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep)
+sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
 {
     int res;
     int status;
 
     while (1) {
-        res = sg_start_io(rep, false);
+        res = sg_start_io(rep, def_arr, false);
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
@@ -1374,7 +1476,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
 
 /* Enters this function holding out_mutex */
 static void
-sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, bool is_wr2)
+sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
 {
     int res;
     int status;
@@ -1384,7 +1486,7 @@ sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, bool is_wr2)
         sg_wr_swap_share(rep, rep->out2fd, true);
 
     while (1) {
-        res = sg_start_io(rep, is_wr2);
+        res = sg_start_io(rep, def_arr, is_wr2);
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
@@ -1453,7 +1555,76 @@ fini:
 
 /* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
 static int
-sg_start_io(Rq_elem * rep, bool is_wr2)
+sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr)
+{
+    int n, k, res, fd;
+    struct sg_io_v4 * a_v4p;
+    struct sg_io_v4 ctl_v4;
+
+    memset(&ctl_v4, 0, sizeof(ctl_v4));
+    ctl_v4.guard = 'Q';
+    a_v4p = def_arr.first.data();
+    n = def_arr.first.size();
+    for (k = 0; k < n; ++k) {
+        struct sg_io_v4 * h4p = a_v4p + k;
+        uint8_t *cmdp = &def_arr.second[k].front();
+
+        h4p->request = (uint64_t)cmdp;
+        if (rep->debug > 3) {
+            pr2serr_lk("def_arr[%d]:\n", k);
+            hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p), 1);
+        }
+    }
+    if (rep->both_sg)
+        fd = rep->infd;         /* assume share to rep->outfd */
+    else if (rep->infd >= 0)
+        fd = rep->infd;
+    else
+        fd = rep->outfd;
+    res = 0;
+    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF;
+    ctl_v4.din_xferp = (uint64_t)a_v4p;
+    ctl_v4.din_xfer_len = n * sizeof(*a_v4p);
+    ctl_v4.dout_xferp = (uint64_t)a_v4p;
+    ctl_v4.dout_xfer_len = n * sizeof(*a_v4p);
+    if (rep->debug > 2) {
+        pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO):\n",
+                   __func__);
+        if (rep->debug > 3)
+            hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
+        v4hdr_out_lk("Controlling object before:", &ctl_v4);
+    }
+    res = ioctl(fd, SG_IO, &ctl_v4); // MULTIPLE_REQS | STOP_IF
+    if (res < 0) {
+        pr2serr_lk("%s: ioctl(SG_IO, MULTIPLE_REQS)-->%d, errno=%d: %s\n",
+                   __func__, res, errno, strerror(errno));
+        def_arr.first.clear();
+        def_arr.second.clear();
+        return -1;
+    }
+    if (rep->debug > 2) {
+        pr2serr_lk("%s: Controlling object output by ioctl(SG_IO):\n",
+                   __func__);
+        if (rep->debug > 3)
+            hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
+        v4hdr_out_lk("Controlling object after:", &ctl_v4);
+        if (rep->debug > 3) {
+            for (k = 0; k < n; ++k) {
+                pr2serr_lk("AFTER: def_arr[%d]:\n", k);
+                v4hdr_out_lk(NULL, (a_v4p + k));
+                // hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p),
+                                  // 1);
+            }
+        }
+    }
+    def_arr.first.clear();
+    def_arr.second.clear();
+    return res;
+}
+
+/* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
+static int
+sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
 {
     bool wr = rep->wr;
     bool fua = wr ? rep->out_flags.fua : rep->in_flags.fua;
@@ -1560,6 +1731,19 @@ do_v4:
     h4p->usr_ptr = (uint64_t)rep;
     h4p->request_extra = rep->rq_id;    /* this is the pack_id */
     h4p->flags = flags;
+    if (rep->nmrqs > 0) {
+        if (rep->both_sg && (rep->outfd == fd))
+            h4p->flags |= SGV4_FLAG_DO_ON_OTHER;
+        cmd_at cmd_obj;
+        uint8_t * cmdp = &(cmd_obj[0]);
+        memcpy(cmdp, rep->cmd, cdbsz);
+        def_arr.first.push_back(*h4p);
+        def_arr.second.push_back(cmd_obj);
+        res = 0;
+        if ((int)def_arr.first.size() >= rep->nmrqs)
+            res = sgh_do_def(rep, def_arr);
+        return res;
+    }
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         sched_yield();  /* another thread may be able to progress */
@@ -1587,7 +1771,7 @@ do_v4:
                 if (res < 0)
                     pr2serr_lk("%s: ioctl(SG_IOABORT) failed: %s [%d]\n",
                                __func__, safe_strerror(errno), errno);
-                else if (rep->debug > 3)
+                else if (rep->debug > 1)
                     pr2serr_lk("%s: sending ioctl(SG_IOABORT) on rq_id=%d\n",
                                __func__, rep->rq_id);
             }   /* else got response, too late for timeout, so skip */
@@ -1676,6 +1860,8 @@ sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2)
     return 0;
 
 do_v4:
+    if (rep->nmrqs > 0)
+        return 0;
     h4p = &rep->io_hdr4;
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
@@ -1710,10 +1896,9 @@ do_v4:
                      rep->rq_id, blk);
             lk_chk_n_print4(ebuff, h4p, false);
             if ((rep->debug > 4) && h4p->info)
-                pr2serr_lk(" info=0x%x sg_info_check=%d another_waiting=%d "
-                           "direct=%d detaching=%d aborted=%d\n", h4p->info,
+                pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
+                           "detaching=%d aborted=%d\n", h4p->info,
                            !!(h4p->info & SG_INFO_CHECK),
-                           !!(h4p->info & SG_INFO_ANOTHER_WAITING),
                            !!(h4p->info & SG_INFO_DIRECT_IO),
                            !!(h4p->info & SG_INFO_DEVICE_DETACHING),
                            !!(h4p->info & SG_INFO_ABORTED));
@@ -1733,10 +1918,9 @@ do_v4:
         pr2serr_lk("%s: tid,rq_id=%d,%d: completed %s\n", __func__, rep->id,
                    rep->rq_id, cp);
         if ((rep->debug > 4) && h4p->info)
-            pr2serr_lk(" info=0x%x sg_info_check=%d another_waiting=%d "
-                       "direct=%d detaching=%d aborted=%d\n", h4p->info,
+            pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
+                       "detaching=%d aborted=%d\n", h4p->info,
                        !!(h4p->info & SG_INFO_CHECK),
-                       !!(h4p->info & SG_INFO_ANOTHER_WAITING),
                        !!(h4p->info & SG_INFO_DIRECT_IO),
                        !!(h4p->info & SG_INFO_DEVICE_DETACHING),
                        !!(h4p->info & SG_INFO_ABORTED));
@@ -1746,14 +1930,14 @@ do_v4:
 
 /* Enter holding in_mutex, exits holding nothing */
 static void
-sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
+sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep, mrq_arr_t & def_arr)
 {
     int res, pid_read, pid_write;
     int status;
 
     while (1) {
         /* start READ */
-        res = sg_start_io(rep, false);
+        res = sg_start_io(rep, def_arr, false);
         pid_read = rep->rq_id;
         if (1 == res)
             err_exit(ENOMEM, "sg interleave starting in command");
@@ -1768,7 +1952,7 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
 
         /* start WRITE */
         rep->wr = true;
-        res = sg_start_io(rep, false);
+        res = sg_start_io(rep, def_arr, false);
         pid_write = rep->rq_id;
         if (1 == res)
             err_exit(ENOMEM, "sg interleave starting out command");
@@ -1786,7 +1970,7 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep)
 
 #ifdef SGH_DD_READ_COMPLET_AFTER
 #warning "SGH_DD_READ_COMPLET_AFTER is set (testing)"
-	goto write_complet;
+        goto write_complet;
 read_complet:
 #endif
 
@@ -1847,7 +2031,7 @@ read_complet:
 
 
 #ifdef SGH_DD_READ_COMPLET_AFTER
-	return;
+        return;
 
 write_complet:
 #endif
@@ -1892,7 +2076,7 @@ write_complet:
             if (0 != status) err_exit(status, "unlock out_mutex");
 
 #ifdef SGH_DD_READ_COMPLET_AFTER
-	goto read_complet;
+        goto read_complet;
 #endif
             return;
         default:
@@ -2011,9 +2195,10 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->swait = true;
         else if (0 == strcmp(cp, "v3"))
             fp->v3 = true;
-        else if (0 == strcmp(cp, "v4"))
+        else if (0 == strcmp(cp, "v4")) {
             fp->v4 = true;
-        else {
+            fp->v4_given = true;
+        } else {
             pr2serr("unrecognised flag: %s\n", cp);
             return false;
         }
@@ -2144,10 +2329,16 @@ main(int argc, char * argv[])
     clp->out2_type = FT_DEV_NULL;
     clp->cdbsz_in = DEF_SCSI_CDBSZ;
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
+    clp->nmrqs = DEF_NUM_MRQS;
     inf[0] = '\0';
     outf[0] = '\0';
     out2f[0] = '\0';
     outregf[0] = '\0';
+    fetch_sg_version();
+    if (sg_version > 40000) {
+        clp->in_flags.v4 = true;
+        clp->out_flags.v4 = true;
+    }
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -2230,6 +2421,13 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "iflag")) {
             if (! process_flags(buf, &clp->in_flags)) {
                 pr2serr("%sbad argument to 'iflag='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key, "mrq")) {
+            clp->nmrqs = sg_get_num(buf);
+            if ((-1 == clp->nmrqs) || (1 == (clp->nmrqs % 2))) {
+                pr2serr("%sbad argument to 'mrq=', want even number or "
+                        "zero\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "obs")) {
@@ -2451,7 +2649,7 @@ main(int argc, char * argv[])
             }
         }
         clp->infp = inf;
-        if ((clp->in_flags.v3 || clp->in_flags.v4) &&
+        if ((clp->in_flags.v3 || clp->in_flags.v4_given) &&
             (FT_SG != clp->in_type)) {
             clp->in_flags.v3 = false;
             clp->in_flags.v4 = false;
@@ -2518,7 +2716,7 @@ main(int argc, char * argv[])
             }
         }
         clp->outfp = outf;
-        if ((clp->out_flags.v3 || clp->out_flags.v4) &&
+        if ((clp->out_flags.v3 || clp->out_flags.v4_given) &&
             (FT_SG != clp->out_type)) {
             clp->out_flags.v3 = false;
             clp->out_flags.v4 = false;
@@ -2588,16 +2786,16 @@ main(int argc, char * argv[])
         clp->out2fp = out2f;
     }
     if ((FT_SG == clp->in_type ) && (FT_SG == clp->out_type)) {
-        if (clp->in_flags.v4 && (! clp->out_flags.v3)) {
-            if (! clp->out_flags.v4) {
+        if (clp->in_flags.v4_given && (! clp->out_flags.v3)) {
+            if (! clp->out_flags.v4_given) {
                 clp->out_flags.v4 = true;
                 if (clp->debug)
                     pr2serr("Changing OFILE from v3 to v4, use oflag=v3 to "
                             "force v3\n");
             }
         }
-        if (clp->out_flags.v4 && (! clp->in_flags.v3)) {
-            if (! clp->in_flags.v4) {
+        if (clp->out_flags.v4_given && (! clp->in_flags.v3)) {
+            if (! clp->in_flags.v4_given) {
                 clp->in_flags.v4 = true;
                 if (clp->debug)
                     pr2serr("Changing IFILE from v3 to v4, use iflag=v3 to "
@@ -2809,7 +3007,8 @@ main(int argc, char * argv[])
             status = pthread_join(tip->a_pthr, &vp);
             if (0 != status) err_exit(status, "pthread_join");
             if (clp->debug > 0)
-                pr2serr_lk("Worker thread k=%d terminated\n", k);
+                pr2serr_lk("%d <-- Worker thread terminated, vp=%s\n", k,
+                           ((vp == clp) ? "clp" : "NULL (or !clp)"));
         }
     }   /* started worker threads and here after they have all exited */
 

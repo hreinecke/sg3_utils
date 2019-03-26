@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SGP_DD "8" "March 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sgp_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -123,7 +123,7 @@ transfer. Only active when \fIOFILE\fR is a sg device file name.
 .TP
 \fBthr\fR=\fITHR\fR
 where \fITHR\fR is the number or worker threads (default 4) that attempt to
-copy in parallel. Minimum is 1 and maximum is 16.
+copy in parallel. Minimum is 1 and maximum is 1024.
 .TP
 \fBtime\fR=0 | 1
 when 1, the transfer is timed and throughput calculation is
