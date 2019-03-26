@@ -5,7 +5,7 @@ INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
-	sg_tst_nvme sg_tst_ioctl sg_tst_bidi tst_sg_lib sgh_dd sgs_dd
+	sg_tst_nvme sg_tst_ioctl sg_tst_bidi tst_sg_lib sgs_dd
 	
 EXTRAS =
 

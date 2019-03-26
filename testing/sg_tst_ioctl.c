@@ -15,6 +15,9 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <ctype.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
@@ -53,9 +56,9 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.04  20190201";
+static const char * version_str = "Version: 1.06  20190323";
 
-#define INQ_REPLY_LEN 96
+#define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
 #define SDIAG_CMD_LEN 6
 #define SENSE_BUFFER_LEN 96
@@ -80,11 +83,14 @@ static bool do_fork = false;
 static bool ioctl_only = false;
 static bool q_at_tail = false;
 static bool write_only = false;
+static bool mrq_immed = false;  /* if set, also sets mrq_iosubmit */
+static bool mrq_iosubmit = false;
 
 static int childs_pid = 0;
 static int q_len = DEF_Q_LEN;
 static int sleep_secs = 0;
 static int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
+static int num_mrqs = 0;
 static int verbose = 0;
 
 static const char * relative_cp = NULL;
@@ -93,13 +99,20 @@ static const char * relative_cp = NULL;
 static void
 usage(void)
 {
-    printf("Usage: sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-o] [-r=SZ] [-s=SEC] "
-           "[-t]\n"
-           "                    [-v] [-V] [-w] <sg_device> [<sg_device2>]\n"
+    printf("Usage: sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] [-r=SZ] "
+           "[-s=SEC]\n"
+           "                    [-t] [-v] [-V] [-w] <sg_device> "
+           "[<sg_device2>]\n"
            " where:\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
            "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
+           "      -m=MRQS[,I|S]    test multi-req, MRQS number to do; if "
+           "the letter\n"
+           "                     'I' is appended after a comma, then do "
+           "IMMED mrq;\n"
+           "                     'S' is appended, then use "
+           "ioctl(SG_IOSUBMIT)\n"
            "      -o      ioctls only, then exit\n"
            "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
            "KB)\n"
@@ -240,7 +253,6 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_UNSHARE;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_FINI;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_ERR;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_CHECK_FOR_MORE;
     seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
 
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
@@ -286,9 +298,6 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
         if (SG_CTL_FLAGM_MASTER_ERR & seip->ctl_flags_rd_mask)
             printf("  %sMASTER_ERR: %s\n", cp,
                    (SG_CTL_FLAGM_MASTER_ERR & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_CHECK_FOR_MORE & seip->ctl_flags_rd_mask)
-            printf("  %sCHECK_FOR_MORE: %s\n", cp,
-                   (SG_CTL_FLAGM_CHECK_FOR_MORE & cflags) ? "true" : "false");
     }
     if (SG_SEIM_MINOR_INDEX & seip->sei_rd_mask)
         printf("  %sminor_index: %u\n", cp, seip->minor_index);
@@ -437,14 +446,134 @@ bypass_share:
     return 0;
 }
 
-#include <linux/fs.h>
-#include <linux/blktrace_api.h>
+static int
+do_mrqs(int sg_fd, int sg_fd2, int mrqs)
+{
+    bool both = (sg_fd2 >= 0);
+    int k, arr_v4_sz, good;
+    int res = 0;
+    struct sg_io_v4 * arr_v4;
+    struct sg_io_v4 * h4p;
+    struct sg_io_v4 * mrq_h4p;
+    struct sg_io_v4 mrq_h4;
+    uint8_t sense_buffer[SENSE_BUFFER_LEN];
+    uint8_t inq_cdb[INQ_CMD_LEN] =      /* Device Id VPD page */
+                                {0x12, 0x1, 0x83, 0, INQ_REPLY_LEN, 0};
+    uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
+                                {0x1d, 0x10 /* PF */, 0, 0, 0, 0};
+    uint8_t inqBuff[INQ_REPLY_LEN];
+
+    if (both) {
+        struct sg_extended_info sei;
+        struct sg_extended_info * seip;
+
+        seip = &sei;
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
+        seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
+        seip->share_fd = sg_fd;         /* master */
+        if (ioctl(sg_fd2, SG_SET_GET_EXTENDED, seip) < 0) {
+            res = errno;
+            pr2serr("ioctl(sg_fd2, SG_SET_GET_EXTENDED) shared_fd, "
+                    "failed errno=%d %s\n", res, strerror(res));
+            return res;
+        }
+    }
+    memset(inqBuff, 0, sizeof(inqBuff));
+    mrq_h4p = &mrq_h4;
+    memset(mrq_h4p, 0, sizeof(*mrq_h4p));
+    mrq_h4p->guard = 'Q';
+    mrq_h4p->flags = SGV4_FLAG_MULTIPLE_REQS;
+    if (mrq_immed)
+        mrq_h4p->flags |= SGV4_FLAG_IMMED;
+    arr_v4 = calloc(mrqs, sizeof(struct sg_io_v4));
+    if (NULL == arr_v4) {
+        res = ENOMEM;
+        goto fini;
+    }
+    arr_v4_sz = mrqs * sizeof(struct sg_io_v4);
+
+    for (k = 0; k < mrqs; ++k) {
+        h4p = arr_v4 + k;
+
+        h4p->guard = 'Q';
+        /* ->protocol and ->subprotocol are already zero */
+        /* io_hdr[k].iovec_count = 0; */  /* memset takes care of this */
+        if (0 == (k % 2)) {
+            h4p->request_len = sizeof(sdiag_cdb);
+            h4p->request = (uint64_t)sdiag_cdb;
+            /* all din and dout fields are zero */
+        } else {
+            h4p->request_len = sizeof(inq_cdb);
+            h4p->request = (uint64_t)inq_cdb;
+            h4p->din_xfer_len = INQ_REPLY_LEN;
+            h4p->din_xferp = (uint64_t)inqBuff;
+            if (both)
+                h4p->flags |= SGV4_FLAG_DO_ON_OTHER;
+        }
+        h4p->response = (uint64_t)sense_buffer;
+        h4p->max_response_len = sizeof(sense_buffer);
+        h4p->timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        h4p->request_extra = k + 3;      /* so pack_id doesn't start at 0 */
+        /* default is to queue at head (in SCSI mid level) */
+        if (q_at_tail)
+            h4p->flags |= SG_FLAG_Q_AT_TAIL;
+        else
+            h4p->flags |= SG_FLAG_Q_AT_HEAD;
+    }
+    mrq_h4p->din_xferp = (uint64_t)arr_v4;
+    mrq_h4p->din_xfer_len = arr_v4_sz;
+    mrq_h4p->dout_xferp = mrq_h4p->din_xferp;
+    mrq_h4p->dout_xfer_len = mrq_h4p->din_xfer_len;
+    if (ioctl(sg_fd, (mrq_iosubmit ? SG_IOSUBMIT : SG_IO), mrq_h4p) < 0) {
+        res = errno;
+        pr2serr("ioctl(SG_IO%s, mrq) failed, errno=%d %s\n",
+                (mrq_iosubmit ? "SUBMIT" : ""), res, strerror(res));
+        goto fini;
+    }
+    if (mrq_immed) {
+mrq_h4p->flags = SGV4_FLAG_MULTIPLE_REQS;       // zap SGV4_FLAG_IMMED
+        if (ioctl(sg_fd, SG_IORECEIVE, mrq_h4p) < 0) {
+            res = errno;
+            pr2serr("ioctl(SG_IORECEIVE, mrq) failed, errno=%d %s\n",
+                    res, strerror(res));
+            goto fini;
+        }
+    }
+
+    for (k = 0, good = 0; k < mrqs; ++k) {
+        h4p = arr_v4 + k;
+        if (! (h4p->driver_status || h4p->transport_status ||
+               h4p->device_status)) {
+            if (h4p->info & SG_INFO_MRQ_FINI)
+                ++good;
+        }
+    }
+    if (good > 0) {
+        printf("Final INQUIRY response:\n");
+        hex2stdout(inqBuff, INQ_REPLY_LEN, 0);
+    }
+    printf("Good responses: %d, bad responses: %d\n", good, mrqs - good);
+    if (mrq_h4p->driver_status != 0)
+        printf("Master mrq object: driver_status=%d\n",
+               mrq_h4p->driver_status);
+    h4p = arr_v4 + mrqs - 1;
+    if (h4p->driver_status != 0)
+        printf("Last mrq object: driver_status=%d\n", h4p->driver_status);
+
+fini:
+    if (arr_v4)
+        free(arr_v4);
+    return res;
+}
+
 
 int
 main(int argc, char * argv[])
 {
     bool done;
     int sg_fd, k, ok, ver_num, pack_id, num_waiting;
+    int res = 0;
     int sg_fd2 = -1;
     int sock = -1;
     uint8_t inq_cdb[INQ_CMD_LEN] =
@@ -478,6 +607,26 @@ main(int argc, char * argv[])
                        "and 511\n");
                 file_name = 0;
                 break;
+            }
+        } else if (0 == memcmp("-m=", argv[k], 3)) {
+            num_mrqs = sg_get_num(argv[k] + 3);
+            if (num_mrqs < 1) {
+                printf("Expect -m= to take a number greater than 0\n");
+                file_name = 0;
+                break;
+            }
+            if ((cp = strchr(argv[k] + 3, ','))) {
+                mrq_iosubmit = true;
+                if (toupper(cp[1]) == 'I')
+                    mrq_immed = true;
+                else if (toupper(cp[1]) == 'S')
+                    ;
+                else {
+                    printf("-m= option expects 'A' or 'a' as a suffix, "
+                           "after comma\n");
+                    file_name = 0;
+                    break;
+                }
             }
         } else if (0 == memcmp("-o", argv[k], 2))
             ioctl_only = true;
@@ -560,6 +709,11 @@ main(int argc, char * argv[])
         if (verbose)
             fprintf(stderr, "opened second file: %s successfully, fd=%d\n",
                     second_fname, sg_fd2);
+    }
+
+    if (num_mrqs > 0) {
+        res = do_mrqs(sg_fd, sg_fd2, num_mrqs);
+        goto out;
     }
 
     if (do_fork) {
@@ -731,5 +885,5 @@ out:
     close(sg_fd);
     if (sg_fd2 >= 0)
         close(sg_fd2);
-    return 0;
+    return res;
 }

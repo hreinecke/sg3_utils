@@ -2,10 +2,35 @@
 
 ACTION=="remove", GOTO="sg3_utils_id_end"
 
-SUBSYSTEM!="block", GOTO="sg3_utils_id_end"
+SUBSYSTEM=="block", GOTO="block_dev"
+
+# SCSI devices other than "block"
+# This code used to live in 60-persistent-storage-tape.rules.
+
+# type 8 devices are "Medium Changers"
+SUBSYSTEM=="scsi_generic", KERNEL=="sg*[0-9]", ATTRS{type}=="8", \
+  GOTO="scsi_inquiry"
+SUBSYSTEM=="scsi_changer", KERNEL=="sch*[0-9]", ATTRS{type}=="8", \
+  ENV{.INQUIRY_DEV}="$root/bsg/$id", GOTO="scsi_inquiry"
+
+# tapes need to be accessed through their bsg device
+KERNEL=="st*[0-9]|nst*[0-9]", SUBSYSTEMS=="scsi", KERNELS=="[0-9]*:*[0-9]", \
+  ENV{.INQUIRY_DEV}="$root/bsg/$id", GOTO="scsi_inquiry"
+
+GOTO="sg3_utils_id_end"
+
+LABEL="block_dev"
 
 # Import values for partitions
-ENV{DEVTYPE}=="partition", IMPORT{parent}="SCSI_*", ENV{ID_SCSI}="1"
+ENV{DEVTYPE}=="partition", IMPORT{parent}="ID_SCSI", IMPORT{parent}="SCSI_*"
+ENV{DEVTYPE}=="partition", ENV{ID_SCSI}=="1", GOTO="compat"
+
+# Handle non-SCSI devices that implement SCSI inquiry
+KERNEL=="cciss*", ENV{DEVTYPE}=="disk", GOTO="sg_inquiry"
+
+# Ignore everything else except sd/sr
+KERNEL!="sd*[!0-9]|sr*", GOTO="sg3_utils_id_end"
+
 # SCSI INQUIRY values
 # If the 'inquiry' sysfs attribute is present the kernel will already
 # have scanned for VPD pages, so if the vpd page attribute is not
@@ -14,30 +39,62 @@ ENV{DEVTYPE}=="partition", IMPORT{parent}="SCSI_*", ENV{ID_SCSI}="1"
 # Set 'ID_SCSI_INQUIRY=0' in an earlier udev rule if the kernel
 # fails to scan VPD pages correctly; the rules will then fall
 # back to calling sg_vpd directly.
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI_INQUIRY}!="?*", IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/inquiry --raw", ENV{ID_SCSI}="1", ENV{ID_SCSI_INQUIRY}="1"
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}!="1", IMPORT{program}="/usr/bin/sg_inq --export $tempnode", ENV{ID_SCSI}="1"
+LABEL="scsi_inquiry"
+ENV{ID_SCSI_INQUIRY}=="0", GOTO="sg_inquiry"
+
+# As of 2018/4.15, the kernel doesn't provide VPD pages for "SPC" devices
+# (SCSI version 0x03, ANSI INCITS 301-1997) in sysfs.
+# It's usually safe to try though (no counter-example is known),
+# and for scsi_id compatibility, we have to try.
+SUBSYSTEMS=="scsi", ATTRS{scsi_level}=="4", GOTO="sg_inquiry"
+
+# "inquiry" is an attribute of the scsi_device in sysfs,
+# we obtain it by using $id after an ATTRS match.
+SUBSYSTEMS=="scsi", ATTRS{inquiry}=="*", KERNELS=="[0-9]*:*[0-9]", \
+  ENV{.SYSFS_PATH}="$sys/class/scsi_device/$id/device"
+ENV{.SYSFS_PATH}=="", GOTO="sg_inquiry"
+
+IMPORT{program}="/usr/bin/sg_inq --export --inhex=$env{.SYSFS_PATH}/inquiry --raw", \
+  ENV{ID_SCSI}="1", ENV{ID_SCSI_INQUIRY}="1"
+# If inquiry sysfs attribute reading it failed, fallback to sg
+ENV{ID_SCSI}!="1", GOTO="sg_inquiry"
+# Read VPD pages 80 (sn) and 83 (di)
+IMPORT{program}="/usr/bin/sg_inq --export --inhex=$env{.SYSFS_PATH}/vpd_pg80 --raw"
+IMPORT{program}="/usr/bin/sg_inq --export --inhex=$env{.SYSFS_PATH}/vpd_pg83 --raw"
+GOTO="compat"
+
+LABEL="sg_inquiry"
+# Handle devices that have no inquiry attributes in sysfs
+ENV{.INQUIRY_DEV}=="", ENV{.INQUIRY_DEV}="$tempnode"
+
+IMPORT{program}="/usr/bin/sg_inq --export $env{.INQUIRY_DEV}", ENV{ID_SCSI}="1"
+# Give up if this fails, too
+ENV{ID_SCSI}!="1", GOTO="sg3_utils_id_end"
+IMPORT{program}="/usr/bin/sg_inq --export --page=sn $env{.INQUIRY_DEV}"
+IMPORT{program}="/usr/bin/sg_inq --export --page=di $env{.INQUIRY_DEV}"
+
+LABEL="compat"
+
 # scsi_id compat mappings
-ENV{SCSI_VENDOR}=="?*", ENV{ID_VENDOR}="$env{SCSI_VENDOR}"
-ENV{SCSI_VENDOR_ENC}=="?*", ENV{ID_VENDOR_ENC}="$env{SCSI_VENDOR_ENC}"
-ENV{SCSI_MODEL}=="?*", ENV{ID_MODEL}="$env{SCSI_MODEL}"
-ENV{SCSI_MODEL_ENC}=="?*", ENV{ID_MODEL_ENC}="$env{SCSI_MODEL_ENC}"
-ENV{SCSI_REVISION}=="?*", ENV{ID_REVISION}="$env{SCSI_REVISION}"
-ENV{SCSI_TYPE}=="?*", ENV{ID_TYPE}="$env{SCSI_TYPE}"
-# SCSI EVPD page 0x80 values
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", ENV{ID_SCSI_INQUIRY}=="1", IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/vpd_pg80 --raw"
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", ENV{ID_SCSI_INQUIRY}!="1", IMPORT{program}="/usr/bin/sg_inq --export --page=sn $tempnode"
-# SCSI EVPD page 0x83 values
-KERNEL=="sd*[!0-9]", ENV{ID_SCSI}=="1", ENV{ID_SCSI_INQUIRY}=="1", IMPORT{program}="/usr/bin/sg_inq --export --inhex=/sys/block/$kernel/device/vpd_pg83 --raw"
-KERNEL=="sd*[!0-9]|sr*", ENV{ID_SCSI}=="1", ENV{ID_SCSI_INQUIRY}!="1", IMPORT{program}="/usr/bin/sg_inq --export --page=di $tempnode"
+ENV{ID_VENDOR}!="?*", ENV{SCSI_VENDOR}=="?*", ENV{ID_VENDOR}="$env{SCSI_VENDOR}"
+ENV{ID_VENDOR_ENC}!="?*", ENV{SCSI_VENDOR_ENC}=="?*", ENV{ID_VENDOR_ENC}="$env{SCSI_VENDOR_ENC}"
+ENV{ID_MODEL}!="?*", ENV{SCSI_MODEL}=="?*", ENV{ID_MODEL}="$env{SCSI_MODEL}"
+ENV{ID_MODEL_ENC}!="?*", ENV{SCSI_MODEL_ENC}=="?*", ENV{ID_MODEL_ENC}="$env{SCSI_MODEL_ENC}"
+ENV{ID_REVISION}!="?*", ENV{SCSI_REVISION}=="?*", ENV{ID_REVISION}="$env{SCSI_REVISION}"
+ENV{ID_TYPE}!="?*", ENV{SCSI_TYPE}=="?*", ENV{ID_TYPE}="$env{SCSI_TYPE}"
+ENV{ID_TARGET_PORT}!="?*", ENV{SCSI_IDENT_PORT_TARGET_PORT_GROUP}=="?*", \
+	PROGRAM="/bin/sh -c 'echo $env{SCSI_IDENT_PORT_TARGET_PORT_GROUP} | /bin/sed s/^0x//'", \
+	ENV{ID_TARGET_PORT}="$result"
 
 # ID_WWN compat mapping
-ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{ID_WWN}!="?*", ENV{ID_WWN}="0x$env{SCSI_IDENT_LUN_NAA_REGEXT}"
-ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{ID_WWN}!="?*", ENV{ID_WWN}="0x$env{SCSI_IDENT_LUN_NAA_REG}"
-ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{ID_WWN}!="?*", ENV{ID_WWN}="0x$env{SCSI_IDENT_LUN_NAA_EXT}"
-ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{ID_WWN}!="?*", ENV{ID_WWN}="0x$env{SCSI_IDENT_LUN_NAA_LOCAL}"
 ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{ID_WWN_WITH_EXTENSION}!="?*", ENV{ID_WWN_WITH_EXTENSION}="0x$env{SCSI_IDENT_LUN_NAA_REGEXT}"
+ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{ID_WWN_WITH_EXTENSION}!="?*", ENV{ID_WWN_WITH_EXTENSION}="0x$env{SCSI_IDENT_LUN_NAA_REG}"
 ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{ID_WWN_WITH_EXTENSION}!="?*", ENV{ID_WWN_WITH_EXTENSION}="0x$env{SCSI_IDENT_LUN_NAA_EXT}"
-ENV{ID_WWN}=="?*", ENV{ID_WWN_WITH_EXTENSION}!="?*", ENV{ID_WWN_WITH_EXTENSION}="$env{ID_WWN}"
+ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{ID_WWN_WITH_EXTENSION}!="?*", ENV{ID_WWN_WITH_EXTENSION}="0x$env{SCSI_IDENT_LUN_NAA_LOCAL}"
+# ID_WWN has max 16 characters
+ENV{ID_WWN_WITH_EXTENSION}=="?*", ENV{ID_WWN}!="?*", \
+	PROGRAM="/bin/sh -c 'echo $env{ID_WWN_WITH_EXTENSION} | /bin/sed s/^\\\(0x.\\\{1,16\\\}\\\).*/\\1/'", \
+	ENV{ID_WWN}="$result"
 
 # ata_id compability
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_ATA}=="?*", ENV{ID_BUS}="ata", ENV{ID_ATA}="1", ENV{ID_SERIAL}="$env{SCSI_IDENT_LUN_ATA}"
@@ -45,11 +102,14 @@ ENV{ID_SERIAL_SHORT}!="?*", ENV{SCSI_VENDOR}=="ATA", ENV{SCSI_IDENT_LUN_VENDOR}=
 # Compat ID_SERIAL setting
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_REGEXT}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_REGEXT}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_REG}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_REG}"
-ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_EXT}"
+ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_EXT}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_EXT}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="2$env{SCSI_IDENT_LUN_EUI64}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_EUI64}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="8$env{SCSI_IDENT_LUN_NAME}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAME}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="1$env{SCSI_IDENT_LUN_T10}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_T10}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_LOCAL}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_LOCAL}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_VENDOR}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_SERIAL}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_SERIAL}"
+
+# Compat ID_SCSI_SERIAL setting
+ENV{ID_SCSI_SERIAL}!="?*", ENV{SCSI_IDENT_SERIAL}=="?*", ENV{ID_SCSI_SERIAL}="$env{SCSI_IDENT_SERIAL}"
 LABEL="sg3_utils_id_end"

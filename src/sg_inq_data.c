@@ -47,7 +47,7 @@ const char * sg_ansi_version_arr[16] =
 
 /* table from SPC-5 revision 16 [sorted numerically (from Annex E.9)] */
 /* Can also be obtained from : http://www.t10.org/lists/stds.txt 20170114 */
-/* Corrected against spc5r18 on 20180201 */
+/* Corrected against spc5r21 on 20190312 */
 
 #ifdef SG_SCSI_STRINGS
 
@@ -487,7 +487,8 @@ struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
     {0x1749, "UAS ISO/IEC 14776-251:2014"},
     {0x1761, "ACS-2 (no version claimed)"},
     {0x1762, "ACS-2 ANSI INCITS 482-2013"},
-    {0x1765, "ACS-3 (no version claimed)"},
+    {0x1765, "ACS-3 INCITS 522-2014"},
+    {0x1767, "ACS-4 INCITS 529-2018"},
     {0x1780, "UAS-2 (no version claimed)"},
     {0x1ea0, "SAT (no version claimed)"},
     {0x1ea7, "SAT T10/1711-D rev 8"},
@@ -538,6 +539,8 @@ struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
     {0xffc0, "IEEE 1667 (no version claimed)"},
     {0xffc1, "IEEE 1667-2006"},
     {0xffc2, "IEEE 1667-2009"},
+    {0xffc3, "IEEE 1667-2015"},
+    {0xffc4, "IEEE 1667-2018"},
     {0xffff, NULL},     /* sentinel, leave at end */
 };
 
