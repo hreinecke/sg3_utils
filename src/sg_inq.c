@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "1.99 20190109";    /* SPC-5 rev 20 */
+static const char * version_str = "2.00 20190313";    /* SPC-5 rev 21 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a

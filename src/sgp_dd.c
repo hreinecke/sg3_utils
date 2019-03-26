@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2018 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2019 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -68,7 +68,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.71 20181227";
+static const char * version_str = "5.72 20190324";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -86,7 +86,7 @@ static const char * version_str = "5.71 20181227";
 #define SGP_READ10 0x28
 #define SGP_WRITE10 0x2a
 #define DEF_NUM_THREADS 4
-#define MAX_NUM_THREADS SG_MAX_QUEUE
+#define MAX_NUM_THREADS 1024  /* was SG_MAX_QUEUE (16) but no longer applies */
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikely value */
@@ -186,6 +186,8 @@ static int sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
 #define STRERR_BUFF_LEN 128
 
 static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
+
+static pthread_t threads[MAX_NUM_THREADS];
 
 static bool shutting_down = false;
 static bool do_sync = false;
@@ -383,7 +385,7 @@ usage()
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
-            "max 16\n"
+            "max 1024\n"
             "    time        0->no timing(def), 1->time plus calculate "
             "throughput\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
@@ -1177,7 +1179,6 @@ main(int argc, char * argv[])
     int res, k, err, keylen;
     int64_t in_num_sect = 0;
     int64_t out_num_sect = 0;
-    pthread_t threads[MAX_NUM_THREADS];
     int in_sect_sz, out_sect_sz, status, n, flags;
     void * vp;
     Rq_coll * clp = &rcoll;

@@ -1,7 +1,7 @@
 /*
  * Test code for the extensions to the Linux OS SCSI generic ("sg")
  * device driver.
- * Copyright (C) 1999-2018 D. Gilbert and P. Allworth
+ * Copyright (C) 1999-2019 D. Gilbert and P. Allworth
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.03 20190105";
+static const char * version_str = "4.04 20190324";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -89,9 +89,9 @@ static const char * my_name = "sgs_dd";
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 40000       /* 40,000 millisecs == 40 seconds */
 #define S_RW_LEN 10             /* Use SCSI READ(10) and WRITE(10) */
-#define SGQ_MAX_RD_AHEAD 4
-#define SGQ_MAX_WR_AHEAD 4
-#define SGQ_NUM_ELEMS (SGQ_MAX_RD_AHEAD+ SGQ_MAX_WR_AHEAD + 1)
+#define SGQ_MAX_RD_AHEAD 32
+#define SGQ_MAX_WR_AHEAD 32
+#define SGQ_NUM_ELEMS (SGQ_MAX_RD_AHEAD + SGQ_MAX_WR_AHEAD + 1)
 
 #define SGQ_FREE 0
 #define SGQ_IO_STARTED 1

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 Douglas Gilbert.
+ * Copyright (c) 2013-2019 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,10 +43,37 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#ifndef HAVE_LINUX_SG_V4_HDR
+
+/* Kernel uapi header contain __user decorations on user space pointers
+ * to indicate they are unsafe in the kernel space. However glibc takes
+ * all those __user decorations out from headers in /usr/include/linux .
+ * So to stop compile errors when directly importing include/uapi/scsi/sg.h
+ * undef __user before doing that include. */
+#define __user
+
+/* Want to block the original sg.h header from also being included. That
+ * causes lots of multiple definition errors. This will only work if this
+ * header is included _before_ the original sg.h header.  */
+#define _SCSI_GENERIC_H         /* original kernel header guard */
+#define _SCSI_SG_H              /* glibc header guard */
+
+#include "uapi_sg.h"    /* local copy of include/uapi/scsi/sg.h */
+
+#else
+#define __user
+#endif  /* end of: ifndef HAVE_LINUX_SG_V4_HDR */
+
 #include "sg_lib.h"
 #include "sg_io_linux.h"
+#include "sg_unaligned.h"
 
-static const char * version_str = "1.10 20181207";
+static const char * version_str = "1.11 20190121";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -102,21 +129,25 @@ static mutex console_mutex;
 static unsigned int odd_count;
 static unsigned int ebusy_count;
 static unsigned int eagain_count;
+static int sg_ifc_ver = 3;
 
 
 static void
 usage(void)
 {
-    printf("Usage: %s [-b] [-f] [-h] [-l <lba>] [-n <n_per_thr>] "
-           "[-t <num_thrs>]\n"
-           "                   [-V] [-w <wait_ms>] [-x] [-xx] "
-           "<sg_disk_device>\n", util_name);
+    printf("Usage: %s [-b] [-f] [-h] [-i <sg_ver>] [-l <lba>] "
+           "[-n <n_per_thr>]\n"
+           "                   [-t <num_thrs>] [-V] [-w <wait_ms>] "
+           "[-x] [-xx]\n"
+           "                   <sg_disk_device>\n", util_name);
     printf("  where\n");
     printf("    -b                block on open (def: O_NONBLOCK)\n");
     printf("    -f                force: any SCSI disk (def: only "
            "scsi_debug)\n");
     printf("                      WARNING: <lba> written to\n");
     printf("    -h                print this usage message then exit\n");
+    printf("    -i <sg_ver>       sg driver interface version (default: "
+           "3)\n");
     printf("    -l <lba>          logical block to increment (def: %u)\n",
            DEF_LBA);
     printf("    -n <n_per_thr>    number of loops per thread "
@@ -153,9 +184,9 @@ usage(void)
  * closes dev_name. If an error occurs returns -1 else returns 0 if
  * first int read from lba is even otherwise returns 1. */
 static int
-do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
-                   int excl, int wait_ms, int id, unsigned int & ebusy,
-                   unsigned int & eagains)
+do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
+                      int excl, int wait_ms, int id, unsigned int & ebusy,
+                      unsigned int & eagains)
 {
     int k, sg_fd, ok, res;
     int odd = 0;
@@ -170,10 +201,8 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
     char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;
 
-    r16CmdBlk[6] = w16CmdBlk[6] = (lba >> 24) & 0xff;
-    r16CmdBlk[7] = w16CmdBlk[7] = (lba >> 16) & 0xff;
-    r16CmdBlk[8] = w16CmdBlk[8] = (lba >> 8) & 0xff;
-    r16CmdBlk[9] = w16CmdBlk[9] = lba & 0xff;
+    sg_put_unaligned_be64(lba, r16CmdBlk + 2);
+    sg_put_unaligned_be64(lba, w16CmdBlk + 2);
     if (! block)
         open_flags |= O_NONBLOCK;
     if (excl)
@@ -190,8 +219,8 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             sleep(0);                   // process yield ??
     }
     if (sg_fd < 0) {
-        snprintf(ebuff, EBUFF_SZ,
-                 "do_rd_inc_wr_twice: error opening file: %s", dev_name);
+        snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s", __func__,
+		 dev_name);
         perror(ebuff);
         return -1;
     }
@@ -215,7 +244,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-                perror("do_rd_inc_wr_twice: write(sg, READ_16)");
+                perror(" write(sg, READ_16)");
             }
             close(sg_fd);
             return -1;
@@ -225,7 +254,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-                perror("do_rd_inc_wr_twice: write(sg, READ_16) 2");
+                perror(" write(sg, READ_16) 2");
             }
             close(sg_fd);
             return -1;
@@ -245,7 +274,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-                perror("do_rd_inc_wr_twice: read(sg, READ_16)");
+                perror(" read(sg, READ_16)");
             }
             close(sg_fd);
             return -1;
@@ -287,7 +316,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 {
                     lock_guard<mutex> lg(console_mutex);
 
-                    perror("do_rd_inc_wr_twice: read(sg, READ_16) 2");
+                    perror(" read(sg, READ_16) 2");
                 }
                 close(sg_fd);
                 return -1;
@@ -303,8 +332,8 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 {
                     lock_guard<mutex> lg(console_mutex);
 
-                    fprintf(stderr, "Recovered error on READ_16, continuing "
-                            "2\n");
+                    fprintf(stderr, "%s: Recovered error on READ_16, "
+			    "continuing 2\n", __func__);
                 }
                 ok = 1;
                 break;
@@ -322,14 +351,12 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             return -1;
         }
 
-        u = (lb[0] << 24) + (lb[1] << 16) + (lb[2] << 8) + lb[3];
+        u = sg_get_unaligned_be32(lb);
+        // Assuming u starts test as even (probably 0), expect it to stay even
         if (0 == k)
             odd = (1 == (u % 2));
         ++u;
-        lb[0] = (u >> 24) & 0xff;
-        lb[1] = (u >> 16) & 0xff;
-        lb[2] = (u >> 8) & 0xff;
-        lb[3] = u & 0xff;
+        sg_put_unaligned_be32(u, lb);
 
         if (wait_ms > 0)       /* allow daylight for bad things ... */
             this_thread::sleep_for(milliseconds{wait_ms});
@@ -355,7 +382,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-                perror("do_rd_inc_wr_twice: WRITE_16 SG_IO ioctl error");
+                perror(" WRITE_16 SG_IO ioctl error");
             }
             close(sg_fd);
             return -1;
@@ -370,7 +397,8 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-                fprintf(stderr, "Recovered error on WRITE_16, continuing\n");
+                fprintf(stderr, "%s: Recovered error on WRITE_16, "
+			"continuing\n", __func__);
             }
             ok = 1;
             break;
@@ -379,6 +407,263 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 lock_guard<mutex> lg(console_mutex);
 
                 sg_chk_n_print3("WRITE_16 command error", &pt, 1);
+            }
+            break;
+        }
+        if (! ok) {
+            close(sg_fd);
+            return -1;
+        }
+    }
+    close(sg_fd);
+    return odd;
+}
+
+/* Opens dev_name and spins if busy (i.e. gets EBUSY), sleeping for
+ * wait_ms milliseconds if wait_ms is positive.
+ * Reads lba (twice) and treats the first 4 bytes as an int (SCSI endian),
+ * increments it and writes it back. Repeats so that happens twice. Then
+ * closes dev_name. If an error occurs returns -1 else returns 0 if
+ * first int read from lba is even otherwise returns 1. */
+static int
+do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
+                      int excl, int wait_ms, int id, unsigned int & ebusy,
+                      unsigned int & eagains)
+{
+    int k, sg_fd, ok, res;
+    int odd = 0;
+    unsigned int u = 0;
+    struct sg_io_v4 pt, pt2;
+    unsigned char r16CmdBlk [READ16_CMD_LEN] =
+                {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
+    unsigned char w16CmdBlk [WRITE16_CMD_LEN] =
+                {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
+    unsigned char sense_buffer[64];
+    unsigned char lb[READ16_REPLY_LEN];
+    char ebuff[EBUFF_SZ];
+    int open_flags = O_RDWR;
+
+    sg_put_unaligned_be64(lba, r16CmdBlk + 2);
+    sg_put_unaligned_be64(lba, w16CmdBlk + 2);
+    if (! block)
+        open_flags |= O_NONBLOCK;
+    if (excl)
+        open_flags |= O_EXCL;
+
+    while (((sg_fd = open(dev_name, open_flags)) < 0) &&
+           (EBUSY == errno)) {
+        ++ebusy;
+        if (wait_ms > 0)
+            this_thread::sleep_for(milliseconds{wait_ms});
+        else if (0 == wait_ms)
+            this_thread::yield();
+        else if (-2 == wait_ms)
+            sleep(0);                   // process yield ??
+    }
+    if (sg_fd < 0) {
+        snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s", __func__,
+		 dev_name);
+        perror(ebuff);
+        return -1;
+    }
+
+    for (k = 0; k < 2; ++k) {
+        /* Prepare READ_16 command */
+        memset(&pt, 0, sizeof(pt));
+        pt.guard = 'Q';
+        pt.request_len = sizeof(r16CmdBlk);
+        pt.max_response_len = sizeof(sense_buffer);
+        // pt.dxfer_direction = SG_DXFER_FROM_DEV;
+        pt.din_xfer_len = READ16_REPLY_LEN;
+        pt.din_xferp = (uint64_t)(sg_uintptr_t)lb;
+        pt.request = (uint64_t)(sg_uintptr_t)r16CmdBlk;
+        pt.response = (uint64_t)(sg_uintptr_t)sense_buffer;
+        pt.timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        pt.request_extra = id;	/* pack_id field */
+
+        // queue up two READ_16s to same LBA
+        if (ioctl(sg_fd, SG_IOSUBMIT, &pt) < 0) {
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror(" write(sg, READ_16)");
+            }
+            close(sg_fd);
+            return -1;
+        }
+        pt2 = pt;
+        if (ioctl(sg_fd, SG_IOSUBMIT, &pt2) < 0) {
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror(" write(sg, READ_16) 2");
+            }
+            close(sg_fd);
+            return -1;
+        }
+
+        while (((res = ioctl(sg_fd, SG_IORECEIVE, &pt)) < 0) &&
+               (EAGAIN == errno)) {
+            ++eagains;
+            if (wait_ms > 0)
+                this_thread::sleep_for(milliseconds{wait_ms});
+            else if (0 == wait_ms)
+                this_thread::yield();
+            else if (-2 == wait_ms)
+                sleep(0);                   // process yield ??
+        }
+        if (res < 0) {
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror(" read(sg, READ_16)");
+            }
+            close(sg_fd);
+            return -1;
+        }
+        /* now for the error processing */
+        ok = 0;
+	switch (sg_err_category_new(pt.device_status, pt.transport_status,
+	        pt.driver_status, sense_buffer, pt.response_len)) {
+        case SG_LIB_CAT_CLEAN:
+            ok = 1;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "Recovered error on READ_16, continuing\n");
+            }
+            ok = 1;
+            break;
+        default: /* won't bother decoding other categories */
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+		sg_linux_sense_print("READ_16 command error",
+				     pt.device_status, pt.transport_status,
+				     pt.driver_status, sense_buffer,
+				     pt.response_len, true);
+                // sg_chk_n_print3("READ_16 command error", &pt, 1);
+            }
+            break;
+        }
+        if (ok) {
+            while (((res = ioctl(sg_fd, SG_IORECEIVE, &pt2)) < 0) &&
+                   (EAGAIN == errno)) {
+                ++eagains;
+                if (wait_ms > 0)
+                    this_thread::sleep_for(milliseconds{wait_ms});
+                else if (0 == wait_ms)
+                    this_thread::yield();
+                else if (-2 == wait_ms)
+                    sleep(0);                   // process yield ??
+            }
+            if (res < 0) {
+                {
+                    lock_guard<mutex> lg(console_mutex);
+
+                    perror(" read(sg, READ_16) 2");
+                }
+                close(sg_fd);
+                return -1;
+            }
+            pt = pt2;
+            /* now for the error processing */
+            ok = 0;
+	    switch (sg_err_category_new(pt.device_status, pt.transport_status,
+	            pt.driver_status, sense_buffer, pt.response_len)) {
+            case SG_LIB_CAT_CLEAN:
+                ok = 1;
+                break;
+            case SG_LIB_CAT_RECOVERED:
+                {
+                    lock_guard<mutex> lg(console_mutex);
+
+                    fprintf(stderr, "%s: Recovered error on READ_16, "
+			    "continuing 2\n", __func__);
+                }
+                ok = 1;
+                break;
+            default: /* won't bother decoding other categories */
+                {
+                    lock_guard<mutex> lg(console_mutex);
+
+		    sg_linux_sense_print("READ_16 command error 2",
+				         pt.device_status,
+					 pt.transport_status,
+				         pt.driver_status, sense_buffer,
+				         pt.response_len, true);
+                    // sg_chk_n_print3("READ_16 command error 2", &pt, 1);
+                }
+                break;
+            }
+        }
+        if (! ok) {
+            close(sg_fd);
+            return -1;
+        }
+
+        u = sg_get_unaligned_be32(lb);
+        // Assuming u starts test as even (probably 0), expect it to stay even
+        if (0 == k)
+            odd = (1 == (u % 2));
+        ++u;
+        sg_put_unaligned_be32(u, lb);
+
+        if (wait_ms > 0)       /* allow daylight for bad things ... */
+            this_thread::sleep_for(milliseconds{wait_ms});
+        else if (0 == wait_ms)
+            this_thread::yield();
+        else if (-2 == wait_ms)
+            sleep(0);                   // process yield ??
+
+        /* Prepare WRITE_16 command */
+        memset(&pt, 0, sizeof(pt));
+        pt.guard = 'Q';
+        pt.request_len = sizeof(w16CmdBlk);
+        pt.max_response_len = sizeof(sense_buffer);
+        // pt.dxfer_direction = SG_DXFER_TO_DEV;
+        pt.dout_xfer_len = WRITE16_REPLY_LEN;
+        pt.dout_xferp = (uint64_t)(sg_uintptr_t)lb;
+        pt.request = (uint64_t)(sg_uintptr_t)w16CmdBlk;
+        pt.response = (uint64_t)(sg_uintptr_t)sense_buffer;
+        pt.timeout = 20000;     /* 20000 millisecs == 20 seconds */
+        pt.request_extra = id;	/* pack_id field */
+
+        if (ioctl(sg_fd, SG_IO, &pt) < 0) {
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                perror(" WRITE_16 SG_IO ioctl error");
+            }
+            close(sg_fd);
+            return -1;
+        }
+        /* now for the error processing */
+        ok = 0;
+        switch (sg_err_category_new(pt.device_status, pt.transport_status,
+                pt.driver_status, sense_buffer, pt.response_len)) {
+        case SG_LIB_CAT_CLEAN:
+            ok = 1;
+            break;
+        case SG_LIB_CAT_RECOVERED:
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+                fprintf(stderr, "%s: Recovered error on WRITE_16, "
+			"continuing\n", __func__);
+            }
+            ok = 1;
+            break;
+        default: /* won't bother decoding other categories */
+            {
+                lock_guard<mutex> lg(console_mutex);
+
+		sg_linux_sense_print("WRITE_16 command error",
+				     pt.device_status, pt.transport_status,
+				     pt.driver_status, sense_buffer,
+				     pt.response_len, true);
             }
             break;
         }
@@ -500,8 +785,18 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
              << block << endl;
     }
     for (k = 0; k < num; ++k) {
-        res = do_rd_inc_wr_twice(dev_name, lba, block, excl, wait_ms, k,
-                                 thr_ebusy_count, thr_eagain_count);
+	if (sg_ifc_ver == 3)
+            res = do_rd_inc_wr_twice_v3(dev_name, lba, block, excl, wait_ms,
+					k, thr_ebusy_count, thr_eagain_count);
+	else if (sg_ifc_ver == 4)
+            res = do_rd_inc_wr_twice_v4(dev_name, lba, block, excl, wait_ms,
+					k, thr_ebusy_count, thr_eagain_count);
+	else {
+	    lock_guard<mutex> lg(console_mutex);
+
+	    cerr << "sg_ifc_ver=" << sg_ifc_ver << " not supported" << endl;
+	    res = -1;
+	}
         if (res < 0)
             break;
         if (res)
@@ -548,6 +843,12 @@ main(int argc, char * argv[])
         else if (0 == memcmp("-h", argv[k], 2)) {
             usage();
             return 0;
+        } else if (0 == memcmp("-i", argv[k], 2)) {
+            ++k;
+            if ((k < argc) && isdigit(*argv[k]))
+                sg_ifc_ver = atoi(argv[k]);
+            else
+                break;
         } else if (0 == memcmp("-l", argv[k], 2)) {
             ++k;
             if ((k < argc) && isdigit(*argv[k]))
