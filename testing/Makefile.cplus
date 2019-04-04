@@ -4,10 +4,10 @@ PREFIX=/usr/local
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
-CC = g++
-LD = g++
-## CC = clang++
-## LD = clang++
+## CC = g++
+## LD = g++
+CXX = clang++-7
+LD = clang++-7
 
 EXECS = sg_tst_excl sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async \
 	sgh_dd
