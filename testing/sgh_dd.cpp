@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.21 20190324";
+static const char * version_str = "1.22 20190331";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -1008,11 +1008,13 @@ read_write_thread(void * v_tip)
         /* Start of READ half of a segment */
         status = pthread_mutex_lock(&clp->in_mutex);
         if (0 != status) err_exit(status, "lock in_mutex");
+
 #if 0
         if (clp->in_stop || (clp->in_count <= 0)) {
             /* no more to do, exit loop then thread */
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
+pr2serr_lk("tid=%d: clp->in_stop\n", rep->id);
             break;
         }
 #endif
@@ -1070,34 +1072,19 @@ read_write_thread(void * v_tip)
         }
 
 skip_force_out_sequence:
-#if 0
         if (clp->out_stop || (clp->out_count <= 0)) {
             if (! clp->out_stop)
                 clp->out_stop = true;
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
+pr2serr_lk("tid=%d: clp->out_stop\n", rep->id);
             break;
         }
-#endif
         if (stop_after_write)
             clp->out_stop = true;
 
         clp->out_blk += blocks;
         clp->out_count -= blocks;
-
-        if (0 == rep->num_blks) {
-            if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
-                if (rep->debug)
-                    pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
-                               (uint32_t)def_arr.first.size());
-                sgh_do_def(rep, def_arr);
-            }
-            clp->out_stop = true;
-            stop_after_write = true;
-            status = pthread_mutex_unlock(&clp->out_mutex);
-            if (0 != status) err_exit(status, "unlock out_mutex");
-            break;      /* read nothing so leave loop */
-        }
 
         pthread_cleanup_push(cleanup_out, (void *)clp);
         if (rep->outregfd >= 0) {
@@ -1142,19 +1129,22 @@ skip_force_out_sequence:
 
             pthread_cleanup_pop(0);
         }
+        if (0 == rep->num_blks) {
+            if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
+                if (rep->debug)
+                    pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
+                               (uint32_t)def_arr.first.size());
+                sgh_do_def(rep, def_arr);
+            }
+            clp->out_stop = true;
+            stop_after_write = true;
+            break;      /* read nothing so leave loop */
+        }
         // if ((! rep->has_share) && (FT_DEV_NULL != clp->out_type))
         pthread_cond_broadcast(&clp->out_sync_cv);
         if (stop_after_write)
             break;
-    }	/* ^^^^^^^^^^ end of main while loop which copies segments ^^^^^^ */
-#if 0
-    if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
-        if (rep->debug)
-            pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
-                       (uint32_t)def_arr.first.size());
-        sgh_do_def(rep, def_arr);
-    }
-#endif
+    }   /* ^^^^^^^^^^ end of main while loop which copies segments ^^^^^^ */
 
     status = pthread_mutex_lock(&clp->in_mutex);
     if (0 != status) err_exit(status, "lock in_mutex");
@@ -1182,9 +1172,6 @@ fini:
     if (own_out2fd && (rep->out2fd >= 0))
         close(rep->out2fd);
     pthread_cond_broadcast(&clp->out_sync_cv);
-    if (rep->num_blks > 0)
-        pr2serr("%d <-- thread exiting with rep->num_blks=%d\n", rep->id,
-                rep->num_blks);
     return stop_after_write ? NULL : clp;
 }
 
@@ -1583,10 +1570,10 @@ sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr)
         fd = rep->outfd;
     res = 0;
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF;
-    ctl_v4.din_xferp = (uint64_t)a_v4p;
-    ctl_v4.din_xfer_len = n * sizeof(*a_v4p);
-    ctl_v4.dout_xferp = (uint64_t)a_v4p;
+    ctl_v4.dout_xferp = (uint64_t)a_v4p;        /* request array */
     ctl_v4.dout_xfer_len = n * sizeof(*a_v4p);
+    ctl_v4.din_xferp = (uint64_t)a_v4p;         /* response array */
+    ctl_v4.din_xfer_len = n * sizeof(*a_v4p);
     if (rep->debug > 2) {
         pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO):\n",
                    __func__);
@@ -1860,8 +1847,10 @@ sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2)
     return 0;
 
 do_v4:
-    if (rep->nmrqs > 0)
+    if (rep->nmrqs > 0) {
+        rep->resid = 0;
         return 0;
+    }
     h4p = &rep->io_hdr4;
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))

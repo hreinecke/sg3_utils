@@ -56,7 +56,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.06  20190323";
+static const char * version_str = "Version: 1.07  20190402";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -382,6 +382,17 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     printf("  %sread_value[SG_SEIRV_TRC_MAX_SZ]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_SUBMITTED;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        return 1;
+    }
+    printf("  %sread_value[SG_SEIRV_SUBMITTED]= %u\n", cp, seip->read_value);
+
+    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
 #if 1
@@ -521,10 +532,10 @@ do_mrqs(int sg_fd, int sg_fd2, int mrqs)
         else
             h4p->flags |= SG_FLAG_Q_AT_HEAD;
     }
-    mrq_h4p->din_xferp = (uint64_t)arr_v4;
-    mrq_h4p->din_xfer_len = arr_v4_sz;
-    mrq_h4p->dout_xferp = mrq_h4p->din_xferp;
-    mrq_h4p->dout_xfer_len = mrq_h4p->din_xfer_len;
+    mrq_h4p->dout_xferp = (uint64_t)arr_v4;
+    mrq_h4p->dout_xfer_len = arr_v4_sz;
+    mrq_h4p->din_xferp = mrq_h4p->dout_xferp;
+    mrq_h4p->din_xfer_len = mrq_h4p->dout_xfer_len;
     if (ioctl(sg_fd, (mrq_iosubmit ? SG_IOSUBMIT : SG_IO), mrq_h4p) < 0) {
         res = errno;
         pr2serr("ioctl(SG_IO%s, mrq) failed, errno=%d %s\n",
