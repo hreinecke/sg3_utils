@@ -55,6 +55,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/resource.h>       /* getrusage */
 
 
 #ifdef HAVE_CONFIG_H
@@ -88,13 +89,13 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.25 20190128";
+static const char * version_str = "1.26 20190403";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
  * driver. Each thread opens 1 file descriptor to the next sg device (1
- * or more can be given on the command line) and then starts up to 16
- * commands or more while checking with the poll command (or
+ * or more can be given on the command line) and then starts up to
+ * num_per_thread commands or more while checking with the poll command (or
  * ioctl(SG_GET_NUM_WAITING) ) for the completion of those commands. Each
  * command has a unique "pack_id" which is a sequence starting at 1.
  * Either TEST UNIT UNIT, READ(16) or WRITE(16) commands are issued.
@@ -142,7 +143,7 @@ using namespace std::chrono;
 #define DEF_LBA 1000
 
 #define MAX_Q_PER_FD 16383      /* sg driver per file descriptor limit */
-#define MAX_CONSEC_NOMEMS 16
+#define MAX_CONSEC_NOMEMS 4	/* was 16 */
 #define URANDOM_DEV "/dev/urandom"
 
 #ifndef SG_FLAG_Q_AT_TAIL
@@ -168,7 +169,7 @@ static atomic<int> start_eagain_count(0);
 static atomic<int> fin_eagain_count(0);
 static atomic<int> start_edom_count(0);
 static atomic<int> uniq_pack_id(1);
-static atomic<int> generic_errs(0);
+// static atomic<int> generic_errs(0);
 
 static int page_size = 4096;   /* rough guess, will ask sysconf() */
 
@@ -486,7 +487,7 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
     for (int k = 0;
          (submit ? ioctl(sg_fd, SG_IOSUBMIT, ptp) :
-                                write(sg_fd, ptp, sizeof(*ptp)) < 0);
+		   write(sg_fd, ptp, sizeof(*ptp)) < 0);
          ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
             this_thread::yield();
@@ -771,6 +772,44 @@ finish_sg4_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
     return ok ? 0 : -1;
 }
 
+static int
+num_submitted(int sg_fd)
+{
+    uint32_t num_subm_wait = 0;
+    struct sg_extended_info sei;
+    struct sg_extended_info *seip = &sei;
+    const char * err = NULL;
+
+    memset(seip, 0, sizeof(*seip));
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_SUBMITTED;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0)
+        err = "ioctl(SG_SET_GET_EXTENDED) failed\n";
+    else
+        num_subm_wait = seip->read_value;
+    if (err)
+        pr2serr_lk("%s: %s, errno=%d\n", __func__, err, errno);
+    return err ? -1 : (int)num_subm_wait;
+}
+
+static int
+pr_rusage(int id)
+{
+    int res;
+    struct rusage ru;
+
+    res = getrusage(RUSAGE_SELF /* RUSAGE_THREAD */, &ru);
+    if (res < 0) {
+        pr2serr_lk("%d->id: %s: getrusage() failed, errno=%d\n", id,
+                   __func__, errno);
+        return res;
+    }
+    pr2serr_lk("%d->id: maxrss=%ldKB  nvcsw=%ld nivcsw=%ld  majflt=%ld\n", id,
+               ru.ru_maxrss, ru.ru_nvcsw, ru.ru_nivcsw, ru.ru_majflt);
+    return 0;
+}
+
 static void
 work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
                  struct opts_t * op)
@@ -858,12 +897,21 @@ work_thread(int id, struct opts_t * op)
 {
     bool is_rw = (SCSI_TUR != op->c2e);
     bool need_finish, repeat;
+    bool once = false;
+    bool once1000 = false;
+    bool once_2000 = false;
+    bool once_4000 = false;
+    bool once5000 = false;
+    bool once_6000 = false;
+    bool once_7000 = false;
+    bool once10_000 = false;
+    bool once20_000 = false;
     int open_flags = O_RDWR;
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
     int vb = op->verbose;
     int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
-    int num_waiting_read, num_to_read, sz, ern, encore_pack_id, ask, j;
+    int num_waiting_read, num_to_read, sz, ern, encore_pack_id, ask, j, m, o;
     int prev_pack_id;
     unsigned int thr_start_eagain_count = 0;
     unsigned int thr_start_ebusy_count = 0;
@@ -1020,10 +1068,86 @@ work_thread(int id, struct opts_t * op)
     pack_id = 0;
     prev_pack_id = 0;
     encore_pack_id = 0;
+    do_inc = 0;
     /* main loop, continues until num_per_thread exhausted and there are
      * no more outstanding responses */
-    for (k = 0, num_outstanding = 0; (k < npt) || num_outstanding;
-         k = do_inc ? k + 1 : k) {
+    for (k = 0, m = 0, o=0, num_outstanding = 0; (k < npt) || num_outstanding;
+         k = do_inc ? k + 1 : k, ++o) {
+        if (do_inc)
+            m = 0;
+        else {
+            ++m;
+            if (m > 100) {
+                pr2serr_lk("%d->id: m=%d\n", id, m);
+                m = 0;
+            }
+        }
+        if (vb && ! once1000 && num_outstanding >= 1000) {
+            int num_waiting;
+            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+
+            once1000 = true;
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
+                err = "ioctl(SG_GET_NUM_WAITING) failed";
+                break;
+            }
+            pr2serr_lk("%d->id: once 1000: k=%d, submitted=%d waiting=%d; "
+                       "pi2buff.sz=%u\n", id, k, num_subm, num_waiting,
+                       (uint32_t)pi2buff.size());
+            pr_rusage(id);
+        }
+        if (vb && ! once5000 && num_outstanding >= 5000) {
+            int num_waiting;
+            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+
+            once5000 = true;
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
+                err = "ioctl(SG_GET_NUM_WAITING) failed";
+                break;
+            }
+            pr2serr_lk("%d->id: once 5000: k=%d, submitted=%d waiting=%d\n",
+                       id, k, num_subm, num_waiting);
+            pr_rusage(id);
+        }
+        if (vb && ! once_7000 && num_outstanding >= 7000) {
+            int num_waiting;
+            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+
+            once_7000 = true;
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
+                err = "ioctl(SG_GET_NUM_WAITING) failed";
+                break;
+            }
+            pr2serr_lk("%d->id: once 7000: k=%d, submitted=%d waiting=%d\n",
+                       id, k, num_subm, num_waiting);
+            pr_rusage(id);
+        }
+        if (vb && ! once10_000 && num_outstanding >= 10000) {
+            int num_waiting;
+            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+
+            once10_000 = true;
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
+                err = "ioctl(SG_GET_NUM_WAITING) failed";
+                break;
+            }
+            pr2serr_lk("%d->id: once 10^4: k=%d, submitted=%d waiting=%d\n",
+                       id, k, num_subm, num_waiting);
+            pr_rusage(id);
+        }
+        if (vb && ! once20_000 && num_outstanding >= 20000) {
+            int num_waiting;
+            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+
+            once20_000 = true;
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
+                err = "ioctl(SG_GET_NUM_WAITING) failed";
+                break;
+            }
+            pr2serr_lk("%d->id: once 20000: k=%d, submitted=%d waiting=%d\n",
+                       id, k, num_subm, num_waiting);
+            pr_rusage(id);
+        }
         do_inc = 0;
         if ((num_outstanding < op->maxq_per_thread) && (k < npt)) {
             do_inc = 1;
@@ -1051,14 +1175,17 @@ work_thread(int id, struct opts_t * op)
                 } else {
                     lbp = encore_lbps.first;
                     free_lbp = encore_lbps.second;
-                    if (free_lst.size() > 1000) {
-                        static bool once = false;
-
-                        if (! once) {
-                            once = true;
-                            pr2serr_lk("id=%d: free_lst.size() over 1000\n",
-                                       id);
-                        }
+                    if (vb && !once && free_lst.size() > 1000) {
+                        once = true;
+                        pr2serr_lk("%d->id: free_lst.size() over 1000\n", id);
+                    }
+                    if (vb && !once_2000 && free_lst.size() > 2000) {
+                        once_2000 = true;
+                        pr2serr_lk("%d->id: free_lst.size() over 2000\n", id);
+                    }
+                    if (vb && !once_6000 && free_lst.size() > 6000) {
+                        once_2000 = true;
+                        pr2serr_lk("%d->id: free_lst.size() over 6000\n", id);
                     }
                 }
             } else
@@ -1093,7 +1220,7 @@ work_thread(int id, struct opts_t * op)
                     encore_pack_id = pack_id;
                     pack_id = prev_pack_id;
                     encore_lbps = make_pair(lbp, free_lbp);
-                    if (vb > 3)
+                    if (vb > 2)
                         pr2serr_lk("t_id=%d: E2BIG hit, prev_pack_id=%d, "
                                    "encore_pack_id=%d\n", id, prev_pack_id,
                                    encore_pack_id);
@@ -1108,13 +1235,17 @@ work_thread(int id, struct opts_t * op)
                 if (ruip)
                     pi_2_lba[pack_id] = lba;
             }
-            if (pi2buff.size() > 1000) {
-                static bool once = false;
-
-                if (! once) {
-                    once = true;
-                    pr2serr_lk("id=%d: pi2buff.size() over 1000\n", id);
-                }
+            if (vb && !once && (pi2buff.size() > 1000)) {
+                once = true;
+                pr2serr_lk("%d->id: pi2buff.size() over 1000 (b)\n", id);
+            }
+            if (vb && !once_2000 && free_lst.size() > 2000) {
+                once_2000 = true;
+                pr2serr_lk("%d->id: free_lst.size() over 2000 (b)\n", id);
+            }
+            if (vb && !once_6000 && free_lst.size() > 6000) {
+                once_2000 = true;
+                pr2serr_lk("%d->id: free_lst.size() over 6000 (b)\n", id);
             }
         }
         num_to_read = 0;
@@ -1164,15 +1295,30 @@ work_thread(int id, struct opts_t * op)
                     }
                 }
             } else {    /* nothing waiting to be read */
-                n = (op->wait_ms > 0) ? op->wait_ms : 0;
-                while (0 == (res = poll(pfd, 1, n))) {
-                    if (res < 0) {
-                        err = "poll(wait_ms) failed";
+                if (op->sg_vn_ge_30901) {
+                    int val = num_submitted(sg_fd);
+
+                    if (0 == val) {
+                        err = "nothing submitted now ??";
+                        break;
+                    } else if (val < 0) {
+                        err = "num_submitted failed";
                         break;
                     }
                 }
-                if (err)
+                n = (op->wait_ms > 0) ? op->wait_ms : 0;
+                for (j = 0; (j < 1000000) && (0 == (res = poll(pfd, 1, n)));
+                     ++j)
+                    ;
+
+                if (j >= 1000000) {
+                    err = "poll() looped 1 million times";
                     break;
+                }
+                if (res < 0) {
+                    err = "poll(wait_ms) failed";
+                    break;
+                }
             }
         } else {        /* not full, not finished injecting */
             if (MYQD_HIGH == op->myqd)
@@ -1191,7 +1337,12 @@ work_thread(int id, struct opts_t * op)
             }
         }
 
-        while (num_to_read-- > 0) {
+        if (vb && !once_4000 && (num_to_read > 4000)) {
+            once_4000 = true;
+            pr2serr_lk("%d->id: num_to_read=%d\n", id, num_to_read);
+        }
+        while (num_to_read > 0) {
+	    --num_to_read;
             if (op->pack_id_force) {
                 j = pi2buff.size();
                 if (j > 0)
@@ -1258,6 +1409,9 @@ work_thread(int id, struct opts_t * op)
         if (err)
             break;
     }           /* end of for loop over npt (number per thread) */
+    if (vb)
+        pr2serr_lk("%d->id: leaving main thread loop; k=%d, o=%d\n", id, k,
+		   o);
     close(sg_fd);       // sg driver will handle any commands "in flight"
     if (ruip)
         delete ruip;
