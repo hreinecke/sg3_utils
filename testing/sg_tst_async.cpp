@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.26 20190403";
+static const char * version_str = "1.26 20190409";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -143,7 +143,7 @@ using namespace std::chrono;
 #define DEF_LBA 1000
 
 #define MAX_Q_PER_FD 16383      /* sg driver per file descriptor limit */
-#define MAX_CONSEC_NOMEMS 4	/* was 16 */
+#define MAX_CONSEC_NOMEMS 4     /* was 16 */
 #define URANDOM_DEV "/dev/urandom"
 
 #ifndef SG_FLAG_Q_AT_TAIL
@@ -184,6 +184,7 @@ enum myQDiscipline {MYQD_LOW,   /* favour completions over new cmds */
 
 struct opts_t {
     vector<const char *> dev_names;
+    vector<int> blk_szs;
     bool block;
     bool cmd_time;
     bool direct;
@@ -194,7 +195,10 @@ struct opts_t {
     bool sg_vn_ge_30901;
     bool submit;
     bool verbose_given;
+    bool v3;
+    bool v3_given;
     bool v4;
+    bool v4_given;
     bool version_given;
     int maxq_per_thread;
     int num_per_thread;
@@ -203,12 +207,13 @@ struct opts_t {
     vector<unsigned int> hi_lbas; /* only used when hi_lba=-1 */
     int lb_sz;
     int num_lbs;
+    int ovn;            /* override number for submission */
     int stats;
     int verbose;
     int wait_ms;
     command2execute c2e;
-    blkLQDiscipline blqd;
-    myQDiscipline myqd;
+    blkLQDiscipline blqd;       /* --qat= 0|1 -> at_head|at_tail */
+    myQDiscipline myqd;         /* --qfav= value (def: 2 --> MYQD_HIGH) */
 };
 
 static struct opts_t a_opts;
@@ -254,6 +259,7 @@ private:
 };
 
 static struct option long_options[] = {
+        {"v3", no_argument, 0, '3'},
         {"v4", no_argument, 0, '4'},
         {"cmd-time", no_argument, 0, 'c'},
         {"cmd_time", no_argument, 0, 'c'},
@@ -270,6 +276,7 @@ static struct option long_options[] = {
         {"num-pt", required_argument, 0, 'n'},
         {"num_pt", required_argument, 0, 'n'},
         {"noxfer", no_argument, 0, 'N'},
+        {"override", required_argument, 0, 'O'},
         {"pack-id", no_argument, 0, 'p'},
         {"pack_id", no_argument, 0, 'p'},
         {"qat", required_argument, 0, 'q'},
@@ -294,12 +301,13 @@ usage(void)
     printf("Usage: %s [--cmd-time] [--direct] [--force] [--generic-sync]\n"
            "                    [--help] [--lba=LBA+] [--maxqpt=QPT] "
            "[--mmap-io]\n"
-           "                    [--numpt=NPT] [--noxfer] [--pack-id] "
-           "[--qat=AT]\n"
-           "                    [-qfav=FAV] [--read] [--stats] [--submit]\n"
+           "                    [--numpt=NPT] [--noxfer] [--override=OVN] "
+           "[--pack-id]\n"
+           "                    [--qat=AT] [-qfav=FAV] [--read] [--stats] "
+           "[--submit]\n"
            "                    [--szlb=LB[,NLBS]] [--tnum=NT] [--tur] "
-           "[--v4]\n"
-           "                    [--verbose] [--version] [--wait=MS] "
+           "[--v3]\n"
+           "                    [--v4] [--verbose] [--version] [--wait=MS] "
            "[--write]\n"
            "                    <sg_disk_device>*\n",
            util_name);
@@ -328,9 +336,13 @@ usage(void)
            "(def: %d)\n", DEF_NUM_PER_THREAD);
     printf("    --noxfer|-N          no data xfer (def: xfer on READ and "
            "WRITE)\n");
+    printf("    --override OVN|-O OVN    override FAV=2 when OVN queue "
+           "depth\n"
+           "                             reached (def: 0 -> no override)\n");
     printf("    --pack-id|-p         set FORCE_PACK_ID, pack-id input to "
            "read/finish\n");
-    printf("    --qat=AT|-q AT       AT=0: q_at_head; AT=1: q_at_tail\n");
+    printf("    --qat=AT|-q AT       AT=0: q_at_head; AT=1: q_at_tail (def: "
+           "(drv): head)\n");
     printf("    --qfav=FAV|-Q FAV    FAV=0: favour completions (smaller q),\n"
            "                         FAV=1: medium,\n"
            "                         FAV=2: favour submissions (larger q, "
@@ -345,8 +357,10 @@ usage(void)
     printf("    --tnum=NT|-t NT    number of threads (def: %d)\n",
            DEF_NUM_THREADS);
     printf("    --tur|-T        do TEST UNIT READYs (default is TURs)\n");
-    printf("    --v4|-4         use sg v4 interface (def: v3). If given "
-           "sets --submit\n");
+    printf("    --v3|-3         use sg v3 interface (def: v3 if driver < "
+           "3.9)\n");
+    printf("    --v4|-4         use sg v4 interface (def if v4 driver). Sets "
+           "--submit\n");
     printf("    --verbose|-v    increase verbosity\n");
     printf("    --version|-V    print version number then exit\n");
     printf("    --wait=MS|-w MS    >0: poll(<wait_ms>); =0: poll(0); (def: "
@@ -417,9 +431,9 @@ get_urandom_uint(void)
 }
 
 #define TUR_CMD_LEN 6
-#define READ16_REPLY_LEN 512
 #define READ16_CMD_LEN 16
-#define WRITE16_REPLY_LEN 512
+#define READ16_REPLY_LEN 4096
+#define WRITE16_REPLY_LEN 4096
 #define WRITE16_CMD_LEN 16
 
 /* Returns 0 if command injected okay, return -1 for error and 2 for
@@ -487,7 +501,7 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
     for (int k = 0;
          (submit ? ioctl(sg_fd, SG_IOSUBMIT, ptp) :
-		   write(sg_fd, ptp, sizeof(*ptp)) < 0);
+                   write(sg_fd, ptp, sizeof(*ptp)) < 0);
          ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
             this_thread::yield();
@@ -909,10 +923,11 @@ work_thread(int id, struct opts_t * op)
     int open_flags = O_RDWR;
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
+    int thr_ovn_force_read = 0;
     int vb = op->verbose;
     int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
     int num_waiting_read, num_to_read, sz, ern, encore_pack_id, ask, j, m, o;
-    int prev_pack_id;
+    int prev_pack_id, blk_sz;
     unsigned int thr_start_eagain_count = 0;
     unsigned int thr_start_ebusy_count = 0;
     unsigned int thr_start_e2big_count = 0;
@@ -940,6 +955,7 @@ work_thread(int id, struct opts_t * op)
     /* device name and hi_lba may depend on id */
     n = op->dev_names.size();
     dev_name = op->dev_names[id % n];
+    blk_sz = op->blk_szs[id % n];
     if ((UINT_MAX == op->hi_lba) && (n == (int)op->hi_lbas.size()))
         hi_lba = op->hi_lbas[id % n];
     else
@@ -1078,7 +1094,8 @@ work_thread(int id, struct opts_t * op)
         else {
             ++m;
             if (m > 100) {
-                pr2serr_lk("%d->id: m=%d\n", id, m);
+                if (vb)
+                    pr2serr_lk("%d->id: no main loop inc =%d times\n", id, m);
                 m = 0;
             }
         }
@@ -1206,11 +1223,11 @@ work_thread(int id, struct opts_t * op)
                 pr2serr_lk("t_id=%d: starting pack_id=%d\n", id, pack_id);
             res = (op->v4) ?
                 start_sg4_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
-                              op->lb_sz * op->num_lbs, sg_flags, op->submit,
+                              blk_sz * op->num_lbs, sg_flags, op->submit,
                               thr_start_eagain_count, thr_start_ebusy_count,
                               thr_start_e2big_count, thr_start_edom_count)  :
                 start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
-                              op->lb_sz * op->num_lbs, sg_flags, op->submit,
+                              blk_sz * op->num_lbs, sg_flags, op->submit,
                               thr_start_eagain_count, thr_start_ebusy_count,
                               thr_start_e2big_count, thr_start_edom_count);
             if (res) {
@@ -1290,6 +1307,22 @@ work_thread(int id, struct opts_t * op)
                         break;
                     case MYQD_HIGH:
                     default:
+                        if (op->ovn > 0) {
+                            if (op->sg_vn_ge_30901) {
+                                int num_subm = num_submitted(sg_fd);
+
+                                if (num_subm > op->ovn) {
+                                    num_to_read = num_waiting_read > 0 ?
+                                                    num_waiting_read : 1;
+                                    break;
+                                }
+                            } else {
+                                if (num_waiting_read > (op->ovn / 2)) {
+                                    num_to_read = num_waiting_read / 2;
+                                    break;
+                                }
+                            }
+                        }
                         num_to_read = 1;
                         break;
                     }
@@ -1321,9 +1354,21 @@ work_thread(int id, struct opts_t * op)
                 }
             }
         } else {        /* not full, not finished injecting */
-            if (MYQD_HIGH == op->myqd)
+            if (MYQD_HIGH == op->myqd) {
                 num_to_read = 0;
-            else {
+                if (op->ovn) {
+                    if (op->sg_vn_ge_30901) {
+                        int num_subm = num_submitted(sg_fd);
+
+                        if (num_subm > op->ovn)
+                            num_to_read = num_waiting_read > 0 ?
+                                            num_waiting_read : 1;
+                    } else {
+                        if (num_waiting_read > (op->ovn / 2))
+                            num_to_read = num_waiting_read / 2;
+                    }
+                }
+            } else {
                 num_waiting_read = 0;
                 if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting_read) < 0) {
                     err = "ioctl(SG_GET_NUM_WAITING) failed";
@@ -1342,7 +1387,7 @@ work_thread(int id, struct opts_t * op)
             pr2serr_lk("%d->id: num_to_read=%d\n", id, num_to_read);
         }
         while (num_to_read > 0) {
-	    --num_to_read;
+            --num_to_read;
             if (op->pack_id_force) {
                 j = pi2buff.size();
                 if (j > 0)
@@ -1411,7 +1456,7 @@ work_thread(int id, struct opts_t * op)
     }           /* end of for loop over npt (number per thread) */
     if (vb)
         pr2serr_lk("%d->id: leaving main thread loop; k=%d, o=%d\n", id, k,
-		   o);
+                   o);
     close(sg_fd);       // sg driver will handle any commands "in flight"
     if (ruip)
         delete ruip;
@@ -1441,8 +1486,11 @@ work_thread(int id, struct opts_t * op)
         }
     }
     if ((vb > 2) && (k > 0))
-        pr2serr_lk("t_id=%d Maximum number of READ/WRITEs queued: %d\n",
+        pr2serr_lk("%d->id: Maximum number of READ/WRITEs queued: %d\n",
                    id, k);
+    if (vb && (thr_ovn_force_read > 0))
+        pr2serr_lk("%d->id: Number of ovn (override number) forced reads: "
+                   "%d\n", id, thr_ovn_force_read);
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
     start_eagain_count += thr_start_eagain_count;
@@ -1536,6 +1584,7 @@ do_inquiry_prod_id(const char * dev_name, int block, int & sg_ver_num,
         ret = 0;
     } else
         ret = -1;
+
     close(sg_fd);
     return ret;
 }
@@ -1632,14 +1681,19 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "4cdfghl:mM:n:Npq:Q:Rs:St:TuvVw:W",
+        c = getopt_long(argc, argv, "34cdfghl:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case '3':
+            op->v3 = true;
+            op->v3_given = true;
+            break;
         case '4':
             op->v4 = true;
+            op->v4_given = true;
             break;
         case 'c':
             op->cmd_time = true;
@@ -1712,6 +1766,18 @@ main(int argc, char * argv[])
             break;
         case 'N':
             op->no_xfer = true;
+            break;
+        case 'O':
+            if (isdigit(*optarg))
+                op->ovn = sg_get_num(optarg);
+            else {
+                pr2serr_lk("--override= expects a number\n");
+                return 1;
+            }
+            if (op->ovn < 0) {
+                pr2serr_lk("--override= bad number\n");
+                return 1;
+            }
             break;
         case 'p':
             op->pack_id_force = true;
@@ -1849,7 +1915,12 @@ main(int argc, char * argv[])
         } else
             op->maxq_per_thread = 1;
     }
-
+    if (! op->cmd_time && getenv("SG3_UTILS_LINUX_NANO")) {
+	op->cmd_time = true;
+	if (op->verbose)
+	    fprintf(stderr, "setting nanosecond timing due to environment "
+		    "variable: SG3_UTILS_LINUX_NANO\n");
+    }
     if (0 == op->dev_names.size()) {
         fprintf(stderr, "No sg_disk_device-s given\n\n");
         usage();
@@ -1907,8 +1978,20 @@ main(int argc, char * argv[])
             if (sg_ver_num < 30000) {
                 pr2serr_lk("%s either not sg device or too old\n", dev_name);
                 return 2;
-            } else if (sg_ver_num >= 30901)
+            } else if (sg_ver_num >= 30901) {
                 op->sg_vn_ge_30901 = true;
+                if (! (op->v3_given || op->v4_given)) {
+                    op->v4 = true;
+                    op->v3 = false;
+                    op->submit = true;
+                }
+            } else {
+                if (! (op->v3_given || op->v4_given)) {
+                    op->v4 = false;
+                    op->v3 = true;
+                    op->submit = false;
+                }
+            }
 
             if ((SCSI_WRITE16 == op->c2e) || (SCSI_READ16 == op->c2e)) {
                 res = do_read_capacity(dev_name, op->block, &last_lba,
@@ -1924,14 +2007,9 @@ main(int argc, char * argv[])
                     pr2serr_lk(">>> Logical block size (%d) of %s\n"
                                "    differs from command line option (or "
                                "default)\n", blk_sz, dev_name);
-                    if (force)
-                        pr2serr_lk("Ignoring due to --force option\n");
-                    else {
-                        pr2serr_lk("Exiting due to block size discrepancy, "
-                                   "use --force to override\n");
-                        return 1;
-                    }
+                   pr2serr_lk("... continue anyway\n");
                 }
+                op->blk_szs.push_back(blk_sz);
                 if (UINT_MAX == op->hi_lba)
                     op->hi_lbas.push_back(last_lba);
             }

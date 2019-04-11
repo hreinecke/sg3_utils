@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.07 (20190320)
+ * Version 4.0.08 (20190406)
  *  This version is for Linux 2.6, 3, 4 and 5 series kernels.
  *
  * Documentation
@@ -205,10 +205,11 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_BOOL_MASK	0x1	/* get SG_CTL_FLAGM_ALL_BITS */
 #define SG_SEIRV_VERS_NUM	0x2	/* get driver version number as int */
 #define SG_SEIRV_FL_RQS		0x3	/* number of requests in free list */
-#define SG_SEIRV_DEV_FL_RQS	0x4	/* sum(fl rqs) on all of dev's fds */
+#define SG_SEIRV_DEV_FL_RQS	0x4	/* sum(fl rqs) on all dev's fds */
 #define SG_SEIRV_TRC_SZ		0x5	/* current size of trace buffer */
 #define SG_SEIRV_TRC_MAX_SZ	0x6	/* maximum size of trace buffer */
 #define SG_SEIRV_SUBMITTED	0x7	/* number of mrqs submitted+unread */
+#define SG_SEIRV_DEV_SUBMITTED	0x8	/* sum(submiited) on all dev's fds */
 
 /*
  * A pointer to the following structure is passed as the third argument to
