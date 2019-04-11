@@ -56,7 +56,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.07  20190402";
+static const char * version_str = "Version: 1.08  20190406";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -391,6 +391,18 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
         return 1;
     }
     printf("  %sread_value[SG_SEIRV_SUBMITTED]= %u\n", cp, seip->read_value);
+
+    memset(seip, 0, sizeof(*seip));
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_DEV_SUBMITTED;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
+                strerror(errno));
+        return 1;
+    }
+    printf("  %sread_value[SG_SEIRV_DEV_SUBMITTED]= %u\n", cp,
+	   seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;

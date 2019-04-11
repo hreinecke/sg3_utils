@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2018 D. Gilbert
+ *  Copyright (C) 2000-2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.67 20181203";
+static const char * version_str = "1.68 20190405";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -118,6 +118,8 @@ static struct page_code_desc pc_desc_common[] = {
     {0xa, 0x1, "coe", "Control extension"},
     {0xa, 0x3, "cdla", "Command duration limit A"},
     {0xa, 0x4, "cdlb", "Command duration limit B"},
+    {0xa, 0x7, "cdt2a", "Command duration limit T2A"},  /* spc6r? */
+    {0xa, 0x8, "cdt2b", "Command duration limit T2B"},  /* spc6r? */
     {0x15, 0x0, "ext_", "Extended"},
     {0x16, 0x0, "edts", "Extended device-type specific"},
     {0x18, 0x0, "pslu", "Protocol specific lu"},

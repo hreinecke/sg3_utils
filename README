@@ -203,7 +203,7 @@ and disable the creation of the shared library (libsgutils<num>.so) this
 invocation could be used: "./configure --prefix=/usr --disable-shared".
 To reduce the size of an executable as well try this:
 "./configure --prefix=/usr --disable-shared --disable-scsistrings".
-Also --disable-shared will produce (realtively) "static" executables in
+Also --disable-shared will produce (relatively) "static" executables in
 the src directory that are easier to debug. And
 "./configure --enable-debug" will compile with more debug type options,
 including more compiler checks and defining "DEBUG" within the src and
@@ -399,6 +399,28 @@ queue limit of 16). Multiple threads doing the same thing act as a
 multiplier to that queue limit.
 
 
+NVME Support
+============
+Firstly the author has no intention of extending this package to contain
+general purpose NVMe utilities. That leaves the areas where SCSI overlaps
+with NVMe. There was a SCSI to NVMe Translation Layer (SNTL) driver in the
+Linux kernel based on a white paper from NVM Express. Intel has withdrawn
+that driver and T10 (SCSI) and NVM Express have made no further attempts
+to standardize a SNTL. Given the SCSI to ATA Translation Layer (SATL) which
+is standardized by T10, it is pretty clear what a SNTL should do.
+
+The NVMe Management Interface (NVME-MI) committee have decided to use SES-3
+standard from T10 via the newly added SES Send and SES Receive MI commands.
+So the sg_ses utility and this package's library have been extended to use
+these commands when a NVMe device (typically a disk enclosure) is detected.
+This has been tested by a disk vendor who is happy with the results. Other
+user reports are welcome as the author does not have equipment to test
+this.
+
+Other utilities in this package that use the SES Send and Receive commands,
+or the SNTL in the library are sg_senddiag, sg_inq and sg_readcap.
+
+
 Command line processing
 =======================
 These utilities can be divided into 3 groups when their handling of command
@@ -519,4 +541,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-28th June 2018
+10th April 2019

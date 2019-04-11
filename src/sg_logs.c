@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.72 20190203";    /* spc5r20 + sbc4r16 */
+static const char * version_str = "1.73 20190405";    /* spc5r21 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -70,6 +70,7 @@ static const char * version_str = "1.72 20190203";    /* spc5r20 + sbc4r16 */
 #define PENDING_DEFECTS_SUBPG 0x1               /* page 0x15 */
 #define BACKGROUND_OP_SUBPG 0x2                 /* page 0x15 */
 #define CACHE_STATS_SUBPG 0x20                  /* page 0x19 */
+#define CMD_DUR_LIMITS_SUBPG 0x21               /* page 0x19, spc6 */
 #define ENV_REPORTING_SUBPG 0x1                 /* page 0xd */
 #define UTILIZATION_SUBPG 0x1                   /* page 0xe */
 #define ENV_LIMITS_SUBPG 0x2                    /* page 0xd */
@@ -403,8 +404,10 @@ static struct log_elem log_arr[] = {
      "gsp", show_stats_perform_pages},  /* 0x19, 0x0  */
     {STATS_LPAGE, 0x1, 0x1f, -1, MVP_STD, "Group Statistics and Performance",
      "grsp", show_stats_perform_pages}, /* 0x19, 0x1...0x1f  */
-    {STATS_LPAGE, 0x20, 0, -1, MVP_STD, "Cache memory statistics", "cms",
-     show_cache_stats_page},            /* 0x19, 0x20  */
+    {STATS_LPAGE, CACHE_STATS_SUBPG, 0, -1, MVP_STD,    /* 0x19, 0x20  */
+     "Cache memory statistics", "cms", show_cache_stats_page},
+    {STATS_LPAGE, CMD_DUR_LIMITS_SUBPG, 0, -1, MVP_STD, /* 0x19, 0x21  */
+     "Commmand duration limits statistics", "cdl", NULL /* spc6r? */ },
     {PCT_LPAGE, 0, 0, -1, MVP_STD, "Power condition transitions", "pct",
      show_power_condition_transitions_page}, /* 0x1a, 0  */
     {0x1b, 0, 0, PDT_TAPE, MVP_STD, "Data compression", "dc",
@@ -6764,7 +6767,7 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
     spf = !!(resp[0] & 0x40);
     pg_code = resp[0] & 0x3f;
     if ((VP_HITA == op->vend_prod_num) && (pg_code >= 0x30))
-        subpg_code = resp[1];	/* Hitachi don't set SPF on VS pages */
+        subpg_code = resp[1];   /* Hitachi don't set SPF on VS pages */
     else
         subpg_code = spf ? resp[1] : 0;
     op->decod_subpg_code = subpg_code;
