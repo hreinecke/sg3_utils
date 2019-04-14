@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.22 20190331";
+static const char * version_str = "1.25 20190413";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -213,6 +213,7 @@ typedef struct global_collection
     int dry_run;
     bool ofile_given;
     bool ofile2_given;
+    bool unit_nanosec;          /* default duration unit is millisecond */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -278,8 +279,9 @@ static void sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr,
                           bool is_wr2);
 static bool normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks);
 static void normal_out_wr(Gbl_coll * clp, Rq_elem * rep, int blocks);
-static int sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2);
-static int sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2);
+static int sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
+                       bool is_wr2);
+static int sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2);
 static int sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp,
                       int *mmap_len);
 static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
@@ -669,7 +671,7 @@ page2:
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
-            "max 16\n"
+            "max 1024\n"
             "    time        0->no timing, 1->time plus calculate "
             "throughput (def)\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
@@ -899,7 +901,7 @@ read_write_thread(void * v_tip)
     memset(rep, 0, sizeof(Rq_elem));
     /* Following clp members are constant during lifetime of thread */
     rep->id = tip->id;
-    if (vb > 0)
+    if (vb > 2)
         pr2serr_lk("%d <-- Starting worker thread\n", rep->id);
     if (! clp->in_flags.mmap) {
         rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
@@ -990,7 +992,7 @@ read_write_thread(void * v_tip)
                        rep->out2fd);
     }
     if (rep->in_flags.noshare || rep->out_flags.noshare) {
-        if (vb)
+        if (vb > 4)
             pr2serr_lk("thread=%d: Skipping share on both IFILE and OFILE\n",
                        rep->id);
     } else if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type))
@@ -1345,11 +1347,10 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
 static void
 sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
 {
-    int res;
-    int status;
+    int res, status, pack_id;
 
     while (1) {
-        res = sg_start_io(rep, def_arr, false);
+        res = sg_start_io(rep, def_arr, pack_id, false);
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
@@ -1364,7 +1365,7 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
         status = pthread_mutex_unlock(&clp->in_mutex);
         if (0 != status) err_exit(status, "unlock in_mutex");
 
-        res = sg_finish_io(rep->wr, rep, false);
+        res = sg_finish_io(rep->wr, rep, pack_id, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -1465,15 +1466,14 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
 static void
 sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
 {
-    int res;
-    int status;
+    int res, status, pack_id;
     pthread_mutex_t * mutexp = is_wr2 ? &clp->out2_mutex : &clp->out_mutex;
 
     if (rep->has_share && is_wr2)
         sg_wr_swap_share(rep, rep->out2fd, true);
 
     while (1) {
-        res = sg_start_io(rep, def_arr, is_wr2);
+        res = sg_start_io(rep, def_arr, pack_id, is_wr2);
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
@@ -1488,7 +1488,7 @@ sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
         status = pthread_mutex_unlock(mutexp);
         if (0 != status) err_exit(status, "unlock out_mutex");
 
-        res = sg_finish_io(rep->wr, rep, is_wr2);
+        res = sg_finish_io(rep->wr, rep, pack_id, is_wr2);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -1611,7 +1611,8 @@ sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr)
 
 /* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
 static int
-sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
+sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
+            bool is_wr2)
 {
     bool wr = rep->wr;
     bool fua = wr ? rep->out_flags.fua : rep->in_flags.fua;
@@ -1664,10 +1665,11 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
         cp = (wr ? " slave active" : " master active");
     } else
         cp = (wr ? " slave not sharing" : " master not sharing");
-    rep->rq_id = atomic_fetch_add(&mono_pack_id, 1);    /* fetch before */
+    pack_id = atomic_fetch_add(&mono_pack_id, 1);    /* fetch before */
+    rep->rq_id = pack_id;
     if (rep->debug > 3) {
         pr2serr_lk("%s tid,rq_id=%d,%d: SCSI %s%s%s%s, blk=%" PRId64
-                   " num_blks=%d\n", __func__, rep->id, rep->rq_id, crwp, cp,
+                   " num_blks=%d\n", __func__, rep->id, pack_id, crwp, cp,
                    c2p, c3p, blk, rep->num_blks);
         lk_print_command(rep->cmd);
     }
@@ -1685,7 +1687,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
-    hp->pack_id = rep->rq_id;
+    hp->pack_id = pack_id;
     hp->flags = flags;
 
     while (((res = write(fd, hp, sizeof(struct sg_io_hdr))) < 0) &&
@@ -1716,8 +1718,8 @@ do_v4:
     h4p->response = (uint64_t)rep->sb;
     h4p->timeout = DEF_TIMEOUT;
     h4p->usr_ptr = (uint64_t)rep;
-    h4p->request_extra = rep->rq_id;    /* this is the pack_id */
-    h4p->flags = flags;
+    h4p->request_extra = pack_id;    /* this is the pack_id */
+    h4p->flags = flags | SGV4_FLAG_IMMED;
     if (rep->nmrqs > 0) {
         if (rep->both_sg && (rep->outfd == fd))
             h4p->flags |= SGV4_FLAG_DO_ON_OTHER;
@@ -1760,7 +1762,7 @@ do_v4:
                                __func__, safe_strerror(errno), errno);
                 else if (rep->debug > 1)
                     pr2serr_lk("%s: sending ioctl(SG_IOABORT) on rq_id=%d\n",
-                               __func__, rep->rq_id);
+                               __func__, pack_id);
             }   /* else got response, too late for timeout, so skip */
         }
     }
@@ -1771,7 +1773,7 @@ do_v4:
    -> try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
    -1 other errors */
 static int
-sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2)
+sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
 {
     bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
     int res, fd;
@@ -1797,7 +1799,7 @@ sg_finish_io(bool wr, Rq_elem * rep, bool is_wr2)
     /* FORCE_PACK_ID active set only read packet with matching pack_id */
     io_hdr.interface_id = 'S';
     io_hdr.dxfer_direction = wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
-    io_hdr.pack_id = rep->rq_id;
+    io_hdr.pack_id = pack_id;
 
     while (((res = read(fd, &io_hdr, sizeof(struct sg_io_hdr))) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
@@ -1852,6 +1854,7 @@ do_v4:
         return 0;
     }
     h4p = &rep->io_hdr4;
+    h4p->request_extra = pack_id;
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         sched_yield();  /* another thread may be able to progress */
@@ -1882,7 +1885,7 @@ do_v4:
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "%s rq_id=%d, blk=%" PRId64, cp,
-                     rep->rq_id, blk);
+                     pack_id, blk);
             lk_chk_n_print4(ebuff, h4p, false);
             if ((rep->debug > 4) && h4p->info)
                 pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
@@ -1905,7 +1908,7 @@ do_v4:
     rep->resid = h4p->din_resid;
     if (rep->debug > 3) {
         pr2serr_lk("%s: tid,rq_id=%d,%d: completed %s\n", __func__, rep->id,
-                   rep->rq_id, cp);
+                   pack_id, cp);
         if ((rep->debug > 4) && h4p->info)
             pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
                        "detaching=%d aborted=%d\n", h4p->info,
@@ -1926,8 +1929,7 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep, mrq_arr_t & def_arr)
 
     while (1) {
         /* start READ */
-        res = sg_start_io(rep, def_arr, false);
-        pid_read = rep->rq_id;
+        res = sg_start_io(rep, def_arr, pid_read, false);
         if (1 == res)
             err_exit(ENOMEM, "sg interleave starting in command");
         else if (res < 0) {
@@ -1941,8 +1943,7 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep, mrq_arr_t & def_arr)
 
         /* start WRITE */
         rep->wr = true;
-        res = sg_start_io(rep, def_arr, false);
-        pid_write = rep->rq_id;
+        res = sg_start_io(rep, def_arr, pid_write, false);
         if (1 == res)
             err_exit(ENOMEM, "sg interleave starting out command");
         else if (res < 0) {
@@ -1964,9 +1965,8 @@ read_complet:
 #endif
 
         /* finish READ */
-        rep->rq_id = pid_read;
         rep->wr = false;
-        res = sg_finish_io(rep->wr, rep, false);
+        res = sg_finish_io(rep->wr, rep, pid_read, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -2025,9 +2025,8 @@ read_complet:
 write_complet:
 #endif
         /* finish WRITE, no lock held */
-        rep->rq_id = pid_write;
         rep->wr = true;
-        res = sg_finish_io(rep->wr, rep, false);
+        res = sg_finish_io(rep->wr, rep, pid_write, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -2081,21 +2080,20 @@ write_complet:
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
 sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
-                  uint8_t **mmpp)
+                  bool unit_nano, uint8_t **mmpp)
 {
     int res, t, num;
     uint8_t *mmp;
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
 
+    seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 40000)) {
         pr2serr_lk("%ssg driver prior to 4.0.00\n", my_name);
         return 0;
     }
     if (elem_sz >= 4096) {
-        struct sg_extended_info sei;
-        struct sg_extended_info * seip;
-
-        seip = &sei;
         memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
@@ -2131,6 +2129,17 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
     if (res < 0)
         perror("sgh_dd: SG_SET_FORCE_PACK_ID error");
+    if (unit_nano) {
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+        seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+            res = -1;
+            pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
+                       errno, strerror(errno));
+        }
+    }
     return (res < 0) ? 0 : num;
 }
 
@@ -2232,7 +2241,7 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
-                         clp->elem_sz,  mmpp);
+                         clp->elem_sz, clp->unit_nanosec, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2262,7 +2271,7 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->out_flags.defres,
-                          clp->elem_sz, mmpp);
+                          clp->elem_sz, clp->unit_nanosec, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2582,8 +2591,11 @@ main(int argc, char * argv[])
         usage(1);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (clp->in_flags.swait && (! clp->out_flags.swait))
-        pr2serr("iflag=swait is ignored, it should be oflag=swait\n");
+    if (clp->in_flags.swait && (! clp->out_flags.swait)) {
+        pr2serr("iflag=swait is treated as oflag=swait\n");
+        clp->out_flags.swait = true;
+    }
+    clp->unit_nanosec = !!getenv("SG3_UTILS_LINUX_NANO");
     if (clp->debug)
         pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
                 PRId64 "\n", my_name, inf, skip, outf, seek, dd_count);
@@ -2995,7 +3007,7 @@ main(int argc, char * argv[])
             tip = thread_arr + k;
             status = pthread_join(tip->a_pthr, &vp);
             if (0 != status) err_exit(status, "pthread_join");
-            if (clp->debug > 0)
+            if (clp->debug > 2)
                 pr2serr_lk("%d <-- Worker thread terminated, vp=%s\n", k,
                            ((vp == clp) ? "clp" : "NULL (or !clp)"));
         }
