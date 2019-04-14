@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.26 20190409";
+static const char * version_str = "1.28 20190414";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -372,7 +372,8 @@ usage(void)
            "Each thread queues up to NT commands.\nOne block is transferred "
            "by each READ and WRITE; zeros are written. If a\nlogical block "
            "range is given, a uniform distribution generates a pseudo\n"
-           "random sequence of LBAs.\n");
+           "random sequence of LBAs. Set environment variable\n"
+	   "SG3_UTILS_LINUX_NANO to get command timings in nanoseconds\n");
 }
 
 #ifdef __GNUC__
@@ -1001,7 +1002,9 @@ work_thread(int id, struct opts_t * op)
             memset(seip, 0, sizeof(*seip));
             seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
             seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
             seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+	    seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
             if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
                 pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
                            errno, strerror(errno));
@@ -1916,10 +1919,10 @@ main(int argc, char * argv[])
             op->maxq_per_thread = 1;
     }
     if (! op->cmd_time && getenv("SG3_UTILS_LINUX_NANO")) {
-	op->cmd_time = true;
-	if (op->verbose)
-	    fprintf(stderr, "setting nanosecond timing due to environment "
-		    "variable: SG3_UTILS_LINUX_NANO\n");
+        op->cmd_time = true;
+        if (op->verbose)
+            fprintf(stderr, "setting nanosecond timing due to environment "
+                    "variable: SG3_UTILS_LINUX_NANO\n");
     }
     if (0 == op->dev_names.size()) {
         fprintf(stderr, "No sg_disk_device-s given\n\n");
