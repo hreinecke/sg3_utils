@@ -78,7 +78,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.04 20190324";
+static const char * version_str = "4.05 20190412";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -170,7 +170,8 @@ typedef struct request_collection
     Rq_elem elem[SGQ_NUM_ELEMS];
 } Rq_coll;
 
-static bool sgs_old_sg_driver = false;
+static bool sgs_old_sg_driver = false;  /* true if VERSION_NUM < 4.00.00 */
+static bool sgs_nanosec_unit = false;
 
 
 static void
@@ -472,7 +473,10 @@ static int
 sz_reserve(int fd, int bs, int bpt, bool rt_sig)
 {
     int res, t, flags;
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
 
+    seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 30000)) {
         fprintf(stderr, "sgs_dd: sg driver prior to 3.0.00\n");
@@ -487,6 +491,18 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig)
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)
         perror("sgs_dd: SG_SET_RESERVED_SIZE error");
+
+    if (sgs_nanosec_unit) {
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+        seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+            pr2serr("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
+                    errno, strerror(errno));
+            return 1;
+        }
+    }
     if (-1 == fcntl(fd, F_SETOWN, getpid())) {
         perror("fcntl(F_SETOWN)");
         return 1;
@@ -933,6 +949,7 @@ main(int argc, char * argv[])
         usage();
         return 1;
     }
+    sgs_nanosec_unit = !!getenv("SG3_UTILS_LINUX_NANO");
 
     for(k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -1045,8 +1062,7 @@ main(int argc, char * argv[])
                     return 1;
                 }
             }
-        }
-        else { /* looks like sg device so close then re-open it RW */
+        } else { /* looks like sg device so close then re-open it RW */
             close(clp->infd);
             open_fl = clp->iflag.excl ? O_EXCL : 0;
             open_fl |= (O_RDWR | O_NONBLOCK);
