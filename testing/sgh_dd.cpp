@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.25 20190413";
+static const char * version_str = "1.27 20190418";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -214,6 +214,7 @@ typedef struct global_collection
     bool ofile_given;
     bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
+    bool mrq_cmds;              /* mrq=<NRQS>,C  given */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -226,6 +227,7 @@ typedef struct request_element
     bool both_sg;
     bool swait; /* interleave READ WRITE async copy segment: READ submit,
                  * WRITE submit, READ receive, WRITE receive */
+    bool mrq_cmds;              /* mrq=<NRQS>,C  given */
     int id;
     int infd;
     int nmrqs;
@@ -288,7 +290,7 @@ static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
                        int *mmap_len);
 static void sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep,
                                  mrq_arr_t & def_arr);
-static int sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr);
+static int sgh_do_def_mrq(Rq_elem * rep, mrq_arr_t & def_arr);
 
 #define STRERR_BUFF_LEN 128
 
@@ -603,7 +605,7 @@ usage(int pg_num)
     pr2serr("               [ae=AEN] [bpt=BPT] [cdbsz=6|10|12|16] [coe=0|1] "
             "[deb=VERB]\n"
             "               [dio=0|1] [elemsz_kb=ESK] [fua=0|1|2|3] "
-            "[mrq=NRQS]\n"
+            "[mrq=NRQS[,C]]\n"
             "               [of2=OFILE2] [ofreg=OFREG] [sync=0|1] [thr=THR] "
             "[time=0|1]\n"
             "               [verbose=VERB] [--dry-run] [--verbose]\n\n"
@@ -664,7 +666,8 @@ page2:
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
             "    mrq         even number of cmds placed in each sg call "
-            "(def: 0)\n"
+            "(def: 0);\n"
+            "                may have trailing ',C', to send bulk cdb_s\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
             "                IFILE in the first half of each shared element\n"
@@ -921,6 +924,7 @@ read_write_thread(void * v_tip)
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
     rep->nmrqs = clp->nmrqs;
+    rep->mrq_cmds = clp->mrq_cmds;
     rep->aen = clp->aen;
     rep->rep_count = 0;
 
@@ -1016,7 +1020,6 @@ read_write_thread(void * v_tip)
             /* no more to do, exit loop then thread */
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
-pr2serr_lk("tid=%d: clp->in_stop\n", rep->id);
             break;
         }
 #endif
@@ -1024,6 +1027,13 @@ pr2serr_lk("tid=%d: clp->in_stop\n", rep->id);
             if (my_index >= dd_count) {
                 status = pthread_mutex_unlock(&clp->in_mutex);
                 if (0 != status) err_exit(status, "unlock in_mutex");
+                if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
+                    if (rep->debug > 1)
+                        pr2serr_lk("thread=%d: tail-end my_index>=dd_count, "
+                                   "to_do=%u\n", rep->id,
+                                   (uint32_t)def_arr.first.size());
+                    sgh_do_def_mrq(rep, def_arr);
+                }
                 break;
             } else if ((my_index + clp->bpt) > dd_count)
                 blocks = dd_count - my_index;
@@ -1079,7 +1089,6 @@ skip_force_out_sequence:
                 clp->out_stop = true;
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
-pr2serr_lk("tid=%d: clp->out_stop\n", rep->id);
             break;
         }
         if (stop_after_write)
@@ -1133,10 +1142,10 @@ pr2serr_lk("tid=%d: clp->out_stop\n", rep->id);
         }
         if (0 == rep->num_blks) {
             if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
-                if (rep->debug)
+                if (rep->debug > 1)
                     pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
                                (uint32_t)def_arr.first.size());
-                sgh_do_def(rep, def_arr);
+                sgh_do_def_mrq(rep, def_arr);
             }
             clp->out_stop = true;
             stop_after_write = true;
@@ -1540,23 +1549,38 @@ fini:
         sg_wr_swap_share(rep, rep->outfd, false);
 }
 
-/* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
+/* This function sets up a multiple request (mrq) transaction and sends it
+ * to the pass-through. Returns 0 on success, 1 if ENOMEM error else -1 for
+ * other errors. */
 static int
-sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr)
+sgh_do_def_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
 {
     int n, k, res, fd;
+    const int max_cdb_sz = 16;
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 ctl_v4;
+    uint8_t * cmd_ap = NULL;
 
     memset(&ctl_v4, 0, sizeof(ctl_v4));
     ctl_v4.guard = 'Q';
     a_v4p = def_arr.first.data();
     n = def_arr.first.size();
+    if (rep->mrq_cmds) {
+        cmd_ap = (uint8_t *)calloc(n, max_cdb_sz);
+        if (NULL == cmd_ap) {
+            pr2serr_lk("%s: no memory for calloc(%d * 16)\n", __func__, n);
+            return -1;
+        }
+    }
     for (k = 0; k < n; ++k) {
         struct sg_io_v4 * h4p = a_v4p + k;
         uint8_t *cmdp = &def_arr.second[k].front();
 
-        h4p->request = (uint64_t)cmdp;
+        if (rep->mrq_cmds) {
+            memcpy(cmd_ap + (k * max_cdb_sz), cmdp, h4p->request_len);
+            h4p->request = 0;
+        } else
+            h4p->request = (uint64_t)cmdp;
         if (rep->debug > 3) {
             pr2serr_lk("def_arr[%d]:\n", k);
             hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p), 1);
@@ -1569,6 +1593,10 @@ sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr)
     else
         fd = rep->outfd;
     res = 0;
+    if (rep->mrq_cmds) {
+        ctl_v4.request_len = n * max_cdb_sz;
+        ctl_v4.request = (uint64_t)cmd_ap;
+    }
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF;
     ctl_v4.dout_xferp = (uint64_t)a_v4p;        /* request array */
     ctl_v4.dout_xfer_len = n * sizeof(*a_v4p);
@@ -1606,6 +1634,8 @@ sgh_do_def(Rq_elem * rep, mrq_arr_t & def_arr)
     }
     def_arr.first.clear();
     def_arr.second.clear();
+    if (cmd_ap)
+        free(cmd_ap);
     return res;
 }
 
@@ -1730,7 +1760,7 @@ do_v4:
         def_arr.second.push_back(cmd_obj);
         res = 0;
         if ((int)def_arr.first.size() >= rep->nmrqs)
-            res = sgh_do_def(rep, def_arr);
+            res = sgh_do_def_mrq(rep, def_arr);
         return res;
     }
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) &&
@@ -2305,6 +2335,7 @@ main(int argc, char * argv[])
     int64_t out_num_sect = 0;
     int in_sect_sz, out_sect_sz, status, n, flags;
     void * vp;
+    const char * cp;
     Gbl_coll * clp = &gcoll;
     Thread_info thread_arr[MAX_NUM_THREADS];
     char ebuff[EBUFF_SZ];
@@ -2428,6 +2459,9 @@ main(int argc, char * argv[])
                         "zero\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            cp = strchr(buf, ',');
+            if (cp && ('C' == toupper(cp[1])))
+                clp->mrq_cmds = true;
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
             if (-1 == obs) {
@@ -2596,9 +2630,14 @@ main(int argc, char * argv[])
         clp->out_flags.swait = true;
     }
     clp->unit_nanosec = !!getenv("SG3_UTILS_LINUX_NANO");
-    if (clp->debug)
+    if (clp->debug) {
         pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
-                PRId64 "\n", my_name, inf, skip, outf, seek, dd_count);
+                PRId64, my_name, inf, skip, outf, seek, dd_count);
+        if (clp->nmrqs > 0)
+            pr2serr(" mrq=%d%s\n", clp->nmrqs, (clp->mrq_cmds ? ",C" : ""));
+        else
+            pr2serr("\n");
+    }
 
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
