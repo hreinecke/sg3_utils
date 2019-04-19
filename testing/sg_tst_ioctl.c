@@ -56,7 +56,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.08  20190406";
+static const char * version_str = "Version: 1.08  20190419";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -84,6 +84,7 @@ static bool ioctl_only = false;
 static bool q_at_tail = false;
 static bool write_only = false;
 static bool mrq_immed = false;  /* if set, also sets mrq_iosubmit */
+static bool mrq_half_immed = false;
 static bool mrq_iosubmit = false;
 
 static int childs_pid = 0;
@@ -111,6 +112,8 @@ usage(void)
            "the letter\n"
            "                     'I' is appended after a comma, then do "
            "IMMED mrq;\n"
+           "                     'i' IMMED on submission, non-IMMED on "
+           "receive;\n"
            "                     'S' is appended, then use "
            "ioctl(SG_IOSUBMIT)\n"
            "      -o      ioctls only, then exit\n"
@@ -362,28 +365,6 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_READ_VAL;
     seip->sei_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_TRC_SZ;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_TRC_SZ]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
-    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_TRC_MAX_SZ;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
-                strerror(errno));
-        return 1;
-    }
-    printf("  %sread_value[SG_SEIRV_TRC_MAX_SZ]= %u\n", cp, seip->read_value);
-
-    memset(seip, 0, sizeof(*seip));
-    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
-    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
     seip->read_value = SG_SEIRV_SUBMITTED;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -402,7 +383,7 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
         return 1;
     }
     printf("  %sread_value[SG_SEIRV_DEV_SUBMITTED]= %u\n", cp,
-	   seip->read_value);
+           seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
@@ -422,8 +403,6 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
            (int)seip->share_fd);
 bypass_share:
 
-    // printf("SG_IOSUBMIT value=0x%lx\n", SG_IOSUBMIT);
-    // printf("SG_IORECEIVE value=0x%lx\n", SG_IORECEIVE);
     if (ioctl(sg_fd, SG_GET_TRANSFORM, NULL) < 0)
         pr2serr("ioctl(SG_GET_TRANSFORM) fail expected, errno=%d %s\n",
                 errno, strerror(errno));
@@ -473,7 +452,7 @@ static int
 do_mrqs(int sg_fd, int sg_fd2, int mrqs)
 {
     bool both = (sg_fd2 >= 0);
-    int k, arr_v4_sz, good;
+    int k, j, arr_v4_sz, good;
     int res = 0;
     struct sg_io_v4 * arr_v4;
     struct sg_io_v4 * h4p;
@@ -554,24 +533,42 @@ do_mrqs(int sg_fd, int sg_fd2, int mrqs)
                 (mrq_iosubmit ? "SUBMIT" : ""), res, strerror(res));
         goto fini;
     }
+    if ((mrq_h4p->dout_resid > 0) || ((int)mrq_h4p->info < mrqs))
+        pr2serr("ioctl(SG_IO%s, mrq) dout_resid=%d, info=%d\n\n",
+                (mrq_iosubmit ? "SUBMIT" : ""), mrq_h4p->dout_resid,
+                mrq_h4p->info);
+
+    good = 0;
+    j = 0;
     if (mrq_immed) {
-mrq_h4p->flags = SGV4_FLAG_MULTIPLE_REQS;       // zap SGV4_FLAG_IMMED
+receive_more:
+        if (mrq_half_immed)
+            mrq_h4p->flags = SGV4_FLAG_MULTIPLE_REQS; // zap SGV4_FLAG_IMMED
         if (ioctl(sg_fd, SG_IORECEIVE, mrq_h4p) < 0) {
             res = errno;
             pr2serr("ioctl(SG_IORECEIVE, mrq) failed, errno=%d %s\n",
                     res, strerror(res));
             goto fini;
         }
+        if ((mrq_h4p->din_resid > 0) || ((int)mrq_h4p->info < mrqs))
+            pr2serr("ioctl(SG_IORECEIVE, mrq) din_resid=%d, info=%d\n",
+                    mrq_h4p->din_resid, mrq_h4p->info);
     }
 
-    for (k = 0, good = 0; k < mrqs; ++k) {
+    for (k = 0; k < (int)mrq_h4p->info; ++k, ++j) {
         h4p = arr_v4 + k;
         if (! (h4p->driver_status || h4p->transport_status ||
                h4p->device_status)) {
             if (h4p->info & SG_INFO_MRQ_FINI)
                 ++good;
         }
+        if ((! (h4p->info & SG_INFO_MRQ_FINI)) && (verbose > 1))
+            pr2serr("%s: k=%d: SG_INFO_MRQ_FINI not set on response\n",
+                    __func__, k);
     }
+    if (mrq_immed && (j < mrqs))
+        goto receive_more;
+
     if (good > 0) {
         printf("Final INQUIRY response:\n");
         hex2stdout(inqBuff, INQ_REPLY_LEN, 0);
@@ -640,9 +637,12 @@ main(int argc, char * argv[])
             }
             if ((cp = strchr(argv[k] + 3, ','))) {
                 mrq_iosubmit = true;
-                if (toupper(cp[1]) == 'I')
+                if (cp[1] == 'I')
                     mrq_immed = true;
-                else if (toupper(cp[1]) == 'S')
+                else if (cp[1] == 'i') {
+                    mrq_immed = true;
+                    mrq_half_immed = true;
+                } else if (toupper(cp[1]) == 'S')
                     ;
                 else {
                     printf("-m= option expects 'A' or 'a' as a suffix, "
@@ -669,6 +669,10 @@ main(int argc, char * argv[])
             }
         } else if (0 == memcmp("-t", argv[k], 2))
             q_at_tail = true;
+        else if (0 == memcmp("-vvvvvv", argv[k], 7))
+            verbose += 4;
+        else if (0 == memcmp("-vvvvv", argv[k], 6))
+            verbose += 4;
         else if (0 == memcmp("-vvvv", argv[k], 5))
             verbose += 4;
         else if (0 == memcmp("-vvv", argv[k], 4))
