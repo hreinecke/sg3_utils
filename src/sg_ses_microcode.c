@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 Douglas Gilbert.
+ * Copyright (c) 2014-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -44,7 +44,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.16 20180628";    /* ses4r02 */
+static const char * version_str = "1.17 20190416";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -935,7 +935,7 @@ fini:
         }
     }
     if (0 == op->verbose) {
-        if (! sg_if_can2stderr("sg_ses_mocrocode failed: ", ret))
+        if (! sg_if_can2stderr("sg_ses_microcode failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' "
                     "or '-vv' for more information\n");
     }
