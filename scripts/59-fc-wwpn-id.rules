@@ -7,9 +7,9 @@ KERNEL!="sd*", GOTO="fc_wwpn_end"
 
 ENV{DEVTYPE}=="disk", IMPORT{program}="fc_wwpn_id %p"
 ENV{DEVTYPE}=="partition", IMPORT{parent}="FC_*"
-ENV{FC_TARGET_WWPN}!="$*"; GOTO="fc_wwpn_end"
-ENV{FC_INITIATOR_WWPN}!="$*"; GOTO="fc_wwpn_end"
-ENV{FC_TARGET_LUN}!="$*"; GOTO="fc_wwpn_end"
+ENV{FC_TARGET_WWPN}!="$*", GOTO="fc_wwpn_end"
+ENV{FC_INITIATOR_WWPN}!="$*", GOTO="fc_wwpn_end"
+ENV{FC_TARGET_LUN}!="$*", GOTO="fc_wwpn_end"
 
 ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-path/fc-$env{FC_INITIATOR_WWPN}-$env{FC_TARGET_WWPN}-lun-$env{FC_TARGET_LUN}"
 ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-path/fc-$env{FC_INITIATOR_WWPN}-$env{FC_TARGET_WWPN}-lun-$env{FC_TARGET_LUN}-part%n"
