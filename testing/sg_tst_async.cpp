@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.28 20190414";
+static const char * version_str = "1.32 20190427";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -134,6 +134,7 @@ using namespace std::chrono;
 #define DEF_NUM_PER_THREAD 1000
 #define DEF_NUM_THREADS 4
 #define DEF_WAIT_MS 10          /* 0: yield or no wait */
+#define DEF_NANOSEC_WAIT 25000  /* 25 microsecs */
 #define DEF_TIMEOUT_MS 20000    /* 20 seconds */
 #define DEF_LB_SZ 512
 #define DEF_BLOCKING 0
@@ -269,6 +270,7 @@ static struct option long_options[] = {
         {"generic_sync", no_argument, 0, 'g'},
         {"help", no_argument, 0, 'h'},
         {"lba", required_argument, 0, 'l'},
+        {"lbsz", required_argument, 0, 'L'},
         {"maxqpt", required_argument, 0, 'M'},
         {"mmap-io", no_argument, 0, 'm'},
         {"mmap_io", no_argument, 0, 'm'},
@@ -299,17 +301,17 @@ static void
 usage(void)
 {
     printf("Usage: %s [--cmd-time] [--direct] [--force] [--generic-sync]\n"
-           "                    [--help] [--lba=LBA+] [--maxqpt=QPT] "
-           "[--mmap-io]\n"
-           "                    [--numpt=NPT] [--noxfer] [--override=OVN] "
-           "[--pack-id]\n"
-           "                    [--qat=AT] [-qfav=FAV] [--read] [--stats] "
-           "[--submit]\n"
-           "                    [--szlb=LB[,NLBS]] [--tnum=NT] [--tur] "
-           "[--v3]\n"
-           "                    [--v4] [--verbose] [--version] [--wait=MS] "
-           "[--write]\n"
-           "                    <sg_disk_device>*\n",
+           "                    [--help] [--lba=LBA+] [--lbsz=LBSZ] "
+           "[--maxqpt=QPT]\n"
+           "                    [--mmap-io] [--numpt=NPT] [--noxfer] "
+           "[--override=OVN]\n"
+           "                    [--pack-id] [--qat=AT] [-qfav=FAV] [--read] "
+           "[--stats]\n"
+           "                    [--submit] [--szlb=LB[,NLBS]] [--tnum=NT] "
+           "[--tur]\n"
+           "                    [--v3] [--v4] [--verbose] [--version] "
+           "[--wait=MS]\n"
+           "                    [--write]  <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
     printf("    --cmd-time|-c    calculate per command average time (ns)\n");
@@ -328,6 +330,9 @@ usage(void)
            "(inclusive)\n"
            "                          if hi_lba=-1 assume last block on "
            "device\n");
+    printf("    --lbsz=LBSZ|-L LBSZ    logical block size in bytes (def: "
+           "512)\n"
+           "                           should be power of 2 (0 --> 512)\n");
     printf("    --maxqpt=QPT|-M QPT    maximum commands queued per thread "
            "(def:%d)\n", MAX_Q_PER_FD);
     printf("    --mmap-io|-m         mmap-ed IO (1 cmd outstanding per "
@@ -373,7 +378,7 @@ usage(void)
            "by each READ and WRITE; zeros are written. If a\nlogical block "
            "range is given, a uniform distribution generates a pseudo\n"
            "random sequence of LBAs. Set environment variable\n"
-	   "SG3_UTILS_LINUX_NANO to get command timings in nanoseconds\n");
+           "SG3_UTILS_LINUX_NANO to get command timings in nanoseconds\n");
 }
 
 #ifdef __GNUC__
@@ -501,7 +506,7 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
     ptp->flags = flags;
 
     for (int k = 0;
-         (submit ? ioctl(sg_fd, SG_IOSUBMIT, ptp) :
+         (submit ? ioctl(sg_fd, SG_IOSUBMIT_V3, ptp) :
                    write(sg_fd, ptp, sizeof(*ptp)) < 0);
          ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
@@ -527,9 +532,9 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 }
 
 static int
-finish_sg3_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
-               int & pack_id, bool receive, int wait_ms,
-               unsigned int & eagains, unsigned int & nanosecs)
+finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
+	       bool receive, int wait_ms, unsigned int & eagains,
+	       unsigned int & nanosecs)
 {
     bool ok;
     int res, k;
@@ -568,17 +573,15 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
     ptp->pack_id = pack_id;
 
     k = 0;
-    while ((((res = receive ? ioctl(sg_fd, SG_IORECEIVE, ptp) :
+    while ((((res = receive ? ioctl(sg_fd, SG_IORECEIVE_V3, ptp) :
                               read(sg_fd, ptp, sizeof(*ptp)))) < 0) &&
            (EAGAIN == errno)) {
         ++eagains;
-        if (pack_id_force) {
-            ++k;
-            if (k > 10000) {
-                pr2serr_lk("%s: unable to find pack_id=%d\n", __func__,
-                           pack_id);
-                return -1;      /* crash out */
-            }
+        ++k;
+        if (k > 10000) {
+            pr2serr_lk("%s: sg_fd=%d: after %d EAGAINs, unable to find "
+                       "pack_id=%d\n", __func__, sg_fd, k, pack_id);
+            return -1;      /* crash out */
         }
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
@@ -696,9 +699,9 @@ start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 }
 
 static int
-finish_sg4_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
-               int & pack_id, bool receive, int wait_ms,
-               unsigned int & eagains, unsigned int & nanosecs)
+finish_sg4_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
+	       bool receive, int wait_ms, unsigned int & eagains,
+	       unsigned int & nanosecs)
 {
     bool ok;
     int res, k;
@@ -725,7 +728,7 @@ finish_sg4_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
         np = "WRITE(16)";
         break;
     }
-    ptp->guard = 'S';
+    ptp->guard = 'Q';
     ptp->max_response_len = sizeof(sense_buffer);
     ptp->response = (uint64_t)sense_buffer;
     ptp->timeout = DEF_TIMEOUT_MS;
@@ -736,13 +739,11 @@ finish_sg4_cmd(int sg_fd, command2execute cmd2exe, bool pack_id_force,
     while ((((res = ioctl(sg_fd, SG_IORECEIVE, ptp))) < 0) &&
            (EAGAIN == errno)) {
         ++eagains;
-        if (pack_id_force) {
-            ++k;
-            if (k > 10000) {
-                pr2serr_lk("%s: unable to find pack_id=%d\n", __func__,
-                           pack_id);
-                return -1;      /* crash out */
-            }
+        ++k;
+        if (k > 10000) {
+            pr2serr_lk("%s: sg_fd=%d: after %d EAGAINs, unable to find "
+                       "pack_id=%d\n", __func__, sg_fd, k, pack_id);
+            return -1;      /* crash out */
         }
         if (wait_ms > 0)
             this_thread::sleep_for(milliseconds{wait_ms});
@@ -956,7 +957,10 @@ work_thread(int id, struct opts_t * op)
     /* device name and hi_lba may depend on id */
     n = op->dev_names.size();
     dev_name = op->dev_names[id % n];
-    blk_sz = op->blk_szs[id % n];
+    if (op->blk_szs.size() >= (unsigned)n)
+        blk_sz = op->blk_szs[id % n];
+    else
+	blk_sz = DEF_LB_SZ;
     if ((UINT_MAX == op->hi_lba) && (n == (int)op->hi_lbas.size()))
         hi_lba = op->hi_lbas[id % n];
     else
@@ -1004,7 +1008,7 @@ work_thread(int id, struct opts_t * op)
             seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
             seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
             seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
-	    seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+            seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
             if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
                 pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
                            errno, strerror(errno));
@@ -1183,7 +1187,7 @@ work_thread(int id, struct opts_t * op)
             if (is_rw) {    /* get new lb buffer or one from free list */
                 if (free_lst.empty()) {
                     lbp = sg_memalign(op->lb_sz * op->num_lbs, 0, &free_lbp,
-                                      vb > 6);
+                                      false);
                     if (NULL == lbp) {
                         err = "out of memory";
                         break;
@@ -1343,17 +1347,28 @@ work_thread(int id, struct opts_t * op)
                     }
                 }
                 n = (op->wait_ms > 0) ? op->wait_ms : 0;
-                for (j = 0; (j < 1000000) && (0 == (res = poll(pfd, 1, n)));
-                     ++j)
-                    ;
+                if (n > 0) {
+                    for (j = 0; (j < 1000000) &&
+                         (0 == (res = poll(pfd, 1, n)));
+                         ++j)
+                        ;
+                    if (j >= 1000000) {
+                        err = "poll() looped 1 million times";
+                        break;
+                    }
+                    if (res < 0) {
+                        err = "poll(wait_ms) failed";
+                        break;
+                    }
+                } else {
+                    struct timespec ts;
 
-                if (j >= 1000000) {
-                    err = "poll() looped 1 million times";
-                    break;
-                }
-                if (res < 0) {
-                    err = "poll(wait_ms) failed";
-                    break;
+                    ts.tv_sec = 0;
+                    ts.tv_nsec = DEF_NANOSEC_WAIT;
+                    if (nanosleep(&ts, NULL) < 0) {
+                        err = "nanosleep() failed";
+                        break;
+                    }
                 }
             }
         } else {        /* not full, not finished injecting */
@@ -1367,6 +1382,12 @@ work_thread(int id, struct opts_t * op)
                             num_to_read = num_waiting_read > 0 ?
                                             num_waiting_read : 1;
                     } else {
+                        num_waiting_read = 0;
+                        if (ioctl(sg_fd, SG_GET_NUM_WAITING,
+                                  &num_waiting_read) < 0) {
+                            err = "ioctl(SG_GET_NUM_WAITING) failed";
+                            break;
+                        }
                         if (num_waiting_read > (op->ovn / 2))
                             num_to_read = num_waiting_read / 2;
                     }
@@ -1401,12 +1422,12 @@ work_thread(int id, struct opts_t * op)
                 pack_id = -1;
             ask = pack_id;
             res = (op->v4) ?
-                    finish_sg4_cmd(sg_fd, op->c2e, op->pack_id_force, pack_id,
-                                   op->submit, op->wait_ms,
-                                   thr_fin_eagain_count, nanosecs)           :
-                    finish_sg3_cmd(sg_fd, op->c2e, op->pack_id_force, pack_id,
-                                   op->submit, op->wait_ms,
-                                   thr_fin_eagain_count, nanosecs);
+                    finish_sg4_cmd(sg_fd, op->c2e, pack_id, op->submit,
+				   op->wait_ms, thr_fin_eagain_count,
+				   nanosecs)           :
+                    finish_sg3_cmd(sg_fd, op->c2e, pack_id, op->submit,
+			  	   op->wait_ms, thr_fin_eagain_count,
+				   nanosecs);
             if (res) {
                 err = "finish_sg3_cmd()";
                 if (ruip && (pack_id > 0)) {
@@ -1420,13 +1441,14 @@ work_thread(int id, struct opts_t * op)
                 }
                 break;
             }
-            if (vb > 4)
-                pr2serr_lk("t_id=%d: finishing pack_id ask=%d, got=%d\n", id,
-                           ask, pack_id);
             if (op->cmd_time && op->sg_vn_ge_30901)
                 sum_nanosecs += nanosecs;
             ++thr_async_finishes;
             --num_outstanding;
+            if (vb > 4)
+                pr2serr_lk("t_id=%d: finishing pack_id ask=%d, got=%d, "
+                           "outstanding=%d\n", id, ask, pack_id,
+                           num_outstanding);
             auto p = pi2buff.find(pack_id);
 
             if (p == pi2buff.end()) {
@@ -1684,7 +1706,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "34cdfghl:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
+        c = getopt_long(argc, argv, "34cdfghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1693,10 +1715,14 @@ main(int argc, char * argv[])
         case '3':
             op->v3 = true;
             op->v3_given = true;
+            op->v4 = false;     /* if '-4 -3' take latter */
+            op->v4_given = false;
             break;
         case '4':
             op->v4 = true;
             op->v4_given = true;
+            op->v3 = false;
+            op->v3_given = false;
             break;
         case 'c':
             op->cmd_time = true;
@@ -1740,6 +1766,15 @@ main(int argc, char * argv[])
                 pr2serr_lk("--lba= expects a number\n");
                 return 1;
             }
+            break;
+        case 'L':
+            op->lb_sz = sg_get_num(optarg);
+            if (op->lb_sz < 0) {
+                pr2serr_lk("--lbsz= expects power of 2\n");
+                return 1;
+            }
+            if (0 == op->lb_sz)
+                op->lb_sz = DEF_LB_SZ;
             break;
         case 'm':
             op->mmap_io = true;
