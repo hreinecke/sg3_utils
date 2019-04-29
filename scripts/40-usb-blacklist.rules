@@ -3,8 +3,12 @@
 #
 # don't inquire sn and di on broken devices (https://bugzilla.suse.com/show_bug.cgi?id=840054)
 
-# unkown device
-ATTRS{idVendor}=="0aec", ATTRS{idProduct}=="3260", ENV{ID_SCSI_DI}="1"
-# Sony/JMicron port replicator
-ATTRS{idVendor}=="054c", ATTRS{idProduct}=="06a0", ENV{ID_SCSI_DI}="1"
+ACTION!="add|change", GOTO="usb_blacklist_end"
+KERNEL!="sd*[!0-9]|sr*", GOTO="usb_blacklist_end"
 
+# unkown device
+ATTRS{idVendor}=="0aec", ATTRS{idProduct}=="3260", ENV{ID_SCSI_INQUIRY}="1"
+# Sony/JMicron port replicator
+ATTRS{idVendor}=="054c", ATTRS{idProduct}=="06a0", ENV{ID_SCSI_INQUIRY}="1"
+
+LABEL="usb_blacklist_end"
