@@ -21,8 +21,8 @@ disks (sg_start); do self tests (sg_senddiag); and various other functions.
 See the README, ChangeLog and COVERAGE files. Requires the linux kernel 2.4
 series or later. In the 2.4 series SCSI generic device names (e.g. /dev/sg0)
 must be used. In the 2.6 series and later other device names may be used as
-well (e.g. /dev/sda). Also some support for NVMe devices, esspecially with
-sg_ses to NVMe enclosures.
+well (e.g. /dev/sda). Also some support for NVMe devices, especially with
+sg_ses on NVMe enclosures.
 
 Warning: Some of these tools access the internals of your system
 and the incorrect usage of them may render your system inoperable.
@@ -84,7 +84,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Fri Jan 04 2019 - dgilbert at interlog dot com
+* Mon Apr 29 2019 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.45
 

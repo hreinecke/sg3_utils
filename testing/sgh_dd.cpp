@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.27 20190418";
+static const char * version_str = "1.28 20190419";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -1028,7 +1028,7 @@ read_write_thread(void * v_tip)
                 status = pthread_mutex_unlock(&clp->in_mutex);
                 if (0 != status) err_exit(status, "unlock in_mutex");
                 if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
-                    if (rep->debug > 1)
+                    if (rep->debug > 2)
                         pr2serr_lk("thread=%d: tail-end my_index>=dd_count, "
                                    "to_do=%u\n", rep->id,
                                    (uint32_t)def_arr.first.size());
@@ -1142,7 +1142,7 @@ skip_force_out_sequence:
         }
         if (0 == rep->num_blks) {
             if ((rep->nmrqs > 0) && (def_arr.first.size() > 0)) {
-                if (rep->debug > 1)
+                if (rep->debug > 2)
                     pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
                                (uint32_t)def_arr.first.size());
                 sgh_do_def_mrq(rep, def_arr);

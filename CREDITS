@@ -12,7 +12,7 @@ Bart Van Assche <bart dot vanassche at sandisk dot com>
         to replace pthread_cancel with pthread_kill [20180102]
 
 Bean Huo <beanhuo dot micron dot com>
-	sg_write_buffer: patch to allow comma or period separated bytes
+        sg_write_buffer: patch to allow comma or period separated bytes
         (in decimal or hex) to be decoded when given as standard input.
 
 Brian Bunker <Brian dot Bunker at netapp dot com> contributed
@@ -107,6 +107,8 @@ Mark Knibbs <markk at clara dot co dot uk>
 
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
+Martin Wilck <mwilck at suse dot com> contributed script files [20190425]
+
 Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
         disk node names (e.g. /dev/sdaaa) [20050511]
 
@@ -145,4 +147,4 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
 
 
 Douglas Gilbert
-12th November 2018
+29th April 2019
