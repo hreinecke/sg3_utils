@@ -14,8 +14,8 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.08 (20190419)
- *  This version is for Linux 2.6, 3, 4 and 5 series kernels.
+ * Version 4.0.11 (20190427)
+ *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
  * =============
@@ -144,7 +144,10 @@ typedef struct sg_scsi_id {
 	int scsi_type;	/* TYPE_... defined in scsi/scsi.h */
 	short h_cmd_per_lun;/* host (adapter) maximum commands per lun */
 	short d_queue_depth;/* device (or adapter) maximum queue length */
-	__u8 scsi_lun[8];  /* full 8 byte SCSI LUN [new v4 driver] */
+	union {
+		int unused[2];	/* as per version 3 driver */
+		__u8 scsi_lun[8];  /* full 8 byte SCSI LUN [in v4 driver] */
+	};
 } sg_scsi_id_t;
 
 /* For backward compatibility v4 driver yields at most SG_MAX_QUEUE of these */
@@ -428,25 +431,33 @@ struct sg_header {
 #define SG_NEXT_CMD_LEN 0x2283
 
 /*
- * New ioctls to replace async write()/read() interface. Present in version
- * 4 and later of the sg driver [>20181014]. These two ioctls accept both
- * the sg_v3 interface (structure defined above) and the sg_v4 interface
- * (structure defined in <include/uapi/linux/bsg.h> ). Following "read" and
- * "write" terms are from the driver's POV, the _IO macros from users' POV.
+ * New ioctls to replace async (non-blocking) write()/read() interface.
+ * Present in version 4 and later of the sg driver [>20190427]. The
+ * SG_IOSUBMIT_V3 and SG_IORECEIVE_V3 ioctls accept the sg_v3 interface
+ * based on struct sg_io_hdr shown above. The SG_IOSUBMIT and SG_IORECEIVE
+ * ioctls accept the sg_v4 interface based on struct sg_io_v4 found in
+ * <include/uapi/linux/bsg.h>. These objects are passed by a pointer in
+ * the third argument of the ioctl.
  *
- * SG_IOSUBMIT and SG_IORECEIVE can take a pointer to a v4 or v3 interface
- * which have different lengths (v4 is longer) but their definitions below
- * encode v4's length into the ioctl number. So users of the v3 interface
- * would be best to place a v3 structure inside (overwriting and at the start
- * of) a v4 structure and pass a pointer to that v4 structure to the ioctl.
+ * Data may be transferred both from the user space to the driver by these
+ * ioctls. Hence the _IOWR macro is used here to generate the ioctl number
+ * rather than _IOW or _IOR.
  */
-/* via pointer reads sg v3 or v4 object, optionally writes tag, so _IOWR */
+/* Submits a v4 interface object to driver, optionally receive tag back */
 #define SG_IOSUBMIT _IOWR(SG_IOCTL_MAGIC_NUM, 0x41, struct sg_io_v4)
-/* via pointer optionally reads tag, writes sg v3 or v4 object, so _IOWR */
+
+/* Gives some v4 identifying info to driver, receives associated response */
 #define SG_IORECEIVE _IOWR(SG_IOCTL_MAGIC_NUM, 0x42, struct sg_io_v4)
 
-/* via pointer reads v4 object (including tag), writes nothing, so _IOW */
+/* Provides identifying info about a prior submission (e.g. a tag) */
 #define SG_IOABORT _IOW(SG_IOCTL_MAGIC_NUM, 0x43, struct sg_io_v4)
+
+/* Submits a v3 interface object to driver */
+#define SG_IOSUBMIT_V3 _IOWR(SG_IOCTL_MAGIC_NUM, 0x45, struct sg_io_hdr)
+
+/* Gives some v3 identifying info to driver, receives associated response */
+#define SG_IORECEIVE_V3 _IOWR(SG_IOCTL_MAGIC_NUM, 0x46, struct sg_io_hdr)
+
 
 /* command queuing is always on when the v3 or v4 interface is used */
 #define SG_DEF_COMMAND_Q 0
