@@ -78,7 +78,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.05 20190412";
+static const char * version_str = "4.06 20190501";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -106,8 +106,8 @@ static const char * my_name = "sgs_dd";
 
 
 #define STR_SZ 1024
-#define INOUTF_SZ 512
-#define EBUFF_SZ 512
+#define INOUTF_SZ 900
+#define EBUFF_SZ 1024
 
 struct flags_t {
     bool dio;
@@ -972,18 +972,20 @@ main(int argc, char * argv[])
             clp->debug = sg_get_num(buf);
         else if (0 == strcmp(key,"ibs"))
             ibs = sg_get_num(buf);
-        else if (strcmp(key,"if") == 0)
-            strncpy(inf, buf, INOUTF_SZ);
-        else if (0 == strcmp(key, "iflag")) {
+        else if (strcmp(key,"if") == 0) {
+            memcpy(inf, buf, INOUTF_SZ);
+            inf[INOUTF_SZ - 1] = '\0';
+        } else if (0 == strcmp(key, "iflag")) {
             if (! process_flags(buf, &clp->iflag)) {
                 pr2serr("%sbad argument to 'iflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"obs"))
             obs = sg_get_num(buf);
-        else if (strcmp(key,"of") == 0)
-            strncpy(outf, buf, INOUTF_SZ);
-        else if (0 == strcmp(key, "oflag")) {
+        else if (strcmp(key,"of") == 0) {
+            memcpy(outf, buf, INOUTF_SZ);
+            outf[INOUTF_SZ - 1] = '\0';
+        } else if (0 == strcmp(key, "oflag")) {
             if (! process_flags(buf, &clp->oflag)) {
                 pr2serr("%sbad argument to 'oflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;

@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2018 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2019 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.61 20181030";
+static const char * version_str = "1.62 20190501";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -812,8 +812,10 @@ main(int argc, char * argv[])
             if ('\0' != inf[0]) {
                 pr2serr("Second 'if=' argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                snprintf(inf, INOUTF_SZ, "%s", buf);
+            } else {
+                memcpy(inf, buf, INOUTF_SZ);
+                inf[INOUTF_SZ - 1] = '\0';
+            }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &in_flags)) {
                 pr2serr(ME "bad argument to 'iflag'\n");
@@ -823,8 +825,10 @@ main(int argc, char * argv[])
             if ('\0' != outf[0]) {
                 pr2serr("Second 'of=' argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                snprintf(outf, INOUTF_SZ, "%s", buf);
+            } else {
+                memcpy(outf, buf, INOUTF_SZ);
+                outf[INOUTF_SZ - 1] = '\0';
+            }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &out_flags)) {
                 pr2serr(ME "bad argument to 'oflag'\n");

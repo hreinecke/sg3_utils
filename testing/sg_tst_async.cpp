@@ -217,7 +217,7 @@ struct opts_t {
     myQDiscipline myqd;         /* --qfav= value (def: 2 --> MYQD_HIGH) */
 };
 
-static struct opts_t a_opts;
+static struct opts_t a_opts;	/* Expect zero fill on simple types */
 
 #if 0
 class Rand_uint {
@@ -1685,7 +1685,9 @@ main(int argc, char * argv[])
     const char * dev_name;
 
     op = &a_opts;
-    memset(op, 0, sizeof(*op));
+#if 0
+    memset(op, 0, sizeof(*op));		// C++ doesn't like this
+#endif
     op->direct = DEF_DIRECT;
     op->lba = DEF_LBA;
     op->hi_lba = 0;
