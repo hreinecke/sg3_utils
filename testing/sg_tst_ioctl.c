@@ -56,7 +56,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.08  20190419";
+static const char * version_str = "Version: 1.09  20190430";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -256,7 +256,10 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_UNSHARE;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_FINI;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_ERR;
+    seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_NO_DURATION;
     seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+    seip->ctl_flags |= SG_CTL_FLAGM_NO_DURATION;
 
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
@@ -301,6 +304,9 @@ tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
         if (SG_CTL_FLAGM_MASTER_ERR & seip->ctl_flags_rd_mask)
             printf("  %sMASTER_ERR: %s\n", cp,
                    (SG_CTL_FLAGM_MASTER_ERR & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_NO_DURATION & seip->ctl_flags_rd_mask)
+            printf("  %sNO_DURATION: %s\n", cp,
+                   (SG_CTL_FLAGM_NO_DURATION & cflags) ? "true" : "false");
     }
     if (SG_SEIM_MINOR_INDEX & seip->sei_rd_mask)
         printf("  %sminor_index: %u\n", cp, seip->minor_index);

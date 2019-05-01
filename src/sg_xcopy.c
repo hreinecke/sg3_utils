@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.69 20190120";
+static const char * version_str = "0.70 20190501";
 
 #define ME "sg_xcopy: "
 
@@ -1428,8 +1428,10 @@ main(int argc, char * argv[])
             if ('\0' != ixcf.fname[0]) {
                 pr2serr("Second IFILE argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                strncpy(ixcf.fname, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(ixcf.fname, buf, INOUTF_SZ - 1);
+                ixcf.fname[INOUTF_SZ - 1] = '\0';
+            }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &ixcf)) {
                 pr2serr(ME "bad argument to 'iflag='\n");
@@ -1441,8 +1443,10 @@ main(int argc, char * argv[])
             if ('\0' != oxcf.fname[0]) {
                 pr2serr("Second OFILE argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                strncpy(oxcf.fname, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(oxcf.fname, buf, INOUTF_SZ - 1);
+                oxcf.fname[INOUTF_SZ - 1] = '\0';
+            }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oxcf)) {
                 pr2serr(ME "bad argument to 'oflag='\n");

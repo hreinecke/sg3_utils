@@ -1,6 +1,6 @@
 /*
  *  A utility program for the Linux OS SCSI generic ("sg") device driver.
- *    Copyright (C) 2001 - 2018 D. Gilbert
+ *    Copyright (C) 2001 - 2019 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -58,7 +58,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.34 20180811";
+static const char * version_str = "1.35 20190501";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -491,17 +491,19 @@ main(int argc, char * argv[])
             dpo = !! sg_get_num(buf);
         else if (0 == strcmp(key,"fua"))
             fua = !! sg_get_num(buf);
-        else if (strcmp(key,"if") == 0)
-            strncpy(inf, buf, INF_SZ - 1);
-        else if (0 == strcmp(key,"mmap"))
+        else if (strcmp(key,"if") == 0) {
+            memcpy(inf, buf, INF_SZ - 1);
+            inf[INF_SZ - 1] = '\0';
+        } else if (0 == strcmp(key,"mmap"))
             do_mmap = !! sg_get_num(buf);
         else if (0 == strcmp(key,"no_dxfer"))
             no_dxfer = !! sg_get_num(buf);
         else if (0 == strcmp(key,"odir"))
             do_odir = !! sg_get_num(buf);
-        else if (strcmp(key,"of") == 0)
-            strncpy(outf, buf, INF_SZ - 1);
-        else if (0 == strcmp(key,"skip")) {
+        else if (strcmp(key,"of") == 0) {
+            memcpy(outf, buf, INF_SZ - 1);
+            outf[INF_SZ - 1] = '\0';
+        } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if (-1 == skip) {
                 pr2serr( ME "bad argument to 'skip'\n");
