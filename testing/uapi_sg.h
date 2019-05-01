@@ -201,7 +201,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 /* rd> 1: master finished 0: not; wr> 1: finish share post master */
 #define SG_CTL_FLAGM_MASTER_FINI 0x100	/* wr> 0: setup for repeat slave req */
 #define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
-#define SG_CTL_FLAGM_ALL_BITS	0x3ff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_NO_DURATION 0x400	/* don't calc command duration */
+#define SG_CTL_FLAGM_ALL_BITS	0x7ff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */

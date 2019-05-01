@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.28 20190419";
+static const char * version_str = "1.29 20190430";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -162,6 +162,7 @@ struct flags_t {
     bool excl;
     bool fua;
     bool mmap;
+    bool no_dur;
     bool noshare;
     bool noxfer;
     bool same_fds;
@@ -249,6 +250,7 @@ typedef struct request_element
     int cdbsz_in;
     int cdbsz_out;
     int aen;
+    int rd_p_id;
     int rep_count;
     int rq_id;
     int mmap_len;
@@ -592,7 +594,9 @@ dd_filetype(const char * filename)
 static void
 usage(int pg_num)
 {
-    if (pg_num > 2)
+    if (pg_num > 3)
+        goto page4;
+    else if (pg_num > 2)
         goto page3;
     else if (pg_num > 1)
         goto page2;
@@ -636,7 +640,8 @@ usage(int pg_num)
             "specialized for\nSCSI devices and uses multiple POSIX threads. "
             "It expects one or both IFILE\nand OFILE to be sg devices. It "
             "is Linux specific and uses the v4 sg driver\n'share' capability "
-            "if available. Use '-hh' or '-hhh' for more information.\n"
+            "if available. Use '-hh', '-hhh' or '-hhhh' for more\n"
+            "information.\n"
 #ifdef SGH_DD_READ_COMPLET_AFTER
             "\nIn this version oflag=swait does read completion _after_ "
             "write completion\n"
@@ -680,7 +685,7 @@ page2:
             "    verbose     same as 'deb=VERB': increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
-            "Use '-hhh' for more information about flags.\n"
+            "Use '-hhh' or '-hhhh' for more information about flags.\n"
            );
     return;
 page3:
@@ -701,6 +706,7 @@ page3:
             "and WRITEs\n"
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
+            "    nodur       turns off command duration calculations\n"
             "    noshare     if IFILE and OFILE are sg devices, don't set "
             "up sharing\n"
             "                (def: do)\n"
@@ -722,8 +728,38 @@ page3:
             "'noshare' is given to 'iflag=' or\n'oflag='. of2=OFILE2 uses "
             "'oflag=FLAGS'. When sharing, the data stays in a\nsingle "
             "in-kernel buffer which is copied (or mmap-ed) to the user "
-            "space\nif the 'ofreg=OFREG' is given.\n"
+            "space\nif the 'ofreg=OFREG' is given. Use '-hhhh' for more "
+            "information.\n"
            );
+    return;
+page4:
+    pr2serr("pack_id:\n"
+            "These are ascending integers, starting at 1, associated with "
+            "each issued\nSCSI command. When both IFILE and OFILE are sg "
+            "devices, then the READ in\neach read-write pair is issued an "
+            "even pack_id and its WRITE pair is\ngiven the pack_id one "
+            "higher (i.e. an odd number). This enables a\n'cat '"
+            "/proc/scsi/sg/debug' user to see associated commands.\n\n");
+    pr2serr("Debugging:\n"
+            "Apart from using one or more '--verbose' options which gets a "
+            "bit noisy\n'cat /proc/scsi/sg/debug' can give a good overview "
+            "of what is happening.\nThat does a sg driver object tree "
+            "traversal that does minimal locking\nto make sure that each "
+            "traversal is 'safe'. So it is important to note\nthe whole "
+            "tree is not locked. This means for fast devices the overall\n"
+            "tree state may change while the traversal is occurring. For "
+            "example,\nit has been observed that both the master and slave "
+            "sides of a request\nshare show they are in 'active' state "
+            "which should not be possible.\nIt occurs because the master "
+            "probably jumped out of active state and\nthe slave request "
+            "entered it while some other nodes were being printed.\n\n");
+    pr2serr("Busy state:\n"
+            "Busy state (abreviated to 'bsy' in the /proc/scsi/sg/debug "
+            "output)\nis entered during request setup and completion. It "
+            "is intended to be\na temporary state. It should not block "
+            "but does sometimes (e.g. in\nblock_get_request()). Even so "
+            "that block should be short and\nif not there is a problem.\n");
+    return;
 }
 
 static void
@@ -1695,7 +1731,15 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         cp = (wr ? " slave active" : " master active");
     } else
         cp = (wr ? " slave not sharing" : " master not sharing");
-    pack_id = atomic_fetch_add(&mono_pack_id, 1);    /* fetch before */
+    if (rep->both_sg) {
+        if (wr)
+            pack_id = rep->rd_p_id + 1;
+        else {
+            pack_id = 2 * atomic_fetch_add(&mono_pack_id, 1);
+            rep->rd_p_id = pack_id;
+        }
+    } else
+        pack_id = atomic_fetch_add(&mono_pack_id, 1);    /* fetch before */
     rep->rq_id = pack_id;
     if (rep->debug > 3) {
         pr2serr_lk("%s tid,rq_id=%d,%d: SCSI %s%s%s%s, blk=%" PRId64
@@ -2110,7 +2154,7 @@ write_complet:
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
 sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
-                  bool unit_nano, uint8_t **mmpp)
+                  bool unit_nano, bool no_dur, uint8_t **mmpp)
 {
     int res, t, num;
     uint8_t *mmp;
@@ -2126,6 +2170,12 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     if (elem_sz >= 4096) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
+        if (no_dur) {
+            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+            seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
+            seip->ctl_flags |= SG_CTL_FLAGM_NO_DURATION;
+        }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
             pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
@@ -2139,6 +2189,15 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
                 pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
                            "wr error: %s\n", __func__, strerror(errno));
         }
+    } else if (no_dur) {
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
+        seip->ctl_flags |= SG_CTL_FLAGM_NO_DURATION;
+        res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
+        if (res < 0)
+            pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(NO_DURATION) "
+                       "error: %s\n", __func__, strerror(errno));
     }
     if (! def_res) {
         num = bs * bpt;
@@ -2211,6 +2270,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->fua = true;
         else if (0 == strcmp(cp, "mmap"))
             fp->mmap = true;
+        else if (0 == strcmp(cp, "nodur"))
+            fp->no_dur = true;
         else if (0 == strcmp(cp, "noshare"))
             fp->noshare = true;
         else if (0 == strcmp(cp, "noxfer"))
@@ -2271,7 +2332,8 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
-                         clp->elem_sz, clp->unit_nanosec, mmpp);
+                          clp->elem_sz, clp->unit_nanosec,
+                          clp->in_flags.no_dur, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2301,7 +2363,8 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->out_flags.defres,
-                          clp->elem_sz, clp->unit_nanosec, mmpp);
+                          clp->elem_sz, clp->unit_nanosec,
+                          clp->out_flags.no_dur, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2445,8 +2508,10 @@ main(int argc, char * argv[])
             if ('\0' != inf[0]) {
                 pr2serr("Second 'if=' argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else
-                snprintf(inf, INOUTF_SZ, "%s", buf);
+            } else {
+                memcpy(inf, buf, INOUTF_SZ);
+                inf[INOUTF_SZ - 1] = '\0';      /* noisy compiler */
+            }
         } else if (0 == strcmp(key, "iflag")) {
             if (! process_flags(buf, &clp->in_flags)) {
                 pr2serr("%sbad argument to 'iflag='\n", my_name);
@@ -2472,20 +2537,26 @@ main(int argc, char * argv[])
             if ('\0' != out2f[0]) {
                 pr2serr("Second OFILE2 argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                strncpy(out2f, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(out2f, buf, INOUTF_SZ);
+                out2f[INOUTF_SZ - 1] = '\0';    /* noisy compiler */
+            }
         } else if (strcmp(key, "ofreg") == 0) {
             if ('\0' != outregf[0]) {
                 pr2serr("Second OFREG argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                strncpy(outregf, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(outregf, buf, INOUTF_SZ);
+                outregf[INOUTF_SZ - 1] = '\0';  /* noisy compiler */
+            }
         } else if (strcmp(key, "of") == 0) {
             if ('\0' != outf[0]) {
                 pr2serr("Second 'of=' argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else
-                snprintf(outf, INOUTF_SZ, "%s", buf);
+            } else {
+                memcpy(outf, buf, INOUTF_SZ);
+                outf[INOUTF_SZ - 1] = '\0';     /* noisy compiler */
+            }
         } else if (0 == strcmp(key, "oflag")) {
             if (! process_flags(buf, &clp->out_flags)) {
                 pr2serr("%sbad argument to 'oflag='\n", my_name);

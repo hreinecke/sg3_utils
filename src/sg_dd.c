@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2018 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2019 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.05 20181213";
+static const char * version_str = "6.06 20190501";
 
 
 #define ME "sg_dd: "
@@ -1609,8 +1609,10 @@ main(int argc, char * argv[])
             if ('\0' != inf[0]) {
                 pr2serr("Second IFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
-            } else
-                strncpy(inf, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(inf, buf, INOUTF_SZ - 1);
+		inf[INOUTF_SZ - 1] = '\0';
+	    }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &iflag)) {
                 pr2serr(ME "bad argument to 'iflag='\n");
@@ -1625,14 +1627,18 @@ main(int argc, char * argv[])
             if ('\0' != outf[0]) {
                 pr2serr("Second OFILE argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                strncpy(outf, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(outf, buf, INOUTF_SZ - 1);
+		outf[INOUTF_SZ - 1] = '\0';
+	    }
         } else if (strcmp(key, "of2") == 0) {
             if ('\0' != out2f[0]) {
                 pr2serr("Second OFILE2 argument??\n");
                 return SG_LIB_CONTRADICT;
-            } else
-                strncpy(out2f, buf, INOUTF_SZ - 1);
+            } else {
+                memcpy(out2f, buf, INOUTF_SZ - 1);
+                out2f[INOUTF_SZ - 1] = '\0';
+	    }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
                 pr2serr(ME "bad argument to 'oflag='\n");
