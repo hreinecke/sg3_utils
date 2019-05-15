@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190515] [svn: r822]
+Changelog for sg3_utils-1.45 [20190515] [svn: r823]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (spc5r20)
@@ -53,6 +53,8 @@ Changelog for sg3_utils-1.45 [20190515] [svn: r822]
   - add: 'SPDX-License-Identifier: BSD-2-Clause'
     or a small number of 'GPL-2.0-or-later'
   - gcc-9: suppress (pointless) warnings
+  - automake: upgrade to version 1.16.1
+  - autoconf: upgrade to version 2.69
 
 Changelog for sg3_utils-1.44 [20180912] [svn: r791]
   - same code as release 1.43 20180911 svn rev 789;
