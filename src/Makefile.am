@@ -44,7 +44,7 @@ DBG_CPPFLAGS =
 endif
 
 # For C++/clang testing
-## CC = gcc-8
+## CC = gcc-9
 ## CC = g++
 ## CC = clang
 ## CC = clang++
