@@ -23,6 +23,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 
 #include <sys/socket.h> /* For passing fd_s via Unix sockets */
 
@@ -56,7 +57,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.09  20190430";
+static const char * version_str = "Version: 1.10  20190506";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -81,13 +82,16 @@ static const char * version_str = "Version: 1.09  20190430";
 static bool is_parent = false;
 static bool do_fork = false;
 static bool ioctl_only = false;
+static bool more_async = false;
 static bool q_at_tail = false;
 static bool write_only = false;
 static bool mrq_immed = false;  /* if set, also sets mrq_iosubmit */
 static bool mrq_half_immed = false;
 static bool mrq_iosubmit = false;
+static bool show_size_value = false;
 
 static int childs_pid = 0;
+static int sg_drv_ver_num = 0;
 static int q_len = DEF_Q_LEN;
 static int sleep_secs = 0;
 static int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
@@ -100,10 +104,10 @@ static const char * relative_cp = NULL;
 static void
 usage(void)
 {
-    printf("Usage: sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] [-r=SZ] "
-           "[-s=SEC]\n"
-           "                    [-t] [-v] [-V] [-w] <sg_device> "
-           "[<sg_device2>]\n"
+    printf("Usage: sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] [-M] "
+           "[-o]\n"
+           "                    [-r=SZ] [-s=SEC] [-S] [-t] [-v] [-V] [-w]\n"
+           "                    <sg_device> [<sg_device2>]\n"
            " where:\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
@@ -116,10 +120,13 @@ usage(void)
            "receive;\n"
            "                     'S' is appended, then use "
            "ioctl(SG_IOSUBMIT)\n"
+           "      -M      set 'more async' flag\n"
            "      -o      ioctls only, then exit\n"
            "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
            "KB)\n"
            "      -s=SEC    sleep between writes and reads (def: 0)\n"
+           "      -S        size of interface structures plus ioctl "
+           "values\n"
            "      -t    queue_at_tail (def: q_at_head)\n"
            "      -v    increase verbosity of output\n"
            "      -V    print version string then exit\n"
@@ -225,6 +232,28 @@ sock_fd_read(int sock, void *buf, ssize_t bufsize, int *fd)
         }
     }
     return size;
+}
+
+static void
+set_more_async(int fd)
+{
+    if (sg_drv_ver_num > 40000) {
+        struct sg_extended_info sei;
+        struct sg_extended_info * seip;
+
+        seip = &sei;
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+        seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
+        seip->ctl_flags = SG_CTL_FLAGM_MORE_ASYNC;
+        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+            pr2serr("ioctl(SG_SET_GET_EXTENDED, MORE_ASYNC) failed, "
+                    "errno=%d %s\n", errno, strerror(errno));
+            return;
+        }
+    } else
+        pr2serr("sg driver too old for ioctl(SG_SET_GET_EXTENDED)\n");
 }
 
 static int
@@ -509,17 +538,17 @@ do_mrqs(int sg_fd, int sg_fd2, int mrqs)
         /* io_hdr[k].iovec_count = 0; */  /* memset takes care of this */
         if (0 == (k % 2)) {
             h4p->request_len = sizeof(sdiag_cdb);
-            h4p->request = (uint64_t)sdiag_cdb;
+            h4p->request = (uint64_t)(uintptr_t)sdiag_cdb;
             /* all din and dout fields are zero */
         } else {
             h4p->request_len = sizeof(inq_cdb);
-            h4p->request = (uint64_t)inq_cdb;
+            h4p->request = (uint64_t)(uintptr_t)inq_cdb;
             h4p->din_xfer_len = INQ_REPLY_LEN;
-            h4p->din_xferp = (uint64_t)inqBuff;
+            h4p->din_xferp = (uint64_t)(uintptr_t)inqBuff;
             if (both)
                 h4p->flags |= SGV4_FLAG_DO_ON_OTHER;
         }
-        h4p->response = (uint64_t)sense_buffer;
+        h4p->response = (uint64_t)(uintptr_t)sense_buffer;
         h4p->max_response_len = sizeof(sense_buffer);
         h4p->timeout = 20000;     /* 20000 millisecs == 20 seconds */
         h4p->request_extra = k + 3;      /* so pack_id doesn't start at 0 */
@@ -529,7 +558,7 @@ do_mrqs(int sg_fd, int sg_fd2, int mrqs)
         else
             h4p->flags |= SG_FLAG_Q_AT_HEAD;
     }
-    mrq_h4p->dout_xferp = (uint64_t)arr_v4;
+    mrq_h4p->dout_xferp = (uint64_t)(uintptr_t)arr_v4;
     mrq_h4p->dout_xfer_len = arr_v4_sz;
     mrq_h4p->din_xferp = mrq_h4p->dout_xferp;
     mrq_h4p->din_xfer_len = mrq_h4p->dout_xfer_len;
@@ -598,7 +627,7 @@ int
 main(int argc, char * argv[])
 {
     bool done;
-    int sg_fd, k, ok, ver_num, pack_id, num_waiting;
+    int sg_fd, k, ok, pack_id, num_waiting;
     int res = 0;
     int sg_fd2 = -1;
     int sock = -1;
@@ -657,7 +686,9 @@ main(int argc, char * argv[])
                     break;
                 }
             }
-        } else if (0 == memcmp("-o", argv[k], 2))
+        } else if (0 == memcmp("-M", argv[k], 2))
+            more_async = true;
+        else if (0 == memcmp("-o", argv[k], 2))
             ioctl_only = true;
         else if (0 == memcmp("-r=", argv[k], 3)) {
             reserve_buff_sz = atoi(argv[k] + 3);
@@ -673,12 +704,16 @@ main(int argc, char * argv[])
                 file_name = 0;
                 break;
             }
-        } else if (0 == memcmp("-t", argv[k], 2))
+        } else if (0 == memcmp("-S", argv[k], 2))
+            show_size_value = true;
+        else if (0 == memcmp("-t", argv[k], 2))
             q_at_tail = true;
+        else if (0 == memcmp("-vvvvvvv", argv[k], 8))
+            verbose += 7;
         else if (0 == memcmp("-vvvvvv", argv[k], 7))
-            verbose += 4;
+            verbose += 6;
         else if (0 == memcmp("-vvvvv", argv[k], 6))
-            verbose += 4;
+            verbose += 5;
         else if (0 == memcmp("-vvvv", argv[k], 5))
             verbose += 4;
         else if (0 == memcmp("-vvv", argv[k], 4))
@@ -708,6 +743,51 @@ main(int argc, char * argv[])
             break;
         }
     }
+    if (show_size_value) {
+        struct utsname unam;
+
+        printf("Size in bytes:\n");
+        printf("\t%zu\tsizeof(struct sg_header) Version 2 interface "
+               "structure\n", sizeof(struct sg_header));
+        printf("\t%zu\tsizeof(struct sg_io_hdr) Version 3 interface "
+               "structure\n", sizeof(struct sg_io_hdr));
+        printf("\t%zu\tsizeof(struct sg_io_v4) Version 4 interface "
+               "structure\n", sizeof(struct sg_io_v4));
+        printf("\t%zu\tsizeof(struct sg_iovec) scatter gather element\n",
+               sizeof(struct sg_iovec));
+        printf("\t%zu\tsizeof(struct sg_scsi_id) topological device id\n",
+               sizeof(struct sg_scsi_id));
+        printf("\t%zu\tsizeof(struct sg_req_info) request information\n",
+               sizeof(struct sg_req_info));
+        printf("\t%zu\tsizeof(struct sg_extended_info) for "
+               "SG_SET_GET_EXTENDED\n",
+               sizeof(struct sg_extended_info));
+        printf("\nioctl values (i.e. second argument to ioctl()):\n");
+        printf("\t0x%lx\t\tvalue of SG_GET_NUM_WAITING ioctl\n",
+               (unsigned long)SG_GET_NUM_WAITING);
+        printf("\t0x%lx\t\tvalue of SG_IO ioctl\n",
+               (unsigned long)SG_IO);
+        printf("\t0x%lx\tvalue of SG_IOABORT ioctl\n",
+               (unsigned long)SG_IOABORT);
+        printf("\t0x%lx\tvalue of SG_IORECEIVE ioctl\n",
+               (unsigned long)SG_IORECEIVE);
+        printf("\t0x%lx\tvalue of SG_IORECEIVE_V3 ioctl\n",
+               (unsigned long)SG_IORECEIVE_V3);
+        printf("\t0x%lx\tvalue of SG_IOSUBMIT ioctl\n",
+               (unsigned long)SG_IOSUBMIT);
+        printf("\t0x%lx\tvalue of SG_IOSUBMIT_V3 ioctl\n",
+               (unsigned long)SG_IOSUBMIT_V3);
+        printf("\t0x%lx\tvalue of SG_SET_GET_EXTENDED ioctl\n",
+               (unsigned long)SG_SET_GET_EXTENDED);
+        printf("\n\t0x%x\t\tbase value of most SG_* ioctls\n",
+               SG_IOCTL_MAGIC_NUM);
+        printf("\nsizeof(void *) [a pointer] on this machine: %u bytes\n",
+               (unsigned)sizeof(void *));
+        if (0 == uname(&unam))
+            printf("Machine name: %s\n", unam.machine);
+
+        return 0;
+    }
     if (0 == file_name) {
         printf("No filename (sg device) given\n\n");
         usage();
@@ -725,12 +805,14 @@ main(int argc, char * argv[])
         fprintf(stderr, "opened given file: %s successfully, fd=%d\n",
                 file_name, sg_fd);
 
-    if (ioctl(sg_fd, SG_GET_VERSION_NUM, &ver_num) < 0) {
+    if (ioctl(sg_fd, SG_GET_VERSION_NUM, &sg_drv_ver_num) < 0) {
         pr2serr("ioctl(SG_GET_VERSION_NUM) failed, errno=%d %s\n", errno,
                 strerror(errno));
         goto out;
     }
-    printf("Linux sg driver version: %d\n", ver_num);
+    printf("Linux sg driver version: %d\n", sg_drv_ver_num);
+    if (more_async)
+        set_more_async(sg_fd);
 
     if (second_fname) {
         if ((sg_fd2 = open(second_fname, O_RDWR)) < 0) {
@@ -742,6 +824,8 @@ main(int argc, char * argv[])
         if (verbose)
             fprintf(stderr, "opened second file: %s successfully, fd=%d\n",
                     second_fname, sg_fd2);
+        if (more_async)
+            set_more_async(sg_fd2);
     }
 
     if (num_mrqs > 0) {
@@ -786,7 +870,7 @@ main(int argc, char * argv[])
     if (do_fork && !is_parent)
         return 0;
 
-    printf("start write() calls\n");
+    printf("start iosubmit calls\n");
     for (k = 0; k < q_len; ++k) {
         /* Prepare INQUIRY command */
         memset(&io_hdr[k], 0, sizeof(sg_io_hdr_t));
@@ -866,7 +950,7 @@ main(int argc, char * argv[])
     else
         printf("num_waiting: %d\n", num_waiting);
 
-    printf("\nstart read() calls\n");
+    printf("\nstart ioreceive() calls\n");
     for (k = 0, done = false; k < q_len; ++k) {
         if ((! done) && (k == q_len / 2)) {
             done = true;

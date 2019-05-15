@@ -28,6 +28,7 @@
 #endif
 
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
@@ -44,7 +45,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.17 20190416";    /* ses4r02 */
+static const char * version_str = "1.18 20190513";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -120,13 +121,10 @@ static struct mode_s mode_arr[] = {
     {NULL, 0, NULL},
 };
 
-struct diag_page_code {
-    int page_code;
-    const char * desc;
-};
-
-/* An array of Download microcode status field values and descriptions */
-static struct diag_page_code mc_status_arr[] = {
+/* An array of Download microcode status field values and descriptions.
+ * This table is a subset of one in sg_read_buffer for the read microcode
+ * status page. */
+static struct sg_lib_simple_value_name_t mc_status_arr[] = {
     {0x0, "No download microcode operation in progress"},
     {0x1, "Download in progress, awaiting more"},
     {0x2, "Download complete, updating storage"},
@@ -241,11 +239,11 @@ print_modes(void)
 static const char *
 get_mc_status_str(uint8_t status_val)
 {
-    const struct diag_page_code * mcsp;
+    const struct sg_lib_simple_value_name_t * mcsp;
 
-    for (mcsp = mc_status_arr; mcsp->desc; ++mcsp) {
-        if (status_val == mcsp->page_code)
-            return mcsp->desc;
+    for (mcsp = mc_status_arr; mcsp->name; ++mcsp) {
+        if (status_val == mcsp->value)
+            return mcsp->name;
     }
     return "";
 }

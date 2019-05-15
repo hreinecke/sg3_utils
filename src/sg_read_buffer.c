@@ -15,15 +15,19 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_pt.h"
@@ -35,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.27 20190113";      /* spc5r20 */
+static const char * version_str = "1.29 20190515";      /* spc5r22 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -47,6 +51,7 @@ static const char * version_str = "1.27 20190113";      /* spc5r20 */
 #define SG_READ_BUFFER_16_CMDLEN 16
 #endif
 
+#define MAX_DEF_INHEX_LEN 8192
 #define SENSE_BUFF_LEN  64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -56,6 +61,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"id", required_argument, 0, 'i'},
+        {"inhex", required_argument, 0, 'I'},
         {"length", required_argument, 0, 'l'},
         {"long", no_argument, 0, 'L'},
         {"mode", required_argument, 0, 'm'},
@@ -73,23 +79,27 @@ static void
 usage()
 {
     pr2serr("Usage: sg_read_buffer [--16] [--help] [--hex] [--id=ID] "
-            "[--length=LEN]\n"
-            "                      [--long] [--mode=MO] [--offset=OFF] "
-            "[--raw]\n"
-            "                      [--readonly] [--specific=MS] [--verbose] "
-            "[--version]\n"
-            "                      DEVICE\n"
+            "[--inhex=FN]\n"
+            "                      [--length=LEN] [--long] [--mode=MO] "
+            "[--offset=OFF]\n"
+            "                      [--raw] [--readonly] [--specific=MS] "
+            "[--verbose]\n"
+            "                      [--version] DEVICE\n"
             "  where:\n"
             "    --16|-L             issue READ BUFFER(16) (def: 10)\n"
             "    --help|-h           print out usage message\n"
             "    --hex|-H            print output in hex\n"
             "    --id=ID|-i ID       buffer identifier (0 (default) to 255)\n"
+            "    --inhex=FN|-I FN    filename FN contains hex data to "
+            "decode\n"
+            "                        rather than DEVICE. If --raw given "
+            "then binary\n"
             "    --length=LEN|-l LEN    length in bytes to read (def: 4)\n"
             "    --long|-L           issue READ BUFFER(16) (def: 10)\n"
             "    --mode=MO|-m MO     read buffer mode, MO is number or "
             "acronym (def: 0)\n"
             "    --offset=OFF|-o OFF    buffer offset (unit: bytes, def: 0)\n"
-            "    --raw|-r            output response to stdout\n"
+            "    --raw|-r            output response in binary to stdout\n"
             "    --readonly|-R       open DEVICE read-only (def: read-write)\n"
             "    --specific=MS|-S MS    mode specific value; 3 bit field (0 "
             "to 7)\n"
@@ -273,6 +283,315 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     return ret;
 }
 
+/* Microcode status: active, redundant and download */
+static const char * act_micro_st_arr[] = {
+    "Microcode status not reported",
+    "Activated microcode is valid",
+    "Activated microcode is not valid",
+    "Activated microcode is not a full microcode image",
+};
+
+static const char * red_micro_st_arr[] = {
+    "Redundant microcode status is not reported",
+    "At least one redundant microcode copy is valid",
+    "No redundant microcode copy is valid",
+    "Redundant microcode is not a full microcode image",
+};
+
+/* Major overlap between this SPC-4 table and SES-4r2 table 63 */
+struct sg_lib_simple_value_name_t down_micro_st_arr[] = {
+    {0x0, "No download microcode operation in progress"},
+    {0x1, "Download in progress, awaiting more"},               /* SES */
+    {0x2, "Download complete, updating storage"},               /* SES */
+    {0x3, "Updating storage with deferred microcode"},          /* SES */
+    {0x10, "Complete, no error, starting now"},                 /* SES */
+    {0x11, "Complete, no error, start after hard reset or power "
+           "cycle"},                                            /* SES */
+    {0x12, "Complete, no error, start after power cycle"},      /* SES */
+    {0x13, "Complete, no error, start after activate_mc, hard reset or "
+           "power cycle"},                                      /* SES */
+    {0x21, "Download in progress, awaiting more"},              /* SPC-6 */
+    {0x22, "Download complete, updating storage"},              /* SPC-6 */
+    {0x23, "Updating storage with deferred microcode"},         /* SPC-6 */
+    {0x30, "Deferred microcode download complete, no reports"}, /* SPC-6 */
+    {0x31, "Deferred download ok, await hard reset or power cycle"},
+    {0x32, "Deferred download ok, await power cycle"},          /* SPC-6 */
+    {0x33, "Deferred download ok, await any event"},            /* SPC-6 */
+    {0x34, "Deferred download ok, await Write buffer command"}, /* SPC-6 */
+    {0x35, "Deferred download ok, await any event, WB only this LU"},
+    {0x80, "Error, discarded, see additional status"},          /* SES */
+    {0x81, "Error, discarded, image error"},                    /* SES */
+    {0x82, "Timeout, discarded"},                               /* SES */
+    {0x83, "Internal error, need new microcode before reset"},  /* SES */
+    {0x84, "Internal error, need new microcode, reset safe"},   /* SES */
+    {0x85, "Unexpected activate_mc received"},                  /* SES */
+    {0x90, "Error, discarded, see additional status"},          /* SPC-6 */
+    {0x91, "Error, discarded, image error"},                    /* SPC-6 */
+    {0x92, "Timeout, discarded"},                               /* SPC-6 */
+    {0x93, "Internal error, need new microcode before reset"},  /* SPC-6 */
+    {0x94, "Internal error, need new microcode, reset safe"},   /* SPC-6 */
+    {0x95, "Unexpected activate_mc received, mcrocode discard"}, /* SPC-6 */
+    {0x1000, NULL},             /* End sentinel */
+};
+
+static void
+decode_microcode_status(uint8_t * resp, int rb_len)
+{
+    int n;
+    uint32_t u;
+    const char * cp;
+    const struct sg_lib_simple_value_name_t * vnp;
+    char b[32];
+
+    if ((NULL == resp) || (rb_len < 1))
+        return;
+    n = resp[0];
+    if (n < (int)SG_ARRAY_SIZE(act_micro_st_arr))
+        cp = act_micro_st_arr[n];
+    else {
+        snprintf(b, sizeof(b), "unknown [0x%x]", n);
+        cp = b;
+    }
+    printf("Activated microcode status: %s\n", cp);
+
+    if (rb_len < 2)
+        return;
+    n = resp[1];
+    if (n < (int)SG_ARRAY_SIZE(red_micro_st_arr))
+        cp = red_micro_st_arr[n];
+    else {
+        snprintf(b, sizeof(b), "unknown [0x%x]", n);
+        cp = b;
+    }
+    printf("Redundant microcode status: %s\n", cp);
+
+    if (rb_len < 3)
+        return;
+    n = resp[2];
+    for (vnp = down_micro_st_arr, cp = NULL; vnp->name; ++vnp) {
+        if (vnp->value == n) {
+            cp = vnp->name;
+            break;
+        }
+    }
+    if (NULL == cp) {
+        snprintf(b, sizeof(b), "unknown [0x%x]", n);
+        cp = b;
+    }
+    printf("Download microcode status: %s\n", cp);
+
+    if (rb_len > 7) {
+        u = sg_get_unaligned_be32(resp + 4);
+        printf("Download microcode maximum size (bytes): %u [0x%x]\n", u, u);
+    }
+    if (rb_len > 15) {
+        u = sg_get_unaligned_be32(resp + 12);
+        printf("Download microcode expected buffer offset (bytes): %u "
+               "[0x%x]\n", u, u);
+    }
+}
+
+/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
+ * stdin). If reading ASCII hex then there should be either one entry per
+ * line or a comma, space or tab separated list of bytes. If no_space is
+ * set then a string of ACSII hex digits is expected, 2 per byte. Everything
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or an
+ * error code. */
+static int
+f2hex_arr(const char * fname, int as_binary, int no_space,
+          uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
+{
+    int fn_len, in_len, k, j, m, fd, err;
+    bool has_stdin, split_line;
+    unsigned int h;
+    const char * lcp;
+    FILE * fp;
+    char line[512];
+    char carry_over[4];
+    int off = 0;
+    struct stat a_stat;
+
+    if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
+        return SG_LIB_LOGIC_ERROR;
+    fn_len = strlen(fname);
+    if (0 == fn_len)
+        return SG_LIB_SYNTAX_ERROR;
+    has_stdin = ((1 == fn_len) && ('-' == fname[0]));   /* read from stdin */
+    if (as_binary) {
+        if (has_stdin)
+            fd = STDIN_FILENO;
+        else {
+            fd = open(fname, O_RDONLY);
+            if (fd < 0) {
+                err = errno;
+                pr2serr("unable to open binary file %s: %s\n", fname,
+                         safe_strerror(err));
+                return sg_convert_errno(err);
+            }
+        }
+        k = read(fd, mp_arr, max_arr_len);
+        if (k <= 0) {
+            int ret = SG_LIB_SYNTAX_ERROR;
+
+            if (0 == k)
+                pr2serr("read 0 bytes from binary file %s\n", fname);
+            else {
+                ret = sg_convert_errno(errno);
+                pr2serr("read from binary file %s: %s\n", fname,
+                        safe_strerror(errno));
+            }
+            if (! has_stdin)
+                close(fd);
+            return ret;
+        }
+        if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
+            /* pipe; keep reading till error or 0 read */
+            while (k < max_arr_len) {
+                m = read(fd, mp_arr + k, max_arr_len - k);
+                if (0 == m)
+                   break;
+                if (m < 0) {
+                    err = errno;
+                    pr2serr("read from binary pipe %s: %s\n", fname,
+                            safe_strerror(err));
+                    if (! has_stdin)
+                        close(fd);
+                    return sg_convert_errno(err);
+                }
+                k += m;
+            }
+        }
+        *mp_arr_len = k;
+        if (! has_stdin)
+            close(fd);
+        return 0;
+    } else {    /* So read the file as ASCII hex */
+        if (has_stdin)
+            fp = stdin;
+        else {
+            fp = fopen(fname, "r");
+            if (NULL == fp) {
+                err = errno;
+                pr2serr("Unable to open %s for reading: %s\n", fname,
+                        safe_strerror(err));
+                return sg_convert_errno(err);
+            }
+        }
+     }
+
+    carry_over[0] = 0;
+    for (j = 0; j < 512; ++j) {
+        if (NULL == fgets(line, sizeof(line), fp))
+            break;
+        in_len = strlen(line);
+        if (in_len > 0) {
+            if ('\n' == line[in_len - 1]) {
+                --in_len;
+                line[in_len] = '\0';
+                split_line = false;
+            } else
+                split_line = true;
+        }
+        if (in_len < 1) {
+            carry_over[0] = 0;
+            continue;
+        }
+        if (carry_over[0]) {
+            if (isxdigit(line[0])) {
+                carry_over[1] = line[0];
+                carry_over[2] = '\0';
+                if (1 == sscanf(carry_over, "%4x", &h))
+                    mp_arr[off - 1] = h;       /* back up and overwrite */
+                else {
+                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
+                            __func__, carry_over, j + 1);
+                    goto bad;
+                }
+                lcp = line + 1;
+                --in_len;
+            } else
+                lcp = line;
+            carry_over[0] = 0;
+        } else
+            lcp = line;
+
+        m = strspn(lcp, " \t");
+        if (m == in_len)
+            continue;
+        lcp += m;
+        in_len -= m;
+        if ('#' == *lcp)
+            continue;
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
+        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
+            pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
+                    j + 1, m + k + 1);
+            goto bad;
+        }
+        if (no_space) {
+            for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
+                 ++k, lcp += 2) {
+                if (1 != sscanf(lcp, "%2x", &h)) {
+                    pr2serr("%s: bad hex number in line %d, pos %d\n",
+                            __func__, j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+                if ((off + k) >= max_arr_len) {
+                    pr2serr("%s: array length exceeded\n", __func__);
+                    goto bad;
+                }
+                mp_arr[off + k] = h;
+            }
+            if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
+                carry_over[0] = *lcp;
+            off += k;
+        } else {
+            for (k = 0; k < 1024; ++k) {
+                if (1 == sscanf(lcp, "%10x", &h)) {
+                    if (h > 0xff) {
+                        pr2serr("%s: hex number larger than 0xff in line "
+                                "%d, pos %d\n", __func__, j + 1,
+                                (int)(lcp - line + 1));
+                        goto bad;
+                    }
+                    if (split_line && (1 == strlen(lcp))) {
+                        /* single trailing hex digit might be a split pair */
+                        carry_over[0] = *lcp;
+                    }
+                    if ((off + k) >= max_arr_len) {
+                        pr2serr("%s: array length exceeded\n", __func__);
+                        goto bad;
+                    }
+                    mp_arr[off + k] = h;
+                    lcp = strpbrk(lcp, " ,\t");
+                    if (NULL == lcp)
+                        break;
+                    lcp += strspn(lcp, " ,\t");
+                    if ('\0' == *lcp)
+                        break;
+                } else {
+                    if (('#' == *lcp) || ('\r' == *lcp)) {
+                        --k;
+                        break;
+                    }
+                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
+                            j + 1, (int)(lcp - line + 1));
+                    goto bad;
+                }
+            }
+            off += (k + 1);
+        }
+    }
+    *mp_arr_len = off;
+    if (stdin != fp)
+        fclose(fp);
+    return 0;
+bad:
+    if (stdin != fp)
+        fclose(fp);
+    return 1;
+}
+
 static void
 dStrRaw(const uint8_t * str, int len)
 {
@@ -290,7 +609,7 @@ main(int argc, char * argv[])
     bool do_raw = false;
     bool verbose_given = false;
     bool version_given = false;
-    int res, c, len, k;
+    int res, c, len, k, inhex_len;
     int sg_fd = -1;
     int do_help = 0;
     int do_hex = 0;
@@ -304,13 +623,15 @@ main(int argc, char * argv[])
     int64_t ll;
     uint64_t rb_offset = 0;
     const char * device_name = NULL;
-    uint8_t * resp;
+    const char * fname = NULL;
+    uint8_t * resp = NULL;
+    uint8_t * free_resp = NULL;
     const struct mode_s * mp;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHi:l:Lm:o:rRS:vV", long_options,
+        c = getopt_long(argc, argv, "hHi:I:l:Lm:o:rRS:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -330,6 +651,14 @@ main(int argc, char * argv[])
                         "255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'I':
+            if (fname) {
+                pr2serr("--inhex= option given more than once. Once only "
+                        "please\n");
+                return SG_LIB_SYNTAX_ERROR;
+            } else
+                fname = optarg;
             break;
         case 'l':
             rb_len = sg_get_num(optarg);
@@ -444,19 +773,35 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    if (NULL == device_name) {
+    rb_len = 0;
+    inhex_len = 0;
+    if (device_name && fname) {
+        pr2serr("Confused: both DEVICE (%s) and --inhex= option given. One "
+                "only please\n", device_name);
+                return SG_LIB_SYNTAX_ERROR;
+    } else if (fname) {
+        rb_len = (rb_len > MAX_DEF_INHEX_LEN) ? rb_len : MAX_DEF_INHEX_LEN;
+        resp = (uint8_t *)sg_memalign(rb_len, 0, &free_resp, false);
+        ret = f2hex_arr(fname, do_raw, 0, resp, &inhex_len, rb_len);
+        if (ret)
+            goto fini;
+        if (do_raw)
+            do_raw = false;     /* only used for input in this case */
+        rb_len = inhex_len;
+        resid = 0;
+        goto decode_result;
+    } else if (NULL == device_name) {
         pr2serr("Missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
     len = rb_len ? rb_len : 8;
-    resp = (uint8_t *)malloc(len);
+    resp = (uint8_t *)sg_memalign(len, 0, &free_resp, false);
     if (NULL == resp) {
         pr2serr("unable to allocate %d bytes on the heap\n", len);
         return SG_LIB_CAT_OTHER;
     }
-    memset(resp, 0, len);
 
     if (do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
@@ -509,6 +854,7 @@ main(int argc, char * argv[])
     }
     if (resid > 0)
         rb_len -= resid;        /* got back less than requested */
+decode_result:
     if (rb_len > 0) {
         if (do_raw)
             dStrRaw(resp, rb_len);
@@ -527,6 +873,9 @@ main(int argc, char * argv[])
                 printf("EBOS:%d\n", resp[0] & 1 ? 1 : 0);
                 printf("Echo buffer capacity: %d (0x%x)\n", k, k);
                 break;
+            case MODE_READ_MICROCODE_ST:
+                decode_microcode_status(resp, rb_len);
+                break;
             default:
                 hex2stdout((const uint8_t *)resp, rb_len,
                            (verbose > 1 ? 0 : 1));
@@ -536,8 +885,8 @@ main(int argc, char * argv[])
     }
 
 fini:
-    if (resp)
-        free(resp);
+    if (free_resp)
+        free(free_resp);
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {

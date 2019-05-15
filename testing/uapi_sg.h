@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.11 (20190427)
+ * Version 4.0.11 (20190502)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -202,7 +202,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_MASTER_FINI 0x100	/* wr> 0: setup for repeat slave req */
 #define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
 #define SG_CTL_FLAGM_NO_DURATION 0x400	/* don't calc command duration */
-#define SG_CTL_FLAGM_ALL_BITS	0x7ff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_MORE_ASYNC 0x800	/* yield EAGAIN in more cases */
+#define SG_CTL_FLAGM_ALL_BITS	0xfff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */

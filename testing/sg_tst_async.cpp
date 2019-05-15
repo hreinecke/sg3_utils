@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.32 20190427";
+static const char * version_str = "1.34 20190506";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -168,7 +168,9 @@ static atomic<int> start_ebusy_count(0);
 static atomic<int> start_e2big_count(0);
 static atomic<int> start_eagain_count(0);
 static atomic<int> fin_eagain_count(0);
+static atomic<int> fin_ebusy_count(0);
 static atomic<int> start_edom_count(0);
+static atomic<int> enomem_count(0);
 static atomic<int> uniq_pack_id(1);
 // static atomic<int> generic_errs(0);
 
@@ -190,6 +192,7 @@ struct opts_t {
     bool cmd_time;
     bool direct;
     bool generic_sync;
+    bool masync;
     bool mmap_io;
     bool no_xfer;
     bool pack_id_force;
@@ -217,7 +220,9 @@ struct opts_t {
     myQDiscipline myqd;         /* --qfav= value (def: 2 --> MYQD_HIGH) */
 };
 
-static struct opts_t a_opts;	/* Expect zero fill on simple types */
+static struct opts_t a_opts;    /* Expect zero fill on simple types */
+
+static int pr_rusage(int id);
 
 #if 0
 class Rand_uint {
@@ -262,6 +267,9 @@ private:
 static struct option long_options[] = {
         {"v3", no_argument, 0, '3'},
         {"v4", no_argument, 0, '4'},
+        {"more-async", no_argument, 0, 'a'},
+        {"more_async", no_argument, 0, 'a'},
+        {"masync", no_argument, 0, 'a'},
         {"cmd-time", no_argument, 0, 'c'},
         {"cmd_time", no_argument, 0, 'c'},
         {"direct", no_argument, 0, 'd'},
@@ -302,16 +310,17 @@ usage(void)
 {
     printf("Usage: %s [--cmd-time] [--direct] [--force] [--generic-sync]\n"
            "                    [--help] [--lba=LBA+] [--lbsz=LBSZ] "
-           "[--maxqpt=QPT]\n"
-           "                    [--mmap-io] [--numpt=NPT] [--noxfer] "
-           "[--override=OVN]\n"
-           "                    [--pack-id] [--qat=AT] [-qfav=FAV] [--read] "
-           "[--stats]\n"
-           "                    [--submit] [--szlb=LB[,NLBS]] [--tnum=NT] "
-           "[--tur]\n"
-           "                    [--v3] [--v4] [--verbose] [--version] "
-           "[--wait=MS]\n"
-           "                    [--write]  <sg_disk_device>*\n",
+           "[--masync]\n"
+           "                    [--maxqpt=QPT] [--mmap-io] [--numpt=NPT] "
+           "[--noxfer]\n"
+           "                    [--override=OVN] [--pack-id] [--qat=AT] "
+           "[-qfav=FAV]\n"
+           "                    [--read] [--stats] [--submit] "
+           "[--szlb=LB[,NLBS]]\n"
+           "                    [--tnum=NT] [--tur] [--v3] [--v4] "
+           "[--verbose]\n"
+           "                    [--version] [--wait=MS] [--write]  "
+           "<sg_disk_device>*\n",
            util_name);
     printf("  where\n");
     printf("    --cmd-time|-c    calculate per command average time (ns)\n");
@@ -333,10 +342,10 @@ usage(void)
     printf("    --lbsz=LBSZ|-L LBSZ    logical block size in bytes (def: "
            "512)\n"
            "                           should be power of 2 (0 --> 512)\n");
+    printf("    --masync|-a     set 'more async' flag on devices\n");
     printf("    --maxqpt=QPT|-M QPT    maximum commands queued per thread "
            "(def:%d)\n", MAX_Q_PER_FD);
-    printf("    --mmap-io|-m         mmap-ed IO (1 cmd outstanding per "
-           "thread)\n");
+    printf("    --mmap-io|-m    mmap-ed IO (1 cmd outstanding per thread)\n");
     printf("    --numpt=NPT|-n NPT    number of commands per thread "
            "(def: %d)\n", DEF_NUM_PER_THREAD);
     printf("    --noxfer|-N          no data xfer (def: xfer on READ and "
@@ -344,7 +353,7 @@ usage(void)
     printf("    --override OVN|-O OVN    override FAV=2 when OVN queue "
            "depth\n"
            "                             reached (def: 0 -> no override)\n");
-    printf("    --pack-id|-p         set FORCE_PACK_ID, pack-id input to "
+    printf("    --pack-id|-p    set FORCE_PACK_ID, pack-id input to "
            "read/finish\n");
     printf("    --qat=AT|-q AT       AT=0: q_at_head; AT=1: q_at_tail (def: "
            "(drv): head)\n");
@@ -447,8 +456,8 @@ get_urandom_uint(void)
 static int
 start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
               uint8_t * lbp, int xfer_bytes, int flags, bool submit,
-              unsigned int & eagains, unsigned int & ebusy,
-              unsigned int & e2big, unsigned int & edom)
+              unsigned int & enomem, unsigned int & eagains,
+              unsigned int & ebusy, unsigned int & e2big, unsigned int & edom)
 {
     struct sg_io_hdr pt;
     struct sg_io_v4 p4t;
@@ -510,6 +519,7 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
                    write(sg_fd, ptp, sizeof(*ptp)) < 0);
          ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
+            ++enomem;
             this_thread::yield();
             continue;
         } else if (EAGAIN == errno) {
@@ -525,6 +535,8 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
             return 2;
         } else if (EDOM == errno)
             ++edom;
+        else if (ENOMEM == errno)
+            pr_rusage(-1);
         pr_errno_lk(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
         return -1;
     }
@@ -533,8 +545,9 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
 static int
 finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
-	       bool receive, int wait_ms, unsigned int & eagains,
-	       unsigned int & nanosecs)
+               bool receive, int wait_ms, unsigned int & enomem,
+               unsigned int & eagains, unsigned int & ebusys,
+               unsigned int & nanosecs)
 {
     bool ok;
     int res, k;
@@ -575,8 +588,13 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
     k = 0;
     while ((((res = receive ? ioctl(sg_fd, SG_IORECEIVE_V3, ptp) :
                               read(sg_fd, ptp, sizeof(*ptp)))) < 0) &&
-           (EAGAIN == errno)) {
-        ++eagains;
+           ((EAGAIN == errno) || (EBUSY == errno) || (ENOMEM == errno))) {
+        if (ENOMEM == errno)
+            ++enomem;
+        else if (EAGAIN == errno)
+            ++eagains;
+        else
+            ++ebusys;
         ++k;
         if (k > 10000) {
             pr2serr_lk("%s: sg_fd=%d: after %d EAGAINs, unable to find "
@@ -591,6 +609,8 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
             sleep(0);                   // process yield ??
     }
     if (res < 0) {
+        if (ENOMEM == errno)
+            pr_rusage(-1);
         pr_errno_lk(errno, "%s: %s", __func__, np);
         return -1;
     }
@@ -622,8 +642,8 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
 static int
 start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
               uint8_t * lbp, int xfer_bytes, int flags, bool submit,
-              unsigned int & eagains, unsigned int & ebusy,
-              unsigned int & e2big, unsigned int & edom)
+              unsigned int & enomem, unsigned int & eagains,
+              unsigned int & ebusy, unsigned int & e2big, unsigned int & edom)
 {
     struct sg_io_v4 p4t;
     uint8_t turCmdBlk[TUR_CMD_LEN] = {0, 0, 0, 0, 0, 0};
@@ -677,6 +697,7 @@ start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
     for (int k = 0; ioctl(sg_fd, SG_IOSUBMIT, ptp) < 0; ++k) {
         if ((ENOMEM == errno) && (k < MAX_CONSEC_NOMEMS)) {
+            ++enomem;
             this_thread::yield();
             continue;
         } else if (EAGAIN == errno) {
@@ -692,6 +713,8 @@ start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
             return 2;
         } else if (EDOM == errno)
             ++edom;
+        else if (ENOMEM == errno)
+            pr_rusage(-1);
         pr_errno_lk(errno, "%s: %s, pack_id=%d", __func__, np, pack_id);
         return -1;
     }
@@ -700,8 +723,9 @@ start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
 
 static int
 finish_sg4_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
-	       bool receive, int wait_ms, unsigned int & eagains,
-	       unsigned int & nanosecs)
+               bool receive, int wait_ms, unsigned int & enomem,
+               unsigned int & eagains, unsigned int & ebusys,
+               unsigned int & nanosecs)
 {
     bool ok;
     int res, k;
@@ -737,8 +761,11 @@ finish_sg4_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
 
     k = 0;
     while ((((res = ioctl(sg_fd, SG_IORECEIVE, ptp))) < 0) &&
-           (EAGAIN == errno)) {
-        ++eagains;
+           ((EAGAIN == errno) || (EBUSY == errno))) {
+        if (EAGAIN == errno)
+            ++eagains;
+        else
+            ++ebusys;
         ++k;
         if (k > 10000) {
             pr2serr_lk("%s: sg_fd=%d: after %d EAGAINs, unable to find "
@@ -753,6 +780,10 @@ finish_sg4_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
             sleep(0);                   // process yield ??
     }
     if (res < 0) {
+        if (ENOMEM == errno) {
+            ++enomem;
+            pr_rusage(-1);
+        }
         pr_errno_lk(errno, "%s: %s", __func__, np);
         return -1;
     }
@@ -847,6 +878,8 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
     if ((sg_fd = sg_cmds_open_device(dev_name, false /* ro */, vb)) < 0) {
         pr2serr_lk("id=%d: error opening file: %s: %s\n", id, dev_name,
                    safe_strerror(-sg_fd));
+        if (ENOMEM == -sg_fd)
+            pr_rusage(id);
         goto err_out;
     }
 
@@ -930,10 +963,12 @@ work_thread(int id, struct opts_t * op)
     int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
     int num_waiting_read, num_to_read, sz, ern, encore_pack_id, ask, j, m, o;
     int prev_pack_id, blk_sz;
+    unsigned int thr_enomem_count = 0;
     unsigned int thr_start_eagain_count = 0;
     unsigned int thr_start_ebusy_count = 0;
     unsigned int thr_start_e2big_count = 0;
     unsigned int thr_fin_eagain_count = 0;
+    unsigned int thr_fin_ebusy_count = 0;
     unsigned int thr_start_edom_count = 0;
     unsigned int seed = 0;
     int needed_sz = op->lb_sz * op->num_lbs;
@@ -960,7 +995,7 @@ work_thread(int id, struct opts_t * op)
     if (op->blk_szs.size() >= (unsigned)n)
         blk_sz = op->blk_szs[id % n];
     else
-	blk_sz = DEF_LB_SZ;
+        blk_sz = DEF_LB_SZ;
     if ((UINT_MAX == op->hi_lba) && (n == (int)op->hi_lbas.size()))
         hi_lba = op->hi_lbas[id % n];
     else
@@ -985,6 +1020,8 @@ work_thread(int id, struct opts_t * op)
     if (sg_fd < 0) {
         pr_errno_lk(errno, "%s: id=%d, error opening file: %s", __func__, id,
                     dev_name);
+        if (ENOMEM == -sg_fd)
+            pr_rusage(id);
         return;
     }
     if (op->pack_id_force) {
@@ -998,7 +1035,7 @@ work_thread(int id, struct opts_t * op)
             if (needed_sz > k)
                 ioctl(sg_fd, SG_SET_RESERVED_SIZE, &needed_sz);
         }
-        if (op->cmd_time) {
+        if (op->cmd_time || op->masync) {
             struct sg_extended_info sei;
             struct sg_extended_info * seip;
 
@@ -1006,14 +1043,21 @@ work_thread(int id, struct opts_t * op)
             memset(seip, 0, sizeof(*seip));
             seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
             seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
-            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
-            seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
-            seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+            if (op->cmd_time) {
+                seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+                seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+                seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+            }
+            if (op->masync) {
+                seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
+                seip->ctl_flags |= SG_CTL_FLAGM_MORE_ASYNC;
+            }
             if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
                 pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
                            errno, strerror(errno));
             }
-            if (! (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags)) {
+            if (op->cmd_time &&
+                (! (SG_CTL_FLAGM_TIME_IN_NS & seip->ctl_flags))) {
                 memset(seip, 0, sizeof(*seip));
                 seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
                 seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
@@ -1231,11 +1275,13 @@ work_thread(int id, struct opts_t * op)
             res = (op->v4) ?
                 start_sg4_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
                               blk_sz * op->num_lbs, sg_flags, op->submit,
-                              thr_start_eagain_count, thr_start_ebusy_count,
-                              thr_start_e2big_count, thr_start_edom_count)  :
+                              thr_enomem_count, thr_start_eagain_count,
+                              thr_start_ebusy_count, thr_start_e2big_count,
+                              thr_start_edom_count)  :
                 start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
                               blk_sz * op->num_lbs, sg_flags, op->submit,
-                              thr_start_eagain_count, thr_start_ebusy_count,
+                              thr_enomem_count, thr_start_eagain_count,
+                              thr_start_ebusy_count,
                               thr_start_e2big_count, thr_start_edom_count);
             if (res) {
                 if (res > 1) { /* here if E2BIG, start not done, try finish */
@@ -1423,11 +1469,13 @@ work_thread(int id, struct opts_t * op)
             ask = pack_id;
             res = (op->v4) ?
                     finish_sg4_cmd(sg_fd, op->c2e, pack_id, op->submit,
-				   op->wait_ms, thr_fin_eagain_count,
-				   nanosecs)           :
+                                   op->wait_ms, thr_enomem_count,
+                                   thr_fin_eagain_count, thr_fin_ebusy_count,
+                                   nanosecs)           :
                     finish_sg3_cmd(sg_fd, op->c2e, pack_id, op->submit,
-			  	   op->wait_ms, thr_fin_eagain_count,
-				   nanosecs);
+                                   op->wait_ms, thr_enomem_count,
+                                   thr_fin_eagain_count, thr_fin_ebusy_count,
+                                   nanosecs);
             if (res) {
                 err = "finish_sg3_cmd()";
                 if (ruip && (pack_id > 0)) {
@@ -1522,6 +1570,7 @@ work_thread(int id, struct opts_t * op)
     start_ebusy_count += thr_start_ebusy_count;
     start_e2big_count += thr_start_e2big_count;
     fin_eagain_count += thr_fin_eagain_count;
+    fin_ebusy_count += thr_fin_ebusy_count;
     start_edom_count += thr_start_edom_count;
     if (op->cmd_time && op->sg_vn_ge_30901 && (npt > 0)) {
         pr2serr_lk("t_id=%d average nanosecs per cmd: %" PRId64
@@ -1686,7 +1735,7 @@ main(int argc, char * argv[])
 
     op = &a_opts;
 #if 0
-    memset(op, 0, sizeof(*op));		// C++ doesn't like this
+    memset(op, 0, sizeof(*op));         // C++ doesn't like this
 #endif
     op->direct = DEF_DIRECT;
     op->lba = DEF_LBA;
@@ -1708,7 +1757,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "34cdfghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
+        c = getopt_long(argc, argv, "34acdfghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1725,6 +1774,9 @@ main(int argc, char * argv[])
             op->v4_given = true;
             op->v3 = false;
             op->v3_given = false;
+            break;
+        case 'a':
+            op->masync = true;
             break;
         case 'c':
             op->cmd_time = true;
@@ -2106,14 +2158,25 @@ main(int argc, char * argv[])
             cout << "Number of async_finishes: " << async_finishes.load() <<
                     endl;
             cout << "Last pack_id: " << n << endl;
-            cout << "Number of EBUSYs: " << start_ebusy_count.load() << endl;
-            cout << "Number of start EAGAINs: " << start_eagain_count.load()
-                 << endl;
-            cout << "Number of finish EAGAINs: " << fin_eagain_count.load()
-                 << endl;
-            cout << "Number of E2BIGs: " << start_e2big_count.load() << endl;
-            cout << "Number of EDOMs: " << start_edom_count.load() << endl;
         }
+        n = start_ebusy_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of start EBUSYs: " << n << endl;
+        n = fin_ebusy_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of finish EBUSYs: " << n << endl;
+        n = start_eagain_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of start EAGAINs: " << n << endl;
+        n = fin_eagain_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of finish EAGAINs: " << n << endl;
+        n = start_e2big_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of E2BIGs: " << n << endl;
+        n = start_edom_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of EDOMs: " << n << endl;
     }
     catch(system_error& e)  {
         cerr << "got a system_error exception: " << e.what() << '\n';

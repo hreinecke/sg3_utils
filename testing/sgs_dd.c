@@ -78,7 +78,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.06 20190501";
+static const char * version_str = "4.07 20190503";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -291,7 +291,7 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
     if (res < 0) {
         if (ENOMEM == errno)
             return 1;
-        if ((EDOM == errno) || (EAGAIN == errno)) {
+        if ((EDOM == errno) || (EAGAIN == errno) || (EBUSY == errno)) {
             rep->state = SGQ_IO_WAIT;   /* busy so wait */
             return 0;
         }
@@ -307,18 +307,18 @@ do_v4:
     memset(h4p, 0, sizeof(struct sg_io_v4));
     h4p->guard = 'Q';
     h4p->request_len = sizeof(rep->cmd);
-    h4p->request = (uint64_t)rep->cmd;
+    h4p->request = (uint64_t)(uintptr_t)rep->cmd;
     if (rep->wr) {
         h4p->dout_xfer_len = clp->bs * rep->num_blks;
-        h4p->dout_xferp = (uint64_t)rep->buffp;
+        h4p->dout_xferp = (uint64_t)(uintptr_t)rep->buffp;
     } else if (rep->num_blks > 0) {
         h4p->din_xfer_len = clp->bs * rep->num_blks;
-        h4p->din_xferp = (uint64_t)rep->buffp;
+        h4p->din_xferp = (uint64_t)(uintptr_t)rep->buffp;
     }
     h4p->max_response_len = sizeof(rep->sb);
-    h4p->response = (uint64_t)rep->sb;
+    h4p->response = (uint64_t)(uintptr_t)rep->sb;
     h4p->timeout = DEF_TIMEOUT;
-    h4p->usr_ptr = (uint64_t)rep;
+    h4p->usr_ptr = (uint64_t)(uintptr_t)rep;
     h4p->request_extra = rep->blk;/* N.B. blk --> pack_id --> request_extra */
     if (flagp->dio)
         h4p->flags |= SG_FLAG_DIRECT_IO;
@@ -333,7 +333,7 @@ do_v4:
     if (res < 0) {
         if (ENOMEM == errno)
             return 1;
-        if ((EDOM == errno) || (EAGAIN == errno)) {
+        if ((EDOM == errno) || (EAGAIN == errno) || (EBUSY == errno)) {
             rep->state = SGQ_IO_WAIT;   /* busy so wait */
             return 0;
         }
@@ -365,7 +365,7 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
         goto do_v4;
     memset(&io_hdr, 0 , sizeof(sg_io_hdr_t));
     while (((res = read(fd, &io_hdr, sizeof(sg_io_hdr_t))) < 0) &&
-           (EINTR == errno))
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
     rep = (Rq_elem *)io_hdr.usr_ptr;
     if (rep)
@@ -414,9 +414,10 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
 do_v4:
     memset(&io_v4, 0 , sizeof(io_v4));
     io_v4.guard = 'Q';
-    while (((res = ioctl(fd, SG_IORECEIVE, &io_v4)) < 0) && (EINTR == errno))
+    while (((res = ioctl(fd, SG_IORECEIVE, &io_v4)) < 0) &&
+           ((EINTR == errno) || (EAGAIN == errno)))
         ;
-    rep = (Rq_elem *)io_v4.usr_ptr;
+    rep = (Rq_elem *)(unsigned long)io_v4.usr_ptr;
     if (res < 0) {
         fprintf(stderr, "%s: ioctl(SG_IORECEIVE): %s [%d]\n", __func__,
                 strerror(errno),
@@ -438,7 +439,7 @@ do_v4:
 
     res = sg_err_category_new(h4p->device_status, h4p->transport_status,
                               h4p->driver_status,
-                              (const uint8_t *)h4p->response,
+                      (const uint8_t *)(unsigned long)h4p->response,
                               h4p->response_len);
     switch (res) {
         case SG_LIB_CAT_CLEAN:
@@ -453,7 +454,7 @@ do_v4:
             sg_linux_sense_print(rep->wr ? "writing": "reading",
                                  h4p->device_status, h4p->transport_status,
                                  h4p->driver_status,
-                                 (const uint8_t *)h4p->response,
+                         (const uint8_t *)(unsigned long)h4p->response,
                                  h4p->response_len, true);
             rep->state = SGQ_IO_ERR;
             return -1;
