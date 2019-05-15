@@ -53,7 +53,7 @@
  is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.04  20190128";
+static const char * version_str = "Version: 1.05  20190501";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_OP 0x12
@@ -350,12 +350,12 @@ rep_sg_io:
             pr2serr("\n");
         }
         io_v4p->request_len = XDWRITEREAD_10_LEN;
-        io_v4p->request = (uint64_t)xdwrrd10_cdb;
+        io_v4p->request = (uint64_t)(uintptr_t)xdwrrd10_cdb;
         io_v4p->din_xfer_len = din_len;
-        io_v4p->din_xferp = (uint64_t)(dinp + (k * din_len));
+        io_v4p->din_xferp = (uint64_t)(uintptr_t)(dinp + (k * din_len));
         io_v4p->dout_xfer_len = dout_len;
-        io_v4p->dout_xferp = (uint64_t)(doutp + (k * dout_len));
-        io_v4p->response = (uint64_t)sense_buffer[k];
+        io_v4p->dout_xferp = (uint64_t)(uintptr_t)(doutp + (k * dout_len));
+        io_v4p->response = (uint64_t)(uintptr_t)sense_buffer[k];
         io_v4p->max_response_len = SENSE_BUFFER_LEN;
         io_v4p->timeout = 20000;     /* 20000 millisecs == 20 seconds */
         io_v4p->request_extra = 99;  /* so pack_id doesn't start at 0 */
@@ -378,7 +378,7 @@ rep_sg_io:
         cat = sg_err_category_new(rio_v4.device_status,
                                   rio_v4.transport_status,
                                   rio_v4.driver_status,
-                                  (const uint8_t *)rio_v4.response,
+			  (const uint8_t *)(unsigned long)rio_v4.response,
                                   rio_v4.response_len);
         switch (cat) {
         case SG_LIB_CAT_CLEAN:
@@ -392,7 +392,7 @@ rep_sg_io:
             sg_linux_sense_print(NULL, rio_v4.device_status,
                                  rio_v4.transport_status,
                                  rio_v4.driver_status,
-                                 (const uint8_t *)rio_v4.response,
+			 (const uint8_t *)(unsigned long)rio_v4.response,
                                  rio_v4.response_len, true);
             break;
         }
@@ -436,11 +436,11 @@ rep_async:
                 pr2serr("\n");
             }
             io_v4p->request_len = XDWRITEREAD_10_LEN;
-            io_v4p->request = (uint64_t)xdwrrd10_cdb;
+            io_v4p->request = (uint64_t)(uintptr_t)xdwrrd10_cdb;
             io_v4p->din_xfer_len = din_len;
-            io_v4p->din_xferp = (uint64_t)(dinp + (k * din_len));
+            io_v4p->din_xferp = (uint64_t)(uintptr_t)(dinp + (k * din_len));
             io_v4p->dout_xfer_len = dout_len;
-            io_v4p->dout_xferp = (uint64_t)(doutp + (k * dout_len));
+            io_v4p->dout_xferp = (uint64_t)(uintptr_t)(doutp + (k * dout_len));
         } else {
             if (verbose > 2) {
                 pr2serr("    %s cdb: ", "INQUIRY");
@@ -449,11 +449,11 @@ rep_async:
                 pr2serr("\n");
             }
             io_v4p->request_len = sizeof(inq_cdb);
-            io_v4p->request = (uint64_t)inq_cdb;
+            io_v4p->request = (uint64_t)(uintptr_t)inq_cdb;
             io_v4p->din_xfer_len = INQ_REPLY_LEN;
-            io_v4p->din_xferp = (uint64_t)inqBuff[k];
+            io_v4p->din_xferp = (uint64_t)(uintptr_t)inqBuff[k];
         }
-        io_v4p->response = (uint64_t)sense_buffer[k];
+        io_v4p->response = (uint64_t)(uintptr_t)sense_buffer[k];
         io_v4p->max_response_len = SENSE_BUFFER_LEN;
         io_v4p->timeout = 20000;     /* 20000 millisecs == 20 seconds */
         io_v4p->request_extra = k + 3;  /* so pack_id doesn't start at 0 */
@@ -546,7 +546,7 @@ rep_async:
         cat = sg_err_category_new(rio_v4.device_status,
                                   rio_v4.transport_status,
                                   rio_v4.driver_status,
-                                  (const uint8_t *)rio_v4.response,
+			  (const uint8_t *)(unsigned long)rio_v4.response,
                                   rio_v4.response_len);
         switch (cat) {
         case SG_LIB_CAT_CLEAN:
@@ -560,7 +560,7 @@ rep_async:
             sg_linux_sense_print(NULL, rio_v4.device_status,
                                  rio_v4.transport_status,
                                  rio_v4.driver_status,
-                                 (const uint8_t *)rio_v4.response,
+			 (const uint8_t *)(unsigned long)rio_v4.response,
                                  rio_v4.response_len, true);
             break;
         }

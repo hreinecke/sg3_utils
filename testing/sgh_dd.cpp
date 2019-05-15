@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.29 20190430";
+static const char * version_str = "1.30 20190505";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -161,6 +161,7 @@ struct flags_t {
     bool dsync;
     bool excl;
     bool fua;
+    bool masync;        /* more async sg v4 driver flag */
     bool mmap;
     bool no_dur;
     bool noshare;
@@ -272,6 +273,10 @@ typedef pair< vector<struct sg_io_v4>, vector<cmd_at> >   mrq_arr_t;
 
 static atomic<int> mono_pack_id(0);
 static atomic<long int> pos_index(0);
+
+static atomic<int> num_ebusy(0);
+static atomic<int> num_start_eagain(0);
+static atomic<int> num_fin_eagain(0);
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
@@ -620,18 +625,20 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,noxfer,null,"
-            "same_fds,v3,v4]\n"
+            "                dsync,excl,fua,masync,mmap,noshare,noxfer,null,"
+            "same_fds,\n"
+            "                v3,v4]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
             "uses /dev/null\n"
             "    of2         second file or device to write to (def: "
             "/dev/null)\n"
-            "    oflag       comma separated list from: [append,coe,dio,"
-            "direct,dpo,\n"
-            "                dsync,excl,fua,mmap,noshare,noxfer,null,"
-            "same_fds,swait,v3,v4]\n"
+            "    oflag       comma separated list from: [append,coe,defres,"
+            "dio,direct,\n"
+            "                dpo,dsync,excl,fua,masync,mmap,noshare,noxfer,"
+            "null,\n"
+            "                same_fds,swait,v3,v4]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -704,6 +711,7 @@ page3:
             "    excl        sets the O_EXCL flag on open()\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
+            "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
             "    nodur       turns off command duration calculations\n"
@@ -1765,8 +1773,13 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     hp->flags = flags;
 
     while (((res = write(fd, hp, sizeof(struct sg_io_hdr))) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
+        if (EAGAIN == errno)
+            ++num_start_eagain;
+        else if (EBUSY == errno)
+            ++num_ebusy;
         sched_yield();  /* another thread may be able to progress */
+    }
     err = errno;
     if (res < 0) {
         if (ENOMEM == err)
@@ -1808,8 +1821,13 @@ do_v4:
         return res;
     }
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
+        if (EAGAIN == errno)
+            ++num_start_eagain;
+        else if (EBUSY == errno)
+            ++num_ebusy;
         sched_yield();  /* another thread may be able to progress */
+    }
     err = errno;
     if (res < 0) {
         if (ENOMEM == err)
@@ -1876,8 +1894,13 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
     io_hdr.pack_id = pack_id;
 
     while (((res = read(fd, &io_hdr, sizeof(struct sg_io_hdr))) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
+        if (EAGAIN == errno)
+            ++num_fin_eagain;
+        else if (EBUSY == errno)
+            ++num_ebusy;
         sched_yield();  /* another thread may be able to progress */
+    }
     if (res < 0) {
         perror("finishing io [read(2)] on sg device, error");
         return -1;
@@ -1930,8 +1953,13 @@ do_v4:
     h4p = &rep->io_hdr4;
     h4p->request_extra = pack_id;
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
+        if (EAGAIN == errno)
+            ++num_fin_eagain;
+        else if (EBUSY == errno)
+            ++num_ebusy;
         sched_yield();  /* another thread may be able to progress */
+    }
     if (res < 0) {
         perror("finishing io [SG_IORECEIVE] on sg device, error");
         return -1;
@@ -2154,7 +2182,7 @@ write_complet:
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
 sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
-                  bool unit_nano, bool no_dur, uint8_t **mmpp)
+                  bool unit_nano, bool no_dur, bool masync, uint8_t **mmpp)
 {
     int res, t, num;
     uint8_t *mmp;
@@ -2189,11 +2217,17 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
                 pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
                            "wr error: %s\n", __func__, strerror(errno));
         }
-    } else if (no_dur) {
+    } else if (no_dur || masync) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
-        seip->ctl_flags |= SG_CTL_FLAGM_NO_DURATION;
+        if (no_dur) {
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
+            seip->ctl_flags |= SG_CTL_FLAGM_NO_DURATION;
+        }
+        if (masync) {
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
+            seip->ctl_flags |= SG_CTL_FLAGM_MORE_ASYNC;
+        }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
             pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(NO_DURATION) "
@@ -2268,6 +2302,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->excl = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
+        else if (0 == strcmp(cp, "masync"))
+            fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
             fp->mmap = true;
         else if (0 == strcmp(cp, "nodur"))
@@ -2333,7 +2369,7 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
                           clp->elem_sz, clp->unit_nanosec,
-                          clp->in_flags.no_dur, mmpp);
+                          clp->in_flags.no_dur, clp->in_flags.masync, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2364,7 +2400,7 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->out_flags.defres,
                           clp->elem_sz, clp->unit_nanosec,
-                          clp->out_flags.no_dur, mmpp);
+                          clp->out_flags.no_dur, clp->out_flags.masync, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -3196,5 +3232,13 @@ fini:
     if (clp->sum_of_resids)
         pr2serr(">> Non-zero sum of residual counts=%d\n",
                clp->sum_of_resids);
+    if (clp->debug && (num_start_eagain > 0))
+        pr2serr("Number of start EAGAINs: %d\n", num_start_eagain.load());
+    if (clp->debug && (num_fin_eagain > 0))
+        pr2serr("Number of finish EAGAINs: %d\n", num_fin_eagain.load());
+    if (clp->debug && (num_ebusy > 0)) {
+        pr2serr("Number of EBUSYs: %d\n", num_ebusy.load());
+
+    }
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }
