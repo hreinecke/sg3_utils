@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "April 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG3_UTILS "8" "May 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -573,8 +573,10 @@ act on the input, typically it acts on the output data.
 Since the structure of the data returned by SCSI commands varies
 considerably then the usage information or the manpage of the utility being
 used should be checked. In some cases \fI\-\-hex\fR may need to be used
-multiple times (and is more conveniently given as '\-HH' or '\-HHH). In
-other cases the name of this option is \fI\-\-inhex=FN\fR.
+multiple times (and is more conveniently given as '\-HH' or '\-HHH).
+.br
+In some cases the name of the option with this functionality is
+\fI\-\-inhex=FN\fR.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response

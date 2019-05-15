@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.73 20190405";    /* spc5r21 + sbc4r17 */
+static const char * version_str = "1.74 20190502";    /* spc5r21 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1928,7 +1928,7 @@ show_error_counter_page(const uint8_t * resp, int len,
         }
         val = sg_get_unaligned_be(pl - 4, bp + 4);
         printf(" = %" PRIu64 "", val);
-        if (val > (1UL << 40))
+        if (val > ((uint64_t)1 << 40))
             printf(" [%" PRIu64 " TB]\n",
                    (val / (1000UL * 1000 * 1000 * 1000)));
         else
