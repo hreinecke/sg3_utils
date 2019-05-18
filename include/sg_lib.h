@@ -569,6 +569,15 @@ void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
 int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
             int cb_len, char * cbp);
 
+/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
+ * stdin). If reading ASCII hex then there should be either one entry per
+ * line or a comma, space or tab separated list of bytes. If no_space is
+ * set then a string of ACSII hex digits is expected, 2 per byte. Everything
+ * from and including a '#' on a line is ignored. Returns 0 if ok, or an
+ * error code. */
+int sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
+                 uint8_t * mp_arr, int * mp_arr_len, int max_arr_len);
+
 /* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a
  * big endian machine). */

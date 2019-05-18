@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.30 20190505";
+static const char * version_str = "1.31 20190515";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -305,6 +305,7 @@ static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
 static bool have_sg_version = false;
 static int sg_version = 0;
+static bool sg_version_lt_4 = false;
 static bool shutting_down = false;
 static bool do_sync = false;
 static bool do_time = true;
@@ -1039,7 +1040,7 @@ read_write_thread(void * v_tip)
             pr2serr_lk("thread=%d: using global sg OFILE2, fd=%d\n", rep->id,
                        rep->out2fd);
     }
-    if (rep->in_flags.noshare || rep->out_flags.noshare) {
+    if (rep->in_flags.noshare || rep->out_flags.noshare || sg_version_lt_4) {
         if (vb > 4)
             pr2serr_lk("thread=%d: Skipping share on both IFILE and OFILE\n",
                        rep->id);
@@ -2184,6 +2185,7 @@ static int
 sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
                   bool unit_nano, bool no_dur, bool masync, uint8_t **mmpp)
 {
+    static bool done = false;
     int res, t, num;
     uint8_t *mmp;
     struct sg_extended_info sei;
@@ -2192,8 +2194,17 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 40000)) {
-        pr2serr_lk("%ssg driver prior to 4.0.00\n", my_name);
-        return 0;
+        if (ioctl(fd, SG_GET_RESERVED_SIZE, &num) < 0) {
+            perror("SG_GET_RESERVED_SIZE ioctl failed");
+            return 0;
+        }
+        if (! done) {
+            done = true;
+            sg_version_lt_4 = true;
+            pr2serr_lk("%ssg driver prior to 4.0.00, reduced functionality\n",
+                       my_name);
+        }
+        goto fini;
     }
     if (elem_sz >= 4096) {
         memset(seip, 0, sizeof(*seip));
@@ -2263,6 +2274,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
                        errno, strerror(errno));
         }
     }
+fini:
     return (res < 0) ? 0 : num;
 }
 

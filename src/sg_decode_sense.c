@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Douglas Gilbert.
+ * Copyright (c) 2010-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.19 20180714";
+static const char * version_str = "1.20 20190516";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
 
@@ -244,154 +244,6 @@ the_end:
     return 0;
 }
 
-/* Read ASCII hex bytes from fname (a file named '-' taken as stdin).
- * There should be either one entry per line or a comma, space or tab
- * separated list of bytes. If no_space is set then a string of ACSII hex
- * digits is expected, 2 per byte. Everything from and including a '#'
- * on a line is ignored.  Returns 0 if ok, sg3_utils code value. */
-static int
-f2hex_arr(const char * fname, bool no_space, uint8_t * mp_arr,
-          int * mp_arr_len, int max_arr_len)
-{
-    bool split_line;
-    int fn_len, in_len, k, j, m, err;
-    int off = 0;
-    unsigned int h;
-    const char * lcp;
-    FILE * fp;
-    char line[512];
-    char carry_over[4];
-
-    if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return SG_LIB_LOGIC_ERROR;
-    fn_len = strlen(fname);
-    if (0 == fn_len)
-        return SG_LIB_SYNTAX_ERROR;
-    if ((1 == fn_len) && ('-' == fname[0]))        /* read from stdin */
-        fp = stdin;
-    else {
-        fp = fopen(fname, "r");
-        if (NULL == fp) {
-            err = errno;
-            pr2serr("Unable to open %s for reading: %s\n", fname,
-                    safe_strerror(err));
-            return sg_convert_errno(err);
-        }
-    }
-
-    carry_over[0] = 0;
-    for (j = 0; j < 512; ++j) {
-        if (NULL == fgets(line, sizeof(line), fp))
-            break;
-        in_len = strlen(line);
-        if (in_len > 0) {
-            if ('\n' == line[in_len - 1]) {
-                --in_len;
-                line[in_len] = '\0';
-                split_line = false;
-            } else
-                split_line = true;
-        }
-        if (in_len < 1) {
-            carry_over[0] = 0;
-            continue;
-        }
-        if (carry_over[0]) {
-            if (isxdigit(line[0])) {
-                carry_over[1] = line[0];
-                carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%x", &h))
-                    mp_arr[off - 1] = h;       /* back up and overwrite */
-                else {
-                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
-                            __func__, carry_over, j + 1);
-                    goto bad;
-                }
-                lcp = line + 1;
-                --in_len;
-            } else
-                lcp = line;
-            carry_over[0] = 0;
-        } else
-            lcp = line;
-
-        m = strspn(lcp, " \t");
-        if (m == in_len)
-            continue;
-        lcp += m;
-        in_len -= m;
-        if ('#' == *lcp)
-            continue;
-        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
-            pr2serr("%s: syntax error at line %d, pos %d\n", __func__, j + 1,
-                    m + k + 1);
-            goto bad;
-        }
-        if (no_space) {
-            for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
-                 ++k, lcp += 2) {
-                if (1 != sscanf(lcp, "%2x", &h)) {
-                    pr2serr("%s: bad hex number in line %d, pos %d\n",
-                            __func__, j + 1, (int)(lcp - line + 1));
-                    goto bad;
-                }
-                if ((off + k) >= max_arr_len) {
-                    pr2serr("%s: array length exceeded\n", __func__);
-                    goto bad;
-                }
-                mp_arr[off + k] = h;
-            }
-            if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
-                carry_over[0] = *lcp;
-            off += k;
-        } else {
-            for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
-                    if (h > 0xff) {
-                        pr2serr("%s: hex number larger than 0xff in line %d, "
-                                "pos %d\n", __func__, j + 1,
-                                (int)(lcp - line + 1));
-                        goto bad;
-                    }
-                    if (split_line && (1 == strlen(lcp))) {
-                        /* single trailing hex digit might be a split pair */
-                        carry_over[0] = *lcp;
-                    }
-                    if ((off + k) >= max_arr_len) {
-                        pr2serr("%s: array length exceeded\n", __func__);
-                        goto bad;
-                    }
-                    mp_arr[off + k] = h;
-                    lcp = strpbrk(lcp, " ,\t");
-                    if (NULL == lcp)
-                        break;
-                    lcp += strspn(lcp, " ,\t");
-                    if ('\0' == *lcp)
-                        break;
-                } else {
-                    if (('#' == *lcp) || ('\r' == *lcp)) {
-                        --k;
-                        break;
-                    }
-                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
-                            j + 1, (int)(lcp - line + 1));
-                    goto bad;
-                }
-            }
-            off += (k + 1);
-        }
-    }
-    *mp_arr_len = off;
-    if (stdin != fp)
-        fclose(fp);
-    return 0;
-bad:
-    if (stdin != fp)
-        fclose(fp);
-    return SG_LIB_SYNTAX_ERROR;
-}
-
 static void
 write2wfn(FILE * fp, struct opts_t * op)
 {
@@ -538,8 +390,8 @@ main(int argc, char *argv[])
         }
         op->sense_len = s;
     } else if (op->file_given) {
-        ret = f2hex_arr(op->fname, op->no_space, op->sense, &op->sense_len,
-                        MAX_SENSE_LEN);
+        ret = sg_f2hex_arr(op->fname, false, op->no_space, op->sense,
+                           &op->sense_len, MAX_SENSE_LEN);
         if (ret) {
             pr2serr("unable to decode ASCII hex from file: %s\n", op->fname);
             return ret;

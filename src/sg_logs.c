@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.74 20190502";    /* spc5r21 + sbc4r17 */
+static const char * version_str = "1.75 20190516";    /* spc5r22 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1355,189 +1355,6 @@ num_or_unknown(const uint8_t * xp, int num_bytes /* max is 8 */, bool in_hex,
     }
     return b;
 }
-
-/* Read ASCII hex bytes or binary from fname (a file named '-' taken as
- * stdin). If reading ASCII hex then there should be either one entry per
- * line or a comma, space or tab separated list of bytes. If no_space is
- * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, error
- * code. */
-static int
-f2hex_arr(const char * fname, bool as_binary, bool no_space,
-          uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
-{
-    bool split_line, has_stdin;
-    int fn_len, in_len, k, j, m, fd, err;
-    int off = 0;
-    unsigned int h;
-    const char * lcp;
-    FILE * fp;
-    char line[512];
-    char carry_over[4];
-
-    if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len))
-        return SG_LIB_LOGIC_ERROR;
-    fn_len = strlen(fname);
-    if (0 == fn_len)
-        return SG_LIB_SYNTAX_ERROR;
-    has_stdin = ((1 == fn_len) && ('-' == fname[0]));  /* read from stdin */
-    if (as_binary) {
-        if (has_stdin) {
-            fd = STDIN_FILENO;
-                if (sg_set_binary_mode(STDIN_FILENO) < 0)
-                    perror("sg_set_binary_mode");
-        } else {
-            fd = open(fname, O_RDONLY);
-            if (fd < 0) {
-                err = errno;
-                pr2serr("unable to open binary file %s: %s\n", fname,
-                         safe_strerror(err));
-                return sg_convert_errno(err);
-            } else if (sg_set_binary_mode(fd) < 0)
-                perror("sg_set_binary_mode");
-        }
-        k = read(fd, mp_arr, max_arr_len);
-        if (k <= 0) {
-            if (0 == k)
-                pr2serr("read 0 bytes from binary file %s\n", fname);
-            else
-                pr2serr("read from binary file %s: %s\n", fname,
-                        safe_strerror(errno));
-            if (! has_stdin)
-                close(fd);
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        *mp_arr_len = k;
-        if (! has_stdin)
-            close(fd);
-        return 0;
-    } else {    /* So read the file as ASCII hex */
-        if (has_stdin)
-            fp = stdin;
-        else {
-            fp = fopen(fname, "r");
-            if (NULL == fp) {
-                err = errno;
-                pr2serr("Unable to open %s for reading: %s\n", fname,
-                        safe_strerror(err));
-                return sg_convert_errno(err);
-            }
-        }
-    }
-
-    carry_over[0] = 0;
-    for (j = 0; j < 512; ++j) {
-        if (NULL == fgets(line, sizeof(line), fp))
-            break;
-        in_len = strlen(line);
-        if (in_len > 0) {
-            if ('\n' == line[in_len - 1]) {
-                --in_len;
-                line[in_len] = '\0';
-                split_line = false;
-            } else
-                split_line = true;
-        }
-        if (in_len < 1) {
-            carry_over[0] = 0;
-            continue;
-        }
-        if (carry_over[0]) {
-            if (isxdigit(line[0])) {
-                carry_over[1] = line[0];
-                carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%4x", &h))
-                    mp_arr[off - 1] = h;       /* back up and overwrite */
-                else {
-                    pr2serr("%s: carry_over error ['%s'] around line %d\n",
-                            __func__, carry_over, j + 1);
-                    goto bad;
-                }
-                lcp = line + 1;
-                --in_len;
-            } else
-                lcp = line;
-            carry_over[0] = 0;
-        } else
-            lcp = line;
-
-        m = strspn(lcp, " \t");
-        if (m == in_len)
-            continue;
-        lcp += m;
-        in_len -= m;
-        if ('#' == *lcp)
-            continue;
-        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-        if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
-            pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
-                    j + 1, m + k + 1);
-            goto bad;
-        }
-        if (no_space) {
-            for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
-                 ++k, lcp += 2) {
-                if (1 != sscanf(lcp, "%2x", &h)) {
-                    pr2serr("%s: bad hex number in line %d, pos %d\n",
-                            __func__, j + 1, (int)(lcp - line + 1));
-                    goto bad;
-                }
-                if ((off + k) >= max_arr_len) {
-                    pr2serr("%s: array length exceeded\n", __func__);
-                    goto bad;
-                }
-                mp_arr[off + k] = h;
-            }
-            if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
-                carry_over[0] = *lcp;
-            off += k;
-        } else {
-            for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%4x", &h)) {
-                    if (h > 0xff) {
-                        pr2serr("%s: hex number larger than 0xff in line %d, "
-                                "pos %d\n", __func__, j + 1,
-                                (int)(lcp - line + 1));
-                        goto bad;
-                    }
-                    if (split_line && (1 == strlen(lcp))) {
-                        /* single trailing hex digit might be a split pair */
-                        carry_over[0] = *lcp;
-                    }
-                    if ((off + k) >= max_arr_len) {
-                        pr2serr("%s: array length exceeded\n", __func__);
-                        goto bad;
-                    }
-                    mp_arr[off + k] = h;
-                    lcp = strpbrk(lcp, " ,\t");
-                    if (NULL == lcp)
-                        break;
-                    lcp += strspn(lcp, " ,\t");
-                    if ('\0' == *lcp)
-                        break;
-                } else {
-                    if (('#' == *lcp) || ('\r' == *lcp)) {
-                        --k;
-                        break;
-                    }
-                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
-                            j + 1, (int)(lcp - line + 1));
-                    goto bad;
-                }
-            }
-            off += (k + 1);
-        }
-    }
-    *mp_arr_len = off;
-    if (stdin != fp)
-        fclose(fp);
-    return 0;
-bad:
-    if (stdin != fp)
-        fclose(fp);
-    return SG_LIB_SYNTAX_ERROR;
-}
-
 
 /* Call LOG SENSE twice: the first time ask for 4 byte response to determine
    actual length of response; then a second time requesting the
@@ -6982,8 +6799,8 @@ main(int argc, char * argv[])
             int pg_code, subpg_code, pdt, n;
             uint16_t u;
 
-            if ((ret = f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff,
-                                 &in_len, rsp_buff_sz)))
+            if ((ret = sg_f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff,
+                                    &in_len, rsp_buff_sz)))
                 goto err_out;
             if (vb > 2)
                 pr2serr("Read %d [0x%x] bytes of user supplied data\n",
@@ -7079,8 +6896,8 @@ main(int argc, char * argv[])
             ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
-        if ((ret = f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff, &in_len,
-                             rsp_buff_sz)))
+        if ((ret = sg_f2hex_arr(op->in_fn, op->do_raw, false, rsp_buff,
+                                &in_len, rsp_buff_sz)))
             goto err_out;
         if (vb > 2)
             pr2serr("Read %d [0x%x] bytes of user supplied data\n", in_len,
