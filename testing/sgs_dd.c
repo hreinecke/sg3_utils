@@ -78,7 +78,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.07 20190503";
+static const char * version_str = "4.08 20190515";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -471,7 +471,7 @@ do_v4:
 }
 
 static int
-sz_reserve(int fd, int bs, int bpt, bool rt_sig)
+sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool vb)
 {
     int res, t, flags;
     struct sg_extended_info sei;
@@ -484,7 +484,8 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig)
         return 1;
     }
     else if (t < 40000) {
-        fprintf(stderr, "sgs_dd: warning: sg driver prior to 4.0.00\n");
+        if (vb)
+            fprintf(stderr, "sgs_dd: warning: sg driver prior to 4.0.00\n");
         sgs_old_sg_driver = true;
     }
     res = 0;
@@ -1075,7 +1076,8 @@ main(int argc, char * argv[])
                 return 1;
             }
             clp->in_is_sg = true;
-            if (sz_reserve(clp->infd, clp->bs, clp->bpt, clp->use_rt_sig))
+            if (sz_reserve(clp->infd, clp->bs, clp->bpt, clp->use_rt_sig,
+                           clp->debug))
                 return 1;
             if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
                 pr2serr("Unable to implement v4 flag because sg driver too "
@@ -1095,7 +1097,7 @@ main(int argc, char * argv[])
             else {
                 clp->out_is_sg = true;
                 if (sz_reserve(clp->outfd, clp->bs, clp->bpt,
-                               clp->use_rt_sig))
+                               clp->use_rt_sig, clp->debug))
                     return 1;
                 if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
                     pr2serr("Unable to implement v4 flag because sg driver "

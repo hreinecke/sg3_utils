@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190515] [svn: r823]
+Changelog for sg3_utils-1.45 [20190517] [svn: r824]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
   - sg_opcodes: expand MLU (spc5r20)
@@ -26,6 +26,7 @@ Changelog for sg3_utils-1.45 [20190515] [svn: r823]
     - tweak sg_pt interface to better handle bidi
     - sg_cmds_process_resp(): two arguments removed
     - add ${PACKAGE_VERSION} to '.so' name
+    - add sg_f2hex_arr()
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - scripts: update 54-before-scsi-sg3_id.rules,
     scsi-enable-target-scan.sh and
