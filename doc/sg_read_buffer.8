@@ -16,6 +16,12 @@ it in binary to stdout. If a response is received for a "descriptor"
 mode then, in the absence of \fI\-\-hex\fR and \fI\-\-raw\fR, it is
 decoded. Response for non\-descriptor modes are output in hexadecimal
 unless the \fI\-\-raw\fR option is given.
+.PP
+This utility may be called without a \fIDEVICE\fR but with a
+\fI\-\-inhex=FN\fR option instead. \fIFN\fR is expected to be a file
+name (or '\-' for stdin). The contents of the file (or stdin stream)
+is assumed to be hexadecimal (or binary) data that represents a SCSI
+READ BUFFER command response and is decoded as such.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP

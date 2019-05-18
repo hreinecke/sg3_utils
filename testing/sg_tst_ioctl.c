@@ -75,7 +75,7 @@ static const char * version_str = "Version: 1.10  20190506";
 #endif
 
 #define DEF_Q_LEN 16    /* max in sg v3 and earlier */
-#define MAX_Q_LEN 256
+#define MAX_Q_LEN 512
 
 #define DEF_RESERVE_BUFF_SZ (256 * 1024)
 
@@ -89,6 +89,7 @@ static bool mrq_immed = false;  /* if set, also sets mrq_iosubmit */
 static bool mrq_half_immed = false;
 static bool mrq_iosubmit = false;
 static bool show_size_value = false;
+static bool do_v3_only = false;
 
 static int childs_pid = 0;
 static int sg_drv_ver_num = 0;
@@ -104,8 +105,8 @@ static const char * relative_cp = NULL;
 static void
 usage(void)
 {
-    printf("Usage: sg_tst_ioctl [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] [-M] "
-           "[-o]\n"
+    printf("Usage: sg_tst_ioctl [-3] [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] "
+           "[-M] [-o]\n"
            "                    [-r=SZ] [-s=SEC] [-S] [-t] [-v] [-V] [-w]\n"
            "                    <sg_device> [<sg_device2>]\n"
            " where:\n"
@@ -257,8 +258,8 @@ set_more_async(int fd)
 }
 
 static int
-tst_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
-          int sock, const char * cp)
+tst_extended_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
+                   int sock, const char * cp)
 {
     uint32_t cflags;
     struct sg_extended_info sei;
@@ -650,7 +651,9 @@ main(int argc, char * argv[])
         pr2serr("Warning <<<< sizeof(struct sg_extended_info)=%zu not 96\n",
                 sizeof(struct sg_extended_info));
     for (k = 1; k < argc; ++k) {
-        if (0 == memcmp("-f", argv[k], 2))
+        if (0 == memcmp("-3", argv[k], 2))
+            do_v3_only = true;
+        else if (0 == memcmp("-f", argv[k], 2))
             do_fork = true;
         else if (0 == memcmp("-h", argv[k], 2)) {
             file_name = 0;
@@ -811,7 +814,7 @@ main(int argc, char * argv[])
         goto out;
     }
     printf("Linux sg driver version: %d\n", sg_drv_ver_num);
-    if (more_async)
+    if (more_async && !do_v3_only)
         set_more_async(sg_fd);
 
     if (second_fname) {
@@ -824,11 +827,11 @@ main(int argc, char * argv[])
         if (verbose)
             fprintf(stderr, "opened second file: %s successfully, fd=%d\n",
                     second_fname, sg_fd2);
-        if (more_async)
+        if (more_async && !do_v3_only)
             set_more_async(sg_fd2);
     }
 
-    if (num_mrqs > 0) {
+    if ((num_mrqs > 0) && !do_v3_only) {
         res = do_mrqs(sg_fd, sg_fd2, num_mrqs);
         goto out;
     }
@@ -862,15 +865,18 @@ main(int argc, char * argv[])
     }
 
     cp = do_fork ? relative_cp : "";
-    if (tst_ioctl(file_name, sg_fd, second_fname, sg_fd2, sock, cp))
-        goto out;
+    if (! do_v3_only) {
+        if (tst_extended_ioctl(file_name, sg_fd, second_fname, sg_fd2, sock,
+                               cp))
+            goto out;
+    }
     if (ioctl_only)
         goto out;
 
     if (do_fork && !is_parent)
         return 0;
 
-    printf("start iosubmit calls\n");
+    printf("start write() calls [submits]\n");
     for (k = 0; k < q_len; ++k) {
         /* Prepare INQUIRY command */
         memset(&io_hdr[k], 0, sizeof(sg_io_hdr_t));
@@ -950,7 +956,7 @@ main(int argc, char * argv[])
     else
         printf("num_waiting: %d\n", num_waiting);
 
-    printf("\nstart ioreceive() calls\n");
+    printf("\nstart read() calls [io receive]\n");
     for (k = 0, done = false; k < q_len; ++k) {
         if ((! done) && (k == q_len / 2)) {
             done = true;
