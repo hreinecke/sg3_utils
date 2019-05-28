@@ -440,6 +440,13 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         }
     }
 
+    if (op->version_given
+#ifdef DEBUG
+       && ! op->verbose_given
+#endif
+       )
+        return 0;
+
     if (optind >= argc) {
         pr2serr("No device specified\n\n");
         return SG_LIB_SYNTAX_ERROR;
