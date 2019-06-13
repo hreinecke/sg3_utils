@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.31 20190515";
+static const char * version_str = "1.33 20190612";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -213,6 +213,7 @@ typedef struct global_collection
     int sum_of_resids;          /* -/ */
     int debug;          /* both -v and deb=VERB bump this field */
     int dry_run;
+    bool aen_given;
     bool ofile_given;
     bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
@@ -277,6 +278,8 @@ static atomic<long int> pos_index(0);
 static atomic<int> num_ebusy(0);
 static atomic<int> num_start_eagain(0);
 static atomic<int> num_fin_eagain(0);
+static atomic<int> num_abort_req(0);
+static atomic<int> num_abort_req_success(0);
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
@@ -1839,6 +1842,10 @@ do_v4:
     }
     if ((rep->aen > 0) && (rep->rep_count > 0)) {
         if (0 == (rep->rq_id % rep->aen)) {
+            struct timespec tspec = {0, 4000 /* 4 usecs */};
+
+            nanosleep(&tspec, NULL);
+#if 0
             struct pollfd a_poll;
 
             a_poll.fd = fd;
@@ -1849,15 +1856,25 @@ do_v4:
                 pr2serr_lk("%s: poll() failed: %s [%d]\n",
                            __func__, safe_strerror(errno), errno);
             else if (0 == res) { /* timeout, cmd still inflight, so abort */
-                res = ioctl(fd, SG_IOABORT, h4p);
-                if (res < 0)
+            }
+#endif
+            ++num_abort_req;
+            res = ioctl(fd, SG_IOABORT, h4p);
+            if (res < 0) {
+                err = errno;
+                if (ENODATA == err)
+                    pr2serr_lk("%s: ioctl(SG_IOABORT) no match on "
+                               "pack_id=%d\n", __func__, pack_id);
+                else
                     pr2serr_lk("%s: ioctl(SG_IOABORT) failed: %s [%d]\n",
-                               __func__, safe_strerror(errno), errno);
-                else if (rep->debug > 1)
-                    pr2serr_lk("%s: sending ioctl(SG_IOABORT) on rq_id=%d\n",
-                               __func__, pack_id);
-            }   /* else got response, too late for timeout, so skip */
-        }
+                               __func__, safe_strerror(err), err);
+            } else {
+                ++num_abort_req_success;
+                if (rep->debug > 1)
+                    pr2serr_lk("%s: sent ioctl(SG_IOABORT) on rq_id=%d, "
+                               "success\n", __func__, pack_id);
+            }
+        }   /* else got response, too late for timeout, so skip */
     }
     return 0;
 }
@@ -2499,6 +2516,7 @@ main(int argc, char * argv[])
                         my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            clp->aen_given = true;
         } else if (0 == strcmp(key, "bpt")) {
             clp->bpt = sg_get_num(buf);
             if (-1 == clp->bpt) {
@@ -2733,6 +2751,13 @@ main(int argc, char * argv[])
         ((! clp->out_flags.noshare) && clp->out_flags.dio)) {
         pr2serr("dio flag can only be used with noshare flag\n");
         return SG_LIB_SYNTAX_ERROR;
+    }
+    if ((clp->in_flags.noshare || clp->out_flags.noshare) &&
+        (clp->nmrqs > 0)) {
+        clp->nmrqs = 0;
+        clp->mrq_cmds = false;
+        if (clp->debug)
+            pr2serr("Ignoring multi-request because noshare flag given\n");
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
@@ -3248,9 +3273,12 @@ fini:
         pr2serr("Number of start EAGAINs: %d\n", num_start_eagain.load());
     if (clp->debug && (num_fin_eagain > 0))
         pr2serr("Number of finish EAGAINs: %d\n", num_fin_eagain.load());
-    if (clp->debug && (num_ebusy > 0)) {
+    if (clp->debug && (num_ebusy > 0))
         pr2serr("Number of EBUSYs: %d\n", num_ebusy.load());
-
+    if (clp->debug && clp->aen_given && (num_abort_req > 0)) {
+        pr2serr("Number of Aborts: %d\n", num_abort_req.load());
+        pr2serr("Number of successful Aborts: %d\n",
+                num_abort_req_success.load());
     }
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

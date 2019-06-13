@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -23,7 +24,7 @@
 
 static int bytes_per_line = DEF_BYTES_PER_LINE;
 
-static const char * version_str = "1.17 20190210";
+static const char * version_str = "1.11 20190527";
 
 #define CHARS_PER_HEX_BYTE 3
 #define BINARY_START_COL 6
@@ -317,9 +318,13 @@ dStrHexOnly(const char* str, int len, long start, int noAddr)
 static void
 usage()
 {
-    fprintf(stderr, "Usage: hxascdmp [-b=<n>] [-h] [-H] [-N] [-V] [-?] "
-            "[<file>+]\n");
+    fprintf(stderr, "Usage: hxascdmp [-1] [-2] [-b=<n>] [-h] [-H] [-N] "
+            "[-o=<off>] [-q]\n"
+            "                [-V] [-?]  [<file>+]\n");
     fprintf(stderr, "  where:\n");
+    fprintf(stderr, "    -1         print first byte in hex, prepend '0x' "
+            "if '-H' given\n");
+    fprintf(stderr, "    -2         like '-1' but print first two bytes\n");
     fprintf(stderr, "    -b=<n>     bytes per line to display "
                     "(def: 16)\n");
     fprintf(stderr, "    -h         print this usage message\n");
@@ -328,6 +333,8 @@ usage()
     fprintf(stderr, "    -N         no address, start in first column\n");
     fprintf(stderr, "    -o=<off>    start decoding at byte <off>. Suffix "
             "multipliers allowed\n");
+    fprintf(stderr, "    -q         quiet: suppress output of header "
+            "info\n");
     fprintf(stderr, "    -V         print version string then exits\n");
     fprintf(stderr, "    -?         print this usage message\n");
     fprintf(stderr, "    <file>+    reads file(s) and outputs each "
@@ -350,6 +357,9 @@ main(int argc, const char ** argv)
     int noAddr = 0;
     int doVersion = 0;
     int hasFilename = 0;
+    int quiet = 0;
+    int print1 = 0;
+    int print2 = 0;
     int ret = 0;
     const char * cp;
 
@@ -375,6 +385,12 @@ main(int argc, const char ** argv)
             offset = off;
         } else if ((len > 1) && ('-' == cp[0]) && ('-' != cp[1])) {
             res = 0;
+            n = num_chs_in_str(cp + 1, len - 1, '1');
+            print1 += n;
+            res += n;
+            n = num_chs_in_str(cp + 1, len - 1, '2');
+            print2 += n;
+            res += n;
             n = num_chs_in_str(cp + 1, len - 1, 'h');
             doHelp += n;
             res += n;
@@ -383,6 +399,9 @@ main(int argc, const char ** argv)
             res += n;
             n = num_chs_in_str(cp + 1, len - 1, 'N');
             noAddr += n;
+            res += n;
+            n = num_chs_in_str(cp + 1, len - 1, 'q');
+            quiet += n;
             res += n;
             n = num_chs_in_str(cp + 1, len - 1, 'V');
             doVersion += n;
@@ -405,6 +424,8 @@ main(int argc, const char ** argv)
             hasFilename = 1;
             break;
         }
+        if (print2)
+            print1 += print2 + print2;
     }
     if (doVersion) {
         printf("%s\n", version_str);
@@ -443,9 +464,26 @@ main(int argc, const char ** argv)
                     start = offset;
                 } else
                     start = 0;
-                if (! doHex)
+                if (! (doHex || quiet || print1))
                     printf("ASCII hex dump of file: %s\n", argv[k]);
                 while ((res = read(inFile, buff, num)) > 0) {
+                    if (print1) {
+                        if (1 == print1) {
+                            if (doHex)
+                                printf("0x%02x\n", (uint8_t)(buff[0]));
+                            else
+                                printf("%02x\n", (uint8_t)(buff[0]));
+                        } else {
+                            uint16_t us;
+
+                            memcpy(&us, buff, 2);
+                            if (doHex)
+                                printf("0x%04x\n", us);
+                            else
+                                printf("%04x\n", us);
+                        }
+                        break;
+                    }
                     if (doHex)
                         dStrHexOnly(buff, res, start, noAddr);
                     else

@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.20 20190516";
+static const char * version_str = "1.21 20190602";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
 
@@ -78,21 +78,21 @@ static char concat_buff[1024];
 static void
 usage()
 {
-  pr2serr("Usage: sg_decode_sense [--binary=FN] [--cdb] [--err=ES] "
-          "[--file=FN]\n"
+  pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES] "
+          "[--file=HFN]\n"
           "                       [--help] [--hex] [--nospace] [--status=SS] "
           "[--verbose]\n"
           "                       [--version] [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
-          "    --binary=FN|-b FN     FN is a file name to read sense "
+          "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
-          "                          binary from. If FN is '-' then read "
+          "                          binary from. If BFN is '-' then read "
           "from stdin\n"
           "    --cdb|-c              decode given hex as cdb rather than "
           "sense data\n"
           "    --err=ES|-e ES        ES is Exit Status from utility in this "
           "package\n"
-          "    --file=FN|-f FN       FN is a file name from which to read "
+          "    --file=HFN|-f HFN     HFN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
           "as stdin\n"
@@ -136,7 +136,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         switch (c) {
         case 'b':
             if (op->fname) {
-                pr2serr("expect only one '--binary=FN' or '--file=FN' "
+                pr2serr("expect only one '--binary=BFN' or '--file=BFN' "
                         "option\n");
                 return SG_LIB_CONTRADICT;
             }
@@ -157,7 +157,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'f':
             if (op->fname) {
-                pr2serr("expect only one '--binary=FN' or '--file=FN' "
+                pr2serr("expect only one '--binary=HFN' or '--file=HFN' "
                         "option\n");
                 return SG_LIB_CONTRADICT;
             }

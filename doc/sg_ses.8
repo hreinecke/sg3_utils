@@ -1,4 +1,4 @@
-.TH SG_SES "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SES "8" "June 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -430,10 +430,10 @@ Wherever an individual index is applicable, it can be replaced by an
 individual index range. It has the form: <first_ii>\-<last_ii>. For
 example: '3\-5' will select individual indexes 3, 4 and 5 .
 .PP
-To cope with vendor specific Element types (which should be in the range 128
-to 255) the Element type can be given as a number with a leading underscore.
-For example these are equivalent: \fI\-\-index=arr\fR and
-\fI\-\-index=_23\fR since the Array Device Slot Element type value is 23.
+To cope with vendor specific Element types (whose type codes should be in
+the range 128 to 255) the Element type code can be given as a number with
+a leading underscore. For example these are equivalent: \fI\-\-index=arr\fR
+and \fI\-\-index=_23\fR since the Array Device Slot Element type code is 23.
 Also \fI\-\-index=ps1\fR and \fI\-\-index=_2_1\fR are equivalent.
 .PP
 Another example: if the first type header in the Configuration dpage has
@@ -746,7 +746,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2018 Douglas Gilbert
+Copyright \(co 2004\-2019 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

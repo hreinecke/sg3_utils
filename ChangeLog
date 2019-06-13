@@ -2,9 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190517] [svn: r824]
+Changelog for sg3_utils-1.45 [20190612] [svn: r825]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
+    - document explicit Element type codes and example
   - sg_opcodes: expand MLU (spc5r20)
   - sg_write_buffer: allow comma and period separated
     lists when input from stdin
@@ -33,19 +34,20 @@ Changelog for sg3_utils-1.45 [20190517] [svn: r824]
     59-fc-wwpn-id.rules
   - linux: add nanosecond durations when
     SG3_UTILS_LINUX_NANO environment variable given
+    and Linux sg driver >= 4.0.30
   - rescan-scsi-bus: widen LUN 0 only scanning
     - multiple patches to sync with Suse
   - testing/sg_tst_async: fix free_list issue
   - testing/sg_tst_ioctl: for sg 4.0 driver
   - testing/sg_tst_bidi: for sg 4.0 driver
-  - testing/sgs_dd: for share in sg 4.0 driver
-  - testing/sgh_dd: rename of sgs_dd to avoid ...
+  - testing/sgh_dd: test request sharing, mreqs...
   - testing/sgs_dd: back from archive, for testing
     SIGPOLL (SIGIO) and realtime (RT) signals
   - sg_pt: add sg_get_opcode_translation() to replace
     global pointer to array: sg_opcode_info_arr[]
     - extend small SNTL to support read capacity
   - utils/hxascdmp: add -o=<offset> option
+    - add -1, -2 and -q options
   - sg_io_linux (sg_lib): add sg_linux_sense_print()
   - sg_pt_linux: uses sg v4 interface if sg driver
     >= 4.0.0 . Force sg v3 always by building with

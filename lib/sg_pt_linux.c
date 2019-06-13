@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.46 20190111 */
+/* sg_pt_linux version 1.47 20190612 */
 
 
 #include <stdio.h>
@@ -56,7 +56,10 @@
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
 
 /* sg driver displayed format: [x]xyyzz --> [x]x.[y]y.zz */
-#define SG_LINUX_SG_VER_V4 40000   /* lowest version in which v4 available */
+#define SG_LINUX_SG_VER_V4_BASE 40000   /* lowest sg driver version with
+                                         * v4 interface */
+#define SG_LINUX_SG_VER_V4_FULL 40030   /* lowest version with full v4
+                                         * interface */
 
 static const char * linux_host_bytes[] = {
     "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT",
@@ -536,7 +539,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
             if (verbose > 4) {
                 int ver = ptp->sg_version;
 
-                if (ptp->sg_version >= SG_LINUX_SG_VER_V4) {
+                if (ptp->sg_version >= SG_LINUX_SG_VER_V4_BASE) {
 #ifdef IGNORE_LINUX_SGV4
                     pr2ws("%s: sg driver version %d.%02d.%02d but config "
                           "override back to v3\n", __func__, ver / 10000,
@@ -554,7 +557,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
         } else if (ptp->is_sg)
             ptp->sg_version = sg_driver_version_num;
 
-        if (ptp->is_sg && (ptp->sg_version >= SG_LINUX_SG_VER_V4) &&
+        if (ptp->is_sg && (ptp->sg_version >= SG_LINUX_SG_VER_V4_FULL) &&
             getenv("SG3_UTILS_LINUX_NANO")) {
             struct sg_extended_info sei;
             struct sg_extended_info * seip = &sei;
@@ -575,6 +578,11 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
                     pr2ws("%s: dev_fd=%d, succeeding in setting durations "
                           "to nanoseconds\n", __func__, dev_fd);
             }
+        } else if (ptp->is_sg && (ptp->sg_version >= SG_LINUX_SG_VER_V4_BASE)
+                   && getenv("SG3_UTILS_LINUX_NANO")) {
+            if (verbose > 2)
+                pr2ws("%s: dev_fd=%d, ignored SG3_UTILS_LINUX_NANO\nbecause "
+                      "base version sg version 4 driver\n", __func__, dev_fd);
         }
     } else {
         ptp->is_sg = false;
@@ -1117,7 +1125,7 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 #ifdef IGNORE_LINUX_SGV4
         return do_scsi_pt_v3(ptp, fd, time_secs, verbose);
 #else
-        if (ptp->sg_version >= SG_LINUX_SG_VER_V4)
+        if (ptp->sg_version >= SG_LINUX_SG_VER_V4_BASE)
             return do_scsi_pt_v4(ptp, fd, time_secs, verbose);
         else
             return do_scsi_pt_v3(ptp, fd, time_secs, verbose);

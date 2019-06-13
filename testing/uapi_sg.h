@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.11 (20190502)
+ * Version 4.0.12 (20190521)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -31,7 +31,11 @@
 #include <linux/types.h>
 #include <linux/major.h>
 
-/* bsg.h contains the sg v4 user space interface structure (sg_io_v4). */
+/*
+ * bsg.h contains the sg v4 user space interface structure (sg_io_v4).
+ * That structure is also used as the controlling object when multiple
+ * requests are issued with one ioctl() call.
+ */
 #include <linux/bsg.h>
 
 /*
@@ -111,8 +115,8 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
 #define SGV4_FLAG_COMPLETE_B4  0x100
 #define SGV4_FLAG_SIG_ON_OTHER  0x200
-#define SGV4_FLAG_IMMED 0x400 /* for polling with SG_IOR, ignored in SG_IOS */
-#define SGV4_FLAG_STOP_IF 0x800    /* Stops sync mrq if error or warning */
+#define SGV4_FLAG_IMMED 0x400	/* for polling with SG_IOR, ignored in SG_IOS */
+#define SGV4_FLAG_STOP_IF 0x800	/* Stops sync mrq if error or warning */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
 #define SGV4_FLAG_SHARE 0x2000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
 #define SGV4_FLAG_DO_ON_OTHER 0x4000 /* available on either of shared pair */
@@ -459,7 +463,6 @@ struct sg_header {
 
 /* Gives some v3 identifying info to driver, receives associated response */
 #define SG_IORECEIVE_V3 _IOWR(SG_IOCTL_MAGIC_NUM, 0x46, struct sg_io_hdr)
-
 
 /* command queuing is always on when the v3 or v4 interface is used */
 #define SG_DEF_COMMAND_Q 0

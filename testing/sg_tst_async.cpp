@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.34 20190506";
+static const char * version_str = "1.35 20190612";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -196,7 +196,8 @@ struct opts_t {
     bool mmap_io;
     bool no_xfer;
     bool pack_id_force;
-    bool sg_vn_ge_30901;
+    bool sg_vn_ge_40000;
+    bool sg_vn_ge_40030;
     bool submit;
     bool verbose_given;
     bool v3;
@@ -1030,12 +1031,12 @@ work_thread(int id, struct opts_t * op)
             pr2serr_lk("ioctl(SG_SET_FORCE_PACK_ID) failed, errno=%d %s\n",
                        errno, strerror(errno));
     }
-    if (op->sg_vn_ge_30901) {
+    if (op->sg_vn_ge_40000) {
         if (ioctl(sg_fd, SG_GET_RESERVED_SIZE, &k) >= 0) {
             if (needed_sz > k)
                 ioctl(sg_fd, SG_SET_RESERVED_SIZE, &needed_sz);
         }
-        if (op->cmd_time || op->masync) {
+        if (op->sg_vn_ge_40030 && (op->cmd_time || op->masync)) {
             struct sg_extended_info sei;
             struct sg_extended_info * seip;
 
@@ -1152,7 +1153,7 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once1000 && num_outstanding >= 1000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
 
             once1000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1166,7 +1167,7 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once5000 && num_outstanding >= 5000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
 
             once5000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1179,7 +1180,7 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once_7000 && num_outstanding >= 7000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
 
             once_7000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1192,7 +1193,7 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once10_000 && num_outstanding >= 10000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
 
             once10_000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1205,7 +1206,7 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once20_000 && num_outstanding >= 20000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_30901) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
 
             once20_000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1361,7 +1362,7 @@ work_thread(int id, struct opts_t * op)
                     case MYQD_HIGH:
                     default:
                         if (op->ovn > 0) {
-                            if (op->sg_vn_ge_30901) {
+                            if (op->sg_vn_ge_40030) {
                                 int num_subm = num_submitted(sg_fd);
 
                                 if (num_subm > op->ovn) {
@@ -1381,7 +1382,7 @@ work_thread(int id, struct opts_t * op)
                     }
                 }
             } else {    /* nothing waiting to be read */
-                if (op->sg_vn_ge_30901) {
+                if (op->sg_vn_ge_40030) {
                     int val = num_submitted(sg_fd);
 
                     if (0 == val) {
@@ -1421,7 +1422,7 @@ work_thread(int id, struct opts_t * op)
             if (MYQD_HIGH == op->myqd) {
                 num_to_read = 0;
                 if (op->ovn) {
-                    if (op->sg_vn_ge_30901) {
+                    if (op->sg_vn_ge_40030) {
                         int num_subm = num_submitted(sg_fd);
 
                         if (num_subm > op->ovn)
@@ -1489,7 +1490,7 @@ work_thread(int id, struct opts_t * op)
                 }
                 break;
             }
-            if (op->cmd_time && op->sg_vn_ge_30901)
+            if (op->cmd_time && op->sg_vn_ge_40030)
                 sum_nanosecs += nanosecs;
             ++thr_async_finishes;
             --num_outstanding;
@@ -1572,7 +1573,7 @@ work_thread(int id, struct opts_t * op)
     fin_eagain_count += thr_fin_eagain_count;
     fin_ebusy_count += thr_fin_ebusy_count;
     start_edom_count += thr_start_edom_count;
-    if (op->cmd_time && op->sg_vn_ge_30901 && (npt > 0)) {
+    if (op->cmd_time && op->sg_vn_ge_40030 && (npt > 0)) {
         pr2serr_lk("t_id=%d average nanosecs per cmd: %" PRId64
                    "\n", id, sum_nanosecs / npt);
     }
@@ -2070,8 +2071,17 @@ main(int argc, char * argv[])
             if (sg_ver_num < 30000) {
                 pr2serr_lk("%s either not sg device or too old\n", dev_name);
                 return 2;
-            } else if (sg_ver_num >= 30901) {
-                op->sg_vn_ge_30901 = true;
+            } else if (sg_ver_num >= 40030) {
+                op->sg_vn_ge_40030 = true;
+                op->sg_vn_ge_40000 = true;
+                if (! (op->v3_given || op->v4_given)) {
+                    op->v4 = true;
+                    op->v3 = false;
+                    op->submit = true;
+                }
+            } else if (sg_ver_num >= 40000) {
+                op->sg_vn_ge_40030 = false;
+                op->sg_vn_ge_40000 = true;
                 if (! (op->v3_given || op->v4_given)) {
                     op->v4 = true;
                     op->v3 = false;
