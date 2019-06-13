@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -57,7 +58,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.10  20190506";
+static const char * version_str = "Version: 1.11  20190523";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -97,6 +98,7 @@ static int q_len = DEF_Q_LEN;
 static int sleep_secs = 0;
 static int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
 static int num_mrqs = 0;
+static int num_sgnw = 0;
 static int verbose = 0;
 
 static const char * relative_cp = NULL;
@@ -107,7 +109,8 @@ usage(void)
 {
     printf("Usage: sg_tst_ioctl [-3] [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] "
            "[-M] [-o]\n"
-           "                    [-r=SZ] [-s=SEC] [-S] [-t] [-v] [-V] [-w]\n"
+           "                    [-r=SZ] [-s=SEC] [-S] [-t] [-T=NUM] [-v] "
+           "[-V] [-w]\n"
            "                    <sg_device> [<sg_device2>]\n"
            " where:\n"
            "      -f      fork and test share between processes\n"
@@ -129,6 +132,8 @@ usage(void)
            "      -S        size of interface structures plus ioctl "
            "values\n"
            "      -t    queue_at_tail (def: q_at_head)\n"
+           "      -T=NUM    time overhead of NUM invocations of\n"
+           "                ioctl(SG_GET_NUM_WAITING); then exit\n"
            "      -v    increase verbosity of output\n"
            "      -V    print version string then exit\n"
            "      -w    write (submit) only then exit\n");
@@ -238,7 +243,7 @@ sock_fd_read(int sock, void *buf, ssize_t bufsize, int *fd)
 static void
 set_more_async(int fd)
 {
-    if (sg_drv_ver_num > 40000) {
+    if (sg_drv_ver_num > 40030) {
         struct sg_extended_info sei;
         struct sg_extended_info * seip;
 
@@ -628,6 +633,7 @@ int
 main(int argc, char * argv[])
 {
     bool done;
+    bool nw_given = false;
     int sg_fd, k, ok, pack_id, num_waiting;
     int res = 0;
     int sg_fd2 = -1;
@@ -711,7 +717,15 @@ main(int argc, char * argv[])
             show_size_value = true;
         else if (0 == memcmp("-t", argv[k], 2))
             q_at_tail = true;
-        else if (0 == memcmp("-vvvvvvv", argv[k], 8))
+        else if (0 == memcmp("-T=", argv[k], 3)) {
+            num_sgnw = sg_get_num(argv[k] + 3);
+            if (num_sgnw < 0) {
+                printf("Expect -T= to take a number >= 0\n");
+                file_name = 0;
+                break;
+            }
+            nw_given = true;
+        } else if (0 == memcmp("-vvvvvvv", argv[k], 8))
             verbose += 7;
         else if (0 == memcmp("-vvvvvv", argv[k], 7))
             verbose += 6;
@@ -814,6 +828,55 @@ main(int argc, char * argv[])
         goto out;
     }
     printf("Linux sg driver version: %d\n", sg_drv_ver_num);
+
+    if (nw_given) {             /* time ioctl(SG_GET_NUM_WAITING) */
+        int nw, sum_nw;
+        struct timespec start_tm, fin_tm, res_tm;
+
+        printf("Timing %d calls to ioctl(SG_GET_NUM_WAITING)\n", num_sgnw);
+        if (0 != clock_gettime(CLOCK_MONOTONIC, &start_tm)) {
+                res = errno;
+                perror("start clock_gettime() failed:");
+                goto out;
+        }
+        for (k = 0, sum_nw = 0; k < num_sgnw; ++k, sum_nw += nw) {
+            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &nw) < 0) {
+                res = errno;
+                fprintf(stderr, "%d: ioctl(SG_GET_NUM_WAITING) failed "
+                        "errno=%d\n", k, res);
+                goto out;
+            }
+        }
+        if (0 != clock_gettime(CLOCK_MONOTONIC, &fin_tm)) {
+            res = errno;
+            perror("finish clock_gettime() failed:");
+            goto out;
+        }
+        res_tm.tv_sec = fin_tm.tv_sec - start_tm.tv_sec;
+        res_tm.tv_nsec = fin_tm.tv_nsec - start_tm.tv_nsec;
+        if (res_tm.tv_nsec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_nsec += 1000000000;
+        }
+        if (verbose) {
+            if (verbose > 1)
+                printf("sum of num_waiting_s=%d\n", sum_nw);
+            printf("elapsed time (nanosecond precision): %d.%09d secs\n",
+                   (int)res_tm.tv_sec, (int)res_tm.tv_nsec);
+        } else
+            printf("elapsed time: %d.%06d secs\n", (int)res_tm.tv_sec,
+                   (int)(res_tm.tv_nsec / 1000));
+        if (num_sgnw >= 100) {
+            double m = (double)res_tm.tv_sec +
+                       ((double)res_tm.tv_nsec / 1000000000.0);
+
+            if (m > 0.000001)
+                printf("Calls per second: %.2f\n", (double)num_sgnw / m);
+        }
+
+        res = 0;
+        goto out;
+    }
     if (more_async && !do_v3_only)
         set_more_async(sg_fd);
 

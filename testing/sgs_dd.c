@@ -78,7 +78,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.08 20190515";
+static const char * version_str = "4.09 20190612";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -171,6 +171,7 @@ typedef struct request_collection
 } Rq_coll;
 
 static bool sgs_old_sg_driver = false;  /* true if VERSION_NUM < 4.00.00 */
+static bool sgs_full_v4_sg_driver = false; /* set if VERSION_NUM >= 4.00.30 */
 static bool sgs_nanosec_unit = false;
 
 
@@ -482,19 +483,22 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool vb)
     if ((res < 0) || (t < 30000)) {
         fprintf(stderr, "sgs_dd: sg driver prior to 3.0.00\n");
         return 1;
-    }
-    else if (t < 40000) {
+    } else if (t < 40000) {
         if (vb)
             fprintf(stderr, "sgs_dd: warning: sg driver prior to 4.0.00\n");
         sgs_old_sg_driver = true;
-    }
+    } else if (t < 40030) {
+        sgs_old_sg_driver = false;
+	sgs_full_v4_sg_driver = false;
+    } else
+	sgs_full_v4_sg_driver = true;
     res = 0;
     t = bs * bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)
         perror("sgs_dd: SG_SET_RESERVED_SIZE error");
 
-    if (sgs_nanosec_unit) {
+    if (sgs_nanosec_unit && sgs_full_v4_sg_driver) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;

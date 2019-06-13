@@ -1,9 +1,9 @@
-.TH SG_DECODE_SENSE "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "June 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense and related data
 .SH SYNOPSIS
 .B sg_decode_sense
-[\fI\-\-binary=FN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=FN\fR]
+[\fI\-\-binary=BFN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=HFN\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR]
 [H1 H2 H3 ...]
@@ -43,8 +43,8 @@ are ignored apart from \fI\-\-verbose\fR.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
-\fB\-b\fR, \fB\-\-binary\fR=\fIFN\fR
-the sense data is read in binary from a file called \fIFN\fR.
+\fB\-b\fR, \fB\-\-binary\fR=\fIBFN\fR
+the sense data is read in binary from a file called \fIBFN\fR.
 .TP
 \fB\-c\fR, \fB\-\-cdb\fR
 treat the given string of hex arguments as bytes in a SCSI CDB and
@@ -60,12 +60,12 @@ is given two or more times a longer form of the message is output. In all
 cases the message is less than 128 characters long with one trailing line
 feed. All other command line options and arguments are ignored.
 .TP
-\fB\-f\fR, \fB\-\-file\fR=\fIFN\fR
-the sense data is read in ASCII hexadecimal from a file called \fIFN\fR.
+\fB\-f\fR, \fB\-\-file\fR=\fIHFN\fR
+the sense data is read in ASCII hexadecimal from a file called \fIHFN\fR.
 The sense data should appear as a sequence of bytes separated by space,
 comma, tab or newline. Everything from and including a hash symbol to the
 end of that line is ignored. If \fI\-\-nospace\fR is set then no separator
-is required between the ASCII hexadecimal digits in \fIFN\fR with bytes
+is required between the ASCII hexadecimal digits in \fIHFN\fR with bytes
 decoded from pairs of ASCII hexadecimal digits.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -82,7 +82,7 @@ expect ASCII hexadecimal to be a string of hexadecimal digits with no
 spaces between them. Bytes are decoded by taking two hexadecimal digits
 at a time, so an even number of digits is expected. The string of
 hexadecimal digits may be on the command line (replacing "H1 H2 H3")
-or spread across multiple lines the \fIFN\fR given to \fI\-\-file=\fR.
+or spread across multiple lines the \fIHFN\fR given to \fI\-\-file=\fR.
 On the command line, spaces (or other whitespace characters) between
 sequences of hexadecimal digits are ignored; the maximum command line
 hex string is 1023 characters long.
@@ -148,7 +148,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2010\-2018 Douglas Gilbert
+Copyright \(co 2010\-2019 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
