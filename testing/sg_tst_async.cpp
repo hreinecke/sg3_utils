@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.35 20190612";
+static const char * version_str = "1.36 20190613";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -1153,7 +1153,8 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once1000 && num_outstanding >= 1000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) :
+                                                  pi2buff.size();
 
             once1000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1167,7 +1168,8 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once5000 && num_outstanding >= 5000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) :
+                                                  pi2buff.size();
 
             once5000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1180,7 +1182,8 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once_7000 && num_outstanding >= 7000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) :
+                                                  pi2buff.size();
 
             once_7000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1193,7 +1196,8 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once10_000 && num_outstanding >= 10000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) :
+                                                  pi2buff.size();
 
             once10_000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {
@@ -1206,7 +1210,8 @@ work_thread(int id, struct opts_t * op)
         }
         if (vb && ! once20_000 && num_outstanding >= 20000) {
             int num_waiting;
-            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) : -1;
+            int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) :
+                                                  pi2buff.size();
 
             once20_000 = true;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting) < 0) {

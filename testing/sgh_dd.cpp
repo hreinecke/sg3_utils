@@ -103,7 +103,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.33 20190612";
+static const char * version_str = "1.34 20190613";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -309,6 +309,7 @@ static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 static bool have_sg_version = false;
 static int sg_version = 0;
 static bool sg_version_lt_4 = false;
+static bool sg_version_ge_40030 = false;
 static bool shutting_down = false;
 static bool do_sync = false;
 static bool do_time = true;
@@ -1047,7 +1048,8 @@ read_write_thread(void * v_tip)
         if (vb > 4)
             pr2serr_lk("thread=%d: Skipping share on both IFILE and OFILE\n",
                        rep->id);
-    } else if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type))
+    } else if (sg_version_ge_40030 && (FT_SG == clp->in_type) &&
+               (FT_SG == clp->out_type))
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, rep->id,
                                           rep->debug > 9);
     if (vb > 9)
@@ -2223,6 +2225,8 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
         }
         goto fini;
     }
+    if (! sg_version_ge_40030)
+        goto bypass;
     if (elem_sz >= 4096) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
@@ -2245,7 +2249,8 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
                 pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
                            "wr error: %s\n", __func__, strerror(errno));
         }
-    } else if (no_dur || masync) {
+    }
+    if (no_dur || masync) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         if (no_dur) {
@@ -2261,6 +2266,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
             pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(NO_DURATION) "
                        "error: %s\n", __func__, strerror(errno));
     }
+bypass:
     if (! def_res) {
         num = bs * bpt;
         res = ioctl(fd, SG_SET_RESERVED_SIZE, &num);
@@ -2280,7 +2286,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
     if (res < 0)
         perror("sgh_dd: SG_SET_FORCE_PACK_ID error");
-    if (unit_nano) {
+    if (unit_nano && sg_version_ge_40030) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
@@ -2495,6 +2501,8 @@ main(int argc, char * argv[])
     if (sg_version > 40000) {
         clp->in_flags.v4 = true;
         clp->out_flags.v4 = true;
+        if (sg_version >= 40030)
+            sg_version_ge_40030 = true;
     }
 
     for (k = 1; k < argc; k++) {
