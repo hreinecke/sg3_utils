@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.06 20190501";
+static const char * version_str = "6.07 20190618";
 
 
 #define ME "sg_dd: "
@@ -148,6 +148,7 @@ static int max_uas = MAX_UNIT_ATTENTIONS;
 static int max_aborted = MAX_ABORTED_CMDS;
 static int coe_limit = 0;
 static int coe_count = 0;
+static uint32_t glob_pack_id = 0;       /* pre-increment */
 static struct timeval start_tm;
 
 static uint8_t * zeros_buff = NULL;
@@ -612,7 +613,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
-    io_hdr.pack_id = (int)from_block;
+    io_hdr.pack_id = (int)++glob_pack_id;
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
 
@@ -1017,7 +1018,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
-    io_hdr.pack_id = (int)to_block;
+    io_hdr.pack_id = (int)++glob_pack_id;
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
 
@@ -1611,8 +1612,8 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             } else {
                 memcpy(inf, buf, INOUTF_SZ - 1);
-		inf[INOUTF_SZ - 1] = '\0';
-	    }
+                inf[INOUTF_SZ - 1] = '\0';
+            }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &iflag)) {
                 pr2serr(ME "bad argument to 'iflag='\n");
@@ -1629,8 +1630,8 @@ main(int argc, char * argv[])
                 return SG_LIB_CONTRADICT;
             } else {
                 memcpy(outf, buf, INOUTF_SZ - 1);
-		outf[INOUTF_SZ - 1] = '\0';
-	    }
+                outf[INOUTF_SZ - 1] = '\0';
+            }
         } else if (strcmp(key, "of2") == 0) {
             if ('\0' != out2f[0]) {
                 pr2serr("Second OFILE2 argument??\n");
@@ -1638,7 +1639,7 @@ main(int argc, char * argv[])
             } else {
                 memcpy(out2f, buf, INOUTF_SZ - 1);
                 out2f[INOUTF_SZ - 1] = '\0';
-	    }
+            }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
                 pr2serr(ME "bad argument to 'oflag='\n");

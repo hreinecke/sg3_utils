@@ -84,6 +84,7 @@ static bool is_parent = false;
 static bool do_fork = false;
 static bool ioctl_only = false;
 static bool more_async = false;
+static bool no_duration = false;
 static bool q_at_tail = false;
 static bool write_only = false;
 static bool mrq_immed = false;  /* if set, also sets mrq_iosubmit */
@@ -108,10 +109,10 @@ static void
 usage(void)
 {
     printf("Usage: sg_tst_ioctl [-3] [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] "
-           "[-M] [-o]\n"
-           "                    [-r=SZ] [-s=SEC] [-S] [-t] [-T=NUM] [-v] "
-           "[-V] [-w]\n"
-           "                    <sg_device> [<sg_device2>]\n"
+           "[-M] [-n]\n"
+           "                    [-o] [-r=SZ] [-s=SEC] [-S] [-t] [-T=NUM] "
+           "[-v] [-V]\n"
+           "                    [-w] <sg_device> [<sg_device2>]\n"
            " where:\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
@@ -125,6 +126,7 @@ usage(void)
            "                     'S' is appended, then use "
            "ioctl(SG_IOSUBMIT)\n"
            "      -M      set 'more async' flag\n"
+           "      -n      do not calculate per command duration (def: do)\n"
            "      -o      ioctls only, then exit\n"
            "      -r=SZ     reserve buffer size in KB (def: 256 --> 256 "
            "KB)\n"
@@ -241,7 +243,7 @@ sock_fd_read(int sock, void *buf, ssize_t bufsize, int *fd)
 }
 
 static void
-set_more_async(int fd)
+set_more_async(int fd, bool more_asy, bool no_dur)
 {
     if (sg_drv_ver_num > 40030) {
         struct sg_extended_info sei;
@@ -251,10 +253,16 @@ set_more_async(int fd)
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
-        seip->ctl_flags = SG_CTL_FLAGM_MORE_ASYNC;
+        if (more_asy) {
+           seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
+           seip->ctl_flags = SG_CTL_FLAGM_MORE_ASYNC;
+        }
+        if (no_dur) {
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
+            seip->ctl_flags = SG_CTL_FLAGM_NO_DURATION;
+        }
         if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
-            pr2serr("ioctl(SG_SET_GET_EXTENDED, MORE_ASYNC) failed, "
+            pr2serr("ioctl(SG_SET_GET_EXTENDED, MORE_ASYNC(|NO_DUR)) failed, "
                     "errno=%d %s\n", errno, strerror(errno));
             return;
         }
@@ -697,6 +705,8 @@ main(int argc, char * argv[])
             }
         } else if (0 == memcmp("-M", argv[k], 2))
             more_async = true;
+        else if (0 == memcmp("-n", argv[k], 2))
+            no_duration = true;
         else if (0 == memcmp("-o", argv[k], 2))
             ioctl_only = true;
         else if (0 == memcmp("-r=", argv[k], 3)) {
@@ -877,8 +887,8 @@ main(int argc, char * argv[])
         res = 0;
         goto out;
     }
-    if (more_async && !do_v3_only)
-        set_more_async(sg_fd);
+    if ((more_async || no_duration) && !do_v3_only)
+        set_more_async(sg_fd, more_async, no_duration);
 
     if (second_fname) {
         if ((sg_fd2 = open(second_fname, O_RDWR)) < 0) {
@@ -891,7 +901,7 @@ main(int argc, char * argv[])
             fprintf(stderr, "opened second file: %s successfully, fd=%d\n",
                     second_fname, sg_fd2);
         if (more_async && !do_v3_only)
-            set_more_async(sg_fd2);
+            set_more_async(sg_fd2, more_async, no_duration);
     }
 
     if ((num_mrqs > 0) && !do_v3_only) {

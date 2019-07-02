@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.36 20190613";
+static const char * version_str = "1.37 20190618";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -897,6 +897,7 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
         memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
         set_scsi_pt_cdb(ptp, cdb, sizeof(cdb));
         set_scsi_pt_sense(ptp, sense_b, sizeof(sense_b));
+	set_scsi_pt_packet_id(ptp, uniq_pack_id.fetch_add(1));
         ++thr_sync_starts;
         rs = do_scsi_pt(ptp, -1, DEF_PT_TIMEOUT, vb);
         n = sg_cmds_process_resp(ptp, "Test unit ready", rs,

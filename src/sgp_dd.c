@@ -58,6 +58,21 @@
 #include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
 #include <linux/fs.h>           /* for BLKSSZGET and friends */
 
+#ifdef __STDC_VERSION__
+#if __STDC_VERSION__ >= 201112L
+#ifndef __STDC_NO_ATOMICS__
+
+#define HAVE_C11_ATOMICS
+#include <stdatomic.h>
+
+#endif
+#endif
+#endif
+
+#ifndef HAVE_C11_ATOMICS
+#warning "Don't have C11 Atomics, using mutex with pack_id"
+#endif
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -68,7 +83,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.72 20190501";
+static const char * version_str = "5.73 20190618";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -169,6 +184,7 @@ typedef struct request_element
     struct flags_t in_flags;
     struct flags_t out_flags;
     int debug;
+    uint32_t pack_id;
 } Rq_elem;
 
 static sigset_t signal_set;
@@ -182,6 +198,29 @@ static bool normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
 static void normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks);
 static int sg_start_io(Rq_elem * rep);
 static int sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
+
+#ifdef HAVE_C11_ATOMICS
+
+/* Assume initialized to 0, but want to start at 1, hence adding 1 in macro */
+static atomic_uint ascending_val;
+
+#define GET_NEXT_PACK_ID(_v) (atomic_fetch_add(&ascending_val, _v) + (_v))
+
+#else
+
+static pthread_mutex_t av_mut = PTHREAD_MUTEX_INITIALIZER;
+static int ascending_val = 1;
+
+#define GET_NEXT_PACK_ID(_v)                            \
+    ( { int _r;                                         \
+    do {                                                \
+        pthread_mutex_lock(&av_mut);                    \
+        _r = ascending_val;                             \
+        ascending_val += _v;                            \
+        pthread_mutex_lock(&av_mut);                    \
+    } while (0) ; _r; } )
+
+#endif
 
 #define STRERR_BUFF_LEN 128
 
@@ -980,7 +1019,8 @@ sg_start_io(Rq_elem * rep)
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
     hp->usr_ptr = rep;
-    hp->pack_id = (int)rep->blk;
+    rep->pack_id = GET_NEXT_PACK_ID(1);
+    hp->pack_id = (int)rep->pack_id;
     if (dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
     if (rep->debug > 8) {
@@ -1019,7 +1059,7 @@ sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
     /* FORCE_PACK_ID active set only read packet with matching pack_id */
     io_hdr.interface_id = 'S';
     io_hdr.dxfer_direction = wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
-    io_hdr.pack_id = (int)rep->blk;
+    io_hdr.pack_id = (int)rep->pack_id;
 
     while (((res = read(wr ? rep->outfd : rep->infd, &io_hdr,
                         sizeof(struct sg_io_hdr))) < 0) &&

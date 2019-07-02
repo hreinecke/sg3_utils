@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -13,7 +13,9 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
+#include <errno.h>
 #include <getopt.h>
 #include <sys/time.h>
 
@@ -24,6 +26,7 @@
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_pr2serr.h"
+#include "sg_pt.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -31,10 +34,16 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.32 20180628";
+static const char * version_str = "1.33 20190628";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
+
+#define SENSE_BUFF_LEN 96       /* Arbitrary, could be larger */
+#define DEF_PT_TIMEOUT 60       /* 60 seconds */
+
+#define REQUEST_SENSE_CMD 0x3
+#define REQUEST_SENSE_CMDLEN 6
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -52,6 +61,7 @@ static const char * version_str = "1.32 20180628";
 
 static struct option long_options[] = {
         {"desc", no_argument, 0, 'd'},
+        {"error", no_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"maxlen", required_argument, 0, 'm'},
@@ -69,14 +79,18 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    pr2serr("Usage: sg_requests [--desc] [--help] [--hex] [--maxlen=LEN] "
-            "[--num=NUM]\n"
-            "                   [--number=NUM] [--progress] [--raw] "
-            "[--status]\n"
-            "                   [--time] [--verbose] [--version] DEVICE\n"
+    pr2serr("Usage: sg_requests [--desc] [--error] [--help] [--hex] "
+            "[--maxlen=LEN]\n"
+            "                   [--num=NUM] [--number=NUM] [--progress] "
+            "[--raw]\n"
+            "                   [--status] [--time] [--verbose] "
+            "[--version] DEVICE\n"
             "  where:\n"
             "    --desc|-d         set flag for descriptor sense "
             "format\n"
+            "    --error|-e        change opcode to 0xff; to measure "
+            "overhead\n"
+            "                      twice: skip ioctl call\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
@@ -112,13 +126,18 @@ dStrRaw(const uint8_t * str, int len)
 int
 main(int argc, char * argv[])
 {
-    int res, c, resp_len, k, progress;
+    int c, n, resp_len, k, progress, rs, sense_cat;
+    int do_error = 0;
+    int err = 0;
+    int num_errs = 0;
     int sg_fd = -1;
+    int res = 0;
     uint8_t requestSenseBuff[MAX_REQS_RESP_LEN + 1];
     bool desc = false;
     bool do_progress = false;
     bool do_raw = false;
     bool do_status = false;
+    bool reported = false;
     bool verbose_given = false;
     bool version_given = false;
     int num_rs = 1;
@@ -127,7 +146,11 @@ main(int argc, char * argv[])
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
+    struct sg_pt_base * ptvp = NULL;
     char b[80];
+    uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
+        {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
+    uint8_t sense_b[SENSE_BUFF_LEN];
 #ifndef SG_LIB_MINGW
     bool do_time = false;
     struct timeval start_tm, end_tm;
@@ -136,7 +159,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dhHm:n:prstvV", long_options,
+        c = getopt_long(argc, argv, "dehHm:n:prstvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -144,6 +167,9 @@ main(int argc, char * argv[])
         switch (c) {
         case 'd':
             desc = true;
+            break;
+        case 'e':
+            ++do_error;
             break;
         case 'h':
         case '?':
@@ -249,11 +275,76 @@ main(int argc, char * argv[])
         ret = sg_convert_errno(-sg_fd);
         goto finish;
     }
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+    if ((NULL == ptvp) || ((err = get_scsi_pt_os_err(ptvp)))) {
+        pr2serr("%s: unable to construct pt object\n", __func__);
+        ret = sg_convert_errno(err ? err : ENOMEM);
+        goto finish;
+    }
+    if (do_error)
+        rs_cdb[0] = 0xff;
+    if (desc)
+        rs_cdb[1] |= 0x1;
+    rs_cdb[4] = maxlen;
     if (do_progress) {
         for (k = 0; k < num_rs; ++k) {
             if (k > 0)
                 sleep_for(30);
+            set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
+            set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
             memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
+            set_scsi_pt_data_in(ptvp, requestSenseBuff,
+                                sizeof(requestSenseBuff));
+            set_scsi_pt_packet_id(ptvp, k + 1);
+            if (do_error > 1) {
+                ++num_errs;
+                n = 0;
+            } else {
+                rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
+                n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
+                                         verbose, &sense_cat);
+            }
+            if (-1 == n) {
+                ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+                goto finish;
+            } else if (-2 == n) {
+                switch (sense_cat) {
+                case SG_LIB_CAT_RECOVERED:
+                case SG_LIB_CAT_NO_SENSE:
+                    break;
+                case SG_LIB_CAT_NOT_READY:
+                    ++num_errs;
+                    if (1 ==  num_rs) {
+                        ret = sense_cat;
+                        printf("device not ready\n");
+                        reported = true;
+                    }
+                    break;
+                case SG_LIB_CAT_UNIT_ATTENTION:
+                    ++num_errs;
+                    if (verbose) {
+                        pr2serr("Ignoring Unit attention (sense key)\n");
+                        reported = true;
+                    }
+                    break;
+                default:
+                    ++num_errs;
+                    if (1 == num_rs) {
+                        ret = sense_cat;
+                        sg_get_category_sense_str(sense_cat, sizeof(b), b,
+                                                  verbose);
+                        printf("%s\n", b);
+                        reported = true;
+                        break; // return k;
+                    }
+                    break;
+                }
+            }
+            clear_scsi_pt_obj(ptvp);
+            if (ret)
+                goto finish;
+
+#if 0
             res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
                                       true, verbose);
             if (res) {
@@ -270,6 +361,7 @@ main(int argc, char * argv[])
                 }
                 break;
             }
+#endif
             /* "Additional sense length" same in descriptor and fixed */
             resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
@@ -277,8 +369,7 @@ main(int argc, char * argv[])
                 hex2stderr(requestSenseBuff, resp_len, 1);
             }
             progress = -1;
-            sg_get_sense_progress_fld(requestSenseBuff, resp_len,
-                                      &progress);
+            sg_get_sense_progress_fld(requestSenseBuff, resp_len, &progress);
             if (progress < 0) {
                 ret = res;
                 if (verbose > 1)
@@ -306,25 +397,79 @@ main(int argc, char * argv[])
     requestSenseBuff[7] = '\0';
     for (k = 0; k < num_rs; ++k) {
         memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-        res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                  true, verbose);
-        ret = res;
-        if (0 == res) {
-            resp_len = requestSenseBuff[7] + 8;
-            if (do_raw)
-                dStrRaw(requestSenseBuff, resp_len);
-            else if (do_hex)
-                hex2stdout(requestSenseBuff, resp_len, 1);
-            else if (1 == num_rs) {
-                pr2serr("Decode parameter data as sense data:\n");
-                sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
-                if (verbose > 1) {
-                    pr2serr("\nParameter data in hex\n");
-                    hex2stderr(requestSenseBuff, resp_len, 1);
+        set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
+        set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+        memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
+        set_scsi_pt_data_in(ptvp, requestSenseBuff,
+                            sizeof(requestSenseBuff));
+        set_scsi_pt_packet_id(ptvp, k + 1);
+        if (do_error > 1) {
+            ++num_errs;
+            n = 0;
+        } else {
+            rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
+            n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
+                                     verbose, &sense_cat);
+        }
+        if (-1 == n) {
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+            goto finish;
+        } else if (-2 == n) {
+            switch (sense_cat) {
+            case SG_LIB_CAT_RECOVERED:
+            case SG_LIB_CAT_NO_SENSE:
+                break;
+            case SG_LIB_CAT_NOT_READY:
+                ++num_errs;
+                if (1 ==  num_rs) {
+                    ret = sense_cat;
+                    printf("device not ready\n");
+                    reported = true;
                 }
+                break;
+            case SG_LIB_CAT_UNIT_ATTENTION:
+                ++num_errs;
+                if (verbose) {
+                    pr2serr("Ignoring Unit attention (sense key)\n");
+                    reported = true;
+                }
+                break;
+            default:
+                ++num_errs;
+                if (1 == num_rs) {
+                    ret = sense_cat;
+                    sg_get_category_sense_str(sense_cat, sizeof(b), b,
+                                              verbose);
+                    printf("%s\n", b);
+                    reported = true;
+                    break; // return k;
+                }
+                break;
             }
+        }
+        clear_scsi_pt_obj(ptvp);
+        if (ret)
+            goto finish;
+
+        // res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
+                                  // true, verbose);
+        // ret = res;
+        resp_len = requestSenseBuff[7] + 8;
+        if (do_raw)
+            dStrRaw(requestSenseBuff, resp_len);
+        else if (do_hex)
+            hex2stdout(requestSenseBuff, resp_len, 1);
+        else if (1 == num_rs) {
+            pr2serr("Decode parameter data as sense data:\n");
+            sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
+            if (verbose > 1) {
+                pr2serr("\nParameter data in hex\n");
+                hex2stderr(requestSenseBuff, resp_len, 1);
+            }
+        }
+#if 0
             continue;
-        } else if (SG_LIB_CAT_INVALID_OP == res)
+        else if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("Request Sense command not supported\n");
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("bad field in Request Sense cdb\n");
@@ -335,6 +480,7 @@ main(int argc, char * argv[])
             pr2serr("Request Sense command: %s\n", b);
         }
         break;
+#endif
     }
     if ((0 == ret) && do_status) {
         resp_len = requestSenseBuff[7] + 8;
@@ -373,6 +519,8 @@ main(int argc, char * argv[])
 #endif
 
 finish:
+    if (num_errs > 0)
+        printf("Number of errors detected: %d\n", num_errs);
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
