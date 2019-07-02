@@ -20,7 +20,7 @@
  *
  * A non-standard argument "bpt" (blocks per transfer) is added to control
  * the maximum number of blocks in each transfer. The default bpt value is
- * (64 * 1024 * 1024 / bs) or 1 if the first expresion is 0. That is an
+ * (64 * 1024 * 1024 / bs) or 1 if the first expression is 0. That is an
  * integer division (rounds toward 0). For example if "bs=512" and "bpt=32"
  * are given then a maximum of 32 blocks (16KB in this case) are transferred
  * to or from the sg device in a single SCSI command.
@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
@@ -50,6 +51,8 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifndef HAVE_LINUX_SG_V4_HDR
 /* Kernel uapi header contain __user decorations on user space pointers
@@ -78,7 +81,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.09 20190612";
+static const char * version_str = "4.11 20190625";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -115,6 +118,8 @@ struct flags_t {
     bool immed;
     bool mmap;
     bool noxfer;
+    bool pack;
+    bool tag;
     bool v3;
     bool v4;
 };
@@ -189,7 +194,8 @@ usage(void)
            "  bs       must be the logical block size of device (def: 512)\n"
            "  deb      debug: 0->no debug (def); > 0 -> more debug\n"
            "  iflag    comma separated list from: dio,excl,immed,mmap,noxfer,"
-           "null,v3,v4\n"
+           "null,pack,\n"
+           "           tag,v3,v4 bound to IFILE\n"
            "  oflag    same flags as iflag but bound to OFILE\n"
            "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
            "  <other operands>     as per dd command\n\n");
@@ -329,6 +335,8 @@ do_v4:
         h4p->flags |= SGV4_FLAG_IMMED;
     if (flagp->mmap)
         h4p->flags |= SG_FLAG_MMAP_IO;
+    if (flagp->tag)
+        h4p->flags |= SGV4_FLAG_YIELD_TAG;
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
@@ -345,6 +353,11 @@ do_v4:
     }
     rep->state = SGQ_IO_STARTED;
     clp->sigs_waiting++;
+#ifdef SG_DEBUG
+    if (rep->wr ? clp->oflag.tag : clp->iflag.tag)
+        fprintf(stderr, "%s:  generated_tag=0x%" PRIx64 "\n", __func__,
+                (uint64_t)h4p->generated_tag);
+#endif
     return 0;
 }
 
@@ -354,8 +367,10 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
 {
     bool dio = false;
     bool is_v4 = wr ? clp->oflag.v4 : clp->iflag.v4;
+    bool use_pack = wr ? clp->oflag.pack : clp->iflag.pack;
+    bool use_tag = wr ? clp->oflag.tag : clp->iflag.tag;
     int fd = wr ? clp->outfd : clp->infd;
-    int res;
+    int res, id, n;
     sg_io_hdr_t io_hdr;
     sg_io_hdr_t * hp;
     struct sg_io_v4 io_v4;
@@ -413,16 +428,39 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
 #endif
     return 0;
 do_v4:
+    id = -1;
+    if (use_pack || use_tag) {
+        while (true) {
+            if ( ((res = ioctl(fd, SG_GET_NUM_WAITING, &n))) < 0) {
+                fprintf(stderr, "%s: ioctl(SG_GET_NUM_WAITING): %s [%d]\n",
+                        __func__, strerror(errno), errno);
+                return -1;
+            }
+            if (n > 0) {
+                if ( ((res = ioctl(fd, SG_GET_PACK_ID, &id))) < 0) {
+                    fprintf(stderr, "%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
+                            __func__, strerror(errno), errno);
+                    return -1;
+                }
+                /* got pack_id or tag of first waiting */
+                break;
+            }
+        }
+    }
     memset(&io_v4, 0 , sizeof(io_v4));
     io_v4.guard = 'Q';
+    if (use_tag)
+        io_v4.request_tag = id;
+    else if (use_pack)
+        io_v4.request_extra = id;
+    io_v4.flags |= SGV4_FLAG_IMMED;
     while (((res = ioctl(fd, SG_IORECEIVE, &io_v4)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         ;
     rep = (Rq_elem *)(unsigned long)io_v4.usr_ptr;
     if (res < 0) {
         fprintf(stderr, "%s: ioctl(SG_IORECEIVE): %s [%d]\n", __func__,
-                strerror(errno),
-                errno);
+                strerror(errno), errno);
         if (rep)
             rep->state = SGQ_IO_ERR;
         return -1;
@@ -467,12 +505,17 @@ do_v4:
 #ifdef SG_DEBUG
     fprintf(stderr, "%s: %s  ", __func__, wr ? "writing" : "reading");
     fprintf(stderr, "    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
+    if (use_pack)
+        fprintf(stderr, "%s:  pack_id=%d\n", __func__, h4p->request_extra);
+    else if (use_tag)
+        fprintf(stderr, "%s:  request_tag=0x%" PRIx64 "\n", __func__,
+                (uint64_t)h4p->request_tag);
 #endif
     return 0;
 }
 
 static int
-sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool vb)
+sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool pack, bool tag, bool vb)
 {
     int res, t, flags;
     struct sg_extended_info sei;
@@ -489,24 +532,45 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool vb)
         sgs_old_sg_driver = true;
     } else if (t < 40030) {
         sgs_old_sg_driver = false;
-	sgs_full_v4_sg_driver = false;
+        sgs_full_v4_sg_driver = false;
     } else
-	sgs_full_v4_sg_driver = true;
+        sgs_full_v4_sg_driver = true;
     res = 0;
     t = bs * bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)
         perror("sgs_dd: SG_SET_RESERVED_SIZE error");
 
-    if (sgs_nanosec_unit && sgs_full_v4_sg_driver) {
-        memset(seip, 0, sizeof(*seip));
-        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
-        seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
-        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
-            pr2serr("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
-                    errno, strerror(errno));
-            return 1;
+    if (sgs_full_v4_sg_driver) {
+        if (sgs_nanosec_unit) {
+            memset(seip, 0, sizeof(*seip));
+            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
+            seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
+            if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                pr2serr("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
+                        errno, strerror(errno));
+                return 1;
+            }
+        }
+        if (tag || pack) {
+            t = 1;
+            if (ioctl(fd, SG_SET_FORCE_PACK_ID, &t) < 0) {
+                pr2serr("ioctl(SG_SET_FORCE_PACK_ID(on)) failed, errno=%d "
+                        "%s\n", errno, strerror(errno));
+                return 1;
+            }
+            if (tag) {
+                memset(seip, 0, sizeof(*seip));
+                seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+                seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TAG_FOR_PACK_ID;
+                seip->ctl_flags |= SG_CTL_FLAGM_TAG_FOR_PACK_ID;
+                if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                    pr2serr("ioctl(EXTENDED(TAG_FOR_PACK_ID)) failed, "
+                            "errno=%d %s\n", errno, strerror(errno));
+                    return 1;
+                }
+            }
         }
     }
     if (-1 == fcntl(fd, F_SETOWN, getpid())) {
@@ -912,6 +976,10 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "pack"))
+            fp->pack = true;
+        else if (0 == strcmp(cp, "tag"))
+            fp->tag = true;
         else if (0 == strcmp(cp, "v3"))
             fp->v3 = true;
         else if (0 == strcmp(cp, "v4"))
@@ -1081,7 +1149,7 @@ main(int argc, char * argv[])
             }
             clp->in_is_sg = true;
             if (sz_reserve(clp->infd, clp->bs, clp->bpt, clp->use_rt_sig,
-                           clp->debug))
+                           clp->iflag.pack, clp->iflag.tag, clp->debug))
                 return 1;
             if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
                 pr2serr("Unable to implement v4 flag because sg driver too "
@@ -1101,7 +1169,8 @@ main(int argc, char * argv[])
             else {
                 clp->out_is_sg = true;
                 if (sz_reserve(clp->outfd, clp->bs, clp->bpt,
-                               clp->use_rt_sig, clp->debug))
+                               clp->use_rt_sig, clp->oflag.pack,
+                               clp->oflag.tag, clp->debug))
                     return 1;
                 if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
                     pr2serr("Unable to implement v4 flag because sg driver "
