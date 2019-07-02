@@ -1,12 +1,12 @@
-.TH SG_REQUESTS "8" "February 2016" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_REQUESTS "8" "July 2018" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
 .B sg_requests
-[\fI\-\-desc\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR] [\fI\-\-progress\fR]
-[\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-desc\fR] [\fI\-\-error\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR]
+[\fI\-\-progress\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-time\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -27,6 +27,16 @@ will only occur if the \fIDEVICE\fR recognizes descriptor format (SPC\-3
 and later). If the device is pre SPC\-3 then setting a bit in a reserved
 field may cause a check condition status with an illegal request sense key,
 but will most likely be ignored.
+.TP
+\fB\-e\fR, \fB\-\-error\fR
+when used once it changes the REQUEST SENSE opcode from 0x3 to 0xff which
+should be rejected by the \fIDEVICE\fR. There is a small chance that the
+device vendor has implemented a vendor specific command at that opcode (0xff).
+When used twice the pass-through call to send the SCSI command is bypassed.
+The idea here is to measure the user space overhead of this package's
+library to set up and process the response of a SCSI command. This option
+will be typically used with the \fI\-\-num=NUM\fR and \fI\-\-time\fR
+options where \fINUM\fR is a large number (e.g. 1000000).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -120,7 +130,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2016 Douglas Gilbert
+Copyright \(co 2004\-2017 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

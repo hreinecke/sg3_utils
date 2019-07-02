@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.62 20190501";
+static const char * version_str = "1.63 20190618";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -121,6 +121,7 @@ static bool do_time = false;
 static bool start_tm_valid = false;
 static struct timeval start_tm;
 static int blk_sz = 0;
+static uint32_t glob_pack_id = 0;       /* pre-increment */
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -488,7 +489,7 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
-    io_hdr.pack_id = (int)from_block;
+    io_hdr.pack_id = (int)++glob_pack_id;
     if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
     if (verbose > 2) {
@@ -579,7 +580,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
-    io_hdr.pack_id = (int)to_block;
+    io_hdr.pack_id = (int)++glob_pack_id;
     if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
     else if (diop && *diop)

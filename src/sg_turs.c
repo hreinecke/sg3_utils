@@ -42,7 +42,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.45 20190113";
+static const char * version_str = "3.46 20190618";
 
 #if defined(MSC_VER) || defined(__MINGW32__)
 #define HAVE_MS_SLEEP
@@ -316,6 +316,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
           struct opts_t * op)
 {
     int k, res;
+    int packet_id = 0;
     int vb = op->verbose;
     char b[80];
 
@@ -329,6 +330,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
             memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
             set_scsi_pt_cdb(ptvp, cdb, sizeof(cdb));
             set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+            set_scsi_pt_packet_id(ptvp, ++packet_id);
             rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, vb);
             n = sg_cmds_process_resp(ptvp, "Test unit ready", rs, (0 == k),
                                      vb, &sense_cat);

@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.12 (20190521)
+ * Version 4.0.31 (20190620)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -110,7 +110,7 @@ typedef struct sg_io_hdr {
  */
 #define SGV4_FLAG_DIRECT_IO SG_FLAG_DIRECT_IO
 #define SGV4_FLAG_MMAP_IO SG_FLAG_MMAP_IO
-#define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::request_tag set after SG_IOS */
+#define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::generated_tag set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
 #define SGV4_FLAG_COMPLETE_B4  0x100
@@ -455,14 +455,14 @@ struct sg_header {
 /* Gives some v4 identifying info to driver, receives associated response */
 #define SG_IORECEIVE _IOWR(SG_IOCTL_MAGIC_NUM, 0x42, struct sg_io_v4)
 
-/* Provides identifying info about a prior submission (e.g. a tag) */
-#define SG_IOABORT _IOW(SG_IOCTL_MAGIC_NUM, 0x43, struct sg_io_v4)
-
 /* Submits a v3 interface object to driver */
 #define SG_IOSUBMIT_V3 _IOWR(SG_IOCTL_MAGIC_NUM, 0x45, struct sg_io_hdr)
 
 /* Gives some v3 identifying info to driver, receives associated response */
 #define SG_IORECEIVE_V3 _IOWR(SG_IOCTL_MAGIC_NUM, 0x46, struct sg_io_hdr)
+
+/* Provides identifying info about a prior submission (e.g. a tag) */
+#define SG_IOABORT _IOW(SG_IOCTL_MAGIC_NUM, 0x43, struct sg_io_v4)
 
 /* command queuing is always on when the v3 or v4 interface is used */
 #define SG_DEF_COMMAND_Q 0
