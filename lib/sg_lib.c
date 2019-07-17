@@ -2081,6 +2081,8 @@ sg_scsi_normalize_sense(const uint8_t * sbp, int sb_len,
                 sshp->ascq = sbp[3];
             if (sb_len > 7)
                 sshp->additional_length = sbp[7];
+            sshp->byte4 = sbp[4];       /* bit 7: SDAT_OVFL bit */
+            /* sbp[5] and sbp[6] reserved for descriptor format */
         } else {                              /* fixed format */
             if (sb_len > 2)
                 sshp->sense_key = (0xf & sbp[2]);
@@ -2090,6 +2092,11 @@ sg_scsi_normalize_sense(const uint8_t * sbp, int sb_len,
                     sshp->asc = sbp[12];
                 if (sb_len > 13)
                     sshp->ascq = sbp[13];
+            }
+            if (sb_len > 6) {   /* lower 3 bytes of INFO field */
+                sshp->byte4 = sbp[4];
+                sshp->byte5 = sbp[5];
+                sshp->byte6 = sbp[6];
             }
         }
     }

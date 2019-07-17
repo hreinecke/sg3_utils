@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.44 20181010";    /* ses4r02 */
+static const char * version_str = "2.45 20190714";    /* ses4r03 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1381,7 +1381,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
         op->do_raw = 0;
-	/* struct data_in_desc_t stuff does not apply when --control */
+        /* struct data_in_desc_t stuff does not apply when --control */
         if (op->do_status && (op->arr_len > 3)) {
             int off;
             int pc = 0;
@@ -2272,17 +2272,15 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
         break;
     case 0x15:
         if (abridged)
-            snprintf(buff, buff_len, "SAS SlimLine 4i");
+            snprintf(buff, buff_len, "SlimSAS 4i");  /* was "SAS SlimLine" */
         else
-            snprintf(buff, buff_len, "SAS SlimLine 4i (SFF-8654) "
-                     "[max 4 phys]");
+            snprintf(buff, buff_len, "SlimSAS 4i (SFF-8654) [max 4 phys]");
         break;
     case 0x16:
         if (abridged)
-            snprintf(buff, buff_len, "SAS SlimLine 8i");
+            snprintf(buff, buff_len, "SlimSAS 8i");  /* was "SAS SlimLine" */
         else
-            snprintf(buff, buff_len, "SAS SlimLine 8i (SFF-8654) "
-                     "[max 8 phys]");
+            snprintf(buff, buff_len, "SlimSAS 8i (SFF-8654) [max 8 phys]");
         break;
     case 0x17:
         if (abridged)

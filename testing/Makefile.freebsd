@@ -68,12 +68,12 @@ tst_sg_lib: tst_sg_lib.o $(D_FILES)
 
 install: $(EXECS)
 	install -d $(INSTDIR)
-	for name in $^; \
-	 do install -s -o root -g root -m 755 $$name $(INSTDIR); \
+	for name in $(EXECS) ; \
+	 do install -s -o root -g wheel -m 755 $$name $(INSTDIR); \
 	done
 	install -d $(MANDIR)/$(MAN_PREF)
 	for mp in $(MAN_PGS); \
-	 do install -o root -g root -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
+	 do install -o root -g wheel -m 644 $$mp $(MANDIR)/$(MAN_PREF); \
 	 gzip -9f $(MANDIR)/$(MAN_PREF)/$$mp; \
 	done
 

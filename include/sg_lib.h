@@ -180,10 +180,10 @@ struct sg_scsi_sense_hdr {
     uint8_t sense_key;
     uint8_t asc;
     uint8_t ascq;
-    uint8_t byte4;
-    uint8_t byte5;
+    uint8_t byte4;      /* descriptor: SDAT_OVFL; fixed: lower three ... */
+    uint8_t byte5;      /* ... bytes of INFO field */
     uint8_t byte6;
-    uint8_t additional_length;
+    uint8_t additional_length;  /* zero for fixed format sense data */
 };
 
 /* Maps the salient data from a sense buffer which is in either fixed or
@@ -280,8 +280,8 @@ int sg_get_designation_descriptor_str(const char * leadin,
  * is lead-in string (on each line) than may be NULL. skip_prefix avoids
  * outputting: '   Locally assigned UUID: ' before the UUID. */
 int sg_t10_uuid_desig2str(const uint8_t * dp, int dlen, int c_set,
-			  bool do_long, bool skip_prefix,
-			  const char * lip, int blen, char * b);
+                          bool do_long, bool skip_prefix,
+                          const char * lip, int blen, char * b);
 
 /* Yield string associated with peripheral device type (pdt). Returns
  * 'buff'. If 'pdt' out of range yields "bad pdt" string. */
@@ -465,7 +465,7 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_CONTRADICT 31    /* error involving two or more cl options */
 #define SG_LIB_LOGIC_ERROR 32   /* unexpected situation in code */
 #define SG_LIB_WINDOWS_ERR 34   /* Windows error number don't fit in 7 bits so
-				 * map to a single value for exit statuses */
+                                 * map to a single value for exit statuses */
 #define SG_LIB_OK_FALSE 36      /* no error, reporting false (cf. no error,
                                  * reporting true is SG_LIB_OK_TRUE(0) ) */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF)
