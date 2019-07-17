@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.33 20190628";
+static const char * version_str = "1.34 20190706";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -137,7 +137,6 @@ main(int argc, char * argv[])
     bool do_progress = false;
     bool do_raw = false;
     bool do_status = false;
-    bool reported = false;
     bool verbose_given = false;
     bool version_given = false;
     int num_rs = 1;
@@ -317,14 +316,12 @@ main(int argc, char * argv[])
                     if (1 ==  num_rs) {
                         ret = sense_cat;
                         printf("device not ready\n");
-                        reported = true;
                     }
                     break;
                 case SG_LIB_CAT_UNIT_ATTENTION:
                     ++num_errs;
                     if (verbose) {
                         pr2serr("Ignoring Unit attention (sense key)\n");
-                        reported = true;
                     }
                     break;
                 default:
@@ -334,7 +331,6 @@ main(int argc, char * argv[])
                         sg_get_category_sense_str(sense_cat, sizeof(b), b,
                                                   verbose);
                         printf("%s\n", b);
-                        reported = true;
                         break; // return k;
                     }
                     break;
@@ -424,14 +420,12 @@ main(int argc, char * argv[])
                 if (1 ==  num_rs) {
                     ret = sense_cat;
                     printf("device not ready\n");
-                    reported = true;
                 }
                 break;
             case SG_LIB_CAT_UNIT_ATTENTION:
                 ++num_errs;
                 if (verbose) {
                     pr2serr("Ignoring Unit attention (sense key)\n");
-                    reported = true;
                 }
                 break;
             default:
@@ -441,7 +435,6 @@ main(int argc, char * argv[])
                     sg_get_category_sense_str(sense_cat, sizeof(b), b,
                                               verbose);
                     printf("%s\n", b);
-                    reported = true;
                     break; // return k;
                 }
                 break;
