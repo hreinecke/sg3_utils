@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.31 (20190620)
+ * Version 4.0.33 (20190720)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -113,6 +113,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::generated_tag set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
+#define SGV4_FLAG_NO_WAITQ  0x40	/* implies SGV4_FLAG_IMMED */
 #define SGV4_FLAG_COMPLETE_B4  0x100
 #define SGV4_FLAG_SIG_ON_OTHER  0x200
 #define SGV4_FLAG_IMMED 0x400	/* for polling with SG_IOR, ignored in SG_IOS */
@@ -207,7 +208,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
 #define SG_CTL_FLAGM_NO_DURATION 0x400	/* don't calc command duration */
 #define SG_CTL_FLAGM_MORE_ASYNC 0x800	/* yield EAGAIN in more cases */
-#define SG_CTL_FLAGM_ALL_BITS	0xfff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */
+#define SG_CTL_FLAGM_ALL_BITS	0x1fff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */

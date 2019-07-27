@@ -73,6 +73,7 @@
 #include <random>
 #include <thread>       // needed for std::this_thread::yield()
 #include <mutex>
+#include <chrono>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -107,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.38 20190717";
+static const char * version_str = "1.40 20190725";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -168,14 +169,18 @@ struct flags_t {
     bool fua;
     bool masync;        /* more async sg v4 driver flag */
     bool mmap;
+    bool mrq_immed;     /* mrq submit non-blocking */
+    bool mrq_wless;     /* mrq waitless (or _NO_WAITQ) */
     bool no_dur;
     bool noshare;
     bool noxfer;
+    bool qtail;
     bool same_fds;
     bool swait;
     bool v3;
     bool v4;
     bool v4_given;
+    bool wq_excl;
 };
 
 typedef struct global_collection
@@ -225,6 +230,7 @@ typedef struct global_collection
     bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
+    bool mrq_async;             /* any mrq_immed or mrq_wless flags given */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -249,6 +255,7 @@ typedef struct request_element
     bool swait; /* interleave READ WRITE async copy segment: READ submit,
                  * WRITE submit, READ receive, WRITE receive */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
+    bool mrq_async;             /* any mrq_immed or mrq_wless flags given */
     // bool mrq_abort_thread_active;
     int id;
     int infd;
@@ -699,20 +706,18 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,masync,mmap,nodur,noshare,"
-            "noxfer,null,\n"
-            "                same_fds,v3,v4]\n"
+            "                dsync,excl,fua,masync,mmap,mrq_immed,mrq_wless,"
+            "nodur,\n"
+            "                noshare,noxfer,null,qtail,same_fds,v3,v4,"
+            "wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
             "uses /dev/null\n"
             "    of2         second file or device to write to (def: "
             "/dev/null)\n"
-            "    oflag       comma separated list from: [append,coe,defres,"
-            "dio,direct,\n"
-            "                dpo,dsync,excl,fua,masync,mmap,nodur,noshare,"
-            "noxfer,\n"
-            "                null,same_fds,swait,v3,v4]\n"
+            "    oflag       comma separated list from: [append,<<list from "
+            "iflag>>]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -790,10 +795,18 @@ page3:
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
+            "    mrq_immed    if mrq active, do submit non-blocking (def: "
+            "ordered\n"
+            "                 blocking)\n"
+            "    mrq_wless    if mrq active, do waitless non-blocking (def: "
+            "ordered\n"
+            "                 blocking)\n"
             "    nodur       turns off command duration calculations\n"
             "    noshare     if IFILE and OFILE are sg devices, don't set "
             "up sharing\n"
             "                (def: do)\n"
+            "    qtail       queue new request at tail of block queue (def: "
+            "q at head)\n"
             "    same_fds    each thread use the same IFILE and OFILE(2) "
             "file\n"
             "                descriptors (def: each threads has own file "
@@ -806,6 +819,7 @@ page3:
             "is v4)\n"
             "    v4          use v4 sg interface (def: v3 unless sg driver "
             "is v4)\n"
+            "    wq_excl     set SG_CTL_FLAGM_EXCL_WAITQ on this sg fd\n"
             "\n"
             "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
             "OFILE are sg\ndevices 'shared' mode is selected unless "
@@ -1085,6 +1099,7 @@ read_write_thread(void * v_tip)
     rep->out_flags = clp->out_flags;
     rep->nmrqs = clp->nmrqs;
     rep->mrq_cmds = clp->mrq_cmds;
+    rep->mrq_async = clp->mrq_async;
     rep->aen = clp->aen;
     rep->m_aen = clp->m_aen;
     rep->rep_count = 0;
@@ -1814,6 +1829,213 @@ fini:
         *good_outblksp = good_outblks;
     return n_good;
 }
+static int
+sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
+                 struct sg_io_v4 * ctlop, int nrq)
+{
+    bool wless = false;
+    int half = nrq / 2;
+    int k, res, nwait, half_num, rest, err, num_good;
+    const int64_t wait_us = 10;
+    uint32_t in_fin_blks, out_fin_blks;
+    const char * sub_str = "SG_IOSUBMIT, MULTIPLE_REQS | ";
+    const char * rec_str = "SG_IORECEIVE, MULTIPLE_REQS | IMMED";
+    struct sg_io_v4 * a_v4p;
+    struct sg_io_v4 hold_ctlo;
+
+    hold_ctlo = *ctlop;
+    a_v4p = def_arr.first.data();
+    ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
+    if (rep->in_flags.mrq_immed || rep->out_flags.mrq_immed)
+        ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
+    else {
+        wless = true;
+        ctlop->flags |= SGV4_FLAG_NO_WAITQ;     /* waitless non-blocking */
+    }
+    if (rep->debug > 4) {
+        pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IOSUBMIT):\n",
+                   __func__);
+        if (rep->debug > 5)
+            hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
+        v4hdr_out_lk("Controlling object before", ctlop, rep->id);
+    }
+    res = ioctl(fd, SG_IOSUBMIT, ctlop);
+    if (res < 0) {
+        err = errno;
+        pr2serr_lk("%s: ioctl(%s%s)-->%d, errno=%d: %s\n", __func__,
+                   sub_str, (wless ? "NO_WAITQ" : "IMMED"), res, err,
+                   strerror(err));
+        return -1;
+    }
+    /* fetch first half */
+    for (k = 0; k < 100000; ++k) {
+        res = ioctl(fd, SG_GET_NUM_WAITING, &nwait);
+        if (res < 0) {
+            err = errno;
+            pr2serr_lk("%s: ioctl(SG_GET_NUM_WAITING)-->%d, errno=%d: %s\n",
+                       __func__, res, err, strerror(err));
+            return -1;
+        }
+        if (nwait >= half)
+            break;
+        this_thread::sleep_for(chrono::microseconds{wait_us});
+    }
+    ctlop->flags = (SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_IMMED);
+    res = ioctl(fd, SG_IORECEIVE, ctlop);
+    if (res < 0) {
+        err = errno;
+        if (ENODATA != err) {
+            pr2serr_lk("%s: ioctl(%s),1-->%d, errno=%d: %s\n", __func__,
+                       rec_str, res, err, strerror(err));
+            return -1;
+        }
+        half_num = 0;
+    } else
+        half_num = ctlop->info;
+    if (rep->debug > 4) {
+        pr2serr_lk("%s: Controlling object output by ioctl(SG_IORECEIVE),1: "
+                   "num_received=%d\n", __func__, half_num);
+        if (rep->debug > 5)
+            hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
+        v4hdr_out_lk("Controlling object after", ctlop, rep->id);
+        if (rep->debug > 5) {
+            for (k = 0; k < half_num; ++k) {
+                pr2serr_lk("AFTER: def_arr[%d]:\n", k);
+                v4hdr_out_lk("normal v4 object", (a_v4p + k), rep->id);
+                // hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p),
+                                  // 1);
+            }
+        }
+    }
+    in_fin_blks = 0;
+    out_fin_blks = 0;
+    num_good = chk_mrq_response(rep, ctlop, a_v4p, half_num, &in_fin_blks,
+                                &out_fin_blks);
+    if (rep->debug > 2)
+        pr2serr_lk("%s: >>>1 num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
+                   "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
+                   in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
+
+    if (num_good < 0)
+        res = -1;
+    else if (num_good < half_num) {
+        int resid_blks = rep->in_mrq_q_blks - in_fin_blks;
+
+        if (resid_blks > 0)
+            gcoll.in_rem_count += resid_blks;
+        resid_blks = rep->out_mrq_q_blks - out_fin_blks;
+        if (resid_blks > 0)
+            gcoll.out_rem_count += resid_blks;
+
+        return -1;
+    }
+
+    rest = nrq - half_num;
+    if (rest < 1)
+        goto fini;
+    /* fetch remaining */
+    for (k = 0; k < 100000; ++k) {
+        res = ioctl(fd, SG_GET_NUM_WAITING, &nwait);
+        if (res < 0) {
+            pr2serr_lk("%s: ioctl(SG_GET_NUM_WAITING)-->%d, errno=%d: %s\n",
+                       __func__, res, errno, strerror(errno));
+            return -1;
+        }
+        if (nwait >= rest)
+            break;
+        this_thread::sleep_for(chrono::microseconds{wait_us});
+    }
+    ctlop = &hold_ctlo;
+    ctlop->din_xferp += (half_num * sizeof(struct sg_io_v4));
+    ctlop->din_xfer_len -= (half_num * sizeof(struct sg_io_v4));
+    ctlop->dout_xferp = ctlop->din_xferp;
+    ctlop->dout_xfer_len = ctlop->din_xfer_len;
+    ctlop->flags = (SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_IMMED);
+    res = ioctl(fd, SG_IORECEIVE, ctlop);
+    if (res < 0) {
+        err = errno;
+        if (ENODATA != err) {
+            pr2serr_lk("%s: ioctl(%s),2-->%d, errno=%d: %s\n", __func__,
+                       rec_str, res, err, strerror(err));
+            return -1;
+        }
+        half_num = 0;
+    } else
+        half_num = ctlop->info;
+    if (rep->debug > 4) {
+        pr2serr_lk("%s: Controlling object output by ioctl(SG_IORECEIVE),2: "
+                   "num_received=%d\n", __func__, half_num);
+        if (rep->debug > 5)
+            hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
+        v4hdr_out_lk("Controlling object after", ctlop, rep->id);
+        if (rep->debug > 5) {
+            for (k = 0; k < half_num; ++k) {
+                pr2serr_lk("AFTER: def_arr[%d]:\n", k);
+                v4hdr_out_lk("normal v4 object", (a_v4p + k), rep->id);
+                // hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p),
+                                  // 1);
+            }
+        }
+    }
+    in_fin_blks = 0;
+    out_fin_blks = 0;
+    num_good = chk_mrq_response(rep, ctlop, a_v4p, half_num, &in_fin_blks,
+                                &out_fin_blks);
+    if (rep->debug > 2)
+        pr2serr_lk("%s: >>>2 num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
+                   "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
+                   in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
+
+    if (num_good < 0)
+        res = -1;
+    else if (num_good < half_num) {
+        int resid_blks = rep->in_mrq_q_blks - in_fin_blks;
+
+        if (resid_blks > 0)
+            gcoll.in_rem_count += resid_blks;
+        resid_blks = rep->out_mrq_q_blks - out_fin_blks;
+        if (resid_blks > 0)
+            gcoll.out_rem_count += resid_blks;
+
+        res = -1;
+    }
+
+fini:
+    return res;
+}
+
+/* Split def_arr into fd_def_arr and o_fd_arr based on whether each element's
+ * flags field has SGV4_FLAG_DO_ON_OTHER set. If it is set place in
+ * o_fd_def_arr and mask out SGV4_DO_ON_OTHER. Returns number of elements
+ * in o_fd_def_arr. */
+static int
+split_def_arr(const mrq_arr_t & def_arr, mrq_arr_t & fd_def_arr,
+              mrq_arr_t & o_fd_def_arr)
+{
+    int nrq, k, flags;
+    int res = 0;
+    const struct sg_io_v4 * a_v4p;
+
+    a_v4p = def_arr.first.data();
+    nrq = def_arr.first.size();
+
+    for (k = 0; k < nrq; ++k) {
+        const struct sg_io_v4 * h4p = a_v4p + k;
+
+        flags = h4p->flags;
+        if (flags & SGV4_FLAG_DO_ON_OTHER) {
+            o_fd_def_arr.first.push_back(def_arr.first[k]);
+            o_fd_def_arr.second.push_back(def_arr.second[k]);
+            flags &= ~SGV4_FLAG_DO_ON_OTHER;    /* mask out DO_ON_OTHER */
+            o_fd_def_arr.first[res].flags = flags;
+            ++res;
+        } else {
+            fd_def_arr.first.push_back(def_arr.first[k]);
+            fd_def_arr.second.push_back(def_arr.second[k]);
+        }
+    }
+    return res;
+}
 
 /* This function sets up a multiple request (mrq) transaction and sends it
  * to the pass-through. Returns 0 on success, 1 if ENOMEM error else -1 for
@@ -1876,6 +2098,8 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         ctl_v4.request_len = nrq * max_cdb_sz;
         ctl_v4.request = (uint64_t)cmd_ap;
     }
+    if (! rep->mrq_async)
+        ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF;
     ctl_v4.dout_xferp = (uint64_t)a_v4p;        /* request array */
     ctl_v4.dout_xfer_len = nrq * sizeof(*a_v4p);
@@ -1907,6 +2131,74 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk("Controlling object before", &ctl_v4, id);
     }
+    if (rep->mrq_async) {
+        mrq_arr_t fd_def_arr;
+        mrq_arr_t o_fd_def_arr;
+
+        int o_num_fd = split_def_arr(def_arr, fd_def_arr, o_fd_def_arr);
+        int num_fd = fd_def_arr.first.size();
+        if (num_fd > 0) {
+            struct sg_io_v4 fd_ctl = ctl_v4;
+            struct sg_io_v4 * aa_v4p = fd_def_arr.first.data();
+
+            for (k = 0; k < num_fd; ++k) {
+                struct sg_io_v4 * h4p = aa_v4p + k;
+                uint8_t *cmdp = &fd_def_arr.second[k].front();
+
+                if (rep->mrq_cmds) {
+                    memcpy(cmd_ap + (k * max_cdb_sz), cmdp, h4p->request_len);
+                    h4p->request = 0;
+                } else
+                    h4p->request = (uint64_t)cmdp;
+                if (rep->debug > 5) {
+                    pr2serr_lk("[%d] df_def_arr[%d]:\n", id, k);
+                    hex2stderr_lk((const uint8_t *)(aa_v4p + k),
+                                  sizeof(*aa_v4p), 1);
+                }
+            }
+            fd_ctl.flags = SGV4_FLAG_MULTIPLE_REQS;
+            fd_ctl.dout_xferp = (uint64_t)aa_v4p;        /* request array */
+            fd_ctl.dout_xfer_len = num_fd * sizeof(*aa_v4p);
+            fd_ctl.din_xferp = (uint64_t)aa_v4p;         /* response array */
+            fd_ctl.din_xfer_len = num_fd * sizeof(*aa_v4p);
+            fd_ctl.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
+            res = sgh_do_async_mrq(rep, fd_def_arr, fd, &fd_ctl, num_fd);
+            rep->in_mrq_q_blks = 0;
+            if (res)
+                goto fini;
+        }
+        if (o_num_fd > 0) {
+            struct sg_io_v4 o_fd_ctl = ctl_v4;
+            struct sg_io_v4 * aa_v4p = o_fd_def_arr.first.data();
+
+            for (k = 0; k < o_num_fd; ++k) {
+                struct sg_io_v4 * h4p = aa_v4p + k;
+                uint8_t *cmdp = &o_fd_def_arr.second[k].front();
+
+                if (rep->mrq_cmds) {
+                    memcpy(cmd_ap + (k * max_cdb_sz), cmdp, h4p->request_len);
+                    h4p->request = 0;
+                } else
+                    h4p->request = (uint64_t)cmdp;
+                if (rep->debug > 5) {
+                    pr2serr_lk("[%d] o_fd_def_arr[%d]:\n", id, k);
+                    hex2stderr_lk((const uint8_t *)(aa_v4p + k),
+                                  sizeof(*aa_v4p), 1);
+                }
+            }
+            o_fd_ctl.flags = SGV4_FLAG_MULTIPLE_REQS;
+            o_fd_ctl.dout_xferp = (uint64_t)aa_v4p;     /* request array */
+            o_fd_ctl.dout_xfer_len = o_num_fd * sizeof(*aa_v4p);
+            o_fd_ctl.din_xferp = (uint64_t)aa_v4p;      /* response array */
+            o_fd_ctl.din_xfer_len = o_num_fd * sizeof(*aa_v4p);
+            o_fd_ctl.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
+            res = sgh_do_async_mrq(rep, o_fd_def_arr, rep->outfd, &o_fd_ctl,
+                                   o_num_fd);
+            rep->out_mrq_q_blks = 0;
+        }
+        goto fini;
+    }
+
     res = ioctl(fd, SG_IO, &ctl_v4); // MULTIPLE_REQS | STOP_IF
     if (res < 0) {
         pr2serr_lk("%s: ioctl(SG_IO, MULTIPLE_REQS)-->%d, errno=%d: %s\n",
@@ -1933,7 +2225,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     out_fin_blks = 0;
     num_good = chk_mrq_response(rep, &ctl_v4, a_v4p, nrq, &in_fin_blks,
                                 &out_fin_blks);
-    if (rep->debug > 1)
+    if (rep->debug > 2)
         pr2serr_lk("%s: >>> num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -1982,6 +2274,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool mmap = wr ? rep->out_flags.mmap : rep->in_flags.mmap;
     bool noxfer = wr ? rep->out_flags.noxfer : rep->in_flags.noxfer;
     bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
+    bool qtail = wr ? rep->out_flags.qtail : rep->in_flags.qtail;
     int cdbsz = wr ? rep->cdbsz_out : rep->cdbsz_in;
     int flags = 0;
     int res, err, fd;
@@ -2014,6 +2307,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         flags |= SG_FLAG_NO_DXFER;
     if (dio)
         flags |= SG_FLAG_DIRECT_IO;
+    if (qtail)
+        flags |= SG_FLAG_Q_AT_TAIL;
     if (rep->has_share) {
         flags |= SGV4_FLAG_SHARE;
         if (wr)
@@ -2488,7 +2783,8 @@ write_complet:
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
 sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
-                  bool unit_nano, bool no_dur, bool masync, uint8_t **mmpp)
+                  bool unit_nano, bool no_dur, bool masync, bool wq_excl,
+                  uint8_t **mmpp)
 {
     static bool done = false;
     int res, t, num;
@@ -2546,6 +2842,10 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
         if (masync) {
             seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
             seip->ctl_flags |= SG_CTL_FLAGM_MORE_ASYNC;
+        }
+        if (wq_excl) {
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_EXCL_WAITQ;
+            seip->ctl_flags |= SG_CTL_FLAGM_EXCL_WAITQ;
         }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
@@ -2627,6 +2927,10 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
             fp->mmap = true;
+        else if (0 == strcmp(cp, "mrq_immed"))
+            fp->mrq_immed = true;
+        else if (0 == strcmp(cp, "mrq_wless"))
+            fp->mrq_wless = true;
         else if (0 == strcmp(cp, "nodur"))
             fp->no_dur = true;
         else if (0 == strcmp(cp, "noshare"))
@@ -2635,6 +2939,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "qtail"))
+            fp->qtail = true;
         else if (0 == strcmp(cp, "same_fds"))
             fp->same_fds = true;
         else if (0 == strcmp(cp, "swait"))
@@ -2644,7 +2950,9 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "v4")) {
             fp->v4 = true;
             fp->v4_given = true;
-        } else {
+        } else if (0 == strcmp(cp, "wq_excl"))
+            fp->wq_excl = true;
+        else {
             pr2serr("unrecognised flag: %s\n", cp);
             return false;
         }
@@ -2690,7 +2998,8 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
                           clp->elem_sz, clp->unit_nanosec,
-                          clp->in_flags.no_dur, clp->in_flags.masync, mmpp);
+                          clp->in_flags.no_dur, clp->in_flags.masync,
+                          clp->in_flags.wq_excl, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2721,7 +3030,8 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
     }
     n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->out_flags.defres,
                           clp->elem_sz, clp->unit_nanosec,
-                          clp->out_flags.no_dur, clp->out_flags.masync, mmpp);
+                          clp->out_flags.no_dur, clp->out_flags.masync,
+                          clp->out_flags.wq_excl, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -3056,6 +3366,9 @@ main(int argc, char * argv[])
         pr2serr("dio flag can only be used with noshare flag\n");
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (clp->in_flags.mrq_immed || clp->out_flags.mrq_immed ||
+        clp->in_flags.mrq_wless || clp->out_flags.mrq_wless)
+        clp->mrq_async = true;
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
        SG_IO ioctl. So reduce it in that case. */
@@ -3282,6 +3595,12 @@ main(int argc, char * argv[])
                     pr2serr("Changing IFILE from v3 to v4, use iflag=v3 to "
                             "force v3\n");
             }
+        }
+        if (clp->mrq_async && !(clp->in_flags.noshare ||
+                                clp->out_flags.noshare)) {
+            pr2serr("With mrq_immed or mrq_wless also need noshare on sg "
+                    "to sg copy\n");
+            return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (outregf[0]) {
