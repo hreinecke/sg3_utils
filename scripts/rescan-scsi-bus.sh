@@ -339,7 +339,9 @@ testonline ()
       fi
   fi
   TMPSTR=$(echo "$SCSISTR" | sed -n 's/.*Type: *\(.*\) *ANSI.*/\1/p' | sed 's/ *$//g')
-  if [ "$TMPSTR" != "$TYPE" ] ; then
+  NTMPSTR="$(sed -e 's/[[:space:]]*$//' -e 's/^[[:space:]]*//' <<<${TMPSTR})"
+  NTYPE="$(sed -e 's/[[:space:]]*$//' -e 's/^[[:space:]]*//' <<<${TYPE})"
+  if [ "$NTMPSTR" != "$NTYPE" ] ; then
     echo -e "\e[A\e[A\e[A\e[A${red}$SGDEV changed: ${bold}\nfrom:${TMPSTR} \nto: $TYPE ${norm} \n\n\n"
     return 1
   fi
