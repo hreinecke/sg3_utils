@@ -574,7 +574,8 @@ int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
  * line or a comma, space or tab separated list of bytes. If no_space is
  * set then a string of ACSII hex digits is expected, 2 per byte. Everything
  * from and including a '#' on a line is ignored. Returns 0 if ok, or an
- * error code. */
+ * error code. If the error code is SG_LIB_LBA_OUT_OF_RANGE then mp_arr
+ * would be exceeded and both mp_arr and mp_arr_len are written to. */
 int sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                  uint8_t * mp_arr, int * mp_arr_len, int max_arr_len);
 

@@ -1,0 +1,35 @@
+# To test sg_get_elem_status with dummy response to the SCSI
+# GET PHYSICAL ELEMENT SATUS command
+
+0 0 0 4
+0 0 0 2
+0 0 0 2
+
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0  0 0 0 0
+
+# first descriptor
+0 0 0 0
+0 0 0 1
+
+0 0 0 0  0
+0
+1
+2c
+0 0 0 0  11 22 33 0
+
+0 0 0 0  0 0 0 0
+
+# second descriptor
+0 0 0 0
+0 0 0 2
+
+0 0 0 0  0
+1
+1
+fe
+ff ff ff ff  ff ff ff ff
+
+0 0 0 0  0 0 0 0
+
+
+

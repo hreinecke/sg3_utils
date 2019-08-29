@@ -1,10 +1,10 @@
-.TH SG3_UTILS "8" "July 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG3_UTILS "8" "August 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
 [\fI\-\-dry\-run\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-in=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
+[\fI\-\-in=FN\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
 [\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -574,9 +574,13 @@ Since the structure of the data returned by SCSI commands varies
 considerably then the usage information or the manpage of the utility being
 used should be checked. In some cases \fI\-\-hex\fR may need to be used
 multiple times (and is more conveniently given as '\-HH' or '\-HHH).
-.br
-In some cases the name of the option with this functionality is
-\fI\-\-inhex=FN\fR.
+.TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
+This option has the same or similar functionality as \fI\-\-in=FN\fR. And
+perhaps 'inhex' is more descriptive since by default, ASCII hexadecimal is
+expected in the contents of file: \fIFN\fR. Alternatively the short form
+option may be \fI\-I\fR or \fI\-X\fR. See the "FORMAT OF FILES CONTAINING
+ASCII HEX" section below for more information.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
@@ -685,6 +689,18 @@ in the C programming language. The second hexadecimal representation is a
 trailing "h" or "H" as found in (storage) standards. When hex numbers are
 given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
+.SH FORMAT OF FILES CONTAINING ASCII HEX
+Such a file is assumed to contain a sequence of one or two digit ASCII
+hexadecimal values separated by whitespace. "Whitespace consists of either
+spaces, tabs, blank lines, or any combination thereof". Each one or two digit
+ASCII hex pair is decoded into a byte (i.e. 8 bits). The following will be
+decoded to valid (ascending valued)
+bytes: '0', '01', '3', 'c', 'F', '4a', 'cC', 'ff'.
+Lines containing only whitespace are ignored. The contents of any line
+containing a hash mark ('#') is ignored from that point until the end of that
+line. Users are encouraged to use hash marks to introduce comments in hex
+files. The author uses the extension'.hex' on such files. Examples can be
+found in the 'inhex' directory.
 .SH MICROCODE AND FIRMWARE
 There are two standardized methods for downloading microcode (i.e. device
 firmware) to a SCSI device. The more general way is with the SCSI WRITE

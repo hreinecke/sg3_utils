@@ -1,0 +1,50 @@
+        Hex data for various sg3_utils utilities
+        ========================================
+
+The files in this folder contain hexadecimal data (in ASCII) and associated
+comments (prefixed with the hash mark symbol ('#')).
+
+The utility that each hex file is associated with can be determined by
+prepending "sg_" to these filenames then going to the 'src' folder (a
+sibling folder to this one) and look for a match or partial match on
+the name.
+
+For example:
+    vpd_dev_id.hex
+after prepending 'sg_' becomes:
+    sg_vpd_dev_id.hex
+which is a partial match on the sg_vpd utility.
+The remaining 'dev_id.hex' is meant to suggest the 'device identifier'
+VPD page which is a mandatory VPD page.
+
+Assuming sg3_utils is installed, it can be tested like this:
+    sg_vpd --inhex=<folder_holding_sg3_utils>/inhex/vpd_dev_id.hex
+
+And should output this:
+
+Device Identification VPD page:
+  Addressed logical unit:
+    designator type: NAA,  code set: Binary
+      0x5000c5003011cb2b
+  Target port:
+    designator type: NAA,  code set: Binary
+     transport: Serial Attached SCSI Protocol (SPL-4)
+      0x5000c5003011cb29
+    designator type: Relative target port,  code set: Binary
+     transport: Serial Attached SCSI Protocol (SPL-4)
+      Relative target port: 0x1
+  Target device that contains addressed lu:
+    designator type: NAA,  code set: Binary
+     transport: Serial Attached SCSI Protocol (SPL-4)
+      0x5000c5003011cb28
+    designator type: SCSI name string,  code set: UTF-8
+      SCSI name string:
+      naa.5000C5003011CB28
+
+
+Users are encouraged to send the author any ASCII hex files for utilities
+that support --inhex and don't have hex data already. Special cases are
+also welcome. They help the author test this code.
+
+Douglas Gilbert
+28th August 2019

@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.01 20190520";    /* SPC-5 rev 22 */
+static const char * version_str = "2.02 20190815";    /* SPC-5 rev 22 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -3768,7 +3768,9 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
 
     clear_scsi_pt_obj(ptvp);
     id_cmdp->nsid = nsid;
-    id_cmdp->cdw10 = 0x0;       /* CNS=0x0 Identify NS */
+    id_cmdp->cdw10 = 0x0;       /* CNS=0x0 Identify NS (CNTID=0) */
+    id_cmdp->cdw11 = 0x0;       /* NVMSETID=0 (only valid when CNS=0x4) */
+    id_cmdp->cdw14 = 0x0;       /* UUID index (assume not supported) */
     set_scsi_pt_data_in(ptvp, id_dinp, id_din_len);
     set_scsi_pt_sense(ptvp, resp, sizeof(resp));
     set_scsi_pt_cdb(ptvp, (const uint8_t *)id_cmdp, sizeof(*id_cmdp));
@@ -3793,7 +3795,7 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
 }
 
 static void
-show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
+show_nvme_id_ctrl(const uint8_t *dinp, const char *dev_name, int do_long)
 {
     bool got_fguid;
     uint8_t ver_min, ver_ter, mtds;
@@ -3820,6 +3822,8 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
     oacs = sg_get_unaligned_le16(dinp + 256);
     if (0x1ff & oacs) {
         printf("  Optional admin command support:\n");
+        if (0x200 & oacs)
+            printf("    Get LBA status\n");     /* NVMe 1.4 */
         if (0x100 & oacs)
             printf("    Doorbell buffer config\n");
         if (0x80 & oacs)
@@ -3843,6 +3847,8 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
     oncs = sg_get_unaligned_le16(dinp + 256);
     if (0x7f & oncs) {
         printf("  Optional NVM command support:\n");
+        if (0x80 & oncs)
+            printf("    Verify\n");     /* NVMe 1.4 */
         if (0x40 & oncs)
             printf("    Timestamp feature\n");
         if (0x20 & oncs)
@@ -3942,7 +3948,7 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
     }
 }
 
-/* Send a NVMe Identify(CNS=1, nsid=0) and decode Controller info. If the
+/* Send a NVMe Identify(CNS=1) and decode Controller info. If the
  * device name includes a namespace indication (e.g. /dev/nvme0ns1) then
  * an Identify namespace command is sent to that namespace (e.g. 1). If the
  * device name does not contain a namespace indication (e.g. /dev/nvme0)
@@ -3951,7 +3957,7 @@ show_nvme_id_ctl(const uint8_t *dinp, const char *dev_name, int do_long)
  * 1 . The CNS (Controller or Namespace Structure) field is CDW10 7:0, was
  * only bit 0 in NVMe 1.0 and bits 1:0 in NVMe 1.1, thereafter 8 bits. */
 static int
-do_nvme_identify(int pt_fd, const struct opts_t * op)
+do_nvme_identify_ctrl(int pt_fd, const struct opts_t * op)
 {
     int ret = 0;
     int vb = op->verbose;
@@ -3978,8 +3984,8 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
     memset(id_cmdp, 0, sizeof(*id_cmdp));
     id_cmdp->opcode = 0x6;
     nsid = get_pt_nvme_nsid(ptvp);
-    /* leave id_cmdp->nsid at 0 */
-    id_cmdp->cdw10 = 0x1;       /* CNS=0x1 Identify controller */
+    id_cmdp->cdw10 = 0x1;       /* CNS=0x1 --> Identify controller */
+    /* id_cmdp->nsid is a "don't care" when CNS=1, so leave as 0 */
     id_dinp = sg_memalign(pg_sz, pg_sz, &free_id_dinp, false);
     if (NULL == id_dinp) {
         pr2serr("%s: sg_memalign problem\n", __func__);
@@ -4009,7 +4015,7 @@ do_nvme_identify(int pt_fd, const struct opts_t * op)
         }
         goto skip1;
     }
-    show_nvme_id_ctl(id_dinp, op->device_name, op->do_long);
+    show_nvme_id_ctrl(id_dinp, op->device_name, op->do_long);
 skip1:
     if (op->do_only)
         goto fini;
@@ -4373,7 +4379,7 @@ main(int argc, char * argv[])
     if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
         op->possible_nvme = true;
         if (! op->page_given) {
-            ret = do_nvme_identify(sg_fd, op);
+            ret = do_nvme_identify_ctrl(sg_fd, op);
             goto fini2;
         }
     }

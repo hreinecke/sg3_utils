@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.40 20190725";
+static const char * version_str = "1.41 20190817";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -852,7 +852,7 @@ page4:
             "probably jumped out of active state and\nthe slave request "
             "entered it while some other nodes were being printed.\n\n");
     pr2serr("Busy state:\n"
-            "Busy state (abreviated to 'bsy' in the /proc/scsi/sg/debug "
+            "Busy state (abbreviated to 'bsy' in the /proc/scsi/sg/debug "
             "output)\nis entered during request setup and completion. It "
             "is intended to be\na temporary state. It should not block "
             "but does sometimes (e.g. in\nblock_get_request()). Even so "

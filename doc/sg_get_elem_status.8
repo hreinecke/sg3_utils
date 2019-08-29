@@ -1,0 +1,100 @@
+.TH SG_GET_ELEM_STATUS "8" "August 2019" "sg3_utils\-1.45" SG3_UTILS
+.SH NAME
+sg_get_elem_status \- send SCSI GET PHYSICAL ELEMENT STATUS command
+.SH SYNOPSIS
+.B sg_get_elem_status
+[\fI\-\-brief\fR] [\fI\-\-filter=FLT\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-inhex=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-report\-type=RT\fR] [\fI\-\-starting=ELEM\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Send the SCSI GET PHYSICAL ELEMENT STATUS command to the \fIDEVICE\fR and
+output the response. The command was introduced in (draft) SBC\-4 revision
+16.
+.PP
+The default action is to decode the response into one physical element
+status descriptor per line then output a header and the status descriptors
+to stdout.  The amount of output can be reduced by the \fI\-\-brief\fR option.
+.PP
+Rather than send this SCSI command to \fIDEVICE\fR, if the \fI\-\-inhex=FN\fR
+option is given, then the contents of the file named \fIFN\fR are decoded
+as ASCII hex and then processed if it was the response of this command.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+tbd
+.TP
+\fB\-f\fR, \fB\-\-filter\fR=\fIFLT\fR
+where \fIFLT\fR is placed in a two bit field called FILTER in the GET
+PHYSICAL ELEMENT STATUS command. Only two values are defined for that
+field: 0 for all element descriptors; 1 for those element descriptors that
+are outside 'spec' or have depopulation information to report. In both cases
+the REPORT TYPE and STARTING ELEMENT fields may further restrict (reduce)
+the number of element descriptors returned. The default value is zero.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output response to this command in ASCII hex.
+.TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
+where \fIFN\fR is a function name whose contents are assumed to be ASCII
+hexadecimal. If \fIDEVICE\fR is also given then \fIDEVICE\fR is ignored,
+a warning is issued and the utility continues, decoding the file named
+\fIFN\fR. See the "FORMAT OF FILES CONTAINING ASCII HEX" section in the
+sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
+also given then the contents of \fIFN\fR are treated as binary.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+where \fILEN\fR is the (maximum) response length in bytes. It is placed in
+the cdb's "allocation length" field. If not given then 32 is used. 32 is
+enough space for the response header only.
+\fILEN\fR should be a multiple of 32 (e.g. 32, 64, and 96 are suitable).
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output response in binary (to stdout) unless the \fI\-\-inhex=FN\fR option
+is also given. In that case the input file name (\fIFN\fR) is decoded as
+binary (and the output is _not_ in binary).
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
+.TP
+\fB\-t\fR, \fB\-\-report\-type\fR=\fIRT\fR
+where \fIRT\fR will be placed in the REPORT TYPE field of the GET PHYSICAL
+ELEMENT STATUS command. Currently only two values are defined: 0
+for 'physical element' and 1: for 'storage element'. The default value
+is 1 .
+.TP
+\fB\-s\fR, \fB\-\-starting\fR=\fIELEM\fR
+where \fIELEM\fR is the placed in the STARTING ELEMENT field of the GET
+PHYSICAL ELEMENT STATUS command. Only physical elements with identifiers
+equal to or greater than \fIELEM\fR are returned. The default value is zero
+which while it isn't a valid element identifier (since they must be
+non\-zero) is given in an example in Annex L of SBC\-4 revision 17. So
+an \fIELEM\fR of zero is assumed to be valid in this context.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output). Additional output
+caused by this option is sent to stderr.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH EXIT STATUS
+The exit status of sg_get_elem_status is 0 when it is successful. Otherwise
+see the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2019 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_get_lba_status(8), sg3_utils(8)

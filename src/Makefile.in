@@ -90,11 +90,11 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
 	sg_decode_sense$(EXEEXT) sg_format$(EXEEXT) \
-	sg_get_config$(EXEEXT) sg_get_lba_status$(EXEEXT) \
-	sg_ident$(EXEEXT) sg_inq$(EXEEXT) sg_logs$(EXEEXT) \
-	sg_luns$(EXEEXT) sg_modes$(EXEEXT) sg_opcodes$(EXEEXT) \
-	sg_persist$(EXEEXT) sg_prevent$(EXEEXT) sg_raw$(EXEEXT) \
-	sg_rdac$(EXEEXT) sg_read_attr$(EXEEXT) \
+	sg_get_config$(EXEEXT) sg_get_elem_status$(EXEEXT) \
+	sg_get_lba_status$(EXEEXT) sg_ident$(EXEEXT) sg_inq$(EXEEXT) \
+	sg_logs$(EXEEXT) sg_luns$(EXEEXT) sg_modes$(EXEEXT) \
+	sg_opcodes$(EXEEXT) sg_persist$(EXEEXT) sg_prevent$(EXEEXT) \
+	sg_raw$(EXEEXT) sg_rdac$(EXEEXT) sg_read_attr$(EXEEXT) \
 	sg_read_block_limits$(EXEEXT) sg_read_buffer$(EXEEXT) \
 	sg_read_long$(EXEEXT) sg_readcap$(EXEEXT) sg_reassign$(EXEEXT) \
 	sg_referrals$(EXEEXT) sg_rep_zones$(EXEEXT) \
@@ -168,6 +168,9 @@ sg_format_DEPENDENCIES = ../lib/libsgutils2.la
 sg_get_config_SOURCES = sg_get_config.c
 sg_get_config_OBJECTS = sg_get_config.$(OBJEXT)
 sg_get_config_DEPENDENCIES = ../lib/libsgutils2.la
+sg_get_elem_status_SOURCES = sg_get_elem_status.c
+sg_get_elem_status_OBJECTS = sg_get_elem_status.$(OBJEXT)
+sg_get_elem_status_DEPENDENCIES = ../lib/libsgutils2.la
 sg_get_lba_status_SOURCES = sg_get_lba_status.c
 sg_get_lba_status_OBJECTS = sg_get_lba_status.$(OBJEXT)
 sg_get_lba_status_DEPENDENCIES = ../lib/libsgutils2.la
@@ -373,6 +376,7 @@ am__depfiles_remade = ./$(DEPDIR)/sg_bg_ctl.Po \
 	./$(DEPDIR)/sg_copy_results.Po ./$(DEPDIR)/sg_dd.Po \
 	./$(DEPDIR)/sg_decode_sense.Po ./$(DEPDIR)/sg_emc_trespass.Po \
 	./$(DEPDIR)/sg_format.Po ./$(DEPDIR)/sg_get_config.Po \
+	./$(DEPDIR)/sg_get_elem_status.Po \
 	./$(DEPDIR)/sg_get_lba_status.Po ./$(DEPDIR)/sg_ident.Po \
 	./$(DEPDIR)/sg_inq.Po ./$(DEPDIR)/sg_inq_data.Po \
 	./$(DEPDIR)/sg_logs.Po ./$(DEPDIR)/sg_luns.Po \
@@ -428,10 +432,10 @@ am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_decode_sense.c sg_emc_trespass.c sg_format.c \
-	sg_get_config.c sg_get_lba_status.c sg_ident.c \
-	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
-	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
-	sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
+	sg_get_config.c sg_get_elem_status.c sg_get_lba_status.c \
+	sg_ident.c $(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c \
+	sg_map26.c sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c \
+	sg_raw.c sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
 	sg_read_block_limits.c sg_read_buffer.c sg_read_long.c \
 	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_zones.c \
 	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
@@ -445,10 +449,10 @@ SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	sg_dd.c sg_decode_sense.c sg_emc_trespass.c sg_format.c \
-	sg_get_config.c sg_get_lba_status.c sg_ident.c \
-	$(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c sg_map26.c \
-	sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c sg_raw.c \
-	sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
+	sg_get_config.c sg_get_elem_status.c sg_get_lba_status.c \
+	sg_ident.c $(sg_inq_SOURCES) sg_logs.c sg_luns.c sg_map.c \
+	sg_map26.c sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c \
+	sg_raw.c sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
 	sg_read_block_limits.c sg_read_buffer.c sg_read_long.c \
 	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_zones.c \
 	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
@@ -597,6 +601,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -633,6 +638,7 @@ sg_decode_sense_LDADD = ../lib/libsgutils2.la
 sg_emc_trespass_LDADD = ../lib/libsgutils2.la
 sg_format_LDADD = ../lib/libsgutils2.la
 sg_get_config_LDADD = ../lib/libsgutils2.la
+sg_get_elem_status_LDADD = ../lib/libsgutils2.la
 sg_get_lba_status_LDADD = ../lib/libsgutils2.la
 sg_ident_LDADD = ../lib/libsgutils2.la
 sginfo_LDADD = ../lib/libsgutils2.la
@@ -809,6 +815,10 @@ sg_format$(EXEEXT): $(sg_format_OBJECTS) $(sg_format_DEPENDENCIES) $(EXTRA_sg_fo
 sg_get_config$(EXEEXT): $(sg_get_config_OBJECTS) $(sg_get_config_DEPENDENCIES) $(EXTRA_sg_get_config_DEPENDENCIES) 
 	@rm -f sg_get_config$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_get_config_OBJECTS) $(sg_get_config_LDADD) $(LIBS)
+
+sg_get_elem_status$(EXEEXT): $(sg_get_elem_status_OBJECTS) $(sg_get_elem_status_DEPENDENCIES) $(EXTRA_sg_get_elem_status_DEPENDENCIES) 
+	@rm -f sg_get_elem_status$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_get_elem_status_OBJECTS) $(sg_get_elem_status_LDADD) $(LIBS)
 
 sg_get_lba_status$(EXEEXT): $(sg_get_lba_status_OBJECTS) $(sg_get_lba_status_DEPENDENCIES) $(EXTRA_sg_get_lba_status_DEPENDENCIES) 
 	@rm -f sg_get_lba_status$(EXEEXT)
@@ -1064,6 +1074,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_emc_trespass.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_format.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_get_config.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_get_elem_status.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_get_lba_status.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_ident.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_inq.Po@am__quote@ # am--include-marker
@@ -1296,6 +1307,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sg_emc_trespass.Po
 	-rm -f ./$(DEPDIR)/sg_format.Po
 	-rm -f ./$(DEPDIR)/sg_get_config.Po
+	-rm -f ./$(DEPDIR)/sg_get_elem_status.Po
 	-rm -f ./$(DEPDIR)/sg_get_lba_status.Po
 	-rm -f ./$(DEPDIR)/sg_ident.Po
 	-rm -f ./$(DEPDIR)/sg_inq.Po
@@ -1412,6 +1424,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sg_emc_trespass.Po
 	-rm -f ./$(DEPDIR)/sg_format.Po
 	-rm -f ./$(DEPDIR)/sg_get_config.Po
+	-rm -f ./$(DEPDIR)/sg_get_elem_status.Po
 	-rm -f ./$(DEPDIR)/sg_get_lba_status.Po
 	-rm -f ./$(DEPDIR)/sg_ident.Po
 	-rm -f ./$(DEPDIR)/sg_inq.Po
