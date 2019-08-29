@@ -67,7 +67,7 @@ sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) $^
 
 sgh_dd: sgh_dd.o $(LIBFILESNEW)
-	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)

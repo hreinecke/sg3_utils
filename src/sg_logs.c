@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.75 20190516";    /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.77 20190822";    /* spc5r22 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -124,6 +124,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"in", required_argument, 0, 'i'},
+        {"inhex", required_argument, 0, 'i'},
         {"list", no_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"name", no_argument, 0, 'n'},
@@ -4921,7 +4922,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x1:
             printf("  Maximum explicitly open zones:");
@@ -4934,7 +4935,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x2:
             printf("  Maximum implicitly open zones:");
@@ -4947,7 +4948,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x3:
             printf("  Minimum empty zones:");
@@ -4960,10 +4961,10 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x4:
-            printf("  Maximum number of non-sequential zones:");
+            printf("  Maximum non-sequential zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     pr2serr("\n    truncated by response length, expected "
@@ -4973,7 +4974,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x5:
             printf("  Zones emptied:");
@@ -4986,7 +4987,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x6:
             printf("  Suboptimal write commands:");
@@ -4999,7 +5000,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x7:
             printf("  Commands exceeding optimal limit:");
@@ -5012,7 +5013,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x8:
             printf("  Failed explicit opens:");
@@ -5025,7 +5026,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0x9:
             printf("  Read rule violations:");
@@ -5038,7 +5039,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         case 0xa:
             printf("  Write rule violations:");
@@ -5051,7 +5052,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            printf(" %" PRIu64 "\n", sg_get_unaligned_be64(bp + 4));
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
