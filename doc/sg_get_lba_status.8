@@ -1,12 +1,13 @@
-.TH SG_GET_LBA_STATUS "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "August 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_get_lba_status \- send SCSI GET LBA STATUS(16 or 32) command
 .SH SYNOPSIS
 .B sg_get_lba_status
 [\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-brief\fR] [\fI\-\-element-id=EI\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-report\-type=RT\fR]
-[\fI\-\-scan-len=SL\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR]  [\fI\-\-inhex=FN\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-report\-type=RT\fR] [\fI\-\-scan-len=SL\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -17,12 +18,17 @@ block provisioning should support this command. The GET LBA STATUS(32)
 command was added in (draft) SBC\-4 revision 14.
 .PP
 The default action is to decode the response into one LBA status descriptor
-per line output to stdout. The descriptor LBA is output in hex (prefixed
-by '0x') and the number of blocks is output in decimal followed by the
-provisioning status and additional status in decimal. The provisioning status
-can be in the range 0 to 15 of which only 0 (mapped or unknown), 1 (unmapped),
-2 (anchored), 3 (mapped) and 4 (unknown) are used currently. The amount of
-output can be reduced by the \fI\-\-brief\fR option.
+per line then output a header and the status descriptors to stdout. The
+descriptor LBA is output in hex (prefixed by '0x') and the number of blocks
+is output in decimal followed by the provisioning status and additional status
+in decimal. The provisioning status can be in the range 0 to 15 of which only
+0 (mapped or unknown), 1 (unmapped), 2 (anchored), 3 (mapped) and 4 (unknown)
+are used currently. The amount of output can be reduced by the
+\fI\-\-brief\fR option.
+.PP
+Rather than send this SCSI command to \fIDEVICE\fR, if the \fI\-\-inhex=FN\fR
+option is given, then the contents of the file named \fIFN\fR are decoded
+as ASCII hex and then processed if it was the response of this command.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -65,6 +71,13 @@ output the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 output response to this command in ASCII hex.
 .TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
+where \fIFN\fR is a filename whose contents are assumed to be ASCII
+hexadecimal bytes. See the "FORMAT OF FILES CONTAINING ASCII HEX" section
+in the sg3_utils manpage for more information. If \fIDEVICE\fR is also
+given then it is ignored. If the \fI\-\-raw\fR option is also given then
+the contents of \fIFN\fR are treated as binary.
+.TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
 where \fILBA\fR is the starting Logical Block Address (LBA) to check the
 provisioning status for. Note that the \fIDEVICE\fR chooses how many
@@ -77,7 +90,9 @@ enough space for the response header and one LBA status descriptor.
 \fILEN\fR should be 8 plus a multiple of 16 (e.g. 24, 40, and 56 are suitable).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-output response in binary (to stdout).
+output response in binary (to stdout) unless the \fI\-\-inhex=FN\fR option
+is also given. In that case the input file name (\fIFN\fR) is decoded as
+binary (and the output is _not_ in binary).
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
@@ -126,9 +141,9 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2018 Douglas Gilbert
+Copyright \(co 2009\-2019 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_write_same(8), sg_unmap(8)
+.B sg_write_same(8), sg_unmap(8), sg3_utils(8)

@@ -81,7 +81,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.11 20190625";
+static const char * version_str = "4.12 20190824";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -226,8 +226,9 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     io_hdr.timeout = DEF_TIMEOUT;
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
+        res = -errno;
         perror("read_capacity (SG_IO) error");
-        return -1;
+        return res;
     }
     res = sg_err_category3(&io_hdr);
     if (SG_LIB_CAT_UNIT_ATTENTION == res)
@@ -387,11 +388,12 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
     if (rep)
         dio = rep->wr ? clp->oflag.dio : clp->iflag.dio;
     if (res < 0) {
+        res = -errno;
         fprintf(stderr, "%s: read(): %s [%d]\n", __func__, strerror(errno),
                 errno);
         if (rep)
             rep->state = SGQ_IO_ERR;
-        return -1;
+        return res;
     }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
         fprintf(stderr, "%s: bad usr_ptr\n", __func__);
@@ -432,15 +434,17 @@ do_v4:
     if (use_pack || use_tag) {
         while (true) {
             if ( ((res = ioctl(fd, SG_GET_NUM_WAITING, &n))) < 0) {
+                res = -errno;
                 fprintf(stderr, "%s: ioctl(SG_GET_NUM_WAITING): %s [%d]\n",
                         __func__, strerror(errno), errno);
-                return -1;
+                return res;
             }
             if (n > 0) {
                 if ( ((res = ioctl(fd, SG_GET_PACK_ID, &id))) < 0) {
+                    res = -errno;
                     fprintf(stderr, "%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
                             __func__, strerror(errno), errno);
-                    return -1;
+                    return res;
                 }
                 /* got pack_id or tag of first waiting */
                 break;
@@ -459,11 +463,12 @@ do_v4:
         ;
     rep = (Rq_elem *)(unsigned long)io_v4.usr_ptr;
     if (res < 0) {
+        res = -errno;
         fprintf(stderr, "%s: ioctl(SG_IORECEIVE): %s [%d]\n", __func__,
                 strerror(errno), errno);
         if (rep)
             rep->state = SGQ_IO_ERR;
-        return -1;
+        return res;
     }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
         fprintf(stderr, "%s: bad usr_ptr=0x%p\n", __func__, rep);
@@ -649,6 +654,7 @@ start_read(Rq_coll * clp)
         res = sg_start_io(clp, rep);
         if (1 == res) {     /* ENOMEM, find what's available+try that */
             if ((res = ioctl(clp->infd, SG_GET_RESERVED_SIZE, &buf_sz)) < 0) {
+                res = -errno;
                 perror("RESERVED_SIZE ioctls failed");
                 return res;
             }
@@ -673,6 +679,7 @@ start_read(Rq_coll * clp)
                (EINTR == errno))
             ;
         if (res < 0) {
+            res = -errno;
             snprintf(ebuff, EBUFF_SZ, "sgs_dd: reading, in_blk=%d ", rep->blk);
             perror(ebuff);
             rep->state = SGQ_IO_ERR;
@@ -736,6 +743,7 @@ start_write(Rq_coll * clp)
                      rep->num_blks * clp->bs)) < 0) && (EINTR == errno))
             ;
         if (res < 0) {
+            res = -errno;
             snprintf(ebuff, EBUFF_SZ, "sgs_dd: output, out_blk=%d ", rep->blk);
             perror(ebuff);
             rep->state = SGQ_IO_ERR;
@@ -1296,6 +1304,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "start_read: res=%d\n", res);
                 break;
             }
+            res = 0;
         }
         if (SGQ_CAN_WRITE & crw) {
             res = start_write(clp);
@@ -1303,6 +1312,7 @@ main(int argc, char * argv[])
                 fprintf(stderr, "start_write: res=%d\n", res);
                 break;
             }
+            res = 0;
         }
     }
 
@@ -1329,5 +1339,5 @@ main(int argc, char * argv[])
         fprintf(stderr, "SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
                clp->sigs_io_received, clp->sigs_rt_received);
     remove_elems(clp);
-    return res;
+    return res < 0 ? 99 : res;
 }

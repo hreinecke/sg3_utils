@@ -2,15 +2,19 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190725] [svn: r829]
+Changelog for sg3_utils-1.45 [20190828] [svn: r830]
+  - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
     - document explicit Element type codes and example
     - rename 'SAS SlimLine' to SlimSAS [ses4r02]
+    - add --inhex=FN, equivalent to --data=@FN, for
+      compatibility with other utilities
   - sg_opcodes: expand MLU (spc5r20)
   - sg_write_buffer: allow comma and period separated
     lists when input from stdin
   - sg_inq: update version descriptors to spc5r21
+    - add some NVMe 1.4 snippets to ctl identify
   - sg_format: add --dcrt used twice (FOV=1 DCRT=0)
   - sg_raw: fix --send bug when using stdin
   - sg_vpd: 3pc VPD page add copy group descriptor
@@ -19,6 +23,7 @@ Changelog for sg3_utils-1.45 [20190725] [svn: r829]
     - add --inhex=FN option
   - sg_request: add --error option, replaces opcode
     with 0xff (or skips call to pass-through)
+  - sg_get_lba_status: add --inhex=FN option
   - sg_xcopy: add --fco (fast copy only) (spc5r20)
     - implement --app=1 (append) on regular OFILE type
   - sg_scan (win32): expand limits for big arrays
@@ -26,12 +31,19 @@ Changelog for sg3_utils-1.45 [20190725] [svn: r829]
     T2A and T2B mpages (sbc4r17)
   - sg_logs: placeholder for Command duration limits
     statistics lpage (sbc4r17)
+    - zoned block device statistics log page: shorten
+      counter fields from 8 to 4 bytes (zbc2r02)
+  - zbc: preparatory work for Zoned domains and
+    realms; add new zbc service actions [19-032r3]
+  - inhex directory: new, contains ASCII hex files
+    that can be used with the '--inhex=' option
   - sg_lib: add sg_t10_uuid_desig2str()
     - sg_scsi_normalize_sense(): populate byte4,5,6
     - tweak sg_pt interface to better handle bidi
     - sg_cmds_process_resp(): two arguments removed
     - add ${PACKAGE_VERSION} to '.so' name
     - add sg_f2hex_arr()
+    - update some tables for NVMe 1.4
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - scripts: update 54-before-scsi-sg3_id.rules,
     scsi-enable-target-scan.sh and

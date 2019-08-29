@@ -913,7 +913,7 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
             break;
         }
         ci_off = 0;
-        if (16 == dlen) {
+        if (16 == dlen) {       /* first 8 bytes are 'Identifier Extension' */
             ci_off = 8;
             id_ext = sg_get_unaligned_be64(ip);
             n += sg_scnpr(b + n, blen - n, "%s      Identifier extension: 0x%"
@@ -3351,7 +3351,8 @@ sg_get_llnum_nomult(const char * buf)
  * line or a comma, space or tab separated list of bytes. If no_space is
  * set then a string of ACSII hex digits is expected, 2 per byte. Everything
  * from and including a '#' on a line is ignored. Returns 0 if ok, or an
- * error code. */
+ * error code. If the error code is SG_LIB_LBA_OUT_OF_RANGE then mp_arr
+ * would be exceeded and both mp_arr and mp_arr_len are written to. */
 int
 sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
              uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
@@ -3359,6 +3360,7 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
     bool has_stdin, split_line;
     int fn_len, in_len, k, j, m, fd, err;
     int off = 0;
+    int ret = 0;
     unsigned int h;
     const char * lcp;
     FILE * fp;
@@ -3386,18 +3388,15 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
         }
         k = read(fd, mp_arr, max_arr_len);
         if (k <= 0) {
-            int ret = SG_LIB_SYNTAX_ERROR;
-
-            if (0 == k)
+            if (0 == k) {
+                ret = SG_LIB_SYNTAX_ERROR;
                 pr2serr("read 0 bytes from binary file %s\n", fname);
-            else {
+            } else {
                 ret = sg_convert_errno(errno);
                 pr2serr("read from binary file %s: %s\n", fname,
                         safe_strerror(errno));
             }
-            if (! has_stdin)
-                close(fd);
-            return ret;
+            goto bin_fini;
         }
         if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
             /* pipe; keep reading till error or 0 read */
@@ -3409,30 +3408,32 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                     err = errno;
                     pr2serr("read from binary pipe %s: %s\n", fname,
                             safe_strerror(err));
-                    if (! has_stdin)
-                        close(fd);
-                    return sg_convert_errno(err);
+                    ret = sg_convert_errno(err);
+                    goto bin_fini;
                 }
                 k += m;
             }
         }
         *mp_arr_len = k;
+bin_fini:
         if (! has_stdin)
             close(fd);
-        return 0;
-    } else {    /* So read the file as ASCII hex */
-        if (has_stdin)
-            fp = stdin;
-        else {
-            fp = fopen(fname, "r");
-            if (NULL == fp) {
-                err = errno;
-                pr2serr("Unable to open %s for reading: %s\n", fname,
-                        safe_strerror(err));
-                return sg_convert_errno(err);
-            }
+        return ret;
+    }
+
+    /* So read the file as ASCII hex */
+    if (has_stdin)
+        fp = stdin;
+    else {
+        fp = fopen(fname, "r");
+        if (NULL == fp) {
+            err = errno;
+            pr2serr("Unable to open %s for reading: %s\n", fname,
+                    safe_strerror(err));
+            ret = sg_convert_errno(err);
+            goto fini;
         }
-     }
+    }
 
     carry_over[0] = 0;
     for (j = 0; j < 512; ++j) {
@@ -3460,7 +3461,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                 else {
                     pr2serr("%s: carry_over error ['%s'] around line %d\n",
                             __func__, carry_over, j + 1);
-                    goto bad;
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto fini;
                 }
                 lcp = line + 1;
                 --in_len;
@@ -3481,7 +3483,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
         if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
                     j + 1, m + k + 1);
-            goto bad;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto fini;
         }
         if (no_space) {
             for (k = 0; isxdigit(*lcp) && isxdigit(*(lcp + 1));
@@ -3489,11 +3492,14 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                 if (1 != sscanf(lcp, "%2x", &h)) {
                     pr2serr("%s: bad hex number in line %d, pos %d\n",
                             __func__, j + 1, (int)(lcp - line + 1));
-                    goto bad;
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto fini;
                 }
                 if ((off + k) >= max_arr_len) {
                     pr2serr("%s: array length exceeded\n", __func__);
-                    goto bad;
+                    *mp_arr_len = max_arr_len;
+                    ret = SG_LIB_LBA_OUT_OF_RANGE;
+                    goto fini;
                 }
                 mp_arr[off + k] = h;
             }
@@ -3507,7 +3513,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                         pr2serr("%s: hex number larger than 0xff in line "
                                 "%d, pos %d\n", __func__, j + 1,
                                 (int)(lcp - line + 1));
-                        goto bad;
+                        ret = SG_LIB_SYNTAX_ERROR;
+                        goto fini;
                     }
                     if (split_line && (1 == strlen(lcp))) {
                         /* single trailing hex digit might be a split pair */
@@ -3515,7 +3522,9 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                     }
                     if ((off + k) >= max_arr_len) {
                         pr2serr("%s: array length exceeded\n", __func__);
-                        goto bad;
+                        ret = SG_LIB_LBA_OUT_OF_RANGE;
+                        *mp_arr_len = max_arr_len;
+                        goto fini;
                     }
                     mp_arr[off + k] = h;
                     lcp = strpbrk(lcp, " ,\t");
@@ -3531,7 +3540,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                     }
                     pr2serr("%s: error in line %d, at pos %d\n", __func__,
                             j + 1, (int)(lcp - line + 1));
-                    goto bad;
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto fini;
                 }
             }
             off += (k + 1);
@@ -3541,10 +3551,10 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
     if (stdin != fp)
         fclose(fp);
     return 0;
-bad:
+fini:
     if (stdin != fp)
         fclose(fp);
-    return SG_LIB_SYNTAX_ERROR;
+    return ret;
 }
 
 /* Extract character sequence from ATA words as in the model string

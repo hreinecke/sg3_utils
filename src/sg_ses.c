@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.45 20190714";    /* ses4r03 */
+static const char * version_str = "2.46 20190826";    /* ses4r03 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -755,6 +755,7 @@ static struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
     {"index", required_argument, 0, 'I'},
+    {"inhex", required_argument, 0, 'X'},
     {"inner-hex", no_argument, 0, 'i'},
     {"inner_hex", no_argument, 0, 'i'},
     {"join", no_argument, 0, 'j'},
@@ -811,7 +812,7 @@ static uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
 
 
 static int read_hex(const char * inp, uint8_t * arr, int mx_arr_len,
-                    int * arr_len, bool in_hex, int verb);
+                    int * arr_len, bool in_hex, bool may_gave_at, int verb);
 static int strcase_eq(const char * s1p, const char * s2p);
 static void enumerate_diag_pages(void);
 static bool saddr_non_zero(const uint8_t * bp);
@@ -832,16 +833,18 @@ usage(int help_num)
             "              [--raw] [--readonly] [--sas-addr=SA] [--status] "
             "[--verbose]\n"
             "              [--warn] DEVICE\n\n"
-            "       sg_ses [--byte1=B1] [--clear=STR] [--control] "
+            "       sg_ses --control [--byte1=B1] [--clear=STR] "
             "[--data=H,H...]\n"
             "              [--descriptor=DES] [--dev-slot-num=SN] "
             "[--index=IIA | =TIA,II]\n"
-            "              [--mask] [--maxlen=LEN] [--nickid=SEID] "
-            "[--nickname=SEN]\n"
-            "              [--page=PG] [--sas-addr=SA] [--set=STR] "
-            "[--verbose]\n"
-            "              DEVICE\n\n"
+            "              [--inhex=FN] [--mask] [--maxlen=LEN] "
+            "[--nickid=SEID]\n"
+            "              [--nickname=SEN] [--page=PG] [--sas-addr=SA] "
+            "[--set=STR]\n"
+            "              [--verbose] DEVICE\n\n"
             "       sg_ses --data=@FN --status [-rr] [<most options from "
+            "first form>]\n"
+            "       sg_ses --inhex=FN --status [-rr] [<most options from "
             "first form>]\n\n"
             "       sg_ses [--enumerate] [--help] [--index=IIA] [--list] "
             "[--version]\n\n"
@@ -858,6 +861,8 @@ usage(int help_num)
                     "[-A SA] [-S STR]\n"
                     "         [-v] DEVICE\n\n"
                     "  sg_ses -d @FN -s [-rr] [<most options from first "
+                    "form>]\n"
+                    "  sg_ses -X FN -s [-rr] [<most options from first "
                     "form>]\n\n"
                     "  sg_ses [-e] [-h] [-I IIA] [-l] [-V]\n"
                    );
@@ -935,6 +940,7 @@ usage(int help_num)
             "                        DEVICE). Use twice for clear,get,set "
             "acronyms\n"
             "    --hex|-H            print page response (or field) in hex\n"
+            "    --inhex=FN|-X FN    alternate form of --data=@FN\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
             "    --list|-l           same as '--enumerate' option\n"
@@ -1129,6 +1135,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
     int c, j, n, d_len, ret;
     const char * data_arg = NULL;
+    const char * inhex_arg = NULL;
     uint64_t saddr;
     const char * cp;
 
@@ -1346,6 +1353,10 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
+        case 'X':       /* --inhex=FN for compatibility with other utils */
+            inhex_arg = optarg;
+            op->do_data = true;
+            break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
             goto err_help;
@@ -1372,13 +1383,23 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         pr2serr("unable to allocate %u bytes on heap\n", op->mx_arr_len);
         return sg_convert_errno(ENOMEM);
     }
-    if (data_arg) {
-        if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
-                     op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
-                     (op->do_raw < 2), op->verbose)) {
-            pr2serr("bad argument, expect '--data=H,H...', '--data=-' or "
-                    "'--data=@FN'\n");
-            return SG_LIB_SYNTAX_ERROR;
+    if (data_arg || inhex_arg) {
+        if (inhex_arg) {
+            data_arg = inhex_arg;
+            if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
+                         op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
+                         (op->do_raw < 2), false, op->verbose)) {
+                pr2serr("bad argument, expect '--inhex=FN' or '--inhex=-'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else {
+            if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
+                         op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
+                         (op->do_raw < 2), true, op->verbose)) {
+                pr2serr("bad argument, expect '--data=H,H...', '--data=-' or "
+                        "'--data=@FN'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
         }
         op->do_raw = 0;
         /* struct data_in_desc_t stuff does not apply when --control */
@@ -3865,14 +3886,14 @@ truncated:
 
 /* Reads hex data from command line, stdin or a file when in_hex is true.
  * Reads binary from stdin or file when in_hex is false. Returns 0 on
- * success, 1 otherwise. If inp is a file, then the first skipped (since
- * (it should be '@'). */
+ * success, 1 otherwise. If inp is a file and may_have_at, then the
+ * first character is skipped to get filename (since it should be '@'). */
 static int
 read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
-         bool in_hex, int vb)
+         bool in_hex, bool may_have_at, int vb)
 {
     bool has_stdin, split_line;
-    int in_len, k, j, m, off;
+    int in_len, k, j, m, off, off_fn;
     unsigned int h;
     const char * lcp;
     char * cp;
@@ -3883,6 +3904,7 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
 
     if ((NULL == inp) || (NULL == arr) || (NULL == arr_len))
         return 1;
+    off_fn = may_have_at ? 1 : 0;
     lcp = inp;
     in_len = strlen(inp);
     if (0 == in_len) {
@@ -3898,9 +3920,9 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
         if (has_stdin)
             fd = STDIN_FILENO;
         else {
-            fd = open(inp + 1, O_RDONLY);
+            fd = open(inp + off_fn, O_RDONLY);
             if (fd < 0) {
-                pr2serr("unable to open binary file %s: %s\n", inp,
+                pr2serr("unable to open binary file %s: %s\n", inp + off_fn,
                          safe_strerror(errno));
                 return 1;
             }
@@ -3908,9 +3930,9 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
         k = read(fd, arr, mx_arr_len);
         if (k <= 0) {
             if (0 == k)
-                pr2serr("read 0 bytes from binary file %s\n", inp);
+                pr2serr("read 0 bytes from binary file %s\n", inp + off_fn);
             else
-                pr2serr("read from binary file %s: %s\n", inp,
+                pr2serr("read from binary file %s: %s\n", inp + off_fn,
                         safe_strerror(errno));
             if (! has_stdin)
                 close(fd);
@@ -3923,7 +3945,7 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
                 if (0 == m)
                    break;
                 if (m < 0) {
-                    pr2serr("read from binary pipe %s: %s\n", inp,
+                    pr2serr("read from binary pipe %s: %s\n", inp + off_fn,
                             safe_strerror(errno));
                     if (! has_stdin)
                         close(fd);
@@ -3937,13 +3959,15 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
             close(fd);
         return 0;
     }
-    if (has_stdin || ('@' == inp[0])) {    /* read from stdin or file */
+    if (has_stdin || (! may_have_at) || ('@' == inp[0])) {
+        /* read hex from stdin or file */
         if (has_stdin)
             fp = stdin;
         else {
-            fp = fopen(inp + 1, "r");
+            fp = fopen(inp + off_fn, "r");
             if (NULL == fp) {
-                pr2serr("%s: unable to open file: %s\n", __func__, inp + 1);
+                pr2serr("%s: unable to open file: %s\n", __func__,
+                        inp + off_fn);
                 return 1;
             }
         }

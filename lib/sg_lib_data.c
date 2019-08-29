@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.63 20190716";/* spc5r22, sbc4r17 */
+const char * sg_lib_version_str = "2.67 20190822";/* spc5r22, sbc4r17 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -529,6 +529,10 @@ struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
 /* Zoning in [0x95] service actions */
 struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0x0, PDT_ZBC, "Report zones"},
+    {0x6, PDT_ZBC, "Report realms"},            /* 19-032r3 */
+    {0x7, PDT_ZBC, "Report zone domains"},      /* 19-032r3 */
+    {0x8, PDT_ZBC, "Zone activate"},            /* 19-032r3 */
+    {0x9, PDT_ZBC, "Zone query"},               /* 19-032r3 */
     {0xffff, 0, NULL},
 };
 
@@ -718,6 +722,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x21,"Logical unit not ready, hard reset required"},
     {0x04,0x22,"Logical unit not ready, power cycle required"},
     {0x04,0x23,"Logical unit not ready, affiliation required"},
+    {0x04,0x24,"Depopulation in progress"},             /* spc5r15 */
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -753,6 +758,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x0B,0x11,"Warning - low operating humidity limit exceeded"},
     {0x0B,0x12,"Warning - microcode security at risk"},
     {0x0B,0x13,"Warning - microcode digital signature validation failure"},
+    {0x0B,0x14,"Warning - physical element status change"},     /* spc5r15 */
     {0x0C,0x00,"Write error"},
     {0x0C,0x01,"Write error - recovered with auto reallocation"},
     {0x0C,0x02,"Write error - auto reallocation failed"},
@@ -1026,6 +1032,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x31,0x01,"Format command failed"},
     {0x31,0x02,"Zoned formatting failed due to spare linking"},
     {0x31,0x03,"Sanitize command failed"},
+    {0x31,0x04,"Depopulation failed"},          /* spc5r15 */
     {0x32,0x00,"No defect spare location available"},
     {0x32,0x01,"Defect list update failure"},
     {0x33,0x00,"Tape length error"},
@@ -1560,6 +1567,7 @@ struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
     {0x81, "Security Send"},
     {0x82, "Security Receive"},
     {0x84, "Sanitize"},                 /* last NVM specific in 1.3a */
+    {0x86, "Get LBA status"},           /* NVM specific, new in 1.4 */
     /* Vendor specific 0xc0 to 0xff */
     {0xffff, NULL},                     /* Sentinel */
 };
@@ -1635,7 +1643,11 @@ struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
     {0x1d, 11, "Sanitize in progress"},
     {0x1e,  5, "SGL data block granularity invalid"},
     {0x1f,  5, "Command not supported for queue in CMB"},
+    {0x20,  18, "Namespace is write protected"},        /* NVMe 1.4 */
+    {0x21,  6, "Command interrupted"},                  /* NVMe 1.4 */
+    {0x22,  5, "Transient transport error"},            /* NVMe 1.4 */
 
+    /* 0x80 - 0xbf: I/O command set specific */
     /* Generic command status values, NVM (I/O) Command Set */
     {0x80, 12, "LBA out of range"},
     {0x81,  3, "Capacity exceeded"},
@@ -1680,6 +1692,9 @@ struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
     {0x120, 5, "Invalid secondary controller state"},
     {0x121, 5, "Invalid number of controller resources"},
     {0x122, 5, "Invalid resource identifier"},
+    {0x123, 5, "Sanitize prohibited while PM enabled"},         /* NVMe 1.4 */
+    {0x124, 5, "ANA group identifier invalid"},                 /* NVMe 1.4 */
+    {0x125, 5, "ANA attach failed"},                            /* NVMe 1.4 */
 
     /* Command specific status values, Status Code Type (SCT): 1h
      * for NVM (I/O) Command Set */

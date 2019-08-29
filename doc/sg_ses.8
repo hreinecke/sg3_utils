@@ -1,4 +1,4 @@
-.TH SG_SES "8" "July 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_SES "8" "August 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
 .PP
 .B sg_ses
-[\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR] [\fI\-\-control\fR]
+\fI\-\-control\fR [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR]
 [\fI\-\-data=H,H...\fR] [\fI\-\-data=@FN\fR] [\fI\-\-descriptor=DES\fR]
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR]
 [\fI\-\-mask\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-nickname=SEN\fR]
@@ -21,6 +21,10 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 .PP
 .B sg_ses
 \fI\-\-data=@FN\fR \fI\-\-status\fR [\fI\-\-raw\fR \fI\-\-raw\fR]
+[<all options from first form>]
+.br
+.B sg_ses
+\fI\-\-inhex=FN\fR \fI\-\-status\fR [\fI\-\-raw\fR \fI\-\-raw\fR]
 [<all options from first form>]
 .PP
 .B sg_ses
@@ -58,11 +62,12 @@ enclosure (e.g. requesting the "ident" (locate) LED to flash on a disk
 carrier in an array) is typically done using a read\-modify\-write cycle.
 See the section on CHANGING STATE below.
 .PP
-The third form in the synopsis shows the options for decoding the contents
-of a file that holds a hexadecimal or binary representation of a SES
-dpage response. Typically an earlier invocation of the first form of this
-utility with the '\-HHHH' option would have generated that file. Since no
-SCSI commands are sent, the \fIDEVICE\fR argument if given will be ignored.
+The third form in the synopsis has two equivalent invocations shown. They
+decode the contents of a file (named \fIFN\fR) that holds a hexadecimal or
+binary representation of one, or many, SES dpage responses. Typically an
+earlier invocation of the first form of this utility with the '\-HHHH'
+option would have generated that file. Since no SCSI commands are sent, the
+\fIDEVICE\fR argument if given will be ignored.
 .PP
 The last form in the synopsis shows the options for providing command line
 help (i.e. usage information), listing out dpage and field information tables
@@ -232,6 +237,14 @@ Status (or Control) dpage is assumed. May be used with the \fI\-\-join\fR
 option or one of the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR or
 \fI\-\-set=STR\fR options. To enumerate the available Element type
 abbreviations use the \fI\-\-enumerate\fR option.
+.TP
+\fB\-X\fR, \fB\-\-inhex\fR=\fIFN\fR
+where \fIFN\fR is a filename. It has the equivalent action of the
+\fI\-\-data=@FN\fR option. If \fIFN\fR is '\-' then stdin is read. This
+option has been given for compatibility with other utilities in this
+package that use \fI\-\-inhex=FN\fR (or \fI\-\-in=FN\fR) is a similar
+way. See the "FORMAT OF FILES CONTAINING ASCII HEX" section in the
+sg3_utils manpage for more information.
 .TP
 \fB\-i\fR, \fB\-\-inner\-hex\fR
 the outer levels of a status dpage are decoded and printed out but the

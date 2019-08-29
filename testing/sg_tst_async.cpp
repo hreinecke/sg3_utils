@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.37 20190618";
+static const char * version_str = "1.38 20190728";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -191,6 +191,7 @@ struct opts_t {
     bool block;
     bool cmd_time;
     bool direct;
+    bool excl;
     bool generic_sync;
     bool masync;
     bool mmap_io;
@@ -274,6 +275,7 @@ static struct option long_options[] = {
         {"cmd-time", no_argument, 0, 'c'},
         {"cmd_time", no_argument, 0, 'c'},
         {"direct", no_argument, 0, 'd'},
+        {"excl", no_argument, 0, 'e'},
         {"force", no_argument, 0, 'f'},
         {"generic-sync", no_argument, 0, 'g'},
         {"generic_sync", no_argument, 0, 'g'},
@@ -309,23 +311,24 @@ static struct option long_options[] = {
 static void
 usage(void)
 {
-    printf("Usage: %s [--cmd-time] [--direct] [--force] [--generic-sync]\n"
-           "                    [--help] [--lba=LBA+] [--lbsz=LBSZ] "
-           "[--masync]\n"
-           "                    [--maxqpt=QPT] [--mmap-io] [--numpt=NPT] "
-           "[--noxfer]\n"
-           "                    [--override=OVN] [--pack-id] [--qat=AT] "
-           "[-qfav=FAV]\n"
-           "                    [--read] [--stats] [--submit] "
-           "[--szlb=LB[,NLBS]]\n"
-           "                    [--tnum=NT] [--tur] [--v3] [--v4] "
-           "[--verbose]\n"
-           "                    [--version] [--wait=MS] [--write]  "
-           "<sg_disk_device>*\n",
+    printf("Usage: %s [--cmd-time] [--direct] [--excl] [--force]\n"
+           "                    [--generic-sync] [--help] [--lba=LBA+] "
+           "[--lbsz=LBSZ]\n"
+           "                    [--masync] [--maxqpt=QPT] [--mmap-io] "
+           "[--numpt=NPT]\n"
+           "                    [--noxfer] [--override=OVN] [--pack-id] "
+           "[--qat=AT]\n"
+           "                    [-qfav=FAV] [--read] [--stats] [--submit]\n"
+           "                    [--szlb=LB[,NLBS]] [--tnum=NT] [--tur] "
+           "[--v3] [--v4]\n"
+           "                    [--verbose] [--version] [--wait=MS] "
+           "[--write]\n"
+           "                    <sg_disk_device>*\n",
            util_name);
     printf("  where\n");
     printf("    --cmd-time|-c    calculate per command average time (ns)\n");
     printf("    --direct|-d     do direct_io (def: indirect)\n");
+    printf("    --excl|-e       do wait_exclusive calls\n");
     printf("    --force|-f      force: any sg device (def: only scsi_debug "
            "owned)\n");
     printf("                    WARNING: <lba> written to if '-W' given\n");
@@ -883,6 +886,8 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
             pr_rusage(id);
         goto err_out;
     }
+    if (vb > 2)
+        pr2serr_lk(">>>> id=%d: open(%s) --> fd=%d\n", id, dev_name, sg_fd);
 
     ptp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
     err = 0;
@@ -897,7 +902,7 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
         memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
         set_scsi_pt_cdb(ptp, cdb, sizeof(cdb));
         set_scsi_pt_sense(ptp, sense_b, sizeof(sense_b));
-	set_scsi_pt_packet_id(ptp, uniq_pack_id.fetch_add(1));
+        set_scsi_pt_packet_id(ptp, uniq_pack_id.fetch_add(1));
         ++thr_sync_starts;
         rs = do_scsi_pt(ptp, -1, DEF_PT_TIMEOUT, vb);
         n = sg_cmds_process_resp(ptp, "Test unit ready", rs,
@@ -1026,6 +1031,8 @@ work_thread(int id, struct opts_t * op)
             pr_rusage(id);
         return;
     }
+    if (vb > 2)
+        pr2serr_lk(">>>> id=%d: open(%s) --> fd=%d\n", id, dev_name, sg_fd);
     if (op->pack_id_force) {
         k = 1;
         if (ioctl(sg_fd, SG_SET_FORCE_PACK_ID, &k) < 0)
@@ -1053,6 +1060,10 @@ work_thread(int id, struct opts_t * op)
             if (op->masync) {
                 seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MORE_ASYNC;
                 seip->ctl_flags |= SG_CTL_FLAGM_MORE_ASYNC;
+            }
+            if (op->excl) {
+                seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_EXCL_WAITQ;
+                seip->ctl_flags |= SG_CTL_FLAGM_EXCL_WAITQ;
             }
             if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
                 pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
@@ -1764,7 +1775,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "34acdfghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
+        c = getopt_long(argc, argv, "34acdefghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1790,6 +1801,9 @@ main(int argc, char * argv[])
             break;
         case 'd':
             op->direct = true;
+            break;
+        case 'e':
+            op->excl = true;
             break;
         case 'f':
             force = true;
