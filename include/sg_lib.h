@@ -613,13 +613,14 @@ int sg_ata_get_chars(const uint16_t * word_arr, int start_word,
 void dWordHex(const uint16_t * words, int num, int no_ascii, bool swapb);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
- * then -1 is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
- * suffix. Otherwise a decimal multiplier suffix may be given. Recognised
- * multipliers: c C  *1;  w W  *2; b  B *512;  k K KiB  *1,024;
- * KB  *1,000;  m M MiB  *1,048,576; MB *1,000,000; g G GiB *1,073,741,824;
- * GB *1,000,000,000 and <n>x<m> which multiplies <n> by <m> . Ignore leading
- * spaces and tabs; accept comma, hyphen, space, tab and hash as terminator.
- */
+ * then -1 is returned. Accepts a hex prefix (0x or 0X) or a decimal
+ * multiplier suffix (as per GNU's dd (since 2002: SI and IEC 60027-2)).
+ * Main (SI) multipliers supported: K, M, G. Ignore leading spaces and
+ * tabs; accept comma, hyphen, space, tab and hash as terminator.
+ * Handles zero and positive values up to 2**31-1 .
+ * Experimental: left argument (must in with hexadecimal digit) added
+ * to, or multiplied, by right argument. No embedded spaces.
+ * Examples: '3+1k' (evaluates to 1027) and '0xf+0x3'. */
 int sg_get_num(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
@@ -630,12 +631,14 @@ int sg_get_num(const char * buf);
 int sg_get_num_nomult(const char * buf);
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown
- * then -1LL is returned. Accepts a hex prefix (0x or 0X) or a 'h' (or 'H')
- * suffix. Otherwise a decimal multiplier suffix may be given. In addition
- * to supporting the multipliers of sg_get_num(), this function supports:
- * t T TiB  *(2**40); TB *(10**12); p P PiB  *(2**50); PB  *(10**15) .
- * Ignore leading spaces and tabs; accept comma, hyphen, space, tab and hash
- * as terminator. */
+ * then -1LL is returned. Accepts a hex prefix (0x or 0X), hex suffix
+ * (h or H), or a decimal multiplier suffix (as per GNU's dd (since 2002:
+ * SI and IEC 60027-2)).  Main (SI) multipliers supported: K, M, G, T, P
+ * and E. Ignore leading spaces and tabs; accept comma, hyphen, space, tab
+ * and hash as terminator. Handles zero and positive values up to 2**63-1 .
+ * Experimental: left argument (must in with hexadecimal digit) added
+ * to, or multipled by right argument. No embedded spaces.
+ * Examples: '3+1k' (evaluates to 1027) and '0xf+0x3'. */
 int64_t sg_get_llnum(const char * buf);
 
 /* If the number in 'buf' can not be decoded then -1 is returned. Accepts a
