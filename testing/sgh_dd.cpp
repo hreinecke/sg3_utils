@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.41 20190817";
+static const char * version_str = "1.44 20190906";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -118,6 +118,10 @@ static const char * version_str = "1.41 20190817";
 
 /* <<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>   xxxxxxxxxx   beware next line */
 // #define SGH_DD_READ_COMPLET_AFTER 1
+
+
+/* comment out following line to stop ioctl(SG_CTL_FLAGM_SNAP_DEV) */
+#define SGH_DD_SNAP_DEV 1
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -170,9 +174,9 @@ struct flags_t {
     bool masync;        /* more async sg v4 driver flag */
     bool mmap;
     bool mrq_immed;     /* mrq submit non-blocking */
-    bool mrq_wless;     /* mrq waitless (or _NO_WAITQ) */
     bool no_dur;
     bool noshare;
+    bool no_waitq;
     bool noxfer;
     bool qtail;
     bool same_fds;
@@ -230,7 +234,7 @@ typedef struct global_collection
     bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
-    bool mrq_async;             /* any mrq_immed or mrq_wless flags given */
+    bool mrq_async;             /* any mrq_immed or no_waitq flags given */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -255,7 +259,7 @@ typedef struct request_element
     bool swait; /* interleave READ WRITE async copy segment: READ submit,
                  * WRITE submit, READ receive, WRITE receive */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
-    bool mrq_async;             /* any mrq_immed or mrq_wless flags given */
+    bool mrq_async;             /* any mrq_immed or no_waitq flags given */
     // bool mrq_abort_thread_active;
     int id;
     int infd;
@@ -706,9 +710,9 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,masync,mmap,mrq_immed,mrq_wless,"
-            "nodur,\n"
-            "                noshare,noxfer,null,qtail,same_fds,v3,v4,"
+            "                dsync,excl,fua,masync,mmap,mrq_immed,nodur, "
+            "noshare\n"
+            "                no_waitq,noxfer,null,qtail,same_fds,v3,v4,"
             "wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
@@ -798,13 +802,12 @@ page3:
             "    mrq_immed    if mrq active, do submit non-blocking (def: "
             "ordered\n"
             "                 blocking)\n"
-            "    mrq_wless    if mrq active, do waitless non-blocking (def: "
-            "ordered\n"
-            "                 blocking)\n"
             "    nodur       turns off command duration calculations\n"
             "    noshare     if IFILE and OFILE are sg devices, don't set "
             "up sharing\n"
             "                (def: do)\n"
+            "    no_waitq     when non-blocking (async) don't use wait "
+            "queue\n"
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"
             "    same_fds    each thread use the same IFILE and OFILE(2) "
@@ -1031,6 +1034,29 @@ sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
                    "slave_fd=%d\n", __func__, id, master_rd_fd, slave_wr_fd);
     return true;
 }
+
+#ifdef SGH_DD_SNAP_DEV
+static void
+sg_take_snap(int sg_fd, int id, bool vb_b)
+{
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
+
+    seip = &sei;
+    memset(seip, 0, sizeof(*seip));
+    seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+    seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
+    seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_SNAP_DEV;
+    seip->ctl_flags &= SG_CTL_FLAGM_SNAP_DEV;   /* don't append */
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr_lk("tid=%d: ioctl(EXTENDED(SNAP_DEV), failed errno=%d %s\n",
+                   id,  errno, strerror(errno));
+        return;
+    }
+    if (vb_b)
+        pr2serr_lk("tid=%d: ioctl(SNAP_DEV) ok\n", id);
+}
+#endif
 
 static void
 cleanup_in(void * v_clp)
@@ -1829,6 +1855,7 @@ fini:
         *good_outblksp = good_outblks;
     return n_good;
 }
+
 static int
 sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
                  struct sg_io_v4 * ctlop, int nrq)
@@ -1846,12 +1873,11 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     hold_ctlo = *ctlop;
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
-    if (rep->in_flags.mrq_immed || rep->out_flags.mrq_immed)
-        ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
-    else {
+    if (rep->in_flags.no_waitq || rep->out_flags.no_waitq) {
         wless = true;
         ctlop->flags |= SGV4_FLAG_NO_WAITQ;     /* waitless non-blocking */
-    }
+    } else
+        ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
     if (rep->debug > 4) {
         pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IOSUBMIT):\n",
                    __func__);
@@ -2272,6 +2298,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool dpo = wr ? rep->out_flags.dpo : rep->in_flags.dpo;
     bool dio = wr ? rep->out_flags.dio : rep->in_flags.dio;
     bool mmap = wr ? rep->out_flags.mmap : rep->in_flags.mmap;
+    bool no_waitq = wr ? rep->out_flags.no_waitq : rep->in_flags.no_waitq;
     bool noxfer = wr ? rep->out_flags.noxfer : rep->in_flags.noxfer;
     bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
     bool qtail = wr ? rep->out_flags.qtail : rep->in_flags.qtail;
@@ -2356,10 +2383,19 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
 
     while (((res = write(fd, hp, sizeof(struct sg_io_hdr))) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
-        if (EAGAIN == errno)
+        if (EAGAIN == errno) {
             ++num_start_eagain;
-        else if (EBUSY == errno)
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        } else if (EBUSY == errno) {
             ++num_ebusy;
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        }
         std::this_thread::yield();/* another thread may be able to progress */
     }
     err = errno;
@@ -2388,7 +2424,7 @@ do_v4:
     h4p->timeout = DEF_TIMEOUT;
     h4p->usr_ptr = (uint64_t)rep;
     h4p->request_extra = pack_id;    /* this is the pack_id */
-    h4p->flags = flags | SGV4_FLAG_IMMED;
+    h4p->flags = flags | (no_waitq ? SGV4_FLAG_NO_WAITQ : SGV4_FLAG_IMMED);
     if (rep->nmrqs > 0) {
         big_cdb cdb_arr;
         uint8_t * cmdp = &(cdb_arr[0]);
@@ -2409,10 +2445,19 @@ do_v4:
     }
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
-        if (EAGAIN == errno)
+        if (EAGAIN == errno) {
             ++num_start_eagain;
-        else if (EBUSY == errno)
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        } else if (EBUSY == errno) {
             ++num_ebusy;
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        }
         std::this_thread::yield();/* another thread may be able to progress */
     }
     err = errno;
@@ -2496,10 +2541,19 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
 
     while (((res = read(fd, &io_hdr, sizeof(struct sg_io_hdr))) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
-        if (EAGAIN == errno)
+        if (EAGAIN == errno) {
             ++num_fin_eagain;
-        else if (EBUSY == errno)
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        } else if (EBUSY == errno) {
             ++num_ebusy;
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        }
         std::this_thread::yield();/* another thread may be able to progress */
     }
     if (res < 0) {
@@ -2555,10 +2609,19 @@ do_v4:
     h4p->request_extra = pack_id;
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
-        if (EAGAIN == errno)
+        if (EAGAIN == errno) {
             ++num_fin_eagain;
-        else if (EBUSY == errno)
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        } else if (EBUSY == errno) {
             ++num_ebusy;
+#ifdef SGH_DD_SNAP_DEV
+            if (0 == (num_ebusy % 1000))
+                sg_take_snap(fd, rep->id, (rep->debug > 2));
+#endif
+        }
         std::this_thread::yield();/* another thread may be able to progress */
     }
     if (res < 0) {
@@ -2929,13 +2992,21 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->mmap = true;
         else if (0 == strcmp(cp, "mrq_immed"))
             fp->mrq_immed = true;
-        else if (0 == strcmp(cp, "mrq_wless"))
-            fp->mrq_wless = true;
         else if (0 == strcmp(cp, "nodur"))
+            fp->no_dur = true;
+        else if (0 == strcmp(cp, "no_dur"))
             fp->no_dur = true;
         else if (0 == strcmp(cp, "noshare"))
             fp->noshare = true;
+        else if (0 == strcmp(cp, "no_share"))
+            fp->noshare = true;
+        else if (0 == strcmp(cp, "no_waitq"))
+            fp->no_waitq = true;
+        else if (0 == strcmp(cp, "nowaitq"))
+            fp->no_waitq = true;
         else if (0 == strcmp(cp, "noxfer"))
+            fp->noxfer = true;
+        else if (0 == strcmp(cp, "no_xfer"))
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
@@ -3366,9 +3437,12 @@ main(int argc, char * argv[])
         pr2serr("dio flag can only be used with noshare flag\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (clp->in_flags.mrq_immed || clp->out_flags.mrq_immed ||
-        clp->in_flags.mrq_wless || clp->out_flags.mrq_wless)
-        clp->mrq_async = true;
+    if (clp->nmrqs > 0) {
+        if (clp->in_flags.mrq_immed || clp->out_flags.mrq_immed)
+            clp->mrq_async = true;
+        if (clp->in_flags.no_waitq || clp->out_flags.no_waitq)
+            clp->mrq_async = true;
+    }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
        SG_IO ioctl. So reduce it in that case. */
@@ -3598,8 +3672,7 @@ main(int argc, char * argv[])
         }
         if (clp->mrq_async && !(clp->in_flags.noshare ||
                                 clp->out_flags.noshare)) {
-            pr2serr("With mrq_immed or mrq_wless also need noshare on sg "
-                    "to sg copy\n");
+            pr2serr("With mrq_immed also need noshare on sg-->sg copy\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }

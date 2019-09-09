@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "August 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG3_UTILS "8" "September 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -676,12 +676,20 @@ An example is "2k" for 2048. The large tera and peta suffixes are only
 available for numeric arguments that might require 64 bits to represent
 internally.
 .PP
-A suffix of the form "x<n>" multiplies the leading number by <n>. An
-example is "2x33" for "66". The leading number cannot be "0" (zero) as
-that would be interpreted as a hexadecimal number (see below).
-.PP
 These multiplicative suffixes are compatible with GNU's dd command (since
 2002) which claims compliance with SI and with IEC 60027\-2.
+.PP
+A suffix of the form "x<n>" multiplies the preceding number by <n>. An
+example is "2x33" for "66". The left argument cannot be '0' as '0x' will
+be interpreted as hexadecimal number prefix (see below). The left
+argument to the multiplication must end in a hexadecimal digit (i.e.
+0 to f) and the whole expression cannot have any embedded whitespace (e.g.
+spaces). An ugly example: "0xfx0x2" for 30.
+.PP
+A suffix of the form "+<n>" adds the preceding number to <n>. An example
+is "3+1k" for "1027". The left argument to the addition must end in a
+hexadecimal digit (i.e. 0 to f) and the whole expression cannot have any
+embedded whitespace (e.g. spaces). Another example: "0xf+0x2" for 17.
 .PP
 Alternatively numerical arguments can be given in hexadecimal. There are
 two syntaxes. The number can be preceded by either "0x" or "0X" as found

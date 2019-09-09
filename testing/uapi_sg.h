@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 #ifndef _UAPI_SCSI_SG_H
 #define _UAPI_SCSI_SG_H
 
@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.33 (20190720)
+ * Version 4.0.34 (20190904)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -209,7 +209,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_NO_DURATION 0x400	/* don't calc command duration */
 #define SG_CTL_FLAGM_MORE_ASYNC 0x800	/* yield EAGAIN in more cases */
 #define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */
-#define SG_CTL_FLAGM_ALL_BITS	0x1fff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_SNAP_DEV	0x2000	/* output to debugfs::snapped */
+#define SG_CTL_FLAGM_ALL_BITS	0x3fff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190828] [svn: r830]
+Changelog for sg3_utils-1.45 [20190905] [svn: r831]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -44,6 +44,8 @@ Changelog for sg3_utils-1.45 [20190828] [svn: r830]
     - add ${PACKAGE_VERSION} to '.so' name
     - add sg_f2hex_arr()
     - update some tables for NVMe 1.4
+    - sg_get_num()+sg_get_llnum(): add 'e' decoding,
+      exabytes; allow addition (e.g. --count=3+1k)
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - scripts: update 54-before-scsi-sg3_id.rules,
     scsi-enable-target-scan.sh and
@@ -58,6 +60,7 @@ Changelog for sg3_utils-1.45 [20190828] [svn: r830]
   - testing/sg_tst_bidi: for sg 4.0 driver
   - testing/sgh_dd: test request sharing, mreqs...
   - testing/sgs_dd: back from archive, for testing
+  - 'make' now builds both C and C++ programs
     SIGPOLL (SIGIO) and realtime (RT) signals
   - sg_pt: add sg_get_opcode_translation() to replace
     global pointer to array: sg_opcode_info_arr[]

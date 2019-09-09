@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.38 20190728";
+static const char * version_str = "1.39 20190902";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -195,6 +195,7 @@ struct opts_t {
     bool generic_sync;
     bool masync;
     bool mmap_io;
+    bool no_waitq;
     bool no_xfer;
     bool pack_id_force;
     bool sg_vn_ge_40000;
@@ -288,6 +289,9 @@ static struct option long_options[] = {
         {"numpt", required_argument, 0, 'n'},
         {"num-pt", required_argument, 0, 'n'},
         {"num_pt", required_argument, 0, 'n'},
+        {"nowaitq", no_argument, 0, 'z'},
+        {"no_waitq", no_argument, 0, 'z'},
+        {"no-waitq", no_argument, 0, 'z'},
         {"noxfer", no_argument, 0, 'N'},
         {"override", required_argument, 0, 'O'},
         {"pack-id", no_argument, 0, 'p'},
@@ -315,10 +319,11 @@ usage(void)
            "                    [--generic-sync] [--help] [--lba=LBA+] "
            "[--lbsz=LBSZ]\n"
            "                    [--masync] [--maxqpt=QPT] [--mmap-io] "
-           "[--numpt=NPT]\n"
-           "                    [--noxfer] [--override=OVN] [--pack-id] "
-           "[--qat=AT]\n"
-           "                    [-qfav=FAV] [--read] [--stats] [--submit]\n"
+           "[--no-waitq]\n"
+           "                    [--noxfer] [--numpt=NPT] [--override=OVN] "
+           "[--pack-id]\n"
+           "                    [--qat=AT] [-qfav=FAV] [--read] [--stats] "
+           "[--submit]\n"
            "                    [--szlb=LB[,NLBS]] [--tnum=NT] [--tur] "
            "[--v3] [--v4]\n"
            "                    [--verbose] [--version] [--wait=MS] "
@@ -350,10 +355,12 @@ usage(void)
     printf("    --maxqpt=QPT|-M QPT    maximum commands queued per thread "
            "(def:%d)\n", MAX_Q_PER_FD);
     printf("    --mmap-io|-m    mmap-ed IO (1 cmd outstanding per thread)\n");
-    printf("    --numpt=NPT|-n NPT    number of commands per thread "
-           "(def: %d)\n", DEF_NUM_PER_THREAD);
+    printf("    --no-waitq|-z    set SGV4_FLAG_NO_WAITQ, bypass poll() if "
+           "requested\n");
     printf("    --noxfer|-N          no data xfer (def: xfer on READ and "
            "WRITE)\n");
+    printf("    --numpt=NPT|-n NPT    number of commands per thread "
+           "(def: %d)\n", DEF_NUM_PER_THREAD);
     printf("    --override OVN|-O OVN    override FAV=2 when OVN queue "
            "depth\n"
            "                             reached (def: 0 -> no override)\n");
@@ -879,6 +886,11 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
         pr2serr_lk("id=%d: only support TUR here for now\n", id);
         goto err_out;
     }
+    if (op->no_waitq)
+        pr2serr_lk("id=%d: ignoring --no-waitq option\n", id);
+    if (op->verbose)
+        pr2serr_lk("id=%d: using libsgutils generic sync passthrough\n", id);
+
     if ((sg_fd = sg_cmds_open_device(dev_name, false /* ro */, vb)) < 0) {
         pr2serr_lk("id=%d: error opening file: %s: %s\n", id, dev_name,
                    safe_strerror(-sg_fd));
@@ -1137,6 +1149,8 @@ work_thread(int id, struct opts_t * op)
         sg_flags |= SG_FLAG_MMAP_IO;
     if (op->no_xfer)
         sg_flags |= SG_FLAG_NO_DXFER;
+    if (op->no_waitq)
+        sg_flags |= SGV4_FLAG_NO_WAITQ;
     if (vb > 1)
         pr2serr_lk("  id=%d, sg_flags=0x%x, %s cmds\n", id, sg_flags,
                    ((SCSI_TUR == op->c2e) ? "TUR":
@@ -1163,7 +1177,7 @@ work_thread(int id, struct opts_t * op)
                 m = 0;
             }
         }
-        if (vb && ! once1000 && num_outstanding >= 1000) {
+        if (vb && (! once1000) && (num_outstanding >= 1000)) {
             int num_waiting;
             int num_subm = (op->sg_vn_ge_40030) ? num_submitted(sg_fd) :
                                                   pi2buff.size();
@@ -1299,8 +1313,8 @@ work_thread(int id, struct opts_t * op)
                 start_sg3_cmd(sg_fd, op->c2e, pack_id, lba, lbp,
                               blk_sz * op->num_lbs, sg_flags, op->submit,
                               thr_enomem_count, thr_start_eagain_count,
-                              thr_start_ebusy_count,
-                              thr_start_e2big_count, thr_start_edom_count);
+                              thr_start_ebusy_count, thr_start_e2big_count,
+                              thr_start_edom_count);
             if (res) {
                 if (res > 1) { /* here if E2BIG, start not done, try finish */
                     do_inc = 0;
@@ -1411,7 +1425,7 @@ work_thread(int id, struct opts_t * op)
                     }
                 }
                 n = (op->wait_ms > 0) ? op->wait_ms : 0;
-                if (n > 0) {
+                if ((n > 0) && (! op->no_waitq)) {
                     for (j = 0; (j < 1000000) &&
                          (0 == (res = poll(pfd, 1, n)));
                          ++j)
@@ -1589,6 +1603,7 @@ work_thread(int id, struct opts_t * op)
     start_e2big_count += thr_start_e2big_count;
     fin_eagain_count += thr_fin_eagain_count;
     fin_ebusy_count += thr_fin_ebusy_count;
+    enomem_count += thr_enomem_count;
     start_edom_count += thr_start_edom_count;
     if (op->cmd_time && op->sg_vn_ge_40030 && (npt > 0)) {
         pr2serr_lk("t_id=%d average nanosecs per cmd: %" PRId64
@@ -1775,7 +1790,8 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "34acdefghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
+        c = getopt_long(argc, argv,
+                        "34acdefghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:Wz",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1982,6 +1998,9 @@ main(int argc, char * argv[])
             break;
         case 'W':
             op->c2e = SCSI_WRITE16;
+            break;
+        case 'z':
+            op->no_waitq = true;
             break;
         default:
             pr2serr_lk("unrecognised option code 0x%x ??\n", c);
@@ -2207,6 +2226,9 @@ main(int argc, char * argv[])
         n = start_edom_count.load();
         if (op->verbose || op->stats || (n > 0))
             cout << "Number of EDOMs: " << n << endl;
+        n = enomem_count.load();
+        if (op->verbose || op->stats || (n > 0))
+            cout << "Number of ENOMEMs: " << n << endl;
     }
     catch(system_error& e)  {
         cerr << "got a system_error exception: " << e.what() << '\n';
