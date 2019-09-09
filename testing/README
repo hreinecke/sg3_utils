@@ -1,3 +1,11 @@
+
+
+The utilities in this directory are _not_ built automatically. So:
+    cd <root_of_sg3_utils_src>
+    ./configure ; make ; make install
+will _not_ build and install them. The make command (or some variant
+of it) needs to be run in this directory as outlined before.
+
 Building files in this directory depends on several files being already
 built in the ../lib directory. So to build files here, the ./configure
 needs to be executed in the parent directory followed by changing
@@ -6,9 +14,14 @@ Another way is to do a top level 'make' after the ./configure which
 will make the libraries followed by all the utilities in the src/
 directory. To make them in FreeBSD use 'make -f Makefile.freebsd' .
 
-There is an brief explanation of each example in the README file in
-the main (i.e. this directory's parent) directory. There are also
-some notes at the top of each source file.
+The utilities in this directory do not have manpages. They have
+relatively complete but terse help messages, typically seen by using
+the '--help' option one or more times. If called several times, the
+shorter form of the help option is more convenient, for example: '-hhh'.
+And of course there is the source code. Unfortunately where the code
+implements many different options, it can become a bit dense. There
+is also a large amount of error checking, as many of these utilities
+were used to test new features placed in the sg v4 driver in Linux.
 
 The sg_chk_asc utility decodes the SCSI additional sense code table
 found at http://www.t10.org/lists/asc-num.txt and checks it against
@@ -20,10 +33,16 @@ The tst_sg_lib utility exercises several functions found in sg_lib.c
 and related files in the 'lib' sibling directory. Use 'tst_sg_lib -h'
 to get more information.
 
-Those files with the extension "cpp" are C++ examples that use facilities
-in C++11. They can be built by calling 'make -f Makefile.cplus'. A
-gcc/g++ compiler of 4.7.3 vintage or later (or a recent clang compiler)
-will be required. To make them in FreeBSD use 'make -f Makefile.cplus_fb'.
+There are both C and C++ files in this directory, they have extensions
+'.c' and '.cpp' respectively. Now both are built with rules in Makefile
+(at least in Linux). Formerly the C++ in Linux required:
+'make -f Makefile.cplus'. A gcc/g++ compiler of 4.7.3 vintage or later
+(or a recent clang compiler) will be required. To make them in FreeBSD
+use 'make -f Makefile.cplus_fb'.
+
+The sgh_dd utility (C++) uses 'libatomic' which may not be installed
+on some systems. On Debian based systems 'apt install libatomic1' fixes
+this.
 
 Douglas Gilbert
-11th October 2018
+2nd September 2019

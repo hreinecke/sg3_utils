@@ -5,7 +5,8 @@ INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/man
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
-	sg_tst_nvme sg_tst_ioctl sg_tst_bidi tst_sg_lib sgs_dd
+	sg_tst_nvme sg_tst_ioctl sg_tst_bidi tst_sg_lib sgs_dd sg_tst_excl \
+	sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async sgh_dd
 	
 EXTRAS =
 
@@ -19,13 +20,15 @@ LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 
 # For C++/clang testing
 ## CC = gcc
-## CC = g++
+## CXX = g++
 ## CC = clang
-## CC = clang++
+## CXX = clang++
+CXXLD = $(CXX)
 
 LD = $(CC)
 
 CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
+CXXFLAGS = -std=c++17 -pthread -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME -DDEBUG
 # CFLAGS = -g -O2 -W -Wall 
 CFLAGS = -g -O2 -W -Wall -DDEBUG
@@ -81,14 +84,29 @@ sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)
 tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
-sgh_dd: sgh_dd.o $(LIBFILESNEW)
-	$(LD) -o $@ $(LDFLAGS) -pthread $^
-
 sgs_dd: sgs_dd.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^ 
 
 sg_tst_bidi: sg_tst_bidi.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^ 
+
+sg_tst_excl: sg_tst_excl.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
+
+sg_tst_excl2: sg_tst_excl2.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
+
+sg_tst_excl3: sg_tst_excl3.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
+
+sg_tst_context: sg_tst_context.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
+
+sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
+
+sgh_dd: sgh_dd.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
 
 
 install: $(EXECS)

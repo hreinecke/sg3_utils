@@ -35,6 +35,7 @@ Here is a list of utilities that have been ported:
     sg_decode_sense
     sg_format
     sg_get_config
+    sg_get_elem_status
     sg_get_lba_status
     sg_ident
     sg_inq          [dropped ATA IDENTIFY DEVICE capability]
@@ -163,4 +164,4 @@ disks to accept SCSI commands including the SCSI ATA PASS THROUGH commands.
 
 
 Douglas Gilbert
-27th January 2018
+9th September 2019
