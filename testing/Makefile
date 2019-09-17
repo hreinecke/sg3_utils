@@ -23,9 +23,9 @@ LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 ## CXX = g++
 ## CC = clang
 ## CXX = clang++
-CXXLD = $(CXX)
 
-LD = $(CC)
+LD = $(CXX)
+CXXLD = $(CXX)
 
 CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
 CXXFLAGS = -std=c++17 -pthread -g -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)

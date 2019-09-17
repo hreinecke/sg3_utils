@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.77 20190822";    /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.78 20190913";    /* spc5r22 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -6980,7 +6980,7 @@ main(int argc, char * argv[])
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
                 pr2serr("log_select: device not ready\n");
-            else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            else if (SG_LIB_CAT_ILLEGAL_REQ == k)
                 pr2serr("log_select: field in cdb illegal\n");
             else if (SG_LIB_CAT_INVALID_OP == k)
                 pr2serr("log_select: not supported\n");

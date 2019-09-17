@@ -1,4 +1,4 @@
-.TH SG_READ "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_READ "8" "September 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_read \- read multiple blocks of data, optionally with SCSI READ commands
 .SH SYNOPSIS
@@ -29,6 +29,11 @@ are issued. "Zero block" means "do nothing" for SCSI READ 10, 12 and
 16 byte commands (but not for the 6 byte variant). In practice "zero
 block" SCSI READ commands have low latency and so are one way to measure
 SCSI command overhead.
+.PP
+Please note: this is a very old utility that uses 32 bit integers for
+disk LBAs and the count. Hence it will not be able to address beyond
+2 Terabytes on a disk with logical blocks that are 512 bytes long.
+Alternatives are the sg_dd and ddpt utilities.
 .SH OPTIONS
 .TP
 \fBblk_sgio\fR=0 | 1
@@ -171,14 +176,17 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2012 Douglas Gilbert
+Copyright \(co 2000\-2019 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 To time streaming media read or write time see
 .B sg_dd
-is in the sg3_utils package. The lmbench package contains
+is in the sg3_utils package and
+.B ddpt
+in a package of the same name.
+The lmbench package contains
 .B lmdd
 which is also interesting.
 .B raw(8), dd(1)

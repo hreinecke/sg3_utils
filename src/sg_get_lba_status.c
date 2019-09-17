@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.20 20190822";      /* sbc4r15 */
+static const char * version_str = "1.21 20190913";      /* sbc4r15 */
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -391,7 +391,7 @@ main(int argc, char * argv[])
         res = sg_ll_get_lba_status16(sg_fd, lba, rt, glbasBuffp, maxlen, true,
                                      verbose);
     else if (do_32)     /* keep analyser happy since do_32 must be true */
-        res = sg_ll_get_lba_status32(sg_fd, lba, element_id, scan_len, rt,
+        res = sg_ll_get_lba_status32(sg_fd, lba, scan_len, element_id, rt,
                                      glbasBuffp, maxlen, true, verbose);
 
     ret = res;

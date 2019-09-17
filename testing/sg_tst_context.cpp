@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 Douglas Gilbert.
+ * Copyright (c) 2013-2019 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.04 20181207";
+static const char * version_str = "1.05 20190917";
 static const char * util_name = "sg_tst_context";
 
 /* This is a test program for checking that file handles keep their
@@ -68,11 +68,9 @@ static const char * util_name = "sg_tst_context";
  * which is assumed to be a sibling of this examples directory. Those
  * object files in the lib directory can be built with:
  *   cd <sg3_utils> ; ./configure ; cd lib; make
- * Then to build sg_tst_context concatenate the next 3 lines:
- *   g++ -Wall -std=c++11 -pthread -I ../include ../lib/sg_lib.o
- *     ../lib/sg_lib_data.o ../lib/sg_pt_linux.o -o sg_tst_context
- *     sg_tst_context.cpp
- * Alternatively use 'make -f Makefile.cplus sg_tst_context'
+ * Then:
+ *   cd ../testing
+ *   make sg_tst_context
  *
  */
 

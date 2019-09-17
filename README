@@ -305,15 +305,14 @@ a "compliant jitter tolerance pattern" (CJTPAT).
 The 'testing' subdirectory contains source and a Makefiles to test
 kernel pass-through and associated drivers, mainly for Linux. There is
 both C code (with the extension ".c") and C++ code (with the extension
-".cpp"). There is a "Makefile" to build the C code and a "Makefile.cplus"
-to build the C++ code. Both depend on some object files from the "lib"
-subdirectory. So a sequence like this may be required prior to invoking
-one of the Makefiles in the directory: "cd <top_of_package> ;
+".cpp"). There is a "Makefile" to build the C + C++ code. The Makefile
+depends on some object files from the "lib" subdirectory. So a sequence
+like this may be required prior to invoking make: "cd <top_of_package> ;
 ./configure ; cd lib ; make ; cd ../testing".
 
 Here is a list in alphabetical order of utilities found in the 'testing'
 subdirectory:
-  - bsg_queue_tst, sg_iovec_tst, sg_queue_tst, sg_sense_tst,
+  - bsg_queue_tst, sgh_dd (C++), sg_iovec_tst, sg_queue_tst, sg_sense_tst,
     sg_tst_async (C++), sg_tst_context (C++), sg_tst_excl (C++),
     sg_tst_excl2 (C++), sg_tst_excl3 (C++)
 
@@ -542,4 +541,4 @@ See http://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-9th September 2019
+17 September 2019

@@ -1141,7 +1141,7 @@ if [ "@$1" = @--help ] || [ "@$1" = @-h ] || [ "@$1" = "@-?" ] ; then
     echo "--largelun:      Tell kernel to support LUNs > 7 even on SCSI2 devs"
     echo "--luns=LIST:     Scan only lun(s) in LIST"
     echo "--multipath:     same as -m"
-    echo "--nooptscan:     don't stop looking for LUNs is 0 is not found"
+    echo "--nooptscan:     don't stop looking for LUNs if 0 is not found"
     echo "--remove:        same as -r"
     echo "--reportlun2:    Tell kernel to try REPORT_LUN even on SCSI2 devices"
     echo "--resize:        same as -s"

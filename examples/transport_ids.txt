@@ -9,7 +9,7 @@
 # To see transport IDs decoded after they have been read in (e.g. to check
 # they are well formed) use the verbose flag 3 times (i.e. "... -vvv ...").
 
-# Here is a simple example (for SPI) of a comma separted hex list:
+# Here is a simple example (for SPI) of a comma separated hex list:
 1,0,0,7,0,0,0,1         # SPI, initiator address=7, relative_port_num=1
 
 # and here is the transport specific format for the same thing:

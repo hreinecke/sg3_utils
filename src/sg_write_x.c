@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20190113";
+static const char * version_str = "1.21 20190913";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -673,8 +673,10 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
     if (cp) {   /* copy from first non whitespace ... */
         memcpy(c, lcp, cp - lcp);  /* ... to just prior to first '#' */
         c[cp - lcp] = '\0';
-    } else
-        strcpy(c, lcp);         /* ... to end of line, including null */
+    } else {
+        /* ... to end of line, including null */
+        snprintf(c, sizeof(c), "%s", lcp);
+    }
     ll = sg_get_llnum(bp);
     ok = ((-1 != ll) || all_ascii_f_s(bp, 16));
     if (! ok) {
@@ -750,10 +752,6 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
             } else if (up)
                 sg_put_unaligned_be16((uint16_t)ll, up + 18);
             break;
-        default:
-            pr2serr("%s: k=%d should not be >= 3\n", __func__, k);
-            ok = false;
-            break;
         }
         if (! ok)
             break;
@@ -774,13 +772,9 @@ parse_scat_pi_line(const char * lcp, uint8_t * up, uint32_t * sum_num)
             if (up)
                 sg_put_unaligned_be16((uint16_t)DEF_TM, up + 18);
             break;
-        default:
-            pr2serr("%s: k=%d should not be >= 3\n", __func__, k);
-            ok = false;
-            break;
         }
     }
-    return ok ? 0 : SG_LIB_SYNTAX_ERROR;
+    return 0;
 }
 
 /* Read pairs or quintets from a scat_file and places them in a T10 scatter

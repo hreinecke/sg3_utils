@@ -636,8 +636,8 @@ int sg_get_num_nomult(const char * buf);
  * SI and IEC 60027-2)).  Main (SI) multipliers supported: K, M, G, T, P
  * and E. Ignore leading spaces and tabs; accept comma, hyphen, space, tab
  * and hash as terminator. Handles zero and positive values up to 2**63-1 .
- * Experimental: left argument (must in with hexadecimal digit) added
- * to, or multipled by right argument. No embedded spaces.
+ * Experimental: the left argument (must end in with hexadecimal digit)
+ * added to, or multiplied by, the right argument. No embedded spaces.
  * Examples: '3+1k' (evaluates to 1027) and '0xf+0x3'. */
 int64_t sg_get_llnum(const char * buf);
 

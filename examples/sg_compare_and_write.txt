@@ -9,7 +9,7 @@
 #
 # The following example shows initialization, successful and unsuccessful
 # compare and write using sg3_utils. I am using caw_buf_zero2one and
-# caw_buf_one2zero as shown bellow.
+# caw_buf_one2zero as shown below.
 
 $ hexdump /tmp/caw_buf_zero2one
 0000000 0000 0000 0000 0000 0000 0000 0000 0000

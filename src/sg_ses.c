@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.46 20190826";    /* ses4r03 */
+static const char * version_str = "2.47 20190913";    /* ses4r03 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1425,15 +1425,12 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                     break;
                 }
             }
-            if (n > 1)
-                op->many_dpages = true;
-            else if (1 == n) {
+            if (1 == n) {
                 op->page_code_given = true;
                 op->page_code = pc;
-            } else {
-                pr2serr("No dpage found --data= argument\n");
-                goto err_help;
-            }
+            } else      /* n must be > 1 */
+                op->many_dpages = true;
+
             if (op->verbose > 3) {
                 int k;
                 char b[128];
@@ -2454,9 +2451,6 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
         else if (conn_type < 0x20)
             snprintf(buff, buff_len, "unknown internal wide connector type: "
                      "0x%x", conn_type);
-        else if (conn_type < 0x30)
-            snprintf(buff, buff_len, "unknown internal connector to end "
-                     "device, type: 0x%x", conn_type);
         else if (conn_type < 0x3f)
             snprintf(buff, buff_len, "reserved for internal connector, "
                      "type: 0x%x", conn_type);
@@ -2659,8 +2653,6 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         case 3:
             printf("%slast 3 bytes (hex): %02x %02x %02x\n", pad, statp[1],
                    statp[2], statp[3]);
-            break;
-        default:
             break;
         }
         break;
@@ -4286,8 +4278,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         subenc_nickname_sdg(resp, resp_len);
         break;
     default:
-        printf("Cannot decode response from diagnostic "
-               "page: %s\n", (cp ? cp : "<unknown>"));
+        printf("Cannot decode response from diagnostic page: %s\n", cp);
         hex2stdout(resp, resp_len, 0);
     }
 
@@ -5336,7 +5327,7 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         if (op->ind_indiv_last <= op->ind_indiv)
             break;
     }   /* end of loop over join array */
-    if ((NULL == jrp->enc_statp) || (k >= MX_JOIN_ROWS)) {
+    if ((k >= MX_JOIN_ROWS || (NULL == jrp->enc_statp))) {
         if (op->desc_name)
             pr2serr("descriptor name: %s not found (check the 'ed' page "
                     "[0x7])\n", op->desc_name);
@@ -5907,7 +5898,7 @@ early_out:
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
         else if ((SG_LIB_SYNTAX_ERROR == ret) && (0 == vb))
-            pr2serr("Add '-h' to command line for usage infomation\n");
+            pr2serr("Add '-h' to command line for usage information\n");
     }
     if (op->free_data_arr)
         free(op->free_data_arr);

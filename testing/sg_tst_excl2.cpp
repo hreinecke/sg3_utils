@@ -47,7 +47,7 @@
 #include "sg_pt.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.09 20190321";
+static const char * version_str = "1.10 20190917";
 static const char * util_name = "sg_tst_excl2";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -69,19 +69,12 @@ static const char * util_name = "sg_tst_excl2";
  * which is assumed to be a sibling of this examples directory. Those
  * object files in the lib directory can be built with:
  *   cd <sg3_utils> ; ./configure ; cd lib; make
- * Then to build sg_tst_excl2 concatenate the next 3 lines:
- *   g++ -Wall -std=c++11 -pthread -I ../include ../lib/sg_lib.o
- *     ../lib/sg_lib_data.o ../lib/sg_pt_linux.o -o sg_tst_excl2
- *     sg_tst_excl2.cpp
- * Alternatively use 'make -f Makefile.cplus sg_tst_excl2'
+ * Then:
+ *   cd ../testing
+ *   make sg_tst_excl2
  *
  * BEWARE: this utility modifies a logical block (default LBA 1000) on the
  * given device.
- *
- * Test breaks sg driver in lk 3.10.4 but works with proposed fix so should
- * work soon thereafter. Works on standard block driver (e.g. /dev/sdc) in
- * lk 3.10.4 . Fails on bsg driver in lk 3.10.4 because it ignores the
- * O_EXCL flag (and that is unlikely to change).
  *
  */
 
@@ -271,7 +264,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
         if (0 == k)
             odd = (1 == (u % 2));
         ++u;
-	sg_put_unaligned_be32(u, lb);
+        sg_put_unaligned_be32(u, lb);
 
         if (wait_ms > 0)       /* allow daylight for bad things ... */
             this_thread::sleep_for(milliseconds{wait_ms});

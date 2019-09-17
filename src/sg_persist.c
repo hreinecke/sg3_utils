@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2018 D. Gilbert
+ *  Copyright (C) 2004-2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.66 20180615";
+static const char * version_str = "0.67 20190913";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -826,7 +826,7 @@ decode_file_tids(const char * fnp, struct opts_t * op)
                     pr2serr("%s: array length exceeded\n", __func__);
                     goto bad;
                 }
-                tid_arr[off + k] = h;
+                op->transportid_arr[off + k] = h;  /* keep code checker happy */
                 lcp = strpbrk(lcp, " ,\t");
                 if (NULL == lcp)
                     break;

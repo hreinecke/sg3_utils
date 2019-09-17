@@ -550,7 +550,7 @@ sg_decode_transportid_str(const char * lip, uint8_t * bp, int bplen,
     }
     if (NULL == lip)
         lip = "";
-    bump = TRANSPORT_ID_MIN_LEN; /* should be overwritten in all loop paths */
+    /* bump = TRANSPORT_ID_MIN_LEN; // some old compilers insisted on this */
     for (k = 0, n = 0; bplen > 0; ++k, bp += bump, bplen -= bump) {
         if ((k > 0) && only_one)
             break;
@@ -1878,9 +1878,6 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
             sg_scnpr(b + r, blen - r, "%s  lba=0x%x\n", lip,
                      sg_get_unaligned_be24(sbp + 1) & 0x1fffff);
         n += sg_scnpr(cbp + n, cblen - n, "%s\n", b);
-        len = sb_len;
-        if (len > 32)
-            len = 32;   /* trim in case there is a lot of rubbish */
     }
 check_raw:
     if (raw_sinfo) {
@@ -2162,14 +2159,11 @@ sg_get_command_size(uint8_t opcode)
     switch ((opcode >> 5) & 0x7) {
     case 0:
         return 6;
-    case 1: case 2: case 6: case 7:
-        return 10;
     case 3: case 5:
         return 12;
-        break;
     case 4:
         return 16;
-    default:
+    default:        /* 1, 2, 6, 7 */
         return 10;
     }
 }
@@ -2305,9 +2299,6 @@ sg_get_opcode_name(uint8_t cmd_byte0, int peri_type, int buff_len,
     case 6:
     case 7:
         sg_scnpr(buff, buff_len, "Vendor specific [0x%x]", (int)cmd_byte0);
-        break;
-    default:
-        sg_scnpr(buff, buff_len, "Opcode=0x%x", (int)cmd_byte0);
         break;
     }
 }
@@ -2624,6 +2615,7 @@ sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
         return false;
     } else if (ind >= k)
         return false;
+
     mp = sg_lib_scsi_status_sense_arr + ind;
     if (status_p)
         *status_p = mp->t1;

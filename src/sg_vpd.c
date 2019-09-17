@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.54 20190516";  /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.55 20190913";  /* spc5r22 + sbc4r17 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1047,9 +1047,6 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
             case 7:
                 printf(" [protection types 1, 2 and 3 supported]\n");
                 break;
-            default:
-                printf("\n");
-                break;
             }
         } else
             printf("\n");
@@ -1775,10 +1772,18 @@ decode_3party_copy_vpd(uint8_t * buff, int len, int do_hex, int pdt,
                 printf("  Maximum identified concurrent copies: %u\n", u);
                 u = sg_get_unaligned_be32(bp + 12);
                 printf("  Maximum segment length: %u\n", u);
-                ull = (1 << bp[16]); /* field is power of 2 */
-                printf("  Data segment granularity: %" PRIu64 "\n", ull);
-                ull = (1 << bp[17]);
-                printf("  Inline data granularity: %" PRIu64 "\n", ull);
+                printf("  Data segment granularity: ");
+                u = bp[16];     /* field is power of 2 */
+                if (u < 64)
+                    printf("%" PRIu64 "\n", (uint64_t)1 << u);
+                else
+                    printf("too large [2^%u]\n", u);
+                printf("  Inline data granularity: ");
+                u = bp[17];     /* field is power of 2 */
+                if (u < 64)
+                    printf("%" PRIu64 "\n", (uint64_t)1 << u);
+                else
+                    printf("too large [2^%u]\n", u);
                 break;
             case 0x9101:
                 printf(" Stream copy operations:\n");
@@ -1832,21 +1837,19 @@ decode_proto_lu_vpd(uint8_t * buff, int len, int do_hex)
         }
         if (0 == desc_len)
             continue;
-        if (2 == do_hex)
+        if (2 == do_hex) {
             hex2stdout(bp + 8, desc_len, 1);
-        else if (do_hex > 2)
-            hex2stdout(bp, bump, 1);
-        else {
-            switch (proto) {
-            case TPROTO_SAS:
-                printf("    Protocol identifier: SAS\n");
-                printf("    TLR control supported: %d\n", !!(bp[8] & 0x1));
-                break;
-            default:
-                pr2serr("Unexpected proto=%d\n", proto);
-                hex2stderr(bp, bump, 1);
-                break;
-            }
+            continue;
+        }
+        switch (proto) {
+        case TPROTO_SAS:
+            printf("    Protocol identifier: SAS\n");
+            printf("    TLR control supported: %d\n", !!(bp[8] & 0x1));
+            break;
+        default:
+            pr2serr("Unexpected proto=%d\n", proto);
+            hex2stderr(bp, bump, 1);
+            break;
         }
     }
 }
@@ -1883,25 +1886,23 @@ decode_proto_port_vpd(uint8_t * buff, int len, int do_hex)
         }
         if (0 == desc_len)
             continue;
-        if (2 == do_hex)
+        if (2 == do_hex) {
             hex2stdout(bp + 8, desc_len, 1);
-        else if (do_hex > 2)
-            hex2stdout(bp, bump, 1);
-        else {
-            switch (proto) {
-            case TPROTO_SAS:    /* page added in spl3r02 */
-                printf("    power disable supported (pwr_d_s)=%d\n",
-                       !!(bp[3] & 0x1));       /* added spl3r03 */
-                pidp = bp + 8;
-                for (j = 0; j < desc_len; j += 4, pidp += 4)
-                    printf("      phy id=%d, SSP persistent capable=%d\n",
-                           pidp[1], (0x1 & pidp[2]));
-                break;
-            default:
-                pr2serr("Unexpected proto=%d\n", proto);
-                hex2stderr(bp, bump, 1);
-                break;
-            }
+            continue;
+        }
+        switch (proto) {
+        case TPROTO_SAS:    /* page added in spl3r02 */
+            printf("    power disable supported (pwr_d_s)=%d\n",
+                   !!(bp[3] & 0x1));       /* added spl3r03 */
+            pidp = bp + 8;
+            for (j = 0; j < desc_len; j += 4, pidp += 4)
+                printf("      phy id=%d, SSP persistent capable=%d\n",
+                       pidp[1], (0x1 & pidp[2]));
+            break;
+        default:
+            pr2serr("Unexpected proto=%d\n", proto);
+            hex2stderr(bp, bump, 1);
+            break;
         }
     }
 }
@@ -2740,7 +2741,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
                 dStrRaw(rp, alloc_len);
             else if (op->do_hex) {
                 if (! op->do_quiet && (op->do_hex < 3))
-                    printf("Standard Inquiry reponse:\n");
+                    printf("Standard Inquiry response:\n");
                 hex2stdout(rp, alloc_len, (1 == op->do_hex) ? 0 : -1);
             } else
                 std_inq_decode(rp, alloc_len, vb);

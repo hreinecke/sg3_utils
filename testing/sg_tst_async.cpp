@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.39 20190902";
+static const char * version_str = "1.40 20190917";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -110,21 +110,17 @@ static const char * util_name = "sg_tst_async";
  * which is assumed to be a sibling of this examples directory. Those
  * object files in the lib directory can be built with:
  *   cd <sg3_utils_package_root> ; ./configure ; cd lib; make
- *   cd ../examples
- * Then to build sg_tst_async concatenate the next 3 lines:
- *   g++ -Wall -std=c++11 -pthread -I ../include ../lib/sg_lib.o
- *     ../lib/sg_lib_data.o ../lib/sg_io_linux.o -o sg_tst_async
- *     sg_tst_async.cpp
- * or use the C++ Makefile in that directory:
- *   make -f Makefile.cplus sg_tst_async
+ *   cd ../testing
+ *   make sg_tst_async
  *
  * Currently this utility is Linux only and uses the sg driver. The bsg
  * driver is known to be broken (it doesn't match responses to the
- * correct file descriptor that requested them) so this utility won't
- * be extended to bsg until that is fixed.
+ * correct file descriptor that requested them). Around Linux kernel 4.15
+ * the async capability of the bsg driver was removed. So this test code
+ * no longer appiles to the bsg driver.
  *
  * BEWARE: >>> This utility will modify a logical block (default LBA 1000)
- * on the given device when the '-W' option is given.
+ * on the given device _when_ the '-W' option is given.
  *
  */
 
