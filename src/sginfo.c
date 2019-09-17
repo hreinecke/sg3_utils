@@ -124,7 +124,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.42 [20180811]";
+static const char * version_str = "2.43 [20190913]";
 
 #include <stdio.h>
 #include <string.h>
@@ -1514,12 +1514,11 @@ read_defect_list(int grown_only)
     if (defectformat == HEAD_SORT_TOKEN) {
         defectformat = 0x04;
         sorthead = 1;
-        headsp = (unsigned int *)malloc(sizeof(unsigned int) * MAX_HEADS);
+        headsp = (unsigned int *)calloc(MAX_HEADS, sizeof(unsigned int));
         if (headsp == NULL) {
            perror("malloc failed");
            return status;
         }
-        memset(headsp,0,sizeof(unsigned int) * MAX_HEADS);
     }
     for (table = grown_only; table < 2; table++) {
         if (heapp) {
@@ -1759,6 +1758,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
+		break;
             case 5:     /* physical sector */
                 while (len > 0) {
                     snprintf((char *)cbuffer1, 40, "%6d:%2u:%5d",
@@ -1777,6 +1777,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
+		break;
             case 0:     /* lba (32 bit) */
                 while (len > 0) {
                     printf("%10d", getnbyte(df, 4));
@@ -1790,6 +1791,7 @@ trytenbyte:
                     else
                         printf("|");
                 }
+		break;
             case 3:     /* lba (64 bit) */
                 while (len > 0) {
                     printf("%15" PRId64 , getnbyte_ll(df, 8));
@@ -1825,6 +1827,7 @@ trytenbyte:
                printf("%3d: %u\n", i, headsp[i]);
             }
         }
+        free(headsp);
     }
     printf("\n");
     return status;

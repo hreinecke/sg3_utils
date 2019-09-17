@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2018 D. Gilbert
+ *  Copyright (C) 1999-2019 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.05 20180627";
+static const char * version_str = "5.06 20190913";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -683,5 +683,5 @@ main(int argc, char * argv[])
     else
         printf("read buffer non-zero\n");
 #endif
-    return (res >= 0) ? res : SG_LIB_CAT_OTHER;
+    return res;
 }

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190905] [svn: r831]
+Changelog for sg3_utils-1.45 [20190917] [svn: r832]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -60,7 +60,7 @@ Changelog for sg3_utils-1.45 [20190905] [svn: r831]
   - testing/sg_tst_bidi: for sg 4.0 driver
   - testing/sgh_dd: test request sharing, mreqs...
   - testing/sgs_dd: back from archive, for testing
-  - 'make' now builds both C and C++ programs
+  - testing: 'make' now builds both C and C++ programs
     SIGPOLL (SIGIO) and realtime (RT) signals
   - sg_pt: add sg_get_opcode_translation() to replace
     global pointer to array: sg_opcode_info_arr[]
@@ -77,6 +77,7 @@ Changelog for sg3_utils-1.45 [20190905] [svn: r831]
   - gcc-9: suppress (pointless) warnings
   - automake: upgrade to version 1.16.1
   - autoconf: upgrade to version 2.69
+  - sync with fixes from Redhat, via github
 
 Changelog for sg3_utils-1.44 [20180912] [svn: r791]
   - same code as release 1.43 20180911 svn rev 789;

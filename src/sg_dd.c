@@ -982,7 +982,7 @@ err_out:
         }
         return may_coe ? 0 : ret;
     } else
-        return ret ? ret : -1;
+        return ret;
 }
 
 
@@ -1230,7 +1230,8 @@ static int
 open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
         int * in_typep, int vb)
 {
-    int infd, flags, fl, t, res;
+    int infd = -1;
+    int flags, fl, t, res;
     char ebuff[EBUFF_SZ];
     struct sg_simple_inquiry_resp sir;
 
@@ -1332,7 +1333,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
 #endif
         }
     }
-    if (ifp->flock) {
+    if (ifp->flock && (infd >= 0)) {
         res = flock(infd, LOCK_EX | LOCK_NB);
         if (res < 0) {
             close(infd);
@@ -1345,8 +1346,12 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
     return infd;
 
 file_err:
+    if (infd >= 0)
+        close(infd);
     return -SG_LIB_FILE_ERROR;
 other_err:
+    if (infd >= 0)
+        close(infd);
     return -SG_LIB_CAT_OTHER;
 }
 
@@ -1358,7 +1363,8 @@ static int
 open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
         int * out_typep, int vb)
 {
-    int outfd, flags, t, res;
+    int outfd = -1;
+    int flags, t, res;
     char ebuff[EBUFF_SZ];
     struct sg_simple_inquiry_resp sir;
 
@@ -1460,21 +1466,25 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                         "\n", (uint64_t)offset);
         }
     }
-    if (ofp->flock) {
+    if (ofp->flock && (outfd >= 0)) {
         res = flock(outfd, LOCK_EX | LOCK_NB);
         if (res < 0) {
-            close(outfd);
             snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
                      "failed", outf);
             perror(ebuff);
+            close(outfd);
             return -SG_LIB_FLOCK_ERR;
         }
     }
     return outfd;
 
 file_err:
+    if (outfd >= 0)
+        close(outfd);
     return -SG_LIB_FILE_ERROR;
 other_err:
+    if (outfd >= 0)
+        close(outfd);
     return -SG_LIB_CAT_OTHER;
 }
 

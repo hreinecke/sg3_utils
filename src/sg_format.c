@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.58 20190113";
+static const char * version_str = "1.59 20190913";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -706,15 +706,9 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
         if (n > (SAFE_STD_INQ_RESP_LEN - 4))
                 n = (SAFE_STD_INQ_RESP_LEN - 4);
         for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
-                if (VPD_UNIT_SERIAL_NUM == b[4 + k]) {
-                        if (has_di) {
-                                if (op->verbose)
-                                        pr2serr("VPD_SUPPORTED_VPDS "
-                                                "dis-ordered\n");
-                                goto out;
-                        }
+                if (VPD_UNIT_SERIAL_NUM == b[4 + k])
                         ++has_sn;
-                } else if (VPD_DEVICE_ID == b[4 + k]) {
+                else if (VPD_DEVICE_ID == b[4 + k]) {
                         ++has_di;
                         break;
                 }

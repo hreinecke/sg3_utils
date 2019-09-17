@@ -800,7 +800,8 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                         printf("             usage: ");
                     else
                         printf("        cdb usage: ");
-                    for (m = 0; m < cdb_sz; ++m)
+                    for (m = 0; (m < cdb_sz) && ((4 + m) < (int)sizeof(b));
+                         ++m)
                         printf("%.2x ", b[4 + m]);
                     printf("\n");
                 }

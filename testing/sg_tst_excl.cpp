@@ -73,7 +73,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.11 20190121";
+static const char * version_str = "1.12 20190917";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -95,12 +95,9 @@ static const char * util_name = "sg_tst_excl";
  * which is assumed to be a sibling of this examples directory. Those
  * object files in the lib directory can be built with:
  *   cd <sg3_utils> ; ./configure ; cd lib; make
- * Then to build sg_tst_excl concatenate the next 3 lines:
- *   g++ -Wall -std=c++11 -pthread -I ../include ../lib/sg_lib.o
- *     ../lib/sg_lib_data.o ../lib/sg_io_linux.o -o sg_tst_excl
- *     sg_tst_excl.cpp
- * or use the C++ Makefile in that directory:
- *   make -f Makefile.cplus sg_tst_excl
+ * Then:
+ *   cd ../testing
+ *   make sg_tst_excl
  *
  * Currently this utility is Linux only and assumes the SG_IO v3 interface
  * which is supported by sg and block devices (but not bsg devices which
@@ -220,7 +217,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
     }
     if (sg_fd < 0) {
         snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s", __func__,
-		 dev_name);
+                 dev_name);
         perror(ebuff);
         return -1;
     }
@@ -333,7 +330,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
                     lock_guard<mutex> lg(console_mutex);
 
                     fprintf(stderr, "%s: Recovered error on READ_16, "
-			    "continuing 2\n", __func__);
+                            "continuing 2\n", __func__);
                 }
                 ok = 1;
                 break;
@@ -398,7 +395,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
                 lock_guard<mutex> lg(console_mutex);
 
                 fprintf(stderr, "%s: Recovered error on WRITE_16, "
-			"continuing\n", __func__);
+                        "continuing\n", __func__);
             }
             ok = 1;
             break;
@@ -462,7 +459,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
     }
     if (sg_fd < 0) {
         snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s", __func__,
-		 dev_name);
+                 dev_name);
         perror(ebuff);
         return -1;
     }
@@ -479,7 +476,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
         pt.request = (uint64_t)(sg_uintptr_t)r16CmdBlk;
         pt.response = (uint64_t)(sg_uintptr_t)sense_buffer;
         pt.timeout = 20000;     /* 20000 millisecs == 20 seconds */
-        pt.request_extra = id;	/* pack_id field */
+        pt.request_extra = id;  /* pack_id field */
 
         // queue up two READ_16s to same LBA
         if (ioctl(sg_fd, SG_IOSUBMIT, &pt) < 0) {
@@ -523,8 +520,8 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
         }
         /* now for the error processing */
         ok = 0;
-	switch (sg_err_category_new(pt.device_status, pt.transport_status,
-	        pt.driver_status, sense_buffer, pt.response_len)) {
+        switch (sg_err_category_new(pt.device_status, pt.transport_status,
+                pt.driver_status, sense_buffer, pt.response_len)) {
         case SG_LIB_CAT_CLEAN:
             ok = 1;
             break;
@@ -540,10 +537,10 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-		sg_linux_sense_print("READ_16 command error",
-				     pt.device_status, pt.transport_status,
-				     pt.driver_status, sense_buffer,
-				     pt.response_len, true);
+                sg_linux_sense_print("READ_16 command error",
+                                     pt.device_status, pt.transport_status,
+                                     pt.driver_status, sense_buffer,
+                                     pt.response_len, true);
                 // sg_chk_n_print3("READ_16 command error", &pt, 1);
             }
             break;
@@ -571,8 +568,8 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             pt = pt2;
             /* now for the error processing */
             ok = 0;
-	    switch (sg_err_category_new(pt.device_status, pt.transport_status,
-	            pt.driver_status, sense_buffer, pt.response_len)) {
+            switch (sg_err_category_new(pt.device_status, pt.transport_status,
+                    pt.driver_status, sense_buffer, pt.response_len)) {
             case SG_LIB_CAT_CLEAN:
                 ok = 1;
                 break;
@@ -581,7 +578,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                     lock_guard<mutex> lg(console_mutex);
 
                     fprintf(stderr, "%s: Recovered error on READ_16, "
-			    "continuing 2\n", __func__);
+                            "continuing 2\n", __func__);
                 }
                 ok = 1;
                 break;
@@ -589,11 +586,11 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                 {
                     lock_guard<mutex> lg(console_mutex);
 
-		    sg_linux_sense_print("READ_16 command error 2",
-				         pt.device_status,
-					 pt.transport_status,
-				         pt.driver_status, sense_buffer,
-				         pt.response_len, true);
+                    sg_linux_sense_print("READ_16 command error 2",
+                                         pt.device_status,
+                                         pt.transport_status,
+                                         pt.driver_status, sense_buffer,
+                                         pt.response_len, true);
                     // sg_chk_n_print3("READ_16 command error 2", &pt, 1);
                 }
                 break;
@@ -629,7 +626,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
         pt.request = (uint64_t)(sg_uintptr_t)w16CmdBlk;
         pt.response = (uint64_t)(sg_uintptr_t)sense_buffer;
         pt.timeout = 20000;     /* 20000 millisecs == 20 seconds */
-        pt.request_extra = id;	/* pack_id field */
+        pt.request_extra = id;  /* pack_id field */
 
         if (ioctl(sg_fd, SG_IO, &pt) < 0) {
             {
@@ -652,7 +649,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                 lock_guard<mutex> lg(console_mutex);
 
                 fprintf(stderr, "%s: Recovered error on WRITE_16, "
-			"continuing\n", __func__);
+                        "continuing\n", __func__);
             }
             ok = 1;
             break;
@@ -660,10 +657,10 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             {
                 lock_guard<mutex> lg(console_mutex);
 
-		sg_linux_sense_print("WRITE_16 command error",
-				     pt.device_status, pt.transport_status,
-				     pt.driver_status, sense_buffer,
-				     pt.response_len, true);
+                sg_linux_sense_print("WRITE_16 command error",
+                                     pt.device_status, pt.transport_status,
+                                     pt.driver_status, sense_buffer,
+                                     pt.response_len, true);
             }
             break;
         }
@@ -785,18 +782,18 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
              << block << endl;
     }
     for (k = 0; k < num; ++k) {
-	if (sg_ifc_ver == 3)
+        if (sg_ifc_ver == 3)
             res = do_rd_inc_wr_twice_v3(dev_name, lba, block, excl, wait_ms,
-					k, thr_ebusy_count, thr_eagain_count);
-	else if (sg_ifc_ver == 4)
+                                        k, thr_ebusy_count, thr_eagain_count);
+        else if (sg_ifc_ver == 4)
             res = do_rd_inc_wr_twice_v4(dev_name, lba, block, excl, wait_ms,
-					k, thr_ebusy_count, thr_eagain_count);
-	else {
-	    lock_guard<mutex> lg(console_mutex);
+                                        k, thr_ebusy_count, thr_eagain_count);
+        else {
+            lock_guard<mutex> lg(console_mutex);
 
-	    cerr << "sg_ifc_ver=" << sg_ifc_ver << " not supported" << endl;
-	    res = -1;
-	}
+            cerr << "sg_ifc_ver=" << sg_ifc_ver << " not supported" << endl;
+            res = -1;
+        }
         if (res < 0)
             break;
         if (res)

@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.02 20190815";    /* SPC-5 rev 22 */
+static const char * version_str = "2.03 20190913";    /* SPC-5 rev 22 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -3246,7 +3246,6 @@ cmddt_process(int sg_fd, const struct opts_t * op)
                         break;
                 case 6: desc_p = "vendor specific (6)"; break;
                 case 7: desc_p = "reserved (7)"; break;
-                default: desc_p = "impossible value > 7"; break;
                 }
                 if (prnt_cmd) {
                     printf("  Support field: %s [", desc_p);

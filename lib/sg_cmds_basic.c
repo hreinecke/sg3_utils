@@ -42,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "1.93 20190128";
+static const char * const version_str = "1.94 20190913";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -364,7 +364,6 @@ create_pt_obj(const char * cname)
 static const char * const inquiry_s = "inquiry";
 
 
-
 /* Returns 0 on success, while positive values are SG_LIB_CAT_* errors
  * (e.g. SG_LIB_CAT_MALFORMED). If OS error, returns negated errno or -1. */
 static int
@@ -377,6 +376,11 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, bool cmddt, bool evpd, int pg_op,
     uint8_t sense_b[SENSE_BUFF_LEN];
     uint8_t * up;
 
+    if (resp == NULL) {
+        if (verbose)
+            pr2ws("Got NULL `resp` pointer");
+        return SG_LIB_CAT_MALFORMED;
+    }
     if (cmddt)
         inq_cdb[1] |= 0x2;
     if (evpd)

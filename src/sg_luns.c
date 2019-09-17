@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.42 20180626";
+static const char * version_str = "1.43 20190913";
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -307,9 +307,6 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                                "\n", l_leadin, len_fld, e_a_method, ull);
                 }
             }
-            break;
-        default:
-            printf("%s<<%s: faulty logic>>\n", l_leadin, __func__);
             break;
         }
         if (next_level)
