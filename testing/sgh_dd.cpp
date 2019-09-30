@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.44 20190906";
+static const char * version_str = "1.49 20190929";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -203,6 +203,8 @@ typedef struct global_collection
     atomic<bool> in_stop;             /*  | */
     pthread_mutex_t in_mutex;         /* -/ */
     int nmrqs;                        /* Number of multi-reqs for sg v4 */
+    int inmrqs;                       /* if both imrq= and omrq= must be == */
+    int onmrqs;                       /* ... unless one is zero */
     int outfd;
     int64_t seek;
     int out_type;
@@ -229,12 +231,16 @@ typedef struct global_collection
     int debug;          /* both -v and deb=VERB bump this field */
     int dry_run;
     bool aen_given;
+    bool cdbsz_given;
+    bool is_mrq_i;
+    bool is_mrq_o;
     bool m_aen_given;
     bool ofile_given;
     bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
-    bool mrq_async;             /* any mrq_immed or no_waitq flags given */
+    bool mrq_async;             /* either mrq_immed or no_waitq flags given */
+    bool unbalanced_mrq;        /* so _not_ sg->sg request sharing sync mrq */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -250,6 +256,7 @@ typedef struct mrq_abort_info
 
 typedef struct request_element
 {       /* one instance per worker thread */
+    Gbl_coll *clp;
     bool wr;
     bool has_share;
     bool both_sg;
@@ -258,12 +265,9 @@ typedef struct request_element
     bool only_out_sg;
     bool swait; /* interleave READ WRITE async copy segment: READ submit,
                  * WRITE submit, READ receive, WRITE receive */
-    bool mrq_cmds;              /* mrq=<NRQS>,C  given */
-    bool mrq_async;             /* any mrq_immed or no_waitq flags given */
     // bool mrq_abort_thread_active;
     int id;
     int infd;
-    int nmrqs;
     int outfd;
     int out2fd;
     int outregfd;
@@ -276,25 +280,18 @@ typedef struct request_element
     struct sg_io_v4 io_hdr4;
     uint8_t cmd[MAX_SCSI_CDBSZ];
     uint8_t sb[SENSE_BUFF_LEN];
-    int bs;
     int dio_incomplete_count;
     int resid;
-    int cdbsz_in;
-    int cdbsz_out;
-    int aen;
-    int m_aen;
     int rd_p_id;
     int rep_count;
     int rq_id;
     int mmap_len;
     int mrq_id;
+    int mrq_index;
     uint32_t in_mrq_q_blks;
     uint32_t out_mrq_q_blks;
     pthread_t mrq_abort_thread_id;
     Mrq_abort_info mai;
-    struct flags_t in_flags;
-    struct flags_t out_flags;
-    int debug;
 } Rq_elem;
 
 typedef struct thread_info
@@ -344,10 +341,9 @@ static pthread_t sig_listen_thread_id;
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static void sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr);
-static void sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr,
-                          bool is_wr2);
-static bool normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks);
-static void normal_out_wr(Gbl_coll * clp, Rq_elem * rep, int blocks);
+static void sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2);
+static bool normal_in_rd(Rq_elem * rep, int blocks);
+static void normal_out_wr(Rq_elem * rep, int blocks);
 static int sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
                        bool is_wr2);
 static int sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2);
@@ -369,7 +365,7 @@ static bool sg_version_lt_4 = false;
 static bool sg_version_ge_40030 = false;
 static bool shutting_down = false;
 static bool do_sync = false;
-static bool do_time = true;
+static int do_time = 1;
 static Gbl_coll gcoll;
 static struct timeval start_tm;
 static int64_t dd_count = -1;
@@ -462,24 +458,120 @@ hex2stderr_lk(const uint8_t * b_str, int len, int no_ascii)
     pthread_mutex_unlock(&strerr_mut);
 }
 
+/* Flags decoded into abbreviations for those that are set, separated by
+ * '|' . */
+static char *
+sg_flags_str(int flags, int b_len, char * b)
+{
+    int n = 0;
+
+    if ((b_len < 1) || (! b))
+        return b;
+    b[0] = '\0';
+    if (SG_FLAG_DIRECT_IO & flags) {            /* 0x1 */
+        n += sg_scnpr(b + n, b_len - n, "DIO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_FLAG_MMAP_IO & flags) {              /* 0x4 */
+        n += sg_scnpr(b + n, b_len - n, "MMAP|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_YIELD_TAG & flags) {          /* 0x8 */
+        n += sg_scnpr(b + n, b_len - n, "YTAG|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_FLAG_Q_AT_TAIL & flags) {            /* 0x10 */
+        n += sg_scnpr(b + n, b_len - n, "QTAI|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_FLAG_Q_AT_HEAD & flags) {            /* 0x20 */
+        n += sg_scnpr(b + n, b_len - n, "QHEA|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_NO_WAITQ & flags) {           /* 0x40 */
+        n += sg_scnpr(b + n, b_len - n, "NWTQ|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_COMPLETE_B4 & flags) {        /* 0x100 */
+        n += sg_scnpr(b + n, b_len - n, "NWTQ|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_SIG_ON_OTHER & flags) {       /* 0x200 */
+        n += sg_scnpr(b + n, b_len - n, "SIGOTH|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_IMMED & flags) {              /* 0x400 */
+        n += sg_scnpr(b + n, b_len - n, "IMM|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_STOP_IF & flags) {            /* 0x800 */
+        n += sg_scnpr(b + n, b_len - n, "STOPIF|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_DEV_SCOPE & flags) {          /* 0x1000 */
+        n += sg_scnpr(b + n, b_len - n, "DEV_SC|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_SHARE & flags) {              /* 0x2000 */
+        n += sg_scnpr(b + n, b_len - n, "SHARE|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_DO_ON_OTHER & flags) {        /* 0x4000 */
+        n += sg_scnpr(b + n, b_len - n, "DO_OTH|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_NO_DXFER & flags) {          /* 0x10000 */
+        n += sg_scnpr(b + n, b_len - n, "NDXFER|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_MULTIPLE_REQS & flags) {     /* 0x20000 */
+        n += sg_scnpr(b + n, b_len - n, "MRQS|");
+        if (n >= b_len)
+            goto fini;
+    }
+fini:
+    if (n < b_len) {    /* trim trailing '\' */
+        if ('|' == b[n - 1])
+            b[n - 1] = '\0';
+    } else if ('|' == b[b_len - 1])
+        b[b_len - 1] = '\0';
+    return b;
+}
+
 static void
 v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
 {
+    char b[80];
+
     pthread_mutex_lock(&strerr_mut);
     if (leadin)
         pr2serr("%s [id=%d]:\n", leadin, id);
     if (('Q' != h4p->guard) || (0 != h4p->protocol) ||
         (0 != h4p->subprotocol))
         pr2serr("  <<<sg_io_v4 _NOT_ properly set>>>\n");
-    pr2serr("  pointers: cdb=%s  sense=%s  din=%s  dout=%s\n",
+    pr2serr("  pointers: cdb=%s  sense=%s  din=%p  dout=%p\n",
             (h4p->request ? "y" : "NULL"), (h4p->response ? "y" : "NULL"),
-            (h4p->din_xferp ? "y" : "NULL"),
-            (h4p->dout_xferp ? "y" : "NULL"));
+            (void *)h4p->din_xferp, (void *)h4p->dout_xferp);
     pr2serr("  lengths: cdb=%u  sense=%u  din=%u  dout=%u\n",
             h4p->request_len, h4p->max_response_len, h4p->din_xfer_len,
              h4p->dout_xfer_len);
     pr2serr("  flags=0x%x  request_extra{pack_id}=%d\n",
             h4p->flags, h4p->request_extra);
+    pr2serr("  flags set: %s\n", sg_flags_str(h4p->flags, sizeof(b), b));
     pr2serr(" OUT:\n");
     pr2serr("  response_len=%d driver/transport/device_status="
             "0x%x/0x%x/0x%x\n", h4p->response_len, h4p->driver_status,
@@ -576,7 +668,7 @@ interrupt_handler(int sig)
     sigact.sa_flags = 0;
     sigaction(sig, &sigact, NULL);
     pr2serr("Interrupted by signal,");
-    if (do_time)
+    if (do_time > 0)
         calc_duration_throughput(0);
     print_stats("");
     kill(getpid (), sig);
@@ -587,7 +679,7 @@ siginfo_handler(int sig)
 {
     if (sig) { ; }      /* unused, dummy to suppress warning */
     pr2serr("Progress report, continuing ...\n");
-    if (do_time)
+    if (do_time > 0)
         calc_duration_throughput(1);
     print_stats("  ");
 }
@@ -599,7 +691,7 @@ siginfo2_handler(int sig)
 
     if (sig) { ; }      /* unused, dummy to suppress warning */
     pr2serr("Progress report, continuing ...\n");
-    if (do_time)
+    if (do_time > 0)
         calc_duration_throughput(1);
     print_stats("  ");
     pr2serr("Send broadcast on out_sync_cv condition variable\n");
@@ -699,7 +791,7 @@ usage(int pg_num)
             "[coe=0|1]\n"
             "               [deb=VERB] [dio=0|1] [elemsz_kb=ESK] "
             "[fua=0|1|2|3]\n"
-            "               [mrq=NRQS[,C]] [of2=OFILE2] [ofreg=OFREG] "
+            "               [mrq=[IO,]NRQS[,C]] [of2=OFILE2] [ofreg=OFREG] "
             "[sync=0|1]\n"
             "               [thr=THR] [time=0|1] [verbose=VERB] [--dry-run] "
             "[--verbose]\n\n"
@@ -772,8 +864,8 @@ page2:
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
             "max 1024\n"
-            "    time        0->no timing, 1->time plus calculate "
-            "throughput (def)\n"
+            "    time        0->no timing, 1->calc throughput(def), "
+	    "2->nanosec precision\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
@@ -813,7 +905,7 @@ page3:
             "    same_fds    each thread use the same IFILE and OFILE(2) "
             "file\n"
             "                descriptors (def: each threads has own file "
-            "desciptors)\n"
+            "descriptors)\n"
             "    swait       slave wait: issue WRITE on OFILE before READ "
             "is finished;\n"
             "                [oflag only] and IFILE and OFILE must be sg "
@@ -1080,6 +1172,28 @@ cleanup_out(void * v_clp)
     pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
+static void inline buffp_onto_next(Rq_elem * rep)
+{
+    Gbl_coll * clp = rep->clp;
+
+    if ((clp->nmrqs > 0) && clp->unbalanced_mrq) {
+        ++rep->mrq_index;
+        if (rep->mrq_index >= clp->nmrqs)
+            rep->mrq_index = 0;         /* wrap */
+    }
+}
+
+static inline uint8_t *
+get_buffp(Rq_elem * rep)
+{
+    Gbl_coll * clp = rep->clp;
+
+    if ((clp->nmrqs > 0) && clp->unbalanced_mrq && (rep->mrq_index > 0))
+        return rep->buffp + (rep->mrq_index * clp->bs * clp->bpt);
+    else
+        return rep->buffp;
+}
+
 static void *
 read_write_thread(void * v_tip)
 {
@@ -1087,7 +1201,7 @@ read_write_thread(void * v_tip)
     Gbl_coll * clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
-    int sz, blocks, status, vb, err, res, wr_blks;
+    int n, sz, blocks, status, vb, err, res, wr_blks;
     int num_sg = 0;
     int64_t my_index;
     volatile bool stop_after_write = false;
@@ -1103,32 +1217,27 @@ read_write_thread(void * v_tip)
     sz = clp->bpt * clp->bs;
     memset(rep, 0, sizeof(Rq_elem));
     /* Following clp members are constant during lifetime of thread */
+    rep->clp = clp;
     rep->id = tip->id;
     if (vb > 2)
         pr2serr_lk("%d <-- Starting worker thread\n", rep->id);
     if (! clp->in_flags.mmap) {
-        rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
+        int n = sz;
+
+        if (clp->unbalanced_mrq)
+            n *= clp->nmrqs;
+        rep->buffp = sg_memalign(n, 0 /* page align */, &rep->alloc_bp,
                                  false);
         if (NULL == rep->buffp)
             err_exit(ENOMEM, "out of memory creating user buffers\n");
     }
-
-    rep->bs = clp->bs;
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
     rep->out2fd = clp->out2fd;
     rep->outregfd = clp->outregfd;
-    rep->debug = clp->debug;
-    rep->cdbsz_in = clp->cdbsz_in;
-    rep->cdbsz_out = clp->cdbsz_out;
-    rep->in_flags = clp->in_flags;
-    rep->out_flags = clp->out_flags;
-    rep->nmrqs = clp->nmrqs;
-    rep->mrq_cmds = clp->mrq_cmds;
-    rep->mrq_async = clp->mrq_async;
-    rep->aen = clp->aen;
-    rep->m_aen = clp->m_aen;
     rep->rep_count = 0;
+    if (clp->unbalanced_mrq && (clp->nmrqs > 0))
+        rep->mrq_index = clp->nmrqs - 1;
 
     if (rep->infd == rep->outfd) {
         if (FT_SG == clp->in_type)
@@ -1140,9 +1249,9 @@ read_write_thread(void * v_tip)
     else if (FT_SG == clp->out_type)
         rep->only_out_sg = true;
 
-    if (rep->in_flags.same_fds || rep->out_flags.same_fds) {
+    if (clp->in_flags.same_fds || clp->out_flags.same_fds) {
         /* we are sharing a single pair of fd_s across all threads */
-        if (rep->out_flags.swait && (! swait_reported)) {
+        if (clp->out_flags.swait && (! swait_reported)) {
             swait_reported = true;
             pr2serr_lk("oflag=swait ignored because same_fds flag given\n");
         }
@@ -1151,8 +1260,8 @@ read_write_thread(void * v_tip)
 
         if ((FT_SG == clp->in_type) && clp->infp) {
             fd = sg_in_open(clp, clp->infp,
-                            (rep->in_flags.mmap ? &rep->buffp : NULL),
-                            (rep->in_flags.mmap ? &rep->mmap_len : NULL));
+                            (clp->in_flags.mmap ? &rep->buffp : NULL),
+                            (clp->in_flags.mmap ? &rep->mmap_len : NULL));
             if (fd < 0)
                 goto fini;
             rep->infd = fd;
@@ -1163,8 +1272,8 @@ read_write_thread(void * v_tip)
         }
         if ((FT_SG == clp->out_type) && clp->outfp) {
             fd = sg_out_open(clp, clp->outfp,
-                            (rep->out_flags.mmap ? &rep->buffp : NULL),
-                            (rep->out_flags.mmap ? &rep->mmap_len : NULL));
+                            (clp->out_flags.mmap ? &rep->buffp : NULL),
+                            (clp->out_flags.mmap ? &rep->mmap_len : NULL));
             if (fd < 0)
                 goto fini;
             rep->outfd = fd;
@@ -1175,8 +1284,8 @@ read_write_thread(void * v_tip)
         }
         if ((FT_SG == clp->out2_type) && clp->out2fp) {
             fd = sg_out_open(clp, clp->out2fp,
-                            (rep->out_flags.mmap ? &rep->buffp : NULL),
-                            (rep->out_flags.mmap ? &rep->mmap_len : NULL));
+                            (clp->out_flags.mmap ? &rep->buffp : NULL),
+                            (clp->out_flags.mmap ? &rep->mmap_len : NULL));
             if (fd < 0)
                 goto fini;
             rep->out2fd = fd;
@@ -1184,7 +1293,7 @@ read_write_thread(void * v_tip)
             if (vb > 2)
                 pr2serr_lk("thread=%d: opened local sg OFILE2\n", rep->id);
         }
-        if (rep->out_flags.swait) {
+        if (clp->out_flags.swait) {
             if (num_sg < 2)
                 pr2serr_lk("oflag=swait ignored since need both IFILE and "
                            "OFILE to be sg devices\n");
@@ -1207,16 +1316,16 @@ read_write_thread(void * v_tip)
         if (vb > 4)
             pr2serr_lk("thread=%d: Skipping share because driver too old\n",
                        rep->id);
-    } else if (rep->in_flags.noshare || rep->out_flags.noshare) {
-        if (rep->nmrqs > 0)
-            sg_share_prepare(rep->outfd, rep->infd, rep->id, rep->debug > 9);
+    } else if (clp->in_flags.noshare || clp->out_flags.noshare) {
+        if (clp->nmrqs > 0)
+            sg_share_prepare(rep->outfd, rep->infd, rep->id, vb > 9);
         else if (vb > 4)
             pr2serr_lk("thread=%d: Skipping IFILE share with OFILE due to "
                        "mrq>0\n", rep->id);
     } else if (sg_version_ge_40030 && (FT_SG == clp->in_type) &&
                (FT_SG == clp->out_type))
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, rep->id,
-                                          rep->debug > 9);
+                                          vb > 9);
     if (vb > 9)
         pr2serr_lk("tid=%d, has_share=%s\n", rep->id,
                    (rep->has_share ? "true" : "false"));
@@ -1227,6 +1336,7 @@ read_write_thread(void * v_tip)
         rep->wr = false;
         my_index = atomic_fetch_add(&pos_index, (long int)clp->bpt);
         /* Start of READ half of a segment */
+        buffp_onto_next(rep);
         status = pthread_mutex_lock(&clp->in_mutex);
         if (0 != status) err_exit(status, "lock in_mutex");
 
@@ -1234,8 +1344,8 @@ read_write_thread(void * v_tip)
             if (my_index >= dd_count) {
                 status = pthread_mutex_unlock(&clp->in_mutex);
                 if (0 != status) err_exit(status, "unlock in_mutex");
-                if ((rep->nmrqs > 0) && (deferred_arr.first.size() > 0)) {
-                    if (rep->debug > 2)
+                if ((clp->nmrqs > 0) && (deferred_arr.first.size() > 0)) {
+                    if (vb > 2)
                         pr2serr_lk("thread=%d: tail-end my_index>=dd_count, "
                                    "to_do=%u\n", rep->id,
                                    (uint32_t)deferred_arr.first.size());
@@ -1263,7 +1373,7 @@ read_write_thread(void * v_tip)
             else        /* unlocks in_mutex mid op */
                 sg_in_rd_cmd(clp, rep, deferred_arr);
         } else {
-            stop_after_write = normal_in_rd(clp, rep, blocks);
+            stop_after_write = normal_in_rd(rep, blocks);
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
         }
@@ -1306,12 +1416,13 @@ skip_force_out_sequence:
 
         pthread_cleanup_push(cleanup_out, (void *)clp);
         if (rep->outregfd >= 0) {
-            res = write(rep->outregfd, rep->buffp, rep->bs * rep->num_blks);
+            res = write(rep->outregfd, get_buffp(rep),
+                        rep->clp->bs * rep->num_blks);
             err = errno;
             if (res < 0)
                 pr2serr_lk("%s: tid=%d: write(outregfd) failed: %s\n",
                            __func__, rep->id, strerror(err));
-            else if (rep->debug > 9)
+            else if (vb > 9)
                 pr2serr_lk("%s: tid=%d: write(outregfd), fd=%d, num_blks=%d"
                            "\n", __func__, rep->id, rep->outregfd,
                            rep->num_blks);
@@ -1323,7 +1434,7 @@ skip_force_out_sequence:
                 status = pthread_mutex_unlock(&clp->out_mutex);
                 if (0 != status) err_exit(status, "unlock out_mutex");
             } else              /* release out_mtx */
-                sg_out_wr_cmd(clp, rep, deferred_arr, false);
+                sg_out_wr_cmd(rep, deferred_arr, false);
         } else if (FT_DEV_NULL == clp->out_type) {
             /* skip actual write operation */
             wr_blks = 0;
@@ -1332,7 +1443,7 @@ skip_force_out_sequence:
             if (0 != status) err_exit(status, "unlock out_mutex");
             --rep->rep_count;
         } else {
-            normal_out_wr(clp, rep, blocks);
+            normal_out_wr(rep, blocks);
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
         }
@@ -1345,15 +1456,15 @@ skip_force_out_sequence:
             status = pthread_mutex_lock(&clp->out2_mutex);
             if (0 != status) err_exit(status, "lock out2_mutex");
             /* releases out2_mutex mid operation */
-            sg_out_wr_cmd(clp, rep, deferred_arr, true);
+            sg_out_wr_cmd(rep, deferred_arr, true);
 
             pthread_cleanup_pop(0);
         }
         if (0 == rep->num_blks) {
-            if ((rep->nmrqs > 0) && (deferred_arr.first.size() > 0)) {
+            if ((clp->nmrqs > 0) && (deferred_arr.first.size() > 0)) {
                 if (wr_blks > 0)
                     rep->out_mrq_q_blks += wr_blks;
-                if (rep->debug > 2)
+                if (vb > 2)
                     pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
                                (uint32_t)deferred_arr.first.size());
                 res = sgh_do_deferred_mrq(rep, deferred_arr);
@@ -1387,10 +1498,34 @@ fini:
 
     } else if (rep->alloc_bp)
         free(rep->alloc_bp);
-    if (own_infd && (rep->infd >= 0))
+    if (own_infd && (rep->infd >= 0)) {
+        if (vb && (FT_SG == clp->in_type)) {
+            if (ioctl(rep->infd, SG_GET_NUM_WAITING, &n) >= 0) {
+                if (n > 0)
+                    pr2serr_lk("%s: tid=%d: num_waiting=%d prior close(in)\n",
+                               __func__, rep->id, n);
+            } else {
+                err = errno;
+                pr2serr_lk("%s: [%d] ioctl(SG_GET_NUM_WAITING) errno=%d: "
+                           "%s\n", __func__, rep->id, err, strerror(err));
+            }
+        }
         close(rep->infd);
-    if (own_outfd && (rep->outfd >= 0))
+    }
+    if (own_outfd && (rep->outfd >= 0)) {
+        if (vb && (FT_SG == clp->out_type)) {
+            if (ioctl(rep->outfd, SG_GET_NUM_WAITING, &n) >= 0) {
+                if (n > 0)
+                    pr2serr_lk("%s: tid=%d: num_waiting=%d prior "
+                               "close(out)\n", __func__, rep->id, n);
+            } else {
+                err = errno;
+                pr2serr_lk("%s: [%d] ioctl(SG_GET_NUM_WAITING) errno=%d: "
+                           "%s\n", __func__, rep->id, err, strerror(err));
+            }
+        }
         close(rep->outfd);
+    }
     if (own_out2fd && (rep->out2fd >= 0))
         close(rep->out2fd);
     pthread_cond_broadcast(&clp->out_sync_cv);
@@ -1398,13 +1533,17 @@ fini:
 }
 
 static bool
-normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks)
+normal_in_rd(Rq_elem * rep, int blocks)
 {
+    Gbl_coll * clp = rep->clp;
     bool stop_after_write = false;
-    bool same_fds = rep->in_flags.same_fds || rep->out_flags.same_fds;
+    bool same_fds = clp->in_flags.same_fds || clp->out_flags.same_fds;
     int res;
     char strerr_buff[STRERR_BUFF_LEN];
 
+    if (clp->debug > 4)
+        pr2serr_lk("%s: tid=%d: iblk=%" PRIu64 ", blocks=%d\n", __func__,
+                   rep->id, rep->iblk, blocks);
     if (! same_fds) {   /* each has own file pointer, so we need to move it */
         int64_t pos = rep->iblk * clp->bs;
 
@@ -1416,15 +1555,15 @@ normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks)
         }
     }
     /* enters holding in_mutex */
-    while (((res = read(clp->infd, rep->buffp, blocks * clp->bs)) < 0) &&
+    while (((res = read(clp->infd, get_buffp(rep), blocks * clp->bs)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
         if (clp->in_flags.coe) {
-            memset(rep->buffp, 0, rep->num_blks * rep->bs);
+            memset(get_buffp(rep), 0, rep->num_blks * clp->bs);
             pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
                        " for %d bytes, %s\n", rep->id, rep->iblk,
-                       rep->num_blks * rep->bs,
+                       rep->num_blks * clp->bs,
                        tsafe_strerror(errno, strerr_buff));
             res = rep->num_blks * clp->bs;
         }
@@ -1456,20 +1595,24 @@ normal_in_rd(Gbl_coll * clp, Rq_elem * rep, int blocks)
 }
 
 static void
-normal_out_wr(Gbl_coll * clp, Rq_elem * rep, int blocks)
+normal_out_wr(Rq_elem * rep, int blocks)
 {
     int res;
+    Gbl_coll * clp = rep->clp;
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding out_mutex */
-    while (((res = write(clp->outfd, rep->buffp, rep->num_blks * clp->bs))
+    if (clp->debug > 4)
+        pr2serr_lk("%s: tid=%d: oblk=%" PRIu64 ", blocks=%d\n", __func__,
+                   rep->id, rep->oblk, blocks);
+    while (((res = write(clp->outfd, get_buffp(rep), rep->num_blks * clp->bs))
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
         if (clp->out_flags.coe) {
             pr2serr_lk("tid=%d: >> ignored error for out blk=%" PRId64
                        " for %d bytes, %s\n", rep->id, rep->oblk,
-                       rep->num_blks * rep->bs,
+                       rep->num_blks * clp->bs,
                        tsafe_strerror(errno, strerr_buff));
             res = rep->num_blks * clp->bs;
         }
@@ -1601,10 +1744,10 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
                 stop_both(clp);
                 return;
             } else {
-                memset(rep->buffp, 0, rep->num_blks * rep->bs);
+                memset(get_buffp(rep), 0, rep->num_blks * clp->bs);
                 pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
                            " for %d bytes\n", rep->id, rep->iblk,
-                           rep->num_blks * rep->bs);
+                           rep->num_blks * clp->bs);
             }
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
@@ -1640,10 +1783,10 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     bool not_first = false;
     int err = 0;
     int master_fd = rep->infd;  /* in (READ) side is master */
+    Gbl_coll * clp = rep->clp;
     struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CHG_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_CHG_SHARE_FD;
@@ -1659,7 +1802,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
            (EBUSY == errno)) {
         err = errno;
         if (! not_first) {
-            if (rep->debug > 9)
+            if (clp->debug > 9)
                 pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
                            "failed errno=%d %s\n", rep->id, master_fd, err,
                            strerror(err));
@@ -1673,7 +1816,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
                    "errno=%d %s\n", rep->id, master_fd, err, strerror(err));
         return false;
     }
-    if (rep->debug > 15)
+    if (clp->debug > 15)
         pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(change_shared_fd)) ok, "
                    "master_fd=%d, to_slave_fd=%d\n", __func__, rep->id,
                    master_fd, to_fd);
@@ -1682,9 +1825,10 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
 
 /* Enters this function holding out_mutex */
 static void
-sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
+sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
 {
     int res, status, pack_id;
+    Gbl_coll * clp = rep->clp;
     pthread_mutex_t * mutexp = is_wr2 ? &clp->out2_mutex : &clp->out_mutex;
 
     if (rep->has_share && is_wr2)
@@ -1725,7 +1869,7 @@ sg_out_wr_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
                 goto fini;
             } else
                 pr2serr_lk(">> ignored error for out blk=%" PRId64 " for %d "
-                           "bytes\n", rep->oblk, rep->num_blks * rep->bs);
+                           "bytes\n", rep->oblk, rep->num_blks * clp->bs);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -1763,6 +1907,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                  const struct sg_io_v4 * a_v4p, int nrq,
                  uint32_t * good_inblksp, uint32_t * good_outblksp)
 {
+    Gbl_coll * clp = rep->clp;
     bool ok;
     int id = rep->id;
     int resid = ctl_v4p->din_resid;
@@ -1770,7 +1915,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int n_subm = nrq - ctl_v4p->dout_resid;
     int n_cmpl = ctl_v4p->info;
     int n_good = 0;
-    int vb = rep->debug;
+    int vb = clp->debug;
     int k, slen;
     uint32_t good_inblks = 0;
     uint32_t good_outblks = 0;
@@ -1795,9 +1940,12 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     /* Check if those submitted have finished or not */
     for (k = 0; k < n_subm; ++k, ++a_np) {
         slen = a_np->response_len;
-        if (! (SG_INFO_MRQ_FINI & a_np->info))
+        if (! (SG_INFO_MRQ_FINI & a_np->info)) {
             pr2serr_lk("[%d] %s, a_n[%d]: missing SG_INFO_MRQ_FINI ? ?\n",
                        id, __func__, k);
+            v4hdr_out_lk("a_np", a_np, id);
+            v4hdr_out_lk("cop", ctl_v4p, id);
+        }
         ok = true;
         if (a_np->device_status || a_np->transport_status ||
             a_np->driver_status) {
@@ -1826,12 +1974,12 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
         }
         if (ok) {
             ++n_good;
-            if (a_np->dout_xfer_len >= (uint32_t)rep->bs)
+            if (a_np->dout_xfer_len >= (uint32_t)clp->bs)
                 good_outblks += (a_np->dout_xfer_len - a_np->dout_resid) /
-                                rep->bs;
-            if (a_np->din_xfer_len >= (uint32_t)rep->bs)
+                                clp->bs;
+            if (a_np->din_xfer_len >= (uint32_t)clp->bs)
                 good_inblks += (a_np->din_xfer_len - a_np->din_resid) /
-                               rep->bs;
+                               clp->bs;
         }
     }
     if ((n_subm == nrq) || (vb < 3))
@@ -1856,40 +2004,41 @@ fini:
     return n_good;
 }
 
+/* do mrq 'submit (waitless) non-blocking' call. These are restricted to
+ * a single file descriptor (i.e. the 'fd' argument). */
 static int
 sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
                  struct sg_io_v4 * ctlop, int nrq)
 {
-    bool wless = false;
     int half = nrq / 2;
-    int k, res, nwait, half_num, rest, err, num_good;
+    int k, res, nwait, half_num, rest, err, num_good, b_len;
     const int64_t wait_us = 10;
     uint32_t in_fin_blks, out_fin_blks;
-    const char * sub_str = "SG_IOSUBMIT, MULTIPLE_REQS | ";
-    const char * rec_str = "SG_IORECEIVE, MULTIPLE_REQS | IMMED";
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 hold_ctlo;
+    Gbl_coll * clp = rep->clp;
+    char b[80];
 
     hold_ctlo = *ctlop;
+    b_len = sizeof(b);
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
-    if (rep->in_flags.no_waitq || rep->out_flags.no_waitq) {
-        wless = true;
+    if (clp->in_flags.no_waitq || clp->out_flags.no_waitq)
         ctlop->flags |= SGV4_FLAG_NO_WAITQ;     /* waitless non-blocking */
-    } else
+    else
         ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
-    if (rep->debug > 4) {
+    if (clp->debug > 4) {
         pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IOSUBMIT):\n",
                    __func__);
-        if (rep->debug > 5)
+        if (clp->debug > 5)
             hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
         v4hdr_out_lk("Controlling object before", ctlop, rep->id);
     }
     res = ioctl(fd, SG_IOSUBMIT, ctlop);
     if (res < 0) {
         err = errno;
-        pr2serr_lk("%s: ioctl(%s%s)-->%d, errno=%d: %s\n", __func__,
-                   sub_str, (wless ? "NO_WAITQ" : "IMMED"), res, err,
+        pr2serr_lk("%s: ioctl(SG_IOSUBMIT, %s)-->%d, errno=%d: %s\n", __func__,
+                   sg_flags_str(ctlop->flags, b_len, b), res, err,
                    strerror(err));
         return -1;
     }
@@ -1911,20 +2060,21 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     if (res < 0) {
         err = errno;
         if (ENODATA != err) {
-            pr2serr_lk("%s: ioctl(%s),1-->%d, errno=%d: %s\n", __func__,
-                       rec_str, res, err, strerror(err));
+            pr2serr_lk("%s: ioctl(SG_IORECEIVE, %s),1-->%d, errno=%d: %s\n",
+                       __func__, sg_flags_str(ctlop->flags, b_len, b), res,
+                       err, strerror(err));
             return -1;
         }
         half_num = 0;
     } else
         half_num = ctlop->info;
-    if (rep->debug > 4) {
+    if (clp->debug > 4) {
         pr2serr_lk("%s: Controlling object output by ioctl(SG_IORECEIVE),1: "
                    "num_received=%d\n", __func__, half_num);
-        if (rep->debug > 5)
+        if (clp->debug > 5)
             hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
         v4hdr_out_lk("Controlling object after", ctlop, rep->id);
-        if (rep->debug > 5) {
+        if (clp->debug > 5) {
             for (k = 0; k < half_num; ++k) {
                 pr2serr_lk("AFTER: def_arr[%d]:\n", k);
                 v4hdr_out_lk("normal v4 object", (a_v4p + k), rep->id);
@@ -1937,7 +2087,7 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     out_fin_blks = 0;
     num_good = chk_mrq_response(rep, ctlop, a_v4p, half_num, &in_fin_blks,
                                 &out_fin_blks);
-    if (rep->debug > 2)
+    if (clp->debug > 2)
         pr2serr_lk("%s: >>>1 num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -1981,20 +2131,21 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     if (res < 0) {
         err = errno;
         if (ENODATA != err) {
-            pr2serr_lk("%s: ioctl(%s),2-->%d, errno=%d: %s\n", __func__,
-                       rec_str, res, err, strerror(err));
+            pr2serr_lk("%s: ioctl(SG_IORECEIVE, %s),2-->%d, errno=%d: %s\n",
+                       __func__, sg_flags_str(ctlop->flags, b_len, b), res,
+                       err, strerror(err));
             return -1;
         }
         half_num = 0;
     } else
         half_num = ctlop->info;
-    if (rep->debug > 4) {
+    if (clp->debug > 4) {
         pr2serr_lk("%s: Controlling object output by ioctl(SG_IORECEIVE),2: "
                    "num_received=%d\n", __func__, half_num);
-        if (rep->debug > 5)
+        if (clp->debug > 5)
             hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
         v4hdr_out_lk("Controlling object after", ctlop, rep->id);
-        if (rep->debug > 5) {
+        if (clp->debug > 5) {
             for (k = 0; k < half_num; ++k) {
                 pr2serr_lk("AFTER: def_arr[%d]:\n", k);
                 v4hdr_out_lk("normal v4 object", (a_v4p + k), rep->id);
@@ -2007,7 +2158,7 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     out_fin_blks = 0;
     num_good = chk_mrq_response(rep, ctlop, a_v4p, half_num, &in_fin_blks,
                                 &out_fin_blks);
-    if (rep->debug > 2)
+    if (clp->debug > 2)
         pr2serr_lk("%s: >>>2 num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -2070,14 +2221,18 @@ static int
 sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
 {
     bool launch_mrq_abort = false;
-    int nrq, k, res, fd, mrq_pack_id, status, id, num_good;
+    int nrq, k, res, fd, mrq_pack_id, status, id, num_good, b_len;
     uint32_t in_fin_blks, out_fin_blks;
     const int max_cdb_sz = 16;
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 ctl_v4;
     uint8_t * cmd_ap = NULL;
+    Gbl_coll * clp = rep->clp;
+    const char * iosub_str = clp->unbalanced_mrq ? "SUBMIT" : "";
+    char b[80];
 
     id = rep->id;
+    b_len = sizeof(b);
     memset(&ctl_v4, 0, sizeof(ctl_v4));
     ctl_v4.guard = 'Q';
     a_v4p = def_arr.first.data();
@@ -2086,7 +2241,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         pr2serr_lk("[%d] %s: strange nrq=0, nothing to do\n", id, __func__);
         return 0;
     }
-    if (rep->mrq_cmds) {
+    if (clp->mrq_cmds) {
         cmd_ap = (uint8_t *)calloc(nrq, max_cdb_sz);
         if (NULL == cmd_ap) {
             pr2serr_lk("[%d] %s: no memory for calloc(%d * 16)\n", id,
@@ -2098,14 +2253,21 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         struct sg_io_v4 * h4p = a_v4p + k;
         uint8_t *cmdp = &def_arr.second[k].front();
 
-        if (rep->mrq_cmds) {
+        if (clp->mrq_cmds) {
             memcpy(cmd_ap + (k * max_cdb_sz), cmdp, h4p->request_len);
             h4p->request = 0;
         } else
             h4p->request = (uint64_t)cmdp;
-        if (rep->debug > 5) {
-            pr2serr_lk("[%d] def_arr[%d]:\n", id, k);
-            hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p), 1);
+        if (clp->debug > 5) {
+            pr2serr_lk("%s%s[%d] def_arr[%d]", ((0 == k) ? __func__ : ""),
+                       ((0 == k) ? ": " : ""), id, k);
+            if (h4p->din_xferp)
+                pr2serr_lk(" [din=0x%p]:\n", (void *)h4p->din_xferp);
+            else if (h4p->dout_xferp)
+                pr2serr_lk(" [dout=0x%p]:\n", (void *)h4p->dout_xferp);
+            else
+                pr2serr_lk(":\n");
+            hex2stderr_lk((const uint8_t *)h4p, sizeof(*h4p), 1);
         }
     }
     if (rep->both_sg || rep->same_sg)
@@ -2120,29 +2282,29 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         goto fini;
     }
     res = 0;
-    if (rep->mrq_cmds) {
+    if (clp->mrq_cmds) {
         ctl_v4.request_len = nrq * max_cdb_sz;
         ctl_v4.request = (uint64_t)cmd_ap;
     }
-    if (! rep->mrq_async)
+    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
+    if (! clp->mrq_async)
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
-    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF;
     ctl_v4.dout_xferp = (uint64_t)a_v4p;        /* request array */
     ctl_v4.dout_xfer_len = nrq * sizeof(*a_v4p);
     ctl_v4.din_xferp = (uint64_t)a_v4p;         /* response array */
     ctl_v4.din_xfer_len = nrq * sizeof(*a_v4p);
     mrq_pack_id = atomic_fetch_add(&mono_mrq_id, 1);
-    if ((rep->m_aen > 0) && (MONO_MRQ_ID_INIT != mrq_pack_id) &&
-        (0 == ((mrq_pack_id - MONO_MRQ_ID_INIT) % rep->m_aen))) {
+    if ((clp->m_aen > 0) && (MONO_MRQ_ID_INIT != mrq_pack_id) &&
+        (0 == ((mrq_pack_id - MONO_MRQ_ID_INIT) % clp->m_aen))) {
         launch_mrq_abort = true;
-        if (rep->debug > 2)
+        if (clp->debug > 2)
             pr2serr_lk("[%d] %s: Decide to launch MRQ abort thread, "
                        "mrq_id=%d\n", id, __func__, mrq_pack_id);
         memset(&rep->mai, 0, sizeof(rep->mai));
         rep->mai.from_tid = id;
         rep->mai.mrq_id = mrq_pack_id;
         rep->mai.fd = fd;
-        rep->mai.debug = rep->debug;
+        rep->mai.debug = clp->debug;
 
         status = pthread_create(&rep->mrq_abort_thread_id, NULL,
                                 mrq_abort_thread, (void *)&rep->mai);
@@ -2150,17 +2312,23 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     }
     ctl_v4.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
     rep->mrq_id = mrq_pack_id;
-    if (rep->debug > 4) {
-        pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO):\n",
-                   __func__);
-        if (rep->debug > 5)
+    if (clp->debug > 4) {
+        if (rep->both_sg && clp->mrq_async)
+            iosub_str = "SUBMIT(variable)";
+        pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO%s):\n",
+                   __func__, iosub_str);
+        if (clp->debug > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk("Controlling object before", &ctl_v4, id);
     }
-    if (rep->mrq_async) {
+    if (clp->mrq_async && (! rep->both_sg)) {
+        /* do 'submit non-blocking' or 'submit waitless non_blocking'
+         * multiple request */
         mrq_arr_t fd_def_arr;
         mrq_arr_t o_fd_def_arr;
 
+        /* need to deconstruct def_arr[] into two separate lists, one for
+         * the source, the other for the destination. */
         int o_num_fd = split_def_arr(def_arr, fd_def_arr, o_fd_def_arr);
         int num_fd = fd_def_arr.first.size();
         if (num_fd > 0) {
@@ -2171,12 +2339,12 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
                 struct sg_io_v4 * h4p = aa_v4p + k;
                 uint8_t *cmdp = &fd_def_arr.second[k].front();
 
-                if (rep->mrq_cmds) {
+                if (clp->mrq_cmds) {
                     memcpy(cmd_ap + (k * max_cdb_sz), cmdp, h4p->request_len);
                     h4p->request = 0;
                 } else
                     h4p->request = (uint64_t)cmdp;
-                if (rep->debug > 5) {
+                if (clp->debug > 5) {
                     pr2serr_lk("[%d] df_def_arr[%d]:\n", id, k);
                     hex2stderr_lk((const uint8_t *)(aa_v4p + k),
                                   sizeof(*aa_v4p), 1);
@@ -2188,6 +2356,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
             fd_ctl.din_xferp = (uint64_t)aa_v4p;         /* response array */
             fd_ctl.din_xfer_len = num_fd * sizeof(*aa_v4p);
             fd_ctl.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
+            /* this is the source side mrq command */
             res = sgh_do_async_mrq(rep, fd_def_arr, fd, &fd_ctl, num_fd);
             rep->in_mrq_q_blks = 0;
             if (res)
@@ -2201,12 +2370,12 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
                 struct sg_io_v4 * h4p = aa_v4p + k;
                 uint8_t *cmdp = &o_fd_def_arr.second[k].front();
 
-                if (rep->mrq_cmds) {
+                if (clp->mrq_cmds) {
                     memcpy(cmd_ap + (k * max_cdb_sz), cmdp, h4p->request_len);
                     h4p->request = 0;
                 } else
                     h4p->request = (uint64_t)cmdp;
-                if (rep->debug > 5) {
+                if (clp->debug > 5) {
                     pr2serr_lk("[%d] o_fd_def_arr[%d]:\n", id, k);
                     hex2stderr_lk((const uint8_t *)(aa_v4p + k),
                                   sizeof(*aa_v4p), 1);
@@ -2218,6 +2387,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
             o_fd_ctl.din_xferp = (uint64_t)aa_v4p;      /* response array */
             o_fd_ctl.din_xfer_len = o_num_fd * sizeof(*aa_v4p);
             o_fd_ctl.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
+            /* this is the destination side mrq command */
             res = sgh_do_async_mrq(rep, o_fd_def_arr, rep->outfd, &o_fd_ctl,
                                    o_num_fd);
             rep->out_mrq_q_blks = 0;
@@ -2225,20 +2395,29 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         goto fini;
     }
 
-    res = ioctl(fd, SG_IO, &ctl_v4); // MULTIPLE_REQS | STOP_IF
+    if (clp->unbalanced_mrq)
+        res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
+    else {
+        if (clp->mrq_async) {
+            iosub_str = "SUBMIT(variable)";
+            res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
+        } else
+            res = ioctl(fd, SG_IO, &ctl_v4);
+    }
     if (res < 0) {
-        pr2serr_lk("%s: ioctl(SG_IO, MULTIPLE_REQS)-->%d, errno=%d: %s\n",
-                   __func__, res, errno, strerror(errno));
+        pr2serr_lk("%s: ioctl(SG_IO%s, %s)-->%d, errno=%d: %s\n",
+                   __func__, iosub_str, sg_flags_str(ctl_v4.flags, b_len, b),
+                   res, errno, strerror(errno));
         res = -1;
         goto fini;
     }
-    if (rep->debug > 4) {
-        pr2serr_lk("%s: Controlling object output by ioctl(SG_IO):\n",
-                   __func__);
-        if (rep->debug > 5)
+    if (clp->debug > 4) {
+        pr2serr_lk("%s: Controlling object output by ioctl(SG_IO%s):\n",
+                   __func__, iosub_str);
+        if (clp->debug > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk("Controlling object after", &ctl_v4, id);
-        if (rep->debug > 5) {
+        if (clp->debug > 5) {
             for (k = 0; k < nrq; ++k) {
                 pr2serr_lk("AFTER: def_arr[%d]:\n", k);
                 v4hdr_out_lk("normal v4 object", (a_v4p + k), id);
@@ -2251,7 +2430,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     out_fin_blks = 0;
     num_good = chk_mrq_response(rep, &ctl_v4, a_v4p, nrq, &in_fin_blks,
                                 &out_fin_blks);
-    if (rep->debug > 2)
+    if (clp->debug > 2)
         pr2serr_lk("%s: >>> num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -2277,7 +2456,7 @@ fini:
     if (cmd_ap)
         free(cmd_ap);
     if (launch_mrq_abort) {
-        if (rep->debug > 1)
+        if (clp->debug > 1)
             pr2serr_lk("[%d] %s: About to join MRQ abort thread, "
                        "mrq_id=%d\n", id, __func__, mrq_pack_id);
 
@@ -2293,26 +2472,27 @@ static int
 sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             bool is_wr2)
 {
+    Gbl_coll * clp = rep->clp;
     bool wr = rep->wr;
-    bool fua = wr ? rep->out_flags.fua : rep->in_flags.fua;
-    bool dpo = wr ? rep->out_flags.dpo : rep->in_flags.dpo;
-    bool dio = wr ? rep->out_flags.dio : rep->in_flags.dio;
-    bool mmap = wr ? rep->out_flags.mmap : rep->in_flags.mmap;
-    bool no_waitq = wr ? rep->out_flags.no_waitq : rep->in_flags.no_waitq;
-    bool noxfer = wr ? rep->out_flags.noxfer : rep->in_flags.noxfer;
-    bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
-    bool qtail = wr ? rep->out_flags.qtail : rep->in_flags.qtail;
-    int cdbsz = wr ? rep->cdbsz_out : rep->cdbsz_in;
+    bool fua = wr ? clp->out_flags.fua : clp->in_flags.fua;
+    bool dpo = wr ? clp->out_flags.dpo : clp->in_flags.dpo;
+    bool dio = wr ? clp->out_flags.dio : clp->in_flags.dio;
+    bool mmap = wr ? clp->out_flags.mmap : clp->in_flags.mmap;
+    bool no_waitq = wr ? clp->out_flags.no_waitq : clp->in_flags.no_waitq;
+    bool noxfer = wr ? clp->out_flags.noxfer : clp->in_flags.noxfer;
+    bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
+    bool qtail = wr ? clp->out_flags.qtail : clp->in_flags.qtail;
+    int cdbsz = wr ? clp->cdbsz_out : clp->cdbsz_in;
     int flags = 0;
-    int res, err, fd;
+    int res, err, fd, b_len;
     int64_t blk = wr ? rep->oblk : rep->iblk;
     struct sg_io_hdr * hp = &rep->io_hdr;
     struct sg_io_v4 * h4p = &rep->io_hdr4;
     const char * cp = "";
-    const char * c2p = "";
-    const char * c3p = "";
     const char * crwp;
+    char b[80];
 
+    b_len = sizeof(b);
     if (wr) {
         fd = is_wr2 ? rep->out2fd : rep->outfd;
         crwp = is_wr2 ? "writing2" : "writing";
@@ -2326,10 +2506,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
                    my_name, blk, rep->num_blks);
         return -1;
     }
-    if (mmap && (rep->outregfd >= 0)) {
+    if (mmap && (rep->outregfd >= 0))
         flags |= SG_FLAG_MMAP_IO;
-        c3p = " mmap";
-    }
     if (noxfer)
         flags |= SG_FLAG_NO_DXFER;
     if (dio)
@@ -2342,8 +2520,6 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             flags |= SGV4_FLAG_NO_DXFER;
         else if (rep->outregfd < 0)
             flags |= SGV4_FLAG_NO_DXFER;
-        if (flags & SGV4_FLAG_NO_DXFER)
-            c2p = " and FLAG_NO_DXFER";
 
         cp = (wr ? " slave active" : " master active");
     } else
@@ -2358,10 +2534,10 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     } else
         pack_id = atomic_fetch_add(&mono_pack_id, 1);    /* fetch before */
     rep->rq_id = pack_id;
-    if (rep->debug > 3) {
-        pr2serr_lk("%s tid,rq_id=%d,%d: SCSI %s%s%s%s, blk=%" PRId64
+    if (clp->debug > 3) {
+        pr2serr_lk("%s tid,rq_id=%d,%d: SCSI %s%s %s, blk=%" PRId64
                    " num_blks=%d\n", __func__, rep->id, pack_id, crwp, cp,
-                   c2p, c3p, blk, rep->num_blks);
+                   sg_flags_str(flags, b_len, b), blk, rep->num_blks);
         lk_print_command(rep->cmd);
     }
     if (v4)
@@ -2372,8 +2548,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     hp->cmd_len = cdbsz;
     hp->cmdp = rep->cmd;
     hp->dxfer_direction = wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
-    hp->dxfer_len = rep->bs * rep->num_blks;
-    hp->dxferp = rep->buffp;
+    hp->dxfer_len = clp->bs * rep->num_blks;
+    hp->dxferp = get_buffp(rep);
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
@@ -2387,13 +2563,13 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             ++num_start_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -2402,8 +2578,9 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     if (res < 0) {
         if (ENOMEM == err)
             return 1;
-        pr2serr_lk("%s tid=%d: %s%s%s write(2) failed: %s\n", __func__,
-                   rep->id, cp, c2p, c3p, strerror(err));
+        pr2serr_lk("%s tid=%d: %s %s write(2) failed: %s\n", __func__,
+                   rep->id, cp, sg_flags_str(hp->flags, b_len, b),
+                   strerror(err));
         return -1;
     }
     return 0;
@@ -2413,19 +2590,21 @@ do_v4:
     h4p->request_len = cdbsz;
     h4p->request = (uint64_t)rep->cmd;
     if (wr) {
-        h4p->dout_xfer_len = rep->bs * rep->num_blks;
-        h4p->dout_xferp = (uint64_t)rep->buffp;
+        h4p->dout_xfer_len = clp->bs * rep->num_blks;
+        h4p->dout_xferp = (uint64_t)get_buffp(rep);
     } else if (rep->num_blks > 0) {
-        h4p->din_xfer_len = rep->bs * rep->num_blks;
-        h4p->din_xferp = (uint64_t)rep->buffp;
+        h4p->din_xfer_len = clp->bs * rep->num_blks;
+        h4p->din_xferp = (uint64_t)get_buffp(rep);
     }
     h4p->max_response_len = sizeof(rep->sb);
     h4p->response = (uint64_t)rep->sb;
     h4p->timeout = DEF_TIMEOUT;
     h4p->usr_ptr = (uint64_t)rep;
     h4p->request_extra = pack_id;    /* this is the pack_id */
-    h4p->flags = flags | (no_waitq ? SGV4_FLAG_NO_WAITQ : SGV4_FLAG_IMMED);
-    if (rep->nmrqs > 0) {
+    h4p->flags = flags;
+    if (no_waitq)
+        h4p->flags |= SGV4_FLAG_NO_WAITQ;
+    if (clp->nmrqs > 0) {
         big_cdb cdb_arr;
         uint8_t * cmdp = &(cdb_arr[0]);
 
@@ -2439,7 +2618,7 @@ do_v4:
         def_arr.first.push_back(*h4p);
         def_arr.second.push_back(cdb_arr);
         res = 0;
-        if ((int)def_arr.first.size() >= rep->nmrqs)
+        if ((int)def_arr.first.size() >= clp->nmrqs)
             res = sgh_do_deferred_mrq(rep, def_arr);
         return res;
     }
@@ -2449,13 +2628,13 @@ do_v4:
             ++num_start_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -2464,12 +2643,14 @@ do_v4:
     if (res < 0) {
         if (ENOMEM == err)
             return 1;
-        pr2serr_lk("%s tid=%d: %s%s%s ioctl(2) failed: %s\n", __func__,
-                   rep->id, cp, c2p, c3p, strerror(err));
+        pr2serr_lk("%s tid=%d: %s %s ioctl(2) failed: %s\n", __func__,
+                   rep->id, cp, sg_flags_str(h4p->flags, b_len, b),
+                   strerror(err));
+	// v4hdr_out_lk("leadin", h4p, rep->id);
         return -1;
     }
-    if ((rep->aen > 0) && (rep->rep_count > 0)) {
-        if (0 == (rep->rq_id % rep->aen)) {
+    if ((clp->aen > 0) && (rep->rep_count > 0)) {
+        if (0 == (rep->rq_id % clp->aen)) {
             struct timespec tspec = {0, 4000 /* 4 usecs */};
 
             nanosleep(&tspec, NULL);
@@ -2498,7 +2679,7 @@ do_v4:
                                __func__, safe_strerror(err), err);
             } else {
                 ++num_abort_req_success;
-                if (rep->debug > 1)
+                if (clp->debug > 1)
                     pr2serr_lk("%s: sent ioctl(SG_IOABORT) on rq_id=%d, "
                                "success\n", __func__, pack_id);
             }
@@ -2513,7 +2694,8 @@ do_v4:
 static int
 sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
 {
-    bool v4 = wr ? rep->out_flags.v4 : rep->in_flags.v4;
+    Gbl_coll * clp = rep->clp;
+    bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
     int res, fd;
     int64_t blk = wr ? rep->oblk : rep->iblk;
     struct sg_io_hdr io_hdr;
@@ -2545,13 +2727,13 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
             ++num_fin_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -2574,7 +2756,7 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-        if (rep->debug > 3)
+        if (clp->debug > 3)
             lk_chk_n_print3(cp, hp, false);
         return res;
     case SG_LIB_CAT_NOT_READY:
@@ -2590,18 +2772,18 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
 #if 0
     if (0 == (++testing % 100)) return -1;
 #endif
-    if ((wr ? rep->out_flags.dio : rep->in_flags.dio) &&
+    if ((wr ? clp->out_flags.dio : clp->in_flags.dio) &&
         ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
         rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
         rep->dio_incomplete_count = 0;
     rep->resid = hp->resid;
-    if (rep->debug > 3)
+    if (clp->debug > 3)
         pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id, cp);
     return 0;
 
 do_v4:
-    if (rep->nmrqs > 0) {
+    if (clp->nmrqs > 0) {
         rep->resid = 0;
         return 0;
     }
@@ -2613,13 +2795,13 @@ do_v4:
             ++num_fin_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (rep->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->debug > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -2642,7 +2824,7 @@ do_v4:
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-        if (rep->debug > 3)
+        if (clp->debug > 3)
             lk_chk_n_print4(cp, h4p, false);
         return res;
     case SG_LIB_CAT_NOT_READY:
@@ -2653,7 +2835,7 @@ do_v4:
             snprintf(ebuff, EBUFF_SZ, "%s rq_id=%d, blk=%" PRId64, cp,
                      pack_id, blk);
             lk_chk_n_print4(ebuff, h4p, false);
-            if ((rep->debug > 4) && h4p->info)
+            if ((clp->debug > 4) && h4p->info)
                 pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
                            "detaching=%d aborted=%d\n", h4p->info,
                            !!(h4p->info & SG_INFO_CHECK),
@@ -2666,16 +2848,16 @@ do_v4:
 #if 0
     if (0 == (++testing % 100)) return -1;
 #endif
-    if ((wr ? rep->out_flags.dio : rep->in_flags.dio) &&
+    if ((wr ? clp->out_flags.dio : clp->in_flags.dio) &&
         (h4p->info & SG_INFO_DIRECT_IO))
         rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
         rep->dio_incomplete_count = 0;
     rep->resid = h4p->din_resid;
-    if (rep->debug > 3) {
+    if (clp->debug > 3) {
         pr2serr_lk("%s: tid,rq_id=%d,%d: completed %s\n", __func__, rep->id,
                    pack_id, cp);
-        if ((rep->debug > 4) && h4p->info)
+        if ((clp->debug > 4) && h4p->info)
             pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
                        "detaching=%d aborted=%d\n", h4p->info,
                        !!(h4p->info & SG_INFO_CHECK),
@@ -2751,10 +2933,10 @@ read_complet:
                 // return;
                 break;
             } else {
-                memset(rep->buffp, 0, rep->num_blks * rep->bs);
+                memset(get_buffp(rep), 0, rep->num_blks * clp->bs);
                 pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
                            " for %d bytes\n", rep->id, rep->iblk,
-                           rep->num_blks * rep->bs);
+                           rep->num_blks * clp->bs);
             }
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
@@ -2811,7 +2993,7 @@ write_complet:
                 return;
             } else
                 pr2serr_lk(">> ignored error for out blk=%" PRId64 " for %d "
-                           "bytes\n", rep->oblk, rep->num_blks * rep->bs);
+                           "bytes\n", rep->oblk, rep->num_blks * clp->bs);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -3113,64 +3295,20 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
 #define STR_SZ 1024
 #define INOUTF_SZ 512
 
-int
-main(int argc, char * argv[])
+static int
+parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
+                     char * outf, char * out2f, char * outregf)
 {
     bool verbose_given = false;
     bool version_given = false;
     bool bpt_given = false;
-    bool cdbsz_given = false;
-    int64_t skip = 0;
-    int64_t seek = 0;
     int ibs = 0;
     int obs = 0;
+    int k, keylen, n, res;
     char str[STR_SZ];
     char * key;
     char * buf;
-    char inf[INOUTF_SZ];
-    char outf[INOUTF_SZ];
-    char out2f[INOUTF_SZ];
-    char outregf[INOUTF_SZ];
-    int res, k, err, keylen;
-    int64_t in_num_sect = 0;
-    int64_t out_num_sect = 0;
-    int in_sect_sz, out_sect_sz, status, n, flags;
-    void * vp;
     const char * cp;
-    Gbl_coll * clp = &gcoll;
-    Thread_info thread_arr[MAX_NUM_THREADS];
-    char ebuff[EBUFF_SZ];
-#if SG_LIB_ANDROID
-    struct sigaction actions;
-
-    memset(&actions, 0, sizeof(actions));
-    sigemptyset(&actions.sa_mask);
-    actions.sa_flags = 0;
-    actions.sa_handler = thread_exit_handler;
-    sigaction(SIGUSR1, &actions, NULL);
-    sigaction(SIGUSR2, &actions, NULL);
-#endif
-    memset(clp, 0, sizeof(*clp));
-    memset(thread_arr, 0, sizeof(thread_arr));
-    clp->bpt = DEF_BLOCKS_PER_TRANSFER;
-    clp->in_type = FT_OTHER;
-    /* change dd's default: if of=OFILE not given, assume /dev/null */
-    clp->out_type = FT_DEV_NULL;
-    clp->out2_type = FT_DEV_NULL;
-    clp->cdbsz_in = DEF_SCSI_CDBSZ;
-    clp->cdbsz_out = DEF_SCSI_CDBSZ;
-    clp->nmrqs = DEF_NUM_MRQS;
-    inf[0] = '\0';
-    outf[0] = '\0';
-    out2f[0] = '\0';
-    outregf[0] = '\0';
-    fetch_sg_version();
-    if (sg_version > 40000) {
-        clp->in_flags.v4 = true;
-        clp->out_flags.v4 = true;
-        if (sg_version >= 40030)
-            sg_version_ge_40030 = true;
-    }
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -3218,7 +3356,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "cdbsz")) {
             clp->cdbsz_in = sg_get_num(buf);
             clp->cdbsz_out = clp->cdbsz_in;
-            cdbsz_given = true;
+            clp->cdbsz_given = true;
         } else if (0 == strcmp(key, "coe")) {
             clp->in_flags.coe = !! sg_get_num(buf);
             clp->out_flags.coe = clp->in_flags.coe;
@@ -3269,13 +3407,27 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "mrq")) {
-            clp->nmrqs = sg_get_num(buf);
-            if ((-1 == clp->nmrqs) || (1 == (clp->nmrqs % 2))) {
-                pr2serr("%sbad argument to 'mrq=', want even number or "
-                        "zero\n", my_name);
+            if (isdigit(buf[0]))
+                cp = buf;
+            else {
+                if ('I' == isupper(buf[0]))
+                    clp->is_mrq_i = true;
+                else if ('O' == isupper(buf[0]))
+                    clp->is_mrq_o = true;
+                else {
+                    pr2serr("%sonly mrq=i,NRQS or mrq=o,NRQS allowed here\n",
+                            my_name);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                cp = strchr(buf, ',');
+                ++cp;
+            }
+            clp->nmrqs = sg_get_num(cp);
+            if (clp->nmrqs < 0) {
+                pr2serr("%sbad argument to 'mrq='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            cp = strchr(buf, ',');
+            cp = strchr(cp, ',');
             if (cp && ('C' == toupper(cp[1])))
                 clp->mrq_cmds = true;
         } else if (0 == strcmp(key, "obs")) {
@@ -3314,14 +3466,14 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "seek")) {
-            seek = sg_get_llnum(buf);
-            if (-1LL == seek) {
+            clp->seek = sg_get_llnum(buf);
+            if (-1LL == clp->seek) {
                 pr2serr("%sbad argument to 'seek='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "skip")) {
-            skip = sg_get_llnum(buf);
-            if (-1LL == skip) {
+            clp->skip = sg_get_llnum(buf);
+            if (-1LL == clp->skip) {
                 pr2serr("%sbad argument to 'skip='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -3330,7 +3482,7 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key, "thr"))
             num_threads = sg_get_num(buf);
         else if (0 == strcmp(key, "time"))
-            do_time = !! sg_get_num(buf);
+            do_time = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
@@ -3406,11 +3558,11 @@ main(int argc, char * argv[])
         usage(0);
         return SG_LIB_SYNTAX_ERROR;
     }
-    if ((skip < 0) || (seek < 0)) {
+    if ((clp->skip < 0) || (clp->seek < 0)) {
         pr2serr("skip and seek cannot be negative\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (clp->out_flags.append && (seek > 0)) {
+    if (clp->out_flags.append && (clp->seek > 0)) {
         pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -3457,15 +3609,69 @@ main(int argc, char * argv[])
         pr2serr("iflag=swait is treated as oflag=swait\n");
         clp->out_flags.swait = true;
     }
-    clp->unit_nanosec = !!getenv("SG3_UTILS_LINUX_NANO");
+    clp->unit_nanosec = (do_time > 1) || !!getenv("SG3_UTILS_LINUX_NANO");
     if (clp->debug) {
         pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
-                PRId64, my_name, inf, skip, outf, seek, dd_count);
+                PRId64, my_name, inf, clp->skip, outf, clp->seek, dd_count);
         if (clp->nmrqs > 0)
             pr2serr(" mrq=%d%s\n", clp->nmrqs, (clp->mrq_cmds ? ",C" : ""));
         else
             pr2serr("\n");
     }
+    return 0;
+}
+
+
+int
+main(int argc, char * argv[])
+{
+    char inf[INOUTF_SZ];
+    char outf[INOUTF_SZ];
+    char out2f[INOUTF_SZ];
+    char outregf[INOUTF_SZ];
+    int res, k, err;
+    int64_t in_num_sect = 0;
+    int64_t out_num_sect = 0;
+    int in_sect_sz, out_sect_sz, status, flags;
+    void * vp;
+    Gbl_coll * clp = &gcoll;
+    Thread_info thread_arr[MAX_NUM_THREADS];
+    char ebuff[EBUFF_SZ];
+#if SG_LIB_ANDROID
+    struct sigaction actions;
+
+    memset(&actions, 0, sizeof(actions));
+    sigemptyset(&actions.sa_mask);
+    actions.sa_flags = 0;
+    actions.sa_handler = thread_exit_handler;
+    sigaction(SIGUSR1, &actions, NULL);
+    sigaction(SIGUSR2, &actions, NULL);
+#endif
+    memset(clp, 0, sizeof(*clp));
+    memset(thread_arr, 0, sizeof(thread_arr));
+    clp->bpt = DEF_BLOCKS_PER_TRANSFER;
+    clp->in_type = FT_OTHER;
+    /* change dd's default: if of=OFILE not given, assume /dev/null */
+    clp->out_type = FT_DEV_NULL;
+    clp->out2_type = FT_DEV_NULL;
+    clp->cdbsz_in = DEF_SCSI_CDBSZ;
+    clp->cdbsz_out = DEF_SCSI_CDBSZ;
+    clp->nmrqs = DEF_NUM_MRQS;
+    inf[0] = '\0';
+    outf[0] = '\0';
+    out2f[0] = '\0';
+    outregf[0] = '\0';
+    fetch_sg_version();
+    if (sg_version > 40000) {
+        clp->in_flags.v4 = true;
+        clp->out_flags.v4 = true;
+        if (sg_version >= 40030)
+            sg_version_ge_40030 = true;
+    }
+
+    res = parse_cmdline_sanity(argc, argv, clp, inf, outf, out2f, outregf);
+    if (res)
+        return res;
 
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -3503,8 +3709,8 @@ main(int argc, char * argv[])
                          my_name, inf);
                 perror(ebuff);
                 return sg_convert_errno(err);
-            } else if (skip > 0) {
-                off64_t offset = skip;
+            } else if (clp->skip > 0) {
+                off64_t offset = clp->skip;
 
                 offset *= clp->bs;       /* could exceed 32 here! */
                 if (lseek64(clp->infd, offset, SEEK_SET) < 0) {
@@ -3570,8 +3776,8 @@ main(int argc, char * argv[])
                     return sg_convert_errno(err);
                 }
             }
-            if (seek > 0) {
-                off64_t offset = seek;
+            if (clp->seek > 0) {
+                off64_t offset = clp->seek;
 
                 offset *= clp->bs;       /* could exceed 32 bits here! */
                 if (lseek64(clp->outfd, offset, SEEK_SET) < 0) {
@@ -3638,8 +3844,8 @@ main(int argc, char * argv[])
                     return sg_convert_errno(err);
                 }
             }
-            if (seek > 0) {
-                off64_t offset = seek;
+            if (clp->seek > 0) {
+                off64_t offset = clp->seek;
 
                 offset *= clp->bs;       /* could exceed 32 bits here! */
                 if (lseek64(clp->out2fd, offset, SEEK_SET) < 0) {
@@ -3654,6 +3860,17 @@ main(int argc, char * argv[])
         clp->out2fp = out2f;
     }
     if ((FT_SG == clp->in_type ) && (FT_SG == clp->out_type)) {
+        if (clp->nmrqs > 0) {
+            if ((clp->is_mrq_i == clp->is_mrq_o) && (0 != (clp->nmrqs % 2))) {
+                pr2serr("When both IFILE and OFILE sg devices, mrq=NRQS must "
+                        "be even\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (clp->is_mrq_i && clp->is_mrq_o)
+                ;
+            else if (clp->is_mrq_i || clp->is_mrq_o)
+                clp->unbalanced_mrq = true;
+        }
         if (clp->in_flags.v4_given && (! clp->out_flags.v3)) {
             if (! clp->out_flags.v4_given) {
                 clp->out_flags.v4 = true;
@@ -3670,11 +3887,16 @@ main(int argc, char * argv[])
                             "force v3\n");
             }
         }
+#if 0
         if (clp->mrq_async && !(clp->in_flags.noshare ||
                                 clp->out_flags.noshare)) {
             pr2serr("With mrq_immed also need noshare on sg-->sg copy\n");
             return SG_LIB_SYNTAX_ERROR;
         }
+#endif
+    } else if ((FT_SG == clp->in_type ) || (FT_SG == clp->out_type)) {
+        if (clp->nmrqs > 0)
+            clp->unbalanced_mrq = true;
     }
     if (outregf[0]) {
         int ftyp = dd_filetype(outregf);
@@ -3736,8 +3958,8 @@ main(int argc, char * argv[])
                 in_num_sect = -1;
             }
         }
-        if (in_num_sect > skip)
-            in_num_sect -= skip;
+        if (in_num_sect > clp->skip)
+            in_num_sect -= clp->skip;
 
         out_num_sect = -1;
         if (FT_SG == clp->out_type) {
@@ -3768,8 +3990,8 @@ main(int argc, char * argv[])
                 out_num_sect = -1;
             }
         }
-        if (out_num_sect > seek)
-            out_num_sect -= seek;
+        if (out_num_sect > clp->seek)
+            out_num_sect -= clp->seek;
 
         if (in_num_sect > 0) {
             if (out_num_sect > 0)
@@ -3789,15 +4011,15 @@ main(int argc, char * argv[])
         pr2serr("Couldn't calculate count, please give one\n");
         return SG_LIB_CAT_OTHER;
     }
-    if (! cdbsz_given) {
+    if (! clp->cdbsz_given) {
         if ((FT_SG == clp->in_type) && (MAX_SCSI_CDBSZ != clp->cdbsz_in) &&
-            (((dd_count + skip) > UINT_MAX) || (clp->bpt > USHRT_MAX))) {
+            (((dd_count + clp->skip) > UINT_MAX) || (clp->bpt > USHRT_MAX))) {
             pr2serr("Note: SCSI command size increased to 16 bytes (for "
                     "'if')\n");
             clp->cdbsz_in = MAX_SCSI_CDBSZ;
         }
         if ((FT_SG == clp->out_type) && (MAX_SCSI_CDBSZ != clp->cdbsz_out) &&
-            (((dd_count + seek) > UINT_MAX) || (clp->bpt > USHRT_MAX))) {
+            (((dd_count + clp->seek) > UINT_MAX) || (clp->bpt > USHRT_MAX))) {
             pr2serr("Note: SCSI command size increased to 16 bytes (for "
                     "'of')\n");
             clp->cdbsz_out = MAX_SCSI_CDBSZ;
@@ -3806,12 +4028,9 @@ main(int argc, char * argv[])
 
     // clp->in_count = dd_count;
     clp->in_rem_count = dd_count;
-    clp->skip = skip;
-    // clp->in_blk = skip;
     clp->out_count = dd_count;
     clp->out_rem_count = dd_count;
-    clp->seek = seek;
-    clp->out_blk = seek;
+    clp->out_blk = clp->seek;
     status = pthread_mutex_init(&clp->in_mutex, NULL);
     if (0 != status) err_exit(status, "init in_mutex");
     status = pthread_mutex_init(&clp->out_mutex, NULL);
@@ -3974,5 +4193,8 @@ fini:
         pr2serr("Number of successful MRQ Aborts: %d\n",
                 num_mrq_abort_req_success.load());
     }
+    if (clp->debug > 3)
+        pr2serr("Final pack_id=%d, mrq_id=%d\n", mono_pack_id.load(),
+                mono_mrq_id.load());
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }
