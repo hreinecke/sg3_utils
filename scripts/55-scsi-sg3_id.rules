@@ -28,6 +28,10 @@ ENV{DEVTYPE}=="partition", ENV{ID_SCSI}=="1", GOTO="compat"
 # Handle non-SCSI devices that implement SCSI inquiry
 KERNEL=="cciss*", ENV{DEVTYPE}=="disk", GOTO="sg_inquiry"
 
+# Ignore USB block devices as they don't contain VPD 0x80 and 0x83
+# and their SERIAL is calculated from usb_id in persistent-storage rules
+DEVPATH=="*usb*", GOTO="sg3_utils_id_end"
+
 # Ignore everything else except sd/sr
 KERNEL!="sd*[!0-9]|sr*", GOTO="sg3_utils_id_end"
 
