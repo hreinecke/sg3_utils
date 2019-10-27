@@ -58,7 +58,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.11  20190523";
+static const char * version_str = "Version: 1.13  20191021";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -392,24 +392,25 @@ tst_extended_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_READ_VAL;
     seip->sei_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_FL_RQS;
+    seip->read_value = SG_SEIRV_INACT_RQS;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
                 strerror(errno));
         return 1;
     }
-    printf("  %sread_value[SG_SEIRV_FL_RQS]= %u\n", cp, seip->read_value);
+    printf("  %sread_value[SG_SEIRV_INACT_RQS]= %u\n", cp, seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_READ_VAL;
     seip->sei_rd_mask |= SG_SEIM_READ_VAL;
-    seip->read_value = SG_SEIRV_DEV_FL_RQS;
+    seip->read_value = SG_SEIRV_DEV_INACT_RQS;
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr("ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n", errno,
                 strerror(errno));
         return 1;
     }
-    printf("  %sread_value[SG_SEIRV_DEV_FL_RQS]= %u\n", cp, seip->read_value);
+    printf("  %sread_value[SG_SEIRV_DEV_INACT_RQS]= %u\n", cp,
+           seip->read_value);
 
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_READ_VAL;
@@ -751,8 +752,7 @@ main(int argc, char * argv[])
             verbose += 1;
         else if (0 == memcmp("-V", argv[k], 2)) {
             printf("%s\n", version_str);
-            file_name = 0;
-            break;
+            return 0;
         } else if (0 == memcmp("-w", argv[k], 2))
             write_only = true;
         else if (*argv[k] == '-') {

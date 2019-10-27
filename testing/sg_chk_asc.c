@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static const char * version_str = "1.07 20181207";
+static const char * version_str = "1.08 20191014";
 
 
 #define MAX_LINE_LEN 1024
@@ -163,10 +163,9 @@ printf("\"%s\",\n", b);
         strncpy(b , line + offset, sizeof(b) - 1);
         b[sizeof(b) - 1] = '\0';
         num = strlen(b);
-        if (0xd == b[num - 2]) {
+        if (0xd == b[num - 2])
             b[num - 2] = '\0';
-            b[num - 1] = '\0';
-        }
+        b[num - 1] = '\0';
         num = strlen(b);
         for (j = 0; j < num; ++j)
             b[j] = toupper(b[j]);

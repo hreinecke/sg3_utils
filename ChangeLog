@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20190929] [svn: r833]
+Changelog for sg3_utils-1.45 [20191027] [svn: r834]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -33,6 +33,11 @@ Changelog for sg3_utils-1.45 [20190929] [svn: r833]
     statistics lpage (sbc4r17)
     - zoned block device statistics log page: shorten
       counter fields from 8 to 4 bytes (zbc2r02)
+    - change '-ll' option to suppress subpages=0xff
+      apart from page 0x0,0xff. Used three times:
+      list all pages and subpages names reported
+  - sg_reassign: for defect list format 6 (vendor
+    specfic) don't try to decode
   - zbc: preparatory work for Zoned domains and
     realms; add new zbc service actions [19-032r3]
   - inhex directory: new, contains ASCII hex files
@@ -45,6 +50,7 @@ Changelog for sg3_utils-1.45 [20190929] [svn: r833]
     - add sg_f2hex_arr()
     - update some tables for NVMe 1.4
     - sg_get_num()+sg_get_llnum(): add 'e' decoding,
+    - asc/ascq match asc-num.txt @t10 20191014
       exabytes; allow addition (e.g. --count=3+1k)
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - scripts: update 54-before-scsi-sg3_id.rules,
@@ -60,6 +66,7 @@ Changelog for sg3_utils-1.45 [20190929] [svn: r833]
   - testing/sg_tst_bidi: for sg 4.0 driver
   - testing/sgh_dd: test request sharing, mreqs...
   - testing/sgs_dd: back from archive, for testing
+  - testing/sg_chk_asc: allow LF and CR/LF in asc-num.txt
   - testing: 'make' now builds both C and C++ programs
     SIGPOLL (SIGIO) and realtime (RT) signals
   - sg_pt: add sg_get_opcode_translation() to replace

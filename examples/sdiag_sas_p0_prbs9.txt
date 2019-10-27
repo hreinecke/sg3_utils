@@ -1,0 +1,12 @@
+# This is the hex for a SAS protocol specific diagnostic
+# page. It will attempt to put phy identifier 0 of the
+# given device into PRBS9 (jitter pattern) generation mode.
+# Physical transmission speed is 22.5 Gbps
+# N.B. This will turn the receiver off on phy id 0.
+#
+# Usage example: 'sg_senddiag --pf --raw=- /dev/sg2 < {this_file}'
+#
+3f,6,0,1c,0,1,3,c,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0
