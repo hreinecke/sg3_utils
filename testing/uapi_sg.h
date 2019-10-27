@@ -216,10 +216,11 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */
 #define SG_SEIRV_BOOL_MASK	0x1	/* get SG_CTL_FLAGM_ALL_BITS */
 #define SG_SEIRV_VERS_NUM	0x2	/* get driver version number as int */
-#define SG_SEIRV_FL_RQS		0x3	/* number of requests in free list */
-#define SG_SEIRV_DEV_FL_RQS	0x4	/* sum(fl rqs) on all dev's fds */
+#define SG_SEIRV_INACT_RQS	0x3	/* number of inactive requests */
+#define SG_SEIRV_DEV_INACT_RQS	0x4	/* sum(inactive rqs) on owning dev */
 #define SG_SEIRV_SUBMITTED	0x5	/* number of mrqs submitted+unread */
 #define SG_SEIRV_DEV_SUBMITTED	0x6	/* sum(submitted) on all dev's fds */
+#define SG_SEIRV_MAX_RSV_REQS	0x7	/* maximum reserve requests */
 
 /*
  * A pointer to the following structure is passed as the third argument to

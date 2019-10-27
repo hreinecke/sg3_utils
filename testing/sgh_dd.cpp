@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.49 20190929";
+static const char * version_str = "1.51 20191010";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -576,8 +576,10 @@ v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
     pr2serr("  response_len=%d driver/transport/device_status="
             "0x%x/0x%x/0x%x\n", h4p->response_len, h4p->driver_status,
             h4p->transport_status, h4p->device_status);
-    pr2serr("  info=0x%x  din_resid=%u  dout_resid=%u  spare_out=%u\n",
-            h4p->info, h4p->din_resid, h4p->dout_resid, h4p->spare_out);
+    pr2serr("  info=0x%x  din_resid=%u  dout_resid=%u  spare_out=%u  "
+	    "dur=%u\n",
+            h4p->info, h4p->din_resid, h4p->dout_resid, h4p->spare_out,
+	    h4p->duration);
     pthread_mutex_unlock(&strerr_mut);
 }
 
@@ -1782,11 +1784,15 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
 {
     bool not_first = false;
     int err = 0;
+    int k;
     int master_fd = rep->infd;  /* in (READ) side is master */
     Gbl_coll * clp = rep->clp;
     struct sg_extended_info sei;
     struct sg_extended_info * seip = &sei;
 
+    if (rep->clp->debug > 2)
+	pr2serr_lk("%s: tid=%d: to_fd=%d, before=%d\n", __func__, rep->id,
+		   to_fd, (int)before);
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CHG_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_CHG_SHARE_FD;
@@ -1798,11 +1804,13 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MASTER_FINI;
         seip->ctl_flags &= SG_CTL_FLAGM_MASTER_FINI;/* would be 0 anyway */
     }
-    while ((ioctl(master_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
-           (EBUSY == errno)) {
+    for (k = 0; (ioctl(master_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
+                 (EBUSY == errno); ++k) {
         err = errno;
+	if (k > 10000)
+	    break;
         if (! not_first) {
-            if (clp->debug > 9)
+            if (clp->debug > 3)
                 pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
                            "failed errno=%d %s\n", rep->id, master_fd, err,
                            strerror(err));

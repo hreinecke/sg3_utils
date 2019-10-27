@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.78 20190913";    /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.79 20191001";    /* spc5r22 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -528,6 +528,10 @@ usage(int hval)
            "    --in=FN|-i FN    FN is a filename containing a log page "
            "in ASCII hex\n"
            "                     or binary if --raw also given.\n"
+           "    --list|-l       list supported log pages; twice: list log "
+           "pages and\n"
+           "                    subpages (exclude 0xff subpages); thrice: "
+           "all pg+spgs\n"
            "    --page=PG|-p PG    PG is either log page acronym, PGN or "
            "PGN,SPGN\n"
            "                       where (S)PGN is a (sub) page number\n");
@@ -1540,6 +1544,8 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
     for (k = 0; k < num; k += 2) {
         pg_code = bp[k];
         subpg_code = bp[k + 1];
+        if ((op->do_list == 2) && (subpg_code == 0xff) && (pg_code > 0))
+            continue;
         if (NOT_SPG_SUBPG == subpg_code)
             snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
         else

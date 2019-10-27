@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2018 Douglas Gilbert.
+ * Copyright (c) 2005-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.26 20180523";
+static const char * version_str = "1.27 20191001";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -468,6 +468,10 @@ main(int argc, char * argv[])
             case 4:     /* bytes from index */
             case 5:     /* physical sector */
                 div = 8;
+                break;
+            case 6:     /* vendor specific */
+		if (verbose)
+		    pr2serr("defect list format: vendor specific\n");
                 break;
             default:
                 pr2serr("defect list format %d unknown\n", dl_format);

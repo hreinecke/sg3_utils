@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_LOGS "8" "October 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -161,7 +161,11 @@ treated as binary.
 lists the names of all logs sense pages supported by this device. This is
 done by reading the "supported log pages" log page. When used
 twice (e.g. '\-ll') lists the names of all logs sense pages and subpages
-supported by this device. There is a list of common log page codes below.
+supported by this device, excluding pages whose subpage number is
+0xff (apart from page 0x0,0xff). When used three times then all supported
+pages and subpages reported by the device are list. So the page/subpage
+names and not thrie content is shown with this option. There is a list of
+common log page codes below.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 sets the "allocation length" field in the LOG SENSE cdb. The is the maximum

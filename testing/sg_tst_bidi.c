@@ -53,7 +53,7 @@
  is implemented by the scsi_debug driver is used.  */
 
 
-static const char * version_str = "Version: 1.05  20190501";
+static const char * version_str = "Version: 1.06  20191021";
 
 #define INQ_REPLY_LEN 96
 #define INQ_CMD_OP 0x12
@@ -265,8 +265,7 @@ main(int argc, char * argv[])
             verbose += 1;
         else if (0 == memcmp("-V", argv[k], 2)) {
             printf("%s\n", version_str);
-            file_name = 0;
-            break;
+            return 0;
         } else if (0 == memcmp("-w", argv[k], 2))
             disable_write = false;
         else if (*argv[k] == '-') {
@@ -378,7 +377,7 @@ rep_sg_io:
         cat = sg_err_category_new(rio_v4.device_status,
                                   rio_v4.transport_status,
                                   rio_v4.driver_status,
-			  (const uint8_t *)(unsigned long)rio_v4.response,
+                          (const uint8_t *)(unsigned long)rio_v4.response,
                                   rio_v4.response_len);
         switch (cat) {
         case SG_LIB_CAT_CLEAN:
@@ -392,7 +391,7 @@ rep_sg_io:
             sg_linux_sense_print(NULL, rio_v4.device_status,
                                  rio_v4.transport_status,
                                  rio_v4.driver_status,
-			 (const uint8_t *)(unsigned long)rio_v4.response,
+                         (const uint8_t *)(unsigned long)rio_v4.response,
                                  rio_v4.response_len, true);
             break;
         }
@@ -546,7 +545,7 @@ rep_async:
         cat = sg_err_category_new(rio_v4.device_status,
                                   rio_v4.transport_status,
                                   rio_v4.driver_status,
-			  (const uint8_t *)(unsigned long)rio_v4.response,
+                          (const uint8_t *)(unsigned long)rio_v4.response,
                                   rio_v4.response_len);
         switch (cat) {
         case SG_LIB_CAT_CLEAN:
@@ -560,7 +559,7 @@ rep_async:
             sg_linux_sense_print(NULL, rio_v4.device_status,
                                  rio_v4.transport_status,
                                  rio_v4.driver_status,
-			 (const uint8_t *)(unsigned long)rio_v4.response,
+                         (const uint8_t *)(unsigned long)rio_v4.response,
                                  rio_v4.response_len, true);
             break;
         }
