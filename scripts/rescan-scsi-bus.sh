@@ -1171,15 +1171,21 @@ fi
 # Make sure sg is there
 modprobe sg >/dev/null 2>&1
 
+# Check for executable "sg_inq" and its version...
 if [ -x /usr/bin/sg_inq ] ; then
   sg_version=$(sg_inq -V 2>&1 | cut -d " " -f 3)
-  if [ -n "$sg_version" ] ; then
-    sg_ver_maj=${sg_version:0:1}
-    sg_version=${sg_version##?.}
-    let sg_version+=$((100 * sg_ver_maj))
+  shopt -s extglob
+  sg_version=${sg_version##*(0)} # remove all leading 0s
+  # If version exists (not NULL)...
+  if [ -n "$sg_version" ]; then
+    sg_ver_maj=${sg_version%%.*} # ...get portion before "." (Major)
+    sg_version=${sg_version##*.*(0)} # ...get portion after "."  (Minor), remove all leading 0s
+    sg_version=${sg_ver_maj}${sg_version} # ...final version = Major prepended to Minor
   fi
-  sg_version=${sg_version##0.}
+  shopt -u extglob
   #echo "\"$sg_version\""
+
+  # If version doesn't exist (NULL) or it's less than 70...
   if [ -z "$sg_version" ] || [ "$sg_version" -lt 70 ] ; then
     sg_len_arg="-36"
   else
