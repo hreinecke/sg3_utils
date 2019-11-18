@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.51 20191010";
+static const char * version_str = "1.53 20191119";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -121,7 +121,7 @@ static const char * version_str = "1.51 20191010";
 
 
 /* comment out following line to stop ioctl(SG_CTL_FLAGM_SNAP_DEV) */
-#define SGH_DD_SNAP_DEV 1
+// #define SGH_DD_SNAP_DEV 1
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -176,8 +176,10 @@ struct flags_t {
     bool mrq_immed;     /* mrq submit non-blocking */
     bool no_dur;
     bool noshare;
+    bool no_unshare;    /* leave it for driver close/release */
     bool no_waitq;
     bool noxfer;
+    bool qhead;
     bool qtail;
     bool same_fds;
     bool swait;
@@ -577,9 +579,9 @@ v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
             "0x%x/0x%x/0x%x\n", h4p->response_len, h4p->driver_status,
             h4p->transport_status, h4p->device_status);
     pr2serr("  info=0x%x  din_resid=%u  dout_resid=%u  spare_out=%u  "
-	    "dur=%u\n",
+            "dur=%u\n",
             h4p->info, h4p->din_resid, h4p->dout_resid, h4p->spare_out,
-	    h4p->duration);
+            h4p->duration);
     pthread_mutex_unlock(&strerr_mut);
 }
 
@@ -867,7 +869,7 @@ page2:
             "    thr         is number of threads, must be > 0, default 4, "
             "max 1024\n"
             "    time        0->no timing, 1->calc throughput(def), "
-	    "2->nanosec precision\n"
+            "2->nanosec precision\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
@@ -900,8 +902,10 @@ page3:
             "    noshare     if IFILE and OFILE are sg devices, don't set "
             "up sharing\n"
             "                (def: do)\n"
+            "    no_unshare    rely on close() to clean up fd share\n"
             "    no_waitq     when non-blocking (async) don't use wait "
             "queue\n"
+            "    qhead       queue new request at head of block queue\n"
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"
             "    same_fds    each thread use the same IFILE and OFILE(2) "
@@ -1129,6 +1133,27 @@ sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
     return true;
 }
 
+static void
+sg_unshare(int sg_fd, int id, bool vb_b)
+{
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
+
+    seip = &sei;
+    memset(seip, 0, sizeof(*seip));
+    seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+    seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
+    seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_UNSHARE;
+    seip->ctl_flags |= SG_CTL_FLAGM_UNSHARE; /* needs to be set to unshare */
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr_lk("tid=%d: ioctl(EXTENDED(UNSHARE), failed errno=%d %s\n",
+                   id,  errno, strerror(errno));
+        return;
+    }
+    if (vb_b)
+        pr2serr_lk("tid=%d: ioctl(UNSHARE) ok\n", id);
+}
+
 #ifdef SGH_DD_SNAP_DEV
 static void
 sg_take_snap(int sg_fd, int id, bool vb_b)
@@ -1141,7 +1166,7 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
     seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_SNAP_DEV;
-    seip->ctl_flags &= SG_CTL_FLAGM_SNAP_DEV;   /* don't append */
+    seip->ctl_flags &= SG_CTL_FLAGM_SNAP_DEV;   /* 0 --> don't append */
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(SNAP_DEV), failed errno=%d %s\n",
                    id,  errno, strerror(errno));
@@ -1500,6 +1525,16 @@ fini:
 
     } else if (rep->alloc_bp)
         free(rep->alloc_bp);
+
+    if (sg_version_ge_40030) {
+        if (clp->in_flags.noshare || clp->out_flags.noshare) {
+            if ((clp->nmrqs > 0) &&
+                (! (clp->in_flags.no_unshare || clp->out_flags.no_unshare)))
+                sg_unshare(rep->infd, rep->id, vb > 9);
+        } else if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type))
+            if (! (clp->in_flags.no_unshare || clp->out_flags.no_unshare))
+            sg_unshare(rep->infd, rep->id, vb > 9);
+    }
     if (own_infd && (rep->infd >= 0)) {
         if (vb && (FT_SG == clp->in_type)) {
             if (ioctl(rep->infd, SG_GET_NUM_WAITING, &n) >= 0) {
@@ -1791,8 +1826,8 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     struct sg_extended_info * seip = &sei;
 
     if (rep->clp->debug > 2)
-	pr2serr_lk("%s: tid=%d: to_fd=%d, before=%d\n", __func__, rep->id,
-		   to_fd, (int)before);
+        pr2serr_lk("%s: tid=%d: to_fd=%d, before=%d\n", __func__, rep->id,
+                   to_fd, (int)before);
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CHG_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_CHG_SHARE_FD;
@@ -1807,8 +1842,8 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     for (k = 0; (ioctl(master_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
                  (EBUSY == errno); ++k) {
         err = errno;
-	if (k > 10000)
-	    break;
+        if (k > 10000)
+            break;
         if (! not_first) {
             if (clp->debug > 3)
                 pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
@@ -2489,6 +2524,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool no_waitq = wr ? clp->out_flags.no_waitq : clp->in_flags.no_waitq;
     bool noxfer = wr ? clp->out_flags.noxfer : clp->in_flags.noxfer;
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
+    bool qhead = wr ? clp->out_flags.qhead : clp->in_flags.qhead;
     bool qtail = wr ? clp->out_flags.qtail : clp->in_flags.qtail;
     int cdbsz = wr ? clp->cdbsz_out : clp->cdbsz_in;
     int flags = 0;
@@ -2508,6 +2544,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         fd = rep->infd;
         crwp = "reading";
     }
+    if (qhead)
+	qtail = false;		/* qhead takes precedence */
     if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, blk, wr, fua,
                           dpo)) {
         pr2serr_lk("%sbad cdb build, start_blk=%" PRId64 ", blocks=%d\n",
@@ -2520,6 +2558,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         flags |= SG_FLAG_NO_DXFER;
     if (dio)
         flags |= SG_FLAG_DIRECT_IO;
+    if (qhead)
+        flags |= SG_FLAG_Q_AT_HEAD;
     if (qtail)
         flags |= SG_FLAG_Q_AT_TAIL;
     if (rep->has_share) {
@@ -2654,7 +2694,7 @@ do_v4:
         pr2serr_lk("%s tid=%d: %s %s ioctl(2) failed: %s\n", __func__,
                    rep->id, cp, sg_flags_str(h4p->flags, b_len, b),
                    strerror(err));
-	// v4hdr_out_lk("leadin", h4p, rep->id);
+        // v4hdr_out_lk("leadin", h4p, rep->id);
         return -1;
     }
     if ((clp->aen > 0) && (rep->rep_count > 0)) {
@@ -2687,7 +2727,7 @@ do_v4:
                                __func__, safe_strerror(err), err);
             } else {
                 ++num_abort_req_success;
-                if (clp->debug > 1)
+                if (clp->debug > 2)
                     pr2serr_lk("%s: sent ioctl(SG_IOABORT) on rq_id=%d, "
                                "success\n", __func__, pack_id);
             }
@@ -3190,6 +3230,10 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noshare = true;
         else if (0 == strcmp(cp, "no_share"))
             fp->noshare = true;
+        else if (0 == strcmp(cp, "no_unshare"))
+            fp->no_unshare = true;
+        else if (0 == strcmp(cp, "no-unshare"))
+            fp->no_unshare = true;
         else if (0 == strcmp(cp, "no_waitq"))
             fp->no_waitq = true;
         else if (0 == strcmp(cp, "nowaitq"))
@@ -3200,6 +3244,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "qhead"))
+            fp->qhead = true;
         else if (0 == strcmp(cp, "qtail"))
             fp->qtail = true;
         else if (0 == strcmp(cp, "same_fds"))
