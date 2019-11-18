@@ -1176,11 +1176,19 @@ if [ -x /usr/bin/sg_inq ] ; then
   sg_version=$(sg_inq -V 2>&1 | cut -d " " -f 3)
   shopt -s extglob
   sg_version=${sg_version##*(0)} # remove all leading 0s
+  sg_version=${sg_version//.*(0)/.} # remove all internal leading 0s
+  # If a naive version will do, the whole if clause can be replaced with:
+  #   sg_version=${sg_version//.}
   # If version exists (not NULL)...
   if [ -n "$sg_version" ]; then
-    sg_ver_maj=${sg_version%%.*} # ...get portion before "." (Major)
-    sg_version=${sg_version##*.*(0)} # ...get portion after "."  (Minor), remove all leading 0s
-    sg_version=${sg_ver_maj}${sg_version} # ...final version = Major prepended to Minor
+    sg_ver_maj=""
+    [[ "$sg_version" =~ "." ]] && sg_ver_maj=${sg_version%%.*} # ...get Major portion if "." exists
+    sg_version=${sg_version#*.} # ...remove Major if a first "." exists
+    #sg_ver_mic=""
+    #[[ "$sg_version" =~ "." ]] && sg_ver_mic=${sg_version##*.}; # ...get Micro portion if "." exists
+    sg_version=${sg_version%.*} # ...remove Micro if a last "." exists
+    sg_version=${sg_version//.} # ...remaining is Minor, remove any remaining "."s
+    sg_version=${sg_ver_maj}${sg_version} # ...final version = Major prepended to Minor, no Micro
   fi
   shopt -u extglob
   #echo "\"$sg_version\""
