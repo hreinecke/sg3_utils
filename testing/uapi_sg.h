@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2018 Douglas Gilbert
  *
- * Version 4.0.34 (20190904)
+ * Version 4.0.38 (20191026)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -221,6 +221,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIRV_SUBMITTED	0x5	/* number of mrqs submitted+unread */
 #define SG_SEIRV_DEV_SUBMITTED	0x6	/* sum(submitted) on all dev's fds */
 #define SG_SEIRV_MAX_RSV_REQS	0x7	/* maximum reserve requests */
+#define SG_SEIRV_DEV_TS_LOWER	0x8	/* device timestamp's lower 32 bits */
+#define SG_SEIRV_DEV_TS_UPPER	0x9	/* device timestamp's upper 32 bits */
 
 /*
  * A pointer to the following structure is passed as the third argument to

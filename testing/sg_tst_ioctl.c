@@ -25,6 +25,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #include <sys/socket.h> /* For passing fd_s via Unix sockets */
 
@@ -58,7 +60,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.13  20191021";
+static const char * version_str = "Version: 1.14  20191116";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -80,6 +82,7 @@ static const char * version_str = "Version: 1.13  20191021";
 
 #define DEF_RESERVE_BUFF_SZ (256 * 1024)
 
+static bool create_time = false;
 static bool is_parent = false;
 static bool do_fork = false;
 static bool ioctl_only = false;
@@ -103,17 +106,19 @@ static int num_sgnw = 0;
 static int verbose = 0;
 
 static const char * relative_cp = NULL;
+static char * file_name = NULL;
 
 
 static void
 usage(void)
 {
-    printf("Usage: sg_tst_ioctl [-3] [-f] [-h] [-l=Q_LEN] [-m=MRQS[,I|S]] "
-           "[-M] [-n]\n"
-           "                    [-o] [-r=SZ] [-s=SEC] [-S] [-t] [-T=NUM] "
-           "[-v] [-V]\n"
-           "                    [-w] <sg_device> [<sg_device2>]\n"
+    printf("Usage: sg_tst_ioctl [-3] [-c] [-f] [-h] [-l=Q_LEN] "
+           "[-m=MRQS[,I|S]]\n"
+           "                    [-M] [-n] [-o] [-r=SZ] [-s=SEC] [-S] [-t] "
+           "[-T=NUM]\n"
+           "                    [-v] [-V] [-w] <sg_device> [<sg_device2>]\n"
            " where:\n"
+           "      -c      timestamp when sg driver created <sg_device>\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
            "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
@@ -139,6 +144,53 @@ usage(void)
            "      -v    increase verbosity of output\n"
            "      -V    print version string then exit\n"
            "      -w    write (submit) only then exit\n");
+}
+
+static void
+timespec_add(const struct timespec *lhs_p, const struct timespec *rhs_p,
+              struct timespec *res_p)
+{
+    if ((lhs_p->tv_nsec + rhs_p->tv_nsec) > 1000000000L) {
+        res_p->tv_sec = lhs_p->tv_sec + rhs_p->tv_sec + 1;
+        res_p->tv_nsec = lhs_p->tv_nsec + rhs_p->tv_nsec - 1000000000L;
+    } else {
+        res_p->tv_sec = lhs_p->tv_sec + rhs_p->tv_sec;
+        res_p->tv_nsec = lhs_p->tv_nsec + rhs_p->tv_nsec;
+    }
+}
+
+static void
+timespec_diff(const struct timespec *lhs_p, const struct timespec *rhs_p,
+              struct timespec *res_p)
+{
+    if ((lhs_p->tv_nsec - rhs_p->tv_nsec) < 0) {
+        res_p->tv_sec = lhs_p->tv_sec - rhs_p->tv_sec - 1;
+        res_p->tv_nsec = lhs_p->tv_nsec - rhs_p->tv_nsec + 1000000000L;
+    } else {
+        res_p->tv_sec = lhs_p->tv_sec - rhs_p->tv_sec;
+        res_p->tv_nsec = lhs_p->tv_nsec - rhs_p->tv_nsec;
+    }
+}
+
+/* Returns 0 on success. */
+int timespec2str(char *buf, uint len, struct timespec *ts)
+{
+    int ret;
+    struct tm t;
+
+    tzset();
+    if (localtime_r(&(ts->tv_sec), &t) == NULL)
+        return 1;
+
+    ret = strftime(buf, len, "%F %T", &t);
+    if (ret == 0)
+        return 2;
+    len -= ret - 1;
+
+    ret = snprintf(&buf[strlen(buf)], len, ".%09ld", ts->tv_nsec);
+    if (ret >= (int)len)
+        return 3;
+    return 0;
 }
 
 /* This function taken from Keith Parkard's blog dated 20121005 */
@@ -268,6 +320,61 @@ set_more_async(int fd, bool more_asy, bool no_dur)
         }
     } else
         pr2serr("sg driver too old for ioctl(SG_SET_GET_EXTENDED)\n");
+}
+
+static void
+pr_create_dev_time(int sg_fd, const char * dev_name)
+{
+    uint32_t u;
+    uint64_t l;
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
+    struct timespec time_up, realtime, boottime, createtime, tmp;
+    char b[64];
+
+    seip = &sei;
+        memset(seip, 0, sizeof(*seip));
+    seip->sei_wr_mask |= SG_SEIM_READ_VAL;
+    seip->sei_rd_mask |= SG_SEIM_READ_VAL;
+    seip->read_value = SG_SEIRV_DEV_TS_LOWER;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("%s: ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n",
+                __func__, errno, strerror(errno));
+        return;
+    }
+    u = seip->read_value;
+    seip->read_value = SG_SEIRV_DEV_TS_UPPER;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr("%s: ioctl(SG_SET_GET_EXTENDED) failed, errno=%d %s\n",
+                __func__, errno, strerror(errno));
+        return;
+    }
+    l = seip->read_value;
+    l <<= 32;
+    l |= u;
+    time_up.tv_sec = l / 1000000000UL;
+    time_up.tv_nsec = l % 1000000000UL;
+    /* printf("create time nanoseconds=%" PRIu64 "\n", l); */
+    if (clock_gettime(CLOCK_REALTIME, &realtime) < 0) {
+        pr2serr("%s: clock_gettime(CLOCK_REALTIME) failed, errno=%d %s\n",
+                __func__, errno, strerror(errno));
+        return;
+    }
+    if (clock_gettime(CLOCK_BOOTTIME, &boottime) < 0) {
+        pr2serr("%s: clock_gettime(CLOCK_REALTIME) failed, errno=%d %s\n",
+                __func__, errno, strerror(errno));
+        return;
+    }
+    timespec_diff(&realtime, &boottime, &tmp);
+    timespec_add(&tmp, &time_up, &createtime);
+#if 0
+    printf("real time: %ld,%ld\n", realtime.tv_sec, realtime.tv_nsec);
+    printf("boot time: %ld,%ld\n", boottime.tv_sec, boottime.tv_nsec);
+    printf("time up: %ld,%ld\n", time_up.tv_sec, time_up.tv_nsec);
+    printf("create time: %ld,%ld\n", createtime.tv_sec, createtime.tv_nsec);
+#endif
+    timespec2str(b, sizeof(b), &createtime);
+    printf("Create time of %s was %s\n", dev_name, b);
 }
 
 static int
@@ -654,7 +761,6 @@ main(int argc, char * argv[])
     uint8_t inqBuff[MAX_Q_LEN][INQ_REPLY_LEN];
     sg_io_hdr_t io_hdr[MAX_Q_LEN];
     sg_io_hdr_t rio_hdr;
-    char * file_name = 0;
     char ebuff[EBUFF_SZ];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
     const char * second_fname = NULL;
@@ -668,6 +774,8 @@ main(int argc, char * argv[])
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-3", argv[k], 2))
             do_v3_only = true;
+        else if (0 == memcmp("-c", argv[k], 2))
+            create_time = true;
         else if (0 == memcmp("-f", argv[k], 2))
             do_fork = true;
         else if (0 == memcmp("-h", argv[k], 2)) {
@@ -838,6 +946,11 @@ main(int argc, char * argv[])
         goto out;
     }
     printf("Linux sg driver version: %d\n", sg_drv_ver_num);
+
+    if (create_time && (sg_drv_ver_num > 40030)) {
+        pr_create_dev_time(sg_fd, file_name);
+        goto out;
+    }
 
     if (nw_given) {             /* time ioctl(SG_GET_NUM_WAITING) */
         int nw, sum_nw;
