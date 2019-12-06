@@ -272,7 +272,7 @@ testonline ()
   RC=$?
 
   # Handle in progress of becoming ready and unit attention
-  while [ $RC = 2 -o $RC = 6 ] && [ $ctr -le 30 ] ; do
+  while [ $RC = 2 -o $RC = 6 ] && [ $ctr -lt $timeout ] ; do
     if [ $RC = 2 ] && [ "$RMB" != "1" ] ; then
       echo -n "."
       let LN+=1
@@ -1122,6 +1122,7 @@ if [ "@$1" = @--help ] || [ "@$1" = @-h ] || [ "@$1" = "@-?" ] ; then
     echo " -m      update multipath devices           [default: disabled]"
     echo " -r      enables removing of devices        [default: disabled]"
     echo " -s      look for resized disks and reload associated multipath devices, if applicable"
+    echo " -t      timeout for testing if device is online. Test is skipped if 0"
     echo " -u      look for existing disks that have been remapped"
     echo " -V      print version date then exit"
     echo " -w      scan for target device IDs 0--15   [default: 0--7]"
@@ -1147,6 +1148,7 @@ if [ "@$1" = @--help ] || [ "@$1" = @-h ] || [ "@$1" = "@-?" ] ; then
     echo "--resize:        same as -s"
     echo "--sparselun:     Tell kernel to support sparse LUN numbering"
     echo "--sync/nosync:   Issue a sync / no sync [default: sync if remove]"
+    echo "--timeout:       same as -t"
     echo "--update:        same as -u"
     echo "--version:       same as -V"
     echo "--wide:          same as -w"
@@ -1207,6 +1209,7 @@ sync=1
 existing_targets=1
 mp_enable=
 lipreset=-1
+timeout=30
 declare -i scan_flags=0
 ignore_rev=0
 
@@ -1226,6 +1229,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     m) mp_enable=1 ;;
     r) remove=1 ;;
     s) resize=1; mp_enable=1 ;;
+    t) timeout=$2 ; shift ;;
     u) update=1 ;;
     w) opt_idsearch=$(seq 0 15) ;;
     -alltargets)  existing_targets=;;
@@ -1248,6 +1252,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     -remove)      remove=1 ;;
     -reportlun2) scan_flags=$((scan_flags|0x20000)) ;;
     -resize) resize=1;;
+    -timeout) timeout=$2 ; shift ;;
     -sparselun) scan_flags=$((scan_flags|0x40)) ;;
     -sync) sync=2 ;;
     -update) update=1;;
