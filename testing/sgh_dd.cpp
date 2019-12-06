@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.53 20191119";
+static const char * version_str = "1.55 20191201";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -174,6 +174,7 @@ struct flags_t {
     bool masync;        /* more async sg v4 driver flag */
     bool mmap;
     bool mrq_immed;     /* mrq submit non-blocking */
+    bool mrq_svb;       /* mrq shared_variable_block, for sg->sg copy */
     bool no_dur;
     bool noshare;
     bool no_unshare;    /* leave it for driver close/release */
@@ -336,6 +337,7 @@ static atomic<int> num_abort_req(0);
 static atomic<int> num_abort_req_success(0);
 static atomic<int> num_mrq_abort_req(0);
 static atomic<int> num_mrq_abort_req_success(0);
+static atomic<long> num_waiting_calls(0);
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
@@ -374,10 +376,17 @@ static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
 static int exit_status = 0;
 static volatile bool swait_reported = false;
+static bool after1 = false;
 
 static mutex rand_lba_mutex;
 
 static const char * my_name = "sgh_dd: ";
+
+static const char * mrq_blk_s = "mrq: ordinary blocking";
+static const char * mrq_vb_s = "mrq: variable blocking";
+static const char * mrq_svb_s = "mrq: shared variable blocking (svb)";
+static const char * mrq_s_nb_s = "mrq: submit non-blocking";
+static const char * mrq_nw_nb_s = "mrq: waitless non-blocking";
 
 
 #ifdef __GNUC__
@@ -806,10 +815,10 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,masync,mmap,mrq_immed,nodur, "
-            "noshare\n"
-            "                no_waitq,noxfer,null,qtail,same_fds,v3,v4,"
-            "wq_excl]\n"
+            "                dsync,excl,fua,masync,mmap,mrq_immed,mrq_svb,"
+            "nodur,\n"
+            "                noshare,no_waitq,noxfer,null,qtail,same_fds,"
+            "v3,v4,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
@@ -898,6 +907,8 @@ page3:
             "    mrq_immed    if mrq active, do submit non-blocking (def: "
             "ordered\n"
             "                 blocking)\n"
+            "    mrq_svb     if mrq and sg->sg copy, do shared_variable_"
+            "blocking\n"
             "    nodur       turns off command duration calculations\n"
             "    noshare     if IFILE and OFILE are sg devices, don't set "
             "up sharing\n"
@@ -1066,6 +1077,7 @@ mrq_abort_thread(void * v_maip)
         pr2serr_lk("%s: from_id=%d: to abort mrq_pack_id=%d\n", __func__,
                    l_mai.from_tid, l_mai.mrq_id);
     res = ioctl(l_mai.fd, SG_GET_NUM_WAITING, &n);
+    ++num_waiting_calls;
     if (res < 0) {
         err = errno;
         pr2serr_lk("%s: ioctl(SG_GET_NUM_WAITING) failed: %s [%d]\n",
@@ -1537,6 +1549,7 @@ fini:
     }
     if (own_infd && (rep->infd >= 0)) {
         if (vb && (FT_SG == clp->in_type)) {
+            ++num_waiting_calls;
             if (ioctl(rep->infd, SG_GET_NUM_WAITING, &n) >= 0) {
                 if (n > 0)
                     pr2serr_lk("%s: tid=%d: num_waiting=%d prior close(in)\n",
@@ -1551,6 +1564,7 @@ fini:
     }
     if (own_outfd && (rep->outfd >= 0)) {
         if (vb && (FT_SG == clp->out_type)) {
+            ++num_waiting_calls;
             if (ioctl(rep->outfd, SG_GET_NUM_WAITING, &n) >= 0) {
                 if (n > 0)
                     pr2serr_lk("%s: tid=%d: num_waiting=%d prior "
@@ -2066,10 +2080,19 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     b_len = sizeof(b);
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
-    if (clp->in_flags.no_waitq || clp->out_flags.no_waitq)
+    if (clp->in_flags.no_waitq || clp->out_flags.no_waitq) {
         ctlop->flags |= SGV4_FLAG_NO_WAITQ;     /* waitless non-blocking */
-    else
+	if (!after1 && (clp->debug > 1)) {
+	    after1 = true;
+	    pr2serr_lk("%s: %s\n", __func__, mrq_nw_nb_s);
+	}
+    } else {
         ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
+	if (!after1 && (clp->debug > 1)) {
+	    after1 = true;
+	    pr2serr_lk("%s: %s\n", __func__, mrq_s_nb_s);
+	}
+    }
     if (clp->debug > 4) {
         pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IOSUBMIT):\n",
                    __func__);
@@ -2087,6 +2110,7 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     }
     /* fetch first half */
     for (k = 0; k < 100000; ++k) {
+        ++num_waiting_calls;
         res = ioctl(fd, SG_GET_NUM_WAITING, &nwait);
         if (res < 0) {
             err = errno;
@@ -2154,6 +2178,7 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
         goto fini;
     /* fetch remaining */
     for (k = 0; k < 100000; ++k) {
+        ++num_waiting_calls;
         res = ioctl(fd, SG_GET_NUM_WAITING, &nwait);
         if (res < 0) {
             pr2serr_lk("%s: ioctl(SG_GET_NUM_WAITING)-->%d, errno=%d: %s\n",
@@ -2393,7 +2418,6 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
                                   sizeof(*aa_v4p), 1);
                 }
             }
-            fd_ctl.flags = SGV4_FLAG_MULTIPLE_REQS;
             fd_ctl.dout_xferp = (uint64_t)aa_v4p;        /* request array */
             fd_ctl.dout_xfer_len = num_fd * sizeof(*aa_v4p);
             fd_ctl.din_xferp = (uint64_t)aa_v4p;         /* response array */
@@ -2424,7 +2448,6 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
                                   sizeof(*aa_v4p), 1);
                 }
             }
-            o_fd_ctl.flags = SGV4_FLAG_MULTIPLE_REQS;
             o_fd_ctl.dout_xferp = (uint64_t)aa_v4p;     /* request array */
             o_fd_ctl.dout_xfer_len = o_num_fd * sizeof(*aa_v4p);
             o_fd_ctl.din_xferp = (uint64_t)aa_v4p;      /* response array */
@@ -2438,14 +2461,37 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         goto fini;
     }
 
-    if (clp->unbalanced_mrq)
+    if (clp->unbalanced_mrq) {
+	if (!after1 && (clp->debug > 1)) {
+	    after1 = true;
+	    pr2serr_lk("%s: unbalanced %s\n", __func__, mrq_vb_s);
+	}
         res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
-    else {
+    } else {
         if (clp->mrq_async) {
-            iosub_str = "SUBMIT(variable)";
+            iosub_str = "SUBMIT(variable_blocking)";
+	    if (!after1 && (clp->debug > 1)) {
+	        after1 = true;
+	        pr2serr_lk("%s: %s\n", __func__, mrq_vb_s);
+	    }
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
-        } else
+        } else if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb) {
+            ctl_v4.flags |= SGV4_FLAG_SHARE;
+            iosub_str = "SUBMIT(shared_variable_blocking)";
+	    if (!after1 && (clp->debug > 1)) {
+	        after1 = true;
+	        pr2serr_lk("%s: %s\n", __func__, mrq_svb_s);
+	    }
+// v4hdr_out_lk("cop: shared_variable_blocking", &ctl_v4, id);
+            res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
+        } else {
+            iosub_str = "SG_IO(ordered_blocking)";
+	    if (!after1 && (clp->debug > 1)) {
+	        after1 = true;
+	        pr2serr_lk("%s: %s\n", __func__, mrq_blk_s);
+	    }
             res = ioctl(fd, SG_IO, &ctl_v4);
+        }
     }
     if (res < 0) {
         pr2serr_lk("%s: ioctl(SG_IO%s, %s)-->%d, errno=%d: %s\n",
@@ -2545,7 +2591,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         crwp = "reading";
     }
     if (qhead)
-	qtail = false;		/* qhead takes precedence */
+        qtail = false;          /* qhead takes precedence */
     if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, blk, wr, fua,
                           dpo)) {
         pr2serr_lk("%sbad cdb build, start_blk=%" PRId64 ", blocks=%d\n",
@@ -2719,10 +2765,11 @@ do_v4:
             res = ioctl(fd, SG_IOABORT, h4p);
             if (res < 0) {
                 err = errno;
-                if (ENODATA == err)
-                    pr2serr_lk("%s: ioctl(SG_IOABORT) no match on "
-                               "pack_id=%d\n", __func__, pack_id);
-                else
+                if (ENODATA == err) {
+                    if (clp->debug > 2)
+                        pr2serr_lk("%s: ioctl(SG_IOABORT) no match on "
+                                   "pack_id=%d\n", __func__, pack_id);
+                } else
                     pr2serr_lk("%s: ioctl(SG_IOABORT) failed: %s [%d]\n",
                                __func__, safe_strerror(err), err);
             } else {
@@ -3177,6 +3224,10 @@ bypass:
         }
     }
 fini:
+    t = 1;
+    res = ioctl(fd, SG_SET_DEBUG, &t);  /* more info in /proc/scsi/sg/debug */
+    if (res < 0)
+        perror("sgh_dd: SG_SET_DEBUG error");
     return (res < 0) ? 0 : num;
 }
 
@@ -3220,8 +3271,12 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
             fp->mmap = true;
+        else if (0 == strcmp(cp, "mrq_imm"))
+            fp->mrq_immed = true;
         else if (0 == strcmp(cp, "mrq_immed"))
             fp->mrq_immed = true;
+        else if (0 == strcmp(cp, "mrq_svb"))
+            fp->mrq_svb = true;
         else if (0 == strcmp(cp, "nodur"))
             fp->no_dur = true;
         else if (0 == strcmp(cp, "no_dur"))
@@ -3596,11 +3651,11 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
 #endif
     if (version_given) {
         pr2serr("%s%s\n", my_name, version_str);
-        return 0;
+        return SG_LIB_OK_FALSE;
     }
     if (clp->help > 0) {
         usage(clp->help);
-        return 0;
+        return SG_LIB_OK_FALSE;
     }
     if (clp->bs <= 0) {
         clp->bs = DEF_BLOCK_SIZE;
@@ -3724,6 +3779,8 @@ main(int argc, char * argv[])
     }
 
     res = parse_cmdline_sanity(argc, argv, clp, inf, outf, out2f, outregf);
+    if (SG_LIB_OK_FALSE == res)
+        return 0;
     if (res)
         return res;
 
@@ -4247,8 +4304,12 @@ fini:
         pr2serr("Number of successful MRQ Aborts: %d\n",
                 num_mrq_abort_req_success.load());
     }
-    if (clp->debug > 3)
-        pr2serr("Final pack_id=%d, mrq_id=%d\n", mono_pack_id.load(),
-                mono_mrq_id.load());
+    if (clp->debug > 1) {
+        if (clp->debug > 3)
+            pr2serr("Final pack_id=%d, mrq_id=%d\n", mono_pack_id.load(),
+                    mono_mrq_id.load());
+        pr2serr("Number of SG_GET_NUM_WAITING calls=%ld\n",
+                num_waiting_calls.load());
+    }
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

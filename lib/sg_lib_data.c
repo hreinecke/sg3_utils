@@ -19,7 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.68 20190904";/* spc5r22, sbc4r17 */
+const char * sg_lib_version_str = "2.69 20191204";
+/* spc5r22, sbc4r17, zbc2r04 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -529,10 +530,10 @@ struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
 /* Zoning in [0x95] service actions */
 struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0x0, PDT_ZBC, "Report zones"},
-    {0x6, PDT_ZBC, "Report realms"},            /* 19-032r3 */
-    {0x7, PDT_ZBC, "Report zone domains"},      /* 19-032r3 */
-    {0x8, PDT_ZBC, "Zone activate"},            /* 19-032r3 */
-    {0x9, PDT_ZBC, "Zone query"},               /* 19-032r3 */
+    {0x6, PDT_ZBC, "Report realms"},            /* zbc2r04 */
+    {0x7, PDT_ZBC, "Report zone domains"},      /* zbc2r04 */
+    {0x8, PDT_ZBC, "Zone activate"},            /* zbc2r04 */
+    {0x9, PDT_ZBC, "Zone query"},               /* zbc2r04 */
     {0xffff, 0, NULL},
 };
 

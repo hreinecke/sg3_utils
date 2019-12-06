@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.79 20191001";    /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.80 20191205";    /* spc5r22 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -5049,6 +5049,19 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
             break;
         case 0xa:
             printf("  Write rule violations:");
+            if ((pl < 8) || (num < 8)) {
+                if (num < 8)
+                    pr2serr("\n    truncated by response length, expected "
+                            "at least 8 bytes\n");
+                else
+                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
+                            pl);
+                break;
+            }
+            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+            break;
+        case 0xb:       /* added zbc2r04 */
+            printf("  Maximum implicitly open or before required zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     pr2serr("\n    truncated by response length, expected "
