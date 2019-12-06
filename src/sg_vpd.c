@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.55 20190913";  /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.56 20191204";  /* spc5r22 + sbc4r17 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2526,7 +2526,7 @@ decode_b5_vpd(uint8_t * b, int len, int do_hex, int pdt)
     }
 }
 
-/* VPD_ZBC_DEV_CHARS 0xb6  sbc or zbc */
+/* VPD_ZBC_DEV_CHARS 0xb6  sbc or zbc [zbc2r04] */
 static void
 decode_zbdc_vpd(uint8_t * b, int len, int do_hex)
 {
@@ -2541,7 +2541,24 @@ decode_zbdc_vpd(uint8_t * b, int len, int do_hex)
                 "short=%d\n", len);
         return;
     }
-    printf("  URSWRZ type: %d\n", !!(b[4] & 0x1));
+    printf("  Zoned block device extension: ");
+    switch ((b[4] >> 4) & 0xf) {
+    case 0:
+        printf("not reported\n");
+        break;
+    case 1:
+        printf("host aware zone block device model\n");
+        break;
+    case 2:
+        printf("Domains and realms zone block device model\n");
+        break;
+    default:
+        printf("Unknown [0x%x]\n", (b[4] >> 4) & 0xf);
+        break;
+    }
+    /* activation aligned on realm boundaries */
+    printf("  AAORB: %d\n", !!(b[4] & 0x2));
+    printf("  URSWRZ: %d\n", !!(b[4] & 0x1));
     u = sg_get_unaligned_be32(b + 8);
     printf("  Optimal number of open sequential write preferred zones: ");
     if (SG_LIB_UNBOUNDED_32BIT == u)

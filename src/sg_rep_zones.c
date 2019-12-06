@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.17 20190113";
+static const char * version_str = "1.18 20191204";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -112,6 +112,7 @@ h_twoormore:
             "    0x5    list zones with a zone condition of FULL\n"
             "    0x6    list zones with a zone condition of READ ONLY\n"
             "    0x7    list zones with a zone condition of OFFLINE\n"
+            "    0x8    list zones with a zone condition of INACTIVE\n"
             "    0x10   list zones with RWP Recommended set to true\n"
             "    0x11   list zones with Non-sequential write resources "
             "active set to true\n"
@@ -202,6 +203,12 @@ zone_type_str(int zt, char * b, int blen, int vb)
     case 3:
         cp = "Sequential write preferred";
         break;
+    case 4:
+        cp = "Sequential or before required";
+        break;
+    case 5:
+        cp = "Gap";
+        break;
     default:
         cp = NULL;
         break;
@@ -238,6 +245,9 @@ zone_condition_str(int zc, char * b, int blen, int vb)
         break;
     case 4:
         cp = "Closed";
+        break;
+    case 5:
+        cp = "Inactive";
         break;
     case 0xd:
         cp = "Read only";

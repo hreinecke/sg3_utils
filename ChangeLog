@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20191119] [svn: r835]
+Changelog for sg3_utils-1.45 [20191206] [svn: r836]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -19,6 +19,7 @@ Changelog for sg3_utils-1.45 [20191119] [svn: r835]
   - sg_raw: fix --send bug when using stdin
   - sg_vpd: 3pc VPD page add copy group descriptor
     - add --examine option
+    - new zoned block device char. field (zbc2r04)
   - sg_read_buffer: decode read microcode status page
     - add --inhex=FN option
   - sg_request: add --error option, replaces opcode
@@ -33,13 +34,13 @@ Changelog for sg3_utils-1.45 [20191119] [svn: r835]
     statistics lpage (sbc4r17)
     - zoned block device statistics log page: shorten
       counter fields from 8 to 4 bytes (zbc2r02)
+      - new field in this log page (zbc2r04)
     - change '-ll' option to suppress subpages=0xff
       apart from page 0x0,0xff. Used three times:
       list all pages and subpages names reported
   - sg_reassign: for defect list format 6 (vendor
     specfic) don't try to decode
-  - zbc: preparatory work for Zoned domains and
-    realms; add new zbc service actions [19-032r3]
+  - sg_rep_zones: expand some fields per zbc2r04
   - inhex directory: new, contains ASCII hex files
     that can be used with the '--inhex=' option
   - sg_lib: add sg_t10_uuid_desig2str()
@@ -52,6 +53,7 @@ Changelog for sg3_utils-1.45 [20191119] [svn: r835]
     - sg_get_num()+sg_get_llnum(): add 'e' decoding,
     - asc/ascq match asc-num.txt @t10 20191014
       exabytes; allow addition (e.g. --count=3+1k)
+    - new zbc2r04 service actions
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
   - scripts: update 54-before-scsi-sg3_id.rules,
     scsi-enable-target-scan.sh and
