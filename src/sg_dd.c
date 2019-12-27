@@ -24,7 +24,7 @@
  * command. The actual size of the SCSI READ or WRITE command block can be
  * selected with the "cdbsz" argument.
  *
- * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
+ * This version is designed for the linux kernel 2, 3, 4 and 5 series.
  */
 
 #define _XOPEN_SOURCE 600
@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.07 20190618";
+static const char * version_str = "6.08 20191220";
 
 
 #define ME "sg_dd: "
@@ -142,6 +142,7 @@ static int dry_run = 0;
 
 static bool do_time = false;
 static bool start_tm_valid = false;
+static bool do_verify = false;          /* when false: do copy */
 static int verbose = 0;
 static int blk_sz = 0;
 static int max_uas = MAX_UNIT_ATTENTIONS;
@@ -203,8 +204,8 @@ print_stats(const char * str)
         pr2serr("  remaining block count=%" PRId64 "\n", dd_count);
     pr2serr("%s%" PRId64 "+%d records in\n", str, in_full - in_partial,
             in_partial);
-    pr2serr("%s%" PRId64 "+%d records out\n", str, out_full - out_partial,
-            out_partial);
+    pr2serr("%s%" PRId64 "+%d records %s\n", str, out_full - out_partial,
+            out_partial, (do_verify ? "verified" : "out"));
     if (oflag.sparse)
         pr2serr("%s%" PRId64 " bypassed records out\n", str, out_sparse_num);
     if (recovered_errs > 0)
@@ -411,12 +412,17 @@ usage()
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
             "    --dry-run    do preparation but bypass copy (or read)\n"
-            "    --help      print out this usage message then exit\n"
-            "    --verbose   same as 'verbose=1', can be used multiple "
+            "    --help|-h    print out this usage message then exit\n"
+            "    --verbose|-v   same as 'verbose=1', can be used multiple "
             "times\n"
-            "    --version   print version information then exit\n\n"
-            "copy from IFILE to OFILE, similar to dd command; "
-            "specialized for SCSI devices\n");
+            "    --verify|-x    do verify/compare rather than copy "
+            "(OFILE must\n"
+            "                   be a sg device)\n"
+            "    --version|-V    print version information then exit\n\n"
+            "Copy from IFILE to OFILE, similar to dd command; "
+            "specialized for SCSI devices.\nIf the --verify option is given "
+            " then IFILE is read and that data is used to\ncompare with "
+            "OFILE using the VERIFY(n) SCSI command (with BYTCHK=1).\n");
 }
 
 
@@ -508,10 +514,12 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 
 static int
 sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
-                  int64_t start_block, bool write_true, bool fua, bool dpo)
+                  int64_t start_block, bool is_verify, bool write_true,
+                  bool fua, bool dpo)
 {
     int sz_ind;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
+    int ve_opcode[] = {0xff /* no VERIFY(6) */, 0x2f, 0xaf, 0x8f};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
 
     memset(cdbp, 0, cdb_sz);
@@ -522,6 +530,10 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
     switch (cdb_sz) {
     case 6:
         sz_ind = 0;
+        if (is_verify && write_true) {
+            pr2serr(ME "there is no VERIFY(6), choose a larger cdbsz\n");
+            return 1;
+        }
         cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                                rd_opcode[sz_ind]);
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
@@ -544,8 +556,11 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         break;
     case 10:
         sz_ind = 1;
-        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
-                                               rd_opcode[sz_ind]);
+        if (is_verify && write_true)
+            cdbp[0] = ve_opcode[sz_ind];
+        else
+            cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
+                                             rd_opcode[sz_ind]);
         sg_put_unaligned_be32(start_block, cdbp + 2);
         sg_put_unaligned_be16(blocks, cdbp + 7);
         if (blocks & (~0xffff)) {
@@ -556,15 +571,21 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         break;
     case 12:
         sz_ind = 2;
-        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
-                                               rd_opcode[sz_ind]);
+        if (is_verify && write_true)
+            cdbp[0] = ve_opcode[sz_ind];
+        else
+            cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
+                                             rd_opcode[sz_ind]);
         sg_put_unaligned_be32(start_block, cdbp + 2);
         sg_put_unaligned_be32(blocks, cdbp + 6);
         break;
     case 16:
         sz_ind = 3;
-        cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
-                                               rd_opcode[sz_ind]);
+        if (is_verify && write_true)
+            cdbp[0] = ve_opcode[sz_ind];
+        else
+            cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
+                                             rd_opcode[sz_ind]);
         sg_put_unaligned_be64(start_block, cdbp + 2);
         sg_put_unaligned_be32(blocks, cdbp + 10);
         break;
@@ -590,14 +611,14 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
             uint64_t * io_addrp)
 {
     bool info_valid;
-    int res, k, slen;
+    int res, slen;
     const uint8_t * sbp;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
-    if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, false,
-                          ifp->fua, ifp->dpo)) {
+    if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, do_verify,
+                          false, ifp->fua, ifp->dpo)) {
         pr2serr(ME "bad rd cdb build, from_block=%" PRId64 ", blocks=%d\n",
                 from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
@@ -617,12 +638,9 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
 
-    if (verbose > 2) {
-        pr2serr("    read cdb: ");
-        for (k = 0; k < ifp->cdbsz; ++k)
-            pr2serr("%02x ", rdCmd[k]);
-        pr2serr("\n");
-    }
+    if (verbose > 2)
+        sg_print_command_len(rdCmd, ifp->cdbsz);
+
     while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         ;
@@ -987,22 +1005,23 @@ err_out:
 
 
 /* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
-   SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
-   SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
-   -1 -> unrecoverable error + others */
+ * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
+ * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
+ * -1 -> unrecoverable error + others.  Note: if do_verify is true then does
+ * a VERIFY rather tahn a WRITE command. */
 static int
 sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
          int bs, const struct flags_t * ofp, bool * diop)
 {
     bool info_valid;
-    int res, k;
+    int res;
     uint64_t io_addr = 0;
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
 
-    if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, true, ofp->fua,
-                          ofp->dpo)) {
+    if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, do_verify,
+                          true, ofp->fua, ofp->dpo)) {
         pr2serr(ME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
                 to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
@@ -1022,12 +1041,9 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
 
-    if (verbose > 2) {
-        pr2serr("    write cdb: ");
-        for (k = 0; k < ofp->cdbsz; ++k)
-            pr2serr("%02x ", wrCmd[k]);
-        pr2serr("\n");
-    }
+    if (verbose > 2)
+        sg_print_command_len(wrCmd, ofp->cdbsz);
+
     while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         ;
@@ -1699,6 +1715,10 @@ main(int argc, char * argv[])
             if (n > 0)
                 version_given = true;
             res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'x');
+            if (n > 0)
+                do_verify = true;
+            res += n;
             if (res < (keylen - 1)) {
                 pr2serr("Unrecognised short option in '%s', try '--help'\n",
                         key);
@@ -1714,7 +1734,9 @@ main(int argc, char * argv[])
         } else if (0 == strncmp(key, "--verb", 6)) {
             verbose_given = true;
             ++verbose;
-        } else if (0 == strncmp(key, "--vers", 6))
+        } else if (0 == strncmp(key, "--veri", 6))
+            do_verify = true;
+        else if (0 == strncmp(key, "--vers", 6))
             version_given = true;
         else {
             pr2serr("Unrecognized option '%s'\n", key);
@@ -1801,7 +1823,19 @@ main(int argc, char * argv[])
         if (outfd < -1)
             return -outfd;
     }
-
+    if (do_verify) {
+        if (! (FT_SG & out_type)) {
+            pr2serr("--verify only supported when OFILE is a sg device or "
+                    "oflag=sgio\n");
+            ret = SG_LIB_CONTRADICT;
+            goto bypass_copy;
+        }
+        if (oflag.sparse) {
+            pr2serr("--verify cannot be used with oflag=sparse\n");
+            ret = SG_LIB_CONTRADICT;
+            goto bypass_copy;
+        }
+    }
     if (out2f[0]) {
         out2_type = dd_filetype(out2f);
         if ((out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
@@ -2124,8 +2158,8 @@ main(int argc, char * argv[])
                     blocks_per = (buf_sz + blk_sz - 1) / blk_sz;
                     if (blocks_per < blocks) {
                         blocks = blocks_per;
-                        pr2serr("Reducing write to %d blocks per loop\n",
-                                blocks);
+                        pr2serr("Reducing %s to %d blocks per loop\n",
+                                (do_verify ? "verify" : "write"), blocks);
                     } else
                         break;
                 } else if ((SG_LIB_CAT_UNIT_ATTENTION == ret) && first) {
@@ -2145,8 +2179,8 @@ main(int argc, char * argv[])
                 } else if (ret < 0)
                     break;
                 else if (retries_tmp > 0) {
-                    pr2serr(">>> retrying a sgio write, lba=0x%" PRIx64 "\n",
-                            (uint64_t)seek);
+                    pr2serr(">>> retrying a sgio %s, lba=0x%" PRIx64 "\n",
+                            (do_verify ? "verify" : "write"), (uint64_t)seek);
                     --retries_tmp;
                     ++num_retries;
                     if (unrecovered_errs > 0)

@@ -58,7 +58,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.35 20190501";
+static const char * version_str = "1.36 20191220";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -295,7 +295,6 @@ sg_bread(int sg_fd, uint8_t * buff, int blocks, int64_t from_block, int bs,
          int cdbsz, bool fua, bool dpo, bool * diop, bool do_mmap,
          bool no_dxfer)
 {
-    int k;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -329,10 +328,10 @@ sg_bread(int sg_fd, uint8_t * buff, int blocks, int64_t from_block, int bs,
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = pack_id_count++;
     if (verbose > 1) {
-        pr2serr( "    read cdb: ");
-        for (k = 0; k < cdbsz; ++k)
-            pr2serr( "%02x ", rdCmd[k]);
-        pr2serr( "\n");
+        char b[128];
+
+        pr2serr("    READ cdb: %s\n",
+                sg_get_command_str(rdCmd, cdbsz, false, sizeof(b), b));
     }
 
     if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {

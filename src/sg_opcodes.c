@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.66 20190113";    /* spc5r20 */
+static const char * version_str = "0.67 20191220";    /* spc5r20 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -195,7 +195,7 @@ do_rsoc(struct sg_pt_base * ptvp, bool rctd, int rep_opts, int rq_opcode,
         int rq_servact, void * resp, int mx_resp_len, int * act_resp_lenp,
         bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -213,10 +213,11 @@ do_rsoc(struct sg_pt_base * ptvp, bool rctd, int rep_opts, int rq_opcode,
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rsoc_cdb + 6);
 
     if (verbose) {
-        pr2serr("    %s cdb: ", rsoc_s);
-        for (k = 0; k < RSOC_CMD_LEN; ++k)
-            pr2serr("%02x ", rsoc_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", rsoc_s,
+                sg_get_command_str(rsoc_cdb, RSOC_CMD_LEN, false,
+                                   sizeof(b), b));
     }
     clear_scsi_pt_obj(ptvp);
     set_scsi_pt_cdb(ptvp, rsoc_cdb, sizeof(rsoc_cdb));
@@ -255,7 +256,7 @@ static int
 do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
          int * act_resp_lenp, bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -267,10 +268,11 @@ do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rstmf_cdb + 6);
 
     if (verbose) {
-        pr2serr("    %s: ", rstmf_s);
-        for (k = 0; k < RSTMF_CMD_LEN; ++k)
-            pr2serr("%02x ", rstmf_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", rstmf_s,
+                sg_get_command_str(rstmf_cdb, RSTMF_CMD_LEN, false,
+                                   sizeof(b), b));
     }
     clear_scsi_pt_obj(ptvp);
     set_scsi_pt_cdb(ptvp, rstmf_cdb, sizeof(rstmf_cdb));

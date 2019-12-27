@@ -39,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.29 20190516";      /* spc5r22 */
+static const char * version_str = "1.30 20191220";      /* spc5r22 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -163,7 +163,7 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
                      uint32_t rb_offset, void * resp, int mx_resp_len,
                      int * residp, bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rb10_cb[SG_READ_BUFFER_10_CMDLEN] =
           {SG_READ_BUFFER_10_CMD, 0, 0, 0,  0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -176,10 +176,11 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     sg_put_unaligned_be24(rb_offset, rb10_cb + 3);
     sg_put_unaligned_be24(mx_resp_len, rb10_cb + 6);
     if (verbose) {
-        pr2serr("    Read buffer(10) cdb: ");
-        for (k = 0; k < SG_READ_BUFFER_10_CMDLEN; ++k)
-            pr2serr("%02x ", rb10_cb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Read buffer(10) cdb: %s\n",
+                sg_get_command_str(rb10_cb, SG_READ_BUFFER_10_CMDLEN, false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj();
@@ -226,7 +227,7 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
                      uint64_t rb_offset, void * resp, int mx_resp_len,
                      int * residp, bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rb16_cb[SG_READ_BUFFER_16_CMDLEN] =
           {SG_READ_BUFFER_16_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
@@ -240,10 +241,11 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     sg_put_unaligned_be24(mx_resp_len, rb16_cb + 11);
     rb16_cb[14] = (uint8_t)rb_id;
     if (verbose) {
-        pr2serr("    Read buffer(16) cdb: ");
-        for (k = 0; k < SG_READ_BUFFER_16_CMDLEN; ++k)
-            pr2serr("%02x ", rb16_cb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Read buffer(16) cdb: %s\n",
+                sg_get_command_str(rb16_cb, SG_READ_BUFFER_16_CMDLEN, false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj();

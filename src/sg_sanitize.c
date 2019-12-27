@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20190913";
+static const char * version_str = "1.14 20191220";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -183,7 +183,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             int param_lst_len)
 {
     bool immed;
-    int k, ret, res, sense_cat, timeout;
+    int ret, res, sense_cat, timeout;
     uint8_t san_cdb[SANITIZE_OP_LEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -217,10 +217,11 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     sg_put_unaligned_be16((uint16_t)param_lst_len, san_cdb + 7);
 
     if (op->verbose > 1) {
-        pr2serr("    Sanitize cdb: ");
-        for (k = 0; k < SANITIZE_OP_LEN; ++k)
-            pr2serr("%02x ", san_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Sanitize cdb: %s\n",
+                sg_get_command_str(san_cdb, SANITIZE_OP_LEN, false,
+                                   sizeof(b), b));
         if (op->verbose > 2) {
             if (param_lst_len > 0) {
                 pr2serr("    Parameter list contents:\n");

@@ -37,7 +37,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.24 20190113";
+static const char * version_str = "1.25 20191220";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -97,7 +97,7 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
                     uint64_t lba, unsigned int num_lb, int to_secs,
                     bool noisy, int verbose)
 {
-    int res, ret, k, sense_cat;
+    int res, ret, sense_cat;
     uint8_t sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
                 {SYNCHRONIZE_CACHE16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0};
@@ -113,10 +113,11 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
     sg_put_unaligned_be32((uint32_t)num_lb, sc_cdb + 10);
 
     if (verbose) {
-        pr2serr("    synchronize cache(16) cdb: ");
-        for (k = 0; k < SYNCHRONIZE_CACHE16_CMDLEN; ++k)
-            pr2serr("%02x ", sc_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Synchronize cache(16) cdb: %s\n",
+                sg_get_command_str(sc_cdb, SYNCHRONIZE_CACHE16_CMDLEN, false,
+                                   sizeof(b), b));
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {

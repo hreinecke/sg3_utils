@@ -35,7 +35,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.10 20190113";
+static const char * version_str = "1.11 20191220";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -89,7 +89,7 @@ static int
 sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
                          bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t bcCDB[16] = {SG_SERVICE_ACTION_IN_16,
            BACKGROUND_CONTROL_SA, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
@@ -101,10 +101,11 @@ sg_ll_background_control(int sg_fd, unsigned int bo_ctl, unsigned int bo_time,
     if (bo_time)
         bcCDB[3] = bo_time;
     if (verbose) {
-        pr2serr("    %s cdb: ", cmd_name);
-        for (k = 0; k < (int)sizeof(bcCDB); ++k)
-            pr2serr("%02x ", bcCDB[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", cmd_name,
+                sg_get_command_str(bcCDB, (int)sizeof(bcCDB), false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj();

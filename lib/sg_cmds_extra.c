@@ -123,7 +123,7 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
                       void * resp, int alloc_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "Get LBA status(16)";
-    int k, res, s_cat, ret;
+    int res, s_cat, ret;
     uint8_t getLbaStatCmd[SERVICE_ACTION_IN_16_CMDLEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -136,10 +136,11 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
     sg_put_unaligned_be32((uint32_t)alloc_len, getLbaStatCmd + 10);
     getLbaStatCmd[14] = rt;
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            pr2ws("%02x ", getLbaStatCmd[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(getLbaStatCmd, SERVICE_ACTION_IN_16_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -196,7 +197,7 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
                        int vb)
 {
     static const char * const cdb_s = "Get LBA status(32)";
-    int k, res, s_cat, ret;
+    int res, s_cat, ret;
     uint8_t gls32_cmd[GLS32_CMD_LEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -211,10 +212,11 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
     sg_put_unaligned_be32(element_id, gls32_cmd + 24);
     sg_put_unaligned_be32((uint32_t)alloc_len, gls32_cmd + 28);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < GLS32_CMD_LEN; ++k)
-            pr2ws("%02x ", gls32_cmd[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(gls32_cmd, GLS32_CMD_LEN, false, sizeof(b),
+                                 b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -269,7 +271,7 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
                           bool extended, bool noisy, int vb)
 {
     static const char * const cdb_s = "Report target port groups";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t rtpg_cdb[MAINTENANCE_IN_CMDLEN] =
                          {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -280,10 +282,11 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
         rtpg_cdb[1] |= 0x20;
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rtpg_cdb + 6);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MAINTENANCE_IN_CMDLEN; ++k)
-            pr2ws("%02x ", rtpg_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rtpg_cdb, MAINTENANCE_IN_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -330,7 +333,7 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
                       int vb)
 {
     static const char * const cdb_s = "Set target port groups";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t stpg_cdb[MAINTENANCE_OUT_CMDLEN] =
                          {MAINTENANCE_OUT_CMD, SET_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -339,10 +342,11 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
 
     sg_put_unaligned_be32((uint32_t)param_len, stpg_cdb + 6);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MAINTENANCE_OUT_CMDLEN; ++k)
-            pr2ws("%02x ", stpg_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(stpg_cdb, MAINTENANCE_OUT_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_s);
             hex2stderr((const uint8_t *)paramp, param_len, -1);
@@ -382,7 +386,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
                        int vb)
 {
     static const char * const cdb_s = "Report referrals";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t repRef_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                          {SERVICE_ACTION_IN_16_CMD, REPORT_REFERRALS_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -394,10 +398,11 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
     if (one_seg)
         repRef_cdb[14] = 0x1;
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            pr2ws("%02x ", repRef_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(repRef_cdb, SERVICE_ACTION_IN_16_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -449,7 +454,7 @@ sg_ll_send_diag_pt(struct sg_pt_base * ptvp, int st_code, bool pf_bit,
                    bool noisy, int vb)
 {
     static const char * const cdb_s = "Send diagnostic";
-    int k, res, ret, s_cat, tmout;
+    int res, ret, s_cat, tmout;
     uint8_t senddiag_cdb[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -470,10 +475,11 @@ sg_ll_send_diag_pt(struct sg_pt_base * ptvp, int st_code, bool pf_bit,
         tmout = long_duration ? LONG_PT_TIMEOUT : DEF_PT_TIMEOUT;
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SEND_DIAGNOSTIC_CMDLEN; ++k)
-            pr2ws("%02x ", senddiag_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(senddiag_cdb, SEND_DIAGNOSTIC_CMDLEN,
+                                 false, sizeof(b), b));
         if (vb > 1) {
             if (paramp && param_len) {
                 pr2ws("    %s parameter list:\n", cdb_s);
@@ -532,7 +538,7 @@ sg_ll_receive_diag_pt(struct sg_pt_base * ptvp, bool pcv, int pg_code,
                       int * residp, bool noisy, int vb)
 {
     int resid = 0;
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     static const char * const cdb_s = "Receive diagnostic results";
     uint8_t rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
@@ -544,10 +550,11 @@ sg_ll_receive_diag_pt(struct sg_pt_base * ptvp, bool pcv, int pg_code,
     sg_put_unaligned_be16((uint16_t)mx_resp_len, rcvdiag_cdb + 3);
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < RECEIVE_DIAGNOSTICS_CMDLEN; ++k)
-            pr2ws("%02x ", rcvdiag_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rcvdiag_cdb, RECEIVE_DIAGNOSTICS_CMDLEN,
+                                 false, sizeof(b), b));
     }
     if (timeout_secs <= 0)
         timeout_secs = DEF_PT_TIMEOUT;
@@ -632,7 +639,7 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
                     void * resp, int mx_resp_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "Read defect(10)";
-    int res, k, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t rdef_cdb[READ_DEFECT10_CMDLEN] =
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -649,10 +656,11 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
         return -1;
     }
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < READ_DEFECT10_CMDLEN; ++k)
-            pr2ws("%02x ", rdef_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rdef_cdb, READ_DEFECT10_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -699,7 +707,7 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
                             bool noisy, int vb)
 {
     static const char * const cdb_s = "Read media serial number";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t rmsn_cdb[SERVICE_ACTION_IN_12_CMDLEN] =
                          {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -708,10 +716,11 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rmsn_cdb + 6);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SERVICE_ACTION_IN_12_CMDLEN; ++k)
-            pr2ws("%02x ", rmsn_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rmsn_cdb, SERVICE_ACTION_IN_12_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -759,7 +768,7 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
                      bool noisy, int vb)
 {
     static const char * const cdb_s = "Report identifying information";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t rii_cdb[MAINTENANCE_IN_CMDLEN] = {MAINTENANCE_IN_CMD,
                         REPORT_IDENTIFYING_INFORMATION_SA,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -770,10 +779,11 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
     rii_cdb[10] |= (itype << 1) & 0xfe;
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MAINTENANCE_IN_CMDLEN; ++k)
-            pr2ws("%02x ", rii_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rii_cdb, MAINTENANCE_IN_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -821,7 +831,7 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
                   bool noisy, int vb)
 {
     static const char * const cdb_s = "Set identifying information";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t sii_cdb[MAINTENANCE_OUT_CMDLEN] = {MAINTENANCE_OUT_CMD,
                          SET_IDENTIFYING_INFORMATION_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -831,10 +841,11 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
     sg_put_unaligned_be32((uint32_t)param_len, sii_cdb + 6);
     sii_cdb[10] |= (itype << 1) & 0xfe;
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MAINTENANCE_OUT_CMDLEN; ++k)
-            pr2ws("%02x ", sii_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(sii_cdb, MAINTENANCE_OUT_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_s);
             hex2stderr((const uint8_t *)paramp, param_len, -1);
@@ -901,7 +912,7 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
                      bool noisy, int vb)
 {
     static const char * const cdb_s = "Format unit";
-    int k, res, ret, s_cat, tmout;
+    int res, ret, s_cat, tmout;
     uint8_t fu_cdb[FORMAT_UNIT_CMDLEN] =
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -921,10 +932,10 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
         fu_cdb[4] |= (ffmt & 0x3);
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < 6; ++k)
-            pr2ws("%02x ", fu_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(fu_cdb, 6, false, sizeof(b), b));
         if (vb > 1) {
             if (param_len > 0) {
                 pr2ws("    %s parameter list:\n", cdb_s);
@@ -967,7 +978,7 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
                       int param_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "Reassign blocks";
-    int res, k, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t reass_cdb[REASSIGN_BLKS_CMDLEN] =
         {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -978,10 +989,11 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
     if (longlist)
         reass_cdb[1] |= 0x1;
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < REASSIGN_BLKS_CMDLEN; ++k)
-            pr2ws("%02x ", reass_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(reass_cdb, REASSIGN_BLKS_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (vb > 1) {
         pr2ws("    %s parameter list\n", cdb_s);
@@ -1022,7 +1034,7 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
                             int mx_resp_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "Persistent reservation in";
-    int res, k, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t prin_cdb[PERSISTENT_RESERVE_IN_CMDLEN] =
                  {PERSISTENT_RESERVE_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1033,10 +1045,11 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     sg_put_unaligned_be16((uint16_t)mx_resp_len, prin_cdb + 7);
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < PERSISTENT_RESERVE_IN_CMDLEN; ++k)
-            pr2ws("%02x ", prin_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(prin_cdb, PERSISTENT_RESERVE_IN_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -1085,7 +1098,7 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
                              int param_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "Persistent reservation out";
-    int res, k, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t prout_cdb[PERSISTENT_RESERVE_OUT_CMDLEN] =
                  {PERSISTENT_RESERVE_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1097,10 +1110,11 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     sg_put_unaligned_be16((uint16_t)param_len, prout_cdb + 7);
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < PERSISTENT_RESERVE_OUT_CMDLEN; ++k)
-            pr2ws("%02x ", prout_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(prout_cdb, PERSISTENT_RESERVE_OUT_CMDLEN,
+                                 false, sizeof(b), b));
         if (vb > 1) {
             pr2ws("    %s parameters:\n", cdb_s);
             hex2stderr((const uint8_t *)paramp, param_len, 0);
@@ -1160,7 +1174,7 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
                   int vb)
 {
     static const char * const cdb_s = "read long(10)";
-    int k, res, s_cat, ret;
+    int res, s_cat, ret;
     uint8_t readLong_cdb[READ_LONG10_CMDLEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1175,10 +1189,11 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
     sg_put_unaligned_be32((uint32_t)lba, readLong_cdb + 2);
     sg_put_unaligned_be16((uint16_t)xfer_len, readLong_cdb + 7);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < READ_LONG10_CMDLEN; ++k)
-            pr2ws("%02x ", readLong_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(readLong_cdb, READ_LONG10_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -1248,7 +1263,7 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
                   int vb)
 {
     static const char * const cdb_s = "read long(16)";
-    int k, res, s_cat, ret;
+    int res, s_cat, ret;
     uint8_t readLong_cdb[SERVICE_ACTION_IN_16_CMDLEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1264,10 +1279,11 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
     sg_put_unaligned_be64(llba, readLong_cdb + 2);
     sg_put_unaligned_be16((uint16_t)xfer_len, readLong_cdb + 12);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            pr2ws("%02x ", readLong_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(readLong_cdb, SERVICE_ACTION_IN_16_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -1337,7 +1353,7 @@ sg_ll_write_long10(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
                    int * offsetp, bool noisy, int vb)
 {
     static const char * const cdb_s = "write long(10)";
-    int k, res, s_cat, ret;
+    int res, s_cat, ret;
     uint8_t writeLong_cdb[WRITE_LONG10_CMDLEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1354,10 +1370,11 @@ sg_ll_write_long10(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     sg_put_unaligned_be32((uint32_t)lba, writeLong_cdb + 2);
     sg_put_unaligned_be16((uint16_t)xfer_len, writeLong_cdb + 7);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < (int)sizeof(writeLong_cdb); ++k)
-            pr2ws("%02x ", writeLong_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(writeLong_cdb, (int)sizeof(writeLong_cdb),
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -1415,7 +1432,7 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
                    int * offsetp, bool noisy, int vb)
 {
     static const char * const cdb_s = "write long(16)";
-    int k, res, s_cat, ret;
+    int res, s_cat, ret;
     uint8_t writeLong_cdb[SERVICE_ACTION_OUT_16_CMDLEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
@@ -1433,10 +1450,11 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     sg_put_unaligned_be64(llba, writeLong_cdb + 2);
     sg_put_unaligned_be16((uint16_t)xfer_len, writeLong_cdb + 12);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SERVICE_ACTION_OUT_16_CMDLEN; ++k)
-            pr2ws("%02x ", writeLong_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(writeLong_cdb, SERVICE_ACTION_OUT_16_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -1510,10 +1528,11 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
     sg_put_unaligned_be32((uint32_t)lba, v_cdb + 2);
     sg_put_unaligned_be16((uint16_t)veri_len, v_cdb + 7);
     if (vb > 1) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < VERIFY10_CMDLEN; ++k)
-            pr2ws("%02x ", v_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(v_cdb, VERIFY10_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 3) && bytchk && data_out && (data_out_len > 0)) {
             k = data_out_len > 4104 ? 4104 : data_out_len;
             pr2ws("    data_out buffer%s\n",
@@ -1587,10 +1606,11 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
     sg_put_unaligned_be32((uint32_t)veri_len, v_cdb + 10);
     v_cdb[14] = group_num & 0x1f;
     if (vb > 1) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < VERIFY16_CMDLEN; ++k)
-            pr2ws("%02x ", v_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(v_cdb, VERIFY16_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 3) && bytchk && data_out && (data_out_len > 0)) {
             k = data_out_len > 4104 ? 4104 : data_out_len;
             pr2ws("    data_out buffer%s\n",
@@ -1716,13 +1736,13 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
         slen = sizeof(sense_b);
     }
     if (vb) {
-        pr2ws("    %s cdb: ", cnamep);
         if (cdb_len < 32) {
-            for (k = 0; k < cdb_len; ++k)
-                pr2ws("%02x ", apt_cdb[k]);
-            pr2ws("\n");
+            char d[128];
+
+            pr2ws("    %s cdb: %s\n", cnamep,
+                  sg_get_command_str(apt_cdb, cdb_len, false, sizeof(d), d));
         } else {
-            pr2ws("\n");
+            pr2ws("    %s cdb:\n", cnamep);
             hex2stderr(apt_cdb, cdb_len, -1);
         }
     }
@@ -1821,7 +1841,7 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
                   void * resp, int mx_resp_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "read buffer(10)";
-    int res, k, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t rbuf_cdb[READ_BUFFER_CMDLEN] =
         {READ_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1832,10 +1852,11 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     sg_put_unaligned_be24((uint32_t)buffer_offset, rbuf_cdb + 3);
     sg_put_unaligned_be24((uint32_t)mx_resp_len, rbuf_cdb + 6);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < READ_BUFFER_CMDLEN; ++k)
-            pr2ws("%02x ", rbuf_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rbuf_cdb, READ_BUFFER_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -1882,7 +1903,7 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
                    void * paramp, int param_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "write buffer";
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1893,10 +1914,11 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     sg_put_unaligned_be24((uint32_t)buffer_offset, wbuf_cdb + 3);
     sg_put_unaligned_be24((uint32_t)param_len, wbuf_cdb + 6);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
-            pr2ws("%02x ", wbuf_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(wbuf_cdb, WRITE_BUFFER_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    %s parameter list", cdb_s);
             if (2 == vb) {
@@ -1949,7 +1971,7 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
                       uint32_t param_len, int timeout_secs, bool noisy,
                       int vb)
 {
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1969,10 +1991,11 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
     sg_put_unaligned_be24(buffer_offset, wbuf_cdb + 3);
     sg_put_unaligned_be24(param_len, wbuf_cdb + 6);
     if (vb) {
-        pr2ws("    Write buffer cdb: ");
-        for (k = 0; k < WRITE_BUFFER_CMDLEN; ++k)
-            pr2ws("%02x ", wbuf_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    Write buffer cdb: %s\n",
+              sg_get_command_str(wbuf_cdb, WRITE_BUFFER_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    Write buffer parameter list%s:\n",
                   ((param_len > 256) ? " (first 256 bytes)" : ""));
@@ -2029,7 +2052,7 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
                void * paramp, int param_len, bool noisy, int vb)
 {
     static const char * const cdb_s = "unmap";
-    int k, res, ret, s_cat, tmout;
+    int res, ret, s_cat, tmout;
     uint8_t u_cdb[UNMAP_CMDLEN] =
                          {UNMAP_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -2041,10 +2064,11 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
     u_cdb[6] = group_num & 0x1f;
     sg_put_unaligned_be16((uint16_t)param_len, u_cdb + 7);
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < UNMAP_CMDLEN; ++k)
-            pr2ws("%02x ", u_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(u_cdb, UNMAP_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_s);
             hex2stderr((const uint8_t *)paramp, param_len, -1);
@@ -2083,17 +2107,18 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
                         bool noisy, int vb)
 {
     static const char * const cdb_s = "read block limits";
-    int k, ret, res, s_cat;
+    int ret, res, s_cat;
     uint8_t rl_cdb[READ_BLOCK_LIMITS_CMDLEN] =
       {READ_BLOCK_LIMITS_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < READ_BLOCK_LIMITS_CMDLEN; ++k)
-            pr2ws("%02x ", rl_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rl_cdb, READ_BLOCK_LIMITS_CMDLEN,
+                                 false, sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
@@ -2140,7 +2165,7 @@ int
 sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
                            int mx_resp_len, bool noisy, int vb)
 {
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t rcvcopyres_cdb[THIRD_PARTY_COPY_IN_CMDLEN] =
       {THIRD_PARTY_COPY_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -2156,10 +2181,11 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rcvcopyres_cdb + 10);
 
     if (vb) {
-        pr2ws("    %s cdb: ", b);
-        for (k = 0; k < THIRD_PARTY_COPY_IN_CMDLEN; ++k)
-            pr2ws("%02x ", rcvcopyres_cdb[k]);
-        pr2ws("\n");
+        char d[128];
+
+        pr2ws("    %s cdb: %s\n", b,
+              sg_get_command_str(rcvcopyres_cdb, THIRD_PARTY_COPY_IN_CMDLEN,
+                                 false, sizeof(d), d));
     }
 
     if (NULL == ((ptvp = create_pt_obj(b))))
@@ -2199,7 +2225,7 @@ int
 sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
                     int vb)
 {
-    int k, res, ret, s_cat;
+    int res, ret, s_cat;
     uint8_t xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
       {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -2210,10 +2236,11 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
     sg_put_unaligned_be32((uint32_t)param_len, xcopy_cdb + 10);
 
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < THIRD_PARTY_COPY_OUT_CMDLEN; ++k)
-            pr2ws("%02x ", xcopy_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(xcopy_cdb, THIRD_PARTY_COPY_OUT_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cdb_s);
             hex2stderr((const uint8_t *)paramp, param_len, -1);
@@ -2255,7 +2282,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
                       int timeout_secs, void * paramp, int param_len,
                       bool noisy, int vb)
 {
-    int k, res, ret, s_cat, tmout;
+    int res, ret, s_cat, tmout;
     uint8_t xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
       {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -2286,10 +2313,11 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
 
     if (vb) {
-        pr2ws("    %s cdb: ", cname);
-        for (k = 0; k < THIRD_PARTY_COPY_OUT_CMDLEN; ++k)
-            pr2ws("%02x ", xcopy_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cname,
+              sg_get_command_str(xcopy_cdb, THIRD_PARTY_COPY_OUT_CMDLEN,
+                                 false, sizeof(b), b));
         if ((vb > 1) && paramp && param_len) {
             pr2ws("    %s parameter list:\n", cname);
             hex2stderr((const uint8_t *)paramp, param_len, -1);
@@ -2338,7 +2366,7 @@ sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
     static const char * const cdb10_name_s = "Pre-fetch(10)";
     static const char * const cdb16_name_s = "Pre-fetch(16)";
     static const char * const cdb_seek_name_s = "Seek(10)";
-    int k, res, s_cat, ret, cdb_len, tmout;
+    int res, s_cat, ret, cdb_len, tmout;
     const char *cdb_s;
     uint8_t preFetchCdb[PRE_FETCH16_CMDLEN]; /* all use longest cdb */
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -2386,10 +2414,10 @@ sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
     }
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
     if (vb) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < cdb_len; ++k)
-            pr2ws("%02x ", preFetchCdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(preFetchCdb, cdb_len, false, sizeof(b), b));
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
         return -1;

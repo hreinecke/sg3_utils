@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.06 20190913";
+static const char * version_str = "5.07 20191226";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -359,7 +359,7 @@ main(int argc, char * argv[])
     bool clear = true;
 #endif
     bool dio_incomplete = false;
-    int sg_fd, res, j, err;
+    int sg_fd, res, err;
     int buf_capacity = 0;
     int buf_size = 0;
     size_t psz;
@@ -451,11 +451,11 @@ main(int argc, char * argv[])
     io_hdr.sbp = sense_buffer;
     io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
     if (op->verbose) {
-        pr2serr("    Read buffer (%sdescriptor) cdb: ",
-                (op->do_echo ? "echo " : ""));
-        for (k = 0; k < RB_CMD_LEN; ++k)
-            pr2serr("%02x ", rb_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Read buffer (%sdescriptor) cdb: %s\n",
+                (op->do_echo ? "echo " : ""),
+                sg_get_command_str(rb_cdb, RB_CMD_LEN, false, sizeof(b), b));
     }
 
     /* do normal IO to find RB size (not dio or mmap-ed at this stage) */
@@ -587,13 +587,13 @@ main(int argc, char * argv[])
         else if (op->do_quick)
             io_hdr.flags |= SG_FLAG_NO_DXFER;
         if (op->verbose > 1) {
-            pr2serr("    Read buffer (%sdata) cdb: ",
-                    (op->do_echo ? "echo " : ""));
-            for (j = 0; j < RB_CMD_LEN; ++j)
-                pr2serr("%02x ", rb_cdb[j]);
-            pr2serr("\n");
-        }
+            char b[128];
 
+            pr2serr("    Read buffer (%sdata) cdb: %s\n",
+                    (op->do_echo ? "echo " : ""),
+                    sg_get_command_str(rb_cdb, RB_CMD_LEN, false,
+                                       sizeof(b), b));
+        }
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
             if (ENOMEM == errno) {
                 pr2serr("SG_IO data: out of memory, try a smaller buffer "

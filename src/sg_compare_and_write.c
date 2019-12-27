@@ -56,7 +56,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.26 20190113";
+static const char * version_str = "1.27 20191220";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -349,7 +349,7 @@ sg_ll_compare_and_write(int sg_fd, uint8_t * buff, int blocks,
                         bool noisy, int verbose)
 {
         bool valid;
-        int k, sense_cat, slen, res, ret;
+        int sense_cat, slen, res, ret;
         uint64_t ull = 0;
         struct sg_pt_base * ptvp;
         uint8_t cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
@@ -370,10 +370,11 @@ sg_ll_compare_and_write(int sg_fd, uint8_t * buff, int blocks,
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
         set_scsi_pt_data_out(ptvp, buff, xfer_len);
         if (verbose > 1) {
-                pr2serr("    Compare and write cdb: ");
-                for (k = 0; k < COMPARE_AND_WRITE_CDB_SIZE; ++k)
-                        pr2serr("%02x ", cawCmd[k]);
-                pr2serr("\n");
+                char b[128];
+
+                pr2serr("    Compare and write cdb: %s\n",
+                sg_get_command_str(cawCmd, COMPARE_AND_WRITE_CDB_SIZE, false,
+                                   sizeof(b), b));
         }
         if ((verbose > 2) && (xfer_len > 0)) {
                 pr2serr("    Data-out buffer contents:\n");

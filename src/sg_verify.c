@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2019 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.25 20180628";    /* sbc4r15 */
+static const char * version_str = "1.26 20191216";    /* sbc4r17 */
 
 #define ME "sg_verify: "
 
@@ -47,6 +47,7 @@ static const char * version_str = "1.25 20180628";    /* sbc4r15 */
 
 
 static struct option long_options[] = {
+        {"0", no_argument, 0, '0'},
         {"16", no_argument, 0, 'S'},
         {"bpc", required_argument, 0, 'b'},
         {"bytchk", required_argument, 0, 'B'},  /* 4 backward compatibility */
@@ -70,22 +71,23 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    pr2serr("Usage: sg_verify [--16] [--bpc=BPC] [--count=COUNT] [--dpo] "
-            "[--ebytchk=BCH]\n"
-            "                 [--group=GN] [--help] [--in=IF] "
-            "[--lba=LBA] [--ndo=NDO]\n"
-            "                 [--quiet] [--readonly] [--verbose] "
-            "[--version]\n"
-            "                 [--vrprotect=VRP] DEVICE\n"
+    pr2serr("Usage: sg_verify [--0] [--16] [--bpc=BPC] [--count=COUNT] "
+            "[--dpo]\n"
+            "                 [--ebytchk=BCH] [--ff] [--group=GN] [--help] "
+            "[--in=IF]\n"
+            "                 [--lba=LBA] [--ndo=NDO] [--quiet] "
+            "[--readonly]\n"
+            "                 [--verbose] [--version] [--vrprotect=VRP] "
+            "DEVICE\n"
             "  where:\n"
+            "    --0|-0              fill buffer with zeros (don't read "
+            "stdin)\n"
             "    --16|-S             use VERIFY(16) (def: use "
             "VERIFY(10) )\n"
             "    --bpc=BPC|-b BPC    max blocks per verify command "
             "(def: 128)\n"
             "    --count=COUNT|-c COUNT    count of blocks to verify "
             "(def: 1).\n"
-            "                              If BCH=3 then COUNT must "
-            "be 1 .\n"
             "    --dpo|-d            disable page out (cache retention "
             "priority)\n"
             "    --ebytchk=BCH|-E BCH    sets BYTCHK value, either 1, 2 "
@@ -96,6 +98,8 @@ usage()
             "size\n"
             "                            (plus protection size if DIF "
             "active)\n"
+            "    --ff|-f             fill buffer with 0xff bytes (don't read "
+            "stdin)\n"
             "    --group=GN|-g GN    set group number field to GN (def: 0)\n"
             "    --help|-h           print out usage message\n"
             "    --in=IF|-i IF       input from file called IF (def: "
@@ -130,12 +134,14 @@ main(int argc, char * argv[])
 {
     bool bpc_given = false;
     bool dpo = false;
+    bool ff_given = false;
     bool got_stdin = false;
     bool quiet = false;
     bool readonly = false;
     bool verbose_given = false;
     bool verify16 = false;
     bool version_given = false;
+    bool zero_given = false;
     int res, c, num, nread, infd;
     int sg_fd = -1;
     int bpc = 128;
@@ -162,12 +168,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:B:c:dE:g:hi:l:n:P:qrSvV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "0b:B:c:dE:fg:hi:l:n:P:qrSvV",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case '0':
+            zero_given = true;
+            break;
         case 'b':
             bpc = sg_get_num(optarg);
             if (bpc < 1) {
@@ -188,10 +197,13 @@ main(int argc, char * argv[])
             break;
         case 'E':
             bytchk = sg_get_num(optarg);
-            if ((bytchk < 1) || (bytchk > 3)) {
+            if ((bytchk < 0) || (bytchk > 3)) {
                 pr2serr("bad argument to '--ebytchk'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'f':
+            ff_given = true;
             break;
         case 'g':
             group = sg_get_num(optarg);
@@ -242,7 +254,7 @@ main(int argc, char * argv[])
             readonly = true;
             break;
         case 'S':
-            verify16 = false;
+            verify16 = true;
             break;
         case 'v':
             verbose_given = true;
@@ -300,14 +312,21 @@ main(int argc, char * argv[])
             pr2serr("count exceed 31 bits, way too large\n");
             return SG_LIB_SYNTAX_ERROR;
         }
+#if 0
         if ((3 == bytchk) && (1 != count)) {
             pr2serr("count must be 1 when bytchk=3\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-        bpc = (int)count;
+        // bpc = (int)count;
+#endif
     } else if (bytchk > 0) {
-        pr2serr("when the 'ebytchk=BCH' option is given, then '--bytchk=NDO' "
+        pr2serr("when the 'ebytchk=BCH' option is given, then '--ndo=NDO' "
                 "must also be given\n");
+        return SG_LIB_CONTRADICT;
+    }
+    if ((zero_given || ff_given) && file_name) {
+        pr2serr("giving --0 or --ff is not compatible with --if=%s\n",
+                file_name);
         return SG_LIB_CONTRADICT;
     }
 
@@ -334,6 +353,10 @@ main(int argc, char * argv[])
             ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
+        if (ff_given)
+            memset(ref_data, 0xff, ndo);
+        if (zero_given || ff_given)
+            goto skip;
         if ((NULL == file_name) || (0 == strcmp(file_name, "-"))) {
             got_stdin = true;
             infd = STDIN_FILENO;
@@ -363,7 +386,7 @@ main(int argc, char * argv[])
         if (! got_stdin)
             close(infd);
     }
-
+skip:
     if (NULL == device_name) {
         pr2serr("missing device name!\n");
         usage();
@@ -413,7 +436,8 @@ main(int argc, char * argv[])
                 break;
             case SG_LIB_CAT_MISCOMPARE:
                 if ((0 == quiet) || verbose)
-                    pr2serr("%s reported MISCOMPARE\n", vc);
+                    pr2serr("%s MISCOMPARE: started at LBA 0x%" PRIx64 "\n",
+                            vc, lba);
                 break;
             default:
                 sg_get_category_sense_str(res, sizeof(b), b, verbose);

@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.69 20191204";
+const char * sg_lib_version_str = "2.70 20191226";
 /* spc5r22, sbc4r17, zbc2r04 */
 
 
@@ -1506,7 +1506,7 @@ const char * sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
 
 const char * sg_lib_transport_proto_strs[] =
 {
-    "Fibre Channel Protocol for SCSI (FCP-4)",
+    "Fibre Channel Protocol for SCSI (FCP-5)",  /* now at fcp5r01 */
     "SCSI Parallel Interface (SPI-5)",  /* obsolete in spc5r01 */
     "Serial Storage Architecture SCSI-3 Protocol (SSA-S3P)",
     "Serial Bus Protocol for IEEE 1394 (SBP-3)",
