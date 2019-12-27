@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.13 20190113";
+static const char * version_str = "1.14 20191220";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -114,7 +114,7 @@ static int
 sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
                bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     struct sg_pt_base * ptvp;
     uint8_t zo_cdb[SG_ZONING_OUT_CMDLEN] =
           {SG_ZONING_OUT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
@@ -128,10 +128,11 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
         zo_cdb[14] = 0x1;
     sg_get_opcode_sa_name(zo_cdb[0], sa, -1, sizeof(b), b);
     if (verbose) {
-        pr2serr("    %s cdb: ", b);
-        for (k = 0; k < SG_ZONING_OUT_CMDLEN; ++k)
-            pr2serr("%02x ", zo_cdb[k]);
-        pr2serr("\n");
+        char d[128];
+
+        pr2serr("    %s cdb: %s\n", b,
+                sg_get_command_str(zo_cdb, SG_ZONING_OUT_CMDLEN,
+                                   false, sizeof(d), d));
     }
 
     ptvp = construct_scsi_pt_obj();

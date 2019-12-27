@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.13 20180113";
+static const char * version_str = "1.14 20191220";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -202,10 +202,11 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rt_cdb + 6);
     if (verbose) {
-        pr2serr("    Report timestamp cdb: ");
-        for (k = 0; k < REP_TIMESTAMP_CMDLEN; ++k)
-            pr2serr("%02x ", rt_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Report timestamp cdb: %s\n",
+                sg_get_command_str(rt_cdb, REP_TIMESTAMP_CMDLEN, false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj();
@@ -252,7 +253,7 @@ static int
 sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
                     int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t st_cdb[SET_TIMESTAMP_CMDLEN] =
           {SG_MAINTENANCE_OUT, SET_TIMESTAMP_SA, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
@@ -261,10 +262,11 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
 
     sg_put_unaligned_be32(param_len, st_cdb + 6);
     if (verbose) {
-        pr2serr("    Set timestamp cdb: ");
-        for (k = 0; k < SET_TIMESTAMP_CMDLEN; ++k)
-            pr2serr("%02x ", st_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Set timestamp cdb: %s\n",
+                sg_get_command_str(st_cdb, SET_TIMESTAMP_CMDLEN, false,
+                                   sizeof(b), b));
         if ((verbose > 1) && paramp && param_len) {
             pr2serr("    set timestamp parameter list:\n");
             hex2stderr((const uint8_t *)paramp, param_len, -1);

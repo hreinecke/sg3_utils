@@ -90,7 +90,7 @@ sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
                     int verbose)
 {
     static const char * const cdb_s = "synchronize cache(10)";
-    int res, ret, k, sense_cat;
+    int res, ret, sense_cat;
     uint8_t sc_cdb[SYNCHRONIZE_CACHE_CMDLEN] =
                 {SYNCHRONIZE_CACHE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -109,10 +109,11 @@ sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
     sg_put_unaligned_be16((int16_t)count, sc_cdb + 7);
 
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SYNCHRONIZE_CACHE_CMDLEN; ++k)
-            pr2ws("%02x ", sc_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(sc_cdb, SYNCHRONIZE_CACHE_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
         return -1;
@@ -146,7 +147,7 @@ sg_ll_readcap_16(int sg_fd, bool pmi, uint64_t llba, void * resp,
                  int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_s = "read capacity(16)";
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rc_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                         {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -160,10 +161,11 @@ sg_ll_readcap_16(int sg_fd, bool pmi, uint64_t llba, void * resp,
     /* Allocation length, no guidance in SBC-2 rev 15b */
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rc_cdb + 10);
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < SERVICE_ACTION_IN_16_CMDLEN; ++k)
-            pr2ws("%02x ", rc_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rc_cdb, SERVICE_ACTION_IN_16_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
         return -1;
@@ -198,7 +200,7 @@ sg_ll_readcap_10(int sg_fd, bool pmi, unsigned int lba, void * resp,
                  int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_s = "read capacity(10)";
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rc_cdb[READ_CAPACITY_10_CMDLEN] =
                          {READ_CAPACITY_10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -209,10 +211,11 @@ sg_ll_readcap_10(int sg_fd, bool pmi, unsigned int lba, void * resp,
         sg_put_unaligned_be32((uint32_t)lba, rc_cdb + 2);
     }
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < READ_CAPACITY_10_CMDLEN; ++k)
-            pr2ws("%02x ", rc_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(rc_cdb, READ_CAPACITY_10_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
         return -1;
@@ -247,7 +250,7 @@ sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code, int sub_pg_code,
                   void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     static const char * const cdb_s = "mode sense(6)";
-    int res, ret, k, sense_cat, resid;
+    int res, ret, sense_cat, resid;
     uint8_t modes_cdb[MODE_SENSE6_CMDLEN] =
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -262,10 +265,11 @@ sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code, int sub_pg_code,
         return -1;
     }
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MODE_SENSE6_CMDLEN; ++k)
-            pr2ws("%02x ", modes_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(modes_cdb, MODE_SENSE6_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))
         return -1;
@@ -340,7 +344,7 @@ sg_ll_mode_sense10_v2(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
                       int sub_pg_code, void * resp, int mx_resp_len,
                       int timeout_secs, int * residp, bool noisy, int verbose)
 {
-    int res, ret, k, sense_cat, resid;
+    int res, ret, sense_cat, resid;
     static const char * const cdb_s = "mode sense(10)";
     struct sg_pt_base * ptvp;
     uint8_t modes_cdb[MODE_SENSE10_CMDLEN] =
@@ -356,10 +360,11 @@ sg_ll_mode_sense10_v2(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
         goto gen_err;
     }
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MODE_SENSE10_CMDLEN; ++k)
-            pr2ws("%02x ", modes_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(modes_cdb, MODE_SENSE10_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (timeout_secs <= 0)
         timeout_secs = DEF_PT_TIMEOUT;
@@ -425,7 +430,7 @@ sg_ll_mode_select6_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
                       int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_s = "mode select(6)";
-    int res, ret, k, sense_cat;
+    int res, ret, sense_cat;
     uint8_t modes_cdb[MODE_SELECT6_CMDLEN] =
         {MODE_SELECT6_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -440,10 +445,11 @@ sg_ll_mode_select6_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
         return -1;
     }
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MODE_SELECT6_CMDLEN; ++k)
-            pr2ws("%02x ", modes_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(modes_cdb, MODE_SELECT6_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (verbose > 1) {
         pr2ws("    %s parameter list\n", cdb_s);
@@ -492,7 +498,7 @@ sg_ll_mode_select10_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
                        int param_len, bool noisy, int verbose)
 {
     static const char * const cdb_s = "mode select(10)";
-    int res, ret, k, sense_cat;
+    int res, ret, sense_cat;
     uint8_t modes_cdb[MODE_SELECT10_CMDLEN] =
         {MODE_SELECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -507,10 +513,11 @@ sg_ll_mode_select10_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
         return -1;
     }
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < MODE_SELECT10_CMDLEN; ++k)
-            pr2ws("%02x ", modes_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(modes_cdb, MODE_SELECT10_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (verbose > 1) {
         pr2ws("    %s parameter list\n", cdb_s);
@@ -787,7 +794,7 @@ sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
                    bool noisy, int verbose)
 {
     static const char * const cdb_s = "log sense";
-    int res, ret, k, sense_cat, resid;
+    int res, ret, sense_cat, resid;
     uint8_t logs_cdb[LOG_SENSE_CMDLEN] =
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -803,10 +810,11 @@ sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
     sg_put_unaligned_be16((int16_t)paramp, logs_cdb + 5);
     sg_put_unaligned_be16((int16_t)mx_resp_len, logs_cdb + 7);
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < LOG_SENSE_CMDLEN; ++k)
-            pr2ws("%02x ", logs_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(logs_cdb, LOG_SENSE_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if (timeout_secs <= 0)
         timeout_secs = DEF_PT_TIMEOUT;
@@ -867,7 +875,7 @@ sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
                  bool noisy, int verbose)
 {
     static const char * const cdb_s = "log select";
-    int res, ret, k, sense_cat;
+    int res, ret, sense_cat;
     uint8_t logs_cdb[LOG_SELECT_CMDLEN] =
         {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -882,10 +890,11 @@ sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
     logs_cdb[3] = (uint8_t)(subpg_code & 0xff);
     sg_put_unaligned_be16((int16_t)param_len, logs_cdb + 7);
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < LOG_SELECT_CMDLEN; ++k)
-            pr2ws("%02x ", logs_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(logs_cdb, LOG_SELECT_CMDLEN, false,
+                                 sizeof(b), b));
     }
     if ((verbose > 1) && (param_len > 0)) {
         pr2ws("    %s parameter list\n", cdb_s);
@@ -949,7 +958,7 @@ sg_ll_start_stop_unit_pt(struct sg_pt_base * ptvp, bool immed,
                          bool loej, bool start, bool noisy, int verbose)
 {
     static const char * const cdb_s = "start stop unit";
-    int k, res, ret, sense_cat;
+    int res, ret, sense_cat;
     uint8_t ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
 
@@ -964,10 +973,11 @@ sg_ll_start_stop_unit_pt(struct sg_pt_base * ptvp, bool immed,
     if (start)
         ssuBlk[4] |= 0x1;
     if (verbose) {
-        pr2ws("    %s command:", cdb_s);
-        for (k = 0; k < (int)sizeof(ssuBlk); ++k)
-                pr2ws(" %02x", ssuBlk[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(ssuBlk, sizeof(ssuBlk), false,
+                                 sizeof(b), b));
     }
 
     clear_scsi_pt_obj(ptvp);
@@ -1001,7 +1011,7 @@ int
 sg_ll_prevent_allow(int sg_fd, int prevent, bool noisy, int verbose)
 {
     static const char * const cdb_s = "prevent allow medium removal";
-    int k, res, ret, sense_cat;
+    int res, ret, sense_cat;
     uint8_t p_cdb[PREVENT_ALLOW_CMDLEN] =
                 {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1013,10 +1023,11 @@ sg_ll_prevent_allow(int sg_fd, int prevent, bool noisy, int verbose)
     }
     p_cdb[4] |= (prevent & 0x3);
     if (verbose) {
-        pr2ws("    %s cdb: ", cdb_s);
-        for (k = 0; k < PREVENT_ALLOW_CMDLEN; ++k)
-            pr2ws("%02x ", p_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", cdb_s,
+              sg_get_command_str(p_cdb, PREVENT_ALLOW_CMDLEN, false,
+                                 sizeof(b), b));
     }
 
     if (NULL == ((ptvp = create_pt_obj(cdb_s))))

@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.63 20190618";
+static const char * version_str = "1.64 20191226";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -467,7 +467,7 @@ static int
 sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         int bs, int cdbsz, bool fua, bool dpo, bool do_mmap)
 {
-    int k, res;
+    int res;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -493,10 +493,10 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     if (do_mmap)
         io_hdr.flags |= SG_FLAG_MMAP_IO;
     if (verbose > 2) {
-        pr2serr("    read cdb: ");
-        for (k = 0; k < cdbsz; ++k)
-            pr2serr("%02x ", rdCmd[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Read cdb: %s\n",
+                sg_get_command_str(rdCmd, cdbsz, false, sizeof(b), b));
     }
 
 #if 1
@@ -558,7 +558,7 @@ static int
 sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
          int bs, int cdbsz, bool fua, bool dpo, bool do_mmap, bool * diop)
 {
-    int k, res;
+    int res;
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -586,10 +586,10 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     else if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
     if (verbose > 2) {
-        pr2serr("    write cdb: ");
-        for (k = 0; k < cdbsz; ++k)
-            pr2serr("%02x ", wrCmd[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Write cdb: %s\n",
+                sg_get_command_str(wrCmd, cdbsz, false, sizeof(b), b));
     }
 
 #if 1

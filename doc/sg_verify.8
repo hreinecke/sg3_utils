@@ -1,19 +1,19 @@
-.TH SG_VERIFY "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_VERIFY "8" "December 2019" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_verify \- invoke SCSI VERIFY command(s) on a block device
 .SH SYNOPSIS
 .B sg_verify
-[\fI\-\-16\fR] [\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR] [\fI\-\-dpo\fR]
-[\fI\-\-ebytchk=BCH\fR] [\fI\-\-group=GN\fR] [\fI\-\-help\fR]
-[\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-ndo=NDO\fR] [\fI\-\-quiet\fR]
-[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
+[\fI\-\-0\fR] [\fI\-\-16\fR] [\fI\-\-bpc=BPC\fR] [\fI\-\-count=COUNT\fR]
+[\fI\-\-dpo\fR] [\fI\-\-ff\fR] [\fI\-\-ebytchk=BCH\fR] [\fI\-\-group=GN\fR]
+[\fI\-\-help\fR] [\fI\-\-in=IF\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-ndo=NDO\fR]
+[\fI\-\-quiet\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-vrprotect=VRP\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Sends one or more SCSI VERIFY (10 or 16) commands to \fIDEVICE\fR. These SCSI
-commands are defined in the SBC\-2 (draft) standard at http://www.t10.org and
-SBC\-3 drafts.
+commands are defined in the SBC\-2 and SBC\-3 standards at http://www.t10.org
+and SBC\-4 drafts.
 .PP
 When \fI\-\-ndo=NDO\fR is not given then the verify starts at the logical
 block address given by the \fI\-\-lba=LBA\fR option and continues for
@@ -44,6 +44,12 @@ of this utility, see the section below on OPTION CHANGES.
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
 option name.
+.TP
+\fB\-0\fR, \fB\-\-0\fR
+a buffer \fINDO\fR bytes long full of zeros is sent as the data\-out
+part of a VERIFY command. So stdin is not read and if \fI\-\-in=IF\fR
+is given, an error is generated. Useful when \fIBCH\fR is 3 to check
+if some or all of \fIDEVICE\fR (e.g. a disk) is zero filled blocks.
 .TP
 \fB\-S\fR, \fB\-\-16\fR
 uses a VERIFY(16) command (default VERIFY(10)). Even without this option,
@@ -80,10 +86,16 @@ other commands are more likely to remain in the device's cache.
 sets the BYTCHK field to \fIBCH\fR overriding the value (1) set by the
 \fI\-\-ndo=NDO\fR option. Values of 1, 2 or 3 are accepted for \fIBCH\fR
 however sbc3r34 reserves the value 2. If this option is given then
-\fI\-\-ndo=NDO\fR must also be given. If \fIBCH\fR is 3 then \fICOUNT\fR
-must be 1 and \fINDO\fR should be the size of one logical block (plus the
-size of some or all of the protection information if \fIVRP\fR is greater
+\fI\-\-ndo=NDO\fR must also be given. If \fIBCH\fR is 3 then \fINDO\fR
+should be the size of one logical block (plus the size of some or all
+of the protection information if \fIVRP\fR is greater
 than 0).
+.TP
+\fB\-f\fR, \fB\-\-ff\fR
+a buffer \fINDO\fR bytes long full of 0xff bytes is sent as the data\-out
+part of a VERIFY command. So stdin is not read and if \fI\-\-in=IF\fR
+is given, an error is generated. Useful when \fIBCH\fR is 3 to check
+if some or all of \fIDEVICE\fR (e.g. a disk) is 0xff byte filled blocks.
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
 where \fIGN\fR becomes the contents of the group number field in the SCSI
@@ -198,7 +210,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2018 Douglas Gilbert
+Copyright \(co 2004\-2019 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

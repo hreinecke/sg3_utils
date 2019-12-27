@@ -42,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "1.94 20190913";
+static const char * const version_str = "1.95 20191219";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -371,7 +371,7 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, bool cmddt, bool evpd, int pg_op,
                   void * resp, int mx_resp_len, int timeout_secs,
                   int * residp, bool noisy, int verbose)
 {
-    int res, ret, k, sense_cat, resid;
+    int res, ret, sense_cat, resid;
     uint8_t inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
     uint8_t * up;
@@ -389,10 +389,11 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, bool cmddt, bool evpd, int pg_op,
     /* 16 bit allocation length (was 8, increased in spc3r09, 200209) */
     sg_put_unaligned_be16((uint16_t)mx_resp_len, inq_cdb + 3);
     if (verbose) {
-        pr2ws("    %s cdb: ", inquiry_s);
-        for (k = 0; k < INQUIRY_CMDLEN; ++k)
-            pr2ws("%02x ", inq_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", inquiry_s,
+              sg_get_command_str(inq_cdb, INQUIRY_CMDLEN, false, sizeof(b),
+                                 b));
     }
     if (resp && (mx_resp_len > 0)) {
         up = (uint8_t *)resp;
@@ -598,15 +599,15 @@ sg_ll_test_unit_ready_progress_pt(struct sg_pt_base * ptvp, int pack_id,
                                   int * progress, bool noisy, int verbose)
 {
     static const char * const tur_s = "test unit ready";
-    int res, ret, k, sense_cat;
+    int res, ret, sense_cat;
     uint8_t tur_cdb[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
 
     if (verbose) {
-        pr2ws("    %s cdb: ", tur_s);
-        for (k = 0; k < TUR_CMDLEN; ++k)
-            pr2ws("%02x ", tur_cdb[k]);
-        pr2ws("\n");
+        char b[128];
+
+        pr2ws("    %s cdb: %s\n", tur_s,
+              sg_get_command_str(tur_cdb, TUR_CMDLEN, false, sizeof(b), b));
     }
 
     clear_scsi_pt_obj(ptvp);
@@ -688,7 +689,7 @@ sg_ll_request_sense_com(struct sg_pt_base * ptvp, int sg_fd, bool desc,
                         void * resp, int mx_resp_len, bool noisy, int verbose)
 {
     bool ptvp_given = false;
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     static const char * const rq_s = "request sense";
     uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
@@ -702,12 +703,12 @@ sg_ll_request_sense_com(struct sg_pt_base * ptvp, int sg_fd, bool desc,
     }
     rs_cdb[4] = mx_resp_len & 0xff;
     if (verbose) {
-        pr2ws("    %s cmd: ", rq_s);
-        for (k = 0; k < REQUEST_SENSE_CMDLEN; ++k)
-            pr2ws("%02x ", rs_cdb[k]);
-        pr2ws("\n");
-    }
+        char b[128];
 
+        pr2ws("    %s cdb: %s\n", rq_s,
+              sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN, false,
+                                 sizeof(b), b));
+    }
     if (ptvp)
         ptvp_given = true;
     else {
@@ -771,7 +772,7 @@ sg_ll_report_luns_com(struct sg_pt_base * ptvp, int sg_fd, int select_report,
 {
     static const char * const report_luns_s = "report luns";
     bool ptvp_given = false;
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rl_cdb[REPORT_LUNS_CMDLEN] =
                          {REPORT_LUNS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -779,12 +780,12 @@ sg_ll_report_luns_com(struct sg_pt_base * ptvp, int sg_fd, int select_report,
     rl_cdb[2] = select_report & 0xff;
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rl_cdb + 6);
     if (verbose) {
-        pr2ws("    %s cdb: ", report_luns_s);
-        for (k = 0; k < REPORT_LUNS_CMDLEN; ++k)
-            pr2ws("%02x ", rl_cdb[k]);
-        pr2ws("\n");
-    }
+        char b[128];
 
+        pr2ws("    %s cdb: %s\n", report_luns_s,
+              sg_get_command_str(rl_cdb, REPORT_LUNS_CMDLEN, false,
+                                 sizeof(b), b));
+    }
     if (ptvp)
         ptvp_given = true;
     else if (NULL == ((ptvp = create_pt_obj(report_luns_s))))

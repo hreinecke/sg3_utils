@@ -40,7 +40,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20190113";
+static const char * version_str = "1.17 20191220";
 
 
 #define ME "sg_write_verify: "
@@ -127,18 +127,18 @@ run_scsi_transaction(int sg_fd, const uint8_t *cdbp, int cdb_len,
                      uint8_t *dop, int do_len, int timeout,
                      bool noisy, int verbose)
 {
-    int res, k, sense_cat, ret;
+    int res, sense_cat, ret;
     struct sg_pt_base * ptvp;
     uint8_t sense_b[SENSE_BUFF_LEN];
     char b[32];
 
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);
     if (verbose) {
-       pr2serr("    %s cdb: ", b);
-       for (k = 0; k < cdb_len; ++k)
-           pr2serr("%02x ", cdbp[k]);
-       pr2serr("\n");
-       if ((verbose > 2) && dop && do_len) {
+        char d[128];
+
+        pr2serr("    %s cdb: %s\n", b,
+                sg_get_command_str(cdbp, cdb_len, false, sizeof(d), d));
+        if ((verbose > 2) && dop && do_len) {
             pr2serr("    Data out buffer [%d bytes]:\n", do_len);
             hex2stderr(dop, do_len, -1);
         }

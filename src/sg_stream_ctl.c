@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.07 20190113";
+static const char * version_str = "1.08 20191220";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -124,10 +124,11 @@ sg_ll_get_stream_status(int sg_fd, uint16_t s_str_id, uint8_t * resp,
         sg_put_unaligned_be16(s_str_id, gssCdb + 4);
     sg_put_unaligned_be32(alloc_len, gssCdb + 10);
     if (verbose) {
-        pr2serr("    %s cdb: ", cmd_name);
-        for (k = 0; k < (int)sizeof(gssCdb); ++k)
-            pr2serr("%02x ", gssCdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", cmd_name,
+                sg_get_command_str(gssCdb, (int)sizeof(gssCdb), false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
@@ -190,10 +191,11 @@ sg_ll_stream_control(int sg_fd, uint32_t str_ctl, uint16_t str_id,
         sg_put_unaligned_be16(str_id, scCdb + 4);
     sg_put_unaligned_be32(alloc_len, scCdb + 10);
     if (verbose) {
-        pr2serr("    %s cdb: ", cmd_name);
-        for (k = 0; k < (int)sizeof(scCdb); ++k)
-            pr2serr("%02x ", scCdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", cmd_name,
+                sg_get_command_str(scCdb, (int)sizeof(scCdb), false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);

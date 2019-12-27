@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.30 (2019-05-16)"
+#define SG_RAW_VERSION "0.4.32 (2019-12-26)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -577,16 +577,13 @@ main(int argc, char *argv[])
         }
     }
     if (op->verbose) {
+        char d[128];
+
         pr2serr("    %s to send: ", is_scsi_cdb ? "cdb" : "cmd");
         if (is_scsi_cdb) {
-            for (k = 0; k < op->cdb_length; ++k)
-                pr2serr("%02x ", op->cdb[k]);
-            pr2serr("\n");
-            if (op->verbose > 1) {
-                sg_get_command_name(op->cdb, 0, b_len - 1, b);
-                b[b_len - 1] = '\0';
-                pr2serr("    Command name: %s\n", b);
-            }
+            pr2serr("%s\n", sg_get_command_str(op->cdb, op->cdb_length,
+                                               op->verbose > 1,
+                                               sizeof(d), d));
         } else {        /* If not SCSI cdb then treat as NVMe command */
             pr2serr("\n");
             hex2stderr(op->cdb, op->cdb_length, -1);

@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.59 20190913";
+static const char * version_str = "1.60 20191220";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -251,7 +251,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
                     void * paramp, int transfer_len, int timeout, bool noisy,
                     int verbose)
 {
-        int k, ret, res, sense_cat;
+        int ret, res, sense_cat;
         uint8_t fm_cdb[SG_FORMAT_MEDIUM_CMDLEN] =
                                   {SG_FORMAT_MEDIUM_CMD, 0, 0, 0, 0, 0};
         uint8_t sense_b[SENSE_BUFF_LEN];
@@ -266,10 +266,11 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         if (transfer_len > 0)
                 sg_put_unaligned_be16(transfer_len, fm_cdb + 3);
         if (verbose) {
-                pr2serr("    Format medium cdb: ");
-                for (k = 0; k < SG_FORMAT_MEDIUM_CMDLEN; ++k)
-                        pr2serr("%02x ", fm_cdb[k]);
-                pr2serr("\n");
+                char b[128];
+
+                pr2serr("    Format medium cdb: %s\n",
+                        sg_get_command_str(fm_cdb, SG_FORMAT_MEDIUM_CMDLEN,
+                                           false, sizeof(b), b));
         }
 
         ptvp = construct_scsi_pt_obj();

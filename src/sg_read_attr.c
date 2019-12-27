@@ -39,7 +39,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.12 20190113";
+static const char * version_str = "1.13 20191220";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -245,7 +245,7 @@ static int
 sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
                 const struct opts_t * op)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t ra_cdb[SG_READ_ATTRIBUTE_CMDLEN] =
           {SG_READ_ATTRIBUTE_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
@@ -265,10 +265,11 @@ sg_ll_read_attr(int sg_fd, void * resp, int * residp, bool noisy,
     if (op->cache)
         ra_cdb[14] |= 0x1;
     if (op->verbose) {
-        pr2serr("    Read attribute cdb: ");
-        for (k = 0; k < SG_READ_ATTRIBUTE_CMDLEN; ++k)
-            pr2serr("%02x ", ra_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Read attribute cdb: %s\n",
+                sg_get_command_str(ra_cdb, SG_READ_ATTRIBUTE_CMDLEN, false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj();

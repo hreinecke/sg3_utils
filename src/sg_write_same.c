@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.28 20190124";
+static const char * version_str = "1.30 20191220";
 
 
 #define ME "sg_write_same: "
@@ -64,6 +64,7 @@ static struct option long_options[] = {
     {"16", no_argument, 0, 'S'},
     {"32", no_argument, 0, 'T'},
     {"anchor", no_argument, 0, 'a'},
+    {"ff", no_argument, 0, 'f'},
     {"grpnum", required_argument, 0, 'g'},
     {"help", no_argument, 0, 'h'},
     {"in", required_argument, 0, 'i'},
@@ -83,6 +84,7 @@ static struct option long_options[] = {
 
 struct opts_t {
     bool anchor;
+    bool ff;
     bool ndob;
     bool lbdata;
     bool pbdata;
@@ -106,12 +108,12 @@ static void
 usage()
 {
     pr2serr("Usage: sg_write_same [--10] [--16] [--32] [--anchor] "
-            "[--grpnum=GN] [--help]\n"
-            "                     [--in=IF] [--lba=LBA] [--lbdata] "
-            "[--ndob] [--num=NUM]\n"
-            "                     [--pbdata] [--timeout=TO] [--unmap] "
-            "[--verbose]\n"
-            "                     [--version] [--wrprotect=WRP] "
+            "[-ff] [--grpnum=GN]\n"
+            "                     [--help] [--in=IF] [--lba=LBA] [--lbdata] "
+            "[--ndob]\n"
+            "                     [--num=NUM] [--pbdata] [--timeout=TO] "
+            "[--unmap]\n"
+            "                     [--verbose] [--version] [--wrprotect=WRP] "
             "[xferlen=LEN]\n"
             "                     DEVICE\n"
             "  where:\n"
@@ -123,6 +125,8 @@ usage()
             "then def 16)\n"
             "    --32|-T              send WRITE SAME(32) (def: 10 or 16)\n"
             "    --anchor|-a          set ANCHOR field in cdb\n"
+            "    --ff|-f              use buffer of 0xff bytes for fill "
+            "(def: 0x0 bytes)\n"
             "    --grpnum=GN|-g GN    GN is group number field (def: 0)\n"
             "    --help|-h            print out usage message\n"
             "    --in=IF|-i IF        IF is file to fetch one block of data "
@@ -163,7 +167,7 @@ static int
 do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
               int * act_cdb_lenp)
 {
-    int k, ret, res, sense_cat, cdb_len;
+    int ret, res, sense_cat, cdb_len;
     uint64_t llba;
     uint8_t ws_cdb[WRITE_SAME32_LEN];
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -251,11 +255,11 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
 
     if (op->verbose > 1) {
-        pr2serr("    Write same(%d) cdb: ", cdb_len);
-        for (k = 0; k < cdb_len; ++k)
-            pr2serr("%02x ", ws_cdb[k]);
-        pr2serr("\n    Data-out buffer length=%d\n",
-                op->xfer_len);
+        char b[128];
+
+        pr2serr("    Write same(%d) cdb: %s\n", cdb_len,
+                sg_get_command_str(ws_cdb, cdb_len, false, sizeof(b), b));
+        pr2serr("    Data-out buffer length=%d\n", op->xfer_len);
     }
     if ((op->verbose > 3) && (op->xfer_len > 0)) {
         pr2serr("    Data-out buffer contents:\n");
@@ -337,7 +341,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "ag:hi:l:Ln:NPRSt:TUvVw:x:",
+        c = getopt_long(argc, argv, "afg:hi:l:Ln:NPRSt:TUvVw:x:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -345,6 +349,9 @@ main(int argc, char * argv[])
         switch (c) {
         case 'a':
             op->anchor = true;
+            break;
+        case 'f':
+            op->ff = true;
             break;
         case 'g':
             op->grpnum = sg_get_num(optarg);
@@ -591,6 +598,8 @@ main(int argc, char * argv[])
             ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
+        if (op->ff)
+            memset(wBuff, 0xff, op->xfer_len);
         if (op->ifilename[0]) {
             if (got_stdin) {
                 infd = STDIN_FILENO;

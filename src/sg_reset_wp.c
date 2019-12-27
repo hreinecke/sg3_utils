@@ -37,7 +37,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.13 20190113";
+static const char * version_str = "1.14 20191220";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -85,7 +85,7 @@ static int
 sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, uint16_t zc, bool all,
                           bool noisy, int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rwp_cdb[SG_ZONING_OUT_CMDLEN] = {SG_ZONING_OUT,
          RESET_WRITE_POINTER_SA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -96,10 +96,11 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, uint16_t zc, bool all,
     if (all)
         rwp_cdb[14] = 0x1;
     if (verbose) {
-        pr2serr("    Reset write pointer cdb: ");
-        for (k = 0; k < SG_ZONING_OUT_CMDLEN; ++k)
-            pr2serr("%02x ", rwp_cdb[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    Reset write pointer cdb: %s\n",
+                sg_get_command_str(rwp_cdb, SG_ZONING_OUT_CMDLEN, false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj();

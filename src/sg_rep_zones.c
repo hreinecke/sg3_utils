@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.18 20191204";
+static const char * version_str = "1.19 20191226";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -127,7 +127,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
                    void * resp, int mx_resp_len, int * residp, bool noisy,
                    int verbose)
 {
-    int k, ret, res, sense_cat;
+    int ret, res, sense_cat;
     uint8_t rz_cdb[SG_ZONING_IN_CMDLEN] =
           {SG_ZONING_IN, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0};
@@ -140,12 +140,12 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
     if (partial)
         rz_cdb[14] |= 0x80;
     if (verbose) {
-        pr2serr("    Report zones cdb: ");
-        for (k = 0; k < SG_ZONING_IN_CMDLEN; ++k)
-            pr2serr("%02x ", rz_cdb[k]);
-        pr2serr("\n");
-    }
+        char b[128];
 
+        pr2serr("    Report zones cdb: %s\n",
+                sg_get_command_str(rz_cdb, SG_ZONING_IN_CMDLEN, false,
+                                   sizeof(b), b));
+    }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
         pr2serr("%s: out of memory\n", __func__);

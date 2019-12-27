@@ -47,7 +47,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.19 20190913";
+static const char * version_str = "1.20 20191220";
 
 #define BPI (signed)(sizeof(int))
 
@@ -96,7 +96,7 @@ find_out_about_buffer(int sg_fd)
         uint8_t rbBuff[RB_DESC_LEN];
         uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
-        int k, res;
+        int res;
 
         rb_cdb[1] = RB_MODE_DESC;
         rb_cdb[8] = RB_DESC_LEN;
@@ -112,10 +112,11 @@ find_out_about_buffer(int sg_fd)
         io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
 
         if (verbose) {
-                pr2serr("    read buffer [mode desc] cdb: ");
-                for (k = 0; k < (int)sizeof(rb_cdb); ++k)
-                        pr2serr("%02x ", rb_cdb[k]);
-                pr2serr("\n");
+                char b[128];
+
+                pr2serr("    read buffer [mode desc] cdb: %s\n",
+                        sg_get_command_str(rb_cdb, (int)sizeof(rb_cdb), false,
+                                           sizeof(b), b));
         }
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
                 perror(ME "SG_IO READ BUFFER descriptor error");
@@ -230,7 +231,7 @@ void do_fill_buffer (int *buf, int len)
 
 int read_buffer (int sg_fd, unsigned ssize)
 {
-        int res, k;
+        int res;
         uint8_t rb_cdb[] = {READ_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         int bufSize = ssize + addread;
         uint8_t * free_rbBuff = NULL;
@@ -255,10 +256,11 @@ int read_buffer (int sg_fd, unsigned ssize)
         io_hdr.pack_id = 2;
         io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
         if (verbose) {
-                pr2serr("    read buffer [mode data] cdb: ");
-                for (k = 0; k < (int)sizeof(rb_cdb); ++k)
-                        pr2serr("%02x ", rb_cdb[k]);
-                pr2serr("\n");
+                char b[128];
+
+                pr2serr("    read buffer [mode data] cdb: %s\n",
+                        sg_get_command_str(rb_cdb, (int)sizeof(rb_cdb), false,
+                                           sizeof(b), b));
         }
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {
@@ -300,7 +302,7 @@ int write_buffer (int sg_fd, unsigned ssize)
                                                   false);
         uint8_t sense_buffer[32];
         struct sg_io_hdr io_hdr;
-        int k, res;
+        int res;
 
         if (NULL == wbBuff)
                 return -1;
@@ -320,10 +322,11 @@ int write_buffer (int sg_fd, unsigned ssize)
         io_hdr.pack_id = 1;
         io_hdr.timeout = 60000;     /* 60000 millisecs == 60 seconds */
         if (verbose) {
-                pr2serr("    write buffer [mode data] cdb: ");
-                for (k = 0; k < (int)sizeof(wb_cdb); ++k)
-                        pr2serr("%02x ", wb_cdb[k]);
-                pr2serr("\n");
+                char b[128];
+
+                pr2serr("    write buffer [mode data] cdb: %s\n",
+                        sg_get_command_str(wb_cdb, (int)sizeof(wb_cdb), false,
+                                           sizeof(b), b));
         }
 
         if (ioctl(sg_fd, SG_IO, &io_hdr) < 0) {

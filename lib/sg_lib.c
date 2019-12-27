@@ -157,25 +157,78 @@ sg_set_warnings_strm(FILE * warnings_strm)
     sg_warnings_strm = warnings_strm;
 }
 
+/* Take care to minimize printf() parsing delays when printing commands */
+static char bin2hexascii[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                              '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+
+/* Given a SCSI command pointed to by cmdp of sz bytes this function forms
+ * a SCSI command in ASCII surrounded by square brackets in 'b'. 'b' is at
+ * least blen bytes long. If cmd_name is true then the command is prefixed
+ * by its SCSI command name (e.g.  "VERIFY(10) [2f ...]". The command is
+ * shown as spaced separated pairs of hexadecimal digits (i.e. 0-9, a-f).
+ * Each pair repesents byte. The leftmost pair of digits is cmdp[0] . If
+ * sz <= 0 then this function tries to guess the length of the command. */
+char *
+sg_get_command_str(const uint8_t * cmdp, int sz, bool cmd_name, int blen,
+                   char * b)
+{
+    int k, j, jj;
+
+    if ((cmdp == NULL) || (b == NULL) || (blen < 1))
+        return b;
+    if (cmd_name && (blen > 16)) {
+        sg_get_command_name(cmdp, 0, blen, b);
+        j = (int)strlen(b);
+        if (j < (blen - 1))
+            b[j++] = ' ';
+    } else
+        j = 0;
+    if (j >= blen)
+        goto fini;
+    b[j++] = '[';
+    if (j >= blen)
+        goto fini;
+    if (sz <= 0) {
+        if (SG_VARIABLE_LENGTH_CMD == cmdp[0])
+            sz = cmdp[7] + 8;
+        else
+            sz = sg_get_command_size(cmdp[0]);
+    }
+    jj = j;
+    for (k = 0; (k < sz) && (j < (blen - 3)); ++k, j += 3, ++cmdp) {
+        b[j] = bin2hexascii[(*cmdp >> 4) & 0xf];
+        b[j + 1] = bin2hexascii[*cmdp & 0xf];
+        b[j + 2] = ' ';
+    }
+    if (j > jj)
+        --j;    /* don't want trailing space before ']' */
+    if (j >= blen)
+        goto fini;
+    b[j++] = ']';
+fini:
+    if (j >= blen)
+        b[blen - 1] = '\0';     /* truncated string */
+    else
+        b[j] = '\0';
+    return b;
+}
+
 #define CMD_NAME_LEN 128
 
 void
-sg_print_command(const uint8_t * command)
+sg_print_command_len(const uint8_t * cmdp, int sz)
 {
-    int k, sz;
     char buff[CMD_NAME_LEN];
 
-    sg_get_command_name(command, 0, CMD_NAME_LEN, buff);
-    buff[CMD_NAME_LEN - 1] = '\0';
+    sg_get_command_str(cmdp, sz, true, sizeof(buff), buff);
+    pr2ws("%s\n", buff);
+}
 
-    pr2ws("%s [", buff);
-    if (SG_VARIABLE_LENGTH_CMD == command[0])
-        sz = command[7] + 8;
-    else
-        sz = sg_get_command_size(command[0]);
-    for (k = 0; k < sz; ++k)
-        pr2ws("%02x ", command[k]);
-    pr2ws("]\n");
+void
+sg_print_command(const uint8_t * cmdp)
+{
+    sg_print_command_len(cmdp, 0);
 }
 
 /* SCSI Status values */

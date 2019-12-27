@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.00 20190827";      /* sbc4r15,17 */
+static const char * version_str = "1.01 20191220";      /* sbc4r15,17 */
 
 
 #ifndef UINT32_MAX
@@ -155,10 +155,11 @@ sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
     if (report_type)
         gpesCmd[14] |= (0xf & report_type);
     if (verbose) {
-        pr2serr("    %s cdb: ", cmd_name);
-        for (k = 0; k < (int)sizeof(gpesCmd); ++k)
-            pr2serr("%02x ", gpesCmd[k]);
-        pr2serr("\n");
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", cmd_name,
+                sg_get_command_str(gpesCmd, (int)sizeof(gpesCmd), false,
+                                   sizeof(b), b));
     }
 
     ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
@@ -548,8 +549,8 @@ start_response:
                 printf("depopulation operations in progress");
             else if (0xff == j)
                 printf("depopulation completed, no errors");
-	    if (a_ped.restore_allowed)
-		printf(" [restore allowed]");
+            if (a_ped.restore_allowed)
+                printf(" [restore allowed]");
             printf("\n");
         }
     }
