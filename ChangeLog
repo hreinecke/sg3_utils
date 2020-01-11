@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20191227] [svn: r837]
+Changelog for sg3_utils-1.45 [20200111] [svn: r838]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -10,7 +10,9 @@ Changelog for sg3_utils-1.45 [20191227] [svn: r837]
     - rename 'SAS SlimLine' to SlimSAS [ses4r02]
     - add --inhex=FN, equivalent to --data=@FN, for
       compatibility with other utilities
-  - sg_opcodes: expand MLU (spc5r20)
+  - sg_opcodes: expand MLU (now 2 bits, spc5r20)
+    - include RWCDLP field as extension of CDLP
+      field (spc5r01)
   - sg_write_buffer: allow comma and period separated
     lists when input from stdin
   - sg_inq: update version descriptors to spc5r21
@@ -30,8 +32,8 @@ Changelog for sg3_utils-1.45 [20191227] [svn: r837]
   - sg_scan (win32): expand limits for big arrays
   - sg_modes: placeholders for Command duration limit
     T2A and T2B mpages (sbc4r17)
-  - sg_logs: placeholder for Command duration limits
-    statistics lpage (sbc4r17)
+  - sg_logs: add Command duration limits statistics
+    lpage (spc6r01)
     - zoned block device statistics log page: shorten
       counter fields from 8 to 4 bytes (zbc2r02)
       - new field in this log page (zbc2r04)

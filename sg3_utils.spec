@@ -84,7 +84,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Fri Dec 06 2019 - dgilbert at interlog dot com
+* Wed Jan 01 2020 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.45
 
