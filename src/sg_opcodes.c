@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2019 D. Gilbert
+ *  Copyright (C) 2004-2020 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.67 20191220";    /* spc5r20 */
+static const char * version_str = "0.68 20200111";    /* spc6r01 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -775,17 +775,20 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                            "%s\n", opcode, sa_buff,
                            sg_get_unaligned_be16(bp + 6), name_buff);
         } else {            /* RCTD clear in cdb */
+            /* treat RWCDLP (1 bit) and CDLP (2 bits) as a 3 bit field */
+            int cdl_mp = ((byt5 >> 2) & 0x3) + ((0x40 & byt5) ? 4 : 0);
+
             if (op->do_compact)
                 printf(" %.2x%c%.4s   %s\n", bp[0], (sa_v ? ',' : ' '),
                        sa_buff, name_buff);
             else if (op->do_mlu)
                 printf(" %.2x     %.4s       %3d   %2d,%d    %s\n", bp[0],
                        sa_buff, sg_get_unaligned_be16(bp + 6),
-                       (byt5 >> 2) & 0x3, !!(0x10 & byt5), name_buff);
+                       cdl_mp, ((byt5 >> 4) & 0x3), name_buff);
             else
                 printf(" %.2x     %.4s       %3d     %2d    %s\n", bp[0],
-                       sa_buff, sg_get_unaligned_be16(bp + 6),
-                       ((byt5 >> 4) & 0x3) /* MLU */, name_buff);
+                       sa_buff, sg_get_unaligned_be16(bp + 6), cdl_mp,
+                       name_buff);
         }
         if (op->do_mask) {
             int cdb_sz;

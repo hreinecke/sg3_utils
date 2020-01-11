@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2019 D. Gilbert
+ * Copyright (C) 2018-2020 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.61 20191226";
+static const char * version_str = "1.64 20200110";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -121,7 +121,7 @@ static const char * version_str = "1.61 20191226";
 
 
 /* comment out following line to stop ioctl(SG_CTL_FLAGM_SNAP_DEV) */
-// #define SGH_DD_SNAP_DEV 1
+#define SGH_DD_SNAP_DEV 1
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -161,6 +161,7 @@ static const char * version_str = "1.61 20191226";
 #define EBUFF_SZ 768
 
 #define PROC_SCSI_SG_VERSION "/proc/scsi/sg/version"
+#define SYS_SCSI_SG_VERSION "/sys/module/sg/version"
 
 struct flags_t {
     bool append;
@@ -630,6 +631,18 @@ fetch_sg_version(void)
     if (fp && fgets(b, sizeof(b) - 1, fp)) {
         if (1 == sscanf(b, "%d", &sg_version))
             have_sg_version = !!sg_version;
+    } else {
+        int j, k, l;
+
+        if (fp)
+            fclose(fp);
+        fp = fopen(SYS_SCSI_SG_VERSION, "r");
+        if (fp && fgets(b, sizeof(b) - 1, fp)) {
+            if (3 == sscanf(b, "%d.%d.%d", &j, &k, &l)) {
+                sg_version = (j * 10000) + (k * 100) + l;
+                have_sg_version = !!sg_version;
+            }
+        }
     }
     if (fp)
         fclose(fp);
@@ -1424,7 +1437,7 @@ read_write_thread(void * v_tip)
 
         pthread_cleanup_push(cleanup_in, (void *)clp);
         if (in_is_sg) {
-            if (rep->swait)
+            if (rep->swait && rep->has_share)
                 sg_in_out_interleave(clp, rep, deferred_arr);
             else        /* unlocks in_mutex mid op */
                 sg_in_rd_cmd(clp, rep, deferred_arr);
@@ -1485,7 +1498,8 @@ skip_force_out_sequence:
         /* Output to OFILE */
         wr_blks = rep->num_blks;
         if (out_is_sg) {
-            if (rep->swait) {   /* done already in sg_in_out_interleave() */
+            if (rep->swait && rep->has_share) {
+		/* done already in sg_in_out_interleave() */
                 status = pthread_mutex_unlock(&clp->out_mutex);
                 if (0 != status) err_exit(status, "unlock out_mutex");
             } else              /* release out_mtx */
@@ -2387,8 +2401,11 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         ctl_v4.request = (uint64_t)cmd_ap;
     }
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
-    if (! clp->mrq_async)
+    if (! clp->mrq_async) {
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
+        if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb)
+            ctl_v4.flags |= SGV4_FLAG_SHARE;
+    }
     ctl_v4.dout_xferp = (uint64_t)a_v4p;        /* request array */
     ctl_v4.dout_xfer_len = nrq * sizeof(*a_v4p);
     ctl_v4.din_xferp = (uint64_t)a_v4p;         /* response array */
@@ -2493,6 +2510,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         goto fini;
     }
 
+try_again:
     if (clp->unbalanced_mrq) {
         if (!after1 && (clp->debug > 1)) {
             after1 = true;
@@ -2508,13 +2526,11 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
             }
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
         } else if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb) {
-            ctl_v4.flags |= SGV4_FLAG_SHARE;
             iosub_str = "SUBMIT(shared_variable_blocking)";
             if (!after1 && (clp->debug > 1)) {
                 after1 = true;
                 pr2serr_lk("%s: %s\n", __func__, mrq_svb_s);
             }
-// v4hdr_out_lk("cop: shared_variable_blocking", &ctl_v4, id);
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
         } else {
             iosub_str = "SG_IO(ordered_blocking)";
@@ -2526,9 +2542,16 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         }
     }
     if (res < 0) {
+        int err = errno;
+
+        if (EBUSY == err) {
+            ++num_ebusy;
+            std::this_thread::yield();/* allow another thread to progress */
+            goto try_again;
+        }
         pr2serr_lk("%s: ioctl(SG_IO%s, %s)-->%d, errno=%d: %s\n",
                    __func__, iosub_str, sg_flags_str(ctl_v4.flags, b_len, b),
-                   res, errno, strerror(errno));
+                   res, err, strerror(err));
         res = -1;
         goto fini;
     }
@@ -2617,7 +2640,10 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     b_len = sizeof(b);
     if (wr) {
         fd = is_wr2 ? rep->out2fd : rep->outfd;
-        crwp = is_wr2 ? "writing2" : "writing";
+        if (clp->verify)
+            crwp = is_wr2 ? "verifying2" : "verifying";
+        else
+            crwp = is_wr2 ? "writing2" : "writing";
     } else {
         fd = rep->infd;
         crwp = "reading";

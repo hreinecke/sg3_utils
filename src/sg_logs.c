@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2019 D. Gilbert
+ *  Copyright (C) 2000-2020 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.80 20191205";    /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.81 20200110";    /* spc6r01 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -70,7 +70,7 @@ static const char * version_str = "1.80 20191205";    /* spc5r22 + sbc4r17 */
 #define PENDING_DEFECTS_SUBPG 0x1               /* page 0x15 */
 #define BACKGROUND_OP_SUBPG 0x2                 /* page 0x15 */
 #define CACHE_STATS_SUBPG 0x20                  /* page 0x19 */
-#define CMD_DUR_LIMITS_SUBPG 0x21               /* page 0x19, spc6 */
+#define CMD_DUR_LIMITS_SUBPG 0x21               /* page 0x19 */
 #define ENV_REPORTING_SUBPG 0x1                 /* page 0xd */
 #define UTILIZATION_SUBPG 0x1                   /* page 0xe */
 #define ENV_LIMITS_SUBPG 0x2                    /* page 0xd */
@@ -294,6 +294,8 @@ static bool show_environmental_reporting_page(const uint8_t * resp, int len,
                                               const struct opts_t * op);
 static bool show_environmental_limits_page(const uint8_t * resp, int len,
                                            const struct opts_t * op);
+static bool show_cmd_dur_limits_page(const uint8_t * resp, int len,
+                                     const struct opts_t * op);
 static bool show_data_compression_page(const uint8_t * resp, int len,
                                        const struct opts_t * op);
 static bool show_tape_alert_ssc_page(const uint8_t * resp, int len,
@@ -408,7 +410,8 @@ static struct log_elem log_arr[] = {
     {STATS_LPAGE, CACHE_STATS_SUBPG, 0, -1, MVP_STD,    /* 0x19, 0x20  */
      "Cache memory statistics", "cms", show_cache_stats_page},
     {STATS_LPAGE, CMD_DUR_LIMITS_SUBPG, 0, -1, MVP_STD, /* 0x19, 0x21  */
-     "Commmand duration limits statistics", "cdl", NULL /* spc6r? */ },
+     "Commmand duration limits statistics", "cdl",
+     show_cmd_dur_limits_page /* spc6r01 */ },
     {PCT_LPAGE, 0, 0, -1, MVP_STD, "Power condition transitions", "pct",
      show_power_condition_transitions_page}, /* 0x1a, 0  */
     {0x1b, 0, 0, PDT_TAPE, MVP_STD, "Data compression", "dc",
@@ -1984,7 +1987,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
                        temperature_str(bp[11], true, b, blen));
             }
         } else
-            printf("  <<unexpect parameter code 0x%x\n", pc);
+            printf("  <<unexpected parameter code 0x%x\n", pc);
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -2066,8 +2069,89 @@ show_environmental_limits_page(const uint8_t * resp, int len,
             printf("  Low operating relative humidity limit trigger: %s\n",
                    humidity_str(bp[11], false, b, blen));
         } else
-            printf("  <<unexpect parameter code 0x%x\n", pc);
+            printf("  <<unexpected parameter code 0x%x\n", pc);
         printf("\n");
+        if (op->do_pcb)
+            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+        if (op->filter_given)
+            break;
+skip:
+        num -= pl;
+        bp += pl;
+    }
+    return true;
+}
+
+/* CMD_DUR_LIMITS_SUBPG [0x19,0x21]  introduced: SPC-6 (rev 01) */
+static bool
+show_cmd_dur_limits_page(const uint8_t * resp, int len,
+                         const struct opts_t * op)
+{
+    int num, pl, pc;
+    const uint8_t * bp;
+    char str[PCB_STR_LEN];
+
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
+        printf("Command duration limits page  [0x19,0x21]\n");
+    num = len - 4;
+    bp = &resp[0] + 4;
+    while (num > 3) {
+        pc = sg_get_unaligned_be16(bp + 0);
+        pl = bp[3] + 4;
+        if (op->filter_given) {
+            if (pc != op->filter)
+                goto skip;
+            if (op->do_raw) {
+                dStrRaw(bp, pl);
+                break;
+            } else if (op->do_hex) {
+                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
+                break;
+            }
+        }
+        switch (pc) {
+        case 0x1:
+            printf("  Number of READ commands = %" PRIu64 "\n",
+                   sg_get_unaligned_be64(bp + 4));
+            break;
+        case 0x11:
+        case 0x12:
+        case 0x13:
+        case 0x14:
+        case 0x15:
+        case 0x16:
+        case 0x17:
+        case 0x21:
+        case 0x22:
+        case 0x23:
+        case 0x24:
+        case 0x25:
+        case 0x26:
+        case 0x27:
+            printf(" Command duration limit T2%s %d [Parameter code 0x%x]:\n",
+                   ((pc > 0x20) ? "B" : "A"),
+                   ((pc > 0x20) ? (pc - 0x20) : (pc - 0x10)), pc);
+            printf("  Number of inactive target miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 4));
+            printf("  Number of active target miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 8));
+            printf("  Number of latency miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 12));
+            printf("  Number of nonconforming miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 16));
+            printf("  Number of predictive latency miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 20));
+            printf("  Number of latency misses attributable to errors = %u\n",
+                   sg_get_unaligned_be32(bp + 24));
+            printf("  Number of latency misses attributable to deferred "
+                   "errors = %u\n", sg_get_unaligned_be32(bp + 28));
+            printf("  Number of latency misses attributable to background "
+                   "operations = %u\n", sg_get_unaligned_be32(bp + 32));
+            break;
+        default:
+            printf("  <<unexpected parameter code 0x%x\n", pc);
+            break;
+        }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
