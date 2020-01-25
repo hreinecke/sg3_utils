@@ -96,7 +96,7 @@ ENV{ID_WWN_WITH_EXTENSION}=="?*", ENV{ID_WWN}!="?*", \
 	PROGRAM="/bin/sh -c 'echo $env{ID_WWN_WITH_EXTENSION} | /bin/sed s/^\\\(0x.\\\{1,16\\\}\\\).*/\\1/'", \
 	ENV{ID_WWN}="$result"
 
-# ata_id compability
+# ata_id compatibility
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_ATA}=="?*", ENV{ID_BUS}="ata", ENV{ID_ATA}="1", ENV{ID_SERIAL}="$env{SCSI_IDENT_LUN_ATA}"
 ENV{ID_SERIAL_SHORT}!="?*", ENV{SCSI_VENDOR}=="ATA", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_VENDOR}"
 # Compat ID_SERIAL setting

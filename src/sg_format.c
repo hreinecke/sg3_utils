@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2019  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2020  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.60 20191220";
+static const char * version_str = "1.61 20200123";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -72,6 +72,11 @@ static const char * version_str = "1.60 20191220";
 /* FORMAT UNIT (SBC) and FORMAT MEDIUM (SSC) share the same opcode */
 #define SG_FORMAT_MEDIUM_CMD 0x4
 #define SG_FORMAT_MEDIUM_CMDLEN 6
+
+/* FORMAT WITH PRESET (new in sbc4r18) */
+#define SG_FORMAT_WITH_PRESET_CMD 0x38
+#define SG_FORMAT_WITH_PRESET_CMDLEN 10
+
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 struct opts_t {
@@ -79,13 +84,15 @@ struct opts_t {
         bool cmplst_given;
         bool dry_run;           /* -d */
         bool early;             /* -e */
-        bool fwait;             /* -w (negate for immed) */
+        bool fmtmaxlba;         /* -b (only with F_WITH_PRESET) */
+        bool fwait;             /* -w (negated form IMMED) */
         bool ip_def;            /* -I */
         bool long_lba;          /* -l */
         bool mode6;             /* -6 */
         bool pinfo;             /* -p, deprecated, prefer fmtpinfo */
         bool poll_type;         /* -x 0|1 */
         bool poll_type_given;
+        bool preset;            /* -E */
         bool quick;             /* -Q */
         bool do_rcap16;         /* -l */
         bool resize;            /* -r */
@@ -98,6 +105,7 @@ struct opts_t {
         int ffmt;               /* -t value; fast_format if > 0 */
         int fmtpinfo;
         int format;             /* -F */
+        uint32_t p_id;          /* set by argument of --preset=id  */
         int mode_page;          /* -M value */
         int pfu;                /* -P value */
         int pie;                /* -q value */
@@ -120,6 +128,7 @@ static struct option long_options[] = {
         {"dry_run", no_argument, 0, 'd'},
         {"early", no_argument, 0, 'e'},
         {"ffmt", required_argument, 0, 't'},
+        {"fmtmaxlba", no_argument, 0, 'b'},
         {"fmtpinfo", required_argument, 0, 'f'},
         {"format", no_argument, 0, 'F'},
         {"help", no_argument, 0, 'h'},
@@ -131,6 +140,7 @@ static struct option long_options[] = {
         {"pfu", required_argument, 0, 'P'},
         {"pie", required_argument, 0, 'q'},
         {"poll", required_argument, 0, 'x'},
+        {"preset", required_argument, 0, 'E'},
         {"quick", no_argument, 0, 'Q'},
         {"resize", no_argument, 0, 'r'},
         {"rto_req", no_argument, 0, 'R'},
@@ -153,15 +163,17 @@ usage()
         printf("Usage:\n"
                "  sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
                "[--dry-run] [--early]\n"
-               "            [--ffmt=FFMT] [--fmtpinfo=FPI] [--format] "
-               "[--help] [--ip-def]\n"
-               "            [--long] [--mode=MP] [--pfu=PFU] [--pie=PIE] "
-               "[--pinfo]\n"
-               "            [--poll=PT] [--quick] [--resize] [--rto_req] "
-               "[--security]\n"
-               "            [--six] [--size=LB_SZ] [--tape=FM] "
-               "[--timeout=SECS] [--verbose]\n"
-               "            [--verify] [--version] [--wait] DEVICE\n"
+               "            [--ffmt=FFMT] [--fmtmaxlba] [--fmtpinfo=FPI] "
+               "[--format] [--help]\n"
+               "            [--ip-def] [--long] [--mode=MP] [--pfu=PFU] "
+               "[--pie=PIE]\n"
+               "            [--pinfo] [--poll=PT] [--preset=ID] [--quick] "
+               "[--resize]\n"
+               "            [--rto_req] [--security] [--six] [--size=LB_SZ] "
+               "[--tape=FM]\n"
+               "            [--timeout=SECS] [--verbose] [--verify] "
+               "[--version] [--wait]\n"
+               "            DEVICE\n"
                "  where:\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
@@ -190,6 +202,8 @@ usage()
                "count and size)\n"
                "                    use thrice for FORMAT UNIT command "
                "only\n"
+               "    --fmtmaxlba|-b    sets FMTMAXLBA field in FORMAT WITH "
+               "PRESET\n"
                "    --help|-h       prints out this usage message\n"
                "    --ip-def|-I     use default initialization pattern\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
@@ -204,8 +218,12 @@ usage()
                "    --poll=PT|-x PT    PT is poll type, 0 for test unit "
                "ready\n"
                "                       1 for request sense (def: 0 (1 "
-               "for tape))\n");
-        printf("    --quick|-Q      start format without pause for user "
+               "for tape and\n"
+               "                       format with preset))\n");
+        printf("    --preset=ID|-E ID    do FORMAT WITH PRESET command "
+               "with PRESET\n"
+               "                         IDENTIFIER field set to ID\n"
+               "    --quick|-Q      start format without pause for user "
                "intervention\n"
                "                    (i.e. no time to reconsider)\n"
                "    --resize|-r     resize (rather than format) to COUNT "
@@ -231,17 +249,19 @@ usage()
                "    --verbose|-v    increase verbosity\n"
                "    --verify|-y     sets VERIFY bit in FORMAT MEDIUM (tape)\n"
                "    --version|-V    print version details and exit\n"
-               "    --wait|-w       format command waits until format "
-               "operation completes\n"
+               "    --wait|-w       format commands wait until format "
+               "operations complete\n"
                "                    (default: set IMMED=1 and poll with "
                "Test Unit Ready)\n\n"
                "\tExample: sg_format --format /dev/sdc\n\n"
                "This utility formats a SCSI disk [FORMAT UNIT] or resizes "
                "it. Alternatively\nif '--tape=FM' is given formats a tape "
-               "[FORMAT MEDIUM].\n\n");
-        printf("WARNING: This utility will destroy all the data on "
-               "DEVICE when '--format'\n\t or '--tape' is given. Check that "
-               "you have specified the correct\n\t DEVICE.\n");
+               "[FORMAT MEDIUM]. Another alternative\nis doing the FORMAT "
+               "WITH PRESET command when '--preset=ID' is given.\n\n");
+        printf("WARNING: This utility will destroy all the data on the "
+               "DEVICE when\n\t '--format', '--tape=FM' or '--preset=ID' "
+               "is given. Double check\n\t that you have specified the "
+               "correct DEVICE.\n");
 }
 
 /* Invokes a SCSI FORMAT MEDIUM command (SSC).  Return of 0 -> success,
@@ -283,6 +303,61 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, transfer_len);
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
         ret = sg_cmds_process_resp(ptvp, "format medium", res, noisy,
+                                   verbose, &sense_cat);
+        if (-1 == ret)
+                ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+        else if (-2 == ret) {
+                switch (sense_cat) {
+                case SG_LIB_CAT_RECOVERED:
+                case SG_LIB_CAT_NO_SENSE:
+                        ret = 0;
+                        break;
+                default:
+                        ret = sense_cat;
+                        break;
+                }
+        } else
+                ret = 0;
+        destruct_scsi_pt_obj(ptvp);
+        return ret;
+}
+
+/* Invokes a SCSI FORMAT WITH PRESET command (SBC).  Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
+static int
+sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
+                         uint32_t preset_id, int timeout, bool noisy,
+                         int verbose)
+{
+        int ret, res, sense_cat;
+        uint8_t fwp_cdb[SG_FORMAT_WITH_PRESET_CMDLEN] =
+                     {SG_FORMAT_WITH_PRESET_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        uint8_t sense_b[SENSE_BUFF_LEN];
+        struct sg_pt_base * ptvp;
+
+        if (immed)
+                fwp_cdb[1] |= 0x80;
+        if (fmtmaxlba)
+                fwp_cdb[1] |= 0x40;
+        if (preset_id > 0)
+                sg_put_unaligned_be32(preset_id, fwp_cdb + 2);
+        if (verbose) {
+                char b[128];
+
+                pr2serr("    Format with preset cdb: %s\n",
+                        sg_get_command_str(fwp_cdb,
+                                           SG_FORMAT_WITH_PRESET_CMDLEN,
+                                           false, sizeof(b), b));
+        }
+        ptvp = construct_scsi_pt_obj();
+        if (NULL == ptvp) {
+                pr2serr("%s: out of memory\n", __func__);
+                return sg_convert_errno(ENOMEM);
+        }
+        set_scsi_pt_cdb(ptvp, fwp_cdb, sizeof(fwp_cdb));
+        set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+        res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
+        ret = sg_cmds_process_resp(ptvp, "format with preset", res, noisy,
                                    verbose, &sense_cat);
         if (-1 == ret)
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
@@ -493,7 +568,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 tmout = op->timeout;
         if (op->dry_run) {
                 res = 0;
-                pr2serr("Due to --dry-run option bypassing FORMAT UNIT "
+                pr2serr("Due to --dry-run option bypassing FORMAT MEDIUM "
                         "command\n");
         } else
                 res = sg_ll_format_medium(fd, op->verify, immed,
@@ -577,6 +652,114 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         free(free_reqSense);
         }
         printf("FORMAT MEDIUM Complete\n");
+        return 0;
+}
+
+/* Return 0 on success, else see sg_ll_format_medium() above */
+static int
+scsi_format_with_preset(int fd, const struct opts_t * op)
+{
+        int res, progress, pr, rem, resp_len, tmout;
+        int vb = op->verbose;
+        bool immed = ! op->fwait;
+        char b[80];
+
+        if (immed)
+                tmout = SHORT_TIMEOUT;
+        else {
+                if (op->total_byte_count > EIGHT_TBYTE)
+                        tmout = VLONG_FORMAT_TIMEOUT;
+                else if (op->total_byte_count > FOUR_TBYTE)
+                        tmout = LONG_FORMAT_TIMEOUT;
+                else
+                        tmout = FORMAT_TIMEOUT;
+        }
+        if (op->timeout > tmout)
+                tmout = op->timeout;
+        if (op->dry_run) {
+                res = 0;
+                pr2serr("Due to --dry-run option bypassing FORMAT WITH "
+                        "PRESET command\n");
+        } else
+                res = sg_ll_format_with_preset(fd, immed, op->fmtmaxlba,
+                                               op->p_id, tmout, true, vb);
+        if (res) {
+                sg_get_category_sense_str(res, sizeof(b), b, vb);
+                pr2serr("Format with preset command: %s\n", b);
+                return res;
+        }
+        if (! immed)
+                return 0;
+
+        if (! op->dry_run)
+                printf("\nFormat with preset has started\n");
+        if (op->early) {
+                if (immed)
+                        printf("Format continuing,\n    Request sense can "
+                               "be used to monitor progress\n");
+                return 0;
+        }
+
+        if (op->dry_run) {
+                printf("No point in polling for progress, so exit\n");
+                return 0;
+        }
+        if (! op->poll_type) {
+                for(;;) {
+                        sleep_for(POLL_DURATION_SECS);
+                        progress = -1;
+                        res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
+                                             true, (vb > 1) ? (vb - 1) : 0);
+                        if (progress >= 0) {
+                                pr = (progress * 100) / 65536;
+                                rem = ((progress * 100) % 65536) / 656;
+                                printf("Format in progress, %d.%02d%% done\n",
+                                       pr, rem);
+                        } else
+                                break;
+                }
+        }
+        if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
+                uint8_t * reqSense;
+                uint8_t * free_reqSense = NULL;
+
+                reqSense = sg_memalign(MAX_BUFF_SZ, 0, &free_reqSense, false);
+                if (NULL == reqSense) {
+                        pr2serr("%s: unable to obtain heap for Request "
+                                "Sense\n", __func__);
+                        return sg_convert_errno(ENOMEM);
+                }
+                for(;;) {
+                        sleep_for(POLL_DURATION_SECS);
+                        memset(reqSense, 0x0, MAX_BUFF_SZ);
+                        res = sg_ll_request_sense(fd, false, reqSense,
+                                                  MAX_BUFF_SZ, false,
+                                                  (vb > 1) ? (vb - 1) : 0);
+                        if (res) {
+                                pr2serr("polling with Request Sense command "
+                                        "failed [res=%d]\n", res);
+                                break;
+                        }
+                        resp_len = reqSense[7] + 8;
+                        if (vb > 1) {
+                                pr2serr("Parameter data in hex:\n");
+                                hex2stderr(reqSense, resp_len, 1);
+                        }
+                        progress = -1;
+                        sg_get_sense_progress_fld(reqSense, resp_len,
+                                                  &progress);
+                        if (progress >= 0) {
+                                pr = (progress * 100) / 65536;
+                                rem = ((progress * 100) % 65536) / 656;
+                                printf("Format in progress, %d.%02d%% done\n",
+                                       pr, rem);
+                        } else
+                                break;
+                }
+                if (free_reqSense)
+                        free(free_reqSense);
+        }
+        printf("FORMAT WITH PRESET Complete\n");
         return 0;
 }
 
@@ -1033,6 +1216,7 @@ static int
 parse_cmd_line(struct opts_t * op, int argc, char **argv)
 {
         int j;
+        int64_t ll;
 
         op->cmplst = true;      /* will be set false if FFMT > 0 */
         op->mode_page = RW_ERROR_RECOVERY_PAGE;
@@ -1043,12 +1227,15 @@ parse_cmd_line(struct opts_t * op, int argc, char **argv)
                 int c;
 
                 c = getopt_long(argc, argv,
-                                "c:C:dDef:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
+                                "bc:C:dDeE:f:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
 
                 switch (c) {
+                case 'b':
+                        op->fmtmaxlba = true;
+                        break;
                 case 'c':
                         if (0 == strcmp("-1", optarg))
                                 op->blk_count = -1;
@@ -1078,6 +1265,17 @@ parse_cmd_line(struct opts_t * op, int argc, char **argv)
                         break;
                 case 'e':
                         op->early = true;
+                        break;
+                case 'E':
+                        ll = sg_get_llnum(optarg);
+                        if ((ll < 0) || (ll > UINT32_MAX)) {
+                                pr2serr("bad argument to '--preset', need 32 "
+                                        "bit integer\n");
+                                return SG_LIB_SYNTAX_ERROR;
+                        }
+                        op->p_id = (uint32_t)ll;
+                        op->preset = true;
+                        op->poll_type = 1;      /* poll with REQUEST SENSE */
                         break;
                 case 'f':
                         op->fmtpinfo = sg_get_num(optarg);
@@ -1240,9 +1438,10 @@ parse_cmd_line(struct opts_t * op, int argc, char **argv)
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
         }
-        if (op->format && (op->tape >= 0)) {
-                pr2serr("Cannot choose both '--format' and '--tape='; disk "
-                        "or tape, choose one only\n");
+        if (((int)(op->format > 0) + (int)(op->tape >= 0) + (int)op->preset)
+            > 1) {
+                pr2serr("Can choose only one of: '--format', '--tape=' and "
+                        "'--preset='\n");
                 return SG_LIB_CONTRADICT;
         }
         if (op->ip_def && op->sec_init) {
@@ -1352,7 +1551,8 @@ main(int argc, char **argv)
                         goto out;
                 }
                 goto format_med;
-        }
+        } else if (op->preset)
+                goto format_with_pre;
 
         ret = fetch_block_desc(fd, dbuff, &calc_len, &bd_lb_sz, op);
         if (ret) {
@@ -1428,7 +1628,6 @@ again_sp_false:
 
         if (op->format) {
 format_only:
-#if 1
                 if (op->quick)
                         goto skip_f_unit_reconsider;
                 printf("\nA FORMAT UNIT will commence in 15 seconds\n");
@@ -1455,9 +1654,6 @@ skip_f_unit_reconsider:
                                 pr2serr("    try '-v' for more "
                                         "information\n");
                 }
-#else
-                pr2serr("FORMAT UNIT ignored, testing\n");
-#endif
         }
         goto out;
 
@@ -1487,8 +1683,35 @@ skip_f_med_reconsider:
         if (res) {
                 pr2serr("FORMAT MEDIUM failed\n");
                 if (0 == vb)
-                        pr2serr("    try '-v' for more "
-                                "information\n");
+                        pr2serr("    try '-v' for more information\n");
+        }
+        goto out;
+
+format_with_pre:
+        if (op->quick)
+                goto skip_f_with_pre_reconsider;
+        printf("\nA FORMAT WITH PRESET will commence in 15 seconds\n");
+        printf("    ALL data on %s will be DESTROYED\n",
+               op->device_name);
+        printf("        Press control-C to abort\n");
+        sleep_for(5);
+        printf("\nA FORMAT WITH PRESET will commence in 10 seconds\n");
+        printf("    ALL data on %s will be DESTROYED\n",
+               op->device_name);
+        printf("        Press control-C to abort\n");
+        sleep_for(5);
+        printf("\nA FORMAT WITH PRESET will commence in 5 seconds\n");
+        printf("    ALL data on %s will be DESTROYED\n",
+               op->device_name);
+        printf("        Press control-C to abort\n");
+        sleep_for(5);
+skip_f_with_pre_reconsider:
+        res = scsi_format_with_preset(fd, op);
+        ret = res;
+        if (res) {
+                pr2serr("FORMAT WITH PRESET failed\n");
+                if (0 == vb)
+                        pr2serr("    try '-v' for more information\n");
         }
 
 out:

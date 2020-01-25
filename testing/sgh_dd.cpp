@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.64 20200110";
+static const char * version_str = "1.66 20200120";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -138,6 +138,8 @@ static const char * version_str = "1.64 20200110";
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
 #define SGP_READ10 0x28
+#define SGP_PRE_FETCH10 0x34
+#define SGP_PRE_FETCH16 0x90
 #define SGP_VERIFY10 0x2f
 #define SGP_WRITE10 0x2a
 #define DEF_NUM_THREADS 4
@@ -247,6 +249,7 @@ typedef struct global_collection
     bool mrq_async;             /* either mrq_immed or no_waitq flags given */
     bool unbalanced_mrq;        /* so _not_ sg->sg request sharing sync mrq */
     bool verify;                /* don't copy, verify like Unix: cmp */
+    bool prefetch;              /* for verify: do PF(b),RD(a),V(b)_a_data */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -348,12 +351,14 @@ static pthread_t sig_listen_thread_id;
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static void sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr);
-static void sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2);
+static void sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2,
+                          bool prefetch);
 static bool normal_in_rd(Rq_elem * rep, int blocks);
 static void normal_out_wr(Rq_elem * rep, int blocks);
 static int sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
-                       bool is_wr2);
-static int sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2);
+                       bool is_wr2, bool prefetch);
+static int sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2,
+                        bool prefetch);
 static int sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp,
                       int *mmap_len);
 static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
@@ -826,9 +831,10 @@ usage(int pg_num)
             "[fua=0|1|2|3]\n"
             "               [mrq=[IO,]NRQS[,C]] [of2=OFILE2] [ofreg=OFREG] "
             "[sync=0|1]\n"
-            "               [thr=THR] [time=0|1] [verbose=VERB] [--dry-run] "
-            "[--verbose]\n"
-            "               [--verify] [--version]\n\n"
+            "               [thr=THR] [time=0|1] [verbose=VERB] "
+            "[--dry-run]\n"
+            "               [--prefetch] [--verbose] [--verify] "
+            "[--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -851,6 +857,7 @@ usage(int pg_num)
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
+            "    --prefetch|-p    with verify: do pre-fetch first\n"
             "    --verify|-x    do a verify (compare) operation [def: do a "
             "copy]\n"
             "    --version|-V   output version string then exit\n\n"
@@ -996,7 +1003,17 @@ page4:
             "is intended to be\na temporary state. It should not block "
             "but does sometimes (e.g. in\nblock_get_request()). Even so "
             "that blockage should be short and if not\nthere is a "
-            "problem.\n");
+            "problem.\n\n");
+    pr2serr("--verify :\n"
+            "For comparing IFILE with OFILE. Does repeated sequences of: "
+            "READ(ifile)\nand uses data returned to send to VERIFY(ofile, "
+            "BYTCHK=1). So the OFILE\ndevice/disk is doing the actual "
+            "comparison. Stops on first miscompare.\n\n");
+    pr2serr("--prefetch :\n"
+            "Used with --verify option. Prepends a PRE-FETCH(ofile, IMMED) "
+            "to verify\nsequence. This should speed the trailing VERIFY by "
+            "making sure that\nthe data it needs for the comparison is "
+            "already in its cache.\n");
     return;
 }
 
@@ -1499,11 +1516,11 @@ skip_force_out_sequence:
         wr_blks = rep->num_blks;
         if (out_is_sg) {
             if (rep->swait && rep->has_share) {
-		/* done already in sg_in_out_interleave() */
+                /* done already in sg_in_out_interleave() */
                 status = pthread_mutex_unlock(&clp->out_mutex);
                 if (0 != status) err_exit(status, "unlock out_mutex");
             } else              /* release out_mtx */
-                sg_out_wr_cmd(rep, deferred_arr, false);
+                sg_out_wr_cmd(rep, deferred_arr, false, clp->prefetch);
         } else if (FT_DEV_NULL == clp->out_type) {
             /* skip actual write operation */
             wr_blks = 0;
@@ -1525,7 +1542,7 @@ skip_force_out_sequence:
             status = pthread_mutex_lock(&clp->out2_mutex);
             if (0 != status) err_exit(status, "lock out2_mutex");
             /* releases out2_mutex mid operation */
-            sg_out_wr_cmd(rep, deferred_arr, true);
+            sg_out_wr_cmd(rep, deferred_arr, true, false);
 
             pthread_cleanup_pop(0);
         }
@@ -1806,7 +1823,7 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
     int res, status, pack_id;
 
     while (1) {
-        res = sg_start_io(rep, def_arr, pack_id, false);
+        res = sg_start_io(rep, def_arr, pack_id, false, false);
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
@@ -1821,7 +1838,7 @@ sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
         status = pthread_mutex_unlock(&clp->in_mutex);
         if (0 != status) err_exit(status, "unlock in_mutex");
 
-        res = sg_finish_io(rep->wr, rep, pack_id, false);
+        res = sg_finish_io(rep->wr, rep, pack_id, false, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -1926,7 +1943,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
 
 /* Enters this function holding out_mutex */
 static void
-sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
+sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2, bool prefetch)
 {
     int res, status, pack_id;
     Gbl_coll * clp = rep->clp;
@@ -1935,8 +1952,9 @@ sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
     if (rep->has_share && is_wr2)
         sg_wr_swap_share(rep, rep->out2fd, true);
 
-    while (1) {
-        res = sg_start_io(rep, def_arr, pack_id, is_wr2);
+    if (prefetch) {
+again:
+        res = sg_start_io(rep, def_arr, pack_id, is_wr2, true);
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
@@ -1951,7 +1969,47 @@ sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
         status = pthread_mutex_unlock(mutexp);
         if (0 != status) err_exit(status, "unlock out_mutex");
 
-        res = sg_finish_io(rep->wr, rep, pack_id, is_wr2);
+        res = sg_finish_io(rep->wr, rep, pack_id, is_wr2, true);
+        switch (res) {
+        case SG_LIB_CAT_ABORTED_COMMAND:
+        case SG_LIB_CAT_UNIT_ATTENTION:
+            /* try again with same addr, count info */
+            /* now re-acquire out mutex for balance */
+            /* N.B. This re-write could now be out of write sequence */
+            status = pthread_mutex_lock(mutexp);
+            if (0 != status) err_exit(status, "lock out_mutex");
+            goto again;
+        case SG_LIB_CAT_CONDITION_MET:
+        case 0:
+            status = pthread_mutex_lock(mutexp);
+            if (0 != status) err_exit(status, "unlock out_mutex");
+            break;
+        default:
+            pr2serr_lk("error finishing sg prefetch command (%d)\n", res);
+            if (exit_status <= 0)
+                exit_status = res;
+            stop_both(clp);
+            goto fini;
+        }
+    }
+
+    while (1) {
+        res = sg_start_io(rep, def_arr, pack_id, is_wr2, false);
+        if (1 == res)
+            err_exit(ENOMEM, "sg starting out command");
+        else if (res < 0) {
+            pr2serr_lk("%soutputting from sg failed, blk=%" PRId64 "\n",
+                       my_name, rep->oblk);
+            status = pthread_mutex_unlock(mutexp);
+            if (0 != status) err_exit(status, "unlock out_mutex");
+            stop_both(clp);
+            goto fini;
+        }
+        /* Now release in mutex to let other reads run in parallel */
+        status = pthread_mutex_unlock(mutexp);
+        if (0 != status) err_exit(status, "unlock out_mutex");
+
+        res = sg_finish_io(rep->wr, rep, pack_id, is_wr2, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -1978,6 +2036,7 @@ sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2)
             /* FALL THROUGH */
 #endif
 #endif
+        case SG_LIB_CAT_CONDITION_MET:
         case 0:
             if (! is_wr2) {
                 status = pthread_mutex_lock(mutexp);
@@ -2019,7 +2078,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int n_cmpl = ctl_v4p->info;
     int n_good = 0;
     int vb = clp->debug;
-    int k, slen;
+    int k, slen, sstatus;
     uint32_t good_inblks = 0;
     uint32_t good_outblks = 0;
     const struct sg_io_v4 * a_np = a_v4p;
@@ -2050,8 +2109,9 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             v4hdr_out_lk("cop", ctl_v4p, id);
         }
         ok = true;
-        if (a_np->device_status || a_np->transport_status ||
-            a_np->driver_status) {
+        sstatus = a_np->device_status;
+        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
+            a_np->transport_status || a_np->driver_status) {
             ok = false;
             if (SAM_STAT_CHECK_CONDITION != a_np->device_status) {
                 pr2serr_lk("[%d] %s, a_n[%d]:\n", id, __func__, k);
@@ -2614,7 +2674,7 @@ fini:
 /* Returns 0 on success, 1 if ENOMEM error else -1 for other errors. */
 static int
 sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
-            bool is_wr2)
+            bool is_wr2, bool prefetch)
 {
     Gbl_coll * clp = rep->clp;
     bool wr = rep->wr;
@@ -2640,9 +2700,11 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     b_len = sizeof(b);
     if (wr) {
         fd = is_wr2 ? rep->out2fd : rep->outfd;
-        if (clp->verify)
+        if (clp->verify) {
             crwp = is_wr2 ? "verifying2" : "verifying";
-        else
+            if (prefetch)
+                crwp = is_wr2 ? "prefetch2" : "prefetch";
+        } else
             crwp = is_wr2 ? "writing2" : "writing";
     } else {
         fd = rep->infd;
@@ -2655,6 +2717,18 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         pr2serr_lk("%sbad cdb build, start_blk=%" PRId64 ", blocks=%d\n",
                    my_name, blk, rep->num_blks);
         return -1;
+    }
+    if (prefetch) {
+        if (cdbsz == 10)
+            rep->cmd[0] = SGP_PRE_FETCH10;
+        else if (cdbsz == 16)
+            rep->cmd[0] = SGP_PRE_FETCH16;
+        else {
+            pr2serr_lk("%sbad PRE-FETCH build, start_blk=%" PRId64 ", "
+                       "blocks=%d\n", my_name, blk, rep->num_blks);
+            return -1;
+        }
+        rep->cmd[1] = 0x2;      /* set IMMED (no fua or dpo) */
     }
     if (mmap && (rep->outregfd >= 0))
         flags |= SG_FLAG_MMAP_IO;
@@ -2703,15 +2777,22 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         lk_print_command_len(prefix, rep->cmd, cdbsz, lock);
     }
     if (v4)
-        goto do_v4;
+        goto do_v4;     // <<<<<<<<<<<<<<< look further down
 
     memset(hp, 0, sizeof(struct sg_io_hdr));
     hp->interface_id = 'S';
     hp->cmd_len = cdbsz;
     hp->cmdp = rep->cmd;
-    hp->dxfer_direction = wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
-    hp->dxfer_len = clp->bs * rep->num_blks;
     hp->dxferp = get_buffp(rep);
+    hp->dxfer_len = clp->bs * rep->num_blks;
+    if (!wr)
+        hp->dxfer_direction = SG_DXFER_FROM_DEV;
+    else if (prefetch) {
+        hp->dxfer_direction = SG_DXFER_NONE;
+        hp->dxfer_len = 0;
+        hp->dxferp = NULL;
+    } else
+        hp->dxfer_direction = SG_DXFER_TO_DEV;
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
@@ -2752,8 +2833,13 @@ do_v4:
     h4p->request_len = cdbsz;
     h4p->request = (uint64_t)rep->cmd;
     if (wr) {
-        h4p->dout_xfer_len = clp->bs * rep->num_blks;
-        h4p->dout_xferp = (uint64_t)get_buffp(rep);
+        if (prefetch) {
+            h4p->dout_xfer_len = 0;     // din_xfer_len is also 0
+            h4p->dout_xferp = 0;
+        } else {
+            h4p->dout_xfer_len = clp->bs * rep->num_blks;
+            h4p->dout_xferp = (uint64_t)get_buffp(rep);
+        }
     } else if (rep->num_blks > 0) {
         h4p->din_xfer_len = clp->bs * rep->num_blks;
         h4p->din_xferp = (uint64_t)get_buffp(rep);
@@ -2855,7 +2941,7 @@ do_v4:
    -> try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
    -1 other errors */
 static int
-sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
+sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2, bool prefetch)
 {
     Gbl_coll * clp = rep->clp;
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
@@ -2872,8 +2958,11 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
     if (wr) {
         fd = is_wr2 ? rep->out2fd : rep->outfd;
         cp = is_wr2 ? "writing2" : "writing";
-        if (clp->verify)
+        if (clp->verify) {
             cp = is_wr2 ? "verifying2" : "verifying";
+            if (prefetch)
+                cp = is_wr2 ? "prefetch2" : "prefetch";
+        }
     } else {
         fd = rep->infd;
         cp = "reading";
@@ -2915,6 +3004,7 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, bool is_wr2)
     res = sg_err_category3(hp);
     switch (res) {
     case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_CONDITION_MET:
         break;
     case SG_LIB_CAT_RECOVERED:
         lk_chk_n_print3(cp, hp, false);
@@ -2983,6 +3073,7 @@ do_v4:
                               h4p->response_len);
     switch (res) {
     case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_CONDITION_MET:
         break;
     case SG_LIB_CAT_RECOVERED:
         lk_chk_n_print4(cp, h4p, false);
@@ -3042,7 +3133,7 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep, mrq_arr_t & def_arr)
 
     while (1) {
         /* start READ */
-        res = sg_start_io(rep, def_arr, pid_read, false);
+        res = sg_start_io(rep, def_arr, pid_read, false, false);
         if (1 == res)
             err_exit(ENOMEM, "sg interleave starting in command");
         else if (res < 0) {
@@ -3056,7 +3147,7 @@ sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep, mrq_arr_t & def_arr)
 
         /* start WRITE */
         rep->wr = true;
-        res = sg_start_io(rep, def_arr, pid_write, false);
+        res = sg_start_io(rep, def_arr, pid_write, false, false);
         if (1 == res)
             err_exit(ENOMEM, "sg interleave starting out command");
         else if (res < 0) {
@@ -3079,7 +3170,7 @@ read_complet:
 
         /* finish READ */
         rep->wr = false;
-        res = sg_finish_io(rep->wr, rep, pid_read, false);
+        res = sg_finish_io(rep->wr, rep, pid_read, false, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -3139,7 +3230,7 @@ write_complet:
 #endif
         /* finish WRITE, no lock held */
         rep->wr = true;
-        res = sg_finish_io(rep->wr, rep, pid_write, false);
+        res = sg_finish_io(rep->wr, rep, pid_write, false, false);
         switch (res) {
         case SG_LIB_CAT_ABORTED_COMMAND:
         case SG_LIB_CAT_UNIT_ATTENTION:
@@ -3671,6 +3762,10 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
             n = num_chs_in_str(key + 1, keylen - 1, 'h');
             clp->help += n;
             res += n;
+            n = num_chs_in_str(key + 1, keylen - 1, 'p');
+            if (n > 0)
+                clp->prefetch = true;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
             if (n > 0)
                 verbose_given = true;
@@ -3696,6 +3791,9 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
         else if ((0 == strncmp(key, "--help", 6)) ||
                    (0 == strcmp(key, "-?")))
             ++clp->help;
+        else if ((0 == strncmp(key, "--prefetch", 10)) ||
+                 (0 == strncmp(key, "--pre-fetch", 11)))
+            clp->prefetch = true;
         else if (0 == strncmp(key, "--verb", 6)) {
             verbose_given = true;
             ++clp->debug;      /* --verbose */

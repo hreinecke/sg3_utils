@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2019 Douglas Gilbert.
+ * Copyright (c) 2006-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.56 20191204";  /* spc5r22 + sbc4r17 */
+static const char * version_str = "1.57 20200123";  /* spc6r01 + sbc4r18 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -78,6 +78,7 @@ static const char * version_str = "1.56 20191204";  /* spc5r22 + sbc4r17 */
 #define VPD_LB_PROTECTION 0xb5          /* SSC-5 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
+#define VPD_FORMAT_PRESETS 0xb8         /* sbc4r18 */
 #define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
 /* Device identification VPD page associations */
@@ -210,6 +211,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_DTDE_ADDRESS, 0, 1, "dtde",
      "Data transfer device element address (SSC)"},
     {VPD_EXT_INQ, 0, -1, "ei", "Extended inquiry data"},
+    {VPD_FORMAT_PRESETS, 0, 0, "fp", "Format presets"},
     {VPD_IMP_OP_DEF, 0, -1, "iod",
      "Implemented operating definition (obsolete)"},
     {VPD_LB_PROTECTION, 0, 0, "lbpro", "Logical block protection (SSC)"},

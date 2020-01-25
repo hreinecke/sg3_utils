@@ -383,7 +383,7 @@ void sg_set_warnings_strm(FILE * warnings_strm);
  * least blen bytes long. If cmd_name is true then the command is prefixed
  * by its SCSI command name (e.g.  "VERIFY(10) [2f ...]". The command is
  * shown as spaced separated pairs of hexadecimal digits (i.e. 0-9, a-f).
- * Each pair repesents byte. The leftmost pair of digits is cmdp[0] . If
+ * Each pair represents byte. The leftmost pair of digits is cmdp[0] . If
  * sz <= 0 then this function tries to guess the length of the command. */
 char *
 sg_get_command_str(const uint8_t * cmdp, int sz, bool cmd_name, int blen,

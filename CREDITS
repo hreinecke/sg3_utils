@@ -145,6 +145,9 @@ Tom Steudten <steudten at gmx dot ch> sginfo addition: add '-Fhead' option
 Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
         data and "-6" switch for sg_modes
 
+Xose Vazquez Perez <xose dot vazquez at gmail dot com>
+	documentation corrections [20200117]
+
 
 Douglas Gilbert
-29th April 2019
+17th January 2020

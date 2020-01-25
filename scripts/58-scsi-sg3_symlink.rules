@@ -19,7 +19,7 @@ ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-
 # 3: IEEE Extended
 ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_EXT}"
 ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_EXT}-part%n"
-# 4: EUI-64 identifer (prefix 2)
+# 4: EUI-64 identifier (prefix 2)
 ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-2$env{SCSI_IDENT_LUN_EUI64}"
 ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-2$env{SCSI_IDENT_LUN_EUI64}-part%n"
 # 5: SCSI name identifier (prefix 8)

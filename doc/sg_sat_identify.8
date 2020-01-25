@@ -1,4 +1,4 @@
-.TH SG_SAT_IDENTIFY "8" "January 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SAT_IDENTIFY "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_sat_identify \- send ATA IDENTIFY DEVICE command via SCSI to ATA
 Translation (SAT) layer
@@ -23,7 +23,7 @@ www.t10.org) defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16
 byte "cdb" and the other with a 12 byte cdb. This utility defaults to using
 the 16 byte cdb variant. SAT\-4 revision 5 added a SCSI "ATA
 PASS\-THROUGH(32)" command. SAT\-2 and SAT\-3 are now also standards: SAT\-2
-ANSI INCITS 465\-2010 and SAT\3 ANSI INCITS 517-2015 . The SAT\-4 project
+ANSI INCITS 465\-2010 and SAT\-3 ANSI INCITS 517-2015 . The SAT\-4 project
 is near standardization and the most recent draft is sat4r06.pdf .
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
@@ -159,7 +159,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2006\-2018 Douglas Gilbert
+Copyright \(co 2006\-2020 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
