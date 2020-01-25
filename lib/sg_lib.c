@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2019 Douglas Gilbert.
+ * Copyright (c) 1999-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -167,7 +167,7 @@ static char bin2hexascii[] = {'0', '1', '2', '3', '4', '5', '6', '7',
  * least blen bytes long. If cmd_name is true then the command is prefixed
  * by its SCSI command name (e.g.  "VERIFY(10) [2f ...]". The command is
  * shown as spaced separated pairs of hexadecimal digits (i.e. 0-9, a-f).
- * Each pair repesents byte. The leftmost pair of digits is cmdp[0] . If
+ * Each pair represents byte. The leftmost pair of digits is cmdp[0] . If
  * sz <= 0 then this function tries to guess the length of the command. */
 char *
 sg_get_command_str(const uint8_t * cmdp, int sz, bool cmd_name, int blen,

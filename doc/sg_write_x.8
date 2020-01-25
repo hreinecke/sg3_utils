@@ -1,4 +1,4 @@
-.TH SG_WRITE_X "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WRITE_X "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 .SH SYNOPSIS
@@ -451,7 +451,7 @@ output version string then exit.
 .TP
 \fB\-w\fR, \fB\-\-wrprotect\fR=\fIWPR\fR
 sets the WRPROTECT field (3 bits) in all sg_write_x commands apart from
-ORWRITE which has a 3 bit ORPROTECT field (and the synopsis shows \fiOPR\fR
+ORWRITE which has a 3 bit ORPROTECT field (and the synopsis shows \fIOPR\fR
 to highlight the difference). In all cases \fIWPR\fR is placed
 in that 3 bit field. The default value is zero which does not send any PI
 in the data\-out buffer. \fIWPR\fR should be a value between 0 and 7.
@@ -587,7 +587,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2017 Douglas Gilbert
+Copyright \(co 2017\-2020 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

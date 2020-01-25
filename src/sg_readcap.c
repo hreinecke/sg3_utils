@@ -1,7 +1,7 @@
 /* This code is does a SCSI READ CAPACITY command on the given device
  * and outputs the result.
  *
- * Copyright (C) 1999 - 2018 D. Gilbert
+ * Copyright (C) 1999 - 2020 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.04 20180911";
+static const char * version_str = "4.05 20200122";
 
 #define ME "sg_readcap: "
 
@@ -83,12 +83,14 @@ struct opts_t {
 static void
 usage()
 {
-    pr2serr("Usage: sg_readcap [--brief] [--help] [--hex] [--lba=LBA] "
-            "[--long] [--16]\n"
+    pr2serr("Usage: sg_readcap [--16] [--brief] [--help] [--hex] "
+            "[--lba=LBA] [--long]\n"
             "                  [--pmi] [--raw] [--readonly] [--verbose] "
             "[--version]\n"
             "                  [--zbc] DEVICE\n"
             "  where:\n"
+            "    --16            use READ CAPACITY (16) cdb (same as "
+            "--long)\n"
             "    --brief|-b      brief, two hex numbers: number of blocks "
             "and block size\n"
             "    --help|-h       print this usage message and exit\n"
@@ -99,8 +101,6 @@ usage()
             "valid with '--pmi']\n"
             "    --long|-l       use READ CAPACITY (16) cdb (def: use "
             "10 byte cdb)\n"
-            "    --16            use READ CAPACITY (16) cdb (same as "
-            "--long)\n"
             "    --pmi|-p        partial medium indicator (without this "
             "option shows\n"
             "                    total disk capacity) [made obsolete in "

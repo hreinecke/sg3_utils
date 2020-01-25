@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2019 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2020 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.08 20191220";
+static const char * version_str = "6.09 20200117";
 
 
 #define ME "sg_dd: "
@@ -94,6 +94,9 @@ static const char * version_str = "6.08 20191220";
 #define READ_LONG_OPCODE 0x3E
 #define READ_LONG_CMD_LEN 10
 #define READ_LONG_DEF_BLK_INC 8
+#define VERIFY10 0x2f
+#define VERIFY12 0xaf
+#define VERIFY16 0x8f
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
@@ -519,14 +522,18 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
 {
     int sz_ind;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
-    int ve_opcode[] = {0xff /* no VERIFY(6) */, 0x2f, 0xaf, 0x8f};
+    int ve_opcode[] = {0xff /* no VERIFY(6) */, VERIFY10, VERIFY12, VERIFY16};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
 
     memset(cdbp, 0, cdb_sz);
-    if (dpo)
-        cdbp[1] |= 0x10;
-    if (fua)
-        cdbp[1] |= 0x8;
+    if (is_verify)
+        cdbp[1] = 0x2;  /* (BYTCHK=1) << 1 */
+    else {
+        if (dpo)
+            cdbp[1] |= 0x10;
+        if (fua)
+            cdbp[1] |= 0x8;
+    }
     switch (cdb_sz) {
     case 6:
         sz_ind = 0;
@@ -657,6 +664,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     slen = io_hdr.sb_len_wr;
     switch (res) {
     case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_CONDITION_MET:
         break;
     case SG_LIB_CAT_RECOVERED:
         ++recovered_errs;
@@ -1016,6 +1024,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     bool info_valid;
     int res;
     uint64_t io_addr = 0;
+    const char * op_str = do_verify ? "verifying" : "writing";
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
     struct sg_io_hdr io_hdr;
@@ -1050,7 +1059,10 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     if (res < 0) {
         if (ENOMEM == errno)
             return -2;
-        perror("writing (SG_IO) on sg device, error");
+        if (do_verify)
+            perror("verifying (SG_IO) on sg device, error");
+        else
+            perror("writing (SG_IO) on sg device, error");
         return -1;
     }
 
@@ -1059,6 +1071,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     res = sg_err_category3(&io_hdr);
     switch (res) {
     case SG_LIB_CAT_CLEAN:
+    case SG_LIB_CAT_CONDITION_MET:
         break;
     case SG_LIB_CAT_RECOVERED:
         ++recovered_errs;
@@ -1068,16 +1081,16 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
             pr2serr("    lba of last recovered error in this WRITE=0x%" PRIx64
                     "\n", io_addr);
             if (verbose > 1)
-                sg_chk_n_print3("writing", &io_hdr, true);
+                sg_chk_n_print3(op_str, &io_hdr, true);
         } else {
-            pr2serr("Recovered error: [no info] writing to block=0x%" PRIx64
-                    ", num=%d\n", to_block, blocks);
-            sg_chk_n_print3("writing", &io_hdr, verbose > 1);
+            pr2serr("Recovered error: [no info] %s to block=0x%" PRIx64
+                    ", num=%d\n", op_str, to_block, blocks);
+            sg_chk_n_print3(op_str, &io_hdr, verbose > 1);
         }
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-        sg_chk_n_print3("writing", &io_hdr, verbose > 1);
+        sg_chk_n_print3(op_str, &io_hdr, verbose > 1);
         return res;
     case SG_LIB_CAT_NOT_READY:
         ++unrecovered_errs;
@@ -1085,7 +1098,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
         return res;
     case SG_LIB_CAT_MEDIUM_HARD:
     default:
-        sg_chk_n_print3("writing", &io_hdr, verbose > 1);
+        sg_chk_n_print3(op_str, &io_hdr, verbose > 1);
         ++unrecovered_errs;
         if (ofp->coe) {
             pr2serr(">> ignored errors for out blk=%" PRId64 " for %d "

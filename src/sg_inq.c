@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- * Copyright (C) 2000-2019 D. Gilbert
+ * Copyright (C) 2000-2020 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.03 20190913";    /* SPC-5 rev 22 */
+static const char * version_str = "2.04 20200123";    /* SPC-6 rev 01 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -108,6 +108,7 @@ static const char * version_str = "2.03 20190913";    /* SPC-5 rev 22 */
 #define VPD_BLOCK_DEV_C_EXTENS 0xb5     /* sbc4r02 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
+#define VPD_FORMAT_PRESETS 0xb8         /* sbc4r18 */
 
 #ifndef SG_NVME_VPD_NICR
 #define SG_NVME_VPD_NICR 0xde
@@ -190,6 +191,7 @@ static struct svpd_values_name_t vpd_pg[] = {
      "identification, target device only"},
 #endif
     {VPD_EXT_INQ, 0, -1, 0, "ei", "Extended inquiry data"},
+    {VPD_FORMAT_PRESETS, 0, 0, 0, "fp", "Format presets"},
     {VPD_LB_PROVISIONING, 0, 0, 0, "lbpv", "Logical block provisioning "
      "(SBC)"},
     {VPD_MAN_NET_ADDR, 0, -1, 0, "mna", "Management network addresses"},

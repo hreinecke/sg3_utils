@@ -1,4 +1,4 @@
-.TH SG_LUNS "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_LUNS "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ should be a list of LUNs ("a LUN inventory") for the I_T nexus associated
 with the \fIDEVICE\fR. Roughly speaking that is all LUNs that share the
 target device that the REPORT LUNS command is sent through. This command
 is defined in the SPC\-3 and SPC\-4 SCSI standards and its support is
-mandatory. The most recent draft if SPC\5 revision 9.
+mandatory. The most recent draft if SPC\-6 revision 1.
 .PP
 When the \fI\-\-test=ALUN\fR option is given (the second form in the
 SYNOPSIS), then the \fIALUN\fR value is decoded as outlined in various
@@ -311,7 +311,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2018 Douglas Gilbert
+Copyright \(co 2004\-2020 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

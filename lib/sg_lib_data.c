@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2019 Douglas Gilbert.
+ * Copyright (c) 2007-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.70 20191226";
+const char * sg_lib_version_str = "2.72 20200125";
 /* spc5r22, sbc4r17, zbc2r04 */
 
 
@@ -104,7 +104,8 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x37, 0, "Read defect data(10)"},
                         /* SBC-3 r31 recommends Read defect data(12) */
     {0x37, PDT_MCHANGER, "Initialize element status with range"},
-    {0x38, 0, "Medium scan"},
+    {0x38, 0, "Format with preset scan"},
+    {0x38, PDT_OCRW, "Medium scan"},
     {0x39, 0, "Compare"},               /* obsolete in SPC-4 r11 */
     {0x3a, 0, "Copy and verify"},       /* obsolete in SPC-4 r11 */
     {0x3b, 0, "Write buffer"},

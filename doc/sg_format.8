@@ -1,17 +1,17 @@
-.TH SG_FORMAT "8" "January 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_FORMAT "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
-sg_format \- format, resize a SCSI disk or format a tape
+sg_format \- format, format with preset, resize SCSI disk; format tape
 .SH SYNOPSIS
 .B sg_format
 [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
 [\fI\-\-dry\-run\fR] [\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR]
-[\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR] [\fI\-\-help\fR]
-[\fI\-\-ip\-def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR] [\fI\-\-pfu=PFU\fR]
-[\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR] [\fI\-\-quick\fR]
-[\fI\-\-resize\fR] [\fI\-\-rto_req\fR] [\fI\-\-security\fR] [\fI\-\-six\fR]
-[\fI\-\-size=LB_SZ\fR] [\fI\-\-tape=FM\fR] [\fI\-\-timeout=SECS\fR]
-[\fI\-\-verbose\fR] [\fI\-\-verify\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR]
-\fIDEVICE\fR
+[\fI\-\-fmtmaxlba\R] [\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR]
+[\fI\-\-help\fR] [\fI\-\-ip\-def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR]
+[\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR]
+[\fI\-\-preset=ID\fR] [\fI\-\-quick\fR] [\fI\-\-resize\fR] [\fI\-\-rto_req\fR]
+[\fI\-\-security\fR] [\fI\-\-six\fR] [\fI\-\-size=LB_SZ\fR]
+[\fI\-\-tape=FM\fR] [\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR]
+[\fI\-\-verify\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -23,6 +23,12 @@ number of blocks that the manufacturer recommends. The manufacturer's
 recommendation typically leaves aside a certain number of tracks, spread
 across the media, for reassignment of blocks to logical block addresses
 during the life of the disk.
+.PP
+This utility issues one of three SCSI format commands: FORMAT UNIT, FORMAT
+MEDIUM or FORMAT WITH PRESET. In the following description, unqualified
+sections will usually be referring to the SCSI FORMAT UNIT command. Both
+FORMAT UNIT and FORMAT WITH PRESET apply to disks (or disk\-like devices).
+The FORMAT MEDIUM command is for tapes.
 .PP
 This utility can format modern SCSI disks and potentially change their block
 size (if permitted) and the block count (i.e. number of accessible blocks on
@@ -42,11 +48,12 @@ response to a MODE SENSE command and the response to a READ CAPACITY command.
 The reason for this double check is to detect a "format corrupt" state (see
 the NOTES section). This usage will not modify the disk.
 .PP
-When this utility is used with the "\-\-format" (or "\-F") option it will
-attempt to format the given DEVICE. In the absence of the \fI\-\-quick\fR
-option there is a 15 second pause during which time the user is invited
-thrice (5 seconds apart) to abort sg_format. This occurs just prior the SCSI
-FORMAT UNIT command being issued. See the NOTES section for more information.
+When this utility is used with either \fI\-\-format\fR, \fI\-\-preset=ID\fR
+or \fI\-\-tape=FM\fR, it will attempt to format the given DEVICE. In the
+absence of the \fI\-\-quick\fR option there is a 15 second pause during which
+time the user is invited thrice (5 seconds apart) to abort sg_format. This
+occurs just prior the SCSI FORMAT UNIT, FORMAT WITH PRESET or FORMAT MEDIUM
+command being issued. See the NOTES section for more information.
 .PP
 Protection information (PI) is optional and is made up of one or more
 protection intervals, each made up of 8 bytes associated with a logical
@@ -58,8 +65,13 @@ INFORMATION section below for more information.
 .PP
 When the \fI\-\-tape=FM\fR option is given then the SCSI FORMAT MEDIUM
 command is sent to the \fIDEVICE\fR. FORMAT MEDIUM is defined in the SSC
-documents at T10 and prepares a volume for use. That may include
-partitioning the medium. See the section below on TAPE for more information.
+documents at T10 and prepares a volume for use. That may include partitioning
+the medium. See the section below on TAPE for more information.
+.PP
+The FORMAT WITH PRESET was added in draft SBC\-4 revision 18. A preset
+pattern, selected by the PRESET IDENTIFIER field (\fI\-\-id=FWPID\fR),
+is written to the disk. See the FORMAT PRESETS VPD page (0xb8) for a list
+of available Format preset identifiers and their associated data.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -126,9 +138,10 @@ list associated with the FORMAT UNIT cdb.
 .TP
 \fB\-d\fR, \fB\-\-dry\-run\fR
 this option will parse the command line, do all the preparation but bypass
-the actual FORMAT UNIT or FORMAT MEDIUM commands. Also if the options would
-cause the logical block size to change, then the MODE SELECT command that
-would do that is also bypassed when the dry run option is given.
+the actual FORMAT UNIT, FORMAT WITH PRESET or FORMAT MEDIUM command. Also if
+the options would otherwise cause the logical block size to change, then the
+MODE SELECT command that would do that is also bypassed when the dry
+run option is given.
 .TP
 \fB\-e\fR, \fB\-\-early\fR
 during a format operation, The default action of this utility is to poll the
@@ -158,6 +171,11 @@ without error. When \fIFFMT\fR is 2 the read operation may yield check
 condition status with a sense key set to hardware error, medium error or
 command aborted. See draft SBC\-4 revision 16 section 4.34 for more details.
 .TP
+\fB\-b\fR, \fB\-\-fmtmaxlba\fR
+This option is only active if it is given together with the
+\fI\-\-preset=ID\fR option. If so it sets the FMTMAXLBA field in the FORMAT
+WITH PRESET command.
+.TP
 \fB\-f\fR, \fB\-\-fmtpinfo\fR=\fIFPI\fR
 sets the FMTPINFO field in the FORMAT UNIT cdb to a value between 0 and 3.
 The default value is 0. The FMTPINFO field from SBC\-3 revision 16 is a 2
@@ -169,8 +187,10 @@ option should be used in their place. See the PROTECTION INFORMATION section
 below for more information.
 .TP
 \fB\-F\fR, \fB\-\-format\fR
-issue a SCSI FORMAT UNIT command.
-.B This will destroy all the data held on the media.
+issue one of the three SCSI "format" commands. In the absence of the
+\fI\-\-preset=ID\fR and \fI\-\-tape=FM\fR options, the SCSI FORMAT UNIT
+command is issued.
+.B These commands will destroy all the data held on the media.
 This option is required to change the block size of a disk. In the absence
 of the \fI\-\-quick\fR option, the user is given a 15 second count down to
 ponder the wisdom of doing this, during which time control\-C (amongst other
@@ -246,6 +266,12 @@ READY command is used, otherwise a REQUEST SENSE command is used. The
 default is currently 0 but this will change to 1 in the near future. See
 the NOTES sections below.
 .TP
+\fB\-E\fR, \fB\-\-preset\fR=\fIID\fR
+this option instructs this utility to issue a SCSI FORMAT WITH PRESET
+command. The PRESET IDENTIFIER field in that cdb is set to \fIID\fR. The
+IMMED field in that cdb is also set unless the \fI\-\-wait\fR option is
+also given, in which case it is cleared.
+.TP
 \fB\-Q\fR, \fB\-\-quick\fR
 the default action (i.e. when the option is not given) is to give the user
 15 seconds to reconsider doing a format operation on the \fIDEVICE\fR.
@@ -302,18 +328,18 @@ in a tape drive for use. Values for \fIFM\fR include 0 to do the "default"
 format; 1 to partition a volume and 2 to do a default format then partition.
 .TP
 \fB\-m\fR, \fB\-\-timeout\fR=\fISECS\fR
-where \fISECS\fR is the FORMAT UNIT or FORMAT MEDIUM command timeout in
-seconds. \fISECS\fR will only be used if it exceeds the internal timeout
-which is 20 seconds if the IMMED bit is set and 72000 seconds (20 hours)
-or higher if the IMMED bit is not set. If the disk size exceeds 4 TB then
-the timeout value is increased to 144000 seconds (40 hours). And if it is
-greater than 8 TB then the timeout value is increased to 288000 seconds (80
-hours). If the timeout is exceeded then the operating system will typically
-abort the command. Aborting a command may escalate to a LUN reset (or
-worse). A timeout may also leave the disk or tape format operation
-incomplete. And that may result in the disk or tape being in a "format
-corrupt" state requiring another format to remedy the situation. So for
-various reasons timeouts are best avoided.
+where \fISECS\fR is the FORMAT UNIT, FORMAT WITH PRESET or FORMAT MEDIUM
+command timeout in seconds. \fISECS\fR will only be used if it exceeds the
+internal timeout which is 20 seconds if the IMMED bit is set and 72000
+seconds (20 hours) or higher if the IMMED bit is not set. If the disk size
+exceeds 4 TB then the timeout value is increased to 144000 seconds (40 hours).
+And if it is greater than 8 TB then the timeout value is increased to
+288000 seconds (80 hours). If the timeout is exceeded then the operating
+system will typically abort the command. Aborting a command may escalate to
+a LUN reset (or worse). A timeout may also leave the disk or tape format
+operation incomplete. And that may result in the disk or tape being in
+a "format corrupt" state requiring another format to remedy the situation.
+So for various reasons command timeouts are best avoided.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). "\-vvv" gives
@@ -330,9 +356,9 @@ print the version string and then exit.
 the default format action is to set the "IMMED" bit in the FORMAT UNIT
 command's (short) parameter header. If this option (i.e. \fI\-\-wait\fR) is
 given then the "IMMED" bit is not set. If \fI\-\-wait\fR is given then the
-FORMAT UNIT or FORMAT MEDIUM command waits until the format operation
-completes before returning its response. This can be many hours on large
-disks. See the \fI\-\-timeout=SECS\fR option.
+FORMAT UNIT, FORMAT WITH PRESET or FORMAT MEDIUM command waits until the
+format operation completes before returning its response. This can be many
+hours on large disks. See the \fI\-\-timeout=SECS\fR option.
 .br
 Alternatively this option may be useful when used together with
 \fI\-\-ffmt=FFMT\fR (and \fIFFMT\fR greater than 0) since the fast format
@@ -433,32 +459,35 @@ the current version of this utility defaults to using TEST UNIT READY
 commands to poll the disk to find out the progress of the format. The
 \fI\-\-poll=PT\fR option has been added to control this.
 .PP
-When the \fI\-\-format\fR option is given without the \fI\-\-wait\fR option
-then the SCSI FORMAT UNIT command is issued with the IMMED bit set which
-causes the SCSI command to return after it has started the format operation.
-The \fI\-\-early\fR option will cause sg_format to exit at that point.
-Otherwise the \fIDEVICE\fR is polled every 60 seconds or every 10 seconds
-if \fIFFMT\fR is non\-zero. The poll is with TEST UNIT READY or REQUEST SENSE
-commands until one reports an "all clear" (i.e. the format operation has
-completed). Normally these polling commands will result in a progress
-indicator (expressed as a percentage) being output to the screen. If the user
-gets bored watching the progress report then sg_format process can be
-terminated (e.g. with control\-C) without affecting the format operation
-which continues. However a target or device reset (or a power cycle) will
-probably cause the device to become "format corrupt".
+When the \fI\-\-format\fR, \fI\-\-preset=ID\fR or \fI\-\-tape=FM\fR option
+is given without the \fI\-\-wait\fR option then the corresponding SCSI
+command is issued with the IMMED bit set which causes the SCSI command to
+return after it has started the format operation. The \fI\-\-early\fR option
+will cause sg_format to exit at that point. Otherwise the \fIDEVICE\fR is
+polled every 60 seconds or every 10 seconds if \fIFFMT\fR is non\-zero. The
+poll is with TEST UNIT READY or REQUEST SENSE commands until one reports
+an "all clear" (i.e. the format operation has completed). Normally these
+polling commands will result in a progress indicator (expressed as a
+percentage) being output to the screen. If the user gets bored watching the
+progress report then sg_format process can be terminated (e.g. with
+control\-C) without affecting the format operation which continues. However
+a target or device reset (or a power cycle) will probably cause the format
+to cease and the \fIDEVICE\fR to become "format corrupt".
 .PP
-When the \fI\-\-format\fR (or \fI\-\-tape\fR) and \fI\-\-wait\fR options are
-both given then this utility may take a long time to return. In this case
-care should be taken not to send any other SCSI commands to the disk as it
-may not respond leaving those commands queued behind the active format
-command. This may cause a timeout in the OS driver (in a lot shorter period
-than 20 hours applicable to some format operations). This may result in the
-OS resetting the disk leaving the format operation incomplete. This may leave
-the disk in a "format corrupt" state requiring another format to remedy
-the situation. Modern SCSI devices should yield a "not ready" sense key
-with an additional sense indicating a format is in progress. With older
-devices the user should take precautions that nothing attempts to access
-a device while it is being formatted.
+When the \fI\-\-format\fR (\fI\-\-preset=ID\fR or \fI\-\-tape\fR) and
+\fI\-\-wait\fR options are both given then this utility may take a long time
+to return. In this case care should be taken not to send any other SCSI
+commands to the disk as it may not respond leaving those commands queued
+behind the active format command. This may cause a timeout in the OS
+driver (in a lot shorter period than 20 hours applicable to some format
+operations). This may result in the OS resetting the disk leaving the format
+operation incomplete. This may leave the disk in a "format corrupt" state
+requiring another format to remedy the situation. Modern SCSI devices should
+yield a "not ready" sense key with an additional sense indicating a format
+is in progress. With older devices the user should take precautions that
+nothing attempts to access a device while it is being formatted. Unmounting
+in mounted file systems on a \fIDEVICE\fR prior to calling this utility
+is strongly advised.
 .PP
 When the block size (i.e. the number of bytes in each block) is changed
 on a disk two SCSI commands must be sent: a MODE SELECT to change the block
@@ -640,7 +669,15 @@ Now /dev/sdd should have 512 byte logical block size. And to switch it back:
    # sg_format \-\-format \-\-ffmt=1 \-\-size=4096 /dev/sdd
 .PP
 Since fast formats can be very quick (a matter of seconds) using the
-\-\-wait option may be appropriate
+\-\-wait option may be appropriate.
+.PP
+And tu use Format with preset this invocation might be used:
+.PP
+   # sg_format \-\-preset=1 \-\-fmtmaxlba /dev/sdd
+.PP
+The FORMAT PRESETS VPD page (0xb8) should be consulted to check that Preset
+identifier 0x1 is there and has the expected format (i.e. "default host aware
+zoned block device model with 512 bytes of user data in each logical block").
 .SH EXIT STATUS
 The exit status of sg_format is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
@@ -651,7 +688,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2019 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2020 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

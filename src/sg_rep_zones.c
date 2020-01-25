@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 Douglas Gilbert.
+ * Copyright (c) 2014-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.19 20191226";
+static const char * version_str = "1.20 20200122";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -472,8 +472,8 @@ main(int argc, char * argv[])
             goto the_end;
         }
         same = reportZonesBuff[4] & 0xf;
-        printf("  Same=%d: %s\n\n", same, same_desc_arr[same]);
-        printf("  Maximum LBA: 0x%" PRIx64 "\n",
+        printf("  Same=%d: %s\n", same, same_desc_arr[same]);
+        printf("  Maximum LBA: 0x%" PRIx64 "\n\n",
                sg_get_unaligned_be64(reportZonesBuff + 8));
         zones = (len - 64) / 64;
         for (k = 0, bp = reportZonesBuff + 64; k < zones; ++k, bp += 64) {

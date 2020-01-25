@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20200111] [svn: r838]
+Changelog for sg3_utils-1.45 [20200125] [svn: r839]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -18,6 +18,7 @@ Changelog for sg3_utils-1.45 [20200111] [svn: r838]
   - sg_inq: update version descriptors to spc5r21
     - add some NVMe 1.4 snippets to ctl identify
   - sg_format: add --dcrt used twice (FOV=1 DCRT=0)
+    - add support for FORMAT WITH PRESET (sbc4r18)
   - sg_raw: fix --send bug when using stdin
   - sg_vpd: 3pc VPD page add copy group descriptor
     - add --examine option
@@ -32,6 +33,7 @@ Changelog for sg3_utils-1.45 [20200111] [svn: r838]
   - sg_scan (win32): expand limits for big arrays
   - sg_modes: placeholders for Command duration limit
     T2A and T2B mpages (sbc4r17)
+    - improve zbc support (e.g. caching mpage)
   - sg_logs: add Command duration limits statistics
     lpage (spc6r01)
     - zoned block device statistics log page: shorten
@@ -41,12 +43,13 @@ Changelog for sg3_utils-1.45 [20200111] [svn: r838]
       apart from page 0x0,0xff. Used three times:
       list all pages and subpages names reported
   - sg_reassign: for defect list format 6 (vendor
-    specfic) don't try to decode
+    specific) don't try to decode
   - sg_rep_zones: expand some fields per zbc2r04
   - sg_verify: correct so issues VERIFY(16)
     - add --0 and --ff options and implement
       bytchk=3 properly
   - sg_write_same: add --ff for 0xff fill
+  - sg_luns: report new "target commands" w-lun (19-117)
   - sg_dd: add --verify support
   - inhex directory: new, contains ASCII hex files
     that can be used with the '--inhex=' option

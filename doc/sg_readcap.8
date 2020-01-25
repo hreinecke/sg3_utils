@@ -1,15 +1,17 @@
-.TH SG_READCAP "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_READCAP "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_readcap \- send SCSI READ CAPACITY command
 .SH SYNOPSIS
 .B sg_readcap
 [\fI\-\-16\fR] [\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-lba=LBA\fR] [\fI\-\-long\fR] [\fI\-\-pmi\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-zbc\fR]
+\fIDEVICE\fR
 .PP
 .B sg_readcap
 [\fI\-16\fR] [\fI\-b\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-lba=LBA\fR]
-[\fI\-pmi\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
+[\fI\-pmi\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-z\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -104,6 +106,10 @@ increase level of verbosity. Can be used multiple times.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 outputs version string then exits.
+.TP
+\fB\-z\fR, \fB\-\-zbc\fR
+additionally prints out the extra ZBC field (RC_BASIS) in the READ CAPACITY
+response. Using the option implicitly sets the \fI\-\-16\fR option.
 .SH NOTES
 The response to READ CAPACITY(16) contains a LBPRZ bit in the SBC\-3
 standard (ANSI INCITS 514\-2014). There was also a LBPRZ bit with the same
@@ -171,6 +177,9 @@ and '\-vvv' are also accepted yielding greater verbosity.
 .TP
 \fB\-V\fR
 outputs version string then exits.
+.TP
+\fB\-R\fR
+Equivalent to \fI\-\-zbc\fR in the main description.
 .SH ENVIRONMENT VARIABLES
 Since sg3_utils version 1.23 the environment variable SG3_UTILS_OLD_OPTS
 can be given. When it is present this utility will expect the older command
@@ -179,7 +188,7 @@ using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999\-2018 Douglas Gilbert
+Copyright \(co 1999\-2020 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,4 +1,4 @@
-.TH SG_DD "8" "December 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_DD "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -219,10 +219,12 @@ when used once, this is equivalent to \fIverbose=1\fR. When used
 twice (e.g. "\-vv") this is equivalent to \fIverbose=2\fR, etc.
 .TP
 \fB\-x\fR, \fB\-\-verify\fR
-do a verify operation (like Unix command cmp(1)) rather than a copy.
-Cannot be used with "oflag=sparse". \fIof=OFILE\fR must be given and
-\fIOFILE\fR must be an sg device or a block device with "oflag=sgio"
-alsoe given.
+do a verify operation (like Unix command cmp(1)) rather than a copy. Cannot
+be used with "oflag=sparse". \fIof=OFILE\fR must be given and \fIOFILE\fR
+must be an sg device or a block device with "oflag=sgio" also given. Uses the
+SCSI VERIFY command with the BYTCHK field set to 1. The VERIFY command is
+used instead of WRITE when this option is given. There is no VERIFY(6)
+command.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 outputs version number information and exits.
@@ -507,7 +509,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2019 Douglas Gilbert
+Copyright \(co 2000\-2020 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

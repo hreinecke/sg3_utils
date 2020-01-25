@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.69 20200111";
+static const char * version_str = "1.71 20200121";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -253,6 +253,15 @@ static struct page_code_desc pc_desc_t_adc[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
+static struct page_code_desc pc_desc_zbc[] = {
+    {0x1, 0x0, "rw", "Read-Write error recovery"},
+    {0x7, 0x0, "ve", "Verify error recovery"},
+    {0x8, 0x0, "ca", "Caching"},
+    {0xa, 0x2, "atag", "Application tag"},
+    {0x1c, 0x1, "bc", "Background control"},
+    {0x0, 0x0, NULL, NULL},
+};
+
 struct pc_desc_group pcd_gr_arr[] = {
     {pc_desc_common, "common"},
     {pc_desc_disk, "disk"},
@@ -263,6 +272,7 @@ struct pc_desc_group pcd_gr_arr[] = {
     {pc_desc_ses, "enclosure"},
     {pc_desc_rbc, "reduced block"},
     {pc_desc_adc, "adc"},
+    {pc_desc_zbc, "zbc"},
     {pc_desc_t_fcp, "transport: FCP"},
     {pc_desc_t_spi4, "transport: SPI"},
     {pc_desc_t_sas, "transport: SAS"},
@@ -821,6 +831,9 @@ get_mpage_tbl_size(int scsi_ptype, int * sizep)
         case PDT_ADC:       /* automation device/interface */
             *sizep = count_desc_elems(pc_desc_adc);
             return &pc_desc_adc[0];
+        case PDT_ZBC:
+            *sizep = count_desc_elems(pc_desc_zbc);
+            return &pc_desc_zbc[0];
     }
     *sizep = 0;
     return NULL;
@@ -1421,7 +1434,7 @@ main(int argc, char * argv[])
             hex2stdout(rsp_buff, headerlen, 1);
             goto fini;
         }
-        if (0 == inq_pdt)
+        if ((PDT_DISK == inq_pdt) || (PDT_ZBC == inq_pdt))
             printf("  Mode data length=%d, medium type=0x%.2x, WP=%d,"
                    " DpoFua=%d, longlba=%d\n", md_len, medium_type,
                    !!(specific & 0x80), !!(specific & 0x10), (int)longlba);
@@ -1448,7 +1461,7 @@ main(int argc, char * argv[])
                     len = 16;
                     density_code_off = 8;
                 }
-                else if (0 == inq_pdt) {
+                else if ((PDT_DISK == inq_pdt) || (PDT_ZBC == inq_pdt)) {
                     printf("> Direct access device block descriptors:\n");
                     density_code_off = 4;
                 }

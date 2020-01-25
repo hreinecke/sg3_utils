@@ -29,6 +29,7 @@ INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
 FINISH ZONE         sg_zone
 FORMAT MEDIUM       sg_format, ++ [SSC]
 FORMAT UNIT         sg_format, ++ [SBC]
+FORMAT WITH PRESET    sg_format, ++ [SBC]
 LOG SELECT          sg_logs('-r' or '-select'), ++
 LOG SENSE           sg_logs, ++
 MODE SELECT(6)      sdparm, sg_wr_mode, sginfo, sg_format,
@@ -159,4 +160,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-28th August 2019
+24th January 2020
