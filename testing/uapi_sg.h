@@ -12,9 +12,9 @@
  *   Copyright (C) 1992 Lawrence Foard
  *
  * Later extensions (versions 2, 3 and 4) to driver:
- *   Copyright (C) 1998 - 2018 Douglas Gilbert
+ *   Copyright (C) 1998 - 2020 Douglas Gilbert
  *
- * Version 4.0.38 (20191026)
+ * Version 4.0.11 (20200124)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -28,6 +28,7 @@
  * For utility and test programs see: http://sg.danny.cz/sg/sg3_utils.html
  */
 
+#include <stddef.h>
 #include <linux/types.h>
 #include <linux/major.h>
 
@@ -114,13 +115,15 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
 #define SGV4_FLAG_NO_WAITQ  0x40	/* implies SGV4_FLAG_IMMED */
+#define SGV4_FLAG_DOUT_OFFSET  0x80	/* dout byte offset in v4::spare_in */
 #define SGV4_FLAG_COMPLETE_B4  0x100
 #define SGV4_FLAG_SIG_ON_OTHER  0x200
-#define SGV4_FLAG_IMMED 0x400	/* for polling with SG_IOR, ignored in SG_IOS */
+#define SGV4_FLAG_IMMED 0x400  /* for polling with SG_IOR, ignored in SG_IOS */
 #define SGV4_FLAG_STOP_IF 0x800	/* Stops sync mrq if error or warning */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
 #define SGV4_FLAG_SHARE 0x2000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
 #define SGV4_FLAG_DO_ON_OTHER 0x4000 /* available on either of shared pair */
+#define SGV4_FLAG_KEEP_SHARE 0x8000  /* ... buffer for another dout command */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
 #define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* n sg_io_v4s in data-in */
 
@@ -207,7 +210,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_MASTER_FINI 0x100	/* wr> 0: setup for repeat slave req */
 #define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
 #define SG_CTL_FLAGM_NO_DURATION 0x400	/* don't calc command duration */
-#define SG_CTL_FLAGM_MORE_ASYNC 0x800	/* yield EAGAIN in more cases */
+#define SG_CTL_FLAGM_MORE_ASYNC	0x800	/* yield EAGAIN in more cases */
 #define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */
 #define SG_CTL_FLAGM_SNAP_DEV	0x2000	/* output to debugfs::snapped */
 #define SG_CTL_FLAGM_ALL_BITS	0x3fff	/* should be OR of previous items */
