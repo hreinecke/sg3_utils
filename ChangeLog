@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20200202] [svn: r840]
+Changelog for sg3_utils-1.45 [20200210] [svn: r841]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -10,6 +10,7 @@ Changelog for sg3_utils-1.45 [20200202] [svn: r840]
     - rename 'SAS SlimLine' to SlimSAS [ses4r02]
     - add --inhex=FN, equivalent to --data=@FN, for
       compatibility with other utilities
+    - 'fan speed factor' field added in 20-013r1
   - sg_opcodes: expand MLU (now 2 bits, spc5r20)
     - include RWCDLP field as extension of CDLP
       field (spc5r01)
