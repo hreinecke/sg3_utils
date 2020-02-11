@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.70 20200202";
+static const char * version_str = "1.71 20200207";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -1234,7 +1234,25 @@ sg_unshare(int sg_fd, int id, bool vb_b)
         pr2serr_lk("tid=%d: ioctl(UNSHARE) ok\n", id);
 }
 
-#ifdef SGH_DD_SNAP_DEV
+static void
+sg_noshare_enlarge(int sg_fd, bool vb_b)
+{
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip;
+
+    seip = &sei;
+    memset(seip, 0, sizeof(*seip));
+    sei.sei_wr_mask |= SG_SEIM_TOT_FD_THRESH;
+    seip->tot_fd_thresh = 96 * 1024 * 1024;
+    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+        pr2serr_lk("%s: ioctl(EXTENDED(TOT_FD_THRESH), failed errno=%d %s\n",
+		   __func__, errno, strerror(errno));
+        return;
+    }
+    if (vb_b)
+        pr2serr_lk("ioctl(TOT_FD_THRESH) ok\n");
+}
+
 static void
 sg_take_snap(int sg_fd, int id, bool vb_b)
 {
@@ -1255,7 +1273,6 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
     if (vb_b)
         pr2serr_lk("tid=%d: ioctl(SNAP_DEV) ok\n", id);
 }
-#endif
 
 static void
 cleanup_in(void * v_clp)
@@ -2106,7 +2123,7 @@ fini:
             xtrp->blk_offset = ofsplit;
             xtrp->blks = rep->num_blks - ofsplit;
             nblks = xtrp->blks;
-	    status = pthread_mutex_lock(mutexp);
+            status = pthread_mutex_lock(mutexp);
             if (0 != status) err_exit(status, "lock out_mutex");
             goto split_upper;
         }
@@ -2147,9 +2164,14 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                    id, __func__, n_cmpl, n_subm);
         n_cmpl = n_subm;
     }
-    if (sres)
+    if (sres) {
         pr2serr_lk("[%d] %s: secondary error: %s [%d], info=0x%x\n", id,
                    __func__, strerror(sres), sres, ctl_v4p->info);
+	if (E2BIG == sres) {
+	    sg_take_snap(rep->infd, id, true);
+	    sg_take_snap(rep->outfd, id, true);
+	}
+    }
     /* Check if those submitted have finished or not */
     for (k = 0; k < n_subm; ++k, ++a_np) {
         slen = a_np->response_len;
@@ -2260,6 +2282,8 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     res = ioctl(fd, SG_IOSUBMIT, ctlop);
     if (res < 0) {
         err = errno;
+	if (E2BIG == err)
+	    sg_take_snap(fd, rep->id, true);
         pr2serr_lk("%s: ioctl(SG_IOSUBMIT, %s)-->%d, errno=%d: %s\n", __func__,
                    sg_flags_str(ctlop->flags, b_len, b), res, err,
                    strerror(err));
@@ -2655,7 +2679,9 @@ try_again:
     if (res < 0) {
         int err = errno;
 
-        if (EBUSY == err) {
+	if (E2BIG == err)
+		sg_take_snap(fd, id, true);
+	else if (EBUSY == err) {
             ++num_ebusy;
             std::this_thread::yield();/* allow another thread to progress */
             goto try_again;
@@ -2968,6 +2994,8 @@ do_v4:
     if (res < 0) {
         if (ENOMEM == err)
             return 1;
+	if (E2BIG == err)
+	    sg_take_snap(fd, rep->id, true);
         pr2serr_lk("%s tid=%d: %s %s ioctl(2) failed: %s\n", __func__,
                    rep->id, cp, sg_flags_str(h4p->flags, b_len, b),
                    strerror(err));
@@ -3604,6 +3632,8 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
                           clp->in_flags.wq_excl, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
+    if (clp->in_flags.noshare || clp->out_flags.noshare)
+	sg_noshare_enlarge(fd, clp->debug > 3);
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3636,6 +3666,8 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
                           clp->out_flags.wq_excl, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
+    if (clp->in_flags.noshare || clp->out_flags.noshare)
+	sg_noshare_enlarge(fd, clp->debug > 3);
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;

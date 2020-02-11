@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2019 Douglas Gilbert.
+ * Copyright (c) 2004-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.47 20190913";    /* ses4r03 */
+static const char * version_str = "2.48 20200206";    /* ses4r03 + 20-013r1 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2468,6 +2468,23 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
     return buff;
 }
 
+/* 'Fan speed factor' new in 20-013r1, probably will be in ses4r04 */
+static int
+calc_fan_speed(int fan_speed_factor, int actual_fan_speed)
+{
+    switch (fan_speed_factor) {
+    case 0:
+        return actual_fan_speed * 10;
+    case 1:
+        return (actual_fan_speed * 10) + 20480;
+    case 2:
+        return actual_fan_speed * 100;
+    default:
+        break;
+    }
+    return -1;        /* something is wrong */
+}
+
 static const char * elem_status_code_desc[] = {
     "Unsupported", "OK", "Critical", "Noncritical",
     "Unrecoverable", "Not installed", "Unknown", "Not available",
@@ -2582,8 +2599,14 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
                    !!(statp[1] & 0x40), !!(statp[3] & 0x80),
                    !!(statp[3] & 0x40), !!(statp[3] & 0x20));
         printf("%sOff=%d, Actual speed=%d rpm, Fan %s\n", pad,
-               !!(statp[3] & 0x10), (((0x7 & statp[1]) << 8) + statp[2]) * 10,
+               !!(statp[3] & 0x10),
+               calc_fan_speed((statp[1] >> 3) & 0x3,
+                              ((0x7 & statp[1]) << 8) + statp[2]),
                actual_speed_desc[7 & statp[3]]);
+        if (op->verbose > 1)    /* show real field values */
+            printf("%s  [Fan_speed_factor=%d, Actual_fan_speed=%d]\n",
+                   pad, (statp[1] >> 3) & 0x3,
+                   ((0x7 & statp[1]) << 8) + statp[2]);
         break;
     case TEMPERATURE_ETC:     /* temperature sensor */
         if (nofilter || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
