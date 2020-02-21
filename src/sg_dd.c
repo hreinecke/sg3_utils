@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.09 20200117";
+static const char * version_str = "6.10 20200216";
 
 
 #define ME "sg_dd: "
@@ -649,7 +649,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         sg_print_command_len(rdCmd, ifp->cdbsz);
 
     while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -1054,7 +1054,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
         sg_print_command_len(wrCmd, ofp->cdbsz);
 
     while (((res = ioctl(sg_fd, SG_IO, &io_hdr)) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -2061,7 +2061,8 @@ main(int argc, char * argv[])
             }
         } else {
             while (((res = read(infd, wrkPos, blocks * blk_sz)) < 0) &&
-                   ((EINTR == errno) || (EAGAIN == errno)))
+                   ((EINTR == errno) || (EAGAIN == errno) ||
+                    (EBUSY == errno)))
                 ;
             if (verbose > 2)
                 pr2serr("read(unix): count=%d, res=%d\n", blocks * blk_sz,
@@ -2089,7 +2090,8 @@ main(int argc, char * argv[])
 
         if (out2f[0]) {
             while (((res = write(out2fd, wrkPos, blocks * blk_sz)) < 0) &&
-                   ((EINTR == errno) || (EAGAIN == errno)))
+                   ((EINTR == errno) || (EAGAIN == errno) ||
+                    (EBUSY == errno)))
                 ;
             if (verbose > 2)
                 pr2serr("write to of2: count=%d, res=%d\n", blocks * blk_sz,
@@ -2215,7 +2217,8 @@ main(int argc, char * argv[])
             out_full += blocks; /* act as if written out without error */
         else {
             while (((res = write(outfd, wrkPos, blocks * blk_sz)) < 0) &&
-                   ((EINTR == errno) || (EAGAIN == errno)))
+                   ((EINTR == errno) || (EAGAIN == errno) ||
+                    (EBUSY == errno)))
                 ;
             if (verbose > 2)
                 pr2serr("write(unix): count=%d, res=%d\n", blocks * blk_sz,
@@ -2283,7 +2286,8 @@ main(int argc, char * argv[])
         else {
             /* ... try writing to extend ofile to length prior to error */
             while (((res = write(outfd, zeros_buff, penult_blocks * blk_sz))
-                    < 0) && ((EINTR == errno) || (EAGAIN == errno)))
+                    < 0) && ((EINTR == errno) || (EAGAIN == errno) ||
+                             (EBUSY == errno)))
                 ;
             if (verbose > 2)
                 pr2serr("write(unix, sparse after error): count=%d, res=%d\n",

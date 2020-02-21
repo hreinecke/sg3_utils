@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.45 [20200210] [svn: r841]
+Changelog for sg3_utils-1.45 [20200220] [svn: r842]
   - sg_get_elem_status: new utility [sbc4r16]
   - sg_ses: bug: --page= being overridden when --control
     and --data= also given; fix
@@ -46,12 +46,14 @@ Changelog for sg3_utils-1.45 [20200210] [svn: r841]
   - sg_reassign: for defect list format 6 (vendor
     specific) don't try to decode
   - sg_rep_zones: expand some fields per zbc2r04
+    - add --num= and --wp options
   - sg_verify: correct so issues VERIFY(16)
     - add --0 and --ff options and implement
       bytchk=3 properly
   - sg_write_same: add --ff for 0xff fill
   - sg_luns: report new "target commands" w-lun (19-117)
   - sg_dd: add --verify support
+  - sgp_dd: support memory-mapped IO via mmap flag
   - inhex directory: new, contains ASCII hex files
     that can be used with the '--inhex=' option
   - sg_lib: add sg_t10_uuid_desig2str()

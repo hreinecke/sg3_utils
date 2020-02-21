@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.20 20200122";
+static const char * version_str = "1.21 20200220";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -55,6 +55,7 @@ static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"maxlen", required_argument, 0, 'm'},
+        {"num", required_argument, 0, 'n'},
         {"partial", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"readonly", no_argument, 0, 'R'},
@@ -62,6 +63,7 @@ static struct option long_options[] = {
         {"start", required_argument, 0, 's'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
+        {"wp", no_argument, 0, 'w'},
         {0, 0, 0, 0},
 };
 
@@ -84,6 +86,8 @@ usage(int h)
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> 8192 bytes)\n"
+            "    --num=NUM|-n NUM    number of zones to output (def: 0 -> "
+            "all)\n"
             "    --partial|-p       sets PARTIAL bit in cdb (def: 0 -> "
             "zone list\n"
             "                       length not altered by allocation length "
@@ -95,7 +99,8 @@ usage(int h)
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
             "                          need not be a zone starting LBA\n"
             "    --verbose|-v       increase verbosity\n"
-            "    --version|-V       print version string and exit\n\n"
+            "    --version|-V       print version string and exit\n"
+            "    --wp|-w            output write pointer only\n\n"
             "Sends a SCSI REPORT ZONES command and decodes the response. "
             "Give\nhelp option twice (e.g. '-hh') to see reporting options "
             "enumerated.\n");
@@ -291,10 +296,12 @@ main(int argc, char * argv[])
     bool o_readonly = false;
     bool verbose_given = false;
     bool version_given = false;
+    bool wp_only = false;
     int k, res, c, zl_len, len, zones, resid, rlen, zt, zc, same;
     int sg_fd = -1;
     int do_help = 0;
     int do_hex = 0;
+    int do_num = 0;
     int maxlen = 0;
     int reporting_opt = 0;
     int ret = 0;
@@ -310,7 +317,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHm:o:prRs:vV", long_options,
+        c = getopt_long(argc, argv, "hHm:n:o:prRs:vVw", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -328,6 +335,13 @@ main(int argc, char * argv[])
             if ((maxlen < 0) || (maxlen > MAX_RZONES_BUFF_LEN)) {
                 pr2serr("argument to '--maxlen' should be %d or "
                         "less\n", MAX_RZONES_BUFF_LEN);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
+        case 'n':
+            do_num = sg_get_num(optarg);
+            if (do_num < 0) {
+                pr2serr("argument to '--num' should be zero or more\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -362,6 +376,9 @@ main(int argc, char * argv[])
             break;
         case 'V':
             version_given = true;
+            break;
+        case 'w':
+            wp_only = true;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
@@ -464,7 +481,8 @@ main(int argc, char * argv[])
                     ((1 == do_hex) ? 1 : -1));
             goto the_end;
         }
-        printf("Report zones response:\n");
+        if (! wp_only)
+            printf("Report zones response:\n");
         if (len < 64) {
             pr2serr("Zone length [%d] too short (perhaps after truncation\n)",
                     len);
@@ -472,14 +490,23 @@ main(int argc, char * argv[])
             goto the_end;
         }
         same = reportZonesBuff[4] & 0xf;
-        printf("  Same=%d: %s\n", same, same_desc_arr[same]);
-        printf("  Maximum LBA: 0x%" PRIx64 "\n\n",
-               sg_get_unaligned_be64(reportZonesBuff + 8));
+        if (! wp_only) {
+            printf("  Same=%d: %s\n", same, same_desc_arr[same]);
+            printf("  Maximum LBA: 0x%" PRIx64 "\n\n",
+                   sg_get_unaligned_be64(reportZonesBuff + 8));
+        }
         zones = (len - 64) / 64;
+        if (do_num > 0)
+                zones = (zones > do_num) ? do_num : zones;
         for (k = 0, bp = reportZonesBuff + 64; k < zones; ++k, bp += 64) {
-            printf(" Zone descriptor: %d\n", k);
+            if (! wp_only)
+                printf(" Zone descriptor: %d\n", k);
             if (do_hex) {
                 hex2stdout(bp, len, -1);
+                continue;
+            }
+            if (wp_only) {
+                printf("0x%" PRIx64 "\n", sg_get_unaligned_be64(bp + 24));
                 continue;
             }
             zt = bp[0] & 0xf;
@@ -497,9 +524,11 @@ main(int argc, char * argv[])
             printf("   Write pointer LBA: 0x%" PRIx64 "\n",
                    sg_get_unaligned_be64(bp + 24));
         }
-        if ((64 + (64 * zones)) < zl_len)
-            printf("\n>>> Beware: Zone list truncated, may need another "
-                   "call\n");
+        if ((do_num == 0) && (! wp_only)) {
+            if ((64 + (64 * zones)) < zl_len)
+                printf("\n>>> Beware: Zone list truncated, may need another "
+                       "call\n");
+        }
     } else if (SG_LIB_CAT_INVALID_OP == res)
         pr2serr("Report zones command not supported\n");
     else {

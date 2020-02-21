@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "March 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SGP_DD "8" "February 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sgp_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -201,6 +201,13 @@ excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR.
 .TP
+mmap
+can only be used in the \fIiflag=FLAGS\fR or the \fIoflag=FLAGS\fR argument
+list but not both. The nominated side of the copy will use memory mapped IO
+based on the mmap(2) system call. The sg driver will remap its DMA
+destination or source buffer into the user space when the mmap(2) system call
+is used on a sg device.
+.TP
 fua
 causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
 commands. This only has effect with sg devices. The 6 byte variants
@@ -314,7 +321,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2019 Douglas Gilbert
+Copyright \(co 2000\-2020 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

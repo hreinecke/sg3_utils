@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.71 20200207";
+static const char * version_str = "1.73 20200215";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -248,9 +248,11 @@ typedef struct global_collection
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
     bool mrq_async;             /* either mrq_immed or no_waitq flags given */
+    bool noshare;               /* don't use request sharing */
     bool unbalanced_mrq;        /* so _not_ sg->sg request sharing sync mrq */
     bool verify;                /* don't copy, verify like Unix: cmp */
     bool prefetch;              /* for verify: do PF(b),RD(a),V(b)_a_data */
+    bool unshare;               /* let close() do file unshare operation */
     const char * infp;
     const char * outfp;
     const char * out2fp;
@@ -270,6 +272,7 @@ typedef struct request_element
     bool wr;
     bool has_share;
     bool both_sg;
+    bool mmap_active;
     bool same_sg;
     bool only_in_sg;
     bool only_out_sg;
@@ -850,12 +853,13 @@ usage(int pg_num)
             "[coe=0|1]\n"
             "               [deb=VERB] [dio=0|1] [elemsz_kb=ESK] "
             "[fua=0|1|2|3]\n"
-            "               [mrq=[IO,]NRQS[,C]] [of2=OFILE2] [ofreg=OFREG] "
-            "[ofsplit=OSP]\n"
-            "               [sync=0|1] [thr=THR] [time=0|1] [verbose=VERB] "
-            "[--dry-run]\n"
-            "               [--prefetch] [--verbose] [--verify] "
-            "[--version]\n\n"
+            "               [mrq=[IO,]NRQS[,C]] [noshare=0|1] [of2=OFILE2] "
+            "[ofreg=OFREG]\n"
+            "               [ofsplit=OSP] [sync=0|1] [thr=THR] [time=0|1] "
+            "[unshare=1|0]\n"
+            "               [verbose=VERB] [--dry-run] [--prefetch] "
+            "[--verbose]\n"
+            "               [--verify] [--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -865,7 +869,7 @@ usage(int pg_num)
             "direct,dpo,\n"
             "                dsync,excl,fua,masync,mmap,mrq_immed,mrq_svb,"
             "nodur,\n"
-            "                noshare,no_waitq,noxfer,null,qtail,same_fds,"
+            "                no_waitq,noxfer,null,qtail,same_fds,"
             "v3,v4,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
@@ -923,6 +927,7 @@ page2:
             "    mrq         number of cmds placed in each sg call "
             "(def: 0);\n"
             "                may have trailing ',C', to send bulk cdb_s\n"
+            "    noshare     0->use request sharing(def), 1->don't\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
             "                IFILE in the first half of each shared element\n"
@@ -934,6 +939,9 @@ page2:
             "max 1024\n"
             "    time        0->no timing, 1->calc throughput(def), "
             "2->nanosec precision\n"
+            "    unshare     0->don't explicitly unshare after share; 1->let "
+            "close do\n"
+            "                file unshare (default)\n"
             "    verbose     same as 'deb=VERB': increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
@@ -966,10 +974,6 @@ page3:
             "    mrq_svb     if mrq and sg->sg copy, do shared_variable_"
             "blocking\n"
             "    nodur       turns off command duration calculations\n"
-            "    noshare     if IFILE and OFILE are sg devices, don't set "
-            "up sharing\n"
-            "                (def: do)\n"
-            "    no_unshare    rely on close() to clean up fd share\n"
             "    no_waitq     when non-blocking (async) don't use wait "
             "queue\n"
             "    qhead       queue new request at head of block queue\n"
@@ -1237,20 +1241,22 @@ sg_unshare(int sg_fd, int id, bool vb_b)
 static void
 sg_noshare_enlarge(int sg_fd, bool vb_b)
 {
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    if (sg_version_ge_40030) {
+        struct sg_extended_info sei;
+        struct sg_extended_info * seip;
 
-    seip = &sei;
-    memset(seip, 0, sizeof(*seip));
-    sei.sei_wr_mask |= SG_SEIM_TOT_FD_THRESH;
-    seip->tot_fd_thresh = 96 * 1024 * 1024;
-    if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
-        pr2serr_lk("%s: ioctl(EXTENDED(TOT_FD_THRESH), failed errno=%d %s\n",
-		   __func__, errno, strerror(errno));
-        return;
+        seip = &sei;
+        memset(seip, 0, sizeof(*seip));
+        sei.sei_wr_mask |= SG_SEIM_TOT_FD_THRESH;
+        seip->tot_fd_thresh = 96 * 1024 * 1024;
+        if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+            pr2serr_lk("%s: ioctl(EXTENDED(TOT_FD_THRESH), failed errno=%d "
+                       "%s\n", __func__, errno, strerror(errno));
+            return;
+        }
+        if (vb_b)
+            pr2serr_lk("ioctl(TOT_FD_THRESH) ok\n");
     }
-    if (vb_b)
-        pr2serr_lk("ioctl(TOT_FD_THRESH) ok\n");
 }
 
 static void
@@ -1393,6 +1399,9 @@ read_write_thread(void * v_tip)
             if (fd < 0)
                 goto fini;
             rep->infd = fd;
+            rep->mmap_active = in_mmap;
+            if (in_mmap && (vb > 4))
+                pr2serr_lk("thread=%d: mmap buffp=%p\n", rep->id, rep->buffp);
             own_infd = true;
             ++num_sg;
             if (vb > 2)
@@ -1404,6 +1413,10 @@ read_write_thread(void * v_tip)
             if (fd < 0)
                 goto fini;
             rep->outfd = fd;
+            if (! rep->mmap_active)
+                rep->mmap_active = out_mmap;
+            if (out_mmap && (vb > 4))
+                pr2serr_lk("thread=%d: mmap buffp=%p\n", rep->id, rep->buffp);
             own_outfd = true;
             ++num_sg;
             if (vb > 2)
@@ -1443,12 +1456,10 @@ read_write_thread(void * v_tip)
         if (vb > 4)
             pr2serr_lk("thread=%d: Skipping share because driver too old\n",
                        rep->id);
-    } else if (clp->in_flags.noshare || clp->out_flags.noshare) {
-        if (clp->nmrqs > 0)
-            sg_share_prepare(rep->outfd, rep->infd, rep->id, vb > 9);
-        else if (vb > 4)
+    } else if (clp->noshare) {
+        if (vb > 4)
             pr2serr_lk("thread=%d: Skipping IFILE share with OFILE due to "
-                       "mrq>0\n", rep->id);
+                       "noshare=1\n", rep->id);
     } else if (sg_version_ge_40030 && in_is_sg && out_is_sg)
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, rep->id,
                                           vb > 9);
@@ -1613,7 +1624,7 @@ skip_force_out_sequence:
     if (0 != status) err_exit(status, "unlock in_mutex");
 
 fini:
-    if (rep->mmap_len > 0) {
+    if (rep->mmap_active && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
             int err = errno;
             char bb[64];
@@ -1621,17 +1632,19 @@ fini:
             pr2serr_lk("thread=%d: munmap() failed: %s\n", rep->id,
                        tsafe_strerror(err, bb));
         }
-
+        if (vb > 4)
+            pr2serr_lk("thread=%d: munmap(%p, %d)\n", rep->id, rep->buffp,
+                       rep->mmap_len);
+        rep->mmap_active = false;
     } else if (rep->alloc_bp)
         free(rep->alloc_bp);
 
     if (sg_version_ge_40030) {
-        if (clp->in_flags.noshare || clp->out_flags.noshare) {
-            if ((clp->nmrqs > 0) &&
-                (! (clp->in_flags.no_unshare || clp->out_flags.no_unshare)))
+        if (clp->noshare) {
+            if ((clp->nmrqs > 0) && clp->unshare)
                 sg_unshare(rep->infd, rep->id, vb > 9);
         } else if (in_is_sg && out_is_sg)
-            if (! (clp->in_flags.no_unshare || clp->out_flags.no_unshare))
+            if (clp->unshare)
             sg_unshare(rep->infd, rep->id, vb > 9);
     }
     if (own_infd && (rep->infd >= 0)) {
@@ -2167,10 +2180,10 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     if (sres) {
         pr2serr_lk("[%d] %s: secondary error: %s [%d], info=0x%x\n", id,
                    __func__, strerror(sres), sres, ctl_v4p->info);
-	if (E2BIG == sres) {
-	    sg_take_snap(rep->infd, id, true);
-	    sg_take_snap(rep->outfd, id, true);
-	}
+        if (E2BIG == sres) {
+            sg_take_snap(rep->infd, id, true);
+            sg_take_snap(rep->outfd, id, true);
+        }
     }
     /* Check if those submitted have finished or not */
     for (k = 0; k < n_subm; ++k, ++a_np) {
@@ -2282,8 +2295,8 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     res = ioctl(fd, SG_IOSUBMIT, ctlop);
     if (res < 0) {
         err = errno;
-	if (E2BIG == err)
-	    sg_take_snap(fd, rep->id, true);
+        if (E2BIG == err)
+            sg_take_snap(fd, rep->id, true);
         pr2serr_lk("%s: ioctl(SG_IOSUBMIT, %s)-->%d, errno=%d: %s\n", __func__,
                    sg_flags_str(ctlop->flags, b_len, b), res, err,
                    strerror(err));
@@ -2679,9 +2692,9 @@ try_again:
     if (res < 0) {
         int err = errno;
 
-	if (E2BIG == err)
-		sg_take_snap(fd, id, true);
-	else if (EBUSY == err) {
+        if (E2BIG == err)
+                sg_take_snap(fd, id, true);
+        else if (EBUSY == err) {
             ++num_ebusy;
             std::this_thread::yield();/* allow another thread to progress */
             goto try_again;
@@ -2816,7 +2829,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         }
         rep->cmd[1] = 0x2;      /* set IMMED (no fua or dpo) */
     }
-    if (mmap && (rep->outregfd >= 0))
+    if (mmap && (clp->noshare || (rep->outregfd >= 0)))
         flags |= SG_FLAG_MMAP_IO;
     if (noxfer)
         flags |= SG_FLAG_NO_DXFER;
@@ -2994,8 +3007,8 @@ do_v4:
     if (res < 0) {
         if (ENOMEM == err)
             return 1;
-	if (E2BIG == err)
-	    sg_take_snap(fd, rep->id, true);
+        if (E2BIG == err)
+            sg_take_snap(fd, rep->id, true);
         pr2serr_lk("%s tid=%d: %s %s ioctl(2) failed: %s\n", __func__,
                    rep->id, cp, sg_flags_str(h4p->flags, b_len, b),
                    strerror(err));
@@ -3413,7 +3426,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
             pr2serr_lk("%ssg driver prior to 4.0.00, reduced functionality\n",
                        my_name);
         }
-        goto fini;
+        goto bypass;
     }
     if (! sg_version_ge_40030)
         goto bypass;
@@ -3491,7 +3504,6 @@ bypass:
                        errno, strerror(errno));
         }
     }
-fini:
     t = 1;
     res = ioctl(fd, SG_SET_DEBUG, &t);  /* more info in /proc/scsi/sg/debug */
     if (res < 0)
@@ -3632,8 +3644,8 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
                           clp->in_flags.wq_excl, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
-    if (clp->in_flags.noshare || clp->out_flags.noshare)
-	sg_noshare_enlarge(fd, clp->debug > 3);
+    if (clp->noshare)
+        sg_noshare_enlarge(fd, clp->debug > 3);
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3666,8 +3678,8 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
                           clp->out_flags.wq_excl, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
-    if (clp->in_flags.noshare || clp->out_flags.noshare)
-	sg_noshare_enlarge(fd, clp->debug > 3);
+    if (clp->noshare)
+        sg_noshare_enlarge(fd, clp->debug > 3);
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3812,6 +3824,8 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
             cp = strchr(cp, ',');
             if (cp && ('C' == toupper(cp[1])))
                 clp->mrq_cmds = true;
+        } else if (0 == strcmp(key, "noshare")) {
+            clp->noshare = !! sg_get_num(buf);
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
             if (-1 == obs) {
@@ -3871,6 +3885,8 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
             num_threads = sg_get_num(buf);
         else if (0 == strcmp(key, "time"))
             do_time = sg_get_num(buf);
+        else if (0 == strcmp(key, "unshare"))
+            clp->unshare = !! sg_get_num(buf);  /* default: true */
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
@@ -3985,9 +4001,16 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
         pr2serr("mmap flag on both IFILE and OFILE doesn't work\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (clp->out_flags.mmap && !(clp->in_flags.noshare ||
-                                  clp->out_flags.noshare)) {
-        pr2serr("oflag=mmap needs either iflag=noshare or oflag=noshare\n");
+    if (! clp->noshare) {
+        if (clp->in_flags.noshare || clp->out_flags.noshare)
+            clp->noshare = true;
+    }
+    if (clp->unshare) {
+        if (clp->in_flags.no_unshare || clp->out_flags.no_unshare)
+            clp->unshare = false;
+    }
+    if (clp->out_flags.mmap && ! clp->noshare) {
+        pr2serr("oflag=mmap needs either noshare=1\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((clp->in_flags.mmap || clp->out_flags.mmap) &&
@@ -3995,9 +4018,8 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
         pr2serr("can't have both 'mmap' and 'same_fds' flags\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    if (((! clp->in_flags.noshare) && clp->in_flags.dio) ||
-        ((! clp->out_flags.noshare) && clp->out_flags.dio)) {
-        pr2serr("dio flag can only be used with noshare flag\n");
+    if ((! clp->noshare) && (clp->in_flags.dio || clp->out_flags.dio)) {
+        pr2serr("dio flag can only be used with noshare=1\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (clp->nmrqs > 0) {
@@ -4074,6 +4096,7 @@ main(int argc, char * argv[])
     clp->cdbsz_in = DEF_SCSI_CDBSZ;
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
     clp->nmrqs = DEF_NUM_MRQS;
+    clp->unshare = true;
     inf[0] = '\0';
     outf[0] = '\0';
     out2f[0] = '\0';
@@ -4319,8 +4342,7 @@ main(int argc, char * argv[])
             }
         }
 #if 0
-        if (clp->mrq_async && !(clp->in_flags.noshare ||
-                                clp->out_flags.noshare)) {
+        if (clp->mrq_async && !(clp->noshare)) {
             pr2serr("With mrq_immed also need noshare on sg-->sg copy\n");
             return SG_LIB_SYNTAX_ERROR;
         }
