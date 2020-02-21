@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2019 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2020 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -48,6 +48,7 @@
 #include <signal.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
+#include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
@@ -83,7 +84,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.73 20190618";
+static const char * version_str = "5.75 20200219";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -119,6 +120,14 @@ static const char * version_str = "5.73 20190618";
 
 #define EBUFF_SZ 768
 
+#ifndef SG_FLAG_MMAP_IO
+#define SG_FLAG_MMAP_IO 4
+#endif
+
+#define STR_SZ 1024
+#define INOUTF_SZ 512
+
+
 struct flags_t {
     bool append;
     bool coe;
@@ -128,6 +137,7 @@ struct flags_t {
     bool dsync;
     bool excl;
     bool fua;
+    bool mmap;
 };
 
 typedef struct request_collection
@@ -157,12 +167,20 @@ typedef struct request_collection
     pthread_cond_t out_sync_cv;       /* -/ hold writes until "in order" */
     int bs;
     int bpt;
+    int num_threads;
     int dio_incomplete_count;   /* -\ */
     int sum_of_resids;          /*  | */
     pthread_mutex_t aux_mutex;  /* -/ (also serializes some printf()s */
+    bool mmap_active;
     int debug;
     int dry_run;
 } Rq_coll;
+
+typedef struct thread_arg
+{       /* pointer to this argument passed to thread */
+    int id;
+    Rq_coll * clp;
+} Thread_arg;
 
 typedef struct request_element
 {       /* one instance per worker thread */
@@ -227,6 +245,7 @@ static int ascending_val = 1;
 static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_t threads[MAX_NUM_THREADS];
+static Thread_arg thr_arg_a[MAX_NUM_THREADS];
 
 static bool shutting_down = false;
 static bool do_sync = false;
@@ -234,8 +253,9 @@ static bool do_time = false;
 static Rq_coll rcoll;
 static struct timeval start_tm;
 static int64_t dd_count = -1;
-static int num_threads = DEF_NUM_THREADS;
 static int exit_status = 0;
+static char infn[INOUTF_SZ];
+static char outfn[INOUTF_SZ];
 
 static const char * my_name = "sgp_dd: ";
 
@@ -412,13 +432,13 @@ usage()
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,dio,direct,dpo,"
             "dsync,excl,\n"
-            "                fua, null]\n"
+            "                fua,mmap,null]\n"
             "    of          file or device to write to (def: stdout), "
             "OFILE of '.'\n"
             "                treated as /dev/null\n"
             "    oflag       comma separated list from: [append,coe,dio,"
-            "direct,dpo,dsync,\n"
-            "                excl,fua,null]\n"
+            "direct,dpo,\n"
+            "                dsync,excl,fua,mmap,null]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
@@ -457,6 +477,32 @@ guarded_stop_both(Rq_coll * clp)
 {
     guarded_stop_in(clp);
     guarded_stop_out(clp);
+}
+
+static int
+sgp_mem_mmap(int fd, int res_sz, uint8_t ** mmpp)
+{
+    int t;
+
+    if (ioctl(fd, SG_GET_RESERVED_SIZE, &t) < 0) {
+        perror("SG_GET_RESERVED_SIZE error");
+        return -1;
+    }
+    if (t < (int)sg_get_page_size())
+        t = sg_get_page_size();
+    if (res_sz > t) {
+        if (ioctl(fd, SG_SET_RESERVED_SIZE, &res_sz) < 0) {
+            perror("SG_SET_RESERVED_SIZE error");
+            return -1;
+        }
+    }
+    *mmpp = (uint8_t *)mmap(NULL, res_sz,
+                            PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (MAP_FAILED == *mmpp) {
+        perror("mmap() failed");
+        return -1;
+    }
+    return 0;
 }
 
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
@@ -567,34 +613,134 @@ cleanup_out(void * v_clp)
     pthread_cond_broadcast(&clp->out_sync_cv);
 }
 
-static void *
-read_write_thread(void * v_clp)
+static int
+sg_prepare(int fd, int bs, int bpt)
 {
+    int res, t;
+
+    res = ioctl(fd, SG_GET_VERSION_NUM, &t);
+    if ((res < 0) || (t < 30000)) {
+        pr2serr("%ssg driver prior to 3.x.y\n", my_name);
+        return 1;
+    }
+    t = bs * bpt;
+    res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
+    if (res < 0)
+        perror("sgp_dd: SG_SET_RESERVED_SIZE error");
+    t = 1;
+    res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
+    if (res < 0)
+        perror("sgp_dd: SG_SET_FORCE_PACK_ID error");
+    return 0;
+}
+
+static int
+sg_in_open(const char * fnp, struct flags_t * flagp, int bs, int bpt)
+{
+    int flags = O_RDWR;
+    int fd, err;
+    char ebuff[800];
+
+    if (flagp->direct)
+        flags |= O_DIRECT;
+    if (flagp->excl)
+        flags |= O_EXCL;
+    if (flagp->dsync)
+        flags |= O_SYNC;
+
+    if ((fd = open(fnp, flags)) < 0) {
+        err = errno;
+        snprintf(ebuff, EBUFF_SZ, "%scould not open %s for sg "
+                 "reading", my_name, fnp);
+        perror(ebuff);
+        return -sg_convert_errno(err);
+    }
+    if (sg_prepare(fd, bs, bpt))
+        return -SG_LIB_FILE_ERROR;
+    return fd;
+}
+
+static int
+sg_out_open(const char * fnp, struct flags_t * flagp, int bs, int bpt)
+{
+    int flags = O_RDWR;
+    int fd, err;
+    char ebuff[800];
+
+    if (flagp->direct)
+        flags |= O_DIRECT;
+    if (flagp->excl)
+        flags |= O_EXCL;
+    if (flagp->dsync)
+        flags |= O_SYNC;
+
+    if ((fd = open(fnp, flags)) < 0) {
+        err = errno;
+        snprintf(ebuff, EBUFF_SZ, "%scould not open %s for sg "
+                 "writing", my_name, fnp);
+        perror(ebuff);
+        return -sg_convert_errno(err);
+    }
+    if (sg_prepare(fd, bs, bpt))
+        return -SG_LIB_FILE_ERROR;
+    return fd;
+}
+
+static void *
+read_write_thread(void * v_tap)
+{
+    Thread_arg * tap;
     Rq_coll * clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
     int sz;
     volatile bool stop_after_write = false;
     int64_t seek_skip;
-    int blocks, status;
+    int blocks, status, id;
 
-    clp = (Rq_coll *)v_clp;
+    tap = (Thread_arg *)v_tap;
+    id = tap->id;
+    clp = tap->clp;
     sz = clp->bpt * clp->bs;
     seek_skip =  clp->seek - clp->skip;
     memset(rep, 0, sizeof(Rq_elem));
-    rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp, false);
-    if (NULL == rep->buffp)
-        err_exit(ENOMEM, "out of memory creating user buffers\n");
-
     /* Following clp members are constant during lifetime of thread */
     rep->bs = clp->bs;
-    rep->infd = clp->infd;
-    rep->outfd = clp->outfd;
+    if ((clp->num_threads > 1) && clp->mmap_active) {
+        /* sg devices need separate file descriptor */
+        if (clp->in_flags.mmap && (FT_SG == clp->in_type)) {
+            rep->infd = sg_in_open(infn, &clp->in_flags, clp->bs, clp->bpt);
+            if (rep->infd < 0) err_exit(-rep->infd, "error opening infn");
+        } else
+            rep->infd = clp->infd;
+        if (clp->out_flags.mmap && (FT_SG == clp->out_type)) {
+            rep->outfd = sg_out_open(outfn, &clp->out_flags, clp->bs,
+                                     clp->bpt);
+            if (rep->outfd < 0) err_exit(-rep->outfd, "error opening outfn");
+
+        } else
+            rep->outfd = clp->outfd;
+    } else {
+        rep->infd = clp->infd;
+        rep->outfd = clp->outfd;
+    }
     rep->debug = clp->debug;
     rep->cdbsz_in = clp->cdbsz_in;
     rep->cdbsz_out = clp->cdbsz_out;
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
+    if (clp->mmap_active) {
+        int fd = clp->in_flags.mmap ? rep->infd : rep->outfd;
+
+pr2serr("%s: id=%d, fd=%d calling sgp_mem_mmap()\n", __func__, id, fd);
+        status = sgp_mem_mmap(fd, sz, &rep->buffp);
+        if (status) err_exit(status, "sgp_mem_mmap() failed");
+    } else {
+        rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
+                                 false);
+        if (NULL == rep->buffp)
+            err_exit(ENOMEM, "out of memory creating user buffers\n");
+    }
 
     while(1) {
         status = pthread_mutex_lock(&clp->in_mutex);
@@ -697,7 +843,7 @@ normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding in_mutex */
-    while (((res = read(clp->infd, rep->buffp, blocks * clp->bs)) < 0) &&
+    while (((res = read(rep->infd, rep->buffp, blocks * clp->bs)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
@@ -743,7 +889,7 @@ normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding out_mutex */
-    while (((res = write(clp->outfd, rep->buffp, rep->num_blks * clp->bs))
+    while (((res = write(rep->outfd, rep->buffp, rep->num_blks * clp->bs))
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         ;
     if (res < 0) {
@@ -999,6 +1145,7 @@ sg_start_io(Rq_elem * rep)
     bool fua = rep->wr ? rep->out_flags.fua : rep->in_flags.fua;
     bool dpo = rep->wr ? rep->out_flags.dpo : rep->in_flags.dpo;
     bool dio = rep->wr ? rep->out_flags.dio : rep->in_flags.dio;
+    bool mmap = rep->wr ? rep->out_flags.mmap : rep->in_flags.mmap;
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
@@ -1014,7 +1161,7 @@ sg_start_io(Rq_elem * rep)
     hp->cmdp = rep->cmd;
     hp->dxfer_direction = rep->wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
     hp->dxfer_len = rep->bs * rep->num_blks;
-    hp->dxferp = rep->buffp;
+    hp->dxferp = mmap ? NULL : rep->buffp;
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
@@ -1023,6 +1170,8 @@ sg_start_io(Rq_elem * rep)
     hp->pack_id = (int)rep->pack_id;
     if (dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
+    if (mmap)
+        hp->flags |= SG_FLAG_MMAP_IO;
     if (rep->debug > 8) {
         pr2serr("sg_start_io: SCSI %s, blk=%" PRId64 " num_blks=%d\n",
                rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
@@ -1031,7 +1180,7 @@ sg_start_io(Rq_elem * rep)
 
     while (((res = write(rep->wr ? rep->outfd : rep->infd, hp,
                          sizeof(struct sg_io_hdr))) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     if (res < 0) {
         if (ENOMEM == errno)
@@ -1063,7 +1212,7 @@ sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 
     while (((res = read(wr ? rep->outfd : rep->infd, &io_hdr,
                         sizeof(struct sg_io_hdr))) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     if (res < 0) {
         perror("finishing io on sg device, error");
@@ -1117,27 +1266,6 @@ sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
 }
 
 static int
-sg_prepare(int fd, int bs, int bpt)
-{
-    int res, t;
-
-    res = ioctl(fd, SG_GET_VERSION_NUM, &t);
-    if ((res < 0) || (t < 30000)) {
-        pr2serr("%ssg driver prior to 3.x.y\n", my_name);
-        return 1;
-    }
-    t = bs * bpt;
-    res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
-    if (res < 0)
-        perror("sgp_dd: SG_SET_RESERVED_SIZE error");
-    t = 1;
-    res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
-    if (res < 0)
-        perror("sgp_dd: SG_SET_FORCE_PACK_ID error");
-    return 0;
-}
-
-static int
 process_flags(const char * arg, struct flags_t * fp)
 {
     char buff[256];
@@ -1171,6 +1299,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->excl = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
+        else if (0 == strcmp(cp, "mmap"))
+            fp->mmap = true;
         else if (0 == strcmp(cp, "null"))
             ;
         else {
@@ -1197,9 +1327,6 @@ num_chs_in_str(const char * s, int slen, int ch)
 }
 
 
-#define STR_SZ 1024
-#define INOUTF_SZ 512
-
 int
 main(int argc, char * argv[])
 {
@@ -1214,8 +1341,6 @@ main(int argc, char * argv[])
     char str[STR_SZ];
     char * key;
     char * buf;
-    char inf[INOUTF_SZ];
-    char outf[INOUTF_SZ];
     int res, k, err, keylen;
     int64_t in_num_sect = 0;
     int64_t out_num_sect = 0;
@@ -1233,13 +1358,14 @@ main(int argc, char * argv[])
     sigaction(SIGUSR1, &actions, NULL);
 #endif
     memset(clp, 0, sizeof(*clp));
+    clp->num_threads = DEF_NUM_THREADS;
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
     clp->in_type = FT_OTHER;
     clp->out_type = FT_OTHER;
     clp->cdbsz_in = DEF_SCSI_CDBSZ;
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
-    inf[0] = '\0';
-    outf[0] = '\0';
+    infn[0] = '\0';
+    outfn[0] = '\0';
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -1300,12 +1426,12 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"if") == 0) {
-            if ('\0' != inf[0]) {
+            if ('\0' != infn[0]) {
                 pr2serr("Second 'if=' argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else {
-                memcpy(inf, buf, INOUTF_SZ);
-                inf[INOUTF_SZ - 1] = '\0';
+                memcpy(infn, buf, INOUTF_SZ);
+                infn[INOUTF_SZ - 1] = '\0';
             }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &clp->in_flags)) {
@@ -1319,12 +1445,12 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"of") == 0) {
-            if ('\0' != outf[0]) {
+            if ('\0' != outfn[0]) {
                 pr2serr("Second 'of=' argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
             } else {
-                memcpy(outf, buf, INOUTF_SZ);
-                outf[INOUTF_SZ - 1] = '\0';
+                memcpy(outfn, buf, INOUTF_SZ);
+                outfn[INOUTF_SZ - 1] = '\0';
             }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &clp->out_flags)) {
@@ -1346,7 +1472,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key,"sync"))
             do_sync = !! sg_get_num(buf);
         else if (0 == strcmp(key,"thr"))
-            num_threads = sg_get_num(buf);
+            clp->num_threads = sg_get_num(buf);
         else if (0 == strcmp(key,"time"))
             do_time = !! sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
@@ -1436,19 +1562,24 @@ main(int argc, char * argv[])
         pr2serr("bpt must be greater than 0\n");
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (clp->in_flags.mmap && clp->out_flags.mmap) {
+        pr2serr("can only use mmap flag in iflag= or oflag=, not both\n");
+        return SG_LIB_SYNTAX_ERROR;
+    } else if (clp->in_flags.mmap || clp->out_flags.mmap)
+        clp->mmap_active = true;
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
        SG_IO ioctl. So reduce it in that case. */
     if ((clp->bs >= 2048) && (0 == bpt_given))
         clp->bpt = DEF_BLOCKS_PER_2048TRANSFER;
-    if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
+    if ((clp->num_threads < 1) || (clp->num_threads > MAX_NUM_THREADS)) {
         pr2serr("too few or too many threads requested\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
     if (clp->debug)
         pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
-                PRId64 "\n", my_name, inf, skip, outf, seek, dd_count);
+                PRId64 "\n", my_name, infn, skip, outfn, seek, dd_count);
 
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -1457,33 +1588,19 @@ main(int argc, char * argv[])
 
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
-    if (inf[0] && ('-' != inf[0])) {
-        clp->in_type = dd_filetype(inf);
+    if (infn[0] && ('-' != infn[0])) {
+        clp->in_type = dd_filetype(infn);
 
         if (FT_ERROR == clp->in_type) {
-            pr2serr("%sunable to access %s\n", my_name, inf);
+            pr2serr("%sunable to access %s\n", my_name, infn);
             return SG_LIB_FILE_ERROR;
         } else if (FT_ST == clp->in_type) {
-            pr2serr("%sunable to use scsi tape device %s\n", my_name, inf);
+            pr2serr("%sunable to use scsi tape device %s\n", my_name, infn);
             return SG_LIB_FILE_ERROR;
         } else if (FT_SG == clp->in_type) {
-            flags = O_RDWR;
-            if (clp->in_flags.direct)
-                flags |= O_DIRECT;
-            if (clp->in_flags.excl)
-                flags |= O_EXCL;
-            if (clp->in_flags.dsync)
-                flags |= O_SYNC;
-
-            if ((clp->infd = open(inf, flags)) < 0) {
-                err = errno;
-                snprintf(ebuff, EBUFF_SZ, "%scould not open %s for sg "
-                         "reading", my_name, inf);
-                perror(ebuff);
-                return sg_convert_errno(err);
-            }
-            if (sg_prepare(clp->infd, clp->bs, clp->bpt))
-                return SG_LIB_FILE_ERROR;
+            clp->infd = sg_in_open(infn, &clp->in_flags, clp->bs, clp->bpt);
+            if (clp->infd < 0)
+                return -clp->infd;
         }
         else {
             flags = O_RDONLY;
@@ -1494,55 +1611,39 @@ main(int argc, char * argv[])
             if (clp->in_flags.dsync)
                 flags |= O_SYNC;
 
-            if ((clp->infd = open(inf, flags)) < 0) {
+            if ((clp->infd = open(infn, flags)) < 0) {
                 err = errno;
                 snprintf(ebuff, EBUFF_SZ, "%scould not open %s for reading",
-                         my_name, inf);
+                         my_name, infn);
                 perror(ebuff);
                 return sg_convert_errno(err);
             }
             else if (skip > 0) {
                 off64_t offset = skip;
 
-                offset *= clp->bs;       /* could exceed 32 here! */
+                offset *= clp->bs;       /* could exceed 32 bits here! */
                 if (lseek64(clp->infd, offset, SEEK_SET) < 0) {
                     err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scouldn't skip to required "
-                             "position on %s", my_name, inf);
+                             "position on %s", my_name, infn);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
             }
         }
     }
-    if (outf[0] && ('-' != outf[0])) {
-        clp->out_type = dd_filetype(outf);
+    if (outfn[0] && ('-' != outfn[0])) {
+        clp->out_type = dd_filetype(outfn);
 
         if (FT_ST == clp->out_type) {
-            pr2serr("%sunable to use scsi tape device %s\n", my_name, outf);
+            pr2serr("%sunable to use scsi tape device %s\n", my_name, outfn);
             return SG_LIB_FILE_ERROR;
-        }
-        else if (FT_SG == clp->out_type) {
-            flags = O_RDWR;
-            if (clp->out_flags.direct)
-                flags |= O_DIRECT;
-            if (clp->out_flags.excl)
-                flags |= O_EXCL;
-            if (clp->out_flags.dsync)
-                flags |= O_SYNC;
-
-            if ((clp->outfd = open(outf, flags)) < 0) {
-                err = errno;
-                snprintf(ebuff,  EBUFF_SZ, "%scould not open %s for sg "
-                         "writing", my_name, outf);
-                perror(ebuff);
-                return sg_convert_errno(err);
-            }
-
-            if (sg_prepare(clp->outfd, clp->bs, clp->bpt))
-                return SG_LIB_FILE_ERROR;
-        }
-        else if (FT_DEV_NULL == clp->out_type)
+        } else if (FT_SG == clp->out_type) {
+            clp->outfd = sg_out_open(outfn, &clp->out_flags, clp->bs,
+                                     clp->bpt);
+            if (clp->outfd < 0)
+                return -clp->outfd;
+        } else if (FT_DEV_NULL == clp->out_type)
             clp->outfd = -1; /* don't bother opening */
         else {
             if (FT_RAW != clp->out_type) {
@@ -1556,19 +1657,19 @@ main(int argc, char * argv[])
                 if (clp->out_flags.append)
                     flags |= O_APPEND;
 
-                if ((clp->outfd = open(outf, flags, 0666)) < 0) {
+                if ((clp->outfd = open(outfn, flags, 0666)) < 0) {
                     err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
-                             "writing", my_name, outf);
+                             "writing", my_name, outfn);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
             }
             else {      /* raw output file */
-                if ((clp->outfd = open(outf, O_WRONLY)) < 0) {
+                if ((clp->outfd = open(outfn, O_WRONLY)) < 0) {
                     err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scould not open %s for raw "
-                             "writing", my_name, outf);
+                             "writing", my_name, outfn);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1580,7 +1681,7 @@ main(int argc, char * argv[])
                 if (lseek64(clp->outfd, offset, SEEK_SET) < 0) {
                     err = errno;
                     snprintf(ebuff, EBUFF_SZ, "%scouldn't seek to required "
-                             "position on %s", my_name, outf);
+                             "position on %s", my_name, outfn);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1603,22 +1704,22 @@ main(int argc, char * argv[])
             }
             if (0 != res) {
                 if (res == SG_LIB_CAT_INVALID_OP)
-                    pr2serr("read capacity not supported on %s\n", inf);
+                    pr2serr("read capacity not supported on %s\n", infn);
                 else if (res == SG_LIB_CAT_NOT_READY)
-                    pr2serr("read capacity failed, %s not ready\n", inf);
+                    pr2serr("read capacity failed, %s not ready\n", infn);
                 else
-                    pr2serr("Unable to read capacity on %s\n", inf);
+                    pr2serr("Unable to read capacity on %s\n", infn);
                 in_num_sect = -1;
             }
         } else if (FT_BLOCK == clp->in_type) {
             if (0 != read_blkdev_capacity(clp->infd, &in_num_sect,
                                           &in_sect_sz)) {
-                pr2serr("Unable to read block capacity on %s\n", inf);
+                pr2serr("Unable to read block capacity on %s\n", infn);
                 in_num_sect = -1;
             }
             if (clp->bs != in_sect_sz) {
                 pr2serr("logical block size on %s confusion; bs=%d, from "
-                        "device=%d\n", inf, clp->bs, in_sect_sz);
+                        "device=%d\n", infn, clp->bs, in_sect_sz);
                 in_num_sect = -1;
             }
         }
@@ -1635,22 +1736,22 @@ main(int argc, char * argv[])
             }
             if (0 != res) {
                 if (res == SG_LIB_CAT_INVALID_OP)
-                    pr2serr("read capacity not supported on %s\n", outf);
+                    pr2serr("read capacity not supported on %s\n", outfn);
                 else if (res == SG_LIB_CAT_NOT_READY)
-                    pr2serr("read capacity failed, %s not ready\n", outf);
+                    pr2serr("read capacity failed, %s not ready\n", outfn);
                 else
-                    pr2serr("Unable to read capacity on %s\n", outf);
+                    pr2serr("Unable to read capacity on %s\n", outfn);
                 out_num_sect = -1;
             }
         } else if (FT_BLOCK == clp->out_type) {
             if (0 != read_blkdev_capacity(clp->outfd, &out_num_sect,
                                           &out_sect_sz)) {
-                pr2serr("Unable to read block capacity on %s\n", outf);
+                pr2serr("Unable to read block capacity on %s\n", outfn);
                 out_num_sect = -1;
             }
             if (clp->bs != out_sect_sz) {
                 pr2serr("logical block size on %s confusion: bs=%d, from "
-                        "device=%d\n", outf, clp->bs, out_sect_sz);
+                        "device=%d\n", outfn, clp->bs, out_sect_sz);
                 out_num_sect = -1;
             }
         }
@@ -1726,12 +1827,14 @@ main(int argc, char * argv[])
     }
 
 /* vvvvvvvvvvv  Start worker threads  vvvvvvvvvvvvvvvvvvvvvvvv */
-    if ((clp->out_rem_count > 0) && (num_threads > 0)) {
+    if ((clp->out_rem_count > 0) && (clp->num_threads > 0)) {
         /* Run 1 work thread to shake down infant retryable stuff */
         status = pthread_mutex_lock(&clp->out_mutex);
         if (0 != status) err_exit(status, "lock out_mutex");
+        thr_arg_a[0].id = 0;
+        thr_arg_a[0].clp = clp;
         status = pthread_create(&threads[0], NULL, read_write_thread,
-                                (void *)clp);
+                                (void *)(thr_arg_a + 0));
         if (0 != status) err_exit(status, "pthread_create");
         if (clp->debug)
             pr2serr("Starting worker thread k=0\n");
@@ -1745,19 +1848,22 @@ main(int argc, char * argv[])
         if (0 != status) err_exit(status, "unlock out_mutex");
 
         /* now start the rest of the threads */
-        for (k = 1; k < num_threads; ++k) {
+        for (k = 1; k < clp->num_threads; ++k) {
+
+            thr_arg_a[k].id = k;
+            thr_arg_a[k].clp = clp;
             status = pthread_create(&threads[k], NULL, read_write_thread,
-                                    (void *)clp);
+                                    (void *)(thr_arg_a + k));
             if (0 != status) err_exit(status, "pthread_create");
-            if (clp->debug)
+            if (clp->debug > 2)
                 pr2serr("Starting worker thread k=%d\n", k);
         }
 
         /* now wait for worker threads to finish */
-        for (k = 0; k < num_threads; ++k) {
+        for (k = 0; k < clp->num_threads; ++k) {
             status = pthread_join(threads[k], &vp);
             if (0 != status) err_exit(status, "pthread_join");
-            if (clp->debug)
+            if (clp->debug > 2)
                 pr2serr("Worker thread k=%d terminated\n", k);
         }
     }   /* started worker threads and here after they have all exited */
@@ -1767,7 +1873,7 @@ main(int argc, char * argv[])
 
     if (do_sync) {
         if (FT_SG == clp->out_type) {
-            pr2serr(">> Synchronizing cache on %s\n", outf);
+            pr2serr(">> Synchronizing cache on %s\n", outfn);
             res = sg_ll_sync_cache_10(clp->outfd, 0, 0, 0, 0, 0, false, 0);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 pr2serr("Unit attention(out), continuing\n");
