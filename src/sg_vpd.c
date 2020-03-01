@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.57 20200123";  /* spc6r01 + sbc4r18 */
+static const char * version_str = "1.58 20200223";  /* spc6r01 + sbc4r18 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -241,7 +241,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_SUPPORTED_VPDS, 0, -1, "sv", "Supported VPD pages"},
     {VPD_TA_SUPPORTED, 0, 1, "tas", "TapeAlert supported flags (SSC)"},
     {VPD_3PARTY_COPY, 0, -1, "tpc", "Third party copy"},
-    {VPD_ZBC_DEV_CHARS, 0, -1, "zbdc", "Zoned block device characteristics"},
+    {VPD_ZBC_DEV_CHARS, 0, -1, "zbdch", "Zoned block device characteristics"},
         /* Use pdt of -1 since this page both for pdt=0 and pdt=0x14 */
     {0, 0, 0, NULL, NULL},
 };
@@ -2530,7 +2530,7 @@ decode_b5_vpd(uint8_t * b, int len, int do_hex, int pdt)
 
 /* VPD_ZBC_DEV_CHARS 0xb6  sbc or zbc [zbc2r04] */
 static void
-decode_zbdc_vpd(uint8_t * b, int len, int do_hex)
+decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
 {
     uint32_t u;
 
@@ -3382,7 +3382,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_zbdc_vpd(rp, len, op->do_hex);
+                decode_zbdch_vpd(rp, len, op->do_hex);
             }
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
