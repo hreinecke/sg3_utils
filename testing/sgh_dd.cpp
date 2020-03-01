@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.73 20200215";
+static const char * version_str = "1.75 20200227";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -176,7 +176,6 @@ struct flags_t {
     bool excl;
     bool fua;
     bool masync;        /* more async sg v4 driver flag */
-    bool mmap;
     bool mrq_immed;     /* mrq submit non-blocking */
     bool mrq_svb;       /* mrq shared_variable_block, for sg->sg copy */
     bool no_dur;
@@ -192,6 +191,7 @@ struct flags_t {
     bool v4;
     bool v4_given;
     bool wq_excl;
+    int mmap;
 };
 
 typedef struct global_collection
@@ -272,7 +272,6 @@ typedef struct request_element
     bool wr;
     bool has_share;
     bool both_sg;
-    bool mmap_active;
     bool same_sg;
     bool only_in_sg;
     bool only_out_sg;
@@ -294,6 +293,7 @@ typedef struct request_element
     uint8_t cmd[MAX_SCSI_CDBSZ];
     uint8_t sb[SENSE_BUFF_LEN];
     int dio_incomplete_count;
+    int mmap_active;
     int resid;
     int rd_p_id;
     int rep_count;
@@ -968,6 +968,7 @@ page3:
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
+            "    mmap,mmap    when used twice, doesn't call munmap()\n"
             "    mrq_immed    if mrq active, do submit non-blocking (def: "
             "ordered\n"
             "                 blocking)\n"
@@ -1347,16 +1348,16 @@ read_write_thread(void * v_tip)
     vb = clp->debug;
     sz = clp->bpt * clp->bs;
     in_is_sg = (FT_SG == clp->in_type);
-    in_mmap = (in_is_sg && clp->in_flags.mmap);
+    in_mmap = (in_is_sg && (clp->in_flags.mmap > 0));
     out_is_sg = (FT_SG == clp->out_type);
-    out_mmap = (out_is_sg && clp->out_flags.mmap);
+    out_mmap = (out_is_sg && (clp->out_flags.mmap > 0));
     memset(rep, 0, sizeof(Rq_elem));
     /* Following clp members are constant during lifetime of thread */
     rep->clp = clp;
     rep->id = tip->id;
     if (vb > 2)
         pr2serr_lk("%d <-- Starting worker thread\n", rep->id);
-    if (! in_mmap) {
+    if (! (in_mmap || out_mmap)) {
         int n = sz;
 
         if (clp->unbalanced_mrq)
@@ -1399,7 +1400,7 @@ read_write_thread(void * v_tip)
             if (fd < 0)
                 goto fini;
             rep->infd = fd;
-            rep->mmap_active = in_mmap;
+            rep->mmap_active = in_mmap ? clp->in_flags.mmap : 0;
             if (in_mmap && (vb > 4))
                 pr2serr_lk("thread=%d: mmap buffp=%p\n", rep->id, rep->buffp);
             own_infd = true;
@@ -1414,7 +1415,7 @@ read_write_thread(void * v_tip)
                 goto fini;
             rep->outfd = fd;
             if (! rep->mmap_active)
-                rep->mmap_active = out_mmap;
+                rep->mmap_active = out_mmap ? clp->out_flags.mmap : 0;
             if (out_mmap && (vb > 4))
                 pr2serr_lk("thread=%d: mmap buffp=%p\n", rep->id, rep->buffp);
             own_outfd = true;
@@ -1624,7 +1625,9 @@ skip_force_out_sequence:
     if (0 != status) err_exit(status, "unlock in_mutex");
 
 fini:
-    if (rep->mmap_active && (rep->mmap_len > 0)) {
+    if ((rep->mmap_active == 0) && rep->alloc_bp)
+        free(rep->alloc_bp);
+    if ((1 == rep->mmap_active) && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
             int err = errno;
             char bb[64];
@@ -1635,9 +1638,8 @@ fini:
         if (vb > 4)
             pr2serr_lk("thread=%d: munmap(%p, %d)\n", rep->id, rep->buffp,
                        rep->mmap_len);
-        rep->mmap_active = false;
-    } else if (rep->alloc_bp)
-        free(rep->alloc_bp);
+        rep->mmap_active = 0;
+    }
 
     if (sg_version_ge_40030) {
         if (clp->noshare) {
@@ -3148,7 +3150,7 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
     if (0 == (++testing % 100)) return -1;
 #endif
     if ((wr ? clp->out_flags.dio : clp->in_flags.dio) &&
-        ((hp->info & SG_INFO_DIRECT_IO_MASK) != SG_INFO_DIRECT_IO))
+        (! (hp->info & SG_INFO_DIRECT_IO_MASK)))
         rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
         rep->dio_incomplete_count = 0;
@@ -3225,7 +3227,7 @@ do_v4:
     if (0 == (++testing % 100)) return -1;
 #endif
     if ((wr ? clp->out_flags.dio : clp->in_flags.dio) &&
-        (h4p->info & SG_INFO_DIRECT_IO))
+        ! (h4p->info & SG_INFO_DIRECT_IO))
         rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
         rep->dio_incomplete_count = 0;
@@ -3477,9 +3479,24 @@ bypass:
     if (! def_res) {
         num = bs * bpt;
         res = ioctl(fd, SG_SET_RESERVED_SIZE, &num);
-        if (res < 0)
+        if (res < 0) {
             perror("sgh_dd: SG_SET_RESERVED_SIZE error");
-        else if (mmpp) {
+            return 0;
+        } else {
+            int nn;
+
+            res = ioctl(fd, SG_GET_RESERVED_SIZE, &nn);
+            if (res < 0) {
+                perror("sgh_dd: SG_GET_RESERVED_SIZE error");
+                return 0;
+            }
+            if (nn < num) {
+                pr2serr_lk("%s: SG_GET_RESERVED_SIZE shows size truncated, "
+                           "wanted %d got %d\n", __func__, num, nn);
+                return 0;
+            }
+        }
+        if (mmpp) {
             mmp = (uint8_t *)mmap(NULL, num, PROT_READ | PROT_WRITE,
                                   MAP_SHARED, fd, 0);
             if (MAP_FAILED == mmp) {
@@ -3550,7 +3567,7 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "masync"))
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
-            fp->mmap = true;
+            ++fp->mmap;         /* mmap > 1 stops munmap() being called */
         else if (0 == strcmp(cp, "mrq_imm"))
             fp->mrq_immed = true;
         else if (0 == strcmp(cp, "mrq_immed"))

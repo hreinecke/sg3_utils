@@ -378,15 +378,15 @@ extern FILE * sg_warnings_strm;
 
 void sg_set_warnings_strm(FILE * warnings_strm);
 
-/* Given a SCSI command pointed to by cmdp of sz bytes this function forms a
+/* Given a SCSI command pointed to by cdbp of sz bytes this function forms a
  * SCSI command in ASCII hex surrounded by square brackets in 'b'. 'b' is at
  * least blen bytes long. If cmd_name is true then the command is prefixed
  * by its SCSI command name (e.g.  "VERIFY(10) [2f ...]". The command is
  * shown as spaced separated pairs of hexadecimal digits (i.e. 0-9, a-f).
- * Each pair represents byte. The leftmost pair of digits is cmdp[0] . If
+ * Each pair represents byte. The leftmost pair of digits is cdbp[0] . If
  * sz <= 0 then this function tries to guess the length of the command. */
 char *
-sg_get_command_str(const uint8_t * cmdp, int sz, bool cmd_name, int blen,
+sg_get_command_str(const uint8_t * cdbp, int sz, bool cmd_name, int blen,
                    char * b);
 
 /* The following "print" functions send ASCII to 'sg_warnings_strm' file

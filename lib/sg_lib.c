@@ -162,23 +162,23 @@ static char bin2hexascii[] = {'0', '1', '2', '3', '4', '5', '6', '7',
                               '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
 
-/* Given a SCSI command pointed to by cmdp of sz bytes this function forms
+/* Given a SCSI command pointed to by cdbp of sz bytes this function forms
  * a SCSI command in ASCII surrounded by square brackets in 'b'. 'b' is at
  * least blen bytes long. If cmd_name is true then the command is prefixed
  * by its SCSI command name (e.g.  "VERIFY(10) [2f ...]". The command is
  * shown as spaced separated pairs of hexadecimal digits (i.e. 0-9, a-f).
- * Each pair represents byte. The leftmost pair of digits is cmdp[0] . If
+ * Each pair represents byte. The leftmost pair of digits is cdbp[0] . If
  * sz <= 0 then this function tries to guess the length of the command. */
 char *
-sg_get_command_str(const uint8_t * cmdp, int sz, bool cmd_name, int blen,
+sg_get_command_str(const uint8_t * cdbp, int sz, bool cmd_name, int blen,
                    char * b)
 {
     int k, j, jj;
 
-    if ((cmdp == NULL) || (b == NULL) || (blen < 1))
+    if ((cdbp == NULL) || (b == NULL) || (blen < 1))
         return b;
     if (cmd_name && (blen > 16)) {
-        sg_get_command_name(cmdp, 0, blen, b);
+        sg_get_command_name(cdbp, 0, blen, b);
         j = (int)strlen(b);
         if (j < (blen - 1))
             b[j++] = ' ';
@@ -190,15 +190,15 @@ sg_get_command_str(const uint8_t * cmdp, int sz, bool cmd_name, int blen,
     if (j >= blen)
         goto fini;
     if (sz <= 0) {
-        if (SG_VARIABLE_LENGTH_CMD == cmdp[0])
-            sz = cmdp[7] + 8;
+        if (SG_VARIABLE_LENGTH_CMD == cdbp[0])
+            sz = cdbp[7] + 8;
         else
-            sz = sg_get_command_size(cmdp[0]);
+            sz = sg_get_command_size(cdbp[0]);
     }
     jj = j;
-    for (k = 0; (k < sz) && (j < (blen - 3)); ++k, j += 3, ++cmdp) {
-        b[j] = bin2hexascii[(*cmdp >> 4) & 0xf];
-        b[j + 1] = bin2hexascii[*cmdp & 0xf];
+    for (k = 0; (k < sz) && (j < (blen - 3)); ++k, j += 3, ++cdbp) {
+        b[j] = bin2hexascii[(*cdbp >> 4) & 0xf];
+        b[j + 1] = bin2hexascii[*cdbp & 0xf];
         b[j + 2] = ' ';
     }
     if (j > jj)
@@ -217,18 +217,18 @@ fini:
 #define CMD_NAME_LEN 128
 
 void
-sg_print_command_len(const uint8_t * cmdp, int sz)
+sg_print_command_len(const uint8_t * cdbp, int sz)
 {
     char buff[CMD_NAME_LEN];
 
-    sg_get_command_str(cmdp, sz, true, sizeof(buff), buff);
+    sg_get_command_str(cdbp, sz, true, sizeof(buff), buff);
     pr2ws("%s\n", buff);
 }
 
 void
-sg_print_command(const uint8_t * cmdp)
+sg_print_command(const uint8_t * cdbp)
 {
-    sg_print_command_len(cmdp, 0);
+    sg_print_command_len(cdbp, 0);
 }
 
 /* SCSI Status values */
@@ -2222,7 +2222,7 @@ sg_get_command_size(uint8_t opcode)
 }
 
 void
-sg_get_command_name(const uint8_t * cmdp, int peri_type, int buff_len,
+sg_get_command_name(const uint8_t * cdbp, int peri_type, int buff_len,
                     char * buff)
 {
     int service_action;
@@ -2233,13 +2233,13 @@ sg_get_command_name(const uint8_t * cmdp, int peri_type, int buff_len,
         buff[0] = '\0';
         return;
     }
-    if (NULL == cmdp) {
+    if (NULL == cdbp) {
         sg_scnpr(buff, buff_len, "%s", "<null> command pointer");
         return;
     }
-    service_action = (SG_VARIABLE_LENGTH_CMD == cmdp[0]) ?
-                     sg_get_unaligned_be16(cmdp + 8) : (cmdp[1] & 0x1f);
-    sg_get_opcode_sa_name(cmdp[0], service_action, peri_type, buff_len, buff);
+    service_action = (SG_VARIABLE_LENGTH_CMD == cdbp[0]) ?
+                     sg_get_unaligned_be16(cdbp + 8) : (cdbp[1] & 0x1f);
+    sg_get_opcode_sa_name(cdbp[0], service_action, peri_type, buff_len, buff);
 }
 
 struct op_code2sa_t {

@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.04 20200123";    /* SPC-6 rev 01 */
+static const char * version_str = "2.05 20200223";    /* SPC-6 rev 01 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -211,7 +211,7 @@ static struct svpd_values_name_t vpd_pg[] = {
     {VPD_SCSI_PORTS, 0, -1, 0, "sp", "SCSI ports"},
     {VPD_SUPPORTED_VPDS, 0, -1, 0, "sv", "Supported VPD pages"},
     {VPD_3PARTY_COPY, 0, -1, 0, "tpc", "Third party copy"},
-    {VPD_ZBC_DEV_CHARS, 0, -1, 0, "zbdc", "Zoned block device "
+    {VPD_ZBC_DEV_CHARS, 0, -1, 0, "zbdch", "Zoned block device "
      "characteristics"},
     /* Following are vendor specific */
     {SG_NVME_VPD_NICR, 0, -1, 1, "nicr",

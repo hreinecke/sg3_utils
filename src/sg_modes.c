@@ -258,6 +258,7 @@ static struct page_code_desc pc_desc_zbc[] = {
     {0x7, 0x0, "ve", "Verify error recovery"},
     {0x8, 0x0, "ca", "Caching"},
     {0xa, 0x2, "atag", "Application tag"},
+    {0xa, 0xf, "zbdct", "Zoned block device control"},  /* zbc2r04a */
     {0x1c, 0x1, "bc", "Background control"},
     {0x0, 0x0, NULL, NULL},
 };
