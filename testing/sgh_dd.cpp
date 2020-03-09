@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.75 20200227";
+static const char * version_str = "1.76 20200307";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -3500,7 +3500,10 @@ bypass:
             mmp = (uint8_t *)mmap(NULL, num, PROT_READ | PROT_WRITE,
                                   MAP_SHARED, fd, 0);
             if (MAP_FAILED == mmp) {
-                perror("error using mmap()");
+		int err = errno;
+
+                pr2serr_lk("sgh_dd: %s: sz=%d, fd=%d, mmap() failed: %s\n",
+			   __func__, num, fd, strerror(err));
                 return 0;
             }
             *mmpp = mmp;

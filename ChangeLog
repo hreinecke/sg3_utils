@@ -2,20 +2,22 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
+Changelog for sg3_utils-1.46 [20200309] [svn: r845]
+  - bump config to 1.46
+
 Changelog for sg3_utils-1.45 [20200229] [svn: r843]
   - sg_get_elem_status: new utility [sbc4r16]
-  - sg_ses: bug: --page= being overridden when --control
-    and --data= also given; fix
+  - sg_ses: bug: --page= being overridden when --control and --data= also
+    given; fix
     - document explicit Element type codes and example
     - rename 'SAS SlimLine' to SlimSAS [ses4r02]
-    - add --inhex=FN, equivalent to --data=@FN, for
-      compatibility with other utilities
+    - add --inhex=FN, equivalent to --data=@FN, for compatibility with
+      other utilities
     - 'fan speed factor' field added in 20-013r1
   - sg_opcodes: expand MLU (now 2 bits, spc5r20)
-    - include RWCDLP field as extension of CDLP
-      field (spc5r01)
-  - sg_write_buffer: allow comma and period separated
-    lists when input from stdin
+    - include RWCDLP field as extension of CDLP field (spc5r01)
+  - sg_write_buffer: allow comma and period separated lists when input
+    from stdin
   - sg_inq: update version descriptors to spc5r21
     - add some NVMe 1.4 snippets to ctl identify
   - sg_format: add --dcrt used twice (FOV=1 DCRT=0)
@@ -23,39 +25,36 @@ Changelog for sg3_utils-1.45 [20200229] [svn: r843]
   - sg_raw: fix --send bug when using stdin
   - sg_vpd: 3pc VPD page add copy group descriptor
     - add --examine option
-    - new zoned block device char. field (zbc2r04)
+    - new zoned block device char. page (zbc2r04)
   - sg_read_buffer: decode read microcode status page
     - add --inhex=FN option
-  - sg_request: add --error option, replaces opcode
-    with 0xff (or skips call to pass-through)
+  - sg_request: add --error option, replaces opcode with 0xff (or skips call
+    to pass-through)
   - sg_get_lba_status: add --inhex=FN option
   - sg_xcopy: add --fco (fast copy only) (spc5r20)
     - implement --app=1 (append) on regular OFILE type
   - sg_scan (win32): expand limits for big arrays
-  - sg_modes: placeholders for Command duration limit
-    T2A and T2B mpages (sbc4r17)
+  - sg_modes: placeholders for Command duration limit  T2A and T2B mpages
+    (sbc4r17)
     - improve zbc support (e.g. caching mpage)
-  - sg_logs: add Command duration limits statistics
-    lpage (spc6r01)
-    - zoned block device statistics log page: shorten
-      counter fields from 8 to 4 bytes (zbc2r02)
+  - sg_logs: add Command duration limits statistics lpage (spc6r01)
+    - zoned block device statistics log page: shorten counter fields from
+      8 to 4 bytes (zbc2r02)
       - new field in this log page (zbc2r04)
-    - change '-ll' option to suppress subpages=0xff
-      apart from page 0x0,0xff. Used three times:
-      list all pages and subpages names reported
-  - sg_reassign: for defect list format 6 (vendor
-    specific) don't try to decode
+    - change '-ll' option to suppress subpages=0xff apart from page
+      0x0,0xff. Used three times: list all pages and subpages names
+      reported
+  - sg_reassign: for defect list format 6 (vendor specific) don't try to decode
   - sg_rep_zones: expand some fields per zbc2r04
     - add --num= and --wp options
   - sg_verify: correct so issues VERIFY(16)
-    - add --0 and --ff options and implement
-      bytchk=3 properly
+    - add --0 and --ff options and implement bytchk=3 properly
   - sg_write_same: add --ff for 0xff fill
   - sg_luns: report new "target commands" w-lun (19-117)
   - sg_dd: add --verify support
   - sgp_dd: support memory-mapped IO via mmap flag
-  - inhex directory: new, contains ASCII hex files
-    that can be used with the '--inhex=' option
+  - inhex directory: new, contains ASCII hex files that can be used with
+    the '--inhex=' option
   - sg_lib: add sg_t10_uuid_desig2str()
     - add sg_get_command_str and sg_print_command_len()
     - speed up sg_print_command()
@@ -65,17 +64,15 @@ Changelog for sg3_utils-1.45 [20200229] [svn: r843]
     - add ${PACKAGE_VERSION} to '.so' name
     - add sg_f2hex_arr()
     - update some tables for NVMe 1.4
-    - sg_get_num()+sg_get_llnum(): add 'e' decoding,
+    - sg_get_num()+sg_get_llnum(): add 'e' decoding, exabytes; allow
+      addition (e.g. --count=3+1k)
     - asc/ascq match asc-num.txt @t10 20191014
-      exabytes; allow addition (e.g. --count=3+1k)
     - new zbc2r04 service actions
   - sg_pt_freebsd: fixes for FreeBSD 12.0 release
-  - scripts: update 54-before-scsi-sg3_id.rules,
-    scsi-enable-target-scan.sh and
-    59-fc-wwpn-id.rules
-  - linux: add nanosecond durations when
-    SG3_UTILS_LINUX_NANO environment variable given
-    and Linux sg driver >= 4.0.30
+  - scripts: update 54-before-scsi-sg3_id.rules, scsi-enable-target-scan.sh
+    and 59-fc-wwpn-id.rules
+  - linux: add nanosecond durations when SG3_UTILS_LINUX_NANO environment
+    variable givenand Linux sg driver >= 4.0.30
   - rescan-scsi-bus: widen LUN 0 only scanning
     - multiple patches to sync with Suse
   - testing/sg_tst_async: fix free_list issue
@@ -83,22 +80,21 @@ Changelog for sg3_utils-1.45 [20200229] [svn: r843]
   - testing/sg_tst_bidi: for sg 4.0 driver
   - testing/sgh_dd: test request sharing, mreqs...
     - add --verify support
-  - testing/sgs_dd: back from archive, for testing
+  - testing/sgs_dd: back from archive, for testing SIGPOLL (SIGIO) and
+    realtime (RT) signals
   - testing/sg_chk_asc: allow LF and CR/LF in asc-num.txt
   - testing: 'make' now builds both C and C++ programs
-    SIGPOLL (SIGIO) and realtime (RT) signals
-  - sg_pt: add sg_get_opcode_translation() to replace
-    global pointer to array: sg_opcode_info_arr[]
+  - sg_pt: add sg_get_opcode_translation() to replace global pointer to
+    array: sg_opcode_info_arr[]
     - extend small SNTL to support read capacity
   - utils/hxascdmp: add -o=<offset> option
     - add -1, -2 and -q options
   - sg_io_linux (sg_lib): add sg_linux_sense_print()
-  - sg_pt_linux: uses sg v4 interface if sg driver
-    >= 4.0.0 . Force sg v3 always by building with
-    './configure --disable-linux-sgv4'
+  - sg_pt_linux: uses sg v4 interface if sg driver >= 4.0.0 . Force sg v3
+    always by building with './configure --disable-linux-sgv4'
     - add sg_linux_get_sg_version() function
-  - add: 'SPDX-License-Identifier: BSD-2-Clause'
-    or a small number of 'GPL-2.0-or-later'
+  - add: 'SPDX-License-Identifier: BSD-2-Clause' or a small number of
+    'GPL-2.0-or-later'
   - gcc-9: suppress (pointless) warnings
   - automake: upgrade to version 1.16.1
   - autoconf: upgrade to version 2.69

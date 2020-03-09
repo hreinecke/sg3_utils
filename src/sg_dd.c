@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.10 20200216";
+static const char * version_str = "6.11 20200303";
 
 
 #define ME "sg_dd: "
@@ -365,7 +365,7 @@ usage()
             "[coe=0|1|2|3]\n"
             "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
             "[of2=OFILE2] [retries=RETR]\n"
-            "              [sync=0|1] [time=0|1] [verbose=VERB]\n"
+            "              [sync=0|1] [time=0|1] [verbose=VERB] [--verify]\n"
             "  where:\n"
             "    blk_sgio    0->block device use normal I/O(def), 1->use "
             "SG_IO\n"
