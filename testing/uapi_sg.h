@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2020 Douglas Gilbert
  *
- * Version 4.0.11 (20200124)
+ * Version 4.0.13 (20200328)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -117,7 +117,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_NO_WAITQ  0x40	/* implies SGV4_FLAG_IMMED */
 #define SGV4_FLAG_DOUT_OFFSET  0x80	/* dout byte offset in v4::spare_in */
 #define SGV4_FLAG_COMPLETE_B4  0x100
-#define SGV4_FLAG_SIG_ON_OTHER  0x200
+#define SGV4_FLAG_SIGNAL 0x200	/* v3: ignored; v4 signal on completion */
 #define SGV4_FLAG_IMMED 0x400  /* for polling with SG_IOR, ignored in SG_IOS */
 #define SGV4_FLAG_STOP_IF 0x800	/* Stops sync mrq if error or warning */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
@@ -126,6 +126,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_KEEP_SHARE 0x8000  /* ... buffer for another dout command */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
 #define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* n sg_io_v4s in data-in */
+#define SGV4_FLAG_EVENTFD 0x40000	/* signal completion on ... */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1
@@ -195,7 +196,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIM_SHARE_FD	0x20	/* slave gives fd of master: sharing */
 #define SG_SEIM_CHG_SHARE_FD	0x40	/* master gives fd of new slave */
 #define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
-#define SG_SEIM_ALL_BITS	0xff	/* should be OR of previous items */
+#define SG_SEIM_EVENTFD		0x100	/* pass eventfd to driver */
+#define SG_SEIM_ALL_BITS	0x1ff	/* should be OR of previous items */
 
 /* flag and mask values for boolean fields follow */
 #define SG_CTL_FLAGM_TIME_IN_NS	0x1	/* time: nanosecs (def: millisecs) */
@@ -213,7 +215,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_MORE_ASYNC	0x800	/* yield EAGAIN in more cases */
 #define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */
 #define SG_CTL_FLAGM_SNAP_DEV	0x2000	/* output to debugfs::snapped */
-#define SG_CTL_FLAGM_ALL_BITS	0x3fff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_RM_EVENTFD	0x4000	/* only if new eventfd wanted */
+#define SG_CTL_FLAGM_ALL_BITS	0x7fff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */
@@ -252,7 +255,7 @@ struct sg_extended_info {
 	__u32	reserved_sz;	/* data/sgl size of pre-allocated request */
 	__u32	tot_fd_thresh;	/* total data/sgat for this fd, 0: no limit */
 	__u32	minor_index;	/* rd: kernel's sg device minor number */
-	__u32	share_fd;	/* SHARE_FD and CHG_SHARE_FD use this */
+	__u32	share_fd;	/* for SHARE_FD, CHG_SHARE_FD or EVENTFD */
 	__u32	sgat_elem_sz;	/* sgat element size (must be power of 2) */
 	__u8	pad_to_96[52];	/* pad so struct is 96 bytes long */
 };

@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.11 20200303";
+static const char * version_str = "6.12 20200331";
 
 
 #define ME "sg_dd: "
@@ -139,6 +139,7 @@ static int out_partial = 0;
 static int64_t out_sparse_num = 0;
 static int recovered_errs = 0;
 static int unrecovered_errs = 0;
+static int miscompare_errs = 0;
 static int read_longs = 0;
 static int num_retries = 0;
 static int dry_run = 0;
@@ -219,8 +220,10 @@ print_stats(const char * str)
         pr2serr("%s%d unrecovered errors\n", str, unrecovered_errs);
         pr2serr("%s%d read_longs fetched part of unrecovered read errors\n",
                 str, read_longs);
-    } else if (unrecovered_errs)
+    } else if (unrecovered_errs > 0)
         pr2serr("%s%d unrecovered error(s)\n", str, unrecovered_errs);
+    if (miscompare_errs > 0)
+        pr2serr("%s%d miscompare error(s)\n", str, miscompare_errs);
 }
 
 
@@ -1016,7 +1019,7 @@ err_out:
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
  * -1 -> unrecoverable error + others.  Note: if do_verify is true then does
- * a VERIFY rather tahn a WRITE command. */
+ * a VERIFY rather than a WRITE command. */
 static int
 sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
          int bs, const struct flags_t * ofp, bool * diop)
@@ -1091,6 +1094,10 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
         sg_chk_n_print3(op_str, &io_hdr, verbose > 1);
+        return res;
+    case SG_LIB_CAT_MISCOMPARE:
+        ++miscompare_errs;
+        pr2serr("VERIFY reports miscompare\n");
         return res;
     case SG_LIB_CAT_NOT_READY:
         ++unrecovered_errs;

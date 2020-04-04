@@ -19,8 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.72 20200125";
-/* spc5r22, sbc4r17, zbc2r04 */
+const char * sg_lib_version_str = "2.73 20200331";
+/* spc6r01, sbc4r19, zbc2r04 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -363,6 +363,7 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x16, 0, "Get stream status"},
     {0x17, 0, "Get physical element status"},   /* added sbc4r13 */
     {0x18, 0, "Remove element and truncate"},   /* added sbc4r13 */
+    {0x19, 0, "Restore elements and rebuild"},  /* added sbc4r19 */
     {0xffff, 0, NULL},
 };
 

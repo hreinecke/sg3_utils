@@ -171,6 +171,13 @@ struct sg_pt_base {
 #ifndef NVME_IOCTL_SUBSYS_RESET
 #define NVME_IOCTL_SUBSYS_RESET _IO('N', 0x45)
 #endif
+#ifndef NVME_IOCTL_RESCAN
+#define NVME_IOCTL_RESCAN       _IO('N', 0x46)
+#endif
+#if 0
+#define NVME_IOCTL_ADMIN64_CMD  _IOWR('N', 0x47, struct nvme_passthru_cmd64)
+#define NVME_IOCTL_IO64_CMD     _IOWR('N', 0x48, struct nvme_passthru_cmd64)
+#endif
 
 extern bool sg_bsg_nvme_char_major_checked;
 extern int sg_bsg_major;

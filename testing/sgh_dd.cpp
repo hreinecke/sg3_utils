@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.76 20200307";
+static const char * version_str = "1.78 20200403";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -545,8 +545,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_SIG_ON_OTHER & flags) {       /* 0x200 */
-        n += sg_scnpr(b + n, b_len - n, "SIGOTH|");
+    if (SGV4_FLAG_SIGNAL & flags) {       /* 0x200 */
+        n += sg_scnpr(b + n, b_len - n, "SIGNAL|");
         if (n >= b_len)
             goto fini;
     }
@@ -2881,6 +2881,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             if ((0 == xtrp->hpv4_ind) && (nblks < rep->num_blks))
                 flags |= SGV4_FLAG_KEEP_SHARE;
         }
+        if (xtrp && wr && rep->has_share && ! is_wr2)
+            flags |= SGV4_FLAG_KEEP_SHARE; /* set on first write only */
     } else
         memset(hp, 0, sizeof(struct sg_io_hdr));
     if (clp->debug > 3) {
@@ -3500,10 +3502,10 @@ bypass:
             mmp = (uint8_t *)mmap(NULL, num, PROT_READ | PROT_WRITE,
                                   MAP_SHARED, fd, 0);
             if (MAP_FAILED == mmp) {
-		int err = errno;
+                int err = errno;
 
                 pr2serr_lk("sgh_dd: %s: sz=%d, fd=%d, mmap() failed: %s\n",
-			   __func__, num, fd, strerror(err));
+                           __func__, num, fd, strerror(err));
                 return 0;
             }
             *mmpp = mmp;

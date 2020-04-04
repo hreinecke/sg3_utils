@@ -51,6 +51,8 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/eventfd.h>
+#include <sys/epoll.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 
@@ -81,7 +83,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.12 20190824";
+static const char * version_str = "4.14 20200330";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -114,6 +116,7 @@ static const char * my_name = "sgs_dd";
 
 struct flags_t {
     bool dio;
+    bool evfd;
     bool excl;
     bool immed;
     bool mmap;
@@ -147,13 +150,16 @@ typedef struct request_collection
 {
     bool in_is_sg;
     bool out_is_sg;
+    bool no_sig;
     bool use_rt_sig;
     int infd;
+    int in_evfd;
     int in_blk;                 /* most recent read */
     int in_count;               /* most recent read */
     int in_done_count;          /* count of completed in blocks */
     int in_partial;
     int outfd;
+    int out_evfd;
     int lowest_seek;
     int out_blk;                /* most recent write */
     int out_count;              /* most recent write */
@@ -185,23 +191,27 @@ usage(void)
 {
     printf("Usage: "
            "sgs_dd  [bpt=BPT] [bs=BS] [count=NUM] [deb=DEB] [if=IFILE]\n"
-           "               [iflag=FLAGS] [of=OFILE] [oflag=FLAGS] "
-           "[rt_sig=0|1]\n"
-           "               [seek=SEEK] [skip=SKIP] [--version]\n"
+           "               [iflag=FLAGS] [no_sig=0|1] [of=OFILE] "
+           "[oflag=FLAGS]\n"
+           "               [rt_sig=0|1] [seek=SEEK] [skip=SKIP] "
+           "[--version]\n"
            "where:\n"
            "  bpt      blocks_per_transfer (default: 65536/bs (or 128 for "
            "bs=512))\n"
            "  bs       must be the logical block size of device (def: 512)\n"
            "  deb      debug: 0->no debug (def); > 0 -> more debug\n"
-           "  iflag    comma separated list from: dio,excl,immed,mmap,noxfer,"
-           "null,pack,\n"
-           "           tag,v3,v4 bound to IFILE\n"
+           "  iflag    comma separated list from: dio,evfd,excl,immed,mmap,"
+           "noxfer,\n"
+           "           null,pack,tag,v3,v4 bound to IFILE\n"
+           "  no_sig   0-> use signals (def); 1-> no signals, hard polling "
+           "instead\n"
            "  oflag    same flags as iflag but bound to OFILE\n"
            "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
            "  <other operands>     as per dd command\n\n");
-    printf("dd clone for testing Linux sg driver SIGPOLL and friends. Either "
-           "IFILE or\nOFILE must be a scsi generic device. If OFILE not given "
-           "then /dev/null\nassumed.\n");
+    printf("dd clone for testing Linux sg driver SIGPOLL and/or polling. "
+           "Either\nIFILE or OFILE must be a scsi generic device. If OFILE "
+           "not given then\n/dev/null assumed (rather than stdout like "
+           "dd).\n");
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -242,8 +252,7 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
     *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
                (rcBuff[6] << 8) | rcBuff[7];
 #ifdef SG_DEBUG
-    fprintf(stderr, "number of sectors=%d, sector size=%d\n", *num_sect,
-            *sect_sz);
+    pr2serr("number of sectors=%d, sector size=%d\n", *num_sect, *sect_sz);
 #endif
     return 0;
 }
@@ -252,9 +261,9 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
 static int
 sg_start_io(Rq_coll * clp, Rq_elem * rep)
 {
+    int res;
     int fd = rep->wr ? clp->outfd : clp->infd;
     struct flags_t * flagp = rep->wr ? rep->oflagp : rep->iflagp;
-    int res;
     sg_io_hdr_t * hp = &rep->io_hdr;
     struct sg_io_v4 * h4p = &rep->io_v4;
 
@@ -285,12 +294,14 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
         hp->flags |= SGV4_FLAG_IMMED;
     if (flagp->mmap)
         hp->flags |= SG_FLAG_MMAP_IO;
+    if (flagp->evfd)
+        hp->flags |= SGV4_FLAG_EVENTFD;
 #ifdef SG_DEBUG
-    fprintf(stderr, "%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
-           rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
+    pr2serr("%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
+            rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
     sg_print_command(hp->cmdp);
-    fprintf(stderr, "dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n",
-            hp->dxfer_direction, hp->dxfer_len, hp->dxferp, hp->cmd_len);
+    pr2serr("dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n", hp->dxfer_direction,
+            hp->dxfer_len, hp->dxferp, hp->cmd_len);
 #endif
 
     while (((res = write(fd, hp, sizeof(sg_io_hdr_t))) < 0) &&
@@ -303,13 +314,13 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
             rep->state = SGQ_IO_WAIT;   /* busy so wait */
             return 0;
         }
-        fprintf(stderr, "%s: write(): %s [%d]\n", __func__, strerror(errno),
-                errno);
+        pr2serr("%s: write(): %s [%d]\n", __func__, strerror(errno), errno);
         rep->state = SGQ_IO_ERR;
         return res;
     }
     rep->state = SGQ_IO_STARTED;
-    clp->sigs_waiting++;
+    if (! clp->no_sig)
+        clp->sigs_waiting++;
     return 0;
 do_v4:
     memset(h4p, 0, sizeof(struct sg_io_v4));
@@ -338,6 +349,11 @@ do_v4:
         h4p->flags |= SG_FLAG_MMAP_IO;
     if (flagp->tag)
         h4p->flags |= SGV4_FLAG_YIELD_TAG;
+    if (flagp->evfd)
+        h4p->flags |= SGV4_FLAG_EVENTFD;
+    if (! clp->no_sig)
+        h4p->flags |= SGV4_FLAG_SIGNAL;
+
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) && (EINTR == errno))
         ;
     if (res < 0) {
@@ -347,16 +363,17 @@ do_v4:
             rep->state = SGQ_IO_WAIT;   /* busy so wait */
             return 0;
         }
-        fprintf(stderr, "%s: ioctl(SG_IOSUBMIT): %s [%d]\n", __func__,
+        pr2serr("%s: ioctl(SG_IOSUBMIT): %s [%d]\n", __func__,
                 strerror(errno), errno);
         rep->state = SGQ_IO_ERR;
         return res;
     }
     rep->state = SGQ_IO_STARTED;
-    clp->sigs_waiting++;
+    if (! clp->no_sig)
+        clp->sigs_waiting++;
 #ifdef SG_DEBUG
     if (rep->wr ? clp->oflag.tag : clp->iflag.tag)
-        fprintf(stderr, "%s:  generated_tag=0x%" PRIx64 "\n", __func__,
+        pr2serr("%s:  generated_tag=0x%" PRIx64 "\n", __func__,
                 (uint64_t)h4p->generated_tag);
 #endif
     return 0;
@@ -366,10 +383,11 @@ do_v4:
 static int
 sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
 {
+    struct flags_t *flagsp = wr ? &clp->oflag : &clp->iflag;
     bool dio = false;
-    bool is_v4 = wr ? clp->oflag.v4 : clp->iflag.v4;
-    bool use_pack = wr ? clp->oflag.pack : clp->iflag.pack;
-    bool use_tag = wr ? clp->oflag.tag : clp->iflag.tag;
+    bool is_v4 = flagsp->v4;
+    bool use_pack = flagsp->pack;
+    bool use_tag = flagsp->tag;
     int fd = wr ? clp->outfd : clp->infd;
     int res, id, n;
     sg_io_hdr_t io_hdr;
@@ -382,21 +400,20 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
         goto do_v4;
     memset(&io_hdr, 0 , sizeof(sg_io_hdr_t));
     while (((res = read(fd, &io_hdr, sizeof(sg_io_hdr_t))) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     rep = (Rq_elem *)io_hdr.usr_ptr;
     if (rep)
-        dio = rep->wr ? clp->oflag.dio : clp->iflag.dio;
+        dio = flagsp->dio;
     if (res < 0) {
         res = -errno;
-        fprintf(stderr, "%s: read(): %s [%d]\n", __func__, strerror(errno),
-                errno);
+        pr2serr("%s: read(): %s [%d]\n", __func__, strerror(errno), errno);
         if (rep)
             rep->state = SGQ_IO_ERR;
         return res;
     }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
-        fprintf(stderr, "%s: bad usr_ptr\n", __func__);
+        pr2serr("%s: bad usr_ptr\n", __func__);
         if (rep)
             rep->state = SGQ_IO_ERR;
         return -1;
@@ -410,8 +427,8 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            fprintf(stderr, "Recovered error on block=%d, num=%d\n",
-                   rep->blk, rep->num_blks);
+            pr2serr("Recovered error on block=%d, num=%d\n", rep->blk,
+                    rep->num_blks);
             break;
         case SG_LIB_CAT_UNIT_ATTENTION:
             return 1;
@@ -425,8 +442,8 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
     clp->sum_of_resids += hp->resid;
     rep->state = SGQ_IO_FINISHED;
 #ifdef SG_DEBUG
-    fprintf(stderr, "%s: %s  ", __func__, wr ? "writing" : "reading");
-    fprintf(stderr, "    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
+    pr2serr("%s: %s  ", __func__, wr ? "writing" : "reading");
+    pr2serr("    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
 #endif
     return 0;
 do_v4:
@@ -435,14 +452,14 @@ do_v4:
         while (true) {
             if ( ((res = ioctl(fd, SG_GET_NUM_WAITING, &n))) < 0) {
                 res = -errno;
-                fprintf(stderr, "%s: ioctl(SG_GET_NUM_WAITING): %s [%d]\n",
+                pr2serr("%s: ioctl(SG_GET_NUM_WAITING): %s [%d]\n",
                         __func__, strerror(errno), errno);
                 return res;
             }
             if (n > 0) {
                 if ( ((res = ioctl(fd, SG_GET_PACK_ID, &id))) < 0) {
                     res = -errno;
-                    fprintf(stderr, "%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
+                    pr2serr("%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
                             __func__, strerror(errno), errno);
                     return res;
                 }
@@ -458,20 +475,22 @@ do_v4:
     else if (use_pack)
         io_v4.request_extra = id;
     io_v4.flags |= SGV4_FLAG_IMMED;
+    if (flagsp->evfd)
+        io_v4.flags |= SGV4_FLAG_EVENTFD;
     while (((res = ioctl(fd, SG_IORECEIVE, &io_v4)) < 0) &&
-           ((EINTR == errno) || (EAGAIN == errno)))
+           ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     rep = (Rq_elem *)(unsigned long)io_v4.usr_ptr;
     if (res < 0) {
         res = -errno;
-        fprintf(stderr, "%s: ioctl(SG_IORECEIVE): %s [%d]\n", __func__,
+        pr2serr("%s: ioctl(SG_IORECEIVE): %s [%d]\n", __func__,
                 strerror(errno), errno);
         if (rep)
             rep->state = SGQ_IO_ERR;
         return res;
     }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
-        fprintf(stderr, "%s: bad usr_ptr=0x%p\n", __func__, rep);
+        pr2serr("%s: bad usr_ptr=0x%p\n", __func__, rep);
         if (rep)
             rep->state = SGQ_IO_ERR;
         return -1;
@@ -489,8 +508,8 @@ do_v4:
         case SG_LIB_CAT_CLEAN:
             break;
         case SG_LIB_CAT_RECOVERED:
-            fprintf(stderr, "Recovered error on block=%d, num=%d\n",
-                   rep->blk, rep->num_blks);
+            pr2serr("Recovered error on block=%d, num=%d\n", rep->blk,
+                    rep->num_blks);
             break;
         case SG_LIB_CAT_UNIT_ATTENTION:
             return 1;
@@ -508,32 +527,37 @@ do_v4:
     clp->sum_of_resids += h4p->din_resid;
     rep->state = SGQ_IO_FINISHED;
 #ifdef SG_DEBUG
-    fprintf(stderr, "%s: %s  ", __func__, wr ? "writing" : "reading");
-    fprintf(stderr, "    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
+    pr2serr("%s: %s  ", __func__, wr ? "writing" : "reading");
+    pr2serr("    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
     if (use_pack)
-        fprintf(stderr, "%s:  pack_id=%d\n", __func__, h4p->request_extra);
+        pr2serr("%s:  pack_id=%d\n", __func__, h4p->request_extra);
     else if (use_tag)
-        fprintf(stderr, "%s:  request_tag=0x%" PRIx64 "\n", __func__,
+        pr2serr("%s:  request_tag=0x%" PRIx64 "\n", __func__,
                 (uint64_t)h4p->request_tag);
 #endif
     return 0;
 }
 
 static int
-sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool pack, bool tag, bool vb)
+sz_reserve(Rq_coll * clp, bool is_in)
 {
-    int res, t, flags;
+    const struct flags_t *flagsp = is_in ? &clp->iflag : &clp->oflag;
+    bool pack = flagsp->pack;
+    bool vb = clp->debug;
+    int res, t, flags, err;
+    int fd = is_in ? clp->infd : clp->outfd;
+    int tag = flagsp->tag;
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
 
     seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 30000)) {
-        fprintf(stderr, "sgs_dd: sg driver prior to 3.0.00\n");
+        pr2serr("sgs_dd: sg driver prior to 3.0.00\n");
         return 1;
     } else if (t < 40000) {
         if (vb)
-            fprintf(stderr, "sgs_dd: warning: sg driver prior to 4.0.00\n");
+            pr2serr("sgs_dd: warning: sg driver prior to 4.0.00\n");
         sgs_old_sg_driver = true;
     } else if (t < 40030) {
         sgs_old_sg_driver = false;
@@ -541,7 +565,7 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool pack, bool tag, bool vb)
     } else
         sgs_full_v4_sg_driver = true;
     res = 0;
-    t = bs * bpt;
+    t = clp->bs * clp->bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)
         perror("sgs_dd: SG_SET_RESERVED_SIZE error");
@@ -577,19 +601,45 @@ sz_reserve(int fd, int bs, int bpt, bool rt_sig, bool pack, bool tag, bool vb)
                 }
             }
         }
+        if (flagsp->evfd) {
+            int evfd = eventfd(0,0);
+
+            if (evfd < 0) {
+                err = errno;
+                pr2serr("eventfd() failed: %s\n", strerror(err));
+                return 1;
+            }
+            if (is_in)
+                clp->in_evfd = evfd;
+            else
+                clp->out_evfd = evfd;
+
+            memset(seip, 0, sizeof(*seip));
+            seip->sei_wr_mask |= SG_SEIM_EVENTFD;
+            seip->sei_rd_mask |= SG_SEIM_EVENTFD;
+            seip->share_fd = evfd;
+            if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                err = errno;
+                pr2serr("ioctl(EXTENDED(SG_SEIM_EVENTFD)) failed, "
+                        "errno=%d %s\n", errno, strerror(errno));
+                return 1;
+            }
+        }
     }
-    if (-1 == fcntl(fd, F_SETOWN, getpid())) {
-        perror("fcntl(F_SETOWN)");
-        return 1;
-    }
-    flags = fcntl(fd, F_GETFL, 0);
-    if (-1 == fcntl(fd, F_SETFL, flags | O_ASYNC)) {
-        perror("fcntl(F_SETFL)");
-        return 1;
-    }
-    if (rt_sig) {       /* displaces SIGIO/SIGPOLL with SIGRTMIN + 1 */
-        if (-1 == fcntl(fd, F_SETSIG, SIGRTMIN + 1))
-            perror("fcntl(F_SETSIG)");
+    if (!clp->no_sig) {
+        if (-1 == fcntl(fd, F_SETOWN, getpid())) {
+            perror("fcntl(F_SETOWN)");
+            return 1;
+        }
+        flags = fcntl(fd, F_GETFL, 0);
+        if (-1 == fcntl(fd, F_SETFL, flags | O_ASYNC)) {
+            perror("fcntl(F_SETFL)");
+            return 1;
+        }
+        if (clp->use_rt_sig) {/* displaces SIGIO/SIGPOLL with SIGRTMIN + 1 */
+            if (-1 == fcntl(fd, F_SETSIG, SIGRTMIN + 1))
+                perror("fcntl(F_SETSIG)");
+        }
     }
     return 0;
 }
@@ -614,7 +664,7 @@ init_elems(Rq_coll * clp)
         rep->buffp = sg_memalign(clp->bpt * clp->bs, 0, &rep->free_buffp,
                                  false);
         if (NULL == rep->buffp) {
-            fprintf(stderr, "out of memory creating user buffers\n");
+            pr2serr("out of memory creating user buffers\n");
             res = -ENOMEM;
         }
     }
@@ -643,7 +693,7 @@ start_read(Rq_coll * clp)
     char ebuff[EBUFF_SZ];
 
 #ifdef SG_DEBUG
-    fprintf(stderr, "%s: elem idx=%zd\n", __func__, rep - clp->elem);
+    pr2serr("%s: elem idx=%zd\n", __func__, rep - clp->elem);
 #endif
     rep->wr = false;
     rep->blk = clp->in_blk;
@@ -659,7 +709,7 @@ start_read(Rq_coll * clp)
                 return res;
             }
             clp->bpt = (buf_sz + clp->bs - 1) / clp->bs;
-            fprintf(stderr, "Reducing blocks per transfer to %d\n", clp->bpt);
+            pr2serr("Reducing blocks per transfer to %d\n", clp->bpt);
             if (clp->bpt < 1)
                 return -ENOMEM;
             res = sg_start_io(clp, rep);
@@ -667,8 +717,7 @@ start_read(Rq_coll * clp)
                 res = -ENOMEM;
         }
         else if (res < 0) {
-            fprintf(stderr, "sgs_dd inputting from sg failed, blk=%d\n",
-                    rep->blk);
+            pr2serr("sgs_dd inputting from sg failed, blk=%d\n", rep->blk);
             rep->state = SGQ_IO_ERR;
             return res;
         }
@@ -720,7 +769,7 @@ start_write(Rq_coll * clp)
             return -1;
     }
 #ifdef SG_DEBUG
-    fprintf(stderr, "%s: elem idx=%zd\n", __func__, rep - clp->elem);
+    pr2serr("%s: elem idx=%zd\n", __func__, rep - clp->elem);
 #endif
     rep->wr = true;
     blocks = rep->num_blks;
@@ -732,7 +781,7 @@ start_write(Rq_coll * clp)
         if (1 == res)      /* ENOMEM, give up */
             return -ENOMEM;
         else if (res < 0) {
-            fprintf(stderr, "sgs_dd output to sg failed, blk=%d\n", rep->blk);
+            pr2serr("sgs_dd output to sg failed, blk=%d\n", rep->blk);
             rep->state = SGQ_IO_ERR;
             return res;
         }
@@ -771,14 +820,14 @@ do_sigwait(Rq_coll * clp, bool inc1_clear0)
     struct timespec ts;
 
     if (clp->debug > 9)
-        fprintf(stderr, "%s: inc1_clear0=%d\n", __func__, (int)inc1_clear0);
+        pr2serr("%s: inc1_clear0=%d\n", __func__, (int)inc1_clear0);
     ts.tv_sec = 60;         /* 60 second timeout */
     ts.tv_nsec = 0;
     while (sigtimedwait(&clp->blocked_sigs, &info, &ts) < 0) {
         if (EINTR != errno) {
             int err = errno;
 
-            fprintf(stderr, "%s: sigtimedwait(): %s [%d]\n", __func__,
+            pr2serr("%s: sigtimedwait(): %s [%d]\n", __func__,
                     strerror(err), err);        /* EAGAIN is timeout */
             return -err;        /* EAGAIN is timeout error */
         }
@@ -796,35 +845,50 @@ do_sigwait(Rq_coll * clp, bool inc1_clear0)
         } else
             clp->sigs_waiting = 0;
     } else {
-        fprintf(stderr, "%s: sigwaitinfo() returned si_signo=%d\n",
+        pr2serr("%s: sigwaitinfo() returned si_signo=%d\n",
                 __func__, info.si_signo);
         return -EINVAL;
     }
     return 0;
 }
 
-/* Returns 1 on success (found), 0 on not found, -1 on error. */
+/* Returns 1 (or more) on success (found), 0 on not found, -1 on error. */
 static int
-do_poll_for_in(Rq_coll * clp, int fd)
+do_num_poll_in(Rq_coll * clp, int fd, bool is_evfd)
 {
     int err;
     struct pollfd a_pollfd = {0, POLLIN | POLLOUT, 0};
 
-    if (clp->sigs_waiting) {
-        int res = do_sigwait(clp, true);
+    if (! clp->no_sig) {
+        if (clp->sigs_waiting) {
+            int res = do_sigwait(clp, true);
 
-        if (res < 0)
-            return res;
+            if (res < 0)
+                return res;
+        }
     }
     a_pollfd.fd = fd;
     if (poll(&a_pollfd, 1, 0) < 0) {
         err = errno;
-        fprintf(stderr, "%s: poll(): %s [%d]\n", __func__, strerror(err),
-                err);
+        pr2serr("%s: poll(): %s [%d]\n", __func__, strerror(err), err);
         return -err;
     }
-    /* fprintf(stderr, "%s: revents=0x%x\n", __func__, a_pollfd.revents); */
-    return !!(a_pollfd.revents & POLLIN);
+    /* pr2serr("%s: revents=0x%x\n", __func__, a_pollfd.revents); */
+    if (a_pollfd.revents & POLLIN) {
+        if (is_evfd) {
+            uint64_t count;
+
+            if (read(fd, &count, sizeof(count)) < 0) {
+                err = errno;
+                pr2serr("%s: read(): %s [%d]\n", __func__,
+                        strerror(err), err);
+                return -err;
+            }
+            return (int)count;
+        } else
+            return 1;   /* could be more but don't know without evfd */
+    } else
+        return 0;
 }
 
 static int
@@ -832,28 +896,35 @@ can_read_write(Rq_coll * clp)
 {
     Rq_elem * rep = NULL;
     bool writeable = false;
+    bool in_is_evfd = (clp->in_evfd >= 0);
+    bool out_is_evfd = (clp->out_evfd >= 0);
     int res = 0;
     int reading = 0;
     int writing = 0;
     int rd_waiting = 0;
     int wr_waiting = 0;
     int sg_finished = 0;
+    int num;
+    int ofd = out_is_evfd ? clp->out_evfd : clp->outfd;
+    int ifd= in_is_evfd ? clp->in_evfd : clp->infd;
 
     /* if write completion pending, then complete it + start read */
     if (clp->out_is_sg) {
-        while ((res = do_poll_for_in(clp, clp->outfd))) {
+        while ((res = do_num_poll_in(clp, ofd, out_is_evfd))) {
             if (res < 0)
                 return res;
-            res = sg_finish_io(clp, 1, &rep);
-            if (res < 0)
-                return res;
-            else if (1 == res) {
-                res = sg_start_io(clp, rep);
-                if (0 != res)
-                    return -1;  /* give up if any problems with retry */
+            num = res;
+            while (--num >= 0) {
+                res = sg_finish_io(clp, true /* write */, &rep);
+                if (res < 0)
+                    return res;
+                else if (1 == res) {
+                    res = sg_start_io(clp, rep);
+                    if (0 != res)
+                        return -1;  /* give up if any problems with retry */
+                } else
+                    sg_finished++;
             }
-            else
-                sg_finished++;
         }
         while ((rep = clp->wr_posp) && (SGQ_IO_FINISHED == rep->state) &&
                rep->wr && (rep != clp->rd_posp)) {
@@ -875,20 +946,22 @@ can_read_write(Rq_coll * clp)
 
     /* if read completion pending, then complete it + start maybe write */
     if (clp->in_is_sg) {
-        while ((res = do_poll_for_in(clp, clp->infd))) {
+        while ((res = do_num_poll_in(clp, ifd, in_is_evfd))) {
             if (res < 0)
                 return res;
-            res = sg_finish_io(clp, 0, &rep);
-            if (res < 0)
-                return res;
-            if (1 == res) {
-                res = sg_start_io(clp, rep);
-                if (0 != res)
-                    return -1;  /* give up if any problems with retry */
-            }
-            else {
-                sg_finished++;
-                clp->in_done_count -= rep->num_blks;
+            num = res;
+            while (--num >= 0) {
+                res = sg_finish_io(clp, false /* read */, &rep);
+                if (res < 0)
+                    return res;
+                if (1 == res) {
+                    res = sg_start_io(clp, rep);
+                    if (0 != res)
+                        return -1;  /* give up if any problems with retry */
+                } else {
+                    sg_finished++;
+                    clp->in_done_count -= rep->num_blks;
+                }
             }
         }
     }
@@ -919,7 +992,7 @@ can_read_write(Rq_coll * clp)
     }
     if (clp->debug) {
         if ((clp->debug >= 9) || wr_waiting || rd_waiting)
-            fprintf(stderr, "%d/%d (nwb/nrb): read=%d/%d (do/wt) "
+            pr2serr("%d/%d (nwb/nrb): read=%d/%d (do/wt) "
                     "write=%d/%d (do/wt) writeable=%d sg_fin=%d\n",
                     clp->out_blk, clp->in_blk, reading, rd_waiting,
                     writing, wr_waiting, (int)writeable, sg_finished);
@@ -935,7 +1008,7 @@ can_read_write(Rq_coll * clp)
         return SGQ_CAN_DO_NOTHING;
 
     /* usleep(10000); */      /* hang about for 10 milliseconds */
-    if (clp->sigs_waiting) {
+    if ((! clp->no_sig) && clp->sigs_waiting) {
         res = do_sigwait(clp, false);
         if (res < 0)
             return res;
@@ -974,6 +1047,8 @@ process_flags(const char * arg, struct flags_t * fp)
             *np++ = '\0';
         if (0 == strcmp(cp, "dio"))
             fp->dio = true;
+        else if (0 == strcmp(cp, "evfd"))
+            fp->evfd = true;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = true;
         else if (0 == strcmp(cp, "immed"))
@@ -1025,6 +1100,8 @@ main(int argc, char * argv[])
 
     memset(clp, 0, sizeof(*clp));
     clp->bpt = 0;
+    clp->in_evfd = -1;
+    clp->out_evfd = -1;
     inf[0] = '\0';
     outf[0] = '\0';
     if (argc < 2) {
@@ -1051,7 +1128,7 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"count"))
             count = sg_get_num(buf);
         else if (0 == strcmp(key,"deb"))
-            clp->debug = sg_get_num(buf);
+            clp->debug += sg_get_num(buf);
         else if (0 == strcmp(key,"ibs"))
             ibs = sg_get_num(buf);
         else if (strcmp(key,"if") == 0) {
@@ -1062,7 +1139,9 @@ main(int argc, char * argv[])
                 pr2serr("%sbad argument to 'iflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key,"obs"))
+        } else if (0 == strcmp(key,"no_sig"))
+            clp->no_sig = !!sg_get_num(buf);
+        else if (0 == strcmp(key,"obs"))
             obs = sg_get_num(buf);
         else if (strcmp(key,"of") == 0) {
             memcpy(outf, buf, INOUTF_SZ);
@@ -1079,10 +1158,18 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"skip"))
             skip = sg_get_num(buf);
         else if ((0 == strcmp(key,"-V")) || (0 == strcmp(key,"--version"))) {
-            fprintf(stderr, "%s: version: %s\n", my_name, version_str);
+            pr2serr("%s: version: %s\n", my_name, version_str);
             return 0;
-        } else {
-            fprintf(stderr, "Unrecognized argument '%s'\n", key);
+        } else if (0 == strcmp(key,"-vvvv"))
+            clp->debug +=4;
+        else if (0 == strcmp(key,"-vvv"))
+            clp->debug +=3;
+        else if (0 == strcmp(key,"-vv"))
+            clp->debug +=2;
+        else if ((0 == strcmp(key,"-v")) || (0 == strcmp(key,"--verbose")))
+            ++clp->debug;
+        else {
+            pr2serr("Unrecognized argument '%s'\n", key);
             usage();
             return 1;
         }
@@ -1093,7 +1180,7 @@ main(int argc, char * argv[])
         bs_given = true;
 
     if ((ibs && (ibs != clp->bs)) || (obs && (obs != clp->bs))) {
-        fprintf(stderr, "If 'ibs' or 'obs' given must be same as 'bs'\n");
+        pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
         usage();
         return 1;
     }
@@ -1102,26 +1189,28 @@ main(int argc, char * argv[])
         if (0 == clp->bpt)
             clp->bpt = 1;
         if (! bs_given)
-            fprintf(stderr, "Assume blocks size bs=%d [bytes] and blocks "
+            pr2serr("Assume blocks size bs=%d [bytes] and blocks "
                     "per transfer bpt=%d\n", clp->bs, clp->bpt);
     } else if (! bs_given)
-        fprintf(stderr, "Assume 'bs' (block size) of %d bytes\n", clp->bs);
+        pr2serr("Assume 'bs' (block size) of %d bytes\n", clp->bs);
 
     if ((skip < 0) || (seek < 0)) {
-        fprintf(stderr, "skip and seek cannot be negative\n");
+        pr2serr("skip and seek cannot be negative\n");
         return 1;
     }
 #ifdef SG_DEBUG
-    fprintf(stderr, "sgs_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
+    pr2serr("sgs_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
            inf, skip, outf, seek, count);
 #endif
-    /* Need to block signals before SIGPOLL is enabled in sz_reserve() */
-    sigemptyset(&clp->blocked_sigs);
-    if (clp->use_rt_sig)
-        sigaddset(&clp->blocked_sigs, SIGRTMIN + 1);
-    sigaddset(&clp->blocked_sigs, SIGINT);
-    sigaddset(&clp->blocked_sigs, SIGPOLL);
-    sigprocmask(SIG_BLOCK, &clp->blocked_sigs, 0);
+    if (! clp->no_sig) {
+        /* Need to block signals before SIGPOLL is enabled in sz_reserve() */
+        sigemptyset(&clp->blocked_sigs);
+        if (clp->use_rt_sig)
+            sigaddset(&clp->blocked_sigs, SIGRTMIN + 1);
+        sigaddset(&clp->blocked_sigs, SIGINT);
+        sigaddset(&clp->blocked_sigs, SIGPOLL);
+        sigprocmask(SIG_BLOCK, &clp->blocked_sigs, 0);
+    }
 
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
@@ -1151,13 +1240,12 @@ main(int argc, char * argv[])
             open_fl = clp->iflag.excl ? O_EXCL : 0;
             open_fl |= (O_RDWR | O_NONBLOCK);
             if ((clp->infd = open(inf, open_fl)) < 0) {
-                fprintf(stderr, "If %s is a sg device, need read+write "
+                pr2serr("If %s is a sg device, need read+write "
                         "permissions, even to read it!\n", inf);
                 return 1;
             }
             clp->in_is_sg = true;
-            if (sz_reserve(clp->infd, clp->bs, clp->bpt, clp->use_rt_sig,
-                           clp->iflag.pack, clp->iflag.tag, clp->debug))
+            if (sz_reserve(clp, true /* is_in */))
                 return 1;
             if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
                 pr2serr("Unable to implement v4 flag because sg driver too "
@@ -1176,9 +1264,7 @@ main(int argc, char * argv[])
             }
             else {
                 clp->out_is_sg = true;
-                if (sz_reserve(clp->outfd, clp->bs, clp->bpt,
-                               clp->use_rt_sig, clp->oflag.pack,
-                               clp->oflag.tag, clp->debug))
+                if (sz_reserve(clp, false /* hence ! is_in */))
                     return 1;
                 if (sgs_old_sg_driver && (clp->iflag.v4 || clp->oflag.v4)) {
                     pr2serr("Unable to implement v4 flag because sg driver "
@@ -1212,7 +1298,7 @@ main(int argc, char * argv[])
         }
     } else if ('\0' == outf[0]) {
         if (STDIN_FILENO == clp->infd) {
-            fprintf(stderr, "Can't have both 'if' as stdin _and_ 'of' as "
+            pr2serr("Can't have both 'if' as stdin _and_ 'of' as "
                     "/dev/null\n");
             return 1;
         }
@@ -1225,8 +1311,7 @@ main(int argc, char * argv[])
         /* ignore any seek */
     } else {    /* must be '-' for stdout */
         if (STDIN_FILENO == clp->infd) {
-            fprintf(stderr, "Can't have both 'if' as stdin _and_ 'of' as "
-                    "stdout\n");
+            pr2serr("Can't have both 'if' as stdin _and_ 'of' as stdout\n");
             return 1;
         }
     }
@@ -1236,12 +1321,11 @@ main(int argc, char * argv[])
         if (clp->in_is_sg) {
             res = read_capacity(clp->infd, &in_num_sect, &in_sect_sz);
             if (2 == res) {
-                fprintf(stderr, "Unit attention, media changed(in), try "
-                        "again\n");
+                pr2serr("Unit attention, media changed(in), try again\n");
                 res = read_capacity(clp->infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
-                fprintf(stderr, "Unable to read capacity on %s\n", inf);
+                pr2serr("Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
             }
             else {
@@ -1252,12 +1336,11 @@ main(int argc, char * argv[])
         if (clp->out_is_sg) {
             res = read_capacity(clp->outfd, &out_num_sect, &out_sect_sz);
             if (2 == res) {
-                fprintf(stderr, "Unit attention, media changed(out), try "
-                        "again\n");
+                pr2serr("Unit attention, media changed(out), try again\n");
                 res = read_capacity(clp->outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
-                fprintf(stderr, "Unable to read capacity on %s\n", outf);
+                pr2serr("Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
             }
             else {
@@ -1266,8 +1349,8 @@ main(int argc, char * argv[])
             }
         }
 #ifdef SG_DEBUG
-        fprintf(stderr, "Start of loop, count=%d, in_num_sect=%d, "
-                "out_num_sect=%d\n", count, in_num_sect, out_num_sect);
+        pr2serr("Start of loop, count=%d, in_num_sect=%d, out_num_sect=%d\n",
+                count, in_num_sect, out_num_sect);
 #endif
         if (in_num_sect > 0) {
             if (out_num_sect > 0)
@@ -1281,7 +1364,7 @@ main(int argc, char * argv[])
     }
 
 #ifdef SG_DEBUG
-    fprintf(stderr, "Start of loop, count=%d, bpt=%d\n", count, clp->bpt);
+    pr2serr("Start of loop, count=%d, bpt=%d\n", count, clp->bpt);
 #endif
 
     clp->in_count = count;
@@ -1301,7 +1384,7 @@ main(int argc, char * argv[])
         if (SGQ_CAN_READ & crw) {
             res = start_read(clp);
             if (res <= 0) {
-                fprintf(stderr, "start_read: res=%d\n", res);
+                pr2serr("start_read: res=%d\n", res);
                 break;
             }
             res = 0;
@@ -1309,7 +1392,7 @@ main(int argc, char * argv[])
         if (SGQ_CAN_WRITE & crw) {
             res = start_write(clp);
             if (res <= 0) {
-                fprintf(stderr, "start_write: res=%d\n", res);
+                pr2serr("start_write: res=%d\n", res);
                 break;
             }
             res = 0;
@@ -1321,23 +1404,22 @@ main(int argc, char * argv[])
     if (STDOUT_FILENO != clp->outfd)
         close(clp->outfd);
     if (0 != clp->out_count) {
-        fprintf(stderr, "Some error occurred, remaining blocks=%d\n",
-                clp->out_count);
+        pr2serr("Some error occurred, remaining blocks=%d\n", clp->out_count);
         res = 1;
     }
-    fprintf(stderr, "%d+%d records in\n", count - clp->in_done_count,
-           clp->in_partial);
-    fprintf(stderr, "%d+%d records out\n", count - clp->out_done_count,
-           clp->out_partial);
+    pr2serr("%d+%d records in\n", count - clp->in_done_count,
+            clp->in_partial);
+    pr2serr("%d+%d records out\n", count - clp->out_done_count,
+            clp->out_partial);
     if (clp->dio_incomplete)
-        fprintf(stderr, ">> Direct IO requested but incomplete %d times\n",
-               clp->dio_incomplete);
+        pr2serr(">> Direct IO requested but incomplete %d times\n",
+                clp->dio_incomplete);
     if (clp->sum_of_resids)
-        fprintf(stderr, ">> Non-zero sum of residual counts=%d\n",
-               clp->sum_of_resids);
-    if (clp->debug > 0)
-        fprintf(stderr, "SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
-               clp->sigs_io_received, clp->sigs_rt_received);
+        pr2serr(">> Non-zero sum of residual counts=%d\n",
+                clp->sum_of_resids);
+    if ((! clp->no_sig) && clp->debug > 0)
+        pr2serr("SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
+                clp->sigs_io_received, clp->sigs_rt_received);
     remove_elems(clp);
     return res < 0 ? 99 : res;
 }

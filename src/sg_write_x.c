@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Douglas Gilbert.
+ * Copyright (c) 2017-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.22 20191220";
+static const char * version_str = "1.23 20200331";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1092,6 +1092,14 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
                 x_cdb[10] |= 0x10;
             if (op->fua)
                 x_cdb[10] |= 0x8;
+            if (op->dld) {      /* added in sbc4r19 */
+                if (op->dld & 1)
+                    x_cdb[11] |= 0x1;
+                if (op->dld & 2)
+                    x_cdb[11] |= 0x2;
+                if (op->dld & 4)
+                    x_cdb[11] |= 0x4;
+            }
             sg_put_unaligned_be32(op->ref_tag, x_cdb + 20);
             sg_put_unaligned_be16(op->app_tag, x_cdb + 24);
             sg_put_unaligned_be16(op->tag_mask, x_cdb + 26);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 Douglas Gilbert.
+ * Copyright (c) 2017-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.09 20190303 */
+/* sg_pt_linux_nvme version 1.10 20200313 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -87,11 +87,15 @@
 #define SCSI_SEND_DIAGNOSTIC_OPC  0x1d
 #define SCSI_RECEIVE_DIAGNOSTIC_OPC  0x1c
 #define SCSI_MAINT_IN_OPC  0xa3
+#define SCSI_READ10_OPC 0x28
+#define SCSI_READ16_OPC 0x88
 #define SCSI_REP_SUP_OPCS_OPC  0xc
 #define SCSI_REP_SUP_TMFS_OPC  0xd
 #define SCSI_MODE_SENSE10_OPC  0x5a
 #define SCSI_MODE_SELECT10_OPC  0x55
 #define SCSI_READ_CAPACITY10_OPC  0x25
+#define SCSI_WRITE10_OPC 0x2a
+#define SCSI_WRITE16_OPC 0x8a
 #define SCSI_SERVICE_ACT_IN_OPC  0x9e
 #define SCSI_READ_CAPACITY16_SA  0x10
 #define SCSI_SA_MSK  0x1f
@@ -423,7 +427,7 @@ sntl_do_identify(struct sg_pt_linux_scsi * ptp, int cns, int nsid,
     struct sg_nvme_passthru_cmd cmd;
 
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x6;   /* Identify */
+    cmd.opcode = 0x6;   /* NVME Identify command opcode */
     cmd.nsid = nsid;
     cmd.cdw10 = cns;
     cmd.addr = (uint64_t)(sg_uintptr_t)up;
@@ -693,7 +697,7 @@ sntl_tur(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
             return res;
     }
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0xa;   /* Get feature */
+    cmd.opcode = 0xa;   /* NVMe Get feature command */
     cmd.nsid = SG_NVME_BROADCAST_NSID;
     cmd.cdw10 = 0x2;    /* SEL=0 (current), Feature=2 Power Management */
     cmd.timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
@@ -742,7 +746,7 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     desc = !!(0x1 & cdbp[1]);
     alloc_len = cdbp[4];
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0xa;   /* Get feature */
+    cmd.opcode = 0xa;   /* NVMe Get feature command */
     cmd.nsid = SG_NVME_BROADCAST_NSID;
     cmd.cdw10 = 0x2;    /* SEL=0 (current), Feature=2 Power Management */
     cmd.timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
@@ -932,7 +936,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: passing through d_pg=0x%x, len=%u to NVME_MI SES send\n",
               __func__, dpg_cd, dpg_len);
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x1d;  /* MI send; hmmm same opcode as SEND DIAG */
+    cmd.opcode = 0x1d;  /* NVMe MI Send; hmmm same opcode as SEND DIAG */
     cmd.addr = (uint64_t)(sg_uintptr_t)dop;
     cmd.data_len = 0x1000;   /* NVMe 4k page size. Maybe determine this? */
                              /* dout_len > 0x1000, is this a problem?? */
@@ -987,7 +991,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: expecting d_pg=0x%x from NVME_MI SES receive\n", __func__,
               dpg_cd);
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x1e;  /* MI receive */
+    cmd.opcode = 0x1e;  /* NVMe MI Receive command */
     cmd.addr = (uint64_t)(sg_uintptr_t)dip;
     cmd.data_len = 0x1000;   /* NVMe 4k page size. Maybe determine this? */
                              /* din_len > 0x1000, is this a problem?? */
@@ -1238,6 +1242,52 @@ fini:
     return res;
 }
 
+static int
+sntl_read(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
+          int time_secs, int vb)
+{
+    bool is_read10 = (SCSI_READ10_OPC == cdbp[0]);
+    uint64_t lba;
+    uint32_t num;
+    struct sg_nvme_user_io io;
+    struct sg_nvme_user_io * iop = &io;
+
+    memset(iop, 0, sizeof(*iop));
+    iop->opcode = 0x2;		/* NVMe Read command */
+    if (is_read10) {
+        lba = sg_get_unaligned_be32(cdbp + 2);
+        num = sg_get_unaligned_be16(cdbp + 7);
+    } else {
+        lba = sg_get_unaligned_be64(cdbp + 2);
+        num = sg_get_unaligned_be32(cdbp + 10);
+    }
+    iop->slba = lba;
+    iop->nblocks = num;
+    return 0;
+}
+
+static int
+sntl_write(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
+           int time_secs, int vb)
+{
+    bool is_write10 = (SCSI_WRITE10_OPC == cdbp[0]);
+    uint64_t lba;
+    uint32_t num;
+    struct sg_nvme_user_io io;
+    struct sg_nvme_user_io * iop = &io;
+
+    memset(iop, 0, sizeof(*iop));
+    iop->opcode = 0x3;		/* NVMe Write command */
+    if (is_write10) {
+        lba = sg_get_unaligned_be32(cdbp + 2);
+        num = sg_get_unaligned_be16(cdbp + 7);
+    } else {
+        lba = sg_get_unaligned_be64(cdbp + 2);
+        num = sg_get_unaligned_be32(cdbp + 10);
+    }
+    return 0;
+}
+
 /* Executes NVMe Admin command (or at least forwards it to lower layers).
  * Returns 0 for success, negative numbers are negated 'errno' values from
  * OS system calls. Positive return values are errors from this package.
@@ -1292,6 +1342,12 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
             return sntl_tur(ptp, time_secs, vb);
         case SCSI_REQUEST_SENSE_OPC:
             return sntl_req_sense(ptp, cdbp, time_secs, vb);
+        case SCSI_READ10_OPC:
+        case SCSI_READ16_OPC:
+            return sntl_read(ptp, cdbp, time_secs, vb);
+        case SCSI_WRITE10_OPC:
+        case SCSI_WRITE16_OPC:
+            return sntl_write(ptp, cdbp, time_secs, vb);
         case SCSI_SEND_DIAGNOSTIC_OPC:
             return sntl_senddiag(ptp, cdbp, time_secs, vb);
         case SCSI_RECEIVE_DIAGNOSTIC_OPC:

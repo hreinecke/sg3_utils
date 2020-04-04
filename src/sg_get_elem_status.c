@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Douglas Gilbert.
+ * Copyright (c) 2019-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.01 20191220";      /* sbc4r15,17 */
+static const char * version_str = "1.02 20200331";      /* sbc4r19 */
 
 
 #ifndef UINT32_MAX
@@ -54,7 +54,7 @@ static const char * version_str = "1.01 20191220";      /* sbc4r15,17 */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 struct gpes_desc_t {    /* info in returned physical status descriptor */
-    bool restore_allowed;
+    bool restoration_allowed;
     uint32_t elem_id;
     uint8_t phys_elem_type;
     uint8_t phys_elem_health;
@@ -215,7 +215,7 @@ decode_elem_status_desc(const uint8_t * bp, struct gpes_desc_t * pedp)
     if ((NULL == bp) || (NULL == pedp))
         return;
     pedp->elem_id = sg_get_unaligned_be32(bp + 4);
-    pedp->restore_allowed = (bool)(bp[13] & 1);
+    pedp->restoration_allowed = (bool)(bp[13] & 1);
     pedp->phys_elem_type = bp[14];
     pedp->phys_elem_health = bp[15];
     pedp->assoc_cap = sg_get_unaligned_be64(bp + 16);
@@ -549,8 +549,8 @@ start_response:
                 printf("depopulation operations in progress");
             else if (0xff == j)
                 printf("depopulation completed, no errors");
-            if (a_ped.restore_allowed)
-                printf(" [restore allowed]");
+            if (a_ped.restoration_allowed)
+                printf(" [restoration allowed]");
             printf("\n");
         }
     }
