@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.10 20200313 */
+/* sg_pt_linux_nvme version 1.11 20200410 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -94,6 +94,8 @@
 #define SCSI_MODE_SENSE10_OPC  0x5a
 #define SCSI_MODE_SELECT10_OPC  0x55
 #define SCSI_READ_CAPACITY10_OPC  0x25
+#define SCSI_VERIFY10_OPC 0x2f
+#define SCSI_VERIFY16_OPC 0x8f
 #define SCSI_WRITE10_OPC 0x2a
 #define SCSI_WRITE16_OPC 0x8a
 #define SCSI_SERVICE_ACT_IN_OPC  0x9e
@@ -129,6 +131,19 @@
 #define MICROCODE_CHANGED_ASCQ 0x1      /* with TARGET_CHANGED_ASC */
 #define MICROCODE_CHANGED_WO_RESET_ASCQ 0x16
 
+/* NVMe Admin commands */
+#define SG_NVME_AD_GET_FEATURE 0xa
+#define SG_NVME_AD_IDENTIFY 0x6         /* similar to SCSI INQUIRY */
+#define SG_NVME_AD_MI_RECEIVE 0x1e      /* MI: Management Interface */
+#define SG_NVME_AD_MI_SEND 0x1d         /* hmmm, same opcode as SEND DIAG */
+
+/* NVMe NVM (Non-Volatile Memory) commands */
+#define SG_NVME_NVM_COMPARE 0x5         /* SCSI VERIFY(BYTCHK=1) */
+#define SG_NVME_NVM_READ 0x2
+#define SG_NVME_NVM_VERIFY 0xc          /* SCSI VERIFY(BYTCHK=0) */
+#define SG_NVME_NVM_WRITE 0x1
+
+#define SG_NVME_NVM_CDW12_FUA (1 << 30) /* Force Unit Access bit */
 
 
 #if (HAVE_NVME && (! IGNORE_NVME))
@@ -285,7 +300,7 @@ sg_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
     char nam[64];
 
     if (vb)
-        sg_get_nvme_opcode_name(*up, true, sizeof(nam), nam);
+        sg_get_nvme_opcode_name(*up, true /* ADMIN */, sizeof(nam), nam);
     else
         nam[0] = '\0';
     cmdp->timeout_ms = (time_secs < 0) ? (-time_secs) : (1000 * time_secs);
@@ -427,7 +442,7 @@ sntl_do_identify(struct sg_pt_linux_scsi * ptp, int cns, int nsid,
     struct sg_nvme_passthru_cmd cmd;
 
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x6;   /* NVME Identify command opcode */
+    cmd.opcode = SG_NVME_AD_IDENTIFY;
     cmd.nsid = nsid;
     cmd.cdw10 = cns;
     cmd.addr = (uint64_t)(sg_uintptr_t)up;
@@ -697,7 +712,7 @@ sntl_tur(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
             return res;
     }
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0xa;   /* NVMe Get feature command */
+    cmd.opcode = SG_NVME_AD_GET_FEATURE;
     cmd.nsid = SG_NVME_BROADCAST_NSID;
     cmd.cdw10 = 0x2;    /* SEL=0 (current), Feature=2 Power Management */
     cmd.timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
@@ -746,7 +761,7 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     desc = !!(0x1 & cdbp[1]);
     alloc_len = cdbp[4];
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0xa;   /* NVMe Get feature command */
+    cmd.opcode = SG_NVME_AD_GET_FEATURE;
     cmd.nsid = SG_NVME_BROADCAST_NSID;
     cmd.cdw10 = 0x2;    /* SEL=0 (current), Feature=2 Power Management */
     cmd.timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
@@ -936,7 +951,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: passing through d_pg=0x%x, len=%u to NVME_MI SES send\n",
               __func__, dpg_cd, dpg_len);
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x1d;  /* NVMe MI Send; hmmm same opcode as SEND DIAG */
+    cmd.opcode = SG_NVME_AD_MI_SEND;
     cmd.addr = (uint64_t)(sg_uintptr_t)dop;
     cmd.data_len = 0x1000;   /* NVMe 4k page size. Maybe determine this? */
                              /* dout_len > 0x1000, is this a problem?? */
@@ -991,7 +1006,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: expecting d_pg=0x%x from NVME_MI SES receive\n", __func__,
               dpg_cd);
     memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = 0x1e;  /* NVMe MI Receive command */
+    cmd.opcode = SG_NVME_AD_MI_RECEIVE;
     cmd.addr = (uint64_t)(sg_uintptr_t)dip;
     cmd.data_len = 0x1000;   /* NVMe 4k page size. Maybe determine this? */
                              /* din_len > 0x1000, is this a problem?? */
@@ -1242,28 +1257,144 @@ fini:
     return res;
 }
 
+/* Since ptp can be a char device (e.g. /dev/nvme0) or a blocks device
+ * (e.g. /dev/nvme0n1 or /dev/nvme0n1p3) use NVME_IOCTL_IO_CMD which is
+ * common to both (and takes a timeout). The difficult is that
+ * NVME_IOCTL_IO_CMD takes a nvme_passthru_cmd object point. */
+static int
+sntl_do_nvm_cmd(struct sg_pt_linux_scsi * ptp, struct sg_nvme_user_io * iop,
+                bool is_read, int time_secs, int vb)
+{
+
+    const uint32_t cmd_len = sizeof(struct sg_nvme_passthru_cmd);
+    int res;
+    uint32_t n;
+    uint16_t sct_sc;
+    struct sg_nvme_passthru_cmd nvme_pt_cmd;
+    struct sg_nvme_passthru_cmd *cmdp = &nvme_pt_cmd;
+    const uint8_t * up = ((const uint8_t *)cmdp) + SG_NVME_PT_OPCODE;
+    void * dp;
+    char nam[64];
+
+    memset(cmdp, 0, sizeof(*cmdp));
+    cmdp->opcode = iop->opcode;
+    cmdp->flags = iop->flags;
+    cmdp->addr = iop->addr;
+    dp = (void *)iop->addr;
+    cmdp->cdw10 = iop->slba & 0xffffffff;
+    cmdp->cdw11 = (iop->slba >> 32) & 0xffffffff;
+    cmdp->cdw12 = iop->nblocks & 0xffff;
+    if (vb)
+        sg_get_nvme_opcode_name(*up, false /* NVM */ , sizeof(nam), nam);
+    else
+        nam[0] = '\0';
+    cmdp->timeout_ms = (time_secs < 0) ? (-time_secs) : (1000 * time_secs);
+    ptp->os_err = 0;
+    if (vb > 2) {
+        pr2ws("NVMe NVM command: %s\n", nam);
+        hex2stderr((const uint8_t *)cmdp, cmd_len, 1);
+        if ((vb > 3) && (! is_read) && dp) {
+            uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
+
+            if (len > 0) {
+                n = len;
+                if ((len < 512) || (vb > 5))
+                    pr2ws("\nData-out buffer (%u bytes):\n", n);
+                else {
+                    pr2ws("\nData-out buffer (first 512 of %u bytes):\n", n);
+                    n = 512;
+                }
+                hex2stderr((const uint8_t *)dp, n, 0);
+            }
+        }
+    }
+    res = ioctl(ptp->dev_fd, NVME_IOCTL_IO_CMD, cmdp);
+    if (res < 0) {  /* OS error (errno negated) */
+        ptp->os_err = -res;
+        if (vb > 1) {
+            pr2ws("%s: ioctl for %s [0x%x] failed: %s "
+                  "(errno=%d)\n", __func__, nam, *up, strerror(-res), -res);
+        }
+        return res;
+    }
+
+    /* Now res contains NVMe completion queue CDW3 31:17 (15 bits) */
+    ptp->nvme_result = cmdp->result;
+    if (ptp->nvme_direct && ptp->io_hdr.response &&
+        (ptp->io_hdr.max_response_len > 3)) {
+        /* build 32 byte "sense" buffer */
+        uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
+        uint16_t st = (uint16_t)res;
+
+        n = ptp->io_hdr.max_response_len;
+        n = (n < 32) ? n : 32;
+        memset(sbp, 0 , n);
+        ptp->io_hdr.response_len = n;
+        sg_put_unaligned_le32(cmdp->result,
+                              sbp + SG_NVME_PT_CQ_RESULT);
+        if (n > 15) /* LSBit will be 0 (Phase bit) after (st << 1) */
+            sg_put_unaligned_le16(st << 1, sbp + SG_NVME_PT_CQ_STATUS_P);
+    }
+    /* clear upper bits (DNR and More) leaving ((SCT << 8) | SC) */
+    sct_sc = 0x7ff & res;       /* 11 bits */
+    ptp->nvme_status = sct_sc;
+    ptp->nvme_stat_dnr = !!(0x4000 & res);
+    ptp->nvme_stat_more = !!(0x2000 & res);
+    if (sct_sc) {  /* when non-zero, treat as command error */
+        if (vb > 1) {
+            char b[80];
+
+            pr2ws("%s: ioctl for %s [0x%x] failed, status: %s [0x%x]\n",
+                   __func__, nam, *up,
+                  sg_get_nvme_cmd_status_str(sct_sc, sizeof(b), b), sct_sc);
+        }
+        return SG_LIB_NVME_STATUS;      /* == SCSI_PT_DO_NVME_STATUS */
+    }
+    if ((vb > 3) && is_read && dp) {
+        uint32_t len = sg_get_unaligned_le32(up + SG_NVME_PT_DATA_LEN);
+
+        if (len > 0) {
+            n = len;
+            if ((len < 1024) || (vb > 5))
+                pr2ws("\nData-in buffer (%u bytes):\n", n);
+            else {
+                pr2ws("\nData-in buffer (first 1024 of %u bytes):\n", n);
+                n = 1024;
+            }
+            hex2stderr((const uint8_t *)dp, n, 0);
+        }
+    }
+    return 0;
+}
+
 static int
 sntl_read(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
           int time_secs, int vb)
 {
     bool is_read10 = (SCSI_READ10_OPC == cdbp[0]);
-    uint64_t lba;
-    uint32_t num;
+    bool have_fua = !!(cdbp[1] & 0x8);
     struct sg_nvme_user_io io;
     struct sg_nvme_user_io * iop = &io;
 
     memset(iop, 0, sizeof(*iop));
-    iop->opcode = 0x2;		/* NVMe Read command */
+    iop->opcode = SG_NVME_NVM_READ;
     if (is_read10) {
-        lba = sg_get_unaligned_be32(cdbp + 2);
-        num = sg_get_unaligned_be16(cdbp + 7);
+        iop->slba = sg_get_unaligned_be32(cdbp + 2);
+        iop->nblocks = sg_get_unaligned_be16(cdbp + 7);
     } else {
-        lba = sg_get_unaligned_be64(cdbp + 2);
-        num = sg_get_unaligned_be32(cdbp + 10);
+        uint32_t num = sg_get_unaligned_be32(cdbp + 10);
+
+        iop->slba = sg_get_unaligned_be64(cdbp + 2);
+        if (num > UINT16_MAX) {
+            mk_sense_invalid_fld(ptp, true, 11, -1, vb);
+            return 0;
+        } else
+            iop->nblocks = num;
     }
-    iop->slba = lba;
-    iop->nblocks = num;
-    return 0;
+    if (have_fua)
+        iop->nblocks |= SG_NVME_NVM_CDW12_FUA;
+    iop->addr = (uint64_t)ptp->io_hdr.din_xferp;
+    return sntl_do_nvm_cmd(ptp, iop, true /* is_read */, time_secs, vb);
 }
 
 static int
@@ -1271,21 +1402,61 @@ sntl_write(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
            int time_secs, int vb)
 {
     bool is_write10 = (SCSI_WRITE10_OPC == cdbp[0]);
-    uint64_t lba;
-    uint32_t num;
+    bool have_fua = !!(cdbp[1] & 0x8);
     struct sg_nvme_user_io io;
     struct sg_nvme_user_io * iop = &io;
 
     memset(iop, 0, sizeof(*iop));
-    iop->opcode = 0x3;		/* NVMe Write command */
+    iop->opcode = SG_NVME_NVM_WRITE;
     if (is_write10) {
-        lba = sg_get_unaligned_be32(cdbp + 2);
-        num = sg_get_unaligned_be16(cdbp + 7);
+        iop->slba = sg_get_unaligned_be32(cdbp + 2);
+        iop->nblocks = sg_get_unaligned_be16(cdbp + 7);
     } else {
-        lba = sg_get_unaligned_be64(cdbp + 2);
-        num = sg_get_unaligned_be32(cdbp + 10);
+        uint32_t num = sg_get_unaligned_be32(cdbp + 10);
+
+        iop->slba = sg_get_unaligned_be64(cdbp + 2);
+        if (num > UINT16_MAX) {
+            mk_sense_invalid_fld(ptp, true, 11, -1, vb);
+            return 0;
+        } else
+            iop->nblocks = num;
     }
-    return 0;
+    if (have_fua)
+        iop->nblocks |= SG_NVME_NVM_CDW12_FUA;
+    iop->addr = (uint64_t)ptp->io_hdr.dout_xferp;
+    return sntl_do_nvm_cmd(ptp, iop, false, time_secs, vb);
+}
+
+static int
+sntl_verify(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
+           int time_secs, int vb)
+{
+    bool is_verify10 = (SCSI_VERIFY10_OPC == cdbp[0]);
+    uint8_t bytchk = (cdbp[1] >> 1) & 0x3;
+    struct sg_nvme_user_io io;
+    struct sg_nvme_user_io * iop = &io;
+
+    if (bytchk > 1) {
+        mk_sense_invalid_fld(ptp, true, 1, 2, vb);
+        return 0;
+    }
+    memset(iop, 0, sizeof(*iop));
+    iop->opcode = bytchk ? SG_NVME_NVM_COMPARE : SG_NVME_NVM_WRITE;
+    if (is_verify10) {
+        iop->slba = sg_get_unaligned_be32(cdbp + 2);
+        iop->nblocks = sg_get_unaligned_be16(cdbp + 7);
+    } else {
+        uint32_t num = sg_get_unaligned_be32(cdbp + 10);
+
+        iop->slba = sg_get_unaligned_be64(cdbp + 2);
+        if (num > UINT16_MAX) {
+            mk_sense_invalid_fld(ptp, true, 11, -1, vb);
+            return 0;
+        } else
+            iop->nblocks = num;
+    }
+    iop->addr = bytchk ? (uint64_t)ptp->io_hdr.dout_xferp : 0;
+    return sntl_do_nvm_cmd(ptp, iop, false, time_secs, vb);
 }
 
 /* Executes NVMe Admin command (or at least forwards it to lower layers).
@@ -1357,6 +1528,9 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
             return sntl_mode_ss(ptp, cdbp, time_secs, vb);
         case SCSI_READ_CAPACITY10_OPC:
             return sntl_readcap(ptp, cdbp, time_secs, vb);
+        case SCSI_VERIFY10_OPC:
+        case SCSI_VERIFY16_OPC:
+            return sntl_verify(ptp, cdbp, time_secs, vb);
         case SCSI_SERVICE_ACT_IN_OPC:
             if (SCSI_READ_CAPACITY16_SA == (cdbp[1] & SCSI_SA_MSK))
                 return sntl_readcap(ptp, cdbp, time_secs, vb);

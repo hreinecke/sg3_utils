@@ -108,7 +108,7 @@
 
 using namespace std;
 
-static const char * version_str = "1.78 20200403";
+static const char * version_str = "1.80 20200404";
 
 #ifdef __GNUC__
 #ifndef  __clang__
@@ -237,6 +237,7 @@ typedef struct global_collection
     atomic<int> dio_incomplete_count;
     atomic<int> sum_of_resids;
     int debug;          /* both -v and deb=VERB bump this field */
+    int fail_mask;
     int dry_run;
     bool aen_given;
     bool cdbsz_given;
@@ -590,6 +591,11 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
+    if (SGV4_FLAG_EVENTFD & flags) {          /* 0x40000 */
+        n += sg_scnpr(b + n, b_len - n, "EVFD|");
+        if (n >= b_len)
+            goto fini;
+    }
 fini:
     if (n < b_len) {    /* trim trailing '\' */
         if ('|' == b[n - 1])
@@ -852,14 +858,14 @@ usage(int pg_num)
     pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1]\n"
             "               [deb=VERB] [dio=0|1] [elemsz_kb=ESK] "
-            "[fua=0|1|2|3]\n"
-            "               [mrq=[IO,]NRQS[,C]] [noshare=0|1] [of2=OFILE2] "
-            "[ofreg=OFREG]\n"
-            "               [ofsplit=OSP] [sync=0|1] [thr=THR] [time=0|1] "
-            "[unshare=1|0]\n"
-            "               [verbose=VERB] [--dry-run] [--prefetch] "
-            "[--verbose]\n"
-            "               [--verify] [--version]\n\n"
+            "[fail_mask=FM]\n"
+            "               [fua=0|1|2|3] [mrq=[IO,]NRQS[,C]] [noshare=0|1] "
+            "[of2=OFILE2]\n"
+            "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] [thr=THR] "
+            "[time=0|1]\n"
+            "               [unshare=1|0] [verbose=VERB] [--dry-run] "
+            "[--prefetch]\n"
+            "               [--verbose] [--verify] [--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -921,6 +927,7 @@ page2:
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
             "    elemsz_kb    scatter gather list element size in kilobytes "
             "(def: 32[KB])\n"
+            "    fail_mask    1: misuse KEEP_SHARE flag; 0: nothing (def)\n"
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
@@ -2492,7 +2499,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     struct sg_io_v4 ctl_v4;
     uint8_t * cmd_ap = NULL;
     Gbl_coll * clp = rep->clp;
-    const char * iosub_str = clp->unbalanced_mrq ? "SUBMIT" : "";
+    const char * iosub_str;
     char b[80];
 
     id = rep->id;
@@ -2701,14 +2708,14 @@ try_again:
             std::this_thread::yield();/* allow another thread to progress */
             goto try_again;
         }
-        pr2serr_lk("%s: ioctl(SG_IO%s, %s)-->%d, errno=%d: %s\n",
+        pr2serr_lk("%s: ioctl(%s, %s)-->%d, errno=%d: %s\n",
                    __func__, iosub_str, sg_flags_str(ctl_v4.flags, b_len, b),
                    res, err, strerror(err));
         res = -1;
         goto fini;
     }
     if (clp->debug > 4) {
-        pr2serr_lk("%s: Controlling object output by ioctl(SG_IO%s):\n",
+        pr2serr_lk("%s: Controlling object output by ioctl(%s):\n",
                    __func__, iosub_str);
         if (clp->debug > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
@@ -2881,8 +2888,10 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             if ((0 == xtrp->hpv4_ind) && (nblks < rep->num_blks))
                 flags |= SGV4_FLAG_KEEP_SHARE;
         }
-        if (xtrp && wr && rep->has_share && ! is_wr2)
+        if (clp->ofile2_given && wr && rep->has_share && ! is_wr2)
             flags |= SGV4_FLAG_KEEP_SHARE; /* set on first write only */
+        else if (clp->fail_mask & 1)
+            flags |= SGV4_FLAG_KEEP_SHARE; /* troublemaking .... */
     } else
         memset(hp, 0, sizeof(struct sg_io_hdr));
     if (clp->debug > 3) {
@@ -3795,6 +3804,13 @@ parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
             if ((clp->elem_sz > 0) && (clp->elem_sz < 4096)) {
                 pr2serr("elemsz_kb cannot be less than 4 (4 KB = 4096 "
                         "bytes)\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if ((0 == strcmp(key, "fail_mask")) ||
+                   (0 == strcmp(key, "fail-mask"))) {
+            clp->fail_mask = sg_get_num(buf);
+            if (clp->fail_mask < 0) {
+                pr2serr("fail_mask: couldn't decode argument\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "fua")) {

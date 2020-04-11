@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.12 20200331";
+static const char * version_str = "6.13 20200410";
 
 
 #define ME "sg_dd: "
@@ -114,7 +114,8 @@ static const char * version_str = "6.12 20200331";
 #define FT_ST 16                /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is block device */
 #define FT_FIFO 64              /* filetype is a fifo (name pipe) */
-#define FT_ERROR 128            /* couldn't "stat" file */
+#define FT_NVME 128             /* NVMe char device (e.g. /dev/nvme2) */
+#define FT_ERROR 256            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -295,6 +296,47 @@ find_bsg_major(void)
     fclose(fp);
 }
 
+static bool nvme_major_checked = false;
+static int nvme_major = 0;
+
+static void
+find_nvme_major(void)
+{
+    int n;
+    char *cp;
+    FILE *fp;
+    const char *proc_devices = "/proc/devices";
+    char a[128];
+    char b[128];
+
+    if (NULL == (fp = fopen(proc_devices, "r"))) {
+        if (verbose)
+            pr2serr("fopen %s failed: %s\n", proc_devices, strerror(errno));
+        return;
+    }
+    while ((cp = fgets(b, sizeof(b), fp))) {
+        if ((1 == sscanf(b, "%126s", a)) &&
+            (0 == memcmp(a, "Character", 9)))
+            break;
+    }
+    while (cp && (cp = fgets(b, sizeof(b), fp))) {
+        if (2 == sscanf(b, "%d %126s", &n, a)) {
+            if (0 == strcmp("nvme", a)) {
+                nvme_major = n;
+                break;
+            }
+        } else
+            break;
+    }
+    if (verbose > 5) {
+        if (cp)
+            pr2serr("found nvme_major=%d\n", bsg_major);
+        else
+            pr2serr("found no nvme char device in %s\n", proc_devices);
+    }
+    fclose(fp);
+}
+
 
 static int
 dd_filetype(const char * filename)
@@ -323,6 +365,12 @@ dd_filetype(const char * filename)
         }
         if (bsg_major == (int)major(st.st_rdev))
             return FT_SG;
+        if (! nvme_major_checked) {
+            nvme_major_checked = true;
+            find_nvme_major();
+        }
+        if (nvme_major == (int)major(st.st_rdev))
+            return FT_NVME;     /* treat as sg device */
     } else if (S_ISBLK(st.st_mode))
         return FT_BLOCK;
     else if (S_ISFIFO(st.st_mode))
@@ -348,6 +396,8 @@ dd_filetype_str(int ft, char * buff)
         off += sg_scnpr(buff + off, 32, "SCSI tape device ");
     if (FT_RAW & ft)
         off += sg_scnpr(buff + off, 32, "raw device ");
+    if (FT_NVME & ft)
+        off += sg_scnpr(buff + off, 32, "NVMe char device ");
     if (FT_OTHER & ft)
         off += sg_scnpr(buff + off, 32, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
@@ -1326,6 +1376,9 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
                 goto file_err;
             }
         }
+    } else if (FT_NVME & *in_typep) {
+        pr2serr("Don't support NVMe char devices as IFILE\n");
+        goto file_err;
     } else {
         flags = O_RDONLY;
         if (ifp->direct)
@@ -1450,6 +1503,9 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
                 goto file_err;
             }
         }
+    } else if (FT_NVME & *out_typep) {
+        pr2serr("Don't support NVMe char devices as OFILE\n");
+        goto file_err;
     } else if (FT_DEV_NULL & *out_typep)
         outfd = -1; /* don't bother opening */
     else {
