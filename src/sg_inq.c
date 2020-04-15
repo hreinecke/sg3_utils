@@ -3550,7 +3550,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                    printf("VPD INQUIRY: Block device characteristcis page "
+                    printf("VPD INQUIRY: Block device characteristics page "
                            "(SBC)\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
