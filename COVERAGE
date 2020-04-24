@@ -137,11 +137,27 @@ SMART READ DATA     examples/sg_sat_smart_rd_data
 
 NVMe command        sg3_utils utilities that use this NVMe command
 ------------        ------------------------------------------------
-IDENTIFY            sg_inq
-SES READ            sg_senddiag, sg_ses (NVME-MI command)
-SES WRITE           sg_senddiag, sg_ses (NVME-MI command)
+Identify            sg_inq
+SES Read            sg_senddiag, sg_ses (NVME-MI command)
+SES Write           sg_senddiag, sg_ses (NVME-MI command)
 Device self-test    [SNTL of SEND DIAGNOSTIC] sg_senddiag  
 Get features(power management) [SNTL of REQUEST SENSE] sg_requests
+Read                [SCSI READ(10) -->SNTL--> Read]
+                    [SCSI READ(16) -->SNTL--> Read]
+Write               [SCSI WRITE(10) -->SNTL--> Write]
+                    [SCSI WRITE(16) -->SNTL--> Write]
+Compare             [SCSI VERIFY(10,BYTCHK=1) -->SNTL--> Compare]
+                    [SCSI VERIFY(16,BYTCHK=1) -->SNTL--> Compare]
+Write zeroes        [SCSI WRITE SAME(10,zeros) -->SNTL--> Write zeroes]
+                    [SCSI WRITE SAME(16,zeros) -->SNTL--> Write zeroes]
+Flush               [SCSI SYNCHRONIZE CACHE -->SNTL--> Flush]
+Set Features        [SCSI MODE SELECT(10) -->SNTL--> Set Features]
+		       only for WCE in Caching page
+
+The following SCSI commands do nothing (currently) in the SNTL but
+do return GOOD status: TEST UNIT READY, START STOP UNIT, REPORT LUNS
+and REQUEST SENSE. READ CAPACITY(10 and 16) yield appropriate data
+by examining the response to the NVMe Identify command.
 
 
 ++  command wrapper found in sg_cmds_basic.c, sg_cmds_mmc.c  or
@@ -160,4 +176,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-24th January 2020
+23rd April 2020

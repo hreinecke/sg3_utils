@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2019 Douglas Gilbert.
+ * Copyright (c) 2005-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,9 +30,13 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 2.00 20190113 */
+/* Version 2.01 20200415 */
 
 #define OSF1_MAXDEV 64
+
+#ifndef CAM_DIR_BOTH
+#define CAM_DIR_BOTH 0x0	/* copy value from FreeBSD */
+#endif
 
 struct osf1_dev_channel {
     int bus;

@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.21 20200220";
+static const char * version_str = "1.22 20200420";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -307,6 +307,7 @@ main(int argc, char * argv[])
     int ret = 0;
     int verbose = 0;
     uint64_t st_lba = 0;
+    uint64_t wp;
     int64_t ll;
     const char * device_name = NULL;
     uint8_t * reportZonesBuff = NULL;
@@ -521,8 +522,11 @@ main(int argc, char * argv[])
                    sg_get_unaligned_be64(bp + 8));
             printf("   Zone start LBA: 0x%" PRIx64 "\n",
                    sg_get_unaligned_be64(bp + 16));
-            printf("   Write pointer LBA: 0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(bp + 24));
+            wp = sg_get_unaligned_be64(bp + 24);
+            if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
+                printf("   Write pointer LBA: -1\n");
+            else
+                printf("   Write pointer LBA: 0x%" PRIx64 "\n", wp);
         }
         if ((do_num == 0) && (! wp_only)) {
             if ((64 + (64 * zones)) < zl_len)

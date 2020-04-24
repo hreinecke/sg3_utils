@@ -262,10 +262,11 @@ NVMe device is the standard INQUIRY response Vendor Identification field
 of "NVMe    " (an 8 character long string with 4 spaces to the right).
 .PP
 The following SCSI commands are currently supported by the SNTL library:
-INQUIRY, MODE SELECT(10), MODE SENSE(10), READ CAPACITY(10 and 16),
+INQUIRY, MODE SELECT(10), MODE SENSE(10), READ(10,16), READ CAPACITY(10,16),
 RECEIVE DIAGNOSTIC RESULTS, REQUEST SENSE, REPORT LUNS, REPORT SUPPORTED
 OPERATION CODES, REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS, SEND
-DIAGNOSTICS, and TEST UNIT READY.
+DIAGNOSTICS, START STOP UNIT, SYNCHRONIZE CACHE(10,16), TEST UNIT READY,
+VERIFY(10,16), WRITE(10,16) and WRITE SAME(10,16).
 .SH EXIT STATUS
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values

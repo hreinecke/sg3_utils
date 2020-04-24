@@ -1,4 +1,4 @@
-.TH SG_DD "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_DD "8" "April 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -12,8 +12,8 @@ devices
 [\fIblk_sgio=\fR{0|1}] [\fIbpt=BPT\fR] [\fIcdbsz=\fR{6|10|12|16}]
 [\fIcoe=\fR{0|1|2|3}] [\fIcoe_limit=CL\fR] [\fIdio=\fR{0|1}]
 [\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR{0|1}]
-[\fItime=\fR{0|1}] [\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR] [\fI\-V\fR]
-[\fI\-\-verify\fR]
+[\fItime=\fR{0|1}] [\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR]
+[\fI\-\-progress\fR] [\fI\-\-verify\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -213,6 +213,13 @@ executing them.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 outputs usage message and exits.
+.TP
+\fB\-p\fR, \fB\-\-progress\fR
+this option causes a progress report to be output every two minutes until
+the copy is complete. After the copy is complete a line with "completed"
+is printed to distinguish the final report from the prior progress reports.
+When used twice the progress report is every minute, when used three times
+the progress report is every 30 seconds.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 when used once, this is equivalent to \fIverbose=1\fR. When used

@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.02 20200331";      /* sbc4r19 */
+static const char * version_str = "1.03 20200423";      /* sbc4r19 */
 
 
 #ifndef UINT32_MAX
@@ -54,7 +54,7 @@ static const char * version_str = "1.02 20200331";      /* sbc4r19 */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 struct gpes_desc_t {    /* info in returned physical status descriptor */
-    bool restoration_allowed;
+    bool restoration_allowed;   /* RALWD bit in sbc4r20a */
     uint32_t elem_id;
     uint8_t phys_elem_type;
     uint8_t phys_elem_health;
@@ -550,7 +550,7 @@ start_response:
             else if (0xff == j)
                 printf("depopulation completed, no errors");
             if (a_ped.restoration_allowed)
-                printf(" [restoration allowed]");
+                printf(" [restoration allowed [RALWD]]");
             printf("\n");
         }
     }

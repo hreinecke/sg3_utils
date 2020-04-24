@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.13 20200410";
+static const char * version_str = "6.14 20200423";
 
 
 #define ME "sg_dd: "
@@ -129,6 +129,10 @@ static const char * version_str = "6.13 20200410";
 #define MAX_UNIT_ATTENTIONS 10
 #define MAX_ABORTED_CMDS 256
 
+#define PROGRESS_TRIGGER_MS 120000      /* milliseconds: 2 minutes */
+#define PROGRESS2_TRIGGER_MS 60000      /* milliseconds: 1 minute */
+#define PROGRESS3_TRIGGER_MS 30000      /* milliseconds: 30 seconds */
+
 static int sum_of_resids = 0;
 
 static int64_t dd_count = -1;
@@ -143,6 +147,7 @@ static int unrecovered_errs = 0;
 static int miscompare_errs = 0;
 static int read_longs = 0;
 static int num_retries = 0;
+static int progress = 0;
 static int dry_run = 0;
 
 static bool do_time = false;
@@ -418,7 +423,8 @@ usage()
             "[coe=0|1|2|3]\n"
             "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
             "[of2=OFILE2] [retries=RETR]\n"
-            "              [sync=0|1] [time=0|1] [verbose=VERB] [--verify]\n"
+            "              [sync=0|1] [time=0|1] [verbose=VERB] "
+            "[--progress] [--verify]\n"
             "  where:\n"
             "    blk_sgio    0->block device use normal I/O(def), 1->use "
             "SG_IO\n"
@@ -469,6 +475,7 @@ usage()
             "etc\n"
             "    --dry-run    do preparation but bypass copy (or read)\n"
             "    --help|-h    print out this usage message then exit\n"
+            "    --progress|-p    print progress report every 2 minutes\n"
             "    --verbose|-v   same as 'verbose=1', can be used multiple "
             "times\n"
             "    --verify|-x    do verify/compare rather than copy "
@@ -1594,6 +1601,132 @@ num_chs_in_str(const char * s, int slen, int ch)
     return res;
 }
 
+/* Returns true when it time to output a progress report; else false. */
+static bool
+check_progress(void)
+{
+#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+    static bool have_prev, measure;
+    static struct timespec prev_true_tm;
+    static int count, threshold;
+    bool res = false;
+    uint32_t elapsed_ms, ms;
+    struct timespec now_tm, res_tm;
+
+    if (progress) {
+        if (! have_prev) {
+            have_prev = true;
+            measure = true;
+            clock_gettime(CLOCK_MONOTONIC, &prev_true_tm);
+            return false;       /* starting reference */
+        }
+        if (! measure) {
+            if (++count >= threshold)
+                count = 0;
+            else
+                return false;
+        }
+        clock_gettime(CLOCK_MONOTONIC, &now_tm);
+        res_tm.tv_sec = now_tm.tv_sec - prev_true_tm.tv_sec;
+        res_tm.tv_nsec = now_tm.tv_nsec - prev_true_tm.tv_nsec;
+        if (res_tm.tv_nsec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_nsec += 1000000000;
+        }
+        elapsed_ms = (1000 * res_tm.tv_sec) + (res_tm.tv_nsec / 1000000);
+        if (measure) {
+            ++threshold;
+            if (elapsed_ms > 80)        /* 80 milliseconds */
+                measure = false;
+        }
+        if (elapsed_ms >= PROGRESS3_TRIGGER_MS) {
+            if (elapsed_ms >= PROGRESS2_TRIGGER_MS) {
+                if (elapsed_ms >= PROGRESS_TRIGGER_MS) {
+                    ms = PROGRESS_TRIGGER_MS;
+                    res = true;
+                } else if (progress > 1) {
+                    ms = PROGRESS2_TRIGGER_MS;
+                    res = true;
+                }
+            } else if (progress > 2) {
+                ms = PROGRESS3_TRIGGER_MS;
+                res = true;
+            }
+        }
+        if (res) {
+            prev_true_tm.tv_sec += (ms / 1000);
+            prev_true_tm.tv_nsec += (ms % 1000) * 1000000;
+            if (prev_true_tm.tv_nsec >= 1000000000) {
+                ++prev_true_tm.tv_sec;
+                prev_true_tm.tv_nsec -= 1000000000;
+            }
+        }
+    }
+    return res;
+
+#elif defined(HAVE_GETTIMEOFDAY)
+    static bool have_prev, measure;
+    static struct timeval prev_true_tm;
+    static int count, threshold;
+    bool res = false;
+    uint32_t elapsed_ms, ms;
+    struct timeval now_tm, res_tm;
+
+    if (progress) {
+        if (! have_prev) {
+            have_prev = true;
+            gettimeofday(&prev_true_tm, NULL);
+            return false;       /* starting reference */
+        }
+        if (! measure) {
+            if (++count >= threshold)
+                count = 0;
+            else
+                return false;
+        }
+        gettimeofday(&now_tm, NULL);
+        res_tm.tv_sec = now_tm.tv_sec - prev_true_tm.tv_sec;
+        res_tm.tv_usec = now_tm.tv_usec - prev_true_tm.tv_usec;
+        if (res_tm.tv_usec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_usec += 1000000;
+        }
+        elapsed_ms = (1000 * res_tm.tv_sec) + (res_tm.tv_usec / 1000);
+        if (measure) {
+            ++threshold;
+            if (elapsed_ms > 80)        /* 80 milliseconds */
+                measure = false;
+        }
+        if (elapsed_ms >= PROGRESS3_TRIGGER_MS) {
+            if (elapsed_ms >= PROGRESS2_TRIGGER_MS) {
+                if (elapsed_ms >= PROGRESS_TRIGGER_MS) {
+                    ms = PROGRESS_TRIGGER_MS;
+                    res = true;
+                } else if (progress > 1) {
+                    ms = PROGRESS2_TRIGGER_MS;
+                    res = true;
+                }
+            } else if (progress > 2) {
+                ms = PROGRESS3_TRIGGER_MS;
+                res = true;
+            }
+        }
+        if (res) {
+            prev_true_tm.tv_sec += (ms / 1000);
+            prev_true_tm.tv_usec += (ms % 1000) * 1000;
+            if (prev_true_tm.tv_usec >= 1000000) {
+                ++prev_true_tm.tv_sec;
+                prev_true_tm.tv_usec -= 1000000;
+            }
+        }
+    }
+    return res;
+
+#else   /* no clock reading functions available */
+    return false;
+#endif
+}
+
 
 int
 main(int argc, char * argv[])
@@ -1782,6 +1915,9 @@ main(int argc, char * argv[])
                 usage();
                 return 0;
             }
+            n = num_chs_in_str(key + 1, keylen - 1, 'p');
+            progress += n;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
             if (n > 0)
                 verbose_given = true;
@@ -1807,7 +1943,9 @@ main(int argc, char * argv[])
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--verb", 6)) {
+        } else if (0 == strncmp(key, "--progress", 10))
+            ++progress;
+        else if (0 == strncmp(key, "--verb", 6)) {
             verbose_given = true;
             ++verbose;
         } else if (0 == strncmp(key, "--veri", 6))
@@ -1840,6 +1978,8 @@ main(int argc, char * argv[])
         pr2serr(ME "version: %s\n", version_str);
         return 0;
     }
+    if (progress > 0 && !do_time)
+        do_time = true;
     if (argc < 2) {
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to stdout\n");
         pr2serr("For more information use '--help'\n");
@@ -2340,6 +2480,12 @@ main(int argc, char * argv[])
             dd_count -= blocks;
         skip += blocks;
         seek += blocks;
+        if (progress > 0) {
+            if (check_progress()) {
+                calc_duration_throughput(true);
+                print_stats("");
+            }
+        }
     } /* end of main loop that does the copy ... */
 
     if (ret && penult_sparse_skip && (penult_blocks > 0)) {
@@ -2380,6 +2526,8 @@ main(int argc, char * argv[])
 bypass_copy:
     if (do_time)
         calc_duration_throughput(false);
+    if (progress > 0)
+        pr2serr("\nCompleted:\n");
 
     free(wrkBuff);
     if (free_zeros_buff)

@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.05 20200223";    /* SPC-6 rev 01 */
+static const char * version_str = "2.07 20200422";    /* SPC-6 rev 01 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2305,12 +2305,19 @@ decode_b0_vpd(uint8_t * buff, int len, int do_hex)
     }
 }
 
+static const char * zoned_strs[] = {
+    "",
+    "  [host-aware]",
+    "  [host-managed]",
+    "",
+};
+
 /* VPD_BLOCK_DEV_CHARS sbc */
 /* VPD_MAN_ASS_SN ssc */
 static void
 decode_b1_vpd(uint8_t * buff, int len, int do_hex)
 {
-    int pdt;
+    int pdt, zoned;
     unsigned int u;
 
     if (do_hex) {
@@ -2362,7 +2369,8 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex)
                 printf("reserved [%u]\n", u);
                 break;
             }
-            printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);   /* sbc4r04 */
+            zoned = (buff[8] >> 4) & 0x3;       /* added sbc4r04 */
+            printf("  ZONED=%d%s\n", zoned, zoned_strs[zoned]);
             printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             printf("  DEPOPULATION_TIME=%u (seconds)\n",
@@ -3551,7 +3559,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
-                    printf("VPD INQUIRY: Block device characteristcis page "
+                    printf("VPD INQUIRY: Block device characteristics page "
                            "(SBC)\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:

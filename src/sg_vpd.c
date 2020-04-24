@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.58 20200223";  /* spc6r01 + sbc4r18 */
+static const char * version_str = "1.59 20200423";  /* spc6r01 + sbc4r20a */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2109,6 +2109,13 @@ static const char * product_type_arr[] =
     "Universal Flash Storage Card (UFS)",
 };
 
+static const char * zoned_strs[] = {
+    "",
+    "  [host-aware]",
+    "  [host-managed]",
+    "",
+};
+
 /* VPD_BLOCK_DEV_CHARS sbc */
 /* VPD_MAN_ASS_SN ssc */
 /* VPD_SECURITY_TOKEN osd */
@@ -2116,6 +2123,7 @@ static const char * product_type_arr[] =
 static void
 decode_b1_vpd(uint8_t * buff, int len, int do_hex, int pdt)
 {
+    int zoned;
     unsigned int u, k;
 
     if (do_hex) {
@@ -2174,7 +2182,8 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex, int pdt)
             printf(": reserved\n");
             break;
         }
-        printf("  ZONED=%d\n", (buff[8] >> 4) & 0x3);   /* sbc4r04 */
+        zoned = (buff[8] >> 4) & 0x3;       /* added sbc4r04 */
+        printf("  ZONED=%d%s\n", zoned, zoned_strs[zoned]);
         printf("  RBWZ=%d\n", !!(buff[8] & 0x8));       /* sbc4r12 */
         printf("  BOCS=%d\n", !!(buff[8] & 0x4));       /* sbc4r07 */
         printf("  FUAB=%d\n", !!(buff[8] & 0x2));
@@ -2689,6 +2698,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
 {
     bool allow_name, allow_if_found, long_notquiet, qt;
     bool vpd_supported = false;
+    bool inhex_active = (-1 == sg_fd);
     int len, pdt, num, k, resid, alloc_len, pn, vb;
     int res = 0;
     const struct svpd_values_name_t * vnp;
@@ -2708,9 +2718,10 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
         allow_name = true;
     allow_if_found = (op->examine > 0) && (! op->do_quiet);
     rp = rsp_buff + off;
-    pn = (-1 == sg_fd) ? rp[1] : op->vpd_pn;
-    if (sg_fd != -1 && !op->do_force &&
-        0 == op->examine &&
+    pn = op->vpd_pn;
+    if (inhex_active && (VPD_NOPE_WANT_STD_INQ != op->vpd_pn))
+        pn = rp[1];
+    if (!inhex_active && !op->do_force && 0 == op->examine &&
         pn != VPD_NOPE_WANT_STD_INQ &&
         pn != VPD_SUPPORTED_VPDS) {
         res = vpd_fetch_page(sg_fd, rp, VPD_SUPPORTED_VPDS, op->maxlen, qt,
@@ -2740,7 +2751,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     }
     switch(pn) {
     case VPD_NOPE_WANT_STD_INQ:    /* -2 (want standard inquiry response) */
-        if (sg_fd >= 0) {
+        if (!inhex_active) {
             if (op->maxlen > 0)
                 alloc_len = op->maxlen;
             else if (op->do_long)
