@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.14 20200423";
+static const char * version_str = "6.15 20200429";
 
 
 #define ME "sg_dd: "
@@ -678,6 +678,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
             uint64_t * io_addrp)
 {
     bool info_valid;
+    bool print_cdb_after = false;
     int res, slen;
     const uint8_t * sbp;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
@@ -786,6 +787,8 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
                 return SG_LIB_CAT_MEDIUM_HARD;
             }
         }
+        if (verbose > 0)
+            print_cdb_after = true;
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
         __attribute__((fallthrough));
@@ -796,6 +799,8 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         ++unrecovered_errs;
         if (verbose > 0)
             sg_chk_n_print3("reading", &io_hdr, verbose > 1);
+        if (print_cdb_after)
+            sg_print_command_len(rdCmd, ifp->cdbsz);
         return res;
     }
     if (diop && *diop &&
@@ -1163,6 +1168,8 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     case SG_LIB_CAT_MEDIUM_HARD:
     default:
         sg_chk_n_print3(op_str, &io_hdr, verbose > 1);
+        if ((SG_LIB_CAT_ILLEGAL_REQ == res) && verbose)
+            sg_print_command_len(wrCmd, ofp->cdbsz);
         ++unrecovered_errs;
         if (ofp->coe) {
             pr2serr(">> ignored errors for out blk=%" PRId64 " for %d "

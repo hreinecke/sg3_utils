@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.12 20200412 */
+/* sg_pt_linux_nvme version 1.13 20200501 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -1589,7 +1589,7 @@ sntl_write_same(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     if (vb > 3)
         pr2ws("%s: ndob=%d, time_secs=%d\n", __func__, (int)ndob, time_secs);
     if (! ndob) {
-        int res, flbas, index, lbafx, lbads, lbsize;
+        int flbas, index, lbafx, lbads, lbsize;
         uint8_t * up;
         uint8_t * dp;
 

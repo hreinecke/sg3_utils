@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2019 Douglas Gilbert.
+ * Copyright (c) 2009-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.30 20191220";
+static const char * version_str = "1.31 20200430";
 
 
 #define ME "sg_write_same: "
@@ -298,6 +298,10 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             }
             ret = sense_cat;
             break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            if (op->verbose)
+                sg_print_command_len(ws_cdb, cdb_len);
+            /* FALL THROUGH */
         default:
             ret = sense_cat;
             break;

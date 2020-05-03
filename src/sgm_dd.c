@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.65 20200216";
+static const char * version_str = "1.66 20200429";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -467,6 +467,7 @@ static int
 sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         int bs, int cdbsz, bool fua, bool dpo, bool do_mmap)
 {
+    bool print_cdb_after = false;
     int res;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
@@ -538,11 +539,16 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     case SG_LIB_CAT_NOT_READY:
     case SG_LIB_CAT_MEDIUM_HARD:
         return res;
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose)
+	    print_cdb_after = true;
+        /* FALL THROUGH */
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-    case SG_LIB_CAT_ILLEGAL_REQ:
     default:
         sg_chk_n_print3("reading", &io_hdr, verbose > 1);
+	if (print_cdb_after)
+            sg_print_command_len(rdCmd, cdbsz);
         return res;
     }
     sum_of_resids += io_hdr.resid;
@@ -558,6 +564,7 @@ static int
 sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
          int bs, int cdbsz, bool fua, bool dpo, bool do_mmap, bool * diop)
 {
+    bool print_cdb_after = false;
     int res;
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
     uint8_t senseBuff[SENSE_BUFF_LEN];
@@ -631,11 +638,16 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     case SG_LIB_CAT_NOT_READY:
     case SG_LIB_CAT_MEDIUM_HARD:
         return res;
+    case SG_LIB_CAT_ILLEGAL_REQ:
+        if (verbose)
+	    print_cdb_after = true;
+        /* FALL THROUGH */
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-    case SG_LIB_CAT_ILLEGAL_REQ:
     default:
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
+	if (print_cdb_after)
+            sg_print_command_len(wrCmd, cdbsz);
         return res;
     }
     if (diop && *diop &&

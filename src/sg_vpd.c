@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.59 20200423";  /* spc6r01 + sbc4r20a */
+static const char * version_str = "1.60 20200501";  /* spc6r01 + sbc4r20a */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -3552,7 +3552,7 @@ svpd_examine_all(int sg_fd, struct opts_t * op)
     int k, res;
     int max_pn = 255;
     int any_err = 0;
-    char b[64];
+    char b[80];
 
     if (op->vpd_pn > 0)
         max_pn = op->vpd_pn;
@@ -3577,8 +3577,6 @@ svpd_examine_all(int sg_fd, struct opts_t * op)
             if (SG_LIB_CAT_ABORTED_COMMAND == res)
                 pr2serr("fetching VPD page failed, aborted command\n");
             else if (res && (SG_LIB_CAT_ILLEGAL_REQ != res)) {
-                char b[80];
-
                 /* SG_LIB_CAT_ILLEGAL_REQ expected as well examine all */
                 sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
                 pr2serr("fetching VPD page failed: %s\n", b);

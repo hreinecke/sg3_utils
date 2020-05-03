@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.48 20200206";    /* ses4r03 + 20-013r1 */
+static const char * version_str = "2.48 20200501";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -2468,7 +2468,7 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
     return buff;
 }
 
-/* 'Fan speed factor' new in 20-013r1, probably will be in ses4r04 */
+/* 'Fan speed factor' new in ses4r04 */
 static int
 calc_fan_speed(int fan_speed_factor, int actual_fan_speed)
 {

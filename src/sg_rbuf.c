@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2019 D. Gilbert
+ *  Copyright (C) 1999-2020 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.07 20191226";
+static const char * version_str = "5.08 20200501";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -632,6 +632,8 @@ main(int argc, char * argv[])
 
 #ifdef DEBUG
         if (clear) {
+            int j;
+
             for (j = 0; j < buf_size; ++j) {
                 if (rbBuff[j] != 0) {
                     clear = false;

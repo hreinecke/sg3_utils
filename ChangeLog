@@ -2,17 +2,19 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.46 [20200423] [svn: r849]
+Changelog for sg3_utils-1.46 [20200503] [svn: r850]
   - sg_dd: separate category for miscompare errors
   - sg_get_elem_status: add ralwd bit sbc4r20a
   - sg_write_x: add dld bits to write(32) [sbc4r19a]
   - sg_rep_zones: print invalid write pointer LBA as -1 rather
     than 16 "f"s
+  - sg_ses: use fan speed factor field for calculation [ses4r04]
   - sg_lib: restore elements and rebuild command added
   - sg_lib: Linux NVMe SNTL: add read, write and verify;
     synchronize cache and write same translations
     - add dummy start stop unit and test unit ready commands
     - wire cache mpage's WCE to nvme 'volatile write cache'
+  - sg_lib: reprint cdb with illegal request sense key
   - testing/sgs_dd: add evfd flags and eventfd processing
   - testing/sgh_dd: various fixes
 

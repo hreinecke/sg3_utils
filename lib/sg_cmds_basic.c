@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2019 Douglas Gilbert.
+ * Copyright (c) 1999-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -42,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "1.95 20191219";
+static const char * const version_str = "1.96 20200503";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -182,11 +182,11 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
  * call to the pass-through. pt_res is returned from do_scsi_pt(). If valid
  * sense data is found it is decoded and output to sg_warnings_strm (def:
  * stderr); depending on the 'noisy' and 'verbose' settings. Returns -2 for
- * "sense" category (may not be fatal), -1 for failed, 0, or a positive
- * number. If din type command (or bidi) returns actual number of bytes read
- * (din_len - resid); otherwise returns 0. If -2 returned then sense category
- * output via 'o_sense_cat' pointer (if not NULL). Note that several sense
- * categories also have data in bytes received; -2 is still returned. */
+ * o_sense_cat (sense category) written which may not be fatal. Returns
+ * -1 for other types of failure. Returns 0, or a positive number. If data-in
+ * type command (or bidi) then returns actual number of bytes read
+ * (din_len - resid); otherwise returns 0. Note that several sense categories
+ * also have data in bytes received; -2 is still returned. */
 int
 sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, bool noisy, int verbose, int * o_sense_cat)

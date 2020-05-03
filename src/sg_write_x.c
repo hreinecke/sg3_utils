@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.23 20200331";
+static const char * version_str = "1.24 20200429";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1372,6 +1372,11 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
                                 ull);
                 }
             }
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+	    if (vb)
+	        sg_print_command_len(x_cdb, cdb_len);
             ret = sense_cat;
             break;
         default:

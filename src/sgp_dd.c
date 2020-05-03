@@ -192,7 +192,7 @@ typedef struct request_element
     uint8_t * buffp;
     uint8_t * alloc_bp;
     struct sg_io_hdr io_hdr;
-    uint8_t cmd[MAX_SCSI_CDBSZ];
+    uint8_t cdb[MAX_SCSI_CDBSZ];
     uint8_t sb[SENSE_BUFF_LEN];
     int bs;
     int dio_incomplete_count;
@@ -689,18 +689,15 @@ sg_out_open(const char * fnp, struct flags_t * flagp, int bs, int bpt)
 static void *
 read_write_thread(void * v_tap)
 {
-    Thread_arg * tap;
-    Rq_coll * clp;
+    Thread_arg * tap = (Thread_arg *)v_tap;
+    Rq_coll * clp = tap->clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
     int sz;
     volatile bool stop_after_write = false;
     int64_t seek_skip;
-    int blocks, status, id;
+    int blocks, status;
 
-    tap = (Thread_arg *)v_tap;
-    id = tap->id;
-    clp = tap->clp;
     sz = clp->bpt * clp->bs;
     seek_skip =  clp->seek - clp->skip;
     memset(rep, 0, sizeof(Rq_elem));
@@ -732,7 +729,6 @@ read_write_thread(void * v_tap)
     if (clp->mmap_active) {
         int fd = clp->in_flags.mmap ? rep->infd : rep->outfd;
 
-pr2serr("%s: id=%d, fd=%d calling sgp_mem_mmap()\n", __func__, id, fd);
         status = sgp_mem_mmap(fd, sz, &rep->buffp);
         if (status) err_exit(status, "sgp_mem_mmap() failed");
     } else {
@@ -1054,6 +1050,10 @@ sg_in_operation(Rq_coll * clp, Rq_elem * rep)
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
             return;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            if (clp->debug)
+                sg_print_command_len(rep->cdb, rep->cdbsz_in);
+            /* FALL THROUGH */
         default:
             pr2serr("error finishing sg in command (%d)\n", res);
             if (exit_status <= 0)
@@ -1128,6 +1128,10 @@ sg_out_operation(Rq_coll * clp, Rq_elem * rep)
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
             return;
+        case SG_LIB_CAT_ILLEGAL_REQ:
+            if (clp->debug)
+                sg_print_command_len(rep->cdb, rep->cdbsz_out);
+            /* FALL THROUGH */
         default:
             pr2serr("error finishing sg out command (%d)\n", res);
             if (exit_status <= 0)
@@ -1149,7 +1153,7 @@ sg_start_io(Rq_elem * rep)
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
-    if (sg_build_scsi_cdb(rep->cmd, cdbsz, rep->num_blks, rep->blk,
+    if (sg_build_scsi_cdb(rep->cdb, cdbsz, rep->num_blks, rep->blk,
                           rep->wr, fua, dpo)) {
         pr2serr("%sbad cdb build, start_blk=%" PRId64 ", blocks=%d\n",
                 my_name, rep->blk, rep->num_blks);
@@ -1158,7 +1162,7 @@ sg_start_io(Rq_elem * rep)
     memset(hp, 0, sizeof(struct sg_io_hdr));
     hp->interface_id = 'S';
     hp->cmd_len = cdbsz;
-    hp->cmdp = rep->cmd;
+    hp->cmdp = rep->cdb;
     hp->dxfer_direction = rep->wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
     hp->dxfer_len = rep->bs * rep->num_blks;
     hp->dxferp = mmap ? NULL : rep->buffp;
