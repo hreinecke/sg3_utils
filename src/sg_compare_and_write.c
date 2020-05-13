@@ -56,7 +56,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.28 20200429";
+static const char * version_str = "1.29 20200509";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -292,6 +292,8 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                         goto out_err;
                 }
         }
+	if (op->version_given && (! op->verbose_given))
+		return 0;
         if (NULL == op->device_name) {
                 pr2serr("missing device name!\n");
                 goto out_err;

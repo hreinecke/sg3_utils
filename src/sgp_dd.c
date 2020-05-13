@@ -22,7 +22,7 @@
  * in this case) are transferred to or from the sg device in a single SCSI
  * command.
  *
- * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
+ * This version is designed for the linux kernel 2.4, 2.6, 3, 4 and 5 series.
  *
  * sgp_dd is a Posix threads specialization of the sg_dd utility. Both
  * sgp_dd and sg_dd only perform special tasks when one or both of the given
@@ -84,7 +84,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.75 20200219";
+static const char * version_str = "5.76 20200510";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -370,7 +370,7 @@ tsafe_strerror(int code, char * ebp)
  * ISBN 0-201-63392-2 . [Highly recommended book.] Changed __FILE__
  * to __func__ */
 #define err_exit(code,text) do { \
-    char strerr_buff[STRERR_BUFF_LEN]; \
+    char strerr_buff[STRERR_BUFF_LEN + 1]; \
     pr2serr("%s at \"%s\":%d: %s\n", \
         text, __func__, __LINE__, tsafe_strerror(code, strerr_buff)); \
     exit(1); \
@@ -836,7 +836,7 @@ normal_in_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
     bool stop_after_write = false;
     int res;
-    char strerr_buff[STRERR_BUFF_LEN];
+    char strerr_buff[STRERR_BUFF_LEN + 1];
 
     /* enters holding in_mutex */
     while (((res = read(rep->infd, rep->buffp, blocks * clp->bs)) < 0) &&
@@ -882,7 +882,7 @@ static void
 normal_out_operation(Rq_coll * clp, Rq_elem * rep, int blocks)
 {
     int res;
-    char strerr_buff[STRERR_BUFF_LEN];
+    char strerr_buff[STRERR_BUFF_LEN + 1];
 
     /* enters holding out_mutex */
     while (((res = write(rep->outfd, rep->buffp, rep->num_blks * clp->bs))

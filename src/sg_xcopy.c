@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2019 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2020 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -27,7 +27,7 @@
  * in this case) is transferred to or from the sg device in a single SCSI
  * command.
  *
- * This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
+ * This version is designed for the linux kernel 2.4, 2.6, 3, 4 and 5 series.
  */
 
 #define _XOPEN_SOURCE 600
@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.70 20190501";
+static const char * version_str = "0.71 20200510";
 
 #define ME "sg_xcopy: "
 

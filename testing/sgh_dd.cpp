@@ -194,7 +194,7 @@ struct flags_t {
     int mmap;
 };
 
-typedef struct global_collection
+struct global_collection
 {       /* one instance visible to all threads */
     int infd;
     int64_t skip;
@@ -257,7 +257,7 @@ typedef struct global_collection
     const char * infp;
     const char * outfp;
     const char * out2fp;
-} Gbl_coll;
+};
 
 typedef struct mrq_abort_info
 {
@@ -269,7 +269,7 @@ typedef struct mrq_abort_info
 
 typedef struct request_element
 {       /* one instance per worker thread */
-    Gbl_coll *clp;
+    struct global_collection *clp;
     bool wr;
     bool has_share;
     bool both_sg;
@@ -311,7 +311,7 @@ typedef struct request_element
 typedef struct thread_info
 {
     int id;
-    Gbl_coll * gcp;
+    struct global_collection * gcp;
     pthread_t a_pthr;
 } Thread_info;
 
@@ -365,7 +365,8 @@ static pthread_t sig_listen_thread_id;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
-static void sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr);
+static void sg_in_rd_cmd(struct global_collection * clp, Rq_elem * rep,
+                         mrq_arr_t & def_arr);
 static void sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2,
                           bool prefetch);
 static bool normal_in_rd(Rq_elem * rep, int blocks);
@@ -374,11 +375,11 @@ static int sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
                        struct sg_io_extra *xtrp);
 static int sg_finish_io(bool wr, Rq_elem * rep, int pack_id,
                         struct sg_io_extra *xtrp);
-static int sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp,
-                      int *mmap_len);
-static int sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp,
-                       int *mmap_len);
-static void sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep,
+static int sg_in_open(struct global_collection *clp, const char *inf,
+                      uint8_t **mmpp, int *mmap_len);
+static int sg_out_open(struct global_collection *clp, const char *outf,
+                       uint8_t **mmpp, int *mmap_len);
+static void sg_in_out_interleave(struct global_collection *clp, Rq_elem * rep,
                                  mrq_arr_t & def_arr);
 static int sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr);
 
@@ -393,7 +394,7 @@ static bool sg_version_ge_40030 = false;
 static bool shutting_down = false;
 static bool do_sync = false;
 static int do_time = 1;
-static Gbl_coll gcoll;
+static struct global_collection gcoll;
 static struct timeval start_tm;
 static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
@@ -755,7 +756,7 @@ siginfo_handler(int sig)
 static void
 siginfo2_handler(int sig)
 {
-    Gbl_coll * clp = &gcoll;
+    struct global_collection * clp = &gcoll;
 
     if (sig) { ; }      /* unused, dummy to suppress warning */
     pr2serr("Progress report, continuing ...\n");
@@ -1053,7 +1054,7 @@ page4:
 }
 
 static inline void
-stop_both(Gbl_coll * clp)
+stop_both(struct global_collection * clp)
 {
     clp->in_stop = true;
     clp->out_stop = true;
@@ -1127,7 +1128,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 static void *
 sig_listen_thread(void * v_clp)
 {
-    Gbl_coll * clp = (Gbl_coll *)v_clp;
+    struct global_collection * clp = (struct global_collection *)v_clp;
     int sig_number;
 
     while (1) {
@@ -1291,7 +1292,7 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
 static void
 cleanup_in(void * v_clp)
 {
-    Gbl_coll * clp = (Gbl_coll *)v_clp;
+    struct global_collection * clp = (struct global_collection *)v_clp;
 
     pr2serr("thread cancelled while in mutex held\n");
     stop_both(clp);
@@ -1302,7 +1303,7 @@ cleanup_in(void * v_clp)
 static void
 cleanup_out(void * v_clp)
 {
-    Gbl_coll * clp = (Gbl_coll *)v_clp;
+    struct global_collection * clp = (struct global_collection *)v_clp;
 
     pr2serr("thread cancelled while out_mutex held\n");
     stop_both(clp);
@@ -1312,7 +1313,7 @@ cleanup_out(void * v_clp)
 
 static void inline buffp_onto_next(Rq_elem * rep)
 {
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
 
     if ((clp->nmrqs > 0) && clp->unbalanced_mrq) {
         ++rep->mrq_index;
@@ -1324,7 +1325,7 @@ static void inline buffp_onto_next(Rq_elem * rep)
 static inline uint8_t *
 get_buffp(Rq_elem * rep)
 {
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
 
     if ((clp->nmrqs > 0) && clp->unbalanced_mrq && (rep->mrq_index > 0))
         return rep->buffp + (rep->mrq_index * clp->bs * clp->bpt);
@@ -1336,7 +1337,7 @@ static void *
 read_write_thread(void * v_tip)
 {
     Thread_info * tip;
-    Gbl_coll * clp;
+    struct global_collection * clp;
     Rq_elem rel;
     Rq_elem * rep = &rel;
     int n, sz, blocks, status, vb, err, res, wr_blks;
@@ -1695,7 +1696,7 @@ fini:
 static bool
 normal_in_rd(Rq_elem * rep, int blocks)
 {
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     bool stop_after_write = false;
     bool same_fds = clp->in_flags.same_fds || clp->out_flags.same_fds;
     int res;
@@ -1758,7 +1759,7 @@ static void
 normal_out_wr(Rq_elem * rep, int blocks)
 {
     int res;
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding out_mutex */
@@ -1880,7 +1881,8 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
 
 /* Enters this function holding in_mutex */
 static void
-sg_in_rd_cmd(Gbl_coll * clp, Rq_elem * rep, mrq_arr_t & def_arr)
+sg_in_rd_cmd(struct global_collection * clp, Rq_elem * rep,
+             mrq_arr_t & def_arr)
 {
     int res, status, pack_id;
 
@@ -1958,7 +1960,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     int err = 0;
     int k;
     int master_fd = rep->infd;  /* in (READ) side is master */
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     struct sg_extended_info sei;
     struct sg_extended_info * seip = &sei;
 
@@ -2008,7 +2010,7 @@ static void
 sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2, bool prefetch)
 {
     int res, status, pack_id, nblks;
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     uint32_t ofsplit = clp->ofsplit;
     pthread_mutex_t * mutexp = is_wr2 ? &clp->out2_mutex : &clp->out_mutex;
     struct sg_io_extra xtr;
@@ -2159,7 +2161,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                  const struct sg_io_v4 * a_v4p, int nrq,
                  uint32_t * good_inblksp, uint32_t * good_outblksp)
 {
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     bool ok;
     int id = rep->id;
     int resid = ctl_v4p->din_resid;
@@ -2274,7 +2276,7 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     uint32_t in_fin_blks, out_fin_blks;
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 hold_ctlo;
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     char b[80];
 
     hold_ctlo = *ctlop;
@@ -2498,7 +2500,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 ctl_v4;
     uint8_t * cmd_ap = NULL;
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     const char * iosub_str;
     char b[80];
 
@@ -2775,7 +2777,7 @@ static int
 sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             struct sg_io_extra *xtrp)
 {
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     bool wr = rep->wr;
     bool fua = wr ? clp->out_flags.fua : clp->in_flags.fua;
     bool dpo = wr ? clp->out_flags.dpo : clp->in_flags.dpo;
@@ -3074,7 +3076,7 @@ do_v4:
 static int
 sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
 {
-    Gbl_coll * clp = rep->clp;
+    struct global_collection * clp = rep->clp;
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
     bool is_wr2 = xtrp ? xtrp->is_wr2 : false;
     bool prefetch = xtrp ? xtrp->prefetch : false;
@@ -3259,7 +3261,8 @@ do_v4:
 
 /* Enter holding in_mutex, exits holding nothing */
 static void
-sg_in_out_interleave(Gbl_coll *clp, Rq_elem * rep, mrq_arr_t & def_arr)
+sg_in_out_interleave(struct global_collection *clp, Rq_elem * rep,
+                     mrq_arr_t & def_arr)
 {
     int res, pid_read, pid_write;
     int status;
@@ -3649,7 +3652,8 @@ num_chs_in_str(const char * s, int slen, int ch)
 }
 
 static int
-sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
+sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
+           int * mmap_lenp)
 {
     int fd, err, n;
     int flags = O_RDWR;
@@ -3683,7 +3687,8 @@ sg_in_open(Gbl_coll *clp, const char *inf, uint8_t **mmpp, int * mmap_lenp)
 }
 
 static int
-sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
+sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
+            int * mmap_lenp)
 {
     int fd, err, n;
     int flags = O_RDWR;
@@ -3720,8 +3725,8 @@ sg_out_open(Gbl_coll *clp, const char *outf, uint8_t **mmpp, int * mmap_lenp)
 #define INOUTF_SZ 512
 
 static int
-parse_cmdline_sanity(int argc, char * argv[], Gbl_coll * clp, char * inf,
-                     char * outf, char * out2f, char * outregf)
+parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
+                     char * inf, char * outf, char * out2f, char * outregf)
 {
     bool verbose_given = false;
     bool version_given = false;
@@ -4111,7 +4116,7 @@ main(int argc, char * argv[])
     int64_t out_num_sect = 0;
     int in_sect_sz, out_sect_sz, status, flags;
     void * vp;
-    Gbl_coll * clp = &gcoll;
+    struct global_collection * clp = &gcoll;
     Thread_info thread_arr[MAX_NUM_THREADS];
     char ebuff[EBUFF_SZ];
 #if SG_LIB_ANDROID
@@ -4124,7 +4129,7 @@ main(int argc, char * argv[])
     sigaction(SIGUSR1, &actions, NULL);
     sigaction(SIGUSR2, &actions, NULL);
 #endif
-    memset(clp, 0, sizeof(*clp));
+    /* memset(clp, 0, sizeof(*clp)); */
     memset(thread_arr, 0, sizeof(thread_arr));
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
     clp->in_type = FT_OTHER;
@@ -4435,7 +4440,12 @@ main(int argc, char * argv[])
                     pr2serr("read capacity failed, %s not ready\n", inf);
                 else
                     pr2serr("Unable to read capacity on %s\n", inf);
-                in_num_sect = -1;
+                return SG_LIB_FILE_ERROR;
+            } else if (clp->bs != in_sect_sz) {
+                pr2serr(">> warning: logical block size on %s confusion: "
+                        "bs=%d, device claims=%d\n", clp->infp, clp->bs,
+                        in_sect_sz);
+                return SG_LIB_FILE_ERROR;
             }
         } else if (FT_BLOCK == clp->in_type) {
             if (0 != read_blkdev_capacity(clp->infd, &in_num_sect,
@@ -4468,6 +4478,12 @@ main(int argc, char * argv[])
                 else
                     pr2serr("Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
+                return SG_LIB_FILE_ERROR;
+            } else if (clp->bs != out_sect_sz) {
+                pr2serr(">> warning: logical block size on %s confusion: "
+                        "bs=%d, device claims=%d\n", clp->outfp, clp->bs,
+                        out_sect_sz);
+                return SG_LIB_FILE_ERROR;
             }
         } else if (FT_BLOCK == clp->out_type) {
             if (0 != read_blkdev_capacity(clp->outfd, &out_num_sect,

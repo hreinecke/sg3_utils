@@ -27,7 +27,7 @@
    then only the read side will be mmap-ed, while the write side will
    use normal IO.
 
-   This version is designed for the linux kernel 2.4, 2.6, 3 and 4 series.
+   This version is designed for the linux kernel 2.4, 2.6, 3, 4 and 5 series.
 */
 
 #define _XOPEN_SOURCE 600
@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.66 20200429";
+static const char * version_str = "1.67 20200510";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -541,13 +541,13 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         return res;
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose)
-	    print_cdb_after = true;
+            print_cdb_after = true;
         /* FALL THROUGH */
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
     default:
         sg_chk_n_print3("reading", &io_hdr, verbose > 1);
-	if (print_cdb_after)
+        if (print_cdb_after)
             sg_print_command_len(rdCmd, cdbsz);
         return res;
     }
@@ -640,13 +640,13 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
         return res;
     case SG_LIB_CAT_ILLEGAL_REQ:
         if (verbose)
-	    print_cdb_after = true;
+            print_cdb_after = true;
         /* FALL THROUGH */
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
     default:
         sg_chk_n_print3("writing", &io_hdr, verbose > 1);
-	if (print_cdb_after)
+        if (print_cdb_after)
             sg_print_command_len(wrCmd, cdbsz);
         return res;
     }
