@@ -1,4 +1,4 @@
-.TH SG_WRITE_X "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_WRITE_X "8" "June 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 .SH SYNOPSIS
@@ -137,7 +137,7 @@ The current reference for these commands is draft SBC\-4 (T10/BSR INCITS
 506) revision 15 dated 9 November 2017. All six SCSI commands are described
 in that document. WRITE ATOMIC was added in SBC\-4 revision 3; WRITE STREAM
 was added in SBC\-4 revision 7; WRITE SCATTERED was added in SBC\-4
-revision 11 while the others are in the SBC\-3 standard. 
+revision 11 while the others are in the SBC\-3 standard.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -535,6 +535,10 @@ would be 520 bytes. To send the 32 byte variant add \-\-32 as in:
 .PP
   sg_write_x \-\-atomic=0 \-\-32 \-\-bs=512 \-\-in=/dev/zero \-\-lba=0x1234
 \-\-num=4 /dev/sdc
+.PP
+For examples using 'sg_write_x \-\-same=NDOB' see the manpage for
+sg_write_same(8). The syntax is a little different but the semantics are the
+same.
 .PP
 To send a WRITE STREAM(32) with a STR_ID of 1 use the following:
 .PP

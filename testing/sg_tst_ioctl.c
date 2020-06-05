@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2018-2019 D. Gilbert
+ *  Copyright (C) 2018-2020 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -60,7 +60,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.14  20191116";
+static const char * version_str = "Version: 1.17  20200602";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -97,6 +97,8 @@ static bool show_size_value = false;
 static bool do_v3_only = false;
 
 static int childs_pid = 0;
+static int iterator_test = -1;
+static int object_walk_test = -1;
 static int sg_drv_ver_num = 0;
 static int q_len = DEF_Q_LEN;
 static int sleep_secs = 0;
@@ -112,15 +114,21 @@ static char * file_name = NULL;
 static void
 usage(void)
 {
-    printf("Usage: sg_tst_ioctl [-3] [-c] [-f] [-h] [-l=Q_LEN] "
-           "[-m=MRQS[,I|S]]\n"
-           "                    [-M] [-n] [-o] [-r=SZ] [-s=SEC] [-S] [-t] "
-           "[-T=NUM]\n"
-           "                    [-v] [-V] [-w] <sg_device> [<sg_device2>]\n"
+    printf("Usage: sg_tst_ioctl [-3] [-c] [-f] [-h] [-I=0|1] [-J=0|1] "
+           "[-l=Q_LEN]\n"
+           "                    [-m=MRQS[,I|S]] [-M] [-n] [-o] [-r=SZ] "
+           "[-s=SEC]\n"
+           "                    [-S] [-t] [-T=NUM] [-v] [-V] [-w]\n"
+           "                    <sg_device> [<sg_device2>]\n"
            " where:\n"
            "      -c      timestamp when sg driver created <sg_device>\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
+           "      -I=0|1    iterator test of mid-level; 0: unlocked, 1: "
+           "locked\n"
+           "                does test -T=NUM times, outputs duration\n"
+           "      -J=0|1    object walk (to root); 0: without ptr; 1: with "
+           "ptr\n"
            "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
            "      -m=MRQS[,I|S]    test multi-req, MRQS number to do; if "
            "the letter\n"
@@ -781,6 +789,20 @@ main(int argc, char * argv[])
         else if (0 == memcmp("-h", argv[k], 2)) {
             file_name = 0;
             break;
+        } else if (0 == memcmp("-I=", argv[k], 3)) {
+            iterator_test = atoi(argv[k] + 3);
+            if ((iterator_test > 1) || (iterator_test < -1)) {
+                printf("Expect -I= to take a number, either 0 or 1\n");
+                file_name = 0;
+                break;
+            }
+        } else if (0 == memcmp("-J=", argv[k], 3)) {
+            object_walk_test = atoi(argv[k] + 3);
+            if ((object_walk_test > 1) || (object_walk_test < -1)) {
+                printf("Expect -J= to take a number, either 0 or 1\n");
+                file_name = 0;
+                break;
+            }
         } else if (0 == memcmp("-l=", argv[k], 3)) {
             q_len = atoi(argv[k] + 3);
             if ((q_len > 511) || (q_len < 1)) {
@@ -878,6 +900,9 @@ main(int argc, char * argv[])
             break;
         }
     }
+    if (iterator_test >= 0)
+        nw_given = false;
+
     if (show_size_value) {
         struct utsname unam;
 
@@ -947,26 +972,82 @@ main(int argc, char * argv[])
     }
     printf("Linux sg driver version: %d\n", sg_drv_ver_num);
 
+    if (object_walk_test >= 0) {
+        k = (object_walk_test == 0) ? -999 : 999;
+        if (ioctl(sg_fd, SG_SET_DEBUG, &k) < 0) {
+            res = errno;
+            fprintf(stderr, "%s%d: ioctl(SG_SET_DEBUG) failed errno=%d\n",
+                    relative_cp, k, res);
+        }
+        goto out;
+    }
+
     if (create_time && (sg_drv_ver_num > 40030)) {
         pr_create_dev_time(sg_fd, file_name);
         goto out;
     }
 
-    if (nw_given) {             /* time ioctl(SG_GET_NUM_WAITING) */
+    if (nw_given || (iterator_test >= 0)) {     /* -T=NUM and/or -I=0|1 */
+        /* time ioctl(SG_GET_NUM_WAITING) or do iterator_test */
         int nw, sum_nw;
         struct timespec start_tm, fin_tm, res_tm;
 
-        printf("Timing %d calls to ioctl(SG_GET_NUM_WAITING)\n", num_sgnw);
+        if (nw_given)
+            printf("Timing %d calls to ioctl(SG_GET_NUM_WAITING)\n",
+                   num_sgnw);
+        else
+            printf("Timing calls to ioctl(SG_SET_DEBUG, %d)\n",
+                   num_sgnw);
         if (0 != clock_gettime(CLOCK_MONOTONIC, &start_tm)) {
                 res = errno;
                 perror("start clock_gettime() failed:");
                 goto out;
         }
-        for (k = 0, sum_nw = 0; k < num_sgnw; ++k, sum_nw += nw) {
-            if (ioctl(sg_fd, SG_GET_NUM_WAITING, &nw) < 0) {
+        if (nw_given) {
+            for (k = 0, sum_nw = 0; k < num_sgnw; ++k, sum_nw += nw) {
+                if (ioctl(sg_fd, SG_GET_NUM_WAITING, &nw) < 0) {
+                    res = errno;
+                    fprintf(stderr, "%d: ioctl(SG_GET_NUM_WAITING) failed "
+                            "errno=%d\n", k, res);
+                    goto out;
+                }
+            }
+        } else {
+            int fd, pid;
+
+            k = num_sgnw + 1000;
+            if (0 == iterator_test)
+                k = -k;
+            if (second_fname) {
+                if ((sg_fd2 = open(second_fname, O_RDWR)) < 0) {
+                    snprintf(ebuff, EBUFF_SZ,
+                             "%s: error opening file: %s", __func__, second_fname);
+                    perror(ebuff);
+                    return 1;
+                }
+                printf("About to fork due to second filename\n");
+                pid = fork();
+                if (pid < 0) {
+                    perror("fork() failed");
+                    goto out;
+                } else if (0 == pid) {
+                    relative_cp = "child: ";
+                    is_parent = false;
+                    fd = sg_fd2;
+                } else {
+                    relative_cp = "parent: ";
+                    is_parent = true;
+                    childs_pid = pid;
+                    fd = sg_fd;
+                }
+            } else {
+                fd = sg_fd;
+                relative_cp = "";
+            }
+            if (ioctl(fd, SG_SET_DEBUG, &k) < 0) {
                 res = errno;
-                fprintf(stderr, "%d: ioctl(SG_GET_NUM_WAITING) failed "
-                        "errno=%d\n", k, res);
+                fprintf(stderr, "%s%d: ioctl(SG_SET_DEBUG) failed errno=%d\n",
+                        relative_cp, k, res);
                 goto out;
             }
         }
@@ -982,21 +1063,21 @@ main(int argc, char * argv[])
             res_tm.tv_nsec += 1000000000;
         }
         if (verbose) {
-            if (verbose > 1)
+            if (nw_given && (verbose > 1))
                 printf("sum of num_waiting_s=%d\n", sum_nw);
-            printf("elapsed time (nanosecond precision): %d.%09d secs\n",
-                   (int)res_tm.tv_sec, (int)res_tm.tv_nsec);
+            printf("%selapsed time (nanosecond precision): %d.%09d secs\n",
+                   relative_cp, (int)res_tm.tv_sec, (int)res_tm.tv_nsec);
         } else
-            printf("elapsed time: %d.%06d secs\n", (int)res_tm.tv_sec,
-                   (int)(res_tm.tv_nsec / 1000));
+            printf("%selapsed time: %d.%06d secs\n", relative_cp,
+                   (int)res_tm.tv_sec, (int)(res_tm.tv_nsec / 1000));
         if (num_sgnw >= 100) {
             double m = (double)res_tm.tv_sec +
                        ((double)res_tm.tv_nsec / 1000000000.0);
 
             if (m > 0.000001)
-                printf("Calls per second: %.2f\n", (double)num_sgnw / m);
+                printf("%sCalls per second: %.2f\n", relative_cp,
+                       (double)num_sgnw / m);
         }
-
         res = 0;
         goto out;
     }
@@ -1191,7 +1272,8 @@ main(int argc, char * argv[])
     }
 
 out:
-    close(sg_fd);
+    if (sg_fd >= 0)
+        close(sg_fd);
     if (sg_fd2 >= 0)
         close(sg_fd2);
     return res;

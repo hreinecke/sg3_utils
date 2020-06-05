@@ -97,9 +97,10 @@ bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
 	sg_raw$(EXEEXT) sg_rdac$(EXEEXT) sg_read_attr$(EXEEXT) \
 	sg_read_block_limits$(EXEEXT) sg_read_buffer$(EXEEXT) \
 	sg_read_long$(EXEEXT) sg_readcap$(EXEEXT) sg_reassign$(EXEEXT) \
-	sg_referrals$(EXEEXT) sg_rep_zones$(EXEEXT) \
-	sg_requests$(EXEEXT) sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) \
-	sg_rtpg$(EXEEXT) sg_safte$(EXEEXT) sg_sanitize$(EXEEXT) \
+	sg_referrals$(EXEEXT) sg_rep_pip$(EXEEXT) \
+	sg_rep_zones$(EXEEXT) sg_requests$(EXEEXT) \
+	sg_reset_wp$(EXEEXT) sg_rmsn$(EXEEXT) sg_rtpg$(EXEEXT) \
+	sg_safte$(EXEEXT) sg_sanitize$(EXEEXT) \
 	sg_sat_identify$(EXEEXT) sg_sat_phy_event$(EXEEXT) \
 	sg_sat_read_gplog$(EXEEXT) sg_sat_set_features$(EXEEXT) \
 	sg_seek$(EXEEXT) sg_senddiag$(EXEEXT) sg_ses$(EXEEXT) \
@@ -237,6 +238,9 @@ sg_reassign_DEPENDENCIES = ../lib/libsgutils2.la
 sg_referrals_SOURCES = sg_referrals.c
 sg_referrals_OBJECTS = sg_referrals.$(OBJEXT)
 sg_referrals_DEPENDENCIES = ../lib/libsgutils2.la
+sg_rep_pip_SOURCES = sg_rep_pip.c
+sg_rep_pip_OBJECTS = sg_rep_pip.$(OBJEXT)
+sg_rep_pip_DEPENDENCIES = ../lib/libsgutils2.la
 sg_rep_zones_SOURCES = sg_rep_zones.c
 sg_rep_zones_OBJECTS = sg_rep_zones.$(OBJEXT)
 sg_rep_zones_DEPENDENCIES = ../lib/libsgutils2.la
@@ -389,12 +393,12 @@ am__depfiles_remade = ./$(DEPDIR)/sg_bg_ctl.Po \
 	./$(DEPDIR)/sg_read_block_limits.Po \
 	./$(DEPDIR)/sg_read_buffer.Po ./$(DEPDIR)/sg_read_long.Po \
 	./$(DEPDIR)/sg_readcap.Po ./$(DEPDIR)/sg_reassign.Po \
-	./$(DEPDIR)/sg_referrals.Po ./$(DEPDIR)/sg_rep_zones.Po \
-	./$(DEPDIR)/sg_requests.Po ./$(DEPDIR)/sg_reset.Po \
-	./$(DEPDIR)/sg_reset_wp.Po ./$(DEPDIR)/sg_rmsn.Po \
-	./$(DEPDIR)/sg_rtpg.Po ./$(DEPDIR)/sg_safte.Po \
-	./$(DEPDIR)/sg_sanitize.Po ./$(DEPDIR)/sg_sat_identify.Po \
-	./$(DEPDIR)/sg_sat_phy_event.Po \
+	./$(DEPDIR)/sg_referrals.Po ./$(DEPDIR)/sg_rep_pip.Po \
+	./$(DEPDIR)/sg_rep_zones.Po ./$(DEPDIR)/sg_requests.Po \
+	./$(DEPDIR)/sg_reset.Po ./$(DEPDIR)/sg_reset_wp.Po \
+	./$(DEPDIR)/sg_rmsn.Po ./$(DEPDIR)/sg_rtpg.Po \
+	./$(DEPDIR)/sg_safte.Po ./$(DEPDIR)/sg_sanitize.Po \
+	./$(DEPDIR)/sg_sat_identify.Po ./$(DEPDIR)/sg_sat_phy_event.Po \
 	./$(DEPDIR)/sg_sat_read_gplog.Po \
 	./$(DEPDIR)/sg_sat_set_features.Po \
 	./$(DEPDIR)/sg_scan_linux.Po ./$(DEPDIR)/sg_scan_win32.Po \
@@ -437,14 +441,14 @@ SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_map26.c sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c \
 	sg_raw.c sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
 	sg_read_block_limits.c sg_read_buffer.c sg_read_long.c \
-	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_zones.c \
-	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
-	sg_safte.c sg_sanitize.c sg_sat_identify.c sg_sat_phy_event.c \
-	sg_sat_read_gplog.c sg_sat_set_features.c $(sg_scan_SOURCES) \
-	sg_seek.c sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c \
-	sg_stpg.c sg_stream_ctl.c sg_sync.c sg_test_rwbuf.c \
-	sg_timestamp.c sg_turs.c sg_unmap.c sg_verify.c \
-	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
+	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_pip.c \
+	sg_rep_zones.c sg_requests.c sg_reset.c sg_reset_wp.c \
+	sg_rmsn.c sg_rtpg.c sg_safte.c sg_sanitize.c sg_sat_identify.c \
+	sg_sat_phy_event.c sg_sat_read_gplog.c sg_sat_set_features.c \
+	$(sg_scan_SOURCES) sg_seek.c sg_senddiag.c sg_ses.c \
+	sg_ses_microcode.c sg_start.c sg_stpg.c sg_stream_ctl.c \
+	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
+	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
 	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
 	sg_xcopy.c sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
@@ -454,10 +458,10 @@ DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	sg_map26.c sg_modes.c sg_opcodes.c sg_persist.c sg_prevent.c \
 	sg_raw.c sg_rbuf.c sg_rdac.c sg_read.c sg_read_attr.c \
 	sg_read_block_limits.c sg_read_buffer.c sg_read_long.c \
-	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_zones.c \
-	sg_requests.c sg_reset.c sg_reset_wp.c sg_rmsn.c sg_rtpg.c \
-	sg_safte.c sg_sanitize.c sg_sat_identify.c sg_sat_phy_event.c \
-	sg_sat_read_gplog.c sg_sat_set_features.c \
+	sg_readcap.c sg_reassign.c sg_referrals.c sg_rep_pip.c \
+	sg_rep_zones.c sg_requests.c sg_reset.c sg_reset_wp.c \
+	sg_rmsn.c sg_rtpg.c sg_safte.c sg_sanitize.c sg_sat_identify.c \
+	sg_sat_phy_event.c sg_sat_read_gplog.c sg_sat_set_features.c \
 	$(am__sg_scan_SOURCES_DIST) sg_seek.c sg_senddiag.c sg_ses.c \
 	sg_ses_microcode.c sg_start.c sg_stpg.c sg_stream_ctl.c \
 	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
@@ -665,6 +669,7 @@ sg_read_long_LDADD = ../lib/libsgutils2.la
 sg_reassign_LDADD = ../lib/libsgutils2.la
 sg_requests_LDADD = ../lib/libsgutils2.la
 sg_referrals_LDADD = ../lib/libsgutils2.la
+sg_rep_pip_LDADD = ../lib/libsgutils2.la
 sg_rep_zones_LDADD = ../lib/libsgutils2.la
 sg_reset_wp_LDADD = ../lib/libsgutils2.la
 sg_rmsn_LDADD = ../lib/libsgutils2.la
@@ -908,6 +913,10 @@ sg_referrals$(EXEEXT): $(sg_referrals_OBJECTS) $(sg_referrals_DEPENDENCIES) $(EX
 	@rm -f sg_referrals$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_referrals_OBJECTS) $(sg_referrals_LDADD) $(LIBS)
 
+sg_rep_pip$(EXEEXT): $(sg_rep_pip_OBJECTS) $(sg_rep_pip_DEPENDENCIES) $(EXTRA_sg_rep_pip_DEPENDENCIES) 
+	@rm -f sg_rep_pip$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_rep_pip_OBJECTS) $(sg_rep_pip_LDADD) $(LIBS)
+
 sg_rep_zones$(EXEEXT): $(sg_rep_zones_OBJECTS) $(sg_rep_zones_DEPENDENCIES) $(EXTRA_sg_rep_zones_DEPENDENCIES) 
 	@rm -f sg_rep_zones$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_rep_zones_OBJECTS) $(sg_rep_zones_LDADD) $(LIBS)
@@ -1098,6 +1107,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_readcap.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_reassign.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_referrals.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rep_pip.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_rep_zones.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_requests.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_reset.Po@am__quote@ # am--include-marker
@@ -1331,6 +1341,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sg_readcap.Po
 	-rm -f ./$(DEPDIR)/sg_reassign.Po
 	-rm -f ./$(DEPDIR)/sg_referrals.Po
+	-rm -f ./$(DEPDIR)/sg_rep_pip.Po
 	-rm -f ./$(DEPDIR)/sg_rep_zones.Po
 	-rm -f ./$(DEPDIR)/sg_requests.Po
 	-rm -f ./$(DEPDIR)/sg_reset.Po
@@ -1448,6 +1459,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sg_readcap.Po
 	-rm -f ./$(DEPDIR)/sg_reassign.Po
 	-rm -f ./$(DEPDIR)/sg_referrals.Po
+	-rm -f ./$(DEPDIR)/sg_rep_pip.Po
 	-rm -f ./$(DEPDIR)/sg_rep_zones.Po
 	-rm -f ./$(DEPDIR)/sg_requests.Po
 	-rm -f ./$(DEPDIR)/sg_reset.Po

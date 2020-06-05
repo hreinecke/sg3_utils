@@ -1,4 +1,4 @@
-.TH SG_REP_ZONES "8" "February 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_REP_ZONES "8" "June 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES command
 .SH SYNOPSIS
@@ -68,12 +68,12 @@ prefixed with '0x' or has a trailing 'h' which indicate hexadecimal.
 increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.TP
+\fB\-w\fR, \fB\-\-wp\fR
 print the write pointer (in hex) only. In the absence of errors, then a hex
 LBA will be printed on each line, one line for each zone. Can be usefully
 combined with the \fI\-\-num=NUM\fR and \fI\-\-start=LBA\fR options.
-.TP
-\fB\-w\fR, \fB\-\-wp\fR
-print the version string and then exit.
 .SH EXIT STATUS
 The exit status of sg_rep_zones is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

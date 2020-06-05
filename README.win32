@@ -57,6 +57,7 @@ Here is a list of utilities that have been ported:
     sg_readcap
     sg_reassign
     sg_referrals
+    sg_rep_pip
     sg_rep_zones
     sg_requests
     sg_reset_wp
@@ -243,4 +244,4 @@ mode" with the setmode() Windows command.
 
 
 Douglas Gilbert
-9th September 2019
+6th June 2020

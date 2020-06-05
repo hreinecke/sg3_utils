@@ -1,4 +1,4 @@
-.TH SG_WRITE_SAME "8" "December 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_WRITE_SAME "8" "June 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_write_same \- send SCSI WRITE SAME command
 .SH SYNOPSIS
@@ -124,6 +124,10 @@ sets the NDOB bit in the WRITE SAME (16 and 32 byte) commands. NDOB stands
 for No Data\-Out Buffer. Default is to clear this bit. When this option
 is given then \fI\-\-in=IF\fR is not allowed and \fI\-\-xferlen=LEN\fR can
 only be given if \fILEN\fR is 0 .
+.br
+By default zeros are written in each block, but it is possible that
+the "provisioning initialization pattern" is written depending on other
+settings.
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the number of blocks, starting at \fILBA\fR, to write the
@@ -235,7 +239,11 @@ introduction in lk 2.6.28 .
 The exit status of sg_write_same is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
 .SH EXAMPLES
-One simple usage is to write blocks of zero from (and including) a given LBA:
+BEWARE: all these examples will overwrite the data on one or more blocks,
+potentially CLEARING the WHOLE DISK.
+.PP
+One simple usage is to write blocks of zero from (and including) a given LBA
+for 63 blocks:
 .PP
   sg_write_same \-\-lba=0x1234 \-\-num=63 /dev/sdc
 .PP
@@ -246,7 +254,24 @@ of bytes in a logical block.  Let us assume that is 512 bytes. Since
 of zeros (each block containing 512 bytes) will be written from (and
 including) LBA 0x1234 . Note that only one block of zeros is passed
 to the SCSI WRITE SAME command in the data\-out buffer (as required by
-SBC\-3).
+SBC\-3). Using the WRITE SAME SCSI command to write one or more blocks
+blocks of zeros is equivalent to the NVMe command: Write Zeroes.
+.br
+Now we will write zero blocks to the WHOLE disk. [Note sanitize type
+commands will also clear blocks and metdata that are not directly
+visible]:
+.PP
+  sg_write_same \-\-lba=0x0 \-\-num=0 /dev/sdc
+.PP
+Yes, in this context \-\-num=0 means the rest of the disk. The above
+invocation may give an error due to the WSNZ bit in the Block Limits VPD
+page being set. To get around that try:
+.PP
+  sg_write_same \-\-lba=0x0 \-\-ndob /dev/sdc
+.PP
+this invocation, if supported, has the added benefit of not sending a data
+out buffer of zeros. Notes that it is possible that the "provisioning
+initialization pattern" is written to each block instead of zeros.
 .PP
 A similar example follows but in this case the blocks
 are "unmapped" ("trimmed" in ATA speak) rather than zeroed:
@@ -322,9 +347,10 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2019 Douglas Gilbert
+Copyright \(co 2009\-2020 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_format,sg_get_lba_status,sg_readcap,sg_vpd,sg_unmap(sg3_utils)
+.B sg_format,sg_get_lba_status,sg_readcap,sg_vpd,sg_unmap,
+.B sg_write_x(sg3_utils)
