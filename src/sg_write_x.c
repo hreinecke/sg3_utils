@@ -156,7 +156,7 @@ struct opts_t {
     bool ndob;          /* "No Data-Out Buffer" from --same=NDOB */
     bool verbose_given;
     bool version_given;
-    int dld;            /* "Duration Limit Descrptor" bit mask; bit 0 -->
+    int dld;            /* "Duration Limit Descriptor" bit mask; bit 0 -->
                          * DLD0, bit 1 --> DLD1, bit 2 --> DLD2
                          * only WRITE(16) and WRITE SCATTERED(16) */
     int dry_run;        /* temporary write when used more than once */

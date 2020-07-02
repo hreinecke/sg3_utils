@@ -36,6 +36,8 @@
  * renamed [20181221]
  */
 
+static const char * version_str = "1.82 20200629";
+
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
@@ -66,6 +68,7 @@
 #include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
 #include <linux/fs.h>           /* for BLKSSZGET and friends */
 #include <sys/mman.h>           /* for mmap() system call */
+#include <sys/random.h>         /* for getrandom() system call */
 
 #include <vector>
 #include <array>
@@ -108,8 +111,6 @@
 
 using namespace std;
 
-static const char * version_str = "1.80 20200404";
-
 #ifdef __GNUC__
 #ifndef  __clang__
 #pragma GCC diagnostic ignored "-Wclobbered"
@@ -128,8 +129,6 @@ static const char * version_str = "1.80 20200404";
 #define DEF_BLOCKS_PER_2048TRANSFER 32
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
-
-#define URANDOM_DEV "/dev/urandom"
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
@@ -156,7 +155,9 @@ static const char * version_str = "1.80 20200404";
 #define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
 #define FT_ST 16                /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is a block device */
-#define FT_ERROR 64             /* couldn't "stat" file */
+#define FT_RANDOM_0_FF 64       /* iflag=00, iflag=ff and iflag=random
+                                   override if=IFILE */
+#define FT_ERROR 128            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -174,6 +175,7 @@ struct flags_t {
     bool dpo;
     bool dsync;
     bool excl;
+    bool ff;
     bool fua;
     bool masync;        /* more async sg v4 driver flag */
     bool mrq_immed;     /* mrq submit non-blocking */
@@ -185,12 +187,14 @@ struct flags_t {
     bool noxfer;
     bool qhead;
     bool qtail;
+    bool random;
     bool same_fds;
     bool swait;
     bool v3;
     bool v4;
     bool v4_given;
     bool wq_excl;
+    bool zero;
     int mmap;
 };
 
@@ -210,8 +214,6 @@ struct global_collection
     atomic<bool> in_stop;             /*  | */
     pthread_mutex_t in_mutex;         /* -/ */
     int nmrqs;                        /* Number of multi-reqs for sg v4 */
-    int inmrqs;                       /* if both imrq= and omrq= must be == */
-    int onmrqs;                       /* ... unless one is zero */
     int outfd;
     int64_t seek;
     int out_type;
@@ -304,6 +306,8 @@ typedef struct request_element
     int mrq_index;
     uint32_t in_mrq_q_blks;
     uint32_t out_mrq_q_blks;
+    long seed;
+    struct drand48_data drand;  /* opaque, used by srand48_r and mrand48_r */
     pthread_t mrq_abort_thread_id;
     Mrq_abort_info mai;
 } Rq_elem;
@@ -597,6 +601,11 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
+    if (SGV4_FLAG_ORDERED_SLV & flags) {      /* 0x80000 */
+        n += sg_scnpr(b + n, b_len - n, "OSLV|");
+        if (n >= b_len)
+            goto fini;
+    }
 fini:
     if (n < b_len) {    /* trim trailing '\' */
         if ('|' == b[n - 1])
@@ -635,24 +644,6 @@ v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
             h4p->info, h4p->din_resid, h4p->dout_resid, h4p->spare_out,
             h4p->duration);
     pthread_mutex_unlock(&strerr_mut);
-}
-
-static unsigned int
-get_urandom_uint(void)
-{
-    unsigned int res = 0;
-    int n;
-    uint8_t b[sizeof(unsigned int)];
-    lock_guard<mutex> lg(rand_lba_mutex);
-
-    int fd = open(URANDOM_DEV, O_RDONLY);
-    if (fd >= 0) {
-        n = read(fd, b, sizeof(unsigned int));
-        if (sizeof(unsigned int) == n)
-            memcpy(&res, b, sizeof(unsigned int));
-        close(fd);
-    }
-    return res;
 }
 
 static void
@@ -860,7 +851,7 @@ usage(int pg_num)
             "[coe=0|1]\n"
             "               [deb=VERB] [dio=0|1] [elemsz_kb=ESK] "
             "[fail_mask=FM]\n"
-            "               [fua=0|1|2|3] [mrq=[IO,]NRQS[,C]] [noshare=0|1] "
+            "               [fua=0|1|2|3] [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
             "[of2=OFILE2]\n"
             "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] [thr=THR] "
             "[time=0|1]\n"
@@ -934,7 +925,10 @@ page2:
             "                3->OFILE+IFILE\n"
             "    mrq         number of cmds placed in each sg call "
             "(def: 0);\n"
-            "                may have trailing ',C', to send bulk cdb_s\n"
+            "                may have trailing ',C', to send bulk cdb_s; "
+            "if preceded\n"
+            "                by 'I' then mrq only on IFILE, likewise 'O' "
+            "for OFILE\n"
             "    noshare     0->use request sharing(def), 1->don't\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
@@ -960,6 +954,8 @@ page3:
     pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
             "  where: 'iflag=<arg>' and 'oflag=<arg>' arguments are listed "
             "below:\n\n"
+            "    00          use all zeros instead of if=IFILE (only in "
+            "iflags)\n"
             "    append      append output to OFILE (assumes OFILE is "
             "regular file)\n"
             "    coe         continue of error (reading, fills with zeros)\n"
@@ -971,6 +967,8 @@ page3:
             "and WRITEs\n"
             "    dsync       sets the O_SYNC flag on open()\n"
             "    excl        sets the O_EXCL flag on open()\n"
+            "    ff          use all 0xff bytes instead of if=IFILE (only in "
+            "iflags)\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
             "    masync      set 'more async' flag on this sg device\n"
@@ -985,9 +983,12 @@ page3:
             "    nodur       turns off command duration calculations\n"
             "    no_waitq     when non-blocking (async) don't use wait "
             "queue\n"
+            "    noxfer      no transfer to/from the user space\n"
             "    qhead       queue new request at head of block queue\n"
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"
+            "    random      use random data instead of if=IFILE (only in "
+            "iflags)\n"
             "    same_fds    each thread use the same IFILE and OFILE(2) "
             "file\n"
             "                descriptors (def: each threads has own file "
@@ -1149,11 +1150,17 @@ mrq_abort_thread(void * v_maip)
 {
     int res, err;
     int n = 0;
-    int seed = get_urandom_uint();
+    int seed;
     unsigned int rn;
+    ssize_t ssz;
     Mrq_abort_info l_mai = *(Mrq_abort_info *)v_maip;
     struct sg_io_v4 ctl_v4;
 
+    ssz = getrandom(&rn, sizeof(rn), 0);
+    if (ssz < (ssize_t)sizeof(rn))
+        pr2serr_lk("%s: getrandom() failed, returned %d\n", __func__,
+                   (int)ssz);
+    seed = rn;
     if (l_mai.debug)
         pr2serr_lk("%s: from_id=%d: to abort mrq_pack_id=%d\n", __func__,
                    l_mai.from_tid, l_mai.mrq_id);
@@ -1393,6 +1400,17 @@ read_write_thread(void * v_tip)
     else if (out_is_sg)
         rep->only_out_sg = true;
 
+    if (clp->in_flags.random) {
+        ssize_t ssz;
+
+        ssz = getrandom(&rep->seed, sizeof(rep->seed), 0);
+        if (ssz < (ssize_t)sizeof(rep->seed))
+            pr2serr_lk("thread=%d: getrandom() failed, ret=%d\n", rep->id,
+                       (int)ssz);
+        if (vb > 1)
+            pr2serr_lk("thread=%d: seed=%ld\n", rep->id, rep->seed);
+        srand48_r(rep->seed, &rep->drand);
+    }
     if (clp->in_flags.same_fds || clp->out_flags.same_fds) {
         /* we are sharing a single pair of fd_s across all threads */
         if (clp->out_flags.swait && (! swait_reported)) {
@@ -1532,6 +1550,8 @@ read_write_thread(void * v_tip)
         if (0 != status) err_exit(status, "lock out_mutex");
 
         /* Make sure the OFILE (+ OFREG) are in same sequence as IFILE */
+        if (clp->in_flags.random)
+            goto skip_force_out_sequence;
         if ((rep->outregfd < 0) && in_is_sg && out_is_sg)
             goto skip_force_out_sequence;
         if (share_and_ofreg || (FT_DEV_NULL != clp->out_type)) {
@@ -1693,6 +1713,8 @@ fini:
     return stop_after_write ? NULL : clp;
 }
 
+/* N.B. A return of true means it wants to stop the copy. So false is the
+ * 'good' reply (i.e. keep going). */
 static bool
 normal_in_rd(Rq_elem * rep, int blocks)
 {
@@ -1705,6 +1727,28 @@ normal_in_rd(Rq_elem * rep, int blocks)
     if (clp->debug > 4)
         pr2serr_lk("%s: tid=%d: iblk=%" PRIu64 ", blocks=%d\n", __func__,
                    rep->id, rep->iblk, blocks);
+    if (FT_RANDOM_0_FF == clp->in_type) {
+        int k, j;
+        const int jbump = sizeof(uint32_t);
+        long rn;
+        uint8_t * bp;
+
+        if (clp->in_flags.zero)
+            memset(rep->buffp, 0, blocks * clp->bs);
+        else if (clp->in_flags.ff)
+            memset(rep->buffp, 0xff, blocks * clp->bs);
+        else {
+            for (k = 0, bp = rep->buffp; k < blocks; ++k, bp += clp->bs) {
+                for (j = 0; j < clp->bs; j += jbump) {
+                    /* mrand48 takes uniformly from [-2^31, 2^31) */
+                    mrand48_r(&rep->drand, &rn);
+                    *((uint32_t *)(bp + j)) = (uint32_t)rn;
+                }
+            }
+        }
+        clp->in_rem_count -= blocks;
+        return stop_after_write;
+    }
     if (! same_fds) {   /* each has own file pointer, so we need to move it */
         int64_t pos = rep->iblk * clp->bs;
 
@@ -1766,7 +1810,7 @@ normal_out_wr(Rq_elem * rep, int blocks)
     if (clp->debug > 4)
         pr2serr_lk("%s: tid=%d: oblk=%" PRIu64 ", blocks=%d\n", __func__,
                    rep->id, rep->oblk, blocks);
-    while (((res = write(clp->outfd, rep->buffp, rep->num_blks * clp->bs))
+    while (((res = write(clp->outfd, rep->buffp, blocks * clp->bs))
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
@@ -2501,7 +2545,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     struct sg_io_v4 ctl_v4;
     uint8_t * cmd_ap = NULL;
     struct global_collection * clp = rep->clp;
-    const char * iosub_str;
+    const char * iosub_str = "svb ?";
     char b[80];
 
     id = rep->id;
@@ -3563,7 +3607,9 @@ process_flags(const char * arg, struct flags_t * fp)
         np = strchr(cp, ',');
         if (np)
             *np++ = '\0';
-        if (0 == strcmp(cp, "append"))
+        if (0 == strcmp(cp, "00"))
+            fp->zero = true;
+        else if (0 == strcmp(cp, "append"))
             fp->append = true;
         else if (0 == strcmp(cp, "coe"))
             fp->coe = true;
@@ -3579,6 +3625,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->dsync = true;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = true;
+        else if (0 == strcmp(cp, "ff"))
+            fp->ff = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
         else if (0 == strcmp(cp, "masync"))
@@ -3617,6 +3665,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->qhead = true;
         else if (0 == strcmp(cp, "qtail"))
             fp->qtail = true;
+        else if (0 == strcmp(cp, "random"))
+            fp->random = true;
         else if (0 == strcmp(cp, "same_fds"))
             fp->same_fds = true;
         else if (0 == strcmp(cp, "swait"))
@@ -4116,6 +4166,8 @@ main(int argc, char * argv[])
     int64_t out_num_sect = 0;
     int in_sect_sz, out_sect_sz, status, flags;
     void * vp;
+    const char * ccp = NULL;
+    const char * cc2p;
     struct global_collection * clp = &gcoll;
     Thread_info thread_arr[MAX_NUM_THREADS];
     char ebuff[EBUFF_SZ];
@@ -4166,7 +4218,25 @@ main(int argc, char * argv[])
 
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
-    if (inf[0] && ('-' != inf[0])) {
+    if (clp->in_flags.ff) {
+        ccp = "<0xff bytes>";
+        cc2p = "ff";
+    } else if (clp->in_flags.random) {
+        ccp = "<random>";
+        cc2p = "random";
+    } else if (clp->in_flags.zero) {
+        ccp = "<zero bytes>";
+        cc2p = "00";
+    }
+    if (ccp) {
+        if (inf[0]) {
+            pr2serr("%siflag=%s and if=%s contradict\n", my_name, cc2p, inf);
+            return SG_LIB_CONTRADICT;
+        }
+        clp->in_type = FT_RANDOM_0_FF;
+        clp->infp = ccp;
+        clp->infd = -1;
+    } else if (inf[0] && ('-' != inf[0])) {
         clp->in_type = dd_filetype(inf);
 
         if (FT_ERROR == clp->in_type) {

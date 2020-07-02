@@ -246,7 +246,7 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, bool dpo, int bytchk,
     return ret;
 }
 
-/* Returns file descriptor ( >= 0) if successfule. Else a negated sg3_utils
+/* Returns file descriptor ( >= 0) if successful. Else a negated sg3_utils
  * error code is returned. */
 static int
 open_if(const char * fn, int got_stdin)

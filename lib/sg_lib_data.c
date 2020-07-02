@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.74 20200423";
+const char * sg_lib_version_str = "2.75 20200624";
 /* spc6r01, sbc4r20a, zbc2r04 */
 
 
@@ -635,7 +635,7 @@ struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20191014 */
+ * The following should match asc-num.txt dated 20200624 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -1087,6 +1087,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x3B,0x1a,"Data transfer device removed"},
     {0x3B,0x1b,"Data transfer device inserted"},
     {0x3B,0x1c,"Too many logical objects on partition to support operation"},
+    {0x3B,0x20,"Element static information changed"},
     {0x3D,0x00,"Invalid bits in identify message"},
     {0x3E,0x00,"Logical unit has not self-configured yet"},
     {0x3E,0x01,"Logical unit failure"},

@@ -101,7 +101,7 @@ static const char * version_str = "6.15 20200429";
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs == 60 seconds */
 
 #ifndef RAW_MAJOR
-#define RAW_MAJOR 255   /*unlikey value */
+#define RAW_MAJOR 255   /*unlikely value */
 #endif
 
 #define SG_LIB_FLOCK_ERR 90

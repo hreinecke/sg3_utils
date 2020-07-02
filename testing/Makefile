@@ -6,7 +6,8 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 
 EXECS = sg_iovec_tst sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc \
 	sg_tst_nvme sg_tst_ioctl sg_tst_bidi tst_sg_lib sgs_dd sg_tst_excl \
-	sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async sgh_dd
+	sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async sgh_dd \
+	sg_mrq_dd
 	
 EXTRAS =
 
@@ -106,6 +107,9 @@ sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
 
 sgh_dd: sgh_dd.o $(LIBFILESNEW)
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
+
+sg_mrq_dd: sg_mrq_dd.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
 
 

@@ -127,6 +127,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
 #define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* n sg_io_v4s in data-in */
 #define SGV4_FLAG_EVENTFD 0x40000	/* signal completion on ... */
+#define SGV4_FLAG_ORDERED_SLV 0x80000	/* svb: issue in-order writes */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1

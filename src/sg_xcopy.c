@@ -97,7 +97,7 @@ static const char * version_str = "0.71 20200510";
 #endif
 
 #ifndef RAW_MAJOR
-#define RAW_MAJOR 255   /*unlikey value */
+#define RAW_MAJOR 255   /*unlikely value */
 #endif
 
 #define SG_LIB_FLOCK_ERR 90

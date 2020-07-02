@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.46 [20200604] [svn: r852]
+Changelog for sg3_utils-1.46 [20200701] [svn: r853]
   - sg_rep_pip: report new provisioning initialization pattern cmd
   - sg_dd: separate category for miscompare errors
   - sg_get_elem_status: add ralwd bit sbc4r20a
@@ -16,6 +16,8 @@ Changelog for sg3_utils-1.46 [20200604] [svn: r852]
     - add dummy start stop unit and test unit ready commands
     - wire cache mpage's WCE to nvme 'volatile write cache'
   - sg_lib: reprint cdb with illegal request sense key
+    - asc/ascq match asc-num.txt @t10 20200624
+  - testing/sg_mrq_testing: new, for blocking mrq usage
   - testing/sgs_dd: add evfd flags and eventfd processing
   - testing/sgh_dd: various fixes
 

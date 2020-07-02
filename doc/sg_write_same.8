@@ -257,9 +257,8 @@ to the SCSI WRITE SAME command in the data\-out buffer (as required by
 SBC\-3). Using the WRITE SAME SCSI command to write one or more blocks
 blocks of zeros is equivalent to the NVMe command: Write Zeroes.
 .br
-Now we will write zero blocks to the WHOLE disk. [Note sanitize type
-commands will also clear blocks and metdata that are not directly
-visible]:
+Now we will write zero blocks to the WHOLE disk. [Note sanitize type commands
+will also clear blocks and metadata that are not directly visible]:
 .PP
   sg_write_same \-\-lba=0x0 \-\-num=0 /dev/sdc
 .PP
