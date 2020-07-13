@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.01 20200701";
+static const char * version_str = "1.02 20200709";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -348,14 +348,10 @@ struct global_collection        /* one instance visible to all threads */
     int mrq_num;                      /* Number of multi-reqs for sg v4 */
     int outfd;
     int out_type;
-    int out2fd;
-    int out2_type;
-    off_t out2_st_size;               /* Only for FT_OTHER (regular) file */
     int cdbsz_out;
     struct flags_t out_flags;
     atomic<int64_t> out_rem_count;    /*  | count of remaining out blocks */
     atomic<int> out_partial;          /*  | */
-    // pthread_mutex_t out2_mutex;
     off_t out_st_size;                /* Only for FT_OTHER (regular) file */
     condition_variable infant_cv;     /* after thread:0 does first segment */
     mutex infant_mut;
@@ -367,20 +363,18 @@ struct global_collection        /* one instance visible to all threads */
     off_t outreg_st_size;
     atomic<int> dio_incomplete_count;
     atomic<int> sum_of_resids;
-    int verbose;          /* both -v and deb=VERB bump this field */
+    int verbose;
     int dry_run;
     bool cdbsz_given;
     bool count_given;
     bool flexible;
     bool ofile_given;
-    bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
     bool verify;                /* don't copy, verify like Unix: cmp */
     bool prefetch;              /* for verify: do PF(b),RD(a),V(b)_a_data */
     const char * infp;
     const char * outfp;
-    const char * out2fp;
     class scat_gath_list i_sgl;
     class scat_gath_list o_sgl;
 };
@@ -397,7 +391,6 @@ typedef struct request_element
     int id;
     int infd;
     int outfd;
-    int out2fd;
     int outregfd;
     uint8_t * buffp;
     uint8_t * alloc_bp;
@@ -429,7 +422,6 @@ typedef struct request_element
 
 /* Additional parameters for sg_start_io() and sg_finish_io() */
 struct sg_io_extra {
-    bool is_wr2;
     bool prefetch;
     bool dout_is_split;
     int hpv4_ind;
@@ -464,7 +456,9 @@ static atomic<long int> pos_index(0);
 static atomic<int> num_ebusy(0);
 static atomic<int> num_start_eagain(0);
 static atomic<int> num_fin_eagain(0);
+#if 0
 static atomic<long> num_waiting_calls(0);
+#endif
 
 static sigset_t signal_set;
 
@@ -703,8 +697,57 @@ fini:
     return b;
 }
 
+/* Info field decoded into abbreviations for those bits that are set,
+ * separated by '|' . */
+static char *
+sg_info_str(int info, int b_len, char * b)
+{
+    int n = 0;
+
+    if ((b_len < 1) || (! b))
+        return b;
+    b[0] = '\0';
+    if (SG_INFO_CHECK & info) {               /* 0x1 */
+        n += sg_scnpr(b + n, b_len - n, "CHK|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_DIRECT_IO & info) {           /* 0x2 */
+        n += sg_scnpr(b + n, b_len - n, "DIO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_MIXED_IO & info) {            /* 0x4 */
+        n += sg_scnpr(b + n, b_len - n, "MIO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_DEVICE_DETACHING & info) {    /* 0x8 */
+        n += sg_scnpr(b + n, b_len - n, "DETA|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_ABORTED & info) {             /* 0x10 */
+        n += sg_scnpr(b + n, b_len - n, "ABRT|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_MRQ_FINI & info) {            /* 0x20 */
+        n += sg_scnpr(b + n, b_len - n, "MRQF|");
+        if (n >= b_len)
+            goto fini;
+    }
+fini:
+    if (n < b_len) {    /* trim trailing '\' */
+        if ('|' == b[n - 1])
+            b[n - 1] = '\0';
+    } else if ('|' == b[b_len - 1])
+        b[b_len - 1] = '\0';
+    return b;
+}
+
 static void
-v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
+v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id, bool chk_info)
 {
     lock_guard<mutex> lk(strerr_mut);
     char b[80];
@@ -723,7 +766,7 @@ v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
     pr2serr("  flags=0x%x  request_extra{pack_id}=%d\n",
             h4p->flags, h4p->request_extra);
     pr2serr("  flags set: %s\n", sg_flags_str(h4p->flags, sizeof(b), b));
-    pr2serr(" OUT:\n");
+    pr2serr(" %s OUT:\n", leadin);
     pr2serr("  response_len=%d driver/transport/device_status="
             "0x%x/0x%x/0x%x\n", h4p->response_len, h4p->driver_status,
             h4p->transport_status, h4p->device_status);
@@ -731,6 +774,8 @@ v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
             "dur=%u\n",
             h4p->info, h4p->din_resid, h4p->dout_resid, h4p->spare_out,
             h4p->duration);
+    if (chk_info && (SG_INFO_CHECK & h4p->info))
+        pr2serr("  >>>> info: %s\n", sg_info_str(h4p->info, sizeof(b), b));
 }
 
 static void
@@ -757,6 +802,8 @@ fetch_sg_version(void)
                 have_sg_version = !!sg_version;
             }
         }
+	if (NULL == fp)
+		pr2serr("The sg driver may not be loaded\n");
     }
     if (fp)
         fclose(fp);
@@ -855,7 +902,7 @@ install_handler(int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-#if 0	/* SG_LIB_ANDROID */
+#if 0   /* SG_LIB_ANDROID */
 static void
 thread_exit_handler(int sig)
 {
@@ -930,16 +977,13 @@ usage(int pg_num)
             "                  [obs=BS] [of=OFILE] [oflag=FLAGS] "
             "[seek=SEEK]\n"
             "                  [skip=SKIP] [--help] [--version]\n\n");
-    pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] "
-            "[coe=0|1]\n"
-            "                  [deb=VERB] [dio=0|1]\n"
-            "                  [fua=0|1|2|3] [mrq=MRQ[,C]] "
-            "[of2=OFILE2]\n"
-            "                  [ofreg=OFREG] [sync=0|1] [thr=THR] "
+    pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
+            "[fua=0|1|2|3]\n"
+            "                  [mrq=MRQ] [ofreg=OFREG] [sync=0|1] [thr=THR] "
             "[time=0|1]\n"
-            "                  [verbose=VERB] [--dry-run] "
-            "\n"
-            "                  [--verbose] [--verify] [--version]\n\n"
+            "                  [verbose=VERB] [--dry-run] [--verbose] "
+            "[--verify]\n"
+            "                  [--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -950,14 +994,11 @@ usage(int pg_num)
             "                dsync,excl,fua,masync,mmap,nodur,\n"
             "                null,order,qtail,serial,wq_excl]\n"
             "    mrq         number of cmds placed in each sg call "
-            "(def: 16);\n"
-            "                may have trailing ',C', to send bulk cdb_s\n"
+            "(def: 16)\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
             "uses /dev/null\n"
-            "    of2         second file or device to write to (def: "
-            "/dev/null)\n"
             "    oflag       comma separated list from: [append,<<list from "
             "iflag>>]\n"
             "    seek        block position to start writing to OFILE\n"
@@ -968,12 +1009,13 @@ usage(int pg_num)
             "copy]\n"
             "    --version|-V   output version string then exit\n\n"
             "Copy IFILE to OFILE, similar to dd command. This utility is "
-            "specialized for\nSCSI devices and uses multiple POSIX threads. "
-            "It expects one or both IFILE\nand OFILE to be sg devices. With "
-            "--verify option does a verify/compare\noperation instead of a "
-            "copy. This utility is Linux specific and uses the\nv4 sg "
-            "driver 'share' capability if available. Use '-hh', '-hhh' or "
-            "'-hhhh'\nfor more information.\n"
+            "specialized for\nSCSI devices and uses the 'multiple requests' "
+            "(mrq) in a single invocation\nfacility in version 4 of the sg "
+            "driver. Usually one or both IFILE and\nOFILE will be sg "
+            "devices. With the --verify option it does a\n"
+            "verify/compare operation instead of a copy. This utility is "
+            "Linux\n specific. Use '-hh', '-hhh' or '-hhhh' for more "
+            "information.\n"
            );
     return;
 page2:
@@ -986,10 +1028,6 @@ page2:
             "    bpt         is blocks_per_transfer (default is 128)\n"
             "    cdbsz       size of SCSI READ, WRITE or VERIFY cdb_s "
             "(default is 10)\n"
-            "    coe         continue on error, 0->exit (def), "
-            "1->zero + continue\n"
-            "    deb         for debug, 0->none (def), > 0->varying degrees "
-            "of debug\n"
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
@@ -1003,7 +1041,7 @@ page2:
             "max 1024\n"
             "    time        0->no timing, 1->calc throughput(def), "
             "2->nanosec precision\n"
-            "    verbose     same as 'deb=VERB': increase verbosity\n"
+            "    verbose     increase verbosity (def: VERB=0)\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
             "Use '-hhh' or '-hhhh' for more information about flags.\n"
@@ -1045,8 +1083,8 @@ page3:
             "    wq_excl     set SG_CTL_FLAGM_EXCL_WAITQ on this sg fd\n"
             "\n"
             "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
-            "OFILE are sg\ndevices 'shared' mode is selected. of2=OFILE2 "
-            "uses 'oflag=FLAGS'. When sharing, the data stays in a\nsingle "
+            "OFILE are sg\ndevices 'shared' mode is selected. "
+            "When sharing, the data stays in a\nsingle "
             "in-kernel buffer which is copied (or mmap-ed) to the user "
             "space\nif the 'ofreg=OFREG' is given. Use '-hhhh' for more "
             "information.\n"
@@ -2124,24 +2162,6 @@ global_collection::get_next(int desired_num_blks)
     return make_pair(expected, desired - expected);
 }
 
-#if 0
-/* Returns the number of times either 'ch1' or 'ch2' is found in
- * string 's' given the string's length. */
-static int
-num_either_ch_in_str(const char * s, int slen, int ch1, int ch2)
-{
-    int k;
-    int res = 0;
-
-    while (--slen >= 0) {
-        k = s[slen];
-        if ((ch1 == k) || (ch2 == k))
-            ++res;
-    }
-    return res;
-}
-#endif
-
 /* Return of 0 -> success, see sg_ll_read_capacity*() otherwise */
 static int
 scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
@@ -2287,7 +2307,6 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
     bool own_infd = false;
     bool in_is_sg, in_mmap, out_is_sg, out_mmap;
     bool own_outfd = false;
-    bool own_out2fd = false;
     bool only_one_sg = false;
     // bool share_and_ofreg;
     class scat_gath_iter i_sg_it(clp->i_sgl);
@@ -2326,7 +2345,6 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
     }
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
-    rep->out2fd = clp->out2fd;
     rep->outregfd = clp->outregfd;
     rep->rep_count = 0;
     rep->in_follow_on = -1;
@@ -2377,25 +2395,11 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
         if (vb > 2)
             pr2serr_lk("[%d]: opened local sg OFILE\n", id);
     }
-    if ((FT_SG == clp->out2_type) && clp->out2fp) {
-        fd = sg_out_open(clp, clp->out2fp,
-                         (out_mmap ? &rep->buffp : NULL),
-                         (out_mmap ? &rep->mmap_len : NULL));
-        if (fd < 0)
-            goto fini;
-        rep->out2fd = fd;
-        own_out2fd = true;
-        if (vb > 2)
-            pr2serr_lk("[%d]: opened local sg OFILE2\n", id);
-    }
     if (vb > 2) {
         if (in_is_sg && (! own_infd))
             pr2serr_lk("[%d]: using global sg IFILE, fd=%d\n", id, rep->infd);
         if (out_is_sg && (! own_outfd))
             pr2serr_lk("[%d]: using global sg OFILE, fd=%d\n", id, rep->outfd);
-        if ((FT_SG == clp->out2_type) && (! own_out2fd))
-            pr2serr_lk("[%d]: using global sg OFILE2, fd=%d\n", id,
-                       rep->out2fd);
     }
     if (rep->both_sg)
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, id, vb > 9);
@@ -2501,7 +2505,9 @@ fini:
 
     if (own_infd && (rep->infd >= 0)) {
         if (vb && in_is_sg) {
+#if 0
             ++num_waiting_calls;
+#endif
             if (ioctl(rep->infd, SG_GET_NUM_WAITING, &n) >= 0) {
                 if (n > 0)
                     pr2serr_lk("%s: tid=%d: num_waiting=%d prior close(in)\n",
@@ -2516,7 +2522,9 @@ fini:
     }
     if (own_outfd && (rep->outfd >= 0)) {
         if (vb && out_is_sg) {
+#if 0
             ++num_waiting_calls;
+#endif
             if (ioctl(rep->outfd, SG_GET_NUM_WAITING, &n) >= 0) {
                 if (n > 0)
                     pr2serr_lk("%s: tid=%d: num_waiting=%d prior "
@@ -2529,8 +2537,6 @@ fini:
         }
         close(rep->outfd);
     }
-    if (own_out2fd && (rep->out2fd >= 0))
-        close(rep->out2fd);
     /* pass stats back to master */
     clp->in_rem_count -= rep->in_local_count;
     clp->out_rem_count -= rep->out_local_count;
@@ -2785,176 +2791,139 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
     return 0;
 }
 
-#if 0
-
-static bool
-sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
-{
-    bool not_first = false;
-    int err = 0;
-    int k;
-    int master_fd = rep->infd;  /* in (READ) side is master */
-    struct global_collection * clp = rep->clp;
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip = &sei;
-
-    if (rep->clp->verbose > 2)
-        pr2serr_lk("%s: tid=%d: to_fd=%d, before=%d\n", __func__, rep->id,
-                   to_fd, (int)before);
-    memset(seip, 0, sizeof(*seip));
-    seip->sei_wr_mask |= SG_SEIM_CHG_SHARE_FD;
-    seip->sei_rd_mask |= SG_SEIM_CHG_SHARE_FD;
-    seip->share_fd = to_fd;
-    if (before) {
-        /* clear MASTER_FINI bit to put master in SG_RQ_SHR_SWAP state */
-        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-        seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MASTER_FINI;
-        seip->ctl_flags &= SG_CTL_FLAGM_MASTER_FINI;/* would be 0 anyway */
-    }
-    for (k = 0; (ioctl(master_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
-                 (EBUSY == errno); ++k) {
-        err = errno;
-        if (k > 10000)
-            break;
-        if (! not_first) {
-            if (clp->verbose > 3)
-                pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
-                           "failed errno=%d %s\n", rep->id, master_fd, err,
-                           strerror(err));
-            not_first = true;
-        }
-        err = 0;
-        std::this_thread::yield();/* another thread may be able to progress */
-    }
-    if (err) {
-        pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), failed "
-                   "errno=%d %s\n", rep->id, master_fd, err, strerror(err));
-        return false;
-    }
-    if (clp->verbose > 15)
-        pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(change_shared_fd)) ok, "
-                   "master_fd=%d, to_slave_fd=%d\n", __func__, rep->id,
-                   master_fd, to_fd);
-    return true;
-}
-
-#endif
-
 static int
 process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                      const struct sg_io_v4 * a_v4p, int num_mrq,
-                     uint32_t & good_inblks, uint32_t & good_outblks)
+                     uint32_t & good_inblks, uint32_t & good_outblks,
+                     bool & last_err_on_in)
 {
     struct global_collection * clp = rep->clp;
-    bool ok;
+    bool ok, all_good;
+    bool sb_in_co = !!(ctl_v4p->response);
     int id = rep->id;
     int resid = ctl_v4p->din_resid;
     int sres = ctl_v4p->spare_out;
     int n_subm = num_mrq - ctl_v4p->dout_resid;
     int n_cmpl = ctl_v4p->info;
     int n_good = 0;
+    int hole_count = 0;
     int vb = clp->verbose;
-    int k, slen, sstatus;
-    const struct sg_io_v4 * a_np = a_v4p;
+    int k, j, f1, slen, sstatus, blen;
+    char b[80];
 
+    blen = sizeof(b);
     good_inblks = 0;
     good_outblks = 0;
+    if (vb > 2)
+        pr2serr_lk("[thread_id=%d] %s: num_mrq=%d, n_subm=%d, n_cmpl=%d\n",
+                   id, __func__, num_mrq, n_subm, n_cmpl);
     if (n_subm < 0) {
-        pr2serr_lk("[%d] %s: co.dout_resid(%d) > num_mrq(%d)\n", id, __func__,
+        pr2serr_lk("[%d] co.dout_resid(%d) > num_mrq(%d)\n", id,
                    ctl_v4p->dout_resid, num_mrq);
         return -1;
     }
     if (n_cmpl != (num_mrq - resid))
-        pr2serr_lk("[%d] %s: co.info(%d) != (num_mrq(%d) - co.din_resid(%d))\n"
-                   "will use co.info\n", id, __func__, n_cmpl, num_mrq, resid);
+        pr2serr_lk("[%d] co.info(%d) != (num_mrq(%d) - co.din_resid(%d))\n"
+                   "will use co.info\n", id, n_cmpl, num_mrq, resid);
     if (n_cmpl > n_subm) {
-        pr2serr_lk("[%d] %s: n_cmpl(%d) > n_subm(%d), use n_subm for both\n",
-                   id, __func__, n_cmpl, n_subm);
+        pr2serr_lk("[%d] n_cmpl(%d) > n_subm(%d), use n_subm for both\n",
+                   id, n_cmpl, n_subm);
         n_cmpl = n_subm;
     }
     if (sres) {
-        pr2serr_lk("[%d] %s: secondary error: %s [%d], info=0x%x\n", id,
-                   __func__, strerror(sres), sres, ctl_v4p->info);
+        pr2serr_lk("[%d] secondary error: %s [%d], info=0x%x\n", id,
+                   strerror(sres), sres, ctl_v4p->info);
         if (E2BIG == sres) {
             sg_take_snap(rep->infd, id, true);
             sg_take_snap(rep->outfd, id, true);
         }
     }
-    /* Check if those submitted have finished or not */
-    for (k = 0; k < n_subm; ++k, ++a_np) {
-        slen = a_np->response_len;
-        if (! (SG_INFO_MRQ_FINI & a_np->info)) {
-            pr2serr_lk("[%d] %s, a_n[%d]: missing SG_INFO_MRQ_FINI ? ?\n",
-                       id, __func__, k);
-            v4hdr_out_lk("a_np", a_np, id);
-            v4hdr_out_lk("cop", ctl_v4p, id);
-        }
+    /* Check if those submitted have finished or not. N.B. If there has been
+     * an error then there may be "holes" (i.e. info=0x0) in the array due
+     * to completions being out-of-order. */
+    for (k = 0, j = 0; ((k < num_mrq) && (j < n_subm));
+         ++k, j += f1, ++a_v4p) {
+        slen = a_v4p->response_len;
+        if (! (SG_INFO_MRQ_FINI & a_v4p->info))
+            ++hole_count;
         ok = true;
-        sstatus = a_np->device_status;
-        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
-            a_np->transport_status || a_np->driver_status) {
+        f1 = !!(a_v4p->info);   /* want to skip n_subm count if info is 0x0 */
+        if (SG_INFO_CHECK & a_v4p->info) {
             ok = false;
-            if (SAM_STAT_CHECK_CONDITION != a_np->device_status) {
-                pr2serr_lk("[%d] %s, a_n[%d]:\n", id, __func__, k);
+            pr2serr_lk("[%d] a_v4[%d]: SG_INFO_CHECK set [%s]\n", id, k,
+                       sg_info_str(a_v4p->info, sizeof(b), b));
+        }
+        sstatus = a_v4p->device_status;
+        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
+            a_v4p->transport_status || a_v4p->driver_status) {
+            ok = false;
+            last_err_on_in = ! (a_v4p->flags & SGV4_FLAG_DO_ON_OTHER);
+            if (SAM_STAT_CHECK_CONDITION != a_v4p->device_status) {
+                pr2serr_lk("[%d] a_v4[%d]:\n", id, k);
                 if (vb)
-                    lk_chk_n_print4("  >>", a_np, false);
+                    lk_chk_n_print4("  >>", a_v4p, vb > 4);
             }
         }
         if (slen > 0) {
             struct sg_scsi_sense_hdr ssh;
-            const uint8_t *sbp = (const uint8_t *)a_np->response;
+            const uint8_t *sbp = (const uint8_t *)
+                        (sb_in_co ? ctl_v4p->response : a_v4p->response);
 
             if (sg_scsi_normalize_sense(sbp, slen, &ssh) &&
                 (ssh.response_code >= 0x70)) {
                 char b[256];
 
-                if (ssh.response_code & 0x1)
+                if (ssh.response_code & 0x1) {
                     ok = true;
+                    last_err_on_in = false;
+                }
                 if (vb) {
-                    sg_get_sense_str("  ", sbp, slen, false, sizeof(b), b);
-                    pr2serr_lk("[%d] %s, a_n[%d]:\n%s\n", id, __func__, k, b);
+                    sg_get_sense_str("  ", sbp, slen, false, blen, b);
+                    pr2serr_lk("[%d] a_v4[%d]:\n%s\n", id, k, b);
                 }
             }
         }
-        if (ok) {
+        if (ok && f1) {
             ++n_good;
-            if (a_np->dout_xfer_len >= (uint32_t)clp->bs) {
-                if (a_np->dout_resid)
-                    good_outblks += (a_np->dout_xfer_len - a_np->dout_resid) /
-                                    clp->bs;
+            if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs) {
+                if (a_v4p->dout_resid)
+                    good_outblks +=
+                         (a_v4p->dout_xfer_len - a_v4p->dout_resid) / clp->bs;
                 else    /* avoid division in common case of resid==0 */
-                    good_outblks += (uint32_t)a_np->usr_ptr;
+                    good_outblks += (uint32_t)a_v4p->usr_ptr;
             }
-            if (a_np->din_xfer_len >= (uint32_t)clp->bs) {
-                if (a_np->din_resid)
-                    good_inblks += (a_np->din_xfer_len - a_np->din_resid) /
+            if (a_v4p->din_xfer_len >= (uint32_t)clp->bs) {
+                if (a_v4p->din_resid)
+                    good_inblks += (a_v4p->din_xfer_len - a_v4p->din_resid) /
                                    clp->bs;
                 else
-                    good_inblks += (uint32_t)a_np->usr_ptr;
+                    good_inblks += (uint32_t)a_v4p->usr_ptr;
             }
         }
-    }
+    }   /* end of request array scan loop */
     if ((n_subm == num_mrq) || (vb < 3))
         goto fini;
-    pr2serr_lk("[%d] %s: checking response array beyond number of "
-               "submissions:\n", id, __func__);
-    for (k = n_subm; k < num_mrq; ++k, ++a_np) {
-        if (SG_INFO_MRQ_FINI & a_np->info)
-            pr2serr_lk("[%d] %s, a_n[%d]: unexpected SG_INFO_MRQ_FINI set\n",
-                       id, __func__, k);
-        if (a_np->device_status || a_np->transport_status ||
-            a_np->driver_status) {
-            pr2serr_lk("[%d] %s, a_n[%d]:\n", id, __func__, k);
-            lk_chk_n_print4("    ", a_np, false);
+    if (vb)
+        pr2serr_lk("[%d] checking response array _beyond_ number of "
+                   "submissions [%d] to num_mrq:\n", id, k);
+    for (all_good = true; k < num_mrq; ++k, ++a_v4p) {
+        if (SG_INFO_MRQ_FINI & a_v4p->info) {
+            pr2serr_lk("[%d] a_v4[%d]: unexpected SG_INFO_MRQ_FINI set [%s]\n",
+                       id, k, sg_info_str(a_v4p->info, sizeof(b), b));
+            all_good = false;
+        }
+        if (a_v4p->device_status || a_v4p->transport_status ||
+            a_v4p->driver_status) {
+            pr2serr_lk("[%d] a_v4[%d]:\n", id, k);
+            lk_chk_n_print4("    ", a_v4p, vb > 4);
+            all_good = false;
         }
     }
+    if (all_good)
+        pr2serr_lk("    ... all good\n");
 fini:
     return n_good;
 }
-
-
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< zzzzzzzzz
 
 /* Returns number of blocks successfully processed or a negative error
  * number. */
@@ -2982,6 +2951,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * flagsp = is_wr ? &clp->out_flags : &clp->in_flags;
     bool serial = flagsp->serial;
+    bool err_on_in = false;
+    int vb = clp->verbose;
 
     id = rep->id;
     b_len = sizeof(b);
@@ -3019,7 +2990,7 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         if (res) {
             pr2serr_lk("[%d] %s: sg_build_scsi_cdb() failed\n", id, __func__);
             break;
-        } else if (clp->verbose > 3)
+        } else if (vb > 3)
             lk_print_command_len("cdb: ", t_cdb.data(), cdbsz, true);
         a_cdb.push_back(t_cdb);
 
@@ -3060,7 +3031,9 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     ctl_v4.request = (uint64_t)a_cdb.data();
     ctl_v4.max_response_len = sizeof(rep->sb);
     ctl_v4.response = (uint64_t)rep->sb;
-    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF;
+    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
+    if (! flagsp->coe)
+        ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
@@ -3068,16 +3041,16 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     if (false /* allow_mrq_abort */)
         ctl_v4.request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
 
-    if (clp->verbose > 4) {
-        pr2serr_lk("[%d] %s: Controlling object _before_ ioctl(SG_IO%s):\n",
+    if (vb > 4) {
+        pr2serr_lk("[%d] %s: >> Control object _before_ ioctl(SG_IO%s):\n",
                    id, __func__, iosub_str);
-        if (clp->verbose > 5)
+        if (vb > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
-        v4hdr_out_lk("Controlling object before", &ctl_v4, id);
+        v4hdr_out_lk(">> Control object before", &ctl_v4, id, false);
     }
 
 try_again:
-    if (!after1 && (clp->verbose > 1)) {
+    if (!after1 && (vb > 1)) {
         after1 = true;
         pr2serr_lk("%s: %s\n", __func__, serial ? mrq_ob_s : mrq_vb_s);
     }
@@ -3100,28 +3073,28 @@ try_again:
                    res, err, strerror(err));
         return -err;
     }
-    if (clp->verbose > 4) {
-        pr2serr_lk("%s: Controlling object output by ioctl(%s):\n", __func__,
-                   iosub_str);
-        if (clp->verbose > 5)
+    if (vb > 4) {
+        pr2serr_lk("%s: >> Control object after ioctl(%s) seg_blks=%d:\n",
+                   __func__, iosub_str, o_seg_blks);
+        if (vb > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
-        v4hdr_out_lk("Controlling object after", &ctl_v4, id);
-        if (clp->verbose > 5) {
+        v4hdr_out_lk(">> Control object after", &ctl_v4, id, false);
+        if (vb > 5) {
             for (k = 0; k < num_mrq; ++k) {
-                pr2serr_lk("AFTER: def_arr[%d]:\n", k);
-                v4hdr_out_lk("normal v4 object", (a_v4p + k), id);
-                // hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p),
-                                  // 1);
+                if ((vb > 6) || a_v4p[k].info) {
+                    snprintf(b, b_len, "a_v4[%d/%d]", k, num_mrq);
+                    v4hdr_out_lk(b, (a_v4p + k), id, true);
+                }
             }
         }
     }
     num_good = process_mrq_response(rep, &ctl_v4, a_v4p, num_mrq, in_fin_blks,
-                                    out_fin_blks);
+                                    out_fin_blks, err_on_in);
     if (is_wr)
         out_mrq_q_blks = mrq_q_blks;
     else
         in_mrq_q_blks = mrq_q_blks;
-    if (clp->verbose > 2)
+    if (vb > 2)
         pr2serr_lk("%s: >>> seg_blks=%d, num_good=%d, in_q/fin blks=%u/%u;  "
                    "out_q/fin blks=%u/%u\n", __func__, o_seg_blks, num_good,
                    in_mrq_q_blks, in_fin_blks, out_mrq_q_blks, out_fin_blks);
@@ -3132,13 +3105,16 @@ try_again:
         if (num_good < num_mrq) {
             int resid_blks = in_mrq_q_blks - in_fin_blks;
 
-            if (resid_blks > 0)
+            if (resid_blks > 0) {
                 rep->in_rem_count += resid_blks;
+                rep->stop_after_write = ! (err_on_in && clp->in_flags.coe);
+            }
 
             resid_blks = out_mrq_q_blks - out_fin_blks;
-            if (resid_blks > 0)
+            if (resid_blks > 0) {
                 rep->out_rem_count += resid_blks;
-            rep->stop_after_write = true;
+                rep->stop_after_write = ! (! err_on_in && clp->out_flags.coe);
+            }
         }
     }
     return is_wr ? out_fin_blks : in_fin_blks;
@@ -3349,6 +3325,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
                    vector<cdb_arr_t> & a_cdb,
                    vector<struct sg_io_v4> & a_v4)
 {
+    bool err_on_in = false;
     int num_mrq, k, res, fd, mrq_pack_id_base, id, b_len, iflags, oflags;
     int num, kk, i_lin_blks, o_lin_blks, cdbsz, num_good;
     int o_seg_blks = seg_blks;
@@ -3366,6 +3343,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * iflagsp = &clp->in_flags;
     struct flags_t * oflagsp = &clp->out_flags;
+    int vb = clp->verbose;
 
     id = rep->id;
     b_len = sizeof(b);
@@ -3415,7 +3393,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             pr2serr_lk("%s: t=%d: input sg_build_scsi_cdb() failed\n",
                        __func__, id);
             break;
-        } else if (clp->verbose > 3)
+        } else if (vb > 3)
             lk_print_command_len("input cdb: ", t_cdb.data(), cdbsz, true);
         a_cdb.push_back(t_cdb);
 
@@ -3439,7 +3417,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             pr2serr_lk("%s: t=%d: output sg_build_scsi_cdb() failed\n",
                        __func__, id);
             break;
-        } else if (clp->verbose > 3)
+        } else if (vb > 3)
             lk_print_command_len("output cdb: ", t_cdb.data(), cdbsz, true);
         a_cdb.push_back(t_cdb);
         memset(t_v4p, 0, sizeof(*t_v4p));
@@ -3453,15 +3431,15 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
         a_v4.push_back(t_v4);
 
-        if (clp->verbose > 5) {
-            pr2serr_lk("%s: t=%d: a_v4 array contents:\n", __func__, id);
-            hex2stderr_lk((const uint8_t *)a_v4.data(),
-                          a_v4.size() * sizeof(struct sg_io_v4), 1);
-        }
         i_sg_it.add_blks(num);
         o_sg_it.add_blks(num);
     }
 
+    if (vb > 6) {
+        pr2serr_lk("%s: t=%d: a_v4 array contents:\n", __func__, id);
+        hex2stderr_lk((const uint8_t *)a_v4.data(),
+                      a_v4.size() * sizeof(struct sg_io_v4), 1);
+    }
     if (rep->both_sg || rep->same_sg)
         fd = rep->infd;         /* assume share to rep->outfd */
     else if (rep->only_in_sg)
@@ -3482,8 +3460,9 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     ctl_v4.request = (uint64_t)a_cdb.data();
     ctl_v4.max_response_len = sizeof(rep->sb);
     ctl_v4.response = (uint64_t)rep->sb;
-    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_STOP_IF |
-                   SGV4_FLAG_SHARE;
+    ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_SHARE;
+    if (! (iflagsp->coe || oflagsp->coe))
+        ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     if ((! clp->verify) && clp->out_flags.order)
         ctl_v4.flags |= SGV4_FLAG_ORDERED_SLV;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
@@ -3493,16 +3472,16 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     if (false /* allow_mrq_abort */)
         ctl_v4.request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
 
-    if (clp->verbose > 4) {
-        pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO%s):\n",
+    if (vb > 4) {
+        pr2serr_lk("%s: >> Control object _before_ ioctl(SG_IO%s):\n",
                    __func__, iosub_str);
-        if (clp->verbose > 5)
+        if (vb > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
-        v4hdr_out_lk("Controlling object before", &ctl_v4, id);
+        v4hdr_out_lk(">> Control object before", &ctl_v4, id, false);
     }
 
 try_again:
-    if (!after1 && (clp->verbose > 1)) {
+    if (!after1 && (vb > 1)) {
         after1 = true;
         pr2serr_lk("%s: %s\n", __func__, mrq_svb_s);
     }
@@ -3523,24 +3502,24 @@ try_again:
         res = -err;
         goto fini;
     }
-    if (clp->verbose > 4) {
-        pr2serr_lk("%s: Controlling object output by ioctl(%s):\n", __func__,
-                   iosub_str);
-        if (clp->verbose > 5)
+    if (vb > 4) {
+        pr2serr_lk("%s: >> Control object after ioctl(%s) seg_blks=%d:\n",
+                   __func__, iosub_str, o_seg_blks);
+        if (vb > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
-        v4hdr_out_lk("Controlling object after", &ctl_v4, id);
-        if (clp->verbose > 5) {
+        v4hdr_out_lk(">> Control object after", &ctl_v4, id, false);
+        if (vb > 5) {
             for (k = 0; k < num_mrq; ++k) {
-                pr2serr_lk("AFTER: def_arr[%d]:\n", k);
-                v4hdr_out_lk("normal v4 object", (a_v4p + k), id);
-                // hex2stderr_lk((const uint8_t *)(a_v4p + k), sizeof(*a_v4p),
-                                  // 1);
+                if ((vb > 6) || a_v4p[k].info) {
+                    snprintf(b, b_len, "a_v4[%d/%d]", k, num_mrq);
+                    v4hdr_out_lk(b, (a_v4p + k), id, true);
+                }
             }
         }
     }
     num_good = process_mrq_response(rep, &ctl_v4, a_v4p, num_mrq, in_fin_blks,
-                                    out_fin_blks);
-    if (clp->verbose > 2)
+                                    out_fin_blks, err_on_in);
+    if (vb > 2)
         pr2serr_lk("%s: >>> seg_blks=%d, num_good=%d, in_q/fin blks=%u/%u;  "
                    "out_q/fin blks=%u/%u\n", __func__, o_seg_blks, num_good,
                    in_mrq_q_blks, in_fin_blks, out_mrq_q_blks, out_fin_blks);
@@ -3551,15 +3530,19 @@ try_again:
         rep->in_local_count += in_fin_blks;
         rep->out_local_count += out_fin_blks;
 
-        if (num_good < num_mrq) {
+        if (num_good < num_mrq) {       /* reduced number completed */
             int resid_blks = in_mrq_q_blks - in_fin_blks;
 
-            if (resid_blks > 0)
+            if (resid_blks > 0) {
                 rep->in_rem_count += resid_blks;
+                rep->stop_after_write = ! (err_on_in && clp->in_flags.coe);
+            }
+
             resid_blks = out_mrq_q_blks - out_fin_blks;
-            if (resid_blks > 0)
+            if (resid_blks > 0) {
                 rep->out_rem_count += resid_blks;
-            rep->stop_after_write = true;
+                rep->stop_after_write = ! (! err_on_in && clp->out_flags.coe);
+            }
         }
     }
 fini:
@@ -3658,10 +3641,12 @@ bypass:
                        errno, strerror(errno));
         }
     }
+#if 0
     t = 1;
     res = ioctl(fd, SG_SET_DEBUG, &t);  /* more info in /proc/scsi/sg/debug */
     if (res < 0)
         perror("sgh_dd: SG_SET_DEBUG error");
+#endif
     return (res < 0) ? 0 : num;
 }
 
@@ -3896,7 +3881,7 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
 
 static int
 parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
-                     char * inf, char * outf, char * out2f, char * outregf)
+                     char * inf, char * outf, char * outregf)
 {
     bool contra = false;
     bool verbose_given = false;
@@ -3942,9 +3927,6 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->cdbsz_in = sg_get_num(buf);
             clp->cdbsz_out = clp->cdbsz_in;
             clp->cdbsz_given = true;
-        } else if (0 == strcmp(key, "coe")) {
-            clp->in_flags.coe = !! sg_get_num(buf);
-            clp->out_flags.coe = clp->in_flags.coe;
         } else if (0 == strcmp(key, "count")) {
             if (clp->count_given) {
                 pr2serr("second 'count=' argument detected, only one "
@@ -3960,10 +3942,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 }
             }   /* treat 'count=-1' as calculate count (same as not given) */
             clp->count_given = true;
-        } else if ((0 == strncmp(key, "deb", 3)) ||
-                   (0 == strncmp(key, "verb", 4)))
-            clp->verbose = sg_get_num(buf);
-        else if (0 == strcmp(key, "dio")) {
+        } else if (0 == strcmp(key, "dio")) {
             clp->in_flags.dio = !! sg_get_num(buf);
             clp->out_flags.dio = clp->in_flags.dio;
         } else if (0 == strcmp(key, "fua")) {
@@ -4010,15 +3989,6 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 pr2serr("%sbad argument to 'obs='\n", my_name);
                 goto syn_err;
             }
-        } else if (strcmp(key, "of2") == 0) {
-            if ('\0' != out2f[0]) {
-                pr2serr("Second OFILE2 argument??\n");
-                contra = true;
-                goto syn_err;
-            } else {
-                memcpy(out2f, buf, INOUTF_SZ);
-                out2f[INOUTF_SZ - 1] = '\0';    /* noisy compiler */
-            }
         } else if (strcmp(key, "ofreg") == 0) {
             if ('\0' != outregf[0]) {
                 pr2serr("Second OFREG argument??\n");
@@ -4063,6 +4033,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             num_threads = sg_get_num(buf);
         else if (0 == strcmp(key, "time"))
             do_time = sg_get_num(buf);
+        else if (0 == strncmp(key, "verb", 4))
+            clp->verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
@@ -4201,8 +4173,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     }
 #endif
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
-       for the block layer in lk 2.6 and results in an EIO on the
-       SG_IO ioctl. So reduce it in that case. */
+     * for the block layer in lk 2.6 and results in an EIO on the
+     * SG_IO ioctl. So reduce it in that case. */
     if ((clp->bs >= 2048) && (! bpt_given))
         clp->bpt = DEF_BLOCKS_PER_2048TRANSFER;
     if (clp->in_flags.order)
@@ -4448,9 +4420,9 @@ fini:
 int
 main(int argc, char * argv[])
 {
+    bool fail_after_cli = false;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
-    char out2f[INOUTF_SZ];
     char outregf[INOUTF_SZ];
     int res, k, err, flags;
     int64_t in_num_sect = -1;
@@ -4462,7 +4434,7 @@ main(int argc, char * argv[])
     vector<thread> work_thr;
     vector<thread> listen_thr;
     char ebuff[EBUFF_SZ];
-#if 0	/* SG_LIB_ANDROID */
+#if 0   /* SG_LIB_ANDROID */
     struct sigaction actions;
 
     memset(&actions, 0, sizeof(actions));
@@ -4478,28 +4450,31 @@ main(int argc, char * argv[])
     clp->in_type = FT_FIFO;
     /* change dd's default: if of=OFILE not given, assume /dev/null */
     clp->out_type = FT_DEV_NULL;
-    clp->out2_type = FT_DEV_NULL;
     clp->cdbsz_in = DEF_SCSI_CDB_SZ;
     clp->cdbsz_out = DEF_SCSI_CDB_SZ;
     clp->mrq_num = DEF_MRQ_NUM;
     inf[0] = '\0';
     outf[0] = '\0';
-    out2f[0] = '\0';
     outregf[0] = '\0';
     fetch_sg_version();
     if (sg_version >= 40030)
         sg_version_ge_40030 = true;
     else {
-        pr2serr("%srequires an sg driver version of 4.0.30 or later\n",
+        pr2serr(">>> %srequires an sg driver version of 4.0.30 or later\n\n",
                 my_name);
-        return SG_LIB_SYNTAX_ERROR;
+        fail_after_cli = true;
     }
 
-    res = parse_cmdline_sanity(argc, argv, clp, inf, outf, out2f, outregf);
+    res = parse_cmdline_sanity(argc, argv, clp, inf, outf, outregf);
     if (SG_LIB_OK_FALSE == res)
         return 0;
     if (res)
         return res;
+    if (fail_after_cli) {
+        pr2serr("%scommand line parsing was okay but sg driver is too old\n",
+                my_name);
+        return SG_LIB_SYNTAX_ERROR;
+    }
 
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -4614,66 +4589,6 @@ main(int argc, char * argv[])
         clp->outfp = outf;
     }
 
-    if (out2f[0])
-        clp->ofile2_given = true;
-    if (out2f[0] && ('-' != out2f[0])) {
-        clp->out2_type = dd_filetype(out2f, clp->out2_st_size);
-
-        if (FT_ST == clp->out2_type) {
-            pr2serr("%sunable to use scsi tape device %s\n", my_name, out2f);
-            return SG_LIB_FILE_ERROR;
-        }
-        else if (FT_SG == clp->out2_type) {
-            clp->out2fd = sg_out_open(clp, out2f, NULL, NULL);
-            if (clp->out2fd < 0)
-                return -clp->out2fd;
-        }
-        else if (FT_DEV_NULL == clp->out2_type)
-            clp->out2fd = -1; /* don't bother opening */
-        else {
-            if (FT_RAW != clp->out2_type) {
-                flags = O_WRONLY | O_CREAT;
-                if (clp->out_flags.direct)
-                    flags |= O_DIRECT;
-                if (clp->out_flags.excl)
-                    flags |= O_EXCL;
-                if (clp->out_flags.dsync)
-                    flags |= O_SYNC;
-                if (clp->out_flags.append)
-                    flags |= O_APPEND;
-
-                if ((clp->out2fd = open(out2f, flags, 0666)) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
-                             "writing", my_name, out2f);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
-            }
-            else {      /* raw output file */
-                if ((clp->out2fd = open(out2f, O_WRONLY)) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for raw "
-                             "writing", my_name, out2f);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
-            }
-            if (clp->o_sgl.lowest_lba > 0) {
-                off64_t offset = clp->o_sgl.lowest_lba;
-
-                offset *= clp->bs;       /* could exceed 32 bits here! */
-                if (lseek64(clp->out2fd, offset, SEEK_SET) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scouldn't seek to required "
-                             "position on %s", my_name, out2f);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
-            }
-        }
-        clp->out2fp = out2f;
-    }
     if ((FT_SG == clp->in_type ) && (FT_SG == clp->out_type)) {
         ;
     } else if (clp->in_flags.order)
@@ -4746,10 +4661,6 @@ main(int argc, char * argv[])
 
     clp->in_rem_count = clp->dd_count;
     clp->out_rem_count = clp->dd_count;
-#if 0
-    status = pthread_mutex_init(&clp->out2_mutex, NULL);
-    if (0 != status) err_exit(status, "init out2_mutex");
-#endif
 
     if (clp->dry_run > 0) {
         pr2serr("Due to --dry-run option, bypass copy/read\n");
@@ -4761,22 +4672,12 @@ main(int argc, char * argv[])
 
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
-#if 0
-    status = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
-    if (0 != status) err_exit(status, "pthread_sigmask");
-#endif
 
     res = sigprocmask(SIG_BLOCK, &signal_set, NULL);
     if (res < 0) {
-	pr2serr("sigprocmask failed: %s\n", safe_strerror(errno));
-	goto fini;
+        pr2serr("sigprocmask failed: %s\n", safe_strerror(errno));
+        goto fini;
     }
-
-#if 0
-    status = pthread_create(&sig_listen_thread_id, NULL,
-                            sig_listen_thread, (void *)clp);
-    if (0 != status) err_exit(status, "pthread_create, sig...");
-#endif
 
     listen_thr.emplace_back(sig_listen_thread, clp);
 
@@ -4829,17 +4730,6 @@ jump:
             if (0 != res)
                 pr2serr_lk("Unable to synchronize cache\n");
         }
-        if (FT_SG == clp->out2_type) {
-            pr2serr_lk(">> Synchronizing cache on %s\n", out2f);
-            res = sg_ll_sync_cache_10(clp->out2fd, 0, 0, 0, 0, 0, false, 0);
-            if (SG_LIB_CAT_UNIT_ATTENTION == res) {
-                pr2serr_lk("Unit attention(out2), continuing\n");
-                res = sg_ll_sync_cache_10(clp->out2fd, 0, 0, 0, 0, 0, false,
-                                          0);
-            }
-            if (0 != res)
-                pr2serr_lk("Unable to synchronize cache (of2)\n");
-        }
     }
 
     shutting_down = true;
@@ -4857,21 +4747,10 @@ fini:
     if ((STDOUT_FILENO != clp->outfd) && (FT_DEV_NULL != clp->out_type) &&
         (clp->outfd >= 0))
         close(clp->outfd);
-    if ((clp->out2fd >= 0) && (STDOUT_FILENO != clp->out2fd) &&
-        (FT_DEV_NULL != clp->out2_type))
-        close(clp->out2fd);
     if ((clp->outregfd >= 0) && (STDOUT_FILENO != clp->outregfd) &&
         (FT_DEV_NULL != clp->outreg_type))
         close(clp->outregfd);
     res = exit_status;
-#if 0
-    if ((0 != clp->out_count.load()) && (0 == clp->dry_run)) {
-        pr2serr(">>>> Some error occurred, remaining blocks=%" PRId64 "\n",
-                clp->out_count.load());
-        if (0 == res)
-            res = SG_LIB_CAT_OTHER;
-    }
-#endif
     print_stats("");
     if (clp->dio_incomplete_count.load()) {
         int fd;
@@ -4897,10 +4776,12 @@ fini:
         pr2serr("Number of finish EAGAINs: %d\n", num_fin_eagain.load());
     if (clp->verbose && (num_ebusy > 0))
         pr2serr("Number of EBUSYs: %d\n", num_ebusy.load());
+#if 0
     if (clp->verbose > 1) {
         pr2serr("Number of SG_GET_NUM_WAITING calls=%ld\n",
                 num_waiting_calls.load());
     }
+#endif
     if (clp->verify && (SG_LIB_CAT_MISCOMPARE == res))
         pr2serr("Verify/compare failed due to miscompare\n");
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;

@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.82 20200629";
+static const char * version_str = "1.83 20200709";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -238,8 +238,9 @@ struct global_collection
     int ofsplit;
     atomic<int> dio_incomplete_count;
     atomic<int> sum_of_resids;
-    int debug;          /* both -v and deb=VERB bump this field */
+    int vebose;
     int fail_mask;
+    int verbose;
     int dry_run;
     bool aen_given;
     bool cdbsz_given;
@@ -615,6 +616,55 @@ fini:
     return b;
 }
 
+/* Info field decoded into abbreviations for those bits that are set,
+ * separated by '|' . */
+static char *
+sg_info_str(int info, int b_len, char * b)
+{
+    int n = 0;
+
+    if ((b_len < 1) || (! b))
+        return b;
+    b[0] = '\0';
+    if (SG_INFO_CHECK & info) {               /* 0x1 */
+        n += sg_scnpr(b + n, b_len - n, "CHK|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_DIRECT_IO & info) {           /* 0x2 */
+        n += sg_scnpr(b + n, b_len - n, "DIO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_MIXED_IO & info) {            /* 0x4 */
+        n += sg_scnpr(b + n, b_len - n, "MIO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_DEVICE_DETACHING & info) {    /* 0x8 */
+        n += sg_scnpr(b + n, b_len - n, "DETA|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_ABORTED & info) {             /* 0x10 */
+        n += sg_scnpr(b + n, b_len - n, "ABRT|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SG_INFO_MRQ_FINI & info) {            /* 0x20 */
+        n += sg_scnpr(b + n, b_len - n, "MRQF|");
+        if (n >= b_len)
+            goto fini;
+    }
+fini:
+    if (n < b_len) {    /* trim trailing '\' */
+        if ('|' == b[n - 1])
+            b[n - 1] = '\0';
+    } else if ('|' == b[b_len - 1])
+        b[b_len - 1] = '\0';
+    return b;
+}
+
 static void
 v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
 {
@@ -635,7 +685,7 @@ v4hdr_out_lk(const char * leadin, const sg_io_v4 * h4p, int id)
     pr2serr("  flags=0x%x  request_extra{pack_id}=%d\n",
             h4p->flags, h4p->request_extra);
     pr2serr("  flags set: %s\n", sg_flags_str(h4p->flags, sizeof(b), b));
-    pr2serr(" OUT:\n");
+    pr2serr(" %s OUT fields:\n", leadin);
     pr2serr("  response_len=%d driver/transport/device_status="
             "0x%x/0x%x/0x%x\n", h4p->response_len, h4p->driver_status,
             h4p->transport_status, h4p->device_status);
@@ -849,10 +899,10 @@ usage(int pg_num)
             "               [--help] [--version]\n\n");
     pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1]\n"
-            "               [deb=VERB] [dio=0|1] [elemsz_kb=ESK] "
-            "[fail_mask=FM]\n"
-            "               [fua=0|1|2|3] [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
-            "[of2=OFILE2]\n"
+            "               [dio=0|1] [elemsz_kb=ESK] [fail_mask=FM] "
+	    "[fua=0|1|2|3]\n"
+            "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
+	    "[of2=OFILE2]\n"
             "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] [thr=THR] "
             "[time=0|1]\n"
             "               [unshare=1|0] [verbose=VERB] [--dry-run] "
@@ -914,8 +964,6 @@ page2:
             "(default is 10)\n"
             "    coe         continue on error, 0->exit (def), "
             "1->zero + continue\n"
-            "    deb         for debug, 0->none (def), > 0->varying degrees "
-            "of debug\n"
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
             "    elemsz_kb    scatter gather list element size in kilobytes "
             "(def: 32[KB])\n"
@@ -944,7 +992,7 @@ page2:
             "    unshare     0->don't explicitly unshare after share; 1->let "
             "close do\n"
             "                file unshare (default)\n"
-            "    verbose     same as 'deb=VERB': increase verbosity\n"
+            "    verbose     increase verbosity\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
             "Use '-hhh' or '-hhhh' for more information about flags.\n"
@@ -1360,7 +1408,7 @@ read_write_thread(void * v_tip)
 
     tip = (Thread_info *)v_tip;
     clp = tip->gcp;
-    vb = clp->debug;
+    vb = clp->verbose;
     sz = clp->bpt * clp->bs;
     in_is_sg = (FT_SG == clp->in_type);
     in_mmap = (in_is_sg && (clp->in_flags.mmap > 0));
@@ -1724,7 +1772,7 @@ normal_in_rd(Rq_elem * rep, int blocks)
     int res;
     char strerr_buff[STRERR_BUFF_LEN];
 
-    if (clp->debug > 4)
+    if (clp->verbose > 4)
         pr2serr_lk("%s: tid=%d: iblk=%" PRIu64 ", blocks=%d\n", __func__,
                    rep->id, rep->iblk, blocks);
     if (FT_RANDOM_0_FF == clp->in_type) {
@@ -1807,7 +1855,7 @@ normal_out_wr(Rq_elem * rep, int blocks)
     char strerr_buff[STRERR_BUFF_LEN];
 
     /* enters holding out_mutex */
-    if (clp->debug > 4)
+    if (clp->verbose > 4)
         pr2serr_lk("%s: tid=%d: oblk=%" PRIu64 ", blocks=%d\n", __func__,
                    rep->id, rep->oblk, blocks);
     while (((res = write(clp->outfd, rep->buffp, blocks * clp->bs))
@@ -2008,7 +2056,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     struct sg_extended_info sei;
     struct sg_extended_info * seip = &sei;
 
-    if (rep->clp->debug > 2)
+    if (rep->clp->verbose > 2)
         pr2serr_lk("%s: tid=%d: to_fd=%d, before=%d\n", __func__, rep->id,
                    to_fd, (int)before);
     memset(seip, 0, sizeof(*seip));
@@ -2028,7 +2076,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
         if (k > 10000)
             break;
         if (! not_first) {
-            if (clp->debug > 3)
+            if (clp->verbose > 3)
                 pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
                            "failed errno=%d %s\n", rep->id, master_fd, err,
                            strerror(err));
@@ -2042,7 +2090,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
                    "errno=%d %s\n", rep->id, master_fd, err, strerror(err));
         return false;
     }
-    if (clp->debug > 15)
+    if (clp->verbose > 15)
         pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(change_shared_fd)) ok, "
                    "master_fd=%d, to_slave_fd=%d\n", __func__, rep->id,
                    master_fd, to_fd);
@@ -2201,6 +2249,138 @@ fini:
 }
 
 static int
+process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
+                     const struct sg_io_v4 * a_v4p, int num_mrq,
+                     uint32_t & good_inblks, uint32_t & good_outblks)
+{
+    struct global_collection * clp = rep->clp;
+    bool ok, all_good;
+    bool sb_in_co = !!(ctl_v4p->response);
+    int id = rep->id;
+    int resid = ctl_v4p->din_resid;
+    int sres = ctl_v4p->spare_out;
+    int n_subm = num_mrq - ctl_v4p->dout_resid;
+    int n_cmpl = ctl_v4p->info;
+    int n_good = 0;
+    int hole_count = 0;
+    int vb = clp->verbose;
+    int k, j, f1, slen, sstatus, blen;
+    char b[80];
+
+    blen = sizeof(b);
+    good_inblks = 0;
+    good_outblks = 0;
+    if (vb > 2)
+        pr2serr_lk("[thread_id=%d] %s: num_mrq=%d, n_subm=%d, n_cmpl=%d\n",
+                   id, __func__, num_mrq, n_subm, n_cmpl);
+    if (n_subm < 0) {
+        pr2serr_lk("[%d] co.dout_resid(%d) > num_mrq(%d)\n", id,
+                   ctl_v4p->dout_resid, num_mrq);
+        return -1;
+    }
+    if (n_cmpl != (num_mrq - resid))
+        pr2serr_lk("[%d] co.info(%d) != (num_mrq(%d) - co.din_resid(%d))\n"
+                   "will use co.info\n", id, n_cmpl, num_mrq, resid);
+    if (n_cmpl > n_subm) {
+        pr2serr_lk("[%d] n_cmpl(%d) > n_subm(%d), use n_subm for both\n",
+                   id, n_cmpl, n_subm);
+        n_cmpl = n_subm;
+    }
+    if (sres) {
+        pr2serr_lk("[%d] secondary error: %s [%d], info=0x%x\n", id,
+                   strerror(sres), sres, ctl_v4p->info);
+        if (E2BIG == sres) {
+            sg_take_snap(rep->infd, id, true);
+            sg_take_snap(rep->outfd, id, true);
+        }
+    }
+    /* Check if those submitted have finished or not. N.B. If there has been
+     * an error then there may be "holes" (i.e. info=0x0) in the array due
+     * to completions being out-of-order. */
+    for (k = 0, j = 0; ((k < num_mrq) && (j < n_subm));
+         ++k, j += f1, ++a_v4p) {
+        slen = a_v4p->response_len;
+        if (! (SG_INFO_MRQ_FINI & a_v4p->info))
+            ++hole_count;
+        ok = true;
+        f1 = !!(a_v4p->info);   /* want to skip n_subm count if info is 0x0 */
+        if (SG_INFO_CHECK & a_v4p->info) {
+            ok = false;
+            pr2serr_lk("[%d] a_v4[%d]: SG_INFO_CHECK set [%s]\n", id, k,
+                       sg_info_str(a_v4p->info, sizeof(b), b));
+        }
+        sstatus = a_v4p->device_status;
+        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
+            a_v4p->transport_status || a_v4p->driver_status) {
+            ok = false;
+            if (SAM_STAT_CHECK_CONDITION != a_v4p->device_status) {
+                pr2serr_lk("[%d] a_v4[%d]:\n", id, k);
+                if (vb)
+                    lk_chk_n_print4("  >>", a_v4p, vb > 4);
+            }
+        }
+        if (slen > 0) {
+            struct sg_scsi_sense_hdr ssh;
+            const uint8_t *sbp = (const uint8_t *)
+                        (sb_in_co ? ctl_v4p->response : a_v4p->response);
+
+            if (sg_scsi_normalize_sense(sbp, slen, &ssh) &&
+                (ssh.response_code >= 0x70)) {
+                char b[256];
+
+                if (ssh.response_code & 0x1) {
+                    ok = true;
+                }
+                if (vb) {
+                    sg_get_sense_str("  ", sbp, slen, false, blen, b);
+                    pr2serr_lk("[%d] a_v4[%d]:\n%s\n", id, k, b);
+                }
+            }
+        }
+        if (ok && f1) {
+            ++n_good;
+            if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs) {
+                if (a_v4p->dout_resid)
+                    good_outblks +=
+                         (a_v4p->dout_xfer_len - a_v4p->dout_resid) / clp->bs;
+                else    /* avoid division in common case of resid==0 */
+                    good_outblks += (uint32_t)a_v4p->usr_ptr;
+            }
+            if (a_v4p->din_xfer_len >= (uint32_t)clp->bs) {
+                if (a_v4p->din_resid)
+                    good_inblks += (a_v4p->din_xfer_len - a_v4p->din_resid) /
+                                   clp->bs;
+                else
+                    good_inblks += (uint32_t)a_v4p->usr_ptr;
+            }
+        }
+    }   /* end of request array scan loop */
+    if ((n_subm == num_mrq) || (vb < 3))
+        goto fini;
+    if (vb)
+        pr2serr_lk("[%d] checking response array _beyond_ number of "
+                   "submissions [%d] to num_mrq:\n", id, k);
+    for (all_good = true; k < num_mrq; ++k, ++a_v4p) {
+        if (SG_INFO_MRQ_FINI & a_v4p->info) {
+            pr2serr_lk("[%d] a_v4[%d]: unexpected SG_INFO_MRQ_FINI set [%s]\n",
+                       id, k, sg_info_str(a_v4p->info, sizeof(b), b));
+            all_good = false;
+        }
+        if (a_v4p->device_status || a_v4p->transport_status ||
+            a_v4p->driver_status) {
+            pr2serr_lk("[%d] a_v4[%d]:\n", id, k);
+            lk_chk_n_print4("    ", a_v4p, vb > 4);
+            all_good = false;
+        }
+    }
+    if (all_good)
+        pr2serr_lk("    ... all good\n");
+fini:
+    return n_good;
+}
+
+#if 0
+static int
 chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                  const struct sg_io_v4 * a_v4p, int nrq,
                  uint32_t * good_inblksp, uint32_t * good_outblksp)
@@ -2213,12 +2393,14 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int n_subm = nrq - ctl_v4p->dout_resid;
     int n_cmpl = ctl_v4p->info;
     int n_good = 0;
-    int vb = clp->debug;
-    int k, slen, sstatus;
+    int vb = clp->verbose;
+    int k, slen, sstatus, blen;
     uint32_t good_inblks = 0;
     uint32_t good_outblks = 0;
     const struct sg_io_v4 * a_np = a_v4p;
+    char b[80];
 
+    blen = sizeof(b);
     if (n_subm < 0) {
         pr2serr_lk("[%d] %s: co.dout_resid(%d) > nrq(%d)\n", id, __func__,
                    ctl_v4p->dout_resid, nrq);
@@ -2244,12 +2426,17 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     for (k = 0; k < n_subm; ++k, ++a_np) {
         slen = a_np->response_len;
         if (! (SG_INFO_MRQ_FINI & a_np->info)) {
-            pr2serr_lk("[%d] %s, a_n[%d]: missing SG_INFO_MRQ_FINI ? ?\n",
-                       id, __func__, k);
+            pr2serr_lk("[%d] %s, a_n[%d]: missing SG_INFO_MRQ_FINI [%s]\n",
+                       id, __func__, k, sg_info_str(a_np->info, blen, b));
             v4hdr_out_lk("a_np", a_np, id);
             v4hdr_out_lk("cop", ctl_v4p, id);
         }
         ok = true;
+        if (SG_INFO_CHECK & a_np->info) {
+            ok = false;
+            pr2serr_lk("[%d] a_n[%d]: SG_INFO_CHECK set [%s]\n", id, k,
+                       sg_info_str(a_np->info, sizeof(b), b));
+        }
         sstatus = a_np->device_status;
         if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
             a_np->transport_status || a_np->driver_status) {
@@ -2297,7 +2484,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
         if (a_np->device_status || a_np->transport_status ||
             a_np->driver_status) {
             pr2serr_lk("[%d] %s, a_n[%d]:\n", id, __func__, k);
-            lk_chk_n_print4("    ", a_np, false);
+            lk_chk_n_print4("    ", a_np, vb > 4);
         }
     }
 fini:
@@ -2307,6 +2494,7 @@ fini:
         *good_outblksp = good_outblks;
     return n_good;
 }
+#endif
 
 /* do mrq 'submit (waitless) non-blocking' call. These are restricted to
  * a single file descriptor (i.e. the 'fd' argument). */
@@ -2329,21 +2517,21 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
     if (clp->in_flags.no_waitq || clp->out_flags.no_waitq) {
         ctlop->flags |= SGV4_FLAG_NO_WAITQ;     /* waitless non-blocking */
-        if (!after1 && (clp->debug > 1)) {
+        if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: %s\n", __func__, mrq_nw_nb_s);
         }
     } else {
         ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
-        if (!after1 && (clp->debug > 1)) {
+        if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: %s\n", __func__, mrq_s_nb_s);
         }
     }
-    if (clp->debug > 4) {
+    if (clp->verbose > 4) {
         pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IOSUBMIT):\n",
                    __func__);
-        if (clp->debug > 5)
+        if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
         v4hdr_out_lk("Controlling object before", ctlop, rep->id);
     }
@@ -2384,13 +2572,13 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
         half_num = 0;
     } else
         half_num = ctlop->info;
-    if (clp->debug > 4) {
+    if (clp->verbose > 4) {
         pr2serr_lk("%s: Controlling object output by ioctl(SG_IORECEIVE),1: "
                    "num_received=%d\n", __func__, half_num);
-        if (clp->debug > 5)
+        if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
         v4hdr_out_lk("Controlling object after", ctlop, rep->id);
-        if (clp->debug > 5) {
+        if (clp->verbose > 5) {
             for (k = 0; k < half_num; ++k) {
                 pr2serr_lk("AFTER: def_arr[%d]:\n", k);
                 v4hdr_out_lk("normal v4 object", (a_v4p + k), rep->id);
@@ -2401,9 +2589,9 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     }
     in_fin_blks = 0;
     out_fin_blks = 0;
-    num_good = chk_mrq_response(rep, ctlop, a_v4p, half_num, &in_fin_blks,
-                                &out_fin_blks);
-    if (clp->debug > 2)
+    num_good = process_mrq_response(rep, ctlop, a_v4p, half_num, in_fin_blks,
+                                    out_fin_blks);
+    if (clp->verbose > 2)
         pr2serr_lk("%s: >>>1 num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -2456,13 +2644,13 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
         half_num = 0;
     } else
         half_num = ctlop->info;
-    if (clp->debug > 4) {
+    if (clp->verbose > 4) {
         pr2serr_lk("%s: Controlling object output by ioctl(SG_IORECEIVE),2: "
                    "num_received=%d\n", __func__, half_num);
-        if (clp->debug > 5)
+        if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)ctlop, sizeof(*ctlop), 1);
         v4hdr_out_lk("Controlling object after", ctlop, rep->id);
-        if (clp->debug > 5) {
+        if (clp->verbose > 5) {
             for (k = 0; k < half_num; ++k) {
                 pr2serr_lk("AFTER: def_arr[%d]:\n", k);
                 v4hdr_out_lk("normal v4 object", (a_v4p + k), rep->id);
@@ -2473,9 +2661,9 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     }
     in_fin_blks = 0;
     out_fin_blks = 0;
-    num_good = chk_mrq_response(rep, ctlop, a_v4p, half_num, &in_fin_blks,
-                                &out_fin_blks);
-    if (clp->debug > 2)
+    num_good = process_mrq_response(rep, ctlop, a_v4p, half_num, in_fin_blks,
+                                    out_fin_blks);
+    if (clp->verbose > 2)
         pr2serr_lk("%s: >>>2 num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -2575,7 +2763,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
             h4p->request = 0;
         } else
             h4p->request = (uint64_t)cmdp;
-        if (clp->debug > 5) {
+        if (clp->verbose > 5) {
             pr2serr_lk("%s%s[%d] def_arr[%d]", ((0 == k) ? __func__ : ""),
                        ((0 == k) ? ": " : ""), id, k);
             if (h4p->din_xferp)
@@ -2617,14 +2805,14 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     if ((clp->m_aen > 0) && (MONO_MRQ_ID_INIT != mrq_pack_id) &&
         (0 == ((mrq_pack_id - MONO_MRQ_ID_INIT) % clp->m_aen))) {
         launch_mrq_abort = true;
-        if (clp->debug > 2)
+        if (clp->verbose > 2)
             pr2serr_lk("[%d] %s: Decide to launch MRQ abort thread, "
                        "mrq_id=%d\n", id, __func__, mrq_pack_id);
         memset(&rep->mai, 0, sizeof(rep->mai));
         rep->mai.from_tid = id;
         rep->mai.mrq_id = mrq_pack_id;
         rep->mai.fd = fd;
-        rep->mai.debug = clp->debug;
+        rep->mai.debug = clp->verbose;
 
         status = pthread_create(&rep->mrq_abort_thread_id, NULL,
                                 mrq_abort_thread, (void *)&rep->mai);
@@ -2632,12 +2820,12 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     }
     ctl_v4.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
     rep->mrq_id = mrq_pack_id;
-    if (clp->debug > 4) {
+    if (clp->verbose > 4) {
         if (rep->both_sg && clp->mrq_async)
             iosub_str = "SUBMIT(variable)";
         pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO%s):\n",
                    __func__, iosub_str);
-        if (clp->debug > 5)
+        if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk("Controlling object before", &ctl_v4, id);
     }
@@ -2664,7 +2852,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
                     h4p->request = 0;
                 } else
                     h4p->request = (uint64_t)cmdp;
-                if (clp->debug > 5) {
+                if (clp->verbose > 5) {
                     pr2serr_lk("[%d] df_def_arr[%d]:\n", id, k);
                     hex2stderr_lk((const uint8_t *)(aa_v4p + k),
                                   sizeof(*aa_v4p), 1);
@@ -2694,7 +2882,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
                     h4p->request = 0;
                 } else
                     h4p->request = (uint64_t)cmdp;
-                if (clp->debug > 5) {
+                if (clp->verbose > 5) {
                     pr2serr_lk("[%d] o_fd_def_arr[%d]:\n", id, k);
                     hex2stderr_lk((const uint8_t *)(aa_v4p + k),
                                   sizeof(*aa_v4p), 1);
@@ -2715,7 +2903,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
 
 try_again:
     if (clp->unbalanced_mrq) {
-        if (!after1 && (clp->debug > 1)) {
+        if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: unbalanced %s\n", __func__, mrq_vb_s);
         }
@@ -2723,21 +2911,21 @@ try_again:
     } else {
         if (clp->mrq_async) {
             iosub_str = "SUBMIT(variable_blocking)";
-            if (!after1 && (clp->debug > 1)) {
+            if (!after1 && (clp->verbose > 1)) {
                 after1 = true;
                 pr2serr_lk("%s: %s\n", __func__, mrq_vb_s);
             }
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
         } else if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb) {
             iosub_str = "SUBMIT(shared_variable_blocking)";
-            if (!after1 && (clp->debug > 1)) {
+            if (!after1 && (clp->verbose > 1)) {
                 after1 = true;
                 pr2serr_lk("%s: %s\n", __func__, mrq_svb_s);
             }
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
         } else {
             iosub_str = "SG_IO(ordered_blocking)";
-            if (!after1 && (clp->debug > 1)) {
+            if (!after1 && (clp->verbose > 1)) {
                 after1 = true;
                 pr2serr_lk("%s: %s\n", __func__, mrq_blk_s);
             }
@@ -2760,13 +2948,13 @@ try_again:
         res = -1;
         goto fini;
     }
-    if (clp->debug > 4) {
+    if (clp->verbose > 4) {
         pr2serr_lk("%s: Controlling object output by ioctl(%s):\n",
                    __func__, iosub_str);
-        if (clp->debug > 5)
+        if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk("Controlling object after", &ctl_v4, id);
-        if (clp->debug > 5) {
+        if (clp->verbose > 5) {
             for (k = 0; k < nrq; ++k) {
                 pr2serr_lk("AFTER: def_arr[%d]:\n", k);
                 v4hdr_out_lk("normal v4 object", (a_v4p + k), id);
@@ -2777,9 +2965,9 @@ try_again:
     }
     in_fin_blks = 0;
     out_fin_blks = 0;
-    num_good = chk_mrq_response(rep, &ctl_v4, a_v4p, nrq, &in_fin_blks,
-                                &out_fin_blks);
-    if (clp->debug > 2)
+    num_good = process_mrq_response(rep, &ctl_v4, a_v4p, nrq, in_fin_blks,
+                                    out_fin_blks);
+    if (clp->verbose > 2)
         pr2serr_lk("%s: >>> num_good=%d, in_q/fin blks=%u/%u;  out_q/fin "
                    "blks=%u/%u\n", __func__, num_good, rep->in_mrq_q_blks,
                    in_fin_blks, rep->out_mrq_q_blks, out_fin_blks);
@@ -2805,7 +2993,7 @@ fini:
     if (cmd_ap)
         free(cmd_ap);
     if (launch_mrq_abort) {
-        if (clp->debug > 1)
+        if (clp->verbose > 1)
             pr2serr_lk("[%d] %s: About to join MRQ abort thread, "
                        "mrq_id=%d\n", id, __func__, mrq_pack_id);
 
@@ -2940,11 +3128,11 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             flags |= SGV4_FLAG_KEEP_SHARE; /* troublemaking .... */
     } else
         memset(hp, 0, sizeof(struct sg_io_hdr));
-    if (clp->debug > 3) {
+    if (clp->verbose > 3) {
         bool lock = true;
         char prefix[128];
 
-        if (4 == clp->debug) {
+        if (4 == clp->verbose) {
             snprintf(prefix, sizeof(prefix), "tid,rq_id=%d,%d: ", rep->id,
                      pack_id);
             lock = false;
@@ -2985,13 +3173,13 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
             ++num_start_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -3051,13 +3239,13 @@ do_v4:
             ++num_start_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -3097,7 +3285,7 @@ do_v4:
             if (res < 0) {
                 err = errno;
                 if (ENODATA == err) {
-                    if (clp->debug > 2)
+                    if (clp->verbose > 2)
                         pr2serr_lk("%s: ioctl(SG_IOABORT) no match on "
                                    "pack_id=%d\n", __func__, pack_id);
                 } else
@@ -3105,7 +3293,7 @@ do_v4:
                                __func__, safe_strerror(err), err);
             } else {
                 ++num_abort_req_success;
-                if (clp->debug > 2)
+                if (clp->verbose > 2)
                     pr2serr_lk("%s: sent ioctl(SG_IOABORT) on rq_id=%d, "
                                "success\n", __func__, pack_id);
             }
@@ -3130,9 +3318,6 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
     struct sg_io_hdr * hp;
     struct sg_io_v4 * h4p;
     const char *cp;
-#if 0
-    static int testing = 0;     /* thread dubious! */
-#endif
 
     if (wr) {
         fd = is_wr2 ? rep->out2fd : rep->outfd;
@@ -3160,13 +3345,13 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
             ++num_fin_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -3190,7 +3375,7 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-        if (clp->debug > 3)
+        if (clp->verbose > 3)
             lk_chk_n_print3(cp, hp, false);
         return res;
     case SG_LIB_CAT_NOT_READY:
@@ -3203,16 +3388,13 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
             return res;
         }
     }
-#if 0
-    if (0 == (++testing % 100)) return -1;
-#endif
     if ((wr ? clp->out_flags.dio : clp->in_flags.dio) &&
         (! (hp->info & SG_INFO_DIRECT_IO_MASK)))
         rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
         rep->dio_incomplete_count = 0;
     rep->resid = hp->resid;
-    if (clp->debug > 3)
+    if (clp->verbose > 3)
         pr2serr_lk("%s: tid=%d: completed %s\n", __func__, rep->id, cp);
     return 0;
 
@@ -3229,13 +3411,13 @@ do_v4:
             ++num_fin_eagain;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         } else if (EBUSY == errno) {
             ++num_ebusy;
 #ifdef SGH_DD_SNAP_DEV
             if (0 == (num_ebusy % 1000))
-                sg_take_snap(fd, rep->id, (clp->debug > 2));
+                sg_take_snap(fd, rep->id, (clp->verbose > 2));
 #endif
         }
         std::this_thread::yield();/* another thread may be able to progress */
@@ -3259,7 +3441,7 @@ do_v4:
         break;
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_UNIT_ATTENTION:
-        if (clp->debug > 3)
+        if (clp->verbose > 3)
             lk_chk_n_print4(cp, h4p, false);
         return res;
     case SG_LIB_CAT_NOT_READY:
@@ -3270,7 +3452,7 @@ do_v4:
             snprintf(ebuff, EBUFF_SZ, "%s rq_id=%d, blk=%" PRId64, cp,
                      pack_id, blk);
             lk_chk_n_print4(ebuff, h4p, false);
-            if ((clp->debug > 4) && h4p->info)
+            if ((clp->verbose > 4) && h4p->info)
                 pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
                            "detaching=%d aborted=%d\n", h4p->info,
                            !!(h4p->info & SG_INFO_CHECK),
@@ -3280,19 +3462,16 @@ do_v4:
             return res;
         }
     }
-#if 0
-    if (0 == (++testing % 100)) return -1;
-#endif
     if ((wr ? clp->out_flags.dio : clp->in_flags.dio) &&
         ! (h4p->info & SG_INFO_DIRECT_IO))
         rep->dio_incomplete_count = 1; /* count dios done as indirect IO */
     else
         rep->dio_incomplete_count = 0;
     rep->resid = h4p->din_resid;
-    if (clp->debug > 4) {
+    if (clp->verbose > 4) {
         pr2serr_lk("%s: tid,rq_id=%d,%d: completed %s\n", __func__, rep->id,
                    pack_id, cp);
-        if ((clp->debug > 4) && h4p->info)
+        if ((clp->verbose > 4) && h4p->info)
             pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
                        "detaching=%d aborted=%d\n", h4p->info,
                        !!(h4p->info & SG_INFO_CHECK),
@@ -3730,7 +3909,7 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (clp->noshare)
-        sg_noshare_enlarge(fd, clp->debug > 3);
+        sg_noshare_enlarge(fd, clp->verbose > 3);
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3765,7 +3944,7 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (clp->noshare)
-        sg_noshare_enlarge(fd, clp->debug > 3);
+        sg_noshare_enlarge(fd, clp->verbose > 3);
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3848,10 +4027,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }   /* treat 'count=-1' as calculate count (same as not given) */
-        } else if ((0 == strncmp(key, "deb", 3)) ||
-                   (0 == strncmp(key, "verb", 4)))
-            clp->debug = sg_get_num(buf);
-        else if (0 == strcmp(key, "dio")) {
+        } else if (0 == strcmp(key, "dio")) {
             clp->in_flags.dio = !! sg_get_num(buf);
             clp->out_flags.dio = clp->in_flags.dio;
         } else if (0 == strcmp(key, "elemsz_kb")) {
@@ -3980,6 +4156,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             do_time = sg_get_num(buf);
         else if (0 == strcmp(key, "unshare"))
             clp->unshare = !! sg_get_num(buf);  /* default: true */
+        else if (0 == strncmp(key, "verb", 4))
+            clp->verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
@@ -3995,7 +4173,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
             if (n > 0)
                 verbose_given = true;
-            clp->debug += n;   /* -v  ---> --verbose */
+            clp->verbose += n;   /* -v  ---> --verbose */
             res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'V');
             if (n > 0)
@@ -4022,7 +4200,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->prefetch = true;
         else if (0 == strncmp(key, "--verb", 6)) {
             verbose_given = true;
-            ++clp->debug;      /* --verbose */
+            ++clp->verbose;      /* --verbose */
         } else if (0 == strncmp(key, "--veri", 6))
             verify_given = true;
         else if (0 == strncmp(key, "--vers", 6))
@@ -4040,12 +4218,12 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
         verbose_given = false;
         version_given = false;
-        clp->debug = 0;
+        clp->verbose = 0;
     } else if (! verbose_given) {
         pr2serr("set '-vv'\n");
-        clp->debug = 2;
+        clp->verbose = 2;
     } else
-        pr2serr("keep verbose=%d\n", clp->debug);
+        pr2serr("keep verbose=%d\n", clp->verbose);
 #else
     if (verbose_given && version_given)
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
@@ -4141,7 +4319,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     }
     clp->unit_nanosec = (do_time > 1) || !!getenv("SG3_UTILS_LINUX_NANO");
 #if 0
-    if (clp->debug) {
+    if (clp->verbose) {
         pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
                 PRId64, my_name, inf, clp->skip, outf, clp->seek, dd_count);
         if (clp->nmrqs > 0)
@@ -4441,7 +4619,7 @@ main(int argc, char * argv[])
         if (clp->in_flags.v4_given && (! clp->out_flags.v3)) {
             if (! clp->out_flags.v4_given) {
                 clp->out_flags.v4 = true;
-                if (clp->debug)
+                if (clp->verbose)
                     pr2serr("Changing OFILE from v3 to v4, use oflag=v3 to "
                             "force v3\n");
             }
@@ -4449,7 +4627,7 @@ main(int argc, char * argv[])
         if (clp->out_flags.v4_given && (! clp->in_flags.v3)) {
             if (! clp->in_flags.v4_given) {
                 clp->in_flags.v4 = true;
-                if (clp->debug)
+                if (clp->verbose)
                     pr2serr("Changing IFILE from v3 to v4, use iflag=v3 to "
                             "force v3\n");
             }
@@ -4481,7 +4659,7 @@ main(int argc, char * argv[])
             perror(ebuff);
             return sg_convert_errno(err);
         }
-        if (clp->debug > 1)
+        if (clp->verbose > 1)
             pr2serr("ofreg=%s opened okay, fd=%d\n", outregf, clp->outregfd);
         if (FT_ERROR == ftyp)
             clp->outreg_type = FT_OTHER;        /* regular file created */
@@ -4580,7 +4758,7 @@ main(int argc, char * argv[])
         else
             dd_count = out_num_sect;
     }
-    if (clp->debug > 2)
+    if (clp->verbose > 2)
         pr2serr("Start of loop, count=%" PRId64 ", in_num_sect=%" PRId64
                 ", out_num_sect=%" PRId64 "\n", dd_count, in_num_sect,
                 out_num_sect);
@@ -4675,7 +4853,7 @@ main(int argc, char * argv[])
             tip = thread_arr + k;
             status = pthread_join(tip->a_pthr, &vp);
             if (0 != status) err_exit(status, "pthread_join");
-            if (clp->debug > 2)
+            if (clp->verbose > 2)
                 pr2serr_lk("%d <-- Worker thread terminated, vp=%s\n", k,
                            ((vp == clp) ? "clp" : "NULL (or !clp)"));
         }
@@ -4754,24 +4932,24 @@ fini:
     if (clp->sum_of_resids.load())
         pr2serr(">> Non-zero sum of residual counts=%d\n",
                clp->sum_of_resids.load());
-    if (clp->debug && (num_start_eagain > 0))
+    if (clp->verbose && (num_start_eagain > 0))
         pr2serr("Number of start EAGAINs: %d\n", num_start_eagain.load());
-    if (clp->debug && (num_fin_eagain > 0))
+    if (clp->verbose && (num_fin_eagain > 0))
         pr2serr("Number of finish EAGAINs: %d\n", num_fin_eagain.load());
-    if (clp->debug && (num_ebusy > 0))
+    if (clp->verbose && (num_ebusy > 0))
         pr2serr("Number of EBUSYs: %d\n", num_ebusy.load());
-    if (clp->debug && clp->aen_given && (num_abort_req > 0)) {
+    if (clp->verbose && clp->aen_given && (num_abort_req > 0)) {
         pr2serr("Number of Aborts: %d\n", num_abort_req.load());
         pr2serr("Number of successful Aborts: %d\n",
                 num_abort_req_success.load());
     }
-    if (clp->debug && clp->m_aen_given && (num_mrq_abort_req > 0)) {
+    if (clp->verbose && clp->m_aen_given && (num_mrq_abort_req > 0)) {
         pr2serr("Number of MRQ Aborts: %d\n", num_mrq_abort_req.load());
         pr2serr("Number of successful MRQ Aborts: %d\n",
                 num_mrq_abort_req_success.load());
     }
-    if (clp->debug > 1) {
-        if (clp->debug > 3)
+    if (clp->verbose > 1) {
+        if (clp->verbose > 3)
             pr2serr("Final pack_id=%d, mrq_id=%d\n", mono_pack_id.load(),
                     mono_mrq_id.load());
         pr2serr("Number of SG_GET_NUM_WAITING calls=%ld\n",

@@ -19,8 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.75 20200624";
-/* spc6r01, sbc4r20a, zbc2r04 */
+const char * sg_lib_version_str = "2.76 20200708";
+/* spc6r02, sbc4r20a, zbc2r04 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -726,6 +726,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x04,0x22,"Logical unit not ready, power cycle required"},
     {0x04,0x23,"Logical unit not ready, affiliation required"},
     {0x04,0x24,"Depopulation in progress"},             /* spc5r15 */
+    {0x04,0x25,"Depopulation restoration in progress"}, /* spc6r02 */
     {0x05,0x00,"Logical unit does not respond to selection"},
     {0x06,0x00,"No reference position found"},
     {0x07,0x00,"Multiple peripheral devices selected"},
@@ -1004,6 +1005,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x2C,0x10,"Unwritten data in zone"},
     {0x2C,0x11,"Descriptor format sense data required"},
     {0x2C,0x12,"Zone is inactive"},
+    {0x2C,0x13,"Well known logical unit access required"},      /* spc6r02 */
     {0x2D,0x00,"Overwrite error on update in place"},
     {0x2E,0x00,"Insufficient time for operation"},
     {0x2E,0x01,"Command timeout before processing"},
@@ -1035,7 +1037,8 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x31,0x01,"Format command failed"},
     {0x31,0x02,"Zoned formatting failed due to spare linking"},
     {0x31,0x03,"Sanitize command failed"},
-    {0x31,0x04,"Depopulation failed"},          /* spc5r15 */
+    {0x31,0x04,"Depopulation failed"},               /* spc5r15 */
+    {0x31,0x05,"Depopulation restoration failed"},   /* spc6r02 */
     {0x32,0x00,"No defect spare location available"},
     {0x32,0x01,"Defect list update failure"},
     {0x33,0x00,"Tape length error"},

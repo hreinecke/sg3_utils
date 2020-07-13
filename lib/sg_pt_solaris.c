@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_solaris version 1.11 20190113 */
+/* sg_pt_solaris version 1.12 20200712 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,8 +103,8 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
         ptp->dev_fd = (dev_fd < 0) ? -1 : dev_fd;
         ptp->is_nvme = false;
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
-        ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
-        ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
+// ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
+        ptp->uscsi.uscsi_flags = USCSI_ISOLATE | USCSI_RQENABLE;
     } else if (verbose)
         fprintf(sg_warnings_strm ? sg_warnings_strm : stderr,
                 "%s: calloc() out of memory\n", __func__);
@@ -134,8 +134,8 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     if (ptp) {
         memset(ptp, 0, sizeof(struct sg_pt_solaris_scsi));
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
-        ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
-        ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
+// ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
+        ptp->uscsi.uscsi_flags = USCSI_ISOLATE | USCSI_RQENABLE;
     }
 }
 
@@ -284,6 +284,11 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     if (time_secs > 0)
         ptp->uscsi.uscsi_timeout = time_secs;
 
+// Test code: address rejection of TUR (no data xfer) with EINVAL
+if (NULL == ptp->uscsi.uscsi_bufaddr)
+    ptp->uscsi.uscsi_bufaddr = ptp->uscsi.uscsi_rqbuf;  /* give it a buffer address even though not used */
+// End of Test code 20200712 dpg
+
     if (ioctl(ptp->dev_fd, USCSICMD, &ptp->uscsi)) {
         ptp->os_err = errno;
         if ((EIO == ptp->os_err) && ptp->uscsi.uscsi_status) {
@@ -335,8 +340,8 @@ void
 get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
                    int * req_doutp)
 {
-    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
-    int dxfer_len = ptp->uscsi.uscsi_buflen
+    const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+    int dxfer_len = ptp->uscsi.uscsi_buflen;
     int flags = ptp->uscsi.uscsi_flags;
 
     if (req_dinp) {
@@ -357,8 +362,8 @@ void
 get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
                       int * act_doutp)
 {
-    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
-    int dxfer_len = ptp->uscsi.uscsi_buflen
+    const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+    int dxfer_len = ptp->uscsi.uscsi_buflen;
     int flags = ptp->uscsi.uscsi_flags;
 
     if (act_dinp) {
@@ -415,7 +420,7 @@ get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 
 /* If not available return 0 otherwise return number of nanoseconds that the
  * lower layers (and hardware) took to execute the command just completed. */
-uint64_t 
+uint64_t
 get_pt_duration_ns(const struct sg_pt_base * vp __attribute__ ((unused)))
 {
     return 0;

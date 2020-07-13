@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.44 20200115";
+static const char * version_str = "1.45 20200708";      /* spc6r02 */
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
