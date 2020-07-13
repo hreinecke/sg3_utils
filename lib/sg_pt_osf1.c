@@ -30,12 +30,12 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 2.01 20200415 */
+/* Version 2.02 20200713 */
 
 #define OSF1_MAXDEV 64
 
 #ifndef CAM_DIR_BOTH
-#define CAM_DIR_BOTH 0x0	/* copy value from FreeBSD */
+#define CAM_DIR_BOTH 0x0        /* copy value from FreeBSD */
 #endif
 
 struct osf1_dev_channel {
@@ -204,10 +204,16 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
+    bool is_nvme;
+    int dev_fd;
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
 
     if (ptp) {
+        is_nvme = ptp->is_nvme;
+        dev_fd = ptp->dev_fd;
         bzero(ptp, sizeof(struct sg_pt_osf1_scsi));
+        ptp->dev_fd = dev_fd;
+        ptp->is_nvme = is_nvme;
         ptp->dxfer_dir = CAM_DIR_NONE;
     }
 }
@@ -545,7 +551,7 @@ get_scsi_pt_duration_ms(const struct sg_pt_base * vp)
 
 /* If not available return 0 otherwise return number of nanoseconds that the
  * lower layers (and hardware) took to execute the command just completed. */
-uint64_t 
+uint64_t
 get_pt_duration_ns(const struct sg_pt_base * vp __attribute__ ((unused)))
 {
     return 0;

@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_solaris version 1.12 20200712 */
+/* sg_pt_solaris version 1.13 20200713 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,8 +103,10 @@ construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
         ptp->dev_fd = (dev_fd < 0) ? -1 : dev_fd;
         ptp->is_nvme = false;
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
-// ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
-        ptp->uscsi.uscsi_flags = USCSI_ISOLATE | USCSI_RQENABLE;
+        /* Comment in Illumos suggest USCSI_ISOLATE and USCSI_DIAGNOSE (both)
+         * seem to mean "don't retry" which is what we want. */
+        ptp->uscsi.uscsi_flags = USCSI_ISOLATE | USCSI_DIAGNOSE |
+                                 USCSI_RQENABLE;
     } else if (verbose)
         fprintf(sg_warnings_strm ? sg_warnings_strm : stderr,
                 "%s: calloc() out of memory\n", __func__);
@@ -129,13 +131,19 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
+    bool is_nvme;
+    int dev_fd;
     struct sg_pt_solaris_scsi * ptp = &vp->impl;
 
     if (ptp) {
+        is_nvme = ptp->is_nvme;
+        dev_fd = ptp->dev_fd;
         memset(ptp, 0, sizeof(struct sg_pt_solaris_scsi));
+        ptp->dev_fd = dev_fd;
+        ptp->is_nvme = is_nvme;
         ptp->uscsi.uscsi_timeout = DEF_TIMEOUT;
-// ptp->uscsi.uscsi_flags = USCSI_READ | USCSI_ISOLATE | USCSI_RQENABLE;
-        ptp->uscsi.uscsi_flags = USCSI_ISOLATE | USCSI_RQENABLE;
+        ptp->uscsi.uscsi_flags = USCSI_ISOLATE | USCSI_DIAGNOSE |
+                                 USCSI_RQENABLE;
     }
 }
 
@@ -283,11 +291,6 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     }
     if (time_secs > 0)
         ptp->uscsi.uscsi_timeout = time_secs;
-
-// Test code: address rejection of TUR (no data xfer) with EINVAL
-if (NULL == ptp->uscsi.uscsi_bufaddr)
-    ptp->uscsi.uscsi_bufaddr = ptp->uscsi.uscsi_rqbuf;  /* give it a buffer address even though not used */
-// End of Test code 20200712 dpg
 
     if (ioctl(ptp->dev_fd, USCSICMD, &ptp->uscsi)) {
         ptp->os_err = errno;
