@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2020 Douglas Gilbert
  *
- * Version 4.0.13 (20200328)
+ * Version 4.0.44 (20200618)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -127,7 +127,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
 #define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* n sg_io_v4s in data-in */
 #define SGV4_FLAG_EVENTFD 0x40000	/* signal completion on ... */
-#define SGV4_FLAG_ORDERED_SLV 0x80000	/* svb: issue in-order writes */
+#define SGV4_FLAG_ORDERED_WR 0x80000	/* svb: issue in-order writes */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1
@@ -194,8 +194,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIM_RESERVED_SIZE	0x4	/* reserved_sz of reserve request */
 #define SG_SEIM_TOT_FD_THRESH	0x8	/* tot_fd_thresh of data buffers */
 #define SG_SEIM_MINOR_INDEX	0x10	/* sg device minor index number */
-#define SG_SEIM_SHARE_FD	0x20	/* slave gives fd of master: sharing */
-#define SG_SEIM_CHG_SHARE_FD	0x40	/* master gives fd of new slave */
+#define SG_SEIM_SHARE_FD	0x20	/* write-side gives fd of read-side */
+#define SG_SEIM_CHG_SHARE_FD	0x40	/* read-side given new write-side fd */
 #define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
 #define SG_SEIM_EVENTFD		0x100	/* pass eventfd to driver */
 #define SG_SEIM_ALL_BITS	0x1ff	/* should be OR of previous items */
@@ -206,12 +206,12 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_OTHER_OPENS 0x4	/* rd: other sg fd_s on this dev */
 #define SG_CTL_FLAGM_ORPHANS	0x8	/* rd: orphaned requests on this fd */
 #define SG_CTL_FLAGM_Q_TAIL	0x10	/* used for future cmds on this fd */
-#define SG_CTL_FLAGM_IS_SHARE	0x20	/* rd: fd is master or slave share */
-#define SG_CTL_FLAGM_IS_MASTER	0x40	/* rd: this fd is share master */
+#define SG_CTL_FLAGM_IS_SHARE	0x20	/* rd: fd is read-side or write-side share */
+#define SG_CTL_FLAGM_IS_READ_SIDE 0x40	/* rd: this fd is read-side share */
 #define SG_CTL_FLAGM_UNSHARE	0x80	/* undo share after inflight cmd */
-/* rd> 1: master finished 0: not; wr> 1: finish share post master */
-#define SG_CTL_FLAGM_MASTER_FINI 0x100	/* wr> 0: setup for repeat slave req */
-#define SG_CTL_FLAGM_MASTER_ERR	0x200	/* rd: sharing, master got error */
+/* rd> 1: read-side finished, 0: not; wr> 1: finish share post read-side */
+#define SG_CTL_FLAGM_READ_SIDE_FINI 0x100 /* wr> 0: setup for repeat write-side req */
+#define SG_CTL_FLAGM_READ_SIDE_ERR 0x200 /* rd: sharing, read-side got error */
 #define SG_CTL_FLAGM_NO_DURATION 0x400	/* don't calc command duration */
 #define SG_CTL_FLAGM_MORE_ASYNC	0x800	/* yield EAGAIN in more cases */
 #define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */

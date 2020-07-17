@@ -19,20 +19,20 @@
 # Example invocation:
 # $ sg_unmap --in=../examples/sg_unmap_example.txt -vv /dev/sdc
 # open /dev/sg2 with flags=0x802
-#     unmap cdb: 42 00 00 00 00 00 00 00 58 00 
+#     unmap cdb: 42 00 00 00 00 00 00 00 58 00
 #     unmap parameter list:
-#         00 56 00 50 00 00 00 00  00 00 00 00 12 34 56 77    
-#         00 00 00 01 00 00 00 00  00 00 00 00 12 34 56 78    
-#         00 00 00 02 00 00 00 00  00 00 00 00 12 34 00 00    
-#         00 00 0d 05 00 00 00 00  00 00 00 5a 5a 5a 5a 5a    
-#         00 00 00 00 00 00 00 00  00 00 00 00 00 a5 a5 a5    
+#         00 56 00 50 00 00 00 00  00 00 00 00 12 34 56 77
+#         00 00 00 01 00 00 00 00  00 00 00 00 12 34 56 78
+#         00 00 00 02 00 00 00 00  00 00 00 00 12 34 00 00
+#         00 00 0d 05 00 00 00 00  00 00 00 5a 5a 5a 5a 5a
+#         00 00 00 00 00 00 00 00  00 00 00 00 00 a5 a5 a5
 #         00 00 00 07 00 00 00 00
 # sg_cmds_process_resp: slen=18
 # unmap:  Fixed format, current;  Sense key: Illegal Request
 #  Additional sense: Invalid command operation code
 #  Raw sense data (in hex):
-#         70 00 05 00 00 00 00 0a  00 00 00 00 20 00 00 00    
-#         00 00                                               
+#         70 00 05 00 00 00 00 0a  00 00 00 00 20 00 00 00
+#         00 00
 # UNMAP not supported
 #
 # --------------------------------------------------------

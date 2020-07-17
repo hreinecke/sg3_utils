@@ -60,7 +60,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.17  20200602";
+static const char * version_str = "Version: 1.18  20200716";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -410,10 +410,10 @@ tst_extended_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_ORPHANS;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_Q_TAIL;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_IS_SHARE;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_IS_MASTER;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_IS_READ_SIDE;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_UNSHARE;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_FINI;
-    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_MASTER_ERR;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_READ_SIDE_FINI;
+    seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_READ_SIDE_ERR;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
     seip->ctl_flags_rd_mask |= SG_CTL_FLAGM_NO_DURATION;
     seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
@@ -450,18 +450,18 @@ tst_extended_ioctl(const char * fnp, int sg_fd, const char * fn2p, int sg_fd2,
         if (SG_CTL_FLAGM_IS_SHARE & seip->ctl_flags_rd_mask)
             printf("  %sIS_SHARE: %s\n", cp,
                    (SG_CTL_FLAGM_IS_SHARE & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_IS_MASTER & seip->ctl_flags_rd_mask)
-            printf("  %sIS_MASTER: %s\n", cp,
-                   (SG_CTL_FLAGM_IS_MASTER & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_IS_READ_SIDE & seip->ctl_flags_rd_mask)
+            printf("  %sIS_READ_SIDE: %s\n", cp,
+                   (SG_CTL_FLAGM_IS_READ_SIDE & cflags) ? "true" : "false");
         if (SG_CTL_FLAGM_UNSHARE & seip->ctl_flags_rd_mask)
             printf("  %sUNSHARE: %s\n", cp,
                    (SG_CTL_FLAGM_UNSHARE & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_MASTER_FINI & seip->ctl_flags_rd_mask)
-            printf("  %sMASTER_FINI: %s\n", cp,
-                   (SG_CTL_FLAGM_MASTER_FINI & cflags) ? "true" : "false");
-        if (SG_CTL_FLAGM_MASTER_ERR & seip->ctl_flags_rd_mask)
-            printf("  %sMASTER_ERR: %s\n", cp,
-                   (SG_CTL_FLAGM_MASTER_ERR & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_READ_SIDE_FINI & seip->ctl_flags_rd_mask)
+            printf("  %sREAD_SIDE_FINI: %s\n", cp,
+                   (SG_CTL_FLAGM_READ_SIDE_FINI & cflags) ? "true" : "false");
+        if (SG_CTL_FLAGM_READ_SIDE_ERR & seip->ctl_flags_rd_mask)
+            printf("  %sREAD_SIDE_ERR: %s\n", cp,
+                   (SG_CTL_FLAGM_READ_SIDE_ERR & cflags) ? "true" : "false");
         if (SG_CTL_FLAGM_NO_DURATION & seip->ctl_flags_rd_mask)
             printf("  %sNO_DURATION: %s\n", cp,
                    (SG_CTL_FLAGM_NO_DURATION & cflags) ? "true" : "false");
@@ -1020,8 +1020,8 @@ main(int argc, char * argv[])
                 k = -k;
             if (second_fname) {
                 if ((sg_fd2 = open(second_fname, O_RDWR)) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                             "%s: error opening file: %s", __func__, second_fname);
+                    snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s",
+                             __func__, second_fname);
                     perror(ebuff);
                     return 1;
                 }

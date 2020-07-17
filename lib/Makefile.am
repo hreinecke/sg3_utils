@@ -5,7 +5,7 @@ libsgutils2_la_SOURCES = \
 	sg_cmds_basic2.c \
 	sg_cmds_extra.c \
 	sg_cmds_mmc.c \
-	sg_pt_common.c 
+	sg_pt_common.c
 
 if OS_LINUX
 libsgutils2_la_SOURCES += \

@@ -21,7 +21,7 @@ problems.
 .PP
 There is an optional SCSI adapter scan which may find additional storage
 devices other than the ones listed above. An example is a SCSI Enclosure
-Services (SES) device typically found in disk arrays. 
+Services (SES) device typically found in disk arrays.
 .PP
 Storage and related devices can have several device names in Windows.
 Probably the most common in the volume name (e.g. "D:"). There is also
@@ -125,9 +125,9 @@ recognised by Windows.
 .PP
   # sg_scan
 .br
-PD0     [C]     FUJITSU   MHY2160BH         0000  
+PD0     [C]     FUJITSU   MHY2160BH         0000
 .br
-PD1     [DF]    WD        2500BEV External  1.05  WD\-WXE90     
+PD1     [DF]    WD        2500BEV External  1.05  WD\-WXE90
 .br
 CDROM0  [E]     MATSHITA DVD/CDRW UJDA775  CB03
 .PP
@@ -136,7 +136,7 @@ and there is a "Sata" bus type.
 .PP
   # sg_scan \-b
 .br
-PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000  
+PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000
 .br
 PD1     [DF]    <Usb  >  WD        2500BEV External  1.05  WD\-WXE90
 .br
@@ -146,13 +146,13 @@ Now request a SCSI adapter scan as well.
 .PP
   # sg_scan \-b \-s
 .br
-PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000  
+PD0     [C]     <Ata  >  FUJITSU   MHY2160BH         0000
 .br
-PD1     [DF]    <Usb  >  WD        2500BEV External  1.05  WD\-WXE90     
+PD1     [DF]    <Usb  >  WD        2500BEV External  1.05  WD\-WXE90
 .br
-CDROM0  [E]     <Atapi>  MATSHITA DVD/CDRW UJDA775  CB03  
+CDROM0  [E]     <Atapi>  MATSHITA DVD/CDRW UJDA775  CB03
 .br
-   
+
 .br
 SCSI0:0,0,0   claimed=1 pdt=0h  FUJITSU   MHY2160BH         0000
 .br

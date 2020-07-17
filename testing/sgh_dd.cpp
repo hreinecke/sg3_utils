@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.83 20200709";
+static const char * version_str = "1.84 20200716";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -602,8 +602,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_ORDERED_SLV & flags) {      /* 0x80000 */
-        n += sg_scnpr(b + n, b_len - n, "OSLV|");
+    if (SGV4_FLAG_ORDERED_WR & flags) {      /* 0x80000 */
+        n += sg_scnpr(b + n, b_len - n, "OWR|");
         if (n >= b_len)
             goto fini;
     }
@@ -900,9 +900,9 @@ usage(int pg_num)
     pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1]\n"
             "               [dio=0|1] [elemsz_kb=ESK] [fail_mask=FM] "
-	    "[fua=0|1|2|3]\n"
+            "[fua=0|1|2|3]\n"
             "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
-	    "[of2=OFILE2]\n"
+            "[of2=OFILE2]\n"
             "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] [thr=THR] "
             "[time=0|1]\n"
             "               [unshare=1|0] [verbose=VERB] [--dry-run] "
@@ -1041,8 +1041,8 @@ page3:
             "file\n"
             "                descriptors (def: each threads has own file "
             "descriptors)\n"
-            "    swait       slave wait: issue WRITE on OFILE before READ "
-            "is finished;\n"
+            "    swait       slave wait: action under review, treat as "
+            "dummy;\n"
             "                [oflag only] and IFILE and OFILE must be sg "
             "devices\n"
             "    v3          use v3 sg interface (def: v3 unless sg driver "
@@ -1077,11 +1077,12 @@ page4:
             "traversal is 'safe'. So it is important to note\nthe whole "
             "tree is not locked. This means for fast devices the overall\n"
             "tree state may change while the traversal is occurring. For "
-            "example,\nit has been observed that both the master and slave "
+            "example,\nit has been observed that both the read- and write- "
             "sides of a request\nshare show they are in 'active' state "
-            "which should not be possible.\nIt occurs because the master "
-            "probably jumped out of active state and\nthe slave request "
-            "entered it while some other nodes were being printed.\n\n");
+            "which should not be possible.\nIt occurs because the read-"
+            "sie probably jumped out of active state and\nthe write-side "
+            "request entered it while some other nodes were being "
+            "printed.\n\n");
     pr2serr("Busy state:\n"
             "Busy state (abbreviated to 'bsy' in the /proc/scsi/sg/debug "
             "output)\nis entered during request setup and completion. It "
@@ -1259,7 +1260,7 @@ mrq_abort_thread(void * v_maip)
 }
 
 static bool
-sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
+sg_share_prepare(int write_side_fd, int read_side_fd, int id, bool vb_b)
 {
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
@@ -1268,16 +1269,17 @@ sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
-    seip->share_fd = master_rd_fd;
-    if (ioctl(slave_wr_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+    seip->share_fd = read_side_fd;
+    if (ioctl(write_side_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(shared_fd=%d), failed "
-                   "errno=%d %s\n", id, master_rd_fd, errno,
+                   "errno=%d %s\n", id, read_side_fd, errno,
                    strerror(errno));
         return false;
     }
     if (vb_b)
-        pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(shared_fd)) ok, master_fd=%d, "
-                   "slave_fd=%d\n", __func__, id, master_rd_fd, slave_wr_fd);
+        pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(shared_fd)) ok, "
+                   "read_side_fd=%d, write_side_fd=%d\n", __func__,
+                   id, read_side_fd, write_side_fd);
     return true;
 }
 
@@ -2051,7 +2053,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     bool not_first = false;
     int err = 0;
     int k;
-    int master_fd = rep->infd;  /* in (READ) side is master */
+    int read_side_fd = rep->infd;
     struct global_collection * clp = rep->clp;
     struct sg_extended_info sei;
     struct sg_extended_info * seip = &sei;
@@ -2064,13 +2066,13 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     seip->sei_rd_mask |= SG_SEIM_CHG_SHARE_FD;
     seip->share_fd = to_fd;
     if (before) {
-        /* clear MASTER_FINI bit to put master in SG_RQ_SHR_SWAP state */
+        /* clear READ_SIDE_FINI bit: puts read-side in SG_RQ_SHR_SWAP state */
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_MASTER_FINI;
-        seip->ctl_flags &= SG_CTL_FLAGM_MASTER_FINI;/* would be 0 anyway */
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_READ_SIDE_FINI;
+        seip->ctl_flags &= SG_CTL_FLAGM_READ_SIDE_FINI;/* would be 0 anyway */
     }
-    for (k = 0; (ioctl(master_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
+    for (k = 0; (ioctl(read_side_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
                  (EBUSY == errno); ++k) {
         err = errno;
         if (k > 10000)
@@ -2078,7 +2080,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
         if (! not_first) {
             if (clp->verbose > 3)
                 pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), "
-                           "failed errno=%d %s\n", rep->id, master_fd, err,
+                           "failed errno=%d %s\n", rep->id, read_side_fd, err,
                            strerror(err));
             not_first = true;
         }
@@ -2087,13 +2089,13 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     }
     if (err) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(change_shared_fd=%d), failed "
-                   "errno=%d %s\n", rep->id, master_fd, err, strerror(err));
+                   "errno=%d %s\n", rep->id, read_side_fd, err, strerror(err));
         return false;
     }
     if (clp->verbose > 15)
         pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(change_shared_fd)) ok, "
-                   "master_fd=%d, to_slave_fd=%d\n", __func__, rep->id,
-                   master_fd, to_fd);
+                   "read_side_fd=%d, to_write_side_fd=%d\n", __func__, rep->id,
+                   read_side_fd, to_fd);
     return true;
 }
 
@@ -3089,9 +3091,9 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         else if (rep->outregfd < 0)
             flags |= SGV4_FLAG_NO_DXFER;
 
-        cp = (wr ? " slave active" : " master active");
+        cp = (wr ? " write_side active" : " read_side active");
     } else
-        cp = (wr ? " slave not sharing" : " master not sharing");
+        cp = (wr ? " write-side not sharing" : " read_side not sharing");
     if (rep->both_sg) {
         if (wr)
             pack_id = rep->rd_p_id + 1;

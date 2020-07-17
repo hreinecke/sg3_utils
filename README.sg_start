@@ -16,7 +16,7 @@ I use it in my shutdown script at the end (before the poweroff command):
 if test -x /bin/sg_start; then
     if test "`basename $command`" = "reboot"; then
         for no in $SG_SHUT_NOS;
-	      do /bin/sg_start /dev/sg$no -s >/dev/null 2>&1; 
+	      do /bin/sg_start /dev/sg$no -s >/dev/null 2>&1;
 	 done
     else
         for no in $SG_SHUT_NOS;

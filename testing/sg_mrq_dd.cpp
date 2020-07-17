@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.02 20200709";
+static const char * version_str = "1.03 20200716";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -683,8 +683,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_ORDERED_SLV & flags) {      /* 0x80000 */
-        n += sg_scnpr(b + n, b_len - n, "OSLV|");
+    if (SGV4_FLAG_ORDERED_WR & flags) {      /* 0x80000 */
+        n += sg_scnpr(b + n, b_len - n, "OWR|");
         if (n >= b_len)
             goto fini;
     }
@@ -802,8 +802,8 @@ fetch_sg_version(void)
                 have_sg_version = !!sg_version;
             }
         }
-	if (NULL == fp)
-		pr2serr("The sg driver may not be loaded\n");
+        if (NULL == fp)
+                pr2serr("The sg driver may not be loaded\n");
     }
     if (fp)
         fclose(fp);
@@ -1107,11 +1107,12 @@ page4:
             "traversal is 'safe'. So it is important to note\nthe whole "
             "tree is not locked. This means for fast devices the overall\n"
             "tree state may change while the traversal is occurring. For "
-            "example,\nit has been observed that both the master and slave "
+            "example,\nit has been observed that both the read- and write- "
             "sides of a request\nshare show they are in 'active' state "
-            "which should not be possible.\nIt occurs because the master "
-            "probably jumped out of active state and\nthe slave request "
-            "entered it while some other nodes were being printed.\n\n");
+            "which should not be possible.\nIt occurs because the read-side "
+            "probably jumped out of active state and\nthe write-side "
+            "request entered it while some other nodes were being "
+            "printed.\n\n");
     pr2serr("Busy state:\n"
             "Busy state (abbreviated to 'bsy' in the /proc/scsi/sg/debug "
             "output)\nis entered during request setup and completion. It "
@@ -2244,7 +2245,7 @@ sig_listen_thread(struct global_collection * clp)
 }
 
 static bool
-sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
+sg_share_prepare(int write_side_fd, int read_side_fd, int id, bool vb_b)
 {
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
@@ -2253,16 +2254,17 @@ sg_share_prepare(int slave_wr_fd, int master_rd_fd, int id, bool vb_b)
     memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
-    seip->share_fd = master_rd_fd;
-    if (ioctl(slave_wr_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+    seip->share_fd = read_side_fd;
+    if (ioctl(write_side_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(shared_fd=%d), failed "
-                   "errno=%d %s\n", id, master_rd_fd, errno,
+                   "errno=%d %s\n", id, read_side_fd, errno,
                    strerror(errno));
         return false;
     }
     if (vb_b)
-        pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(shared_fd)) ok, master_fd=%d, "
-                   "slave_fd=%d\n", __func__, id, master_rd_fd, slave_wr_fd);
+        pr2serr_lk("%s: tid=%d: ioctl(EXTENDED(shared_fd)) ok, "
+                   "read_side_fd=%d, write_side_fd=%d\n", __func__, id,
+                   read_side_fd, write_side_fd);
     return true;
 }
 
@@ -2537,7 +2539,7 @@ fini:
         }
         close(rep->outfd);
     }
-    /* pass stats back to master */
+    /* pass stats back to read-side */
     clp->in_rem_count -= rep->in_local_count;
     clp->out_rem_count -= rep->out_local_count;
     clp->in_partial += rep->in_local_partial;
@@ -2983,7 +2985,7 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
             break;
         }
 
-        /* First build the command/request for the master (READ) side */
+        /* First build the command/request for the read-side */
         cdbsz = is_wr ? clp->cdbsz_out : clp->cdbsz_in;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num, sg_it.current_lba(),
                                 false, is_wr, flagsp->fua, flagsp->dpo);
@@ -3384,7 +3386,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             break;
         }
 
-        /* First build the command/request for the master (READ) side */
+        /* First build the command/request for the read-side*/
         cdbsz = clp->cdbsz_in;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
                                 i_sg_it.current_lba(), false, false,
@@ -3408,7 +3410,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
         a_v4.push_back(t_v4);
 
-        /* Now build the command/request for slave (WRITE or VERIFY) side */
+        /* Now build the command/request for write-side (WRITE or VERIFY) */
         cdbsz = clp->cdbsz_out;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
                                 o_sg_it.current_lba(), clp->verify, true,
@@ -3464,7 +3466,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     if (! (iflagsp->coe || oflagsp->coe))
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     if ((! clp->verify) && clp->out_flags.order)
-        ctl_v4.flags |= SGV4_FLAG_ORDERED_SLV;
+        ctl_v4.flags |= SGV4_FLAG_ORDERED_WR;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */

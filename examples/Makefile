@@ -24,7 +24,7 @@ EXTRAS = sgq_dd
 BSG_EXTRAS =
 
 
-MAN_PGS = 
+MAN_PGS =
 MAN_PREF = man8
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -71,7 +71,7 @@ sg_simple16: sg_simple16.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 scsi_inquiry: scsi_inquiry.o
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_excl: sg_excl.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
@@ -95,7 +95,7 @@ sg_sat_smart_rd_data: sg_sat_smart_rd_data.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sgq_dd: sgq_dd.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 install: $(EXECS)
 	install -d $(INSTDIR)

@@ -141,7 +141,7 @@ NVMe command        sg3_utils utilities that use this NVMe command
 Identify            sg_inq
 SES Read            sg_senddiag, sg_ses (NVME-MI command)
 SES Write           sg_senddiag, sg_ses (NVME-MI command)
-Device self-test    [SNTL of SEND DIAGNOSTIC] sg_senddiag  
+Device self-test    [SNTL of SEND DIAGNOSTIC] sg_senddiag
 Get features(power management) [SNTL of REQUEST SENSE] sg_requests
 Read                [SCSI READ(10) -->SNTL--> Read]
                     [SCSI READ(16) -->SNTL--> Read]

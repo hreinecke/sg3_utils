@@ -14,7 +14,7 @@ EXTRAS =
 BSG_EXTRAS =
 
 
-MAN_PGS = 
+MAN_PGS =
 MAN_PREF = man8
 
 LARGE_FILE_FLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -31,10 +31,10 @@ CXXLD = $(CXX)
 CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
 CXXFLAGS = -std=c++17 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME -DDEBUG
-# CFLAGS = -g -O2 -W -Wall 
+# CFLAGS = -g -O2 -W -Wall
 CFLAGS = -ggdb -O2 -W -Wall -DDEBUG
 # CFLAGS = -g -O2 -Wall -DSG_KERNEL_INCLUDES
-# CFLAGS = -g -O2 -Wall -pedantic 
+# CFLAGS = -g -O2 -Wall -pedantic
 # CFLAGS = -Wall -W -pedantic -std=c11 --analyze
 # CFLAGS = -Wall -W -pedantic -std=c++14 -fPIC
 
@@ -67,29 +67,29 @@ sg_sense_test: sg_sense_test.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_queue_tst: sg_queue_tst.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 bsg_queue_tst: bsg_queue_tst.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_ioctl: sg_tst_ioctl.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 # building sg_chk_asc depends on a prior successful make in ../lib
 sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sgs_dd: sgs_dd.o $(LIBFILESOLD)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_bidi: sg_tst_bidi.o $(LIBFILESNEW)
-	$(LD) -o $@ $(LDFLAGS) $^ 
+	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_excl: sg_tst_excl.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^

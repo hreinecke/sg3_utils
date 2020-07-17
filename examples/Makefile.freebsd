@@ -18,7 +18,7 @@ EXECS = sg_simple5
 
 # EXTRAS = sgq_dd
 
-MAN_PGS = 
+MAN_PGS =
 MAN_PREF = man8
 
 OS_FLAGS = -DSG_LIB_FREEBSD

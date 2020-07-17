@@ -15,9 +15,9 @@
 # INQUIRY (VPD: 0x83)    Device identification VPD page
 # INQUIRY (VPD: 0x89)    ATA Information VPD page
 # REPORT LUNS            SPC-3, SPC-4 (hardly mentioned in sat-r08c)
-# TEST UNIT READY        
-# REQUEST SENSE          
-# SEND DIAGNOSTIC        default self test        
+# TEST UNIT READY
+# REQUEST SENSE
+# SEND DIAGNOSTIC        default self test
 # MODE SENSE(10)         draft unclear which mode pages, so ask for all
 # ATA PASS THROUGH(16)   send IDENTIFY DEVICE command. Assume non-packet
 #                        device, if packet device add "-p" option
@@ -76,7 +76,7 @@ if [ $# -lt 1 ]
   then
     usage
     exit 1
-fi 
+fi
 
 for command in "sg_inq" "sg_vpd" "sg_vpd -p di" "sg_vpd -p ai" "sg_luns" \
                "sg_turs" "sg_requests -s" "sg_senddiag -t" "sg_modes -a" \

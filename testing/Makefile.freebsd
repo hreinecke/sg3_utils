@@ -17,7 +17,7 @@ EXECS = sg_sense_test sg_chk_asc sg_tst_nvme tst_sg_lib
 	
 EXTRAS =
 
-MAN_PGS = 
+MAN_PGS =
 MAN_PREF = man8
 
 OS_FLAGS = -DSG_LIB_FREEBSD -DHAVE_NVME
