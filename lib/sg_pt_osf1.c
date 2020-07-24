@@ -30,7 +30,7 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 2.02 20200713 */
+/* Version 2.03 20200722 */
 
 #define OSF1_MAXDEV 64
 
@@ -219,15 +219,45 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 }
 
 void
+partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    if (NULL == ptp)
+        return;
+    ptp->in_err = 0;
+    ptp->os_err = 0;
+    ptp->transport_err = 0;
+    ptp->scsi_status = 0;
+    ptp->dxfer_dir = CAM_DIR_NONE;
+    ptp->dxferp = NULL;
+    ptp->dxfer_len = 0;
+}
+
+void
 set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
                 int cdb_len)
 {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
 
-    if (ptp->cdb)
-        ++ptp->in_err;
     ptp->cdb = (uint8_t *)cdb;
     ptp->cdb_len = cdb_len;
+}
+
+int
+get_scsi_pt_cdb_len(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    return ptp->cdb_len;
+}
+
+uint8_t *
+get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    return ptp->cdb;
 }
 
 void
@@ -236,9 +266,10 @@ set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
 {
     struct sg_pt_osf1_scsi * ptp = &vp->impl;
 
-    if (ptp->sense)
-        ++ptp->in_err;
-    bzero(sense, max_sense_len);
+    if (sense) {
+        if (max_sense_len > 0)
+            bzero(sense, max_sense_len);
+    }
     ptp->sense = sense;
     ptp->sense_len = max_sense_len;
 }

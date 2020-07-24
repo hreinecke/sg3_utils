@@ -2,8 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.46 [20200716] [svn: r856]
+Changelog for sg3_utils-1.46 [20200724] [svn: r857]
   - sg_rep_pip: report new provisioning initialization pattern cmd
+  - sg_turs: estimated time-to-ready [20-061r2]
+    - add --delay=MS option
+  - sg_requests: substantial cleanup
   - sg_dd: separate category for miscompare errors
   - sg_get_elem_status: add ralwd bit sbc4r20a
   - sg_write_x: add dld bits to write(32) [sbc4r19a]
@@ -13,6 +16,8 @@ Changelog for sg3_utils-1.46 [20200716] [svn: r856]
   - sg_pt_solaris+sg_pt_osf1: fix problem with clear_scsi_pt_obj()
     which needs to remember is_nvme and dev_fd values
   - sg_lib: restore elements and rebuild command added
+  - sg_lib,sg_pt: add partial_clear_scsi_pt_obj(),
+    get_scsi_pt_cdb_len() and get_scsi_pt_cdb_buf()
   - sg_lib: Linux NVMe SNTL: add read, write and verify;
     synchronize cache and write same translations
     - add dummy start stop unit and test unit ready commands

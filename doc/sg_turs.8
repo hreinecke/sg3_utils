@@ -1,14 +1,14 @@
-.TH SG_TURS "8" "September 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_TURS "8" "July 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
 .B sg_turs
-[\fI\-\-help\fR] [\fI\-\-low\fR] [\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR]
-[\fI\-\-progress\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-delay=MS\fR] [\fI\-\-help\fR] [\fI\-\-low\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-number=NUM\fR] [\fI\-\-progress\fR] [\fI\-\-time\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_turs
-[\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR]
+[\fI\-d=MS\fR] [\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -23,6 +23,10 @@ shown first in the synopsis and explained in this section. A later section
 on the old command line syntax outlines the second group of options.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-d\fR, \fB\-\-delay\fR=\fIMS\fR
+this option causes a delay of \fIMS\fR milliseconds to occur before each
+TEST UNIT READY command is issued.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -55,6 +59,8 @@ Switch to older style options. Please use as first option.
 show progress indication (a percentage) if available. If \fI\-\-num=NUM\fR
 is given, \fINUM\fR is greater than 1 and an initial progress indication
 was detected then this utility waits 30 seconds before subsequent checks.
+If the \fI\-\-delay=MS\fR option is given then it will wait for that number
+of milliseconds instead of 30 seconds.
 Exits when \fINUM\fR is reached or there are no more progress indications.
 Ignores \fI\-\-time\fR option. See NOTES section below.
 .TP
@@ -101,6 +107,10 @@ options which can be overridden by using \fI\-\-old\fR (or \fI\-O\fR) as the
 first option. See the ENVIRONMENT VARIABLES section for another way to
 force the use of these older command line options.
 .TP
+\fB\-d\fR, \fB\-\-delay\fR=\fIMS\fR
+this option causes a delay of \fIMS\fR milliseconds to occur before each
+TEST UNIT READY command is issued.
+.TP
 \fB\-n\fR=\fINUM\fR
 performs TEST UNIT READY \fINUM\fR times. If not given defaults to 1.
 Equivalent to \fI\-\-num=NUM\fR in the main description.
@@ -130,7 +140,7 @@ using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2019 Douglas Gilbert
+Copyright \(co 2000\-2020 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

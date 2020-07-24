@@ -60,14 +60,14 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.18  20200716";
+static const char * version_str = "Version: 1.18  20200719";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
 #define SDIAG_CMD_LEN 6
 #define SENSE_BUFFER_LEN 96
 
-#define EBUFF_SZ 256
+#define EBUFF_SZ 512
 
 #ifndef SG_FLAG_Q_AT_TAIL
 #define SG_FLAG_Q_AT_TAIL 0x10
@@ -105,6 +105,9 @@ static int sleep_secs = 0;
 static int reserve_buff_sz = DEF_RESERVE_BUFF_SZ;
 static int num_mrqs = 0;
 static int num_sgnw = 0;
+static int dname_current = 0;
+static int dname_last = 0;
+static int dname_pos = 0;
 static int verbose = 0;
 
 static const char * relative_cp = NULL;
@@ -119,16 +122,18 @@ usage(void)
            "                    [-m=MRQS[,I|S]] [-M] [-n] [-o] [-r=SZ] "
            "[-s=SEC]\n"
            "                    [-S] [-t] [-T=NUM] [-v] [-V] [-w]\n"
-           "                    <sg_device> [<sg_device2>]\n"
+           "                    <sg_device>[-<num>] [<sg_device2>]\n"
            " where:\n"
+           "      -3      use sg v3 interface (def: sg v4 if available)\n"
            "      -c      timestamp when sg driver created <sg_device>\n"
            "      -f      fork and test share between processes\n"
            "      -h      help: print usage message then exit\n"
            "      -I=0|1    iterator test of mid-level; 0: unlocked, 1: "
            "locked\n"
            "                does test -T=NUM times, outputs duration\n"
-           "      -J=0|1    object walk (to root); 0: without ptr; 1: with "
-           "ptr\n"
+           "      -J=0|1    object walk up then 2 lookups; 0: no logging; "
+           "1: log\n"
+           "                up-scan once per 1000 iterations\n"
            "      -l=Q_LEN    queue length, between 1 and 511 (def: 16)\n"
            "      -m=MRQS[,I|S]    test multi-req, MRQS number to do; if "
            "the letter\n"
@@ -151,7 +156,14 @@ usage(void)
            "                ioctl(SG_GET_NUM_WAITING); then exit\n"
            "      -v    increase verbosity of output\n"
            "      -V    print version string then exit\n"
-           "      -w    write (submit) only then exit\n");
+           "      -w    write (submit) only then exit\n\n");
+    printf("There are various groups of options for different tests. The "
+           "get_num_waiting\ngroup needs '-T=NUM' given. When '-I=0|1' is "
+           "also given then an object tree\niterator test is done NUM "
+           "times. If instead '-J=0|1' is given then an\nobject tree "
+           "traversal (up/down) is done 10,000 times (and NUM is\n"
+           "ignored).\n"
+          );
 }
 
 static void
@@ -756,10 +768,13 @@ fini:
 int
 main(int argc, char * argv[])
 {
-    bool done;
+    bool done, is_first;
     bool nw_given = false;
-    int sg_fd, k, ok, pack_id, num_waiting;
+    bool has_dname_range = false;
+    int k, ok, pack_id, num_waiting;
     int res = 0;
+    int sum_nw = 0;
+    int sg_fd = -1;
     int sg_fd2 = -1;
     int sock = -1;
     uint8_t inq_cdb[INQ_CMD_LEN] =
@@ -770,9 +785,11 @@ main(int argc, char * argv[])
     sg_io_hdr_t io_hdr[MAX_Q_LEN];
     sg_io_hdr_t rio_hdr;
     char ebuff[EBUFF_SZ];
+    char dname[256];
     uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
     const char * second_fname = NULL;
     const char * cp;
+    char * chp;
     struct sg_scsi_id ssi;
 
 
@@ -900,7 +917,7 @@ main(int argc, char * argv[])
             break;
         }
     }
-    if (iterator_test >= 0)
+    if ((iterator_test >= 0) || (object_walk_test >= 0))
         nw_given = false;
 
     if (show_size_value) {
@@ -953,58 +970,87 @@ main(int argc, char * argv[])
         usage();
         return 1;
     }
+    memset(dname, 0, sizeof(dname));
+    if (strlen(file_name) > 255) {
+        fprintf(stderr, "file_name too long\n");
+        goto out;
+    }
+    strncpy(dname, file_name, sizeof(dname) - 1);
+    if ((chp = strchr(dname, '-'))) {
+        if (1 != sscanf(chp + 1, "%d", &dname_last)) {
+            fprintf(stderr, "can't code number after '-' in file_name\n");
+            goto out;
+        }
+        *chp = '\0';
+        --chp;
+        while (isdigit(*chp))
+            --chp;
+        ++chp;
+        if (1 != sscanf(chp, "%d", &dname_current)) {
+            fprintf(stderr, "can't code number before '-' in file_name\n");
+            goto out;
+        }
+        *chp = '\0';
+        has_dname_range = true;
+        dname_pos = strlen(dname);
+    }
+    is_first = true;
+
+dname_range_loop:
+    if (has_dname_range)
+        sprintf(dname + dname_pos, "%d", dname_current);
 
     /* An access mode of O_RDWR is required for write()/read() interface */
-    if ((sg_fd = open(file_name, O_RDWR)) < 0) {
-        snprintf(ebuff, EBUFF_SZ,
-                 "error opening file: %s", file_name);
+    if ((sg_fd = open(dname, O_RDWR)) < 0) {
+        snprintf(ebuff, EBUFF_SZ, "error opening file: %s", dname);
         perror(ebuff);
         return 1;
     }
     if (verbose)
         fprintf(stderr, "opened given file: %s successfully, fd=%d\n",
-                file_name, sg_fd);
+                dname, sg_fd);
 
     if (ioctl(sg_fd, SG_GET_VERSION_NUM, &sg_drv_ver_num) < 0) {
         pr2serr("ioctl(SG_GET_VERSION_NUM) failed, errno=%d %s\n", errno,
                 strerror(errno));
         goto out;
     }
-    printf("Linux sg driver version: %d\n", sg_drv_ver_num);
-
-    if (object_walk_test >= 0) {
-        k = (object_walk_test == 0) ? -999 : 999;
-        if (ioctl(sg_fd, SG_SET_DEBUG, &k) < 0) {
-            res = errno;
-            fprintf(stderr, "%s%d: ioctl(SG_SET_DEBUG) failed errno=%d\n",
-                    relative_cp, k, res);
-        }
-        goto out;
-    }
+    if (is_first)
+        printf("Linux sg driver version: %d\n", sg_drv_ver_num);
 
     if (create_time && (sg_drv_ver_num > 40030)) {
-        pr_create_dev_time(sg_fd, file_name);
+        pr_create_dev_time(sg_fd, dname);
         goto out;
     }
 
-    if (nw_given || (iterator_test >= 0)) {     /* -T=NUM and/or -I=0|1 */
+    if (nw_given || (iterator_test >= 0) || (object_walk_test >= 0)) {
+        /* -T=NUM and/or -I=0|1 or -j=0|1 */
         /* time ioctl(SG_GET_NUM_WAITING) or do iterator_test */
-        int nw, sum_nw;
+        int nw;
         struct timespec start_tm, fin_tm, res_tm;
 
-        if (nw_given)
-            printf("Timing %d calls to ioctl(SG_GET_NUM_WAITING)\n",
-                   num_sgnw);
-        else
-            printf("Timing calls to ioctl(SG_SET_DEBUG, %d)\n",
-                   num_sgnw);
-        if (0 != clock_gettime(CLOCK_MONOTONIC, &start_tm)) {
-                res = errno;
-                perror("start clock_gettime() failed:");
-                goto out;
+        if (is_first) {
+            int rang = has_dname_range ? (1 + dname_last - dname_current) : 1;
+
+            is_first = false;
+            if (nw_given)
+                printf("Timing %dx%d calls to ioctl(SG_GET_NUM_WAITING)\n",
+                       rang, num_sgnw);
+            else if (iterator_test >= 0) {
+                k = num_sgnw + 1000;
+                printf("Timing %d calls to ioctl(SG_SET_DEBUG, %d)\n",
+                       rang, ((0 == iterator_test) ? -k : k));
+            } else
+                printf("Timing %d calls to ioctl(SG_SET_DEBUG, %d)\n",
+                       rang, (object_walk_test == 0) ? 999 : -999);
+            if (0 != clock_gettime(CLOCK_MONOTONIC, &start_tm)) {
+                    res = errno;
+                    perror("start clock_gettime() failed:");
+                    goto out;
+            }
         }
         if (nw_given) {
-            for (k = 0, sum_nw = 0; k < num_sgnw; ++k, sum_nw += nw) {
+            for (k = 0; k < num_sgnw; ++k, sum_nw += nw) {
                 if (ioctl(sg_fd, SG_GET_NUM_WAITING, &nw) < 0) {
                     res = errno;
                     fprintf(stderr, "%d: ioctl(SG_GET_NUM_WAITING) failed "
@@ -1012,7 +1058,7 @@ main(int argc, char * argv[])
                     goto out;
                 }
             }
-        } else {
+        } else if (iterator_test >= 0) {
             int fd, pid;
 
             k = num_sgnw + 1000;
@@ -1049,6 +1095,31 @@ main(int argc, char * argv[])
                 fprintf(stderr, "%s%d: ioctl(SG_SET_DEBUG) failed errno=%d\n",
                         relative_cp, k, res);
                 goto out;
+            } else if (verbose)
+                fprintf(stderr, "%siterator_test good ioctl(SG_SET_DEBUG, "
+                        "%d)\n", relative_cp, k);
+            sum_nw += num_sgnw;
+        } else if (object_walk_test >= 0) {
+            const char * ccp = "object_walk_test";
+
+            relative_cp = "";
+            k = (object_walk_test == 0) ? 999 : -999;
+            if (ioctl(sg_fd, SG_SET_DEBUG, &k) < 0) {
+                res = errno;
+                fprintf(stderr, "%s: ioctl(SG_SET_DEBUG, %d) failed "
+                        "errno=%d\n", ccp, k, res);
+            } else if (verbose)
+                fprintf(stderr, "%s: good call to ioctl(SG_SET_DEBUG, %d)\n",
+                        ccp, k);
+            sum_nw += 10000;    /* (1_up-scan + 2_lookups) * 10,000 times */
+        }
+
+        if (has_dname_range) {
+            ++dname_current;
+            if (dname_current <= dname_last) {
+                if (sg_fd >= 0)
+                    close(sg_fd);
+                goto dname_range_loop;
             }
         }
         if (0 != clock_gettime(CLOCK_MONOTONIC, &fin_tm)) {
@@ -1076,7 +1147,7 @@ main(int argc, char * argv[])
 
             if (m > 0.000001)
                 printf("%sCalls per second: %.2f\n", relative_cp,
-                       (double)num_sgnw / m);
+                       (double)sum_nw / m);
         }
         res = 0;
         goto out;
@@ -1133,7 +1204,7 @@ main(int argc, char * argv[])
 
     cp = do_fork ? relative_cp : "";
     if (! do_v3_only) {
-        if (tst_extended_ioctl(file_name, sg_fd, second_fname, sg_fd2, sock,
+        if (tst_extended_ioctl(dname, sg_fd, second_fname, sg_fd2, sock,
                                cp))
             goto out;
     }

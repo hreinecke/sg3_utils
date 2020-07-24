@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.84 20200716";
+static const char * version_str = "1.85 20200720";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -2267,7 +2267,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int hole_count = 0;
     int vb = clp->verbose;
     int k, j, f1, slen, sstatus, blen;
-    char b[80];
+    char b[160];
 
     blen = sizeof(b);
     good_inblks = 0;

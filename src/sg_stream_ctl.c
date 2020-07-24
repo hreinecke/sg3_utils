@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Douglas Gilbert.
+ * Copyright (c) 2018-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.08 20191220";
+static const char * version_str = "1.09 20200724";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -294,7 +294,7 @@ main(int argc, char * argv[])
             return 0;
         case 'i':
             k = sg_get_num(optarg);
-            if ((k < 0) || (k > UINT16_MAX)) {
+            if ((k < 0) || (k > (int)UINT16_MAX)) {
                 pr2serr("--id= expects a number from 0 to 65535\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

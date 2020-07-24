@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2019 Douglas Gilbert.
+ * Copyright (c) 2005-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -96,18 +96,23 @@ int get_pt_file_handle(const struct sg_pt_base * objp);
  * Use set_pt_file_handle() to change dev_fd. */
 void clear_scsi_pt_obj(struct sg_pt_base * objp);
 
+/* Partially clear state information held in *objp . Any error settings and
+ * the data-in and data-out settings are cleared. So dev_fd, cdb and sense
+ * settings are kept. */
+void partial_clear_scsi_pt_obj(struct sg_pt_base * objp);
+
 /* Set the CDB (command descriptor block). May also be a NVMe Admin command
  * which will be 64 bytes long.
  *
  * Note that the sg_cmds_is_nvme() function found in sg_cmds_basic.h can be
  * called after this function to "guess" which command set the given command
- * belongs to. */
+ * belongs to. It is valid to supply a cdb value of NULL. */
 void set_scsi_pt_cdb(struct sg_pt_base * objp, const uint8_t * cdb,
                      int cdb_len);
 
 /* Set the sense buffer and the maximum length of that buffer. For NVMe
  * commands this "sense" buffer will receive the 4 DWORDs of from the
- * completion queue. */
+ * completion queue. It is valid to supply a sense value of NULL. */
 void set_scsi_pt_sense(struct sg_pt_base * objp, uint8_t * sense,
                        int max_sense_len);
 
@@ -189,6 +194,12 @@ int get_scsi_pt_status_response(const struct sg_pt_base * objp);
  * then returns NVMe result (i.e. DWord(0) from completion queue). If
  * 'objp' is NULL then returns 0xffffffff. */
 uint32_t get_pt_result(const struct sg_pt_base * objp);
+
+/* These two get functions should just echo what has been given to
+ * set_scsi_pt_cdb(). If it has not been called or clear_scsi_pt_obj()
+ * has been called then return 0 and NULL respectively. */
+int get_scsi_pt_cdb_len(const struct sg_pt_base * objp);
+uint8_t * get_scsi_pt_cdb_buf(const struct sg_pt_base * objp);
 
 /* Actual sense length returned. If sense data is present but
    actual sense length is not known, return 'max_sense_len' */

@@ -109,7 +109,7 @@ sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
 sgh_dd: sgh_dd.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
 
-sg_mrq_dd: sg_mrq_dd.o $(LIBFILESNEW)
+sg_mrq_dd: sg_mrq_dd.o sg_scat_gath.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2019 Douglas Gilbert.
+ * Copyright (c) 2006-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_win32 version 1.30 20190210 */
+/* sg_pt_win32 version 1.31 20200723 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -864,6 +864,32 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 }
 
 void
+partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_win32_scsi * psp = &vp->impl;
+
+    if (NULL == psp)
+        return;
+    psp->in_err = 0;
+    psp->os_err = 0;
+    psp->transport_err = 0;
+    psp->scsi_status = 0;
+    if (spt_direct) {
+        psp->swb_d.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+        psp->swb_d.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+        psp->swb_d.spt.SenseInfoOffset =
+            offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
+        psp->swb_d.spt.TimeOutValue = DEF_TIMEOUT;
+    } else {
+        psp->swb_i.spt.DataIn = SCSI_IOCTL_DATA_UNSPECIFIED;
+        psp->swb_i.spt.SenseInfoLength = SCSI_MAX_SENSE_LEN;
+        psp->swb_i.spt.SenseInfoOffset =
+            offsetof(SCSI_PASS_THROUGH_WITH_BUFFERS, ucSenseBuf);
+        psp->swb_i.spt.TimeOutValue = DEF_TIMEOUT;
+    }
+}
+
+void
 set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
                 int cdb_len)
 {
@@ -871,14 +897,9 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
     struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (! scsi_cdb) {
-        if (psp->have_nvme_cmd)
-            ++psp->in_err;
-        else
-            psp->have_nvme_cmd = true;
+        psp->have_nvme_cmd = true;
         memcpy(psp->nvme_cmd, cdb, cdb_len);
     } else if (spt_direct) {
-        if (psp->swb_d.spt.CdbLength > 0)
-            ++psp->in_err;
         if (cdb_len > (int)sizeof(psp->swb_d.spt.Cdb)) {
             ++psp->in_err;
             return;
@@ -886,8 +907,6 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
         memcpy(psp->swb_d.spt.Cdb, cdb, cdb_len);
         psp->swb_d.spt.CdbLength = cdb_len;
     } else {
-        if (psp->swb_i.spt.CdbLength > 0)
-            ++psp->in_err;
         if (cdb_len > (int)sizeof(psp->swb_i.spt.Cdb)) {
             ++psp->in_err;
             return;
@@ -897,15 +916,29 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
     }
 }
 
+int
+get_scsi_pt_cdb_len(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_win32_scsi * psp = &vp->impl;
+
+    return spt_direct ? psp->swb_d.spt.CdbLength : psp->swb_i.spt.CdbLength;
+}
+
+uint8_t *
+get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_win32_scsi * psp = &vp->impl;
+
+    return (uint8_t *)(spt_direct ? psp->swb_d.spt.Cdb : psp->swb_i.spt.Cdb);
+}
+
 void
-set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
-                  int sense_len)
+set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense, int sense_len)
 {
     struct sg_pt_win32_scsi * psp = vp->implp;
 
-    if (psp->sensep)
-        ++psp->in_err;
-    memset(sense, 0, sense_len);
+    if (sense && (sense_len > 0))
+        memset(sense, 0, sense_len);
     psp->sensep = sense;
     psp->sense_len = sense_len;
 }

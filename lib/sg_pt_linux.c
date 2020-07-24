@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2019 Douglas Gilbert.
+ * Copyright (c) 2005-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.47 20190612 */
+/* sg_pt_linux version 1.48 20200722 */
 
 
 #include <stdio.h>
@@ -477,6 +477,28 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     }
 }
 
+void
+partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    if (NULL == ptp)
+        return;
+    ptp->in_err = 0;
+    ptp->os_err = 0;
+    if (ptp->nvme_direct)
+        ptp->nvme_result = 0;
+    else {
+        ptp->io_hdr.device_status = 0;
+        ptp->io_hdr.transport_status = 0;
+        ptp->io_hdr.driver_status = 0;
+        ptp->io_hdr.din_xferp = 0;
+        ptp->io_hdr.din_xfer_len = 0;
+        ptp->io_hdr.dout_xferp = 0;
+        ptp->io_hdr.dout_xfer_len = 0;
+    }
+}
+
 #ifndef SG_SET_GET_EXTENDED
 
 /* If both sei_wr_mask and sei_rd_mask are 0, this ioctl does nothing */
@@ -619,10 +641,24 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if (ptp->io_hdr.request)
-        ++ptp->in_err;
     ptp->io_hdr.request = (__u64)(sg_uintptr_t)cdb;
     ptp->io_hdr.request_len = cdb_len;
+}
+
+int
+get_scsi_pt_cdb_len(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return ptp->io_hdr.request_len;
+}
+
+uint8_t *
+get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+    return (uint8_t *)ptp->io_hdr.request;
 }
 
 void
@@ -631,9 +667,10 @@ set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if (ptp->io_hdr.response)
-        ++ptp->in_err;
-    memset(sense, 0, max_sense_len);
+    if (sense) {
+        if (max_sense_len > 0)
+            memset(sense, 0, max_sense_len);
+    }
     ptp->io_hdr.response = (__u64)(sg_uintptr_t)sense;
     ptp->io_hdr.max_response_len = max_sense_len;
 }
@@ -686,7 +723,7 @@ set_scsi_pt_packet_id(struct sg_pt_base * vp, int pack_id)
 {
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    ptp->io_hdr.request_extra = pack_id;        /* was place in spare_in */
+    ptp->io_hdr.request_extra = pack_id;        /* was placed in spare_in */
 }
 
 void

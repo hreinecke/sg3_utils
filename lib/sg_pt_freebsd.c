@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2019 Douglas Gilbert.
+ * Copyright (c) 2005-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.35 20190210 */
+/* sg_pt_freebsd version 1.36 20200724 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -452,6 +452,32 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
     }
 }
 
+void
+partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
+{
+    struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    if (NULL == ptp)
+        return;
+    ptp->in_err = 0;
+    ptp->os_err = 0;
+    ptp->transport_err = 0;
+    if (ptp->nvme_direct) {
+        struct freebsd_dev_channel *fdc_p;
+
+        fdc_p = get_fdc_p(ptp);
+        if (fdc_p)
+            fdc_p->nvme_result = 0;
+    } else {
+        ptp->scsi_status = 0;
+        ptp->dxfer_dir = CAM_DIR_NONE;
+        ptp->dxferip = NULL;
+        ptp->dxfer_ilen = 0;
+        ptp->dxferop = NULL;
+        ptp->dxfer_olen = 0;
+    }
+}
+
 /* Forget any previous dev_han and install the one given. May attempt to
  * find file type (e.g. if pass-though) from OS so there could be an error.
  * Returns 0 for success or the same value as get_scsi_pt_os_err()
@@ -511,10 +537,24 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb, int cdb_len)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
-    if (ptp->cdb)
-        ++ptp->in_err;
     ptp->cdb = (uint8_t *)cdb;
     ptp->cdb_len = cdb_len;
+}
+
+int
+get_scsi_pt_cdb_len(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    return ptp->cdb_len;
+}
+
+uint8_t *
+get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+    return ptp->cdb;
 }
 
 void
@@ -523,9 +563,10 @@ set_scsi_pt_sense(struct sg_pt_base * vp, uint8_t * sense,
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
-    if (ptp->sense)
-        ++ptp->in_err;
-    memset(sense, 0, max_sense_len);
+    if (sense) {
+        if (max_sense_len > 0)
+            memset(sense, 0, max_sense_len);
+    }
     ptp->sense = sense;
     ptp->sense_len = max_sense_len;
 }

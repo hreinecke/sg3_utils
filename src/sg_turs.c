@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000-2019 D. Gilbert
+ * Copyright (C) 2000-2020 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -22,8 +22,11 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 #include <getopt.h>
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -42,23 +45,13 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.46 20190618";
-
-#if defined(MSC_VER) || defined(__MINGW32__)
-#define HAVE_MS_SLEEP
-#endif
-
-#ifdef HAVE_MS_SLEEP
-#include <windows.h>
-#define sleep_for(seconds)    Sleep( (seconds) * 1000)
-#else
-#define sleep_for(seconds)    sleep(seconds)
-#endif
+static const char * version_str = "3.47 20200722";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
 static struct option long_options[] = {
+        {"delay", required_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
         {"low", no_argument, 0, 'l'},
         {"new", no_argument, 0, 'N'},
@@ -74,12 +67,14 @@ static struct option long_options[] = {
 };
 
 struct opts_t {
+    bool delay_given;
     bool do_low;
     bool do_progress;
     bool do_time;
     bool opts_new;
     bool verbose_given;
     bool version_given;
+    int delay;
     int do_help;
     int do_number;
     int verbose;
@@ -96,10 +91,13 @@ struct loop_res_t {
 static void
 usage()
 {
-    printf("Usage: sg_turs [--help] [--low] [--number=NUM] [--num=NUM] "
-           "[--progress]\n"
-           "               [--time] [--verbose] [--version] DEVICE\n"
+    printf("Usage: sg_turs [--delay=MS] [--help] [--low] [--number=NUM] "
+           "[--num=NUM]\n"
+           "               [--progress] [--time] [--verbose] [--version] "
+           "DEVICE\n"
            "  where:\n"
+           "    --delay=MS|-d MS    delay MS miiliseconds before sending "
+           "each tur\n"
            "    --help|-h        print usage message then exit\n"
            "    --low|-l         use low level (sg_pt) interface for "
            "speed\n"
@@ -109,19 +107,23 @@ usage()
            "    --old|-O         use old interface (use as first option)\n"
            "    --progress|-p    outputs progress indication (percentage) "
            "if available\n"
+           "                     waits 30 seconds before TUR unless "
+           "--delay=MS given\n"
            "    --time|-t        outputs total duration and commands per "
            "second\n"
            "    --verbose|-v     increase verbosity\n"
            "    --version|-V     print version string then exit\n\n"
-           "Performs a SCSI TEST UNIT READY command (or many of them).\n");
+           "Performs a SCSI TEST UNIT READY command (or many of them).\n"
+           "This SCSI command is often known by its abbreviation: TUR .\n");
 }
 
 static void
 usage_old()
 {
-    printf("Usage: sg_turs [-l] [-n=NUM] [-p] [-t] [-v] [-V] "
+    printf("Usage: sg_turs [-d=MS] [-l] [-n=NUM] [-p] [-t] [-v] [-V] "
            "DEVICE\n"
            "  where:\n"
+           "    -d=MS     same as --delay=MS in new interface\n"
            "    -l        use low level interface (sg_pt) for speed\n"
            "    -n=NUM    number of test_unit_ready commands "
            "(def: 1)\n"
@@ -152,12 +154,22 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hln:NOptvV", long_options,
+        c = getopt_long(argc, argv, "d:hln:NOptvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'd':
+            n = sg_get_num(optarg);
+            if (n < 0) {
+                pr2serr("bad argument to '--delay='\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->delay = n;
+            op->delay_given = true;
+            break;
         case 'h':
         case '?':
             ++op->do_help;
@@ -263,7 +275,15 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             }
             if (plen <= 0)
                 continue;
-            if (0 == strncmp("n=", cp, 2)) {
+            if (0 == strncmp("d=", cp, 2)) {
+                op->delay = sg_get_num(cp + 2);
+                if (op->delay < 0) {
+                    printf("Couldn't decode number after 'd=' option\n");
+                    usage_old();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->delay_given = true;
+            } else if (0 == strncmp("n=", cp, 2)) {
                 op->do_number = sg_get_num(cp + 2);
                 if (op->do_number <= 0) {
                     printf("Couldn't decode number after 'n=' option\n");
@@ -310,6 +330,38 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     return res;
 }
 
+static void
+wait_millisecs(int millisecs)
+{
+    struct timespec wait_period, rem;
+
+    wait_period.tv_sec = millisecs / 1000;
+    wait_period.tv_nsec = (millisecs % 1000) * 1000000;
+    while ((nanosleep(&wait_period, &rem) < 0) && (EINTR == errno))
+                wait_period = rem;
+}
+
+/* Returns true if prints estimate of duration to ready */
+bool
+check_for_lu_becoming(struct sg_pt_base * ptvp)
+{
+    int s_len = get_scsi_pt_sense_len(ptvp);
+    uint64_t info;
+    uint8_t * sense_b = get_scsi_pt_sense_buf(ptvp);
+    struct sg_scsi_sense_hdr ssh;
+
+    /* Check for "LU is in process of becoming ready" with a non-zero INFO
+     * field that isn't too big. As per 20-061r2 it means the following: */
+    if (sg_scsi_normalize_sense(sense_b, s_len, &ssh) && (ssh.asc == 0x4) &&
+        (ssh.ascq == 0x1) && sg_get_sense_info_fld(sense_b, s_len, &info) &&
+        (info > 0x0) && (info < 0x1000000)) {
+        printf("device not ready, estimated to be ready in %" PRIu64
+               " milliseconds\n", info);
+        return true;
+    }
+    return false;
+}
+
 /* Returns number of TURs performed */
 static int
 loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
@@ -319,13 +371,15 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
     int packet_id = 0;
     int vb = op->verbose;
     char b[80];
+    uint8_t sense_b[32];
 
     if (op->do_low) {
         int rs, n, sense_cat;
         uint8_t cdb[6];
-        uint8_t sense_b[32];
 
         for (k = 0; k < op->do_number; ++k) {
+            if (op->delay > 0)
+                wait_millisecs(op->delay);
             /* Might get Unit Attention on first invocation */
             memset(cdb, 0, sizeof(cdb));    /* TUR's cdb is 6 zeros */
             set_scsi_pt_cdb(ptvp, cdb, sizeof(cdb));
@@ -344,9 +398,10 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                     break;
                 case SG_LIB_CAT_NOT_READY:
                     ++resp->num_errs;
-                    if (1 ==  op->do_number) {
+                    if ((1 == op->do_number) || (op->delay > 0)) {
+                        if (! check_for_lu_becoming(ptvp))
+                            printf("device not ready\n");
                         resp->ret = sense_cat;
-                        printf("device not ready\n");
                         resp->reported = true;
                     }
                     break;
@@ -369,20 +424,25 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                     break;
                 }
             }
-            clear_scsi_pt_obj(ptvp);
+            partial_clear_scsi_pt_obj(ptvp);
         }
         return k;
     } else {
         for (k = 0; k < op->do_number; ++k) {
+            if (op->delay > 0)
+                wait_millisecs(op->delay);
+            set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
             /* Might get Unit Attention on first invocation */
             res = sg_ll_test_unit_ready_pt(ptvp, k, (0 == k), vb);
             if (res) {
                 ++resp->num_errs;
                 resp->ret = res;
-                if (1 == op->do_number) {
-                    if (SG_LIB_CAT_NOT_READY == res)
-                        printf("device not ready\n");
-                    else {
+                if ((1 == op->do_number) || (op->delay > 0)) {
+                    if (SG_LIB_CAT_NOT_READY == res) {
+                        if (! check_for_lu_becoming(ptvp))
+                            printf("device not ready\n");
+			continue;
+                    } else {
                         sg_get_category_sense_str(res, sizeof(b), b, vb);
                         printf("%s\n", b);
                     }
@@ -447,6 +507,8 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
+    if (op->do_progress && (! op->delay_given))
+        op->delay = 30 * 1000;  /* progress has 30 second default delay */
 
     if (NULL == op->device_name) {
         pr2serr("No DEVICE argument given\n");
@@ -469,8 +531,12 @@ main(int argc, char * argv[])
     }
     if (op->do_progress) {
         for (k = 0; k < op->do_number; ++k) {
-            if (k > 0)
-                sleep_for(30);
+            if (op->delay > 0) {
+                if (op->delay_given)
+                    wait_millisecs(op->delay);
+                else if (k > 0)
+                    wait_millisecs(op->delay);
+            }
             progress = -1;
             res = sg_ll_test_unit_ready_progress_pt(ptvp, k, &progress,
                              (1 == op->do_number), op->verbose);

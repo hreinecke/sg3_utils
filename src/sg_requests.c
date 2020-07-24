@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2019 Douglas Gilbert.
+ * Copyright (c) 2004-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.34 20190706";
+static const char * version_str = "1.35 20200723";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -126,19 +126,22 @@ dStrRaw(const uint8_t * str, int len)
 int
 main(int argc, char * argv[])
 {
-    int c, n, resp_len, k, progress, rs, sense_cat;
+    int c, n, k, progress, rs, sense_cat, act_din_len;
     int do_error = 0;
     int err = 0;
     int num_errs = 0;
+    int num_din_errs = 0;
+    int most_recent_skey = 0;
     int sg_fd = -1;
     int res = 0;
-    uint8_t requestSenseBuff[MAX_REQS_RESP_LEN + 1];
+    uint8_t rsBuff[MAX_REQS_RESP_LEN + 1];
     bool desc = false;
     bool do_progress = false;
     bool do_raw = false;
     bool do_status = false;
     bool verbose_given = false;
     bool version_given = false;
+    bool not_raw_hex;
     int num_rs = 1;
     int do_hex = 0;
     int maxlen = 0;
@@ -146,7 +149,7 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     int ret = 0;
     struct sg_pt_base * ptvp = NULL;
-    char b[80];
+    char b[256];
     uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -265,10 +268,20 @@ main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         }
     }
+    if (do_raw || do_hex) {
+        not_raw_hex = false;
+        if (do_progress || do_time) {
+            pr2serr("With either --raw or --hex, --progress and --time "
+                    "contradict\n");
+            ret = SG_LIB_CONTRADICT;
+            goto finish;
+        }
+    } else
+        not_raw_hex = true;
 
     sg_fd = sg_cmds_open_device(device_name, true /* ro */, verbose);
     if (sg_fd < 0) {
-        if (verbose)
+        if (not_raw_hex && verbose)
             pr2serr(ME "open error: %s: %s\n", device_name,
                     safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
@@ -276,7 +289,8 @@ main(int argc, char * argv[])
     }
     ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
     if ((NULL == ptvp) || ((err = get_scsi_pt_os_err(ptvp)))) {
-        pr2serr("%s: unable to construct pt object\n", __func__);
+        if (not_raw_hex)
+            pr2serr("%s: unable to construct pt object\n", __func__);
         ret = sg_convert_errno(err ? err : ENOMEM);
         goto finish;
     }
@@ -287,18 +301,25 @@ main(int argc, char * argv[])
     rs_cdb[4] = maxlen;
     if (do_progress) {
         for (k = 0; k < num_rs; ++k) {
+            act_din_len = 0;
             if (k > 0)
                 sleep_for(30);
             set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
             set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-            memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-            set_scsi_pt_data_in(ptvp, requestSenseBuff,
-                                sizeof(requestSenseBuff));
+            memset(rsBuff, 0x0, sizeof(rsBuff));
+            set_scsi_pt_data_in(ptvp, rsBuff, sizeof(rsBuff));
             set_scsi_pt_packet_id(ptvp, k + 1);
             if (do_error > 1) {
                 ++num_errs;
                 n = 0;
             } else {
+                if (verbose && (0 == k)) {
+                    char b[128];
+
+                    pr2serr("    cdb: %s\n",
+                            sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN,
+                                               true, sizeof(b), b));
+                }
                 rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
                 n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
                                          verbose, &sense_cat);
@@ -336,36 +357,17 @@ main(int argc, char * argv[])
                     break;
                 }
             }
-            clear_scsi_pt_obj(ptvp);
+            if (n >= 0)
+                act_din_len = n;
             if (ret)
                 goto finish;
 
-#if 0
-            res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                      true, verbose);
-            if (res) {
-                ret = res;
-                if (SG_LIB_CAT_INVALID_OP == res)
-                    pr2serr("Request Sense command not supported\n");
-                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                    pr2serr("bad field in Request Sense cdb\n");
-                else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                    pr2serr("Request Sense, aborted command\n");
-                else {
-                    sg_get_category_sense_str(res, sizeof(b), b, verbose);
-                    pr2serr("Request Sense command: %s\n", b);
-                }
-                break;
-            }
-#endif
-            /* "Additional sense length" same in descriptor and fixed */
-            resp_len = requestSenseBuff[7] + 8;
             if (verbose > 1) {
                 pr2serr("Parameter data in hex\n");
-                hex2stderr(requestSenseBuff, resp_len, 1);
+                hex2stderr(rsBuff, act_din_len, 1);
             }
             progress = -1;
-            sg_get_sense_progress_fld(requestSenseBuff, resp_len, &progress);
+            sg_get_sense_progress_fld(rsBuff, act_din_len, &progress);
             if (progress < 0) {
                 ret = res;
                 if (verbose > 1)
@@ -377,32 +379,40 @@ main(int argc, char * argv[])
                 printf("Progress indication: %d.%02d%% done\n",
                        (progress * 100) / 65536,
                        ((progress * 100) % 65536) / 656);
-        }
+            partial_clear_scsi_pt_obj(ptvp);
+        }                               /* >>>>> end of for(num_rs) loop */
         goto finish;
     }
 
 #ifndef SG_LIB_MINGW
-    if (do_time) {
+    if (not_raw_hex && do_time) {
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
     }
 #endif
 
-    requestSenseBuff[0] = '\0';
-    requestSenseBuff[7] = '\0';
+    rsBuff[0] = '\0';
+    rsBuff[7] = '\0';
     for (k = 0; k < num_rs; ++k) {
-        memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
+        act_din_len = 0;
+        ret = 0;
         set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-        memset(requestSenseBuff, 0x0, sizeof(requestSenseBuff));
-        set_scsi_pt_data_in(ptvp, requestSenseBuff,
-                            sizeof(requestSenseBuff));
+        memset(rsBuff, 0x0, sizeof(rsBuff));
+        set_scsi_pt_data_in(ptvp, rsBuff, sizeof(rsBuff));
         set_scsi_pt_packet_id(ptvp, k + 1);
         if (do_error > 1) {
             ++num_errs;
             n = 0;
         } else {
+            if (verbose && (0 == k)) {
+                char b[128];
+
+                pr2serr("    cdb: %s\n",
+                        sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN,
+                                           true, sizeof(b), b));
+            }
             rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
             n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
                                      verbose, &sense_cat);
@@ -440,55 +450,50 @@ main(int argc, char * argv[])
                 break;
             }
         }
-        clear_scsi_pt_obj(ptvp);
+        if (n >= 0)
+            act_din_len = n;
+
+        if (act_din_len > 7) {
+            struct sg_scsi_sense_hdr ssh;
+
+            if (sg_scsi_normalize_sense(rsBuff, act_din_len, &ssh)) {
+                if (ssh.sense_key > 0) {
+                    ++num_din_errs;
+                    most_recent_skey = ssh.sense_key;
+                }
+                if (not_raw_hex && ((1 == num_rs) || verbose)) {
+                    char b[144];
+
+                    sg_get_sense_str(NULL, rsBuff, act_din_len,
+                                     false, sizeof(b), b);
+                    pr2serr("data-in decoded as sense:\n%s\n", b);
+                }
+            }
+        }
+        partial_clear_scsi_pt_obj(ptvp);
         if (ret)
             goto finish;
 
-        // res = sg_ll_request_sense(sg_fd, desc, requestSenseBuff, maxlen,
-                                  // true, verbose);
-        // ret = res;
-        resp_len = requestSenseBuff[7] + 8;
-        if (do_raw)
-            dStrRaw(requestSenseBuff, resp_len);
-        else if (do_hex)
-            hex2stdout(requestSenseBuff, resp_len, 1);
-        else if (1 == num_rs) {
-            pr2serr("Decode parameter data as sense data:\n");
-            sg_print_sense(NULL, requestSenseBuff, resp_len, 0);
-            if (verbose > 1) {
-                pr2serr("\nParameter data in hex\n");
-                hex2stderr(requestSenseBuff, resp_len, 1);
-            }
+        if (act_din_len > 0) {
+            if (do_raw)
+                dStrRaw(rsBuff, act_din_len);
+            else if (do_hex)
+                hex2stdout(rsBuff, act_din_len, 1);
         }
-#if 0
-            continue;
-        else if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("Request Sense command not supported\n");
-        else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("bad field in Request Sense cdb\n");
-        else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-            pr2serr("Request Sense, aborted command\n");
-        else {
-            sg_get_category_sense_str(res, sizeof(b), b, verbose);
-            pr2serr("Request Sense command: %s\n", b);
-        }
-        break;
-#endif
-    }
+    }                                   /* <<<<< end of for(num_rs) loop */
     if ((0 == ret) && do_status) {
-        resp_len = requestSenseBuff[7] + 8;
-        ret = sg_err_category_sense(requestSenseBuff, resp_len);
+        ret = sg_err_category_sense(rsBuff, act_din_len);
         if (SG_LIB_CAT_NO_SENSE == ret) {
             struct sg_scsi_sense_hdr ssh;
 
-            if (sg_scsi_normalize_sense(requestSenseBuff, resp_len, &ssh)) {
+            if (sg_scsi_normalize_sense(rsBuff, act_din_len, &ssh)) {
                 if ((0 == ssh.asc) && (0 == ssh.ascq))
                     ret = 0;
             }
         }
     }
 #ifndef SG_LIB_MINGW
-    if (do_time && (start_tm.tv_sec || start_tm.tv_usec)) {
+    if (not_raw_hex && do_time && (start_tm.tv_sec || start_tm.tv_usec)) {
         struct timeval res_tm;
         double den, num;
 
@@ -512,17 +517,23 @@ main(int argc, char * argv[])
 #endif
 
 finish:
-    if (num_errs > 0)
-        printf("Number of errors detected: %d\n", num_errs);
+    if (not_raw_hex) {
+        if (num_errs > 0)
+            printf("Number of command errors detected: %d\n", num_errs);
+        if (num_din_errs > 0)
+            printf("Number of data-in errors detected: %d, most recent "
+                   "sense_key=%d\n", num_din_errs, most_recent_skey);
+    }
     if (sg_fd >= 0) {
         res = sg_cmds_close_device(sg_fd);
         if (res < 0) {
-            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (not_raw_hex)
+                pr2serr("close error: %s\n", safe_strerror(-res));
             if (0 == ret)
                 ret = sg_convert_errno(-res);
         }
     }
-    if (0 == verbose) {
+    if (not_raw_hex && (0 == verbose)) {
         if (! sg_if_can2stderr("sg_requests failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' "
                     "or '-vv' for more information\n");
