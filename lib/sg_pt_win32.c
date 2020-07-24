@@ -866,7 +866,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 void
 partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    struct sg_pt_win32_scsi * psp = &vp->impl;
+    struct sg_pt_win32_scsi * psp = vp->implp;
 
     if (NULL == psp)
         return;
@@ -919,7 +919,7 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const uint8_t * cdb,
 int
 get_scsi_pt_cdb_len(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     return spt_direct ? psp->swb_d.spt.CdbLength : psp->swb_i.spt.CdbLength;
 }
@@ -927,7 +927,7 @@ get_scsi_pt_cdb_len(const struct sg_pt_base * vp)
 uint8_t *
 get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
 {
-    const struct sg_pt_win32_scsi * psp = &vp->impl;
+    const struct sg_pt_win32_scsi * psp = vp->implp;
 
     return (uint8_t *)(spt_direct ? psp->swb_d.spt.Cdb : psp->swb_i.spt.Cdb);
 }
