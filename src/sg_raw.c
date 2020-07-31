@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2019 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2020 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,12 +39,12 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.32 (2019-12-26)"
+#define SG_RAW_VERSION "0.4.33 (2020-07-30)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
 #define MAX_SCSI_CDBSZ 260
-#define MAX_SCSI_DXLEN (64 * 1024)
+#define MAX_SCSI_DXLEN (1024 * 1024)
 
 #define NVME_ADDR_DATA_IN  0xfffffffffffffffe
 #define NVME_ADDR_DATA_OUT 0xfffffffffffffffd

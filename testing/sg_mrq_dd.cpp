@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.04 20200720";
+static const char * version_str = "1.05 20200728";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -899,7 +899,7 @@ usage(int pg_num)
            );
     return;
 page2:
-    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
+    pr2serr("Syntax:  sg_mrq_dd [operands] [options]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n"
             "         style commands, and options start with one or "
@@ -919,8 +919,8 @@ page2:
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
             "max 1024\n"
-            "    time        0->no timing, 1->calc throughput(def), "
-            "2->nanosec precision\n"
+            "    time        0->no timing; 1/2->millisec/nanosec precision "
+            "(def: 1)\n"
             "    verbose     increase verbosity (def: VERB=0)\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
@@ -928,7 +928,7 @@ page2:
            );
     return;
 page3:
-    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
+    pr2serr("Syntax:  sg_mrq_dd [operands] [options]\n\n"
             "  where: 'iflag=<arg>' and 'oflag=<arg>' arguments are listed "
             "below:\n\n"
             "    00          use all zeros instead of if=IFILE (only in "
@@ -2434,10 +2434,13 @@ fini:
 
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
-sg_prepare_resbuf(int fd, int bs, int bpt, bool unit_nano, bool no_dur,
-                  bool masync, bool wq_excl, uint8_t **mmpp)
+sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
+                  uint8_t **mmpp)
 {
     static bool done = false;
+    bool no_dur = is_in ? clp->in_flags.no_dur : clp->out_flags.no_dur;
+    bool masync = is_in ? clp->in_flags.masync : clp->out_flags.masync;
+    bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
     int res, t, num;
     uint8_t *mmp;
     struct sg_extended_info sei;
@@ -2474,21 +2477,21 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool unit_nano, bool no_dur,
         }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
-            pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(NO_DURATION) "
+            pr2serr_lk("sg_mrq_dd: %s: SG_SET_GET_EXTENDED(NO_DURATION) "
                        "error: %s\n", __func__, strerror(errno));
     }
 bypass:
-    num = bs * bpt;
+    num = clp->bs * clp->bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &num);
     if (res < 0) {
-        perror("sgh_dd: SG_SET_RESERVED_SIZE error");
+        perror("sg_mrq_dd: SG_SET_RESERVED_SIZE error");
         return 0;
     } else {
         int nn;
 
         res = ioctl(fd, SG_GET_RESERVED_SIZE, &nn);
         if (res < 0) {
-            perror("sgh_dd: SG_GET_RESERVED_SIZE error");
+            perror("sg_mrq_dd: SG_GET_RESERVED_SIZE error");
             return 0;
         }
         if (nn < num) {
@@ -2502,7 +2505,7 @@ bypass:
             if (MAP_FAILED == mmp) {
                 int err = errno;
 
-                pr2serr_lk("sgh_dd: %s: sz=%d, fd=%d, mmap() failed: %s\n",
+                pr2serr_lk("sg_mrq_dd: %s: sz=%d, fd=%d, mmap() failed: %s\n",
                            __func__, num, fd, strerror(err));
                 return 0;
             }
@@ -2512,8 +2515,8 @@ bypass:
     t = 1;
     res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
     if (res < 0)
-        perror("sgh_dd: SG_SET_FORCE_PACK_ID error");
-    if (unit_nano) {
+        perror("sg_mrq_dd: SG_SET_FORCE_PACK_ID error");
+    if (clp->unit_nanosec) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
@@ -2524,12 +2527,13 @@ bypass:
                        errno, strerror(errno));
         }
     }
-#if 0
-    t = 1;
-    res = ioctl(fd, SG_SET_DEBUG, &t);  /* more info in /proc/scsi/sg/debug */
-    if (res < 0)
-        perror("sgh_dd: SG_SET_DEBUG error");
-#endif
+    if (clp->verbose) {
+        t = 1;
+        /* more info in /proc/scsi/sg/debug */
+        res = ioctl(fd, SG_SET_DEBUG, &t);
+        if (res < 0)
+            perror("sg_mrq_dd: SG_SET_DEBUG error");
+    }
     return (res < 0) ? 0 : num;
 }
 
@@ -2719,9 +2723,7 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->unit_nanosec,
-                          clp->in_flags.no_dur, clp->in_flags.masync,
-                          clp->in_flags.wq_excl, mmpp);
+    n = sg_prepare_resbuf(fd, clp, true, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -2751,9 +2753,7 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->unit_nanosec,
-                          clp->out_flags.no_dur, clp->out_flags.masync,
-                          clp->out_flags.wq_excl, mmpp);
+    n = sg_prepare_resbuf(fd, clp, false, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (mmap_lenp)
@@ -3062,7 +3062,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
      * SG_IO ioctl. So reduce it in that case. */
     if ((clp->bs >= 2048) && (! bpt_given))
         clp->bpt = DEF_BLOCKS_PER_2048TRANSFER;
-    if (clp->in_flags.order)
+    if (clp->in_flags.order && (! clp->out_flags.order))
         pr2serr("Warning iflag=order is ignored, use with oflag=\n");
     if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
         pr2serr("too few or too many threads requested\n");

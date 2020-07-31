@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.46 [20200724] [svn: r858]
+Changelog for sg3_utils-1.46 [20200730] [svn: r859]
   - sg_rep_pip: report new provisioning initialization pattern cmd
   - sg_turs: estimated time-to-ready [20-061r2]
     - add --delay=MS option
@@ -13,6 +13,8 @@ Changelog for sg3_utils-1.46 [20200724] [svn: r858]
   - sg_rep_zones: print invalid write pointer LBA as -1 rather
     than 16 "f"s
   - sg_ses: use fan speed factor field for calculation [ses4r04]
+  - sg_raw: increase maximum data-in and data-out buffer size
+    from 64 KB to 1 MB
   - sg_pt_solaris+sg_pt_osf1: fix problem with clear_scsi_pt_obj()
     which needs to remember is_nvme and dev_fd values
   - sg_lib: restore elements and rebuild command added
