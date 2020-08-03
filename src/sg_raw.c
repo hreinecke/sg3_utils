@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.33 (2020-07-30)"
+#define SG_RAW_VERSION "0.4.33 (2020-08-02)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -59,6 +59,7 @@ static struct option long_options[] = {
     { "infile",  required_argument, NULL, 'i' },
     { "skip",    required_argument, NULL, 'k' },
     { "nosense", no_argument,       NULL, 'n' },
+    { "nvm",     no_argument,       NULL, 'N' },
     { "outfile", required_argument, NULL, 'o' },
     { "raw",     no_argument,       NULL, 'w' },
     { "request", required_argument, NULL, 'r' },
@@ -77,6 +78,7 @@ struct opts_t {
     bool do_dataout;
     bool do_enumerate;
     bool no_sense;
+    bool nvm;           /* the NVMe command set containing its READ+WRITE */
     bool do_help;
     bool verbose_given;
     bool version_given;
@@ -100,7 +102,7 @@ static void
 pr_version()
 {
     pr2serr("sg_raw " SG_RAW_VERSION "\n"
-            "Copyright (C) 2007-2018 Ingo van Lil <inguin@gmx.de>\n"
+            "Copyright (C) 2007-2020 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
@@ -127,6 +129,9 @@ usage()
             "(default:\n"
             "                             stdin)\n"
             "  --nosense|-n           Don't display sense information\n"
+            "  --nvm|-N               command is for NVM command set (def: "
+            "if NVMe fd:\n"
+            "                         Admin command set)\n"
             "  --outfile=OFILE|-o OFILE    Write binary data to OFILE (def: "
             "hexdump\n"
             "                              to stdout)\n"
@@ -158,7 +163,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
     while (1) {
         int c, n;
 
-        c = getopt_long(argc, argv, "bc:ehi:k:no:r:Rs:t:vVw", long_options,
+        c = getopt_long(argc, argv, "bc:ehi:k:nNo:r:Rs:t:vVw", long_options,
                         NULL);
         if (c == -1)
             break;
@@ -195,6 +200,9 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
             break;
         case 'n':
             op->no_sense = true;
+            break;
+        case 'N':
+            op->nvm = true;
             break;
         case 'o':
             if (op->datain_file) {
@@ -272,13 +280,16 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
     }
 
     if (op->cmdfile_given) {
-        bool ok;
+        int err;
 
-        ok = sg_f2hex_arr(op->cmd_file, (op->raw > 0) /* as_binary */,
-                          false /* no_space */, op->cdb, &op->cdb_length,
-                          MAX_SCSI_CDBSZ);
-        if (! ok)
+        err = sg_f2hex_arr(op->cmd_file, (op->raw > 0) /* as_binary */,
+                           false /* no_space */, op->cdb, &op->cdb_length,
+                           MAX_SCSI_CDBSZ);
+        if (err) {
+            pr2serr("Unable to parse: %s as %s\n", op->cmd_file,
+                    (op->raw > 0) ? "binary" : "hex");
             return SG_LIB_SYNTAX_ERROR;
+        }
         if (op->verbose > 2) {
             pr2serr("Read %d from %s . They are in hex:\n", op->cdb_length,
                     op->cmd_file);
@@ -520,9 +531,9 @@ main(int argc, char *argv[])
         goto done;
     }
 
-    ptvp = construct_scsi_pt_obj();
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
     if (ptvp == NULL) {
-        pr2serr("out of memory\n");
+        pr2serr("construct_scsi_pt_obj_with_fd() failed\n");
         ret = SG_LIB_CAT_OTHER;
         goto done;
     }
@@ -599,7 +610,10 @@ main(int argc, char *argv[])
                 (int)sizeof(sense_buffer));
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
-    ret = do_scsi_pt(ptvp, sg_fd, op->timeout, op->verbose);
+    if (op->nvm)
+        ret = do_nvm_pt(ptvp, 0, op->timeout, op->verbose);
+    else
+        ret = do_scsi_pt(ptvp, -1, op->timeout, op->verbose);
     if (ret > 0) {
         switch (ret) {
         case SCSI_PT_DO_BAD_PARAMS:
@@ -624,6 +638,10 @@ main(int argc, char *argv[])
                     hex2stderr(sense_buffer, s_len, -1);
                 }
             }
+            break;
+        case SCSI_PT_DO_NOT_SUPPORTED:
+            pr2serr("do_scsi_pt: not supported\n");
+            ret = SG_LIB_CAT_TIMEOUT;
             break;
         default:
             pr2serr("do_scsi_pt: unknown error: %d\n", ret);

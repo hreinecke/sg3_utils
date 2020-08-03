@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.46 [20200730] [svn: r859]
+Changelog for sg3_utils-1.46 [20200802] [svn: r860]
   - sg_rep_pip: report new provisioning initialization pattern cmd
   - sg_turs: estimated time-to-ready [20-061r2]
     - add --delay=MS option
@@ -15,21 +15,26 @@ Changelog for sg3_utils-1.46 [20200730] [svn: r859]
   - sg_ses: use fan speed factor field for calculation [ses4r04]
   - sg_raw: increase maximum data-in and data-out buffer size
     from 64 KB to 1 MB
+    - fix --cmdfile= handling
+    - add --nvm option to send commands from the NVM command set
   - sg_pt_solaris+sg_pt_osf1: fix problem with clear_scsi_pt_obj()
     which needs to remember is_nvme and dev_fd values
   - sg_lib: restore elements and rebuild command added
   - sg_lib,sg_pt: add partial_clear_scsi_pt_obj(),
     get_scsi_pt_cdb_len() and get_scsi_pt_cdb_buf()
+    - add do_nvm_pt() for the NVM (sub-)command set
   - sg_lib: Linux NVMe SNTL: add read, write and verify;
     synchronize cache and write same translations
     - add dummy start stop unit and test unit ready commands
     - wire cache mpage's WCE to nvme 'volatile write cache'
+    - fix crash in sg_f2hex_arr() when fname not found
   - sg_lib: reprint cdb with illegal request sense key
     - asc/ascq match asc-num.txt @t10 20200708 [spc6r02]
   - remove space from end of source lines for git-svn
   - testing/sg_mrq_testing: new, for blocking mrq usage
   - testing/sgs_dd: add evfd flags and eventfd processing
   - testing: remove master-slave terminology for sgv4
+  - examples: add nvme_read_ctl.hex and nvme_write_ctl.hex
 
 Changelog for sg3_utils-1.45 [20200229] [svn: r843]
   - sg_get_elem_status: new utility [sbc4r16]

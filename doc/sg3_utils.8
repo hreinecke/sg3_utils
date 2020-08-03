@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "July 2020" "sg3_utils\-1.46" SG3_UTILS
+.TH SG3_UTILS "8" "August 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -91,9 +91,14 @@ The SG3_UTILS_OLD_OPTS environment variable is explained in the previous
 section. It is only for backward compatibility of the command line options
 for older utilities.
 .PP
-The SG3_UTILS_DSENSE environment variable may be set to a number. If that
-number is non\-zero then descriptor sense is set in the SNTL (the small
-SCSI to NVMe Translation Layer within the underlying library).
+The SG3_UTILS_DSENSE environment variable may be set to a number. It is
+only used by the embedded SNTL within the library used by the utilities in
+this library. SNTL is a SCSI to NVMe Translation Layer. This environment
+variable defaults to 0 which will lead to any utility that issues a SCSI
+command that is translated to a NVMe command (by the embedded SNTL) that
+fails at the NVMe dvice, to return SCSI sense in 'fixed' format. If this
+variable is non\-zero then then the returned SCSI sense will be in 'descriptor'
+format.
 .PP
 Several utilities have their own environment variable setting (e.g.
 sg_persist has SG_PERSIST_IN_RDONLY). See individual utility man pages

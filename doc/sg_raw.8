@@ -1,13 +1,14 @@
-.TH SG_RAW "8" "July 2020" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_RAW "8" "August 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
-sg_raw \- send arbitrary SCSI command to a device
+sg_raw \- send arbitrary SCSI or NVMe command to a device
 .SH SYNOPSIS
 .B sg_raw
 [\fI\-\-binary\fR] [\fI\-\-cmdfile=CF\fR] [\fI\-\-enumerate\fR]
 [\fI\-\-help\fR] [\fI\-\-infile=IFILE\fR] [\fI\-\-nosense\fR]
-[\fI\-\-outfile=OFILE\fR] [\fI\-\-readonly\fR] [\fI\-\-request=RLEN\fR]
-[\fI\-\-send=SLEN\fR] [\fI\-\-skip=KLEN\fR] [\fI\-\-timeout=SECS\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR [CDB0 CDB1 ...]
+[\fI\-\-nvm\fR] [\fI\-\-outfile=OFILE\fR] [\fI\-\-readonly\fR]
+[\fI\-\-request=RLEN\fR] [\fI\-\-send=SLEN\fR] [\fI\-\-skip=KLEN\fR]
+[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR [CDB0 CDB1 ...]
 .SH DESCRIPTION
 This utility sends an arbitrary SCSI command (between 6 and 256 bytes) to
 the \fIDEVICE\fR. There may be no associated data transfer; or data may be
@@ -25,11 +26,11 @@ command can be given either on the command line or via the
 The commands pass through a generic SCSI interface which is implemented
 for several operating systems including Linux, FreeBSD and Windows.
 .PP
-Experimental support has been added to send NVMe Admin commands to the
-\fIDEVICE\fR. Since all NVMe commands are 64 bytes long it is more
-convenient to use the \fI\-\-cmdfile=CF\fR option rather than type the
-64 bytes of the NVMe command on the command line. See the section on
-NVME below.
+Experimental support has been added to send NVMe Admin and NVM commands to
+the \fIDEVICE\fR. Since all NVMe commands are 64 bytes long it is more
+convenient to use the \fI\-\-cmdfile=CF\fR option rather than type the 64
+bytes of the NVMe command on the command line. See the section on NVME
+below.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -52,6 +53,11 @@ Read data from \fIIFILE\fR instead of stdin. This option is ignored if
 .TP
 \fB\-n\fR, \fB\-\-nosense\fR
 Don't display SCSI Sense information.
+.TP
+\fB\-N\fR, \fB\-\-nvm\fR
+When sending NVMe commands, the Admin command set is assumed. To send the
+NVM command set (e.g. the Read and Write (user data) commands) this option
+needs to be given.
 .TP
 \fB\-o\fR, \fB\-\-outfile\fR=\fIOFILE\fR
 Write data received from the \fIDEVICE\fR to \fIOFILE\fR. The data is
@@ -125,19 +131,19 @@ the '\-vv' option is given. The command line syntax still needs to be
 correct, so /dev/null may be used for the \fIDEVICE\fR since the CDB
 command name decoding is done before the \fIDEVICE\fR is checked.
 .SH NVME SUPPORT
-Support for NVMe (a.k.a. NVM Express) is currently experimental. NVMe
-concepts map reasonably well to the SCSI architecture. A SCSI logical
-unit (LU) is similar to a NVMe namespace (although LUN 0 is very common
-in SCSI while namespace IDs start at 1). A SCSI target device is similar
-to a NVMe controller. SCSI commands vary from 6 to 260 bytes long (although
-SCSI command descriptor blocks (cdb_s) longer than 32 bytes are uncommon)
-while all NVMe commands are currently 64 bytes long. The SCSI architecture
-makes a clear distinction between an initiator (often called a HBA) and
-a target (device) while (at least on the PCIe transport) the NVMe
-controller plays both roles. At this time this utility only
-supports "Admin" commands (i.e. it does not support the I/O (or "NVM")
-command set). Admin commands are sent to submission queue 0 while non\-admin
-commands are sent to submissions greater than 0.
+Support for NVMe (a.k.a. NVM Express) is currently experimental. NVMe concepts
+map reasonably well to the SCSI architecture. A SCSI logical unit (LU) is
+similar to a NVMe namespace (although LUN 0 is very common in SCSI while
+namespace IDs start at 1). A SCSI target device is similar to a NVMe
+controller. SCSI commands vary from 6 to 260 bytes long (although SCSI command
+descriptor blocks (cdb_s) longer than 32 bytes are uncommon) while all NVMe
+commands are currently 64 bytes long. The SCSI architecture makes a clear
+distinction between an initiator (often called a HBA) and a target (device)
+while (at least on the PCIe transport) the NVMe controller plays both roles.
+This utility defaults to assuming the user provided 64 byte command belongs
+to NVMe's Admin command set. To issue commands from the "NVM" command set,
+the \fI\-\-nvm\fR option must be given. Admin and NVM commands are sent to
+submission queue 0.
 .PP
 One significant difference is that SCSI uses a big endian representation
 for integers that are longer than 8 bits (i.e. longer than 1 byte) while
@@ -158,11 +164,17 @@ data\-in buffer's address" while 0xfffffffffffffffd is interpreted as "use
 the data\-out buffer's address". Since NVMe uses little endian notation
 then that first address appears in the NVMe command byte stream as "fe"
 followed by seven "ff"s. A similar arrangement is made for the length
-of that buffer, but since that is a 32 byte quantity, the first 4
-bytes (all "ff"s) are removed.
+of that buffer (in bytes), but since that is a 32 byte quantity, the
+first 4 bytes (all "ff"s) are removed.
 .PP
-Two command file examples can be found in the examples directory of this
-package's source tarball: nvme_identify_ctl.hex and nvme_dev_self_test.hex .
+Several command file examples can be found in the examples directory of this
+package's source tarball: nvme_identify_ctl.hex, nvme_dev_self_test.hex,
+nvme_read_ctl.hex and nvme_write_ctl.hex .
+.PP
+Beware: the NVMe standard often refers to some of its fields as "0's based".
+They are typically counts of something like the number of blocks to be read.
+For example in NVMe Read command, a "0's based" number of blocks field
+containing the value 3 means to read 4 blocks! No, this is not a joke.
 .SH EXAMPLES
 These examples, apart from the last one, use Linux device names. For
 suitable device names in other supported Operating Systems see the

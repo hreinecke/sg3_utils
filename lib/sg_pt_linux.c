@@ -471,7 +471,7 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
         ptp->is_sg = is_sg;
         ptp->is_bsg = is_bsg;
         ptp->is_nvme = is_nvme;
-        ptp->nvme_direct = false;
+        ptp->nvme_our_sntl = false;
         ptp->nvme_nsid = nvme_nsid;
         ptp->dev_stat = dev_stat;
     }
@@ -486,9 +486,7 @@ partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
         return;
     ptp->in_err = 0;
     ptp->os_err = 0;
-    if (ptp->nvme_direct)
-        ptp->nvme_result = 0;
-    else {
+    if (ptp->nvme_our_sntl) {
         ptp->io_hdr.device_status = 0;
         ptp->io_hdr.transport_status = 0;
         ptp->io_hdr.driver_status = 0;
@@ -496,7 +494,8 @@ partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
         ptp->io_hdr.din_xfer_len = 0;
         ptp->io_hdr.dout_xferp = 0;
         ptp->io_hdr.dout_xfer_len = 0;
-    }
+    } else
+        ptp->nvme_result = 0;
 }
 
 #ifndef SG_SET_GET_EXTENDED
@@ -610,7 +609,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
         ptp->is_sg = false;
         ptp->is_bsg = false;
         ptp->is_nvme = false;
-        ptp->nvme_direct = false;
+        ptp->nvme_our_sntl = false;
         ptp->nvme_nsid = 0;
         ptp->os_err = 0;
     }
@@ -797,7 +796,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if ((NULL == ptp) || (ptp->nvme_direct))
+    if ((NULL == ptp) || (! ptp->nvme_our_sntl))
         return 0;
     else if ((ptp->io_hdr.din_xfer_len > 0) &&
              (ptp->io_hdr.dout_xfer_len > 0))
@@ -856,8 +855,8 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return (int)(ptp->nvme_direct ? ptp->nvme_status :
-                                    ptp->io_hdr.device_status);
+    return (int)(ptp->nvme_our_sntl ? ptp->io_hdr.device_status :
+				      ptp->nvme_status);
 }
 
 uint32_t
@@ -867,8 +866,7 @@ get_pt_result(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return ptp->nvme_direct ? ptp->nvme_result :
-                              ptp->io_hdr.device_status;
+    return ptp->nvme_our_sntl ? ptp->io_hdr.device_status : ptp->nvme_result;
 }
 
 int

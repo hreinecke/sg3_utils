@@ -57,8 +57,8 @@
 
 struct freebsd_dev_channel {
     int unitnum;                  // the SCSI unit number
-    bool is_nvme;       /* OS device type, if false ignore nvme_direct */
-    bool nvme_direct;   /* false: our SNTL; true: received NVMe command */
+    bool is_nvme;       /* OS device type, if false ignore nvme_our_sntl */
+    bool nvme_our_sntl; /* true: our SNTL; false: received NVMe command */
     bool is_char;
     uint32_t nsid;
     uint32_t nv_ctrlid;
@@ -107,7 +107,7 @@ struct sg_pt_freebsd_scsi {
                                 // (dev_han - FREEBSD_FDOFFSET) is the
                                 // index into devicetable[]
     bool is_nvme;               // copy of same field in fdc object
-    bool nvme_direct;           // copy of same field in fdc object
+    bool nvme_our_sntl;         // copy of same field in fdc object
     struct sg_sntl_dev_state_t * dev_statp;     // points to associated fdc
 };
 
@@ -251,7 +251,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
             goto scsi_ata_try;
         }
         fdc_p->is_nvme = true;
-        fdc_p->nvme_direct = false;
+        fdc_p->nvme_our_sntl = true;	/* guess at this stage */
         fdc_p->is_char = is_char;
         fdc_p->nsid = (broadcast_nsid == nsid) ? 0 : nsid;
         fdc_p->nv_ctrlid = nv_ctrlid;
@@ -462,19 +462,19 @@ partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
     ptp->in_err = 0;
     ptp->os_err = 0;
     ptp->transport_err = 0;
-    if (ptp->nvme_direct) {
-        struct freebsd_dev_channel *fdc_p;
-
-        fdc_p = get_fdc_p(ptp);
-        if (fdc_p)
-            fdc_p->nvme_result = 0;
-    } else {
+    if (ptp->nvme_our_sntl) {
         ptp->scsi_status = 0;
         ptp->dxfer_dir = CAM_DIR_NONE;
         ptp->dxferip = NULL;
         ptp->dxfer_ilen = 0;
         ptp->dxferop = NULL;
         ptp->dxfer_olen = 0;
+    } else {
+        struct freebsd_dev_channel *fdc_p;
+
+        fdc_p = get_fdc_p(ptp);
+        if (fdc_p)
+            fdc_p->nvme_result = 0;
     }
 }
 
@@ -816,7 +816,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
-    return ((NULL == ptp) || ptp->nvme_direct) ? 0 : ptp->resid;
+    return ((NULL == ptp) || (! ptp->nvme_our_sntl)) ? 0 : ptp->resid;
 }
 
 void
@@ -870,15 +870,16 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp) {
-        if (ptp->nvme_direct) {
+        if (ptp->nvme_our_sntl)
+	    return ptp->scsi_status;
+	else {
             const struct freebsd_dev_channel *fdc_p;
 
             fdc_p = get_fdc_cp(ptp);
             if (NULL == fdc_p)
                 return -1;
             return (int)fdc_p->nvme_status;
-        } else
-            return ptp->scsi_status;
+        }
     }
     return -1;
 }
@@ -890,15 +891,16 @@ get_pt_result(const struct sg_pt_base * vp)
     const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
 
     if (ptp) {
-        if (ptp->nvme_direct) {
+        if (ptp->nvme_our_sntl)
+	    return (uint32_t)ptp->scsi_status;
+	else {
             const struct freebsd_dev_channel *fdc_p;
 
             fdc_p = get_fdc_cp(ptp);
             if (NULL == fdc_p)
                 return -1;
             return fdc_p->nvme_result;
-        } else
-            return (uint32_t)ptp->scsi_status;
+        }
     }
     return 0xffffffff;
 }
@@ -2187,9 +2189,9 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
     if (vb > 3)
         pr2ws("%s: opcode=0x%x, fd=%d\n", __func__, cdbp[0], fd);
     scsi_cdb = sg_is_scsi_cdb(cdbp, n);
-    /* nvme_direct is true when NVMe command (64 byte) has been given */
-    ptp->nvme_direct = ! scsi_cdb;
-    fdc_p->nvme_direct = ptp->nvme_direct;
+    /* nvme_our_sntl is false when NVMe command (64 byte) has been given */
+    ptp->nvme_our_sntl = scsi_cdb;
+    fdc_p->nvme_our_sntl = ptp->nvme_our_sntl;
     if (scsi_cdb) {
         switch (cdbp[0]) {
         case SCSI_INQUIRY_OPC:
@@ -2305,6 +2307,46 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int vb)
             pr2ws("%s: object pointer NULL; fd=%d\n", __func__, fd);
     }
     return -ENOTTY;             /* inappropriate ioctl error */
+}
+
+#endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+
+#if (HAVE_NVME && (! IGNORE_NVME))
+
+int
+do_nvm_pt(struct sg_pt_base * vp, int submq, int timeout_secs, int vb)
+{
+    if (vb)
+        pr2ws("%s: not supported, ", __func__);
+    if (vp) { }
+    if (submq) { }
+    if (timeout_secs) { }
+    return SCSI_PT_DO_NOT_SUPPORTED;
+}
+
+#else           /* (HAVE_NVME && (! IGNORE_NVME)) */
+
+int
+do_nvm_pt(struct sg_pt_base * vp, int submq, int timeout_secs, int verbose)
+{
+    if (vb) {
+        pr2ws("%s: not supported, ", __func__);
+#ifdef HAVE_NVME
+        pr2ws("HAVE_NVME, ");
+#else
+        pr2ws("don't HAVE_NVME, ");
+#endif
+
+#ifdef IGNORE_NVME
+        pr2ws("IGNORE_NVME");
+#else
+        pr2ws("don't IGNORE_NVME");
+#endif
+    }
+    if (vp) { }
+    if (submq) { }
+    if (timeout_secs) { }
+    return SCSI_PT_DO_NOT_SUPPORTED;
 }
 
 #endif          /* (HAVE_NVME && (! IGNORE_NVME)) */

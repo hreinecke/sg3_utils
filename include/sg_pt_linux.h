@@ -117,8 +117,8 @@ struct sg_pt_linux_scsi {
     /* Leave io_hdr in first place of this structure */
     bool is_sg;
     bool is_bsg;
-    bool is_nvme;       /* OS device type, if false ignore nvme_direct */
-    bool nvme_direct;   /* false: our SNTL; true: received NVMe command */
+    bool is_nvme;       /* OS device type, if false ignore nvme_our_sntl */
+    bool nvme_our_sntl; /* true: our SNTL; false: received NVMe command */
     bool nvme_stat_dnr; /* Do No Retry, part of completion status field */
     bool nvme_stat_more; /* More, part of completion status field */
     bool mdxfer_out;    /* direction of metadata xfer, true->data-out */

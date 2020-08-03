@@ -150,6 +150,7 @@ void set_scsi_pt_flags(struct sg_pt_base * objp, int flags);
 #define SCSI_PT_DO_START_OK 0
 #define SCSI_PT_DO_BAD_PARAMS 1
 #define SCSI_PT_DO_TIMEOUT 2
+#define SCSI_PT_DO_NOT_SUPPORTED 4
 #define SCSI_PT_DO_NVME_STATUS 48       /* == SG_LIB_NVME_STATUS */
 /* If OS error prior to or during command submission then returns negated
  * error value (e.g. Unix '-errno'). This includes interrupted system calls
@@ -161,6 +162,19 @@ void set_scsi_pt_flags(struct sg_pt_base * objp, int flags);
  * given 'fd' can be -1 or the same value as given to the constructor. */
 int do_scsi_pt(struct sg_pt_base * objp, int fd, int timeout_secs,
                int verbose);
+
+/* NVMe Admin commands can be sent directly to do_scsi_pt(). Unfortunately
+ * NVMe has at least one other command set: "NVM" to access user data and
+ * the opcodes in the NVM command set overlap with the Admin command set.
+ * So NVMe Admin commands should be sent do_scsi_pt() while NVMe "NVM"
+ * commands should be sent to this function. No SCSI commands should be
+ * sent to this function. Currently submq is not implemented and all
+ * submitted NVM commands are sent on queue 0, the same queue use for
+ * Admin commands. The return values follow the same pattern as do_scsi_pt(),
+ * with 0 returned being good.  The NVMe device file descriptor must either
+ * be given to the obj constructor, or a prior set_pt_file_handle() call. */
+int do_nvm_pt(struct sg_pt_base * objp, int submq, int timeout_secs,
+              int verbose);
 
 #define SCSI_PT_RESULT_GOOD 0
 #define SCSI_PT_RESULT_STATUS 1 /* other than GOOD and CHECK CONDITION */

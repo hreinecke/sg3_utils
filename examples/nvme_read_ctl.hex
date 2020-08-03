@@ -1,0 +1,38 @@
+# 64 byte NVMe, Read command (a NVM command) that is suitable for:
+#       sg_raw --cmdfile=<this_file_name> --nvm --request=2048 <nvme_device>
+#
+# The address field (at byte offset 24, 8 bytes and little endian) gives
+# special meaning to the highest address pointers:
+#    ffffffff fffffffe         use address of data-in buffer
+#    ffffffff fffffffd         use address of data-out buffer
+#
+# The data length field (at byte offset 36, 4 bytes and little endian)
+# gives special meaning to the highest block counts:
+#    fffffffe                  use byte length of data-in buffer
+#    fffffffd                  use byte length of data-out buffer
+#
+# 512 byte logical block size is assumed. Read 4 blocks hence 2048bytes.
+# The first LBA read is 0x12345 and the namespace is 1. If successful
+# the four blocks will be read into the data-in buffer. Submission queu
+# 0 is used (the same queue that Admin commands use). The NVM opcode for
+# the Read command is 0x2 and appears in the first command byte.
+
+02 00 00 00 01 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  fe ff ff ff ff ff ff ff
+00 00 00 00 fe ff ff ff  45 23 01 00 00 00 00 00
+03 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+
+# Notice NVMe uses its quirky "0's based" number of blocks so
+# 03 appears at byte offset 48 to mean "read 4 blocks".
+#
+# A typical invocation in Linux and FreeBSD would look like this:
+#    sg_raw --cmdfile=nvme_read_ctl.hex --nvm -r 2048
+#           --outfile=t.bin /dev/nvme0
+#
+# Notice the '--nvm' option which is needed to distiguish a NVM
+# command from an Admin command as Admin commands are the default
+# in this utility.
+#
+# This utility (and most others in the package) aligns data-in and
+# data-out buffers to the beginning of pages which are 4096 bytes
+# long at a minimum. This is the way NVMe likes things as well.

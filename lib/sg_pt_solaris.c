@@ -519,3 +519,13 @@ get_scsi_pt_os_err_str(const struct sg_pt_base * vp, int max_b_len, char * b)
         b[max_b_len - 1] = '\0';
     return b;
 }
+
+int
+do_nvm_pt(struct sg_pt_base * vp, int submq, int timeout_secs, int verbose)
+{
+    if (vp) { }
+    if (submq) { }
+    if (timeout_secs) { }
+    if (verbose) { }
+    return SCSI_PT_DO_NOT_SUPPORTED;
+}

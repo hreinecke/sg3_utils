@@ -3132,3 +3132,13 @@ nvme_pt(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
 }
 
 #endif          /* (HAVE_NVME && (! IGNORE_NVME)) */
+
+int
+do_nvm_pt(struct sg_pt_base * vp, int submq, int timeout_secs, int verbose)
+{
+    if (vp) { }
+    if (submq) { }
+    if (timeout_secs) { }
+    if (verbose) { }
+    return SCSI_PT_DO_NOT_SUPPORTED;
+}
