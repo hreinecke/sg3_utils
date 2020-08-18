@@ -1,4 +1,3 @@
-PROPS-END
 /*
  * Copyright (c) 2019 Douglas Gilbert.
  * All rights reserved.

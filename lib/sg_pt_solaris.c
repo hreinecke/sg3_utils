@@ -335,8 +335,8 @@ void
 get_pt_req_lengths(const struct sg_pt_base * vp, int * req_dinp,
                    int * req_doutp)
 {
-    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
-    int dxfer_len = ptp->uscsi.uscsi_buflen
+    const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+    int dxfer_len = ptp->uscsi.uscsi_buflen;
     int flags = ptp->uscsi.uscsi_flags;
 
     if (req_dinp) {
@@ -357,8 +357,8 @@ void
 get_pt_actual_lengths(const struct sg_pt_base * vp, int * act_dinp,
                       int * act_doutp)
 {
-    const struct sg_pt_freebsd_scsi * ptp = &vp->impl;
-    int dxfer_len = ptp->uscsi.uscsi_buflen
+    const struct sg_pt_solaris_scsi * ptp = &vp->impl;
+    int dxfer_len = ptp->uscsi.uscsi_buflen;
     int flags = ptp->uscsi.uscsi_flags;
 
     if (act_dinp) {
