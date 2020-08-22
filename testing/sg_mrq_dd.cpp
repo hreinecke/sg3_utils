@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.05 20200728";
+static const char * version_str = "1.08 20200820";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -100,6 +100,7 @@ static const char * version_str = "1.05 20200728";
 // C++ local header
 #include "sg_scat_gath.h"
 
+// C headers associated with sg3_utils library
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -221,7 +222,7 @@ struct global_collection        /* one instance visible to all threads */
     atomic<int64_t> in_rem_count;     /*  | count of remaining in blocks */
     atomic<int> in_partial;           /*  | */
     off_t in_st_size;                 /* Only for FT_OTHER (regular) file */
-    int mrq_num;                      /* Number of multi-reqs for sg v4 */
+    int mrq_num;                      /* if user gives 0, set this to 1 */
     int outfd;
     int out_type;
     int cdbsz_out;
@@ -231,9 +232,9 @@ struct global_collection        /* one instance visible to all threads */
     off_t out_st_size;                /* Only for FT_OTHER (regular) file */
     condition_variable infant_cv;     /* after thread:0 does first segment */
     mutex infant_mut;
-    bool processed;
     int bs;
     int bpt;
+    int elem_sz;
     int outregfd;
     int outreg_type;
     off_t outreg_st_size;
@@ -241,12 +242,14 @@ struct global_collection        /* one instance visible to all threads */
     atomic<int> sum_of_resids;
     int verbose;
     int dry_run;
+    bool mrq_eq_0;              /* true when user gives mrq=0 */
+    bool processed;
     bool cdbsz_given;
     bool count_given;
     bool flexible;
     bool ofile_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
-    bool mrq_cmds;              /* mrq=<NRQS>,C  given */
+    bool no_waitq;              /* if set use polling for response instead */
     bool verify;                /* don't copy, verify like Unix: cmp */
     bool prefetch;              /* for verify: do PF(b),RD(a),V(b)_a_data */
     const char * infp;
@@ -335,6 +338,7 @@ static atomic<int> num_fin_eagain(0);
 #if 0
 static atomic<long> num_waiting_calls(0);
 #endif
+static atomic<bool> vb_first_time(true);
 
 static sigset_t signal_set;
 
@@ -348,6 +352,8 @@ static int do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
                               scat_gath_iter & o_sg_it, int seg_blks,
                               vector<cdb_arr_t> & a_cdb,
                               vector<struct sg_io_v4> & a_v4);
+static int do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
+                                   scat_gath_iter & o_sg_it, int seg_blks);
 static int do_normal_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
                                 scat_gath_iter & o_sg_it, int seg_blks,
                                 vector<cdb_arr_t> & a_cdb,
@@ -362,7 +368,7 @@ static mutex strerr_mut;
 static bool have_sg_version = false;
 static int sg_version = 0;
 static bool sg_version_ge_40030 = false;
-static atomic<bool> shutting_down = false;
+static atomic<bool> shutting_down{false};
 static bool do_sync = false;
 static int do_time = 1;
 static struct global_collection gcoll;
@@ -495,7 +501,7 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_NO_WAITQ & flags) {           /* 0x40 */
-        n += sg_scnpr(b + n, b_len - n, "NWTQ|");
+        n += sg_scnpr(b + n, b_len - n, "NO_WTQ|");
         if (n >= b_len)
             goto fini;
     }
@@ -505,7 +511,7 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_COMPLETE_B4 & flags) {        /* 0x100 */
-        n += sg_scnpr(b + n, b_len - n, "NWTQ|");
+        n += sg_scnpr(b + n, b_len - n, "CPL_B4|");
         if (n >= b_len)
             goto fini;
     }
@@ -858,12 +864,13 @@ usage(int pg_num)
             "[seek=SEEK]\n"
             "                  [skip=SKIP] [--help] [--version]\n\n");
     pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
-            "[fua=0|1|2|3]\n"
-            "                  [mrq=MRQ] [ofreg=OFREG] [sync=0|1] [thr=THR] "
-            "[time=0|1]\n"
-            "                  [verbose=VERB] [--dry-run] [--verbose] "
-            "[--verify]\n"
-            "                  [--version]\n\n"
+            "[elemsz_kb=EKB]\n"
+            "                  [fua=0|1|2|3] [mrq=MRQ] [no_waitq=0|1] "
+            "[ofreg=OFREG]\n"
+            "                  [sync=0|1] [thr=THR] [time=0|1] "
+            "[verbose=VERB]\n"
+            "                  [--dry-run] [--verbose] [--verify] "
+            "[--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -875,6 +882,8 @@ usage(int pg_num)
             "                null,order,qtail,serial,wq_excl]\n"
             "    mrq         number of cmds placed in each sg call "
             "(def: 16)\n"
+            "                if mrq=0 does single, blocking ioctl(SG_IO)s "
+            "for all IO\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
@@ -891,10 +900,10 @@ usage(int pg_num)
             "Copy IFILE to OFILE, similar to dd command. This utility is "
             "specialized for\nSCSI devices and uses the 'multiple requests' "
             "(mrq) in a single invocation\nfacility in version 4 of the sg "
-            "driver. Usually one or both IFILE and\nOFILE will be sg "
-            "devices. With the --verify option it does a\n"
+            "driver unless mrq=0. Usually one or both\nIFILE and OFILE will "
+            "be sg devices. With the --verify option it does a\n"
             "verify/compare operation instead of a copy. This utility is "
-            "Linux\n specific. Use '-hh', '-hhh' or '-hhhh' for more "
+            "Linux specific.\nUse '-hh', '-hhh' or '-hhhh' for more "
             "information.\n"
            );
     return;
@@ -909,9 +918,15 @@ page2:
             "    cdbsz       size of SCSI READ, WRITE or VERIFY cdb_s "
             "(default is 10)\n"
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
+            "    elemsz_kb=EKB    scatter gather list element size in "
+            "kibibytes;\n"
+            "                     must be power of two, >= page_size "
+            "(typically 4)\n"
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
+            "    no_waitq=0|1    poll for completion when 1; def: 0 (use "
+            "wait queue)\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
             "                IFILE in the first half of each shared element\n"
@@ -1317,8 +1332,12 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
                 a_cdb.reserve(nn);
             if (a_v4.capacity() < nn)
                 a_v4.reserve(nn);
-            res = do_both_sg_segment(rep, i_sg_it, o_sg_it, seg_blks, a_cdb,
-                                     a_v4);
+            if (clp->mrq_eq_0)
+                res = do_both_sg_segment_mrq0(rep, i_sg_it, o_sg_it,
+                                              seg_blks);
+            else
+                res = do_both_sg_segment(rep, i_sg_it, o_sg_it, seg_blks,
+                                         a_cdb, a_v4);
             if (res < 0)
                 break;
         } else if (only_one_sg) {
@@ -1371,7 +1390,7 @@ fini:
         free(rep->alloc_bp);
     if ((1 == rep->mmap_active) && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
-            int err = errno;
+            err = errno;
             char bb[64];
 
             pr2serr_lk("thread=%d: munmap() failed: %s\n", rep->id,
@@ -1809,13 +1828,109 @@ fini:
 /* Returns number of blocks successfully processed or a negative error
  * number. */
 static int
+sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
+                     int seg_blks, uint8_t *dp)
+{
+    int k, res, fd, pack_id_base, id, rflags;
+    int num, kk, lin_blks, cdbsz, err;
+    uint32_t q_blks = 0;
+    struct global_collection * clp = rep->clp;
+    cdb_arr_t t_cdb = {};
+    struct sg_io_v4 t_v4;
+    struct sg_io_v4 * t_v4p = &t_v4;
+    struct flags_t * flagsp = is_wr ? &clp->out_flags : &clp->in_flags;
+    int vb = clp->verbose;
+
+    id = rep->id;
+    pack_id_base = id * PACK_ID_TID_MULTIPLIER;
+    rflags = 0;
+    fd = is_wr ? rep->outfd : rep->infd;
+    if (flagsp->mmap && (rep->outregfd >= 0))
+        rflags |= SGV4_FLAG_MMAP_IO;
+    if (flagsp->dio)
+        rflags |= SGV4_FLAG_DIRECT_IO;
+    if (flagsp->qhead)
+        rflags |= SGV4_FLAG_Q_AT_HEAD;
+    if (flagsp->qtail)
+        rflags |= SGV4_FLAG_Q_AT_TAIL;
+    if (clp->no_waitq)
+        rflags |= SGV4_FLAG_NO_WAITQ;
+
+    for (k = 0, num = 0; seg_blks > 0; ++k, seg_blks -= num) {
+        kk = min<int>(seg_blks, clp->bpt);
+        lin_blks = sg_it.linear_for_n_blks(kk);
+        num = lin_blks;
+        if (num <= 0) {
+            res = 0;
+            pr2serr_lk("[%d] %s: unexpected num=%d\n", id, __func__, num);
+            break;
+        }
+
+        /* First build the command/request for the read-side */
+        cdbsz = is_wr ? clp->cdbsz_out : clp->cdbsz_in;
+        res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num, sg_it.current_lba(),
+                                false, is_wr, flagsp->fua, flagsp->dpo);
+        if (res) {
+            pr2serr_lk("[%d] %s: sg_build_scsi_cdb() failed\n", id, __func__);
+            break;
+        } else if (vb > 3)
+            lk_print_command_len("cdb: ", t_cdb.data(), cdbsz, true);
+
+        memset(t_v4p, 0, sizeof(*t_v4p));
+        t_v4p->guard = 'Q';
+        t_v4p->request = (uint64_t)t_cdb.data();
+        t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->flags = rflags;
+        t_v4p->request_len = cdbsz;
+        if (is_wr) {
+            t_v4p->dout_xfer_len = num * clp->bs;
+            t_v4p->dout_xferp = (uint64_t)(dp + (q_blks * clp->bs));
+        } else {
+            t_v4p->din_xfer_len = num * clp->bs;
+            t_v4p->din_xferp = (uint64_t)(dp + (q_blks * clp->bs));
+        }
+        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->usr_ptr = num;           /* pass number blocks requested */
+        t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
+mrq0_again:
+        res = ioctl(fd, SG_IO, t_v4p);
+        err = errno;
+        if (vb > 5)
+            v4hdr_out_lk("sg_half_segment_mrq0: >> after ioctl(SG_IO)",
+                         t_v4p, id, false);
+        if (res < 0) {
+            if (E2BIG == err)
+                sg_take_snap(fd, id, true);
+            else if (EBUSY == err) {
+                ++num_ebusy;
+                std::this_thread::yield();/* so other threads can progress */
+                goto mrq0_again;
+            }
+            pr2serr_lk("[%d] %s: ioctl(SG_IO)-->%d, errno=%d: %s\n", id,
+                       __func__, res, err, strerror(err));
+            return -err;
+        }
+        if (t_v4p->device_status || t_v4p->transport_status ||
+            t_v4p->driver_status) {
+            pr2serr_lk("[%d] t_v4[%d]:\n", id, k);
+            lk_chk_n_print4("    ", t_v4p, vb > 4);
+            return q_blks;
+        }
+        q_blks += num;
+        sg_it.add_blks(num);
+    }
+    return q_blks;
+}
+
+/* Returns number of blocks successfully processed or a negative error
+ * number. */
+static int
 sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
-                   int seg_blks, uint8_t *dp,
-                   vector<cdb_arr_t> & a_cdb,
-                   vector<struct sg_io_v4> & a_v4)
+                int seg_blks, uint8_t *dp, vector<cdb_arr_t> & a_cdb,
+                vector<struct sg_io_v4> & a_v4)
 {
     int num_mrq, k, res, fd, mrq_pack_id_base, id, b_len, rflags;
-    int num, kk, lin_blks, cdbsz, num_good;
+    int num, kk, lin_blks, cdbsz, num_good, err;
     int o_seg_blks = seg_blks;
     uint32_t in_fin_blks, out_fin_blks;
     uint32_t mrq_q_blks = 0;
@@ -1825,7 +1940,7 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 ctl_v4;     /* MRQ control object */
     struct global_collection * clp = rep->clp;
-    const char * iosub_str = "SUBMIT(variable blocking)";
+    const char * iosub_str = "SG_IOSUBMIT(variable blocking)";
     char b[80];
     cdb_arr_t t_cdb = {};
     struct sg_io_v4 t_v4;
@@ -1838,7 +1953,7 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     id = rep->id;
     b_len = sizeof(b);
     if (serial)
-        iosub_str = "(ordered blocking)";
+        iosub_str = "SG_IO(ordered blocking)";
 
     a_cdb.clear();
     a_v4.clear();
@@ -1853,8 +1968,10 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_HEAD;
     if (flagsp->qtail)
         rflags |= SGV4_FLAG_Q_AT_TAIL;
+    if (clp->no_waitq)
+        rflags |= SGV4_FLAG_NO_WAITQ;
 
-    for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
+    for (k = 0, num = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
         lin_blks = sg_it.linear_for_n_blks(kk);
         num = lin_blks;
@@ -1922,9 +2039,15 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     if (false /* allow_mrq_abort */)
         ctl_v4.request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
 
+    if (vb && vb_first_time.load()) {
+        pr2serr_lk("First controlling object output by ioctl(%s), flags: "
+                   "%s\n", iosub_str, sg_flags_str(ctl_v4.flags, b_len, b));
+        vb_first_time.store(false);
+    } else if (vb > 4) {
+        pr2serr_lk("[%d] %s: >> Control object _before_ ioctl(%s):\n", id,
+                   __func__, iosub_str);
+    }
     if (vb > 4) {
-        pr2serr_lk("[%d] %s: >> Control object _before_ ioctl(SG_IO%s):\n",
-                   id, __func__, iosub_str);
         if (vb > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk(">> Control object before", &ctl_v4, id, false);
@@ -1940,16 +2063,15 @@ try_again:
     else
         res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);  /* overlapping commands */
     if (res < 0) {
-        int err = errno;
-
+        err = errno;
         if (E2BIG == err)
-                sg_take_snap(fd, id, true);
+            sg_take_snap(fd, id, true);
         else if (EBUSY == err) {
             ++num_ebusy;
             std::this_thread::yield();/* allow another thread to progress */
             goto try_again;
         }
-        pr2serr_lk("[%d] %s: ioctl(SG_IO%s, %s)-->%d, errno=%d: %s\n", id,
+        pr2serr_lk("[%d] %s: ioctl(%s, %s)-->%d, errno=%d: %s\n", id,
                    __func__, iosub_str, sg_flags_str(ctl_v4.flags, b_len, b),
                    res, err, strerror(err));
         return -err;
@@ -2128,8 +2250,12 @@ do_normal_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             ++seg_blks;
             rep->in_resid_bytes = 0;
         }
-        res = sg_half_segment(rep, o_sg_it, true /* is_wr */, seg_blks,
-                              rep->buffp, a_cdb, a_v4);
+        if (clp->mrq_eq_0)
+            res = sg_half_segment_mrq0(rep, o_sg_it, true /* is_wr */,
+                                      seg_blks, rep->buffp);
+        else
+            res = sg_half_segment(rep, o_sg_it, true /* is_wr */, seg_blks,
+                                  rep->buffp, a_cdb, a_v4);
         if (res < seg_blks) {
             if (res < 0) {
                 pr2serr_lk("[%d] %s: sg out failed d_off=%d, err=%d\n",
@@ -2142,8 +2268,12 @@ do_normal_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         out_fin_blks = seg_blks;
 
     } else {      /* in: sg --> out: normal */
-        res = sg_half_segment(rep, i_sg_it, false, seg_blks, rep->buffp,
-                              a_cdb, a_v4);
+        if (clp->mrq_eq_0)
+            res = sg_half_segment_mrq0(rep, i_sg_it, false, seg_blks,
+                                       rep->buffp);
+        else
+            res = sg_half_segment(rep, i_sg_it, false, seg_blks, rep->buffp,
+                                  a_cdb, a_v4);
         if (res < seg_blks) {
             if (res < 0) {
                 pr2serr_lk("[%d] %s: sg in failed, err=%d\n", id, __func__,
@@ -2203,6 +2333,168 @@ fini:
  * to the pass-through. Returns number of blocks processed (==seg_blks for
  * all good) or a negative error number. */
 static int
+do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
+                        scat_gath_iter & o_sg_it, int seg_blks)
+{
+    int k, kk, res, pack_id_base, id, iflags, oflags;
+    int num, i_lin_blks, o_lin_blks, cdbsz, err;
+    uint32_t in_fin_blks = 0;
+    uint32_t out_fin_blks = 0;
+    struct global_collection * clp = rep->clp;
+    cdb_arr_t t_cdb = {};
+    struct sg_io_v4 t_v4;
+    struct sg_io_v4 * t_v4p = &t_v4;
+    struct flags_t * iflagsp = &clp->in_flags;
+    struct flags_t * oflagsp = &clp->out_flags;
+    int vb = clp->verbose;
+
+    id = rep->id;
+    pack_id_base = id * PACK_ID_TID_MULTIPLIER;
+
+    iflags = SGV4_FLAG_SHARE;
+    if (iflagsp->mmap && (rep->outregfd >= 0))
+        iflags |= SGV4_FLAG_MMAP_IO;
+    else
+        iflags |= SGV4_FLAG_NO_DXFER;
+    if (iflagsp->dio)
+        iflags |= SGV4_FLAG_DIRECT_IO;
+    if (iflagsp->qhead)
+        iflags |= SGV4_FLAG_Q_AT_HEAD;
+    if (iflagsp->qtail)
+        iflags |= SGV4_FLAG_Q_AT_TAIL;
+    if (clp->no_waitq)
+        iflags |= SGV4_FLAG_NO_WAITQ;
+
+    oflags = SGV4_FLAG_SHARE | SGV4_FLAG_NO_DXFER;
+    if (oflagsp->dio)
+        oflags |= SGV4_FLAG_DIRECT_IO;
+    if (oflagsp->qhead)
+        oflags |= SGV4_FLAG_Q_AT_HEAD;
+    if (oflagsp->qtail)
+        oflags |= SGV4_FLAG_Q_AT_TAIL;
+    if (clp->no_waitq)
+        oflags |= SGV4_FLAG_NO_WAITQ;
+
+    for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
+        kk = min<int>(seg_blks, clp->bpt);
+        i_lin_blks = i_sg_it.linear_for_n_blks(kk);
+        o_lin_blks = o_sg_it.linear_for_n_blks(kk);
+        num = min<int>(i_lin_blks, o_lin_blks);
+        if (num <= 0) {
+            res = 0;
+            pr2serr_lk("[%d] %s: min(i_lin_blks=%d o_lin_blks=%d) < 1\n", id,
+		       __func__, i_lin_blks, o_lin_blks);
+            break;
+        }
+
+        /* First build the command/request for the read-side*/
+        cdbsz = clp->cdbsz_in;
+        res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
+                                i_sg_it.current_lba(), false, false,
+                                iflagsp->fua, iflagsp->dpo);
+        if (res) {
+            pr2serr_lk("%s: t=%d: input sg_build_scsi_cdb() failed\n",
+                       __func__, id);
+            break;
+        } else if (vb > 3)
+            lk_print_command_len("input cdb: ", t_cdb.data(), cdbsz, true);
+
+        memset(t_v4p, 0, sizeof(*t_v4p));
+        t_v4p->guard = 'Q';
+        t_v4p->request = (uint64_t)t_cdb.data();
+        t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->flags = iflags;
+        t_v4p->request_len = cdbsz;
+        t_v4p->din_xfer_len = num * clp->bs;
+        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->usr_ptr = num;           /* pass number blocks requested */
+        t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
+mrq0_again:
+        res = ioctl(rep->infd, SG_IO, t_v4p);
+        err = errno;
+        if (vb > 5)
+            v4hdr_out_lk("do_both_sg_segment_mrq0: >> after ioctl(SG_IO)",
+                         t_v4p, id, false);
+        if (res < 0) {
+            if (E2BIG == err)
+                sg_take_snap(rep->infd, id, true);
+            else if (EBUSY == err) {
+                ++num_ebusy;
+                std::this_thread::yield();/* so other threads can progress */
+                goto mrq0_again;
+            }
+            pr2serr_lk("[%d] %s: ioctl(SG_IO, read-side)-->%d, errno=%d: "
+                       "%s\n", id, __func__, res, err, strerror(err));
+            return -err;
+        }
+        if (t_v4p->device_status || t_v4p->transport_status ||
+            t_v4p->driver_status) {
+            pr2serr_lk("[%d] t_v4[%d]:\n", id, k);
+            lk_chk_n_print4("    ", t_v4p, vb > 4);
+            return min<int>(in_fin_blks, out_fin_blks);
+        }
+        rep->in_local_count += num;
+        in_fin_blks += num;
+
+        /* Now build the command/request for write-side (WRITE or VERIFY) */
+        cdbsz = clp->cdbsz_out;
+        res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
+                                o_sg_it.current_lba(), clp->verify, true,
+                                oflagsp->fua, oflagsp->dpo);
+        if (res) {
+            pr2serr_lk("%s: t=%d: output sg_build_scsi_cdb() failed\n",
+                       __func__, id);
+            break;
+        } else if (vb > 3)
+            lk_print_command_len("output cdb: ", t_cdb.data(), cdbsz, true);
+
+        memset(t_v4p, 0, sizeof(*t_v4p));
+        t_v4p->guard = 'Q';
+        t_v4p->request = (uint64_t)t_cdb.data();
+        t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->flags = oflags;
+        t_v4p->request_len = cdbsz;
+        t_v4p->dout_xfer_len = num * clp->bs;
+        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->usr_ptr = num;           /* pass number blocks requested */
+        t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
+mrq0_again2:
+        res = ioctl(rep->outfd, SG_IO, t_v4p);
+        err = errno;
+        if (vb > 5)
+            v4hdr_out_lk("do_both_sg_segment_mrq0: >> after ioctl(SG_IO)",
+                         t_v4p, id, false);
+        if (res < 0) {
+            if (E2BIG == err)
+                sg_take_snap(rep->outfd, id, true);
+            else if (EBUSY == err) {
+                ++num_ebusy;
+                std::this_thread::yield();/* so other threads can progress */
+                goto mrq0_again2;
+            }
+            pr2serr_lk("[%d] %s: ioctl(SG_IO, write-side)-->%d, errno=%d: "
+                       "%s\n", id, __func__, res, err, strerror(err));
+            return -err;
+        }
+        if (t_v4p->device_status || t_v4p->transport_status ||
+            t_v4p->driver_status) {
+            pr2serr_lk("[%d] t_v4[%d]:\n", id, k);
+            lk_chk_n_print4("    ", t_v4p, vb > 4);
+            return min<int>(in_fin_blks, out_fin_blks);
+        }
+        rep->out_local_count += num;
+        out_fin_blks += num;
+
+        i_sg_it.add_blks(num);
+        o_sg_it.add_blks(num);
+    }
+    return min<int>(in_fin_blks, out_fin_blks);
+}
+
+/* This function sets up a multiple request (mrq) transaction and sends it
+ * to the pass-through. Returns number of blocks processed (==seg_blks for
+ * all good) or a negative error number. */
+static int
 do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
                    scat_gath_iter & o_sg_it, int seg_blks,
                    vector<cdb_arr_t> & a_cdb,
@@ -2210,7 +2502,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
 {
     bool err_on_in = false;
     int num_mrq, k, res, fd, mrq_pack_id_base, id, b_len, iflags, oflags;
-    int num, kk, i_lin_blks, o_lin_blks, cdbsz, num_good;
+    int num, kk, i_lin_blks, o_lin_blks, cdbsz, num_good, err;
     int o_seg_blks = seg_blks;
     uint32_t in_fin_blks, out_fin_blks;
     uint32_t in_mrq_q_blks = 0;
@@ -2219,7 +2511,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     struct sg_io_v4 * a_v4p;
     struct sg_io_v4 ctl_v4;     /* MRQ control object */
     struct global_collection * clp = rep->clp;
-    const char * iosub_str = "SUBMIT(svb)";
+    const char * iosub_str = "SG_IOSUBMIT(svb)";
     char b[80];
     cdb_arr_t t_cdb = {};
     struct sg_io_v4 t_v4;
@@ -2246,6 +2538,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_HEAD;
     if (iflagsp->qtail)
         iflags |= SGV4_FLAG_Q_AT_TAIL;
+    if (clp->no_waitq)
+        iflags |= SGV4_FLAG_NO_WAITQ;
 
     oflags = SGV4_FLAG_SHARE | SGV4_FLAG_NO_DXFER;
     if (oflagsp->dio)
@@ -2254,6 +2548,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_HEAD;
     if (oflagsp->qtail)
         oflags |= SGV4_FLAG_Q_AT_TAIL;
+    if (clp->no_waitq)
+        oflags |= SGV4_FLAG_NO_WAITQ;
     oflags |= SGV4_FLAG_DO_ON_OTHER;
 
     for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
@@ -2263,7 +2559,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         num = min<int>(i_lin_blks, o_lin_blks);
         if (num <= 0) {
             res = 0;
-            pr2serr_lk("[%d] %s: unexpected num=%d\n", id, __func__, num);
+            pr2serr_lk("[%d] %s: min(i_lin_blks=%d o_lin_blks=%d) < 1\n", id,
+		       __func__, i_lin_blks, o_lin_blks);
             break;
         }
 
@@ -2325,12 +2622,9 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     }
     if (rep->both_sg || rep->same_sg)
         fd = rep->infd;         /* assume share to rep->outfd */
-    else if (rep->only_in_sg)
-        fd = rep->infd;
-    else if (rep->only_out_sg)
-        fd = rep->outfd;
     else {
-        pr2serr_lk("[%d] %s: why am I here? No sg devices\n", id, __func__);
+        pr2serr_lk("[%d] %s: why am I here? Want 2 sg devices\n", id,
+                   __func__);
         res = -1;
         goto fini;
     }
@@ -2355,9 +2649,14 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     if (false /* allow_mrq_abort */)
         ctl_v4.request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
 
+    if (vb && vb_first_time.load()) {
+        pr2serr_lk("First controlling object output by ioctl(%s), flags: "
+                   "%s\n", iosub_str, sg_flags_str(ctl_v4.flags, b_len, b));
+        vb_first_time.store(false);
+    } else if (vb > 4)
+        pr2serr_lk("%s: >> Control object _before_ ioctl(%s):\n", __func__,
+                   iosub_str);
     if (vb > 4) {
-        pr2serr_lk("%s: >> Control object _before_ ioctl(SG_IO%s):\n",
-                   __func__, iosub_str);
         if (vb > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk(">> Control object before", &ctl_v4, id, false);
@@ -2370,8 +2669,7 @@ try_again:
     }
     res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
     if (res < 0) {
-        int err = errno;
-
+        err = errno;
         if (E2BIG == err)
                 sg_take_snap(fd, id, true);
         else if (EBUSY == err) {
@@ -2379,7 +2677,7 @@ try_again:
             std::this_thread::yield();/* allow another thread to progress */
             goto try_again;
         }
-        pr2serr_lk("%s: ioctl(SG_IO%s, %s)-->%d, errno=%d: %s\n", __func__,
+        pr2serr_lk("%s: ioctl(%s, %s)-->%d, errno=%d: %s\n", __func__,
                    iosub_str, sg_flags_str(ctl_v4.flags, b_len, b), res, err,
                    strerror(err));
         res = -err;
@@ -2424,7 +2722,8 @@ try_again:
             resid_blks = out_mrq_q_blks - out_fin_blks;
             if (resid_blks > 0) {
                 rep->out_rem_count += resid_blks;
-                rep->stop_after_write = ! (! err_on_in && clp->out_flags.coe);
+                rep->stop_after_write = ! ((! err_on_in) &&
+                                           clp->out_flags.coe);
             }
         }
     }
@@ -2441,7 +2740,8 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
     bool no_dur = is_in ? clp->in_flags.no_dur : clp->out_flags.no_dur;
     bool masync = is_in ? clp->in_flags.masync : clp->out_flags.masync;
     bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
-    int res, t, num;
+    int elem_sz = clp->elem_sz;
+    int res, t, num, err;
     uint8_t *mmp;
     struct sg_extended_info sei;
     struct sg_extended_info * seip;
@@ -2459,6 +2759,23 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
                        my_name);
         }
         goto bypass;
+    }
+    if (elem_sz >= 4096) {
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
+        res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
+        if (res < 0)
+            pr2serr_lk("sg_mrq_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
+                       "error: %s\n", __func__, strerror(errno));
+        if (elem_sz != (int)seip->sgat_elem_sz) {
+            memset(seip, 0, sizeof(*seip));
+            seip->sei_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
+            seip->sgat_elem_sz = elem_sz;
+            res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
+            if (res < 0)
+                pr2serr_lk("sg_mrq_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
+                           "wr error: %s\n", __func__, strerror(errno));
+        }
     }
     if (no_dur || masync) {
         memset(seip, 0, sizeof(*seip));
@@ -2503,8 +2820,7 @@ bypass:
             mmp = (uint8_t *)mmap(NULL, num, PROT_READ | PROT_WRITE,
                                   MAP_SHARED, fd, 0);
             if (MAP_FAILED == mmp) {
-                int err = errno;
-
+                err = errno;
                 pr2serr_lk("sg_mrq_dd: %s: sz=%d, fd=%d, mmap() failed: %s\n",
                            __func__, num, fd, strerror(err));
                 return 0;
@@ -2830,6 +3146,17 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         } else if (0 == strcmp(key, "dio")) {
             clp->in_flags.dio = !! sg_get_num(buf);
             clp->out_flags.dio = clp->in_flags.dio;
+        } else if (0 == strcmp(key, "elemsz_kb")) {
+            n = sg_get_num(buf);
+            if (n < 1) {
+                pr2serr("elemsz_kb=EKB wants an integer > 0\n");
+                goto syn_err;
+            }
+            if (n & (n - 1)) {
+                pr2serr("elemsz_kb=EKB wants EKB to be power of 2\n");
+                goto syn_err;
+            }
+            clp->elem_sz = n * 1024;
         } else if (0 == strcmp(key, "fua")) {
             n = sg_get_num(buf);
             if (n & 1)
@@ -2868,6 +3195,20 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 pr2serr("%sbad argument to 'mrq='\n", my_name);
                 goto syn_err;
             }
+            if (0 == clp->mrq_num) {
+                clp->mrq_eq_0 = true;
+                clp->mrq_num = 1;
+                pr2serr("note: send single, non-mrq commands\n");
+            }
+        } else if ((0 == strcmp(key, "no_waitq")) ||
+                   (0 == strcmp(key, "no-waitq"))) {
+            n = sg_get_num(buf);
+            if (-1 == n) {
+                pr2serr("%sbad argument to 'no_waitq=', expect 0 or 1\n",
+                        my_name);
+                goto syn_err;
+            }
+            clp->no_waitq = !!n;
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
             if (-1 == obs) {

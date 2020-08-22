@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.48 20200722 */
+/* sg_pt_linux version 1.49 20200820 */
 
 
 #include <stdio.h>
@@ -486,16 +486,14 @@ partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
         return;
     ptp->in_err = 0;
     ptp->os_err = 0;
-    if (ptp->nvme_our_sntl) {
-        ptp->io_hdr.device_status = 0;
-        ptp->io_hdr.transport_status = 0;
-        ptp->io_hdr.driver_status = 0;
-        ptp->io_hdr.din_xferp = 0;
-        ptp->io_hdr.din_xfer_len = 0;
-        ptp->io_hdr.dout_xferp = 0;
-        ptp->io_hdr.dout_xfer_len = 0;
-    } else
-        ptp->nvme_result = 0;
+    ptp->io_hdr.device_status = 0;
+    ptp->io_hdr.transport_status = 0;
+    ptp->io_hdr.driver_status = 0;
+    ptp->io_hdr.din_xferp = 0;
+    ptp->io_hdr.din_xfer_len = 0;
+    ptp->io_hdr.dout_xferp = 0;
+    ptp->io_hdr.dout_xfer_len = 0;
+    ptp->nvme_result = 0;
 }
 
 #ifndef SG_SET_GET_EXTENDED
@@ -856,7 +854,7 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
     if (NULL == ptp)
         return 0;
     return (int)(ptp->nvme_our_sntl ? ptp->io_hdr.device_status :
-				      ptp->nvme_status);
+                                      ptp->nvme_status);
 }
 
 uint32_t

@@ -5,6 +5,8 @@
  * license that can be found in the BSD_LICENSE file.
  *
  * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Version 1.01 [20200820]
  */
 
 // C headers
@@ -772,18 +774,19 @@ scat_gath_iter::add_blks(uint64_t blk_count)
 
     if (0 == bc)
         return true;
-    for (first = true, k = it_el_ind; k < elems; ++k, first = false) {
+    for (first = true, k = it_el_ind; k < elems; ++k) {
         num = ((k == last_ind) && extend_last) ? MAX_SGL_NUM_VAL :
                                                  sglist.sgl[k].num;
         if (first) {
-            if ((uint64_t)(num - it_blk_off) < bc)
+            first = false;
+            if ((uint64_t)(num - it_blk_off) <= bc)
                 bc -= (num - it_blk_off);
             else {
                 it_blk_off = bc + it_blk_off;
                 break;
             }
         } else {
-            if ((uint64_t)num < bc)
+            if ((uint64_t)num <= bc)
                 bc -= num;
             else {
                 it_blk_off = (uint32_t)bc;
@@ -840,6 +843,7 @@ scat_gath_iter::sub_blks(uint64_t blk_count)
     }
     if (k < 0) {
         blk_idx = 0;
+        it_blk_off = 0;
         return false;           /* bad situation */
     }
     if ((int64_t)orig_blk_count <= blk_idx)
@@ -935,6 +939,7 @@ scat_gath_iter::is_sgl_linear() const
     return sglist.linearity == SGL_LINEAR;
 }
 
+/* Should return 1 or more unless max_n<=0 or at_end() */
 int
 scat_gath_iter::linear_for_n_blks(int max_n) const
 {
@@ -947,6 +952,10 @@ scat_gath_iter::linear_for_n_blks(int max_n) const
         return 0;
     sge = sglist.sgl[it_el_ind];
     rem = (int)sge.num - it_blk_off;
+    if (rem <= 0) {
+        sge = sglist.sgl[it_el_ind + 1];
+        rem = (int)sge.num;
+    }
     if (max_n <= rem)
         return max_n;
     prev_lba = sge.lba + sge.num;

@@ -1056,6 +1056,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x38,0x04,"Esn - media class event"},
     {0x38,0x06,"Esn - device busy class event"},
     {0x38,0x07,"Thin provisioning soft threshold reached"},
+    {0x38,0x08,"Depopulation interrupted"},     /* > spc6r02 */
     {0x39,0x00,"Saving parameters not supported"},
     {0x3A,0x00,"Medium not present"},
     {0x3A,0x01,"Medium not present - tray closed"},

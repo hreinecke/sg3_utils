@@ -251,7 +251,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
             goto scsi_ata_try;
         }
         fdc_p->is_nvme = true;
-        fdc_p->nvme_our_sntl = true;	/* guess at this stage */
+        fdc_p->nvme_our_sntl = true;    /* guess at this stage */
         fdc_p->is_char = is_char;
         fdc_p->nsid = (broadcast_nsid == nsid) ? 0 : nsid;
         fdc_p->nv_ctrlid = nv_ctrlid;
@@ -456,26 +456,22 @@ void
 partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+    struct freebsd_dev_channel *fdc_p;
 
     if (NULL == ptp)
         return;
     ptp->in_err = 0;
     ptp->os_err = 0;
     ptp->transport_err = 0;
-    if (ptp->nvme_our_sntl) {
-        ptp->scsi_status = 0;
-        ptp->dxfer_dir = CAM_DIR_NONE;
-        ptp->dxferip = NULL;
-        ptp->dxfer_ilen = 0;
-        ptp->dxferop = NULL;
-        ptp->dxfer_olen = 0;
-    } else {
-        struct freebsd_dev_channel *fdc_p;
-
-        fdc_p = get_fdc_p(ptp);
-        if (fdc_p)
-            fdc_p->nvme_result = 0;
-    }
+    ptp->scsi_status = 0;
+    ptp->dxfer_dir = CAM_DIR_NONE;
+    ptp->dxferip = NULL;
+    ptp->dxfer_ilen = 0;
+    ptp->dxferop = NULL;
+    ptp->dxfer_olen = 0;
+    fdc_p = get_fdc_p(ptp);
+    if (fdc_p)
+        fdc_p->nvme_result = 0;
 }
 
 /* Forget any previous dev_han and install the one given. May attempt to
@@ -871,8 +867,8 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 
     if (ptp) {
         if (ptp->nvme_our_sntl)
-	    return ptp->scsi_status;
-	else {
+            return ptp->scsi_status;
+        else {
             const struct freebsd_dev_channel *fdc_p;
 
             fdc_p = get_fdc_cp(ptp);
@@ -892,8 +888,8 @@ get_pt_result(const struct sg_pt_base * vp)
 
     if (ptp) {
         if (ptp->nvme_our_sntl)
-	    return (uint32_t)ptp->scsi_status;
-	else {
+            return (uint32_t)ptp->scsi_status;
+        else {
             const struct freebsd_dev_channel *fdc_p;
 
             fdc_p = get_fdc_cp(ptp);

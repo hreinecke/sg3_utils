@@ -490,7 +490,7 @@ do_v4:
         return res;
     }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
-        pr2serr("%s: bad usr_ptr=0x%p\n", __func__, rep);
+        pr2serr("%s: bad usr_ptr=0x%p\n", __func__, (void *)rep);
         if (rep)
             rep->state = SGQ_IO_ERR;
         return -1;

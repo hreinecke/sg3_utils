@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.86 20200729";
+static const char * version_str = "1.89 20200818";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -358,6 +358,7 @@ static atomic<int> num_abort_req_success(0);
 static atomic<int> num_mrq_abort_req(0);
 static atomic<int> num_mrq_abort_req_success(0);
 static atomic<long> num_waiting_calls(0);
+static atomic<bool> vb_first_time(true);
 
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
@@ -529,7 +530,7 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_NO_WAITQ & flags) {           /* 0x40 */
-        n += sg_scnpr(b + n, b_len - n, "NWTQ|");
+        n += sg_scnpr(b + n, b_len - n, "NO_WTQ|");
         if (n >= b_len)
             goto fini;
     }
@@ -539,7 +540,7 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_COMPLETE_B4 & flags) {        /* 0x100 */
-        n += sg_scnpr(b + n, b_len - n, "NWTQ|");
+        n += sg_scnpr(b + n, b_len - n, "CPL_B4|");
         if (n >= b_len)
             goto fini;
     }
@@ -598,6 +599,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
+    if (0 == n)
+        n += sg_scnpr(b + n, b_len - n, "<none>");
 fini:
     if (n < b_len) {    /* trim trailing '\' */
         if ('|' == b[n - 1])
@@ -753,10 +756,14 @@ print_stats(const char * str)
     pr2serr("%s%" PRId64 "+%d records in\n", str,
             infull - gcoll.in_partial.load(), gcoll.in_partial.load());
 
-    outfull = dd_count - gcoll.out_rem_count.load();
-    pr2serr("%s%" PRId64 "+%d records %s\n", str,
-            outfull - gcoll.out_partial.load(), gcoll.out_partial.load(),
-            (gcoll.verify ? "verified" : "out"));
+    if (gcoll.out_type == FT_DEV_NULL)
+        pr2serr("%s0+0 records out\n", str);
+    else {
+        outfull = dd_count - gcoll.out_rem_count.load();
+        pr2serr("%s%" PRId64 "+%d records %s\n", str,
+                outfull - gcoll.out_partial.load(), gcoll.out_partial.load(),
+                (gcoll.verify ? "verified" : "out"));
+    }
 }
 
 static void
@@ -890,7 +897,7 @@ usage(int pg_num)
             "               [--help] [--version]\n\n");
     pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1]\n"
-            "               [dio=0|1] [elemsz_kb=ESK] [fail_mask=FM] "
+            "               [dio=0|1] [elemsz_kb=EKB] [fail_mask=FM] "
             "[fua=0|1|2|3]\n"
             "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
             "[of2=OFILE2]\n"
@@ -1596,8 +1603,8 @@ skip_force_out_sequence:
         if (stop_after_write)
             clp->out_stop = true;
 
-        clp->out_blk += blocks;
         clp->out_count -= blocks;
+        clp->out_blk += blocks;
 
         pthread_cleanup_push(cleanup_out, (void *)clp);
         if (rep->outregfd >= 0) {
@@ -1614,21 +1621,21 @@ skip_force_out_sequence:
         }
         /* Output to OFILE */
         wr_blks = rep->num_blks;
-        if (out_is_sg)
+        if (out_is_sg) {
             sg_out_wr_cmd(rep, deferred_arr, false, clp->prefetch);
-        else if (FT_DEV_NULL == clp->out_type) {
+            ++rep->rep_count;
+        } else if (FT_DEV_NULL == clp->out_type) {
             /* skip actual write operation */
             wr_blks = 0;
             clp->out_rem_count -= blocks;
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
-            --rep->rep_count;
         } else {
             normal_out_wr(rep, blocks);
             status = pthread_mutex_unlock(&clp->out_mutex);
             if (0 != status) err_exit(status, "unlock out_mutex");
+            ++rep->rep_count;
         }
-        ++rep->rep_count;
         pthread_cleanup_pop(0);
 
         /* Output to OFILE2 if sg device */
@@ -2483,7 +2490,8 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
     if (clp->in_flags.no_waitq || clp->out_flags.no_waitq) {
-        ctlop->flags |= SGV4_FLAG_NO_WAITQ;     /* waitless non-blocking */
+        /* waitless non-blocking */
+        ctlop->flags |= (SGV4_FLAG_IMMED | SGV4_FLAG_NO_WAITQ);
         if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: %s\n", __func__, mrq_nw_nb_s);
@@ -2700,7 +2708,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     struct sg_io_v4 ctl_v4;
     uint8_t * cmd_ap = NULL;
     struct global_collection * clp = rep->clp;
-    const char * iosub_str = "svb ?";
+    const char * iosub_str = "iosub_str";
     char b[80];
 
     id = rep->id;
@@ -2787,10 +2795,10 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     }
     ctl_v4.request_extra = launch_mrq_abort ? mrq_pack_id : 0;
     rep->mrq_id = mrq_pack_id;
+    if (clp->verbose && rep->both_sg && clp->mrq_async)
+        iosub_str = "SG_IOSUBMIT(variable)";
     if (clp->verbose > 4) {
-        if (rep->both_sg && clp->mrq_async)
-            iosub_str = "SUBMIT(variable)";
-        pr2serr_lk("%s: Controlling object _before_ ioctl(SG_IO%s):\n",
+        pr2serr_lk("%s: Controlling object _before_ ioctl(%s):\n",
                    __func__, iosub_str);
         if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
@@ -2870,6 +2878,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
 
 try_again:
     if (clp->unbalanced_mrq) {
+        iosub_str = "SG_IOSUBMIT(variable_blocking)";
         if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: unbalanced %s\n", __func__, mrq_vb_s);
@@ -2877,14 +2886,14 @@ try_again:
         res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
     } else {
         if (clp->mrq_async) {
-            iosub_str = "SUBMIT(variable_blocking)";
+            iosub_str = "SG_IOSUBMIT(variable_blocking)";
             if (!after1 && (clp->verbose > 1)) {
                 after1 = true;
                 pr2serr_lk("%s: %s\n", __func__, mrq_vb_s);
             }
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
         } else if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb) {
-            iosub_str = "SUBMIT(shared_variable_blocking)";
+            iosub_str = "SG_IOSUBMIT(shared_variable_blocking)";
             if (!after1 && (clp->verbose > 1)) {
                 after1 = true;
                 pr2serr_lk("%s: %s\n", __func__, mrq_svb_s);
@@ -2915,9 +2924,14 @@ try_again:
         res = -1;
         goto fini;
     }
-    if (clp->verbose > 4) {
+    if (clp->verbose && vb_first_time.load()) {
+        pr2serr_lk("First controlling object output by ioctl(%s), flags: "
+                   "%s\n", iosub_str, sg_flags_str(ctl_v4.flags, b_len, b));
+        vb_first_time.store(false);
+    } else if (clp->verbose > 4)
         pr2serr_lk("%s: Controlling object output by ioctl(%s):\n",
                    __func__, iosub_str);
+    if (clp->verbose > 4) {
         if (clp->verbose > 5)
             hex2stderr_lk((const uint8_t *)&ctl_v4, sizeof(ctl_v4), 1);
         v4hdr_out_lk("Controlling object after", &ctl_v4, id);
@@ -3073,6 +3087,11 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     blk_off = 0;
     if (no_waitq)
         flags |= SGV4_FLAG_NO_WAITQ;
+    if (clp->verbose && 0 == clp->nmrqs && vb_first_time.load()) {
+        vb_first_time.store(false);
+        pr2serr("First normal IO: %s, flags: %s\n", cp,
+                sg_flags_str(flags, b_len, b));
+    }
     if (v4) {
         memset(h4p, 0, sizeof(struct sg_io_v4));
         if (clp->nmrqs > 0) {
@@ -3481,12 +3500,6 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     if (elem_sz >= 4096) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
-        if (no_dur) {
-            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-            seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
-            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
-            seip->ctl_flags |= SG_CTL_FLAGM_NO_DURATION;
-        }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
             pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
@@ -3840,12 +3853,16 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->in_flags.dio = !! sg_get_num(buf);
             clp->out_flags.dio = clp->in_flags.dio;
         } else if (0 == strcmp(key, "elemsz_kb")) {
-            clp->elem_sz = sg_get_num(buf) * 1024;
-            if ((clp->elem_sz > 0) && (clp->elem_sz < 4096)) {
-                pr2serr("elemsz_kb cannot be less than 4 (4 KB = 4096 "
-                        "bytes)\n");
+            n = sg_get_num(buf);
+            if (n < 1) {
+                pr2serr("elemsz_kb=EKB wants an integer > 0\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if (n & (n - 1)) {
+                pr2serr("elemsz_kb=EKB wants EKB to be power of 2\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            clp->elem_sz = n * 1024;
         } else if ((0 == strcmp(key, "fail_mask")) ||
                    (0 == strcmp(key, "fail-mask"))) {
             clp->fail_mask = sg_get_num(buf);
