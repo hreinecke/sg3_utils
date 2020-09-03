@@ -52,6 +52,7 @@
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_unaligned.h"
+#include "sg_pr2serr.h"
 
 /* sg_lib_version_str (and datestamp) defined in sg_lib_data.c file */
 

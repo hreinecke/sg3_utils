@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.15 20200429";
+static const char * version_str = "6.16 20200825";
 
 
 #define ME "sg_dd: "
@@ -1766,7 +1766,7 @@ main(int argc, char * argv[])
     int64_t out_num_sect = -1;
     char * key;
     char * buf;
-    uint8_t * wrkBuff;
+    uint8_t * wrkBuff = NULL;
     uint8_t * wrkPos;
     char inf[INOUTF_SZ];
     char outf[INOUTF_SZ];
@@ -2536,7 +2536,8 @@ bypass_copy:
     if (progress > 0)
         pr2serr("\nCompleted:\n");
 
-    free(wrkBuff);
+    if (wrkBuff)
+        free(wrkBuff);
     if (free_zeros_buff)
         free(free_zeros_buff);
     if (STDIN_FILENO != infd)

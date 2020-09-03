@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.89 20200818";
+static const char * version_str = "1.91 20200829";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -398,8 +398,6 @@ static int64_t dd_count = -1;
 static int num_threads = DEF_NUM_THREADS;
 static int exit_status = 0;
 static bool after1 = false;
-
-static mutex rand_lba_mutex;
 
 static const char * my_name = "sgh_dd: ";
 
@@ -902,7 +900,7 @@ usage(int pg_num)
             "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
             "[of2=OFILE2]\n"
             "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] [thr=THR] "
-            "[time=0|1]\n"
+            "[time=0|1|2]\n"
             "               [unshare=1|0] [verbose=VERB] [--dry-run] "
             "[--prefetch]\n"
             "               [--verbose] [--verify] [--version]\n\n"

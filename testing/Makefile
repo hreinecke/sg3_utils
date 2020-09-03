@@ -33,8 +33,8 @@ CXXFLAGS = -std=c++17 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRAN
 # CXXFLAGS = -std=c++2a -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CXXFLAGS = -std=c++11 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME -DDEBUG
-# CFLAGS = -g -O2 -W -Wall
-CFLAGS = -ggdb -O2 -W -Wall -DDEBUG
+CFLAGS = -g -O2 -W -Wall
+# CFLAGS = -ggdb -O2 -W -Wall -DDEBUG
 # CFLAGS = -g -O2 -Wall -DSG_KERNEL_INCLUDES
 # CFLAGS = -g -O2 -Wall -pedantic
 # CFLAGS = -Wall -W -pedantic -std=c11 --analyze

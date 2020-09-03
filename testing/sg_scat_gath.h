@@ -27,7 +27,8 @@
 // Sizing matches largest SCSI READ and WRITE commands plus those of Unix
 // read(2)s and write(2)s. User can give larger than 31 bit 'num's but they
 // are split into several consecutive elements.
-struct scat_gath_elem {
+class scat_gath_elem {
+public:
     uint64_t lba;       // of start block
     uint32_t num;       // number of blocks from and including start block
 
@@ -89,8 +90,8 @@ public:
     int64_t lowest_lba; // initialized to 0
     int64_t sum;        // of all 'num' elements in 'sgl'
 
-    friend int diff_between_iters(const struct scat_gath_iter & left,
-                                  const struct scat_gath_iter & right);
+    friend int diff_between_iters(const class scat_gath_iter & left,
+                                  const class scat_gath_iter & right);
 
 private:
     friend class scat_gath_iter;
@@ -111,7 +112,7 @@ public:
 
     int64_t current_lba() const;
     int64_t current_lba_rem_num(int & rem_num) const;
-    struct scat_gath_elem current_elem() const;
+    class scat_gath_elem current_elem() const;
     bool at_end() const;
     bool is_sgl_linear() const; // the whole list
     // Should return 1 or more unless max_n<=0 or at_end()
@@ -124,11 +125,11 @@ public:
 
     void dbg_print(const char * id_str, bool to_stdout, int verbose) const;
 
-    friend int diff_between_iters(const struct scat_gath_iter & left,
-                                  const struct scat_gath_iter & right);
+    friend int diff_between_iters(const class scat_gath_iter & left,
+                                  const class scat_gath_iter & right);
 
-    friend bool sgls_eq_from_iters(const struct scat_gath_iter & left,
-                                   const struct scat_gath_iter & right,
+    friend bool sgls_eq_from_iters(const class scat_gath_iter & left,
+                                   const class scat_gath_iter & right,
                                    bool allow_partial);
 
 private:

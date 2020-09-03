@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 Douglas Gilbert.
+ * Copyright (c) 2013-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -44,7 +44,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.13 20190108";
+static const char * version_str = "1.14 20200901";
 
 
 #define MAX_LINE_LEN 1024
@@ -595,11 +595,11 @@ main(int argc, char * argv[])
         elapsed_msecs = (end_tm.tv_sec - start_tm.tv_sec) * 1000;
         elapsed_msecs += (end_tm.tv_nsec - start_tm.tv_nsec) / 1000000;
         if (16 == byteswap_sz)
-            printf("  count16=%u\n", count16);
+            printf("  last k=%d, last count16=%u\n", k, count16);
         else if (32 == byteswap_sz)
-            printf("  count32=%u\n", count32);
+            printf("  last k=%d, last count32=%u\n", k, count32);
         else
-            printf("  count64=%" PRIu64 "\n", count64);
+            printf("  last k=%d, last count64=%" PRIu64 "\n", k, count64);
         printf("Unaligned elapsed milliseconds: %u\n", elapsed_msecs);
         count16 = 0;
         count32 = 0;
@@ -640,11 +640,11 @@ main(int argc, char * argv[])
         elapsed_msecs = (end_tm.tv_sec - start_tm.tv_sec) * 1000;
         elapsed_msecs += (end_tm.tv_nsec - start_tm.tv_nsec) / 1000000;
         if (16 == byteswap_sz)
-            printf("  count16=%u\n", count16);
+            printf("  last k=%d, last count16=%u\n", k, count16);
         else if (32 == byteswap_sz)
-            printf("  count32=%u\n", count32);
+            printf("  last k=%d, last count32=%u\n", k, count32);
         else
-            printf("  count64=%" PRIu64 "\n", count64);
+            printf("  last k=%d, last count64=%" PRIu64 "\n", k, count64);
         printf("Byteswap/memcpy elapsed milliseconds: %u\n", elapsed_msecs);
         count16 = 0;
         count32 = 0;

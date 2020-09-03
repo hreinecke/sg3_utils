@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.08 20200820";
+static const char * version_str = "1.10 20200830";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -310,9 +310,7 @@ struct sg_io_extra {
 
 #define MONO_MRQ_ID_INIT 0x10000
 
-// typedef vector< pair<int, struct sg_io_v4> > mrq_arr_t;
 typedef array<uint8_t, 32> big_cdb;     /* allow up to a 32 byte cdb */
-typedef pair< vector<struct sg_io_v4>, vector<big_cdb> >   mrq_arr_t;
 
 
 /* Use this class to wrap C++11 <random> features to produce uniform random
@@ -330,14 +328,9 @@ private:
     default_random_engine dre;
 };
 
-static atomic<long int> pos_index(0);
-
 static atomic<int> num_ebusy(0);
 static atomic<int> num_start_eagain(0);
 static atomic<int> num_fin_eagain(0);
-#if 0
-static atomic<long> num_waiting_calls(0);
-#endif
 static atomic<bool> vb_first_time(true);
 
 static sigset_t signal_set;
@@ -377,8 +370,6 @@ static int num_threads = DEF_NUM_THREADS;
 static int exit_status = 0;
 static bool after1 = false;
 
-static mutex rand_lba_mutex;
-
 static const char * my_name = "sg_mrq_dd: ";
 
 // static const char * mrq_blk_s = "mrq: ordinary blocking";
@@ -390,15 +381,8 @@ static const char * mrq_vb_s = "mrq: variable blocking";
 #ifdef __GNUC__
 static int pr2serr_lk(const char * fmt, ...)
         __attribute__ ((format (printf, 1, 2)));
-#if 0
-static void pr_errno_lk(int e_no, const char * fmt, ...)
-        __attribute__ ((format (printf, 2, 3)));
-#endif
 #else
 static int pr2serr_lk(const char * fmt, ...);
-#if 0
-static void pr_errno_lk(int e_no, const char * fmt, ...);
-#endif
 #endif
 
 
@@ -414,21 +398,6 @@ pr2serr_lk(const char * fmt, ...)
     va_end(args);
     return n;
 }
-
-#if 0   // not used yet
-static void
-pr_errno_lk(int e_no, const char * fmt, ...)
-{
-    char b[180];
-    va_list args;
-    lock_guard<mutex> lk(strerr_mut);
-
-    va_start(args, fmt);
-    vsnprintf(b, sizeof(b), fmt, args);
-    fprintf(stderr, "%s: %s\n", b, strerror(e_no));
-    va_end(args);
-}
-#endif
 
 static void
 lk_print_command_len(const char *prefix, uint8_t * cmdp, int len, bool lock)
@@ -788,14 +757,6 @@ install_handler(int sig_num, void (*sig_handler) (int sig))
     }
 }
 
-#if 0   /* SG_LIB_ANDROID */
-static void
-thread_exit_handler(int sig)
-{
-    pthread_exit(0);
-}
-#endif
-
 /* Make safe_strerror() thread safe */
 static char *
 tsafe_strerror(int code, char * ebp)
@@ -808,16 +769,6 @@ tsafe_strerror(int code, char * ebp)
     ebp[STRERR_BUFF_LEN - 1] = '\0';
     return ebp;
 }
-
-
-/* Following macro from D.R. Butenhof's POSIX threads book:
- * ISBN 0-201-63392-2 . Changed __FILE__ to __func__ */
-#define err_exit(code,text) do { \
-    char strerr_buff[STRERR_BUFF_LEN]; \
-    pr2serr("%s at \"%s\":%d: %s\n", \
-        text, __func__, __LINE__, tsafe_strerror(code, strerr_buff)); \
-    exit(1); \
-    } while (0)
 
 
 static int
@@ -867,7 +818,7 @@ usage(int pg_num)
             "[elemsz_kb=EKB]\n"
             "                  [fua=0|1|2|3] [mrq=MRQ] [no_waitq=0|1] "
             "[ofreg=OFREG]\n"
-            "                  [sync=0|1] [thr=THR] [time=0|1] "
+            "                  [sync=0|1] [thr=THR] [time=0|1|2] "
             "[verbose=VERB]\n"
             "                  [--dry-run] [--verbose] [--verify] "
             "[--version]\n\n"
@@ -1181,12 +1132,6 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
         pr2serr_lk("tid=%d: ioctl(SNAP_DEV) ok\n", id);
 }
 
-static inline uint8_t *
-get_buffp(Rq_elem * rep)
-{
-    return rep->buffp;
-}
-
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 /* Each thread's "main" function */
 static void
@@ -1197,17 +1142,14 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
     int n, sz, fd, vb, err, seg_blks;
     int res = 0;
     int num_sg = 0;
-    // volatile bool stop_after_write = false;
     bool own_infd = false;
     bool in_is_sg, in_mmap, out_is_sg, out_mmap;
     bool own_outfd = false;
     bool only_one_sg = false;
-    // bool share_and_ofreg;
     class scat_gath_iter i_sg_it(clp->i_sgl);
     class scat_gath_iter o_sg_it(clp->o_sgl);
     vector<cdb_arr_t> a_cdb;
     vector<struct sg_io_v4> a_v4;
-    // mrq_arr_t deferred_arr;  /* MRQ deferred array (vector) */
 
     vb = clp->verbose;
     sz = clp->mrq_num * clp->bpt * clp->bs;
@@ -1231,11 +1173,13 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
 
     if (vb > 2)
         pr2serr_lk("%d <-- Starting worker thread\n", id);
-    if (! rep->both_sg) {
+    if (! (rep->both_sg || in_mmap)) {
         rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
                                  false);
-        if (NULL == rep->buffp)
-            err_exit(ENOMEM, "out of memory creating user buffers\n");
+        if (NULL == rep->buffp) {
+            pr2serr_lk("Failed to allocate %d bytes, exiting\n", sz);
+            return;
+        }
     }
     rep->infd = clp->infd;
     rep->outfd = clp->outfd;
@@ -1385,9 +1329,6 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
 
 fini:
 
-#if 0
-    if ((rep->mmap_active == 0) && rep->alloc_bp)
-        free(rep->alloc_bp);
     if ((1 == rep->mmap_active) && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
             err = errno;
@@ -1401,13 +1342,9 @@ fini:
                        rep->mmap_len);
         rep->mmap_active = 0;
     }
-#endif
 
     if (own_infd && (rep->infd >= 0)) {
         if (vb && in_is_sg) {
-#if 0
-            ++num_waiting_calls;
-#endif
             if (ioctl(rep->infd, SG_GET_NUM_WAITING, &n) >= 0) {
                 if (n > 0)
                     pr2serr_lk("%s: tid=%d: num_waiting=%d prior close(in)\n",
@@ -1422,9 +1359,6 @@ fini:
     }
     if (own_outfd && (rep->outfd >= 0)) {
         if (vb && out_is_sg) {
-#if 0
-            ++num_waiting_calls;
-#endif
             if (ioctl(rep->outfd, SG_GET_NUM_WAITING, &n) >= 0) {
                 if (n > 0)
                     pr2serr_lk("%s: tid=%d: num_waiting=%d prior "
@@ -1442,6 +1376,8 @@ fini:
     clp->out_rem_count -= rep->out_local_count;
     clp->in_partial += rep->in_local_partial;
     clp->out_partial += rep->out_local_partial;
+    if (rep->alloc_bp)
+        free(rep->alloc_bp);
 }
 
 /* N.B. Returns 'blocks' is successful, lesser positive number if there was
@@ -2383,7 +2319,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         if (num <= 0) {
             res = 0;
             pr2serr_lk("[%d] %s: min(i_lin_blks=%d o_lin_blks=%d) < 1\n", id,
-		       __func__, i_lin_blks, o_lin_blks);
+                       __func__, i_lin_blks, o_lin_blks);
             break;
         }
 
@@ -2560,7 +2496,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         if (num <= 0) {
             res = 0;
             pr2serr_lk("[%d] %s: min(i_lin_blks=%d o_lin_blks=%d) < 1\n", id,
-		       __func__, i_lin_blks, o_lin_blks);
+                       __func__, i_lin_blks, o_lin_blks);
             break;
         }
 
@@ -2891,7 +2827,7 @@ skip_seek(struct global_collection *clp, const char * key, const char * buf,
           bool is_skip, bool ignore_verbose)
 {
     bool def_hex = false;
-    int len, err;
+    int len;
     int vb = clp->verbose;  /* needs to appear before skip/seek= on cl */
     int64_t ll;
     const char * cp;
@@ -2912,7 +2848,7 @@ skip_seek(struct global_collection *clp, const char * key, const char * buf,
         if (! either_list.load_from_file(cp, def_hex, clp->flexible, true)) {
             pr2serr("bad argument to '%s=' [err=%d]\n", key,
                     either_list.m_errno);
-            return err ? err : SG_LIB_SYNTAX_ERROR;
+            return SG_LIB_SYNTAX_ERROR;
         }
     } else if (num_either_ch_in_str(buf, len, ',', ' ') > 0) {
         if (! either_list.load_from_cli(buf, vb > 0)) {
@@ -2931,14 +2867,6 @@ skip_seek(struct global_collection *clp, const char * key, const char * buf,
     }
 
     either_list.sum_scan(key, vb > 3 /* bool show_sgl */, vb > 1);
-#if 0
-    if (vb > 3) {
-        lock_guard<mutex> lk(strerr_mut);
-
-        pr2serr("%s: scatter gathet list:\n", is_skip ? ("skip" : "seek"));
-        either_list.dbg_print(false, is_skip ? ("skip" : "seek"), false,
-                   bool show_sgl)
-#endif
     return 0;
 }
 
@@ -2985,6 +2913,8 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "mmap"))
             ++fp->mmap;         /* mmap > 1 stops munmap() being called */
         else if (0 == strcmp(cp, "nodur"))
+            fp->no_dur = true;
+        else if (0 == strcmp(cp, "no_dur"))
             fp->no_dur = true;
         else if (0 == strcmp(cp, "no_dur"))
             fp->no_dur = true;
@@ -3392,12 +3322,6 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         pr2serr("mmap flag on both IFILE and OFILE doesn't work\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-#if 0
-    if (clp->out_flags.mmap) {
-        pr2serr("oflag=mmap needs either noshare=1\n");
-        return SG_LIB_SYNTAX_ERROR;
-    }
-#endif
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
      * for the block layer in lk 2.6 and results in an EIO on the
      * SG_IO ioctl. So reduce it in that case. */
@@ -4006,12 +3930,6 @@ fini:
         pr2serr("Number of finish EAGAINs: %d\n", num_fin_eagain.load());
     if (clp->verbose && (num_ebusy > 0))
         pr2serr("Number of EBUSYs: %d\n", num_ebusy.load());
-#if 0
-    if (clp->verbose > 1) {
-        pr2serr("Number of SG_GET_NUM_WAITING calls=%ld\n",
-                num_waiting_calls.load());
-    }
-#endif
     if (clp->verify && (SG_LIB_CAT_MISCOMPARE == res))
         pr2serr("Verify/compare failed due to miscompare\n");
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;

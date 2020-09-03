@@ -635,7 +635,7 @@ struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20200710 */
+ * The following should match asc-num.txt dated 20200817 */
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =

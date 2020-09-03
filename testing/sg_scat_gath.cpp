@@ -70,7 +70,7 @@ scat_gath_list::load_from_cli(const char * cl_p, bool b_vb)
     char * cp;
     char * c2p;
     const char * lcp;
-    struct scat_gath_elem sge;
+    class scat_gath_elem sge;
 
     if (NULL == cl_p) {
         pr2serr("%s: bad arguments\n", __func__);
@@ -191,7 +191,7 @@ scat_gath_list::file2sgl_helper(FILE * fp, const char * fnp, bool def_hex,
     int64_t ll;
     uint64_t ull, prev_lba;
     char * lcp;
-    struct scat_gath_elem sge;
+    class scat_gath_elem sge;
     char line[1024];
 
     for (j = 0 ; ; ++j) {
@@ -434,7 +434,7 @@ scat_gath_list::dbg_print(bool skip_meta, const char * id_str, bool to_stdout,
             (num == 1 ? "" : "s"));
     if (show_sgl) {
         for (k = 0; k < num; ++k) {
-            const struct scat_gath_elem & sge = sgl[k];
+            const class scat_gath_elem & sge = sgl[k];
 
             fprintf(fp, "    lba: 0x%" PRIx64 ", number: 0x%" PRIx32,
                     sge.lba, sge.num);
@@ -467,7 +467,7 @@ scat_gath_list::sum_scan(const char * id_str, bool show_sgl, bool b_vb)
 
     sum = 0;
     for (k = 0, low = 0, high = 0; k < elems; ++k) {
-        const struct scat_gath_elem & sge = sgl[k];
+        const class scat_gath_elem & sge = sgl[k];
 
         degen = false;
         t_num = sge.num;
@@ -514,7 +514,7 @@ scat_gath_list::sum_scan(const char * id_str, bool show_sgl, bool b_vb)
         prev_lba = t_lba;
         ++k;
         for ( ; k < elems; ++k) {
-            const struct scat_gath_elem & sge = sgl[k];
+            const class scat_gath_elem & sge = sgl[k];
 
             degen = false;
             t_lba = sge.lba;
@@ -558,7 +558,7 @@ scat_gath_list::append_1or(int64_t extra_blks, int64_t start_lba)
     int o_num = sgl.size();
     const int max_nbs = MAX_SGL_NUM_VAL;
     int64_t cnt = 0;
-    struct scat_gath_elem sge;
+    class scat_gath_elem sge;
 
     if ((extra_blks <= 0) || (start_lba < 0))
         return o_num;       /* nothing to do */
@@ -602,7 +602,7 @@ scat_gath_list::append_1or(int64_t extra_blks)
     if (o_num < 1)
         return append_1or(extra_blks, 0);
 
-    struct scat_gath_elem sge = sgl[o_num - 1];
+    class scat_gath_elem sge = sgl[o_num - 1];
     return append_1or(extra_blks, sge.lba + sge.num);
 }
 
@@ -865,7 +865,7 @@ scat_gath_iter::current_lba() const
     int64_t res = SG_LBA_INVALID; /* for at end or invalid (-1) */
 
     if (it_el_ind < elems) {
-        struct scat_gath_elem sge = sglist.sgl[it_el_ind];
+        class scat_gath_elem sge = sglist.sgl[it_el_ind];
 
         if ((uint32_t)it_blk_off < sge.num)
             return sge.lba + it_blk_off;
@@ -889,7 +889,7 @@ scat_gath_iter::current_lba_rem_num(int & rem_num) const
     int64_t res = SG_LBA_INVALID; /* for at end or invalid (-1) */
 
     if (it_el_ind < elems) {
-        struct scat_gath_elem sge = sglist.sgl[it_el_ind];
+        class scat_gath_elem sge = sglist.sgl[it_el_ind];
 
         if ((uint32_t)it_blk_off < sge.num) {
             rem_num = sge.num - it_blk_off;
@@ -908,11 +908,11 @@ scat_gath_iter::current_lba_rem_num(int & rem_num) const
     return res;
 }
 
-struct scat_gath_elem
+class scat_gath_elem
 scat_gath_iter::current_elem() const
 {
     const int elems = sglist.sgl.size();
-    struct scat_gath_elem sge;
+    class scat_gath_elem sge;
 
     sge.make_bad();
     if (it_el_ind < elems)
@@ -946,7 +946,7 @@ scat_gath_iter::linear_for_n_blks(int max_n) const
     int k, rem;
     const int elems = sglist.sgl.size();
     uint64_t prev_lba;
-    struct scat_gath_elem sge;
+    class scat_gath_elem sge;
 
     if (at_end() || (max_n <= 0))
         return 0;
@@ -992,8 +992,8 @@ scat_gath_iter::dbg_print(const char * id_str, bool to_stdout,
  * INT_MIN. Assumes iterators close enough for result to lie in range
  * from (-INT_MAX) to INT_MAX (inclusive). */
 int
-diff_between_iters(const struct scat_gath_iter & left,
-                   const struct scat_gath_iter & right)
+diff_between_iters(const class scat_gath_iter & left,
+                   const class scat_gath_iter & right)
 {
     int res, k, r_e_ind, l_e_ind;
 
@@ -1028,8 +1028,8 @@ diff_between_iters(const struct scat_gath_iter & left,
  * true. If no inequality but remaining lists differ in length then returns
  * allow_partial. */
 bool
-sgls_eq_from_iters(const struct scat_gath_iter & left,
-                   const struct scat_gath_iter & right,
+sgls_eq_from_iters(const class scat_gath_iter & left,
+                   const class scat_gath_iter & right,
                    bool allow_partial)
 {
     return sgls_eq_off(left.sglist, left.it_el_ind, left.it_blk_off,

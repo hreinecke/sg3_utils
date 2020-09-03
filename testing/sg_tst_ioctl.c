@@ -60,7 +60,7 @@
  * later of the Linux sg driver.  */
 
 
-static const char * version_str = "Version: 1.18  20200719";
+static const char * version_str = "Version: 1.19  20200825";
 
 #define INQ_REPLY_LEN 128
 #define INQ_CMD_LEN 6
@@ -110,7 +110,7 @@ static int dname_last = 0;
 static int dname_pos = 0;
 static int verbose = 0;
 
-static const char * relative_cp = NULL;
+static const char * relative_cp = "";
 static char * file_name = NULL;
 
 
@@ -665,7 +665,7 @@ do_mrqs(int sg_fd, int sg_fd2, int mrqs)
     mrq_h4p->flags = SGV4_FLAG_MULTIPLE_REQS;
     if (mrq_immed)
         mrq_h4p->flags |= SGV4_FLAG_IMMED;
-    arr_v4 = calloc(mrqs, sizeof(struct sg_io_v4));
+    arr_v4 = (struct sg_io_v4 *)calloc(mrqs, sizeof(struct sg_io_v4));
     if (NULL == arr_v4) {
         res = ENOMEM;
         goto fini;
@@ -1034,7 +1034,7 @@ dname_range_loop:
 
             is_first = false;
             if (nw_given)
-                printf("Timing %dx%d calls to ioctl(SG_GET_NUM_WAITING)\n",
+                printf("Timing %d x %d calls to ioctl(SG_GET_NUM_WAITING)\n",
                        rang, num_sgnw);
             else if (iterator_test >= 0) {
                 k = num_sgnw + 1000;
@@ -1144,10 +1144,10 @@ dname_range_loop:
         if (num_sgnw >= 100) {
             double m = (double)res_tm.tv_sec +
                        ((double)res_tm.tv_nsec / 1000000000.0);
+            double num = num_sgnw;
 
             if (m > 0.000001)
-                printf("%sCalls per second: %.2f\n", relative_cp,
-                       (double)sum_nw / m);
+                printf("%sCalls per second: %.2f\n", relative_cp, num / m);
         }
         res = 0;
         goto out;
