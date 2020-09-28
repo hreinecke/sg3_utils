@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2020 Douglas Gilbert
  *
- * Version 4.0.44 (20200818)
+ * Version 4.0.45 (20200913)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -114,18 +114,18 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::generated_tag set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
-#define SGV4_FLAG_NO_WAITQ  0x40	/* implies SGV4_FLAG_IMMED */
+#define SGV4_FLAG_NO_WAITQ  0x40	/* need to poll for completion */
 #define SGV4_FLAG_DOUT_OFFSET  0x80	/* dout byte offset in v4::spare_in */
-#define SGV4_FLAG_COMPLETE_B4  0x100
+#define SGV4_FLAG_COMPLETE_B4  0x100	/* mrq: complete this rq before next */
 #define SGV4_FLAG_SIGNAL 0x200	/* v3: ignored; v4 signal on completion */
-#define SGV4_FLAG_IMMED 0x400  /* for polling with SG_IOR, ignored in SG_IOS */
+#define SGV4_FLAG_IMMED 0x400   /* issue request and return immediately ... */
 #define SGV4_FLAG_STOP_IF 0x800	/* Stops sync mrq if error or warning */
 #define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
 #define SGV4_FLAG_SHARE 0x2000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
 #define SGV4_FLAG_DO_ON_OTHER 0x4000 /* available on either of shared pair */
 #define SGV4_FLAG_KEEP_SHARE 0x8000  /* ... buffer for another dout command */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
-#define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* n sg_io_v4s in data-in */
+#define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* 1 or more sg_io_v4-s in data-in */
 #define SGV4_FLAG_EVENTFD 0x40000	/* signal completion on ... */
 #define SGV4_FLAG_ORDERED_WR 0x80000	/* svb: issue in-order writes */
 #define SGV4_FLAG_REC_ORDER 0x100000 /* receive order in v4:request_priority */
@@ -218,7 +218,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */
 #define SG_CTL_FLAGM_SNAP_DEV	0x2000	/* output to debugfs::snapped */
 #define SG_CTL_FLAGM_RM_EVENTFD	0x4000	/* only if new eventfd wanted */
-#define SG_CTL_FLAGM_ALL_BITS	0x7fff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_NO_WAIT_POLL 0x8000 /* POLLERR on poll(2)s that wait */
+#define SG_CTL_FLAGM_ALL_BITS	0xffff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */

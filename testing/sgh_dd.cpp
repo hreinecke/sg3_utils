@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.91 20200829";
+static const char * version_str = "1.94 20200927";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -357,6 +357,7 @@ static atomic<int> num_abort_req(0);
 static atomic<int> num_abort_req_success(0);
 static atomic<int> num_mrq_abort_req(0);
 static atomic<int> num_mrq_abort_req_success(0);
+static atomic<int> num_miscompare(0);
 static atomic<long> num_waiting_calls(0);
 static atomic<bool> vb_first_time(true);
 
@@ -388,7 +389,7 @@ static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 static bool have_sg_version = false;
 static int sg_version = 0;
 static bool sg_version_lt_4 = false;
-static bool sg_version_ge_40030 = false;
+static bool sg_version_ge_40045 = false;
 static bool shutting_down = false;
 static bool do_sync = false;
 static int do_time = 1;
@@ -1296,7 +1297,7 @@ sg_unshare(int sg_fd, int id, bool vb_b)
 static void
 sg_noshare_enlarge(int sg_fd, bool vb_b)
 {
-    if (sg_version_ge_40030) {
+    if (sg_version_ge_40045) {
         struct sg_extended_info sei;
         struct sg_extended_info * seip;
 
@@ -1507,7 +1508,7 @@ read_write_thread(void * v_tip)
             pr2serr_lk("thread=%d: using global sg OFILE2, fd=%d\n", rep->id,
                        rep->out2fd);
     }
-    if (!sg_version_ge_40030) {
+    if (!sg_version_ge_40045) {
         if (vb > 4)
             pr2serr_lk("thread=%d: Skipping share because driver too old\n",
                        rep->id);
@@ -1515,7 +1516,7 @@ read_write_thread(void * v_tip)
         if (vb > 4)
             pr2serr_lk("thread=%d: Skipping IFILE share with OFILE due to "
                        "noshare=1\n", rep->id);
-    } else if (sg_version_ge_40030 && in_is_sg && out_is_sg)
+    } else if (sg_version_ge_40045 && in_is_sg && out_is_sg)
         rep->has_share = sg_share_prepare(rep->outfd, rep->infd, rep->id,
                                           vb > 9);
     if (vb > 9)
@@ -1689,7 +1690,7 @@ fini:
         rep->mmap_active = 0;
     }
 
-    if (sg_version_ge_40030) {
+    if (sg_version_ge_40045) {
         if (clp->noshare) {
             if ((clp->nmrqs > 0) && clp->unshare)
                 sg_unshare(rep->infd, rep->id, vb > 9);
@@ -2079,6 +2080,7 @@ sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2, bool prefetch)
     pthread_mutex_t * mutexp = is_wr2 ? &clp->out2_mutex : &clp->out_mutex;
     struct sg_io_extra xtr;
     struct sg_io_extra * xtrp = &xtr;
+    const char * wr_or_ver = clp->verify ? "verify" : "out";
 
     memset(xtrp, 0, sizeof(*xtrp));
     xtrp->is_wr2 = is_wr2;
@@ -2093,8 +2095,8 @@ again:
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
-            pr2serr_lk("%soutputting from sg failed, blk=%" PRId64 "\n",
-                       my_name, rep->oblk);
+            pr2serr_lk("%ssg %s failed, blk=%" PRId64 "\n",
+                       my_name, wr_or_ver, rep->oblk);
             status = pthread_mutex_unlock(mutexp);
             if (0 != status) err_exit(status, "unlock out_mutex");
             stop_both(clp);
@@ -2143,8 +2145,8 @@ split_upper:
         if (1 == res)
             err_exit(ENOMEM, "sg starting out command");
         else if (res < 0) {
-            pr2serr_lk("%soutputting from sg failed, blk=%" PRId64 "\n",
-                       my_name, rep->oblk);
+            pr2serr_lk("%ssg %s failed, blk=%" PRId64 "\n", my_name,
+                       wr_or_ver, rep->oblk);
             status = pthread_mutex_unlock(mutexp);
             if (0 != status) err_exit(status, "unlock out_mutex");
             stop_both(clp);
@@ -2167,14 +2169,14 @@ split_upper:
         case SG_LIB_CAT_MEDIUM_HARD:
             if (0 == clp->out_flags.coe) {
                 pr2serr_lk("error finishing sg %s command (medium)\n",
-                           (clp->verify ? "verify" : "out"));
+                           wr_or_ver);
                 if (exit_status <= 0)
                     exit_status = res;
                 stop_both(clp);
                 goto fini;
             } else
-                pr2serr_lk(">> ignored error for out blk=%" PRId64 " for %d "
-                           "bytes\n", rep->oblk, nblks * clp->bs);
+                pr2serr_lk(">> ignored error for %s blk=%" PRId64 " for %d "
+                           "bytes\n", wr_or_ver, rep->oblk, nblks * clp->bs);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -2195,9 +2197,12 @@ split_upper:
                 if (0 != status) err_exit(status, "unlock out_mutex");
             }
             goto fini;
+        case SG_LIB_CAT_MISCOMPARE:
+            ++num_miscompare;
+            // fall through
         default:
-            pr2serr_lk("error finishing sg %s command (%d)\n",
-                       (clp->verify ? "verify" : "out"), res);
+            pr2serr_lk("error finishing sg %s command (%d)\n", wr_or_ver,
+                       res);
             if (exit_status <= 0)
                 exit_status = res;
             stop_both(clp);
@@ -2311,20 +2316,12 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
         }
         if (ok && f1) {
             ++n_good;
-            if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs) {
-                if (a_v4p->dout_resid)
-                    good_outblks +=
-                         (a_v4p->dout_xfer_len - a_v4p->dout_resid) / clp->bs;
-                else    /* avoid division in common case of resid==0 */
-                    good_outblks += (uint32_t)a_v4p->usr_ptr;
-            }
-            if (a_v4p->din_xfer_len >= (uint32_t)clp->bs) {
-                if (a_v4p->din_resid)
-                    good_inblks += (a_v4p->din_xfer_len - a_v4p->din_resid) /
-                                   clp->bs;
-                else
-                    good_inblks += (uint32_t)a_v4p->usr_ptr;
-            }
+            if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs)
+                good_outblks += (a_v4p->dout_xfer_len - a_v4p->dout_resid) /
+                                clp->bs;
+            if (a_v4p->din_xfer_len >= (uint32_t)clp->bs)
+                good_inblks += (a_v4p->din_xfer_len - a_v4p->din_resid) /
+                               clp->bs;
         }
     }   /* end of request array scan loop */
     if ((n_subm == num_mrq) || (vb < 3))
@@ -3362,6 +3359,9 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
         if (clp->verbose > 3)
             lk_chk_n_print3(cp, hp, false);
         return res;
+    case SG_LIB_CAT_MISCOMPARE:
+        ++num_miscompare;
+        // fall through
     case SG_LIB_CAT_NOT_READY:
     default:
         {
@@ -3428,6 +3428,9 @@ do_v4:
         if (clp->verbose > 3)
             lk_chk_n_print4(cp, h4p, false);
         return res;
+    case SG_LIB_CAT_MISCOMPARE:
+        ++num_miscompare;
+        // fall through
     case SG_LIB_CAT_NOT_READY:
     default:
         {
@@ -3468,11 +3471,15 @@ do_v4:
 
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
-sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
-                  bool unit_nano, bool no_dur, bool masync, bool wq_excl,
+sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
                   uint8_t **mmpp)
 {
     static bool done = false;
+    bool def_res = is_in ? clp->in_flags.defres : clp->out_flags.defres;
+    bool no_dur = is_in ? clp->in_flags.no_dur : clp->out_flags.no_dur;
+    bool masync = is_in ? clp->in_flags.masync : clp->out_flags.masync;
+    bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
+    bool no_waitq = is_in ? clp->in_flags.no_waitq : clp->out_flags.no_waitq;
     int res, t, num;
     uint8_t *mmp;
     struct sg_extended_info sei;
@@ -3493,19 +3500,19 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
         }
         goto bypass;
     }
-    if (! sg_version_ge_40030)
+    if (! sg_version_ge_40045)
         goto bypass;
-    if (elem_sz >= 4096) {
+    if (clp->elem_sz >= 4096) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
             pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
                        "error: %s\n", __func__, strerror(errno));
-        if (elem_sz != (int)seip->sgat_elem_sz) {
+        if (clp->elem_sz != (int)seip->sgat_elem_sz) {
             memset(seip, 0, sizeof(*seip));
             seip->sei_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
-            seip->sgat_elem_sz = elem_sz;
+            seip->sgat_elem_sz = clp->elem_sz;
             res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
             if (res < 0)
                 pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
@@ -3534,7 +3541,7 @@ sg_prepare_resbuf(int fd, int bs, int bpt, bool def_res, int elem_sz,
     }
 bypass:
     if (! def_res) {
-        num = bs * bpt;
+        num = clp->bs * clp->bpt;
         res = ioctl(fd, SG_SET_RESERVED_SIZE, &num);
         if (res < 0) {
             perror("sgh_dd: SG_SET_RESERVED_SIZE error");
@@ -3570,7 +3577,7 @@ bypass:
     res = ioctl(fd, SG_SET_FORCE_PACK_ID, &t);
     if (res < 0)
         perror("sgh_dd: SG_SET_FORCE_PACK_ID error");
-    if (unit_nano && sg_version_ge_40030) {
+    if (clp->unit_nanosec && sg_version_ge_40045) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
@@ -3578,6 +3585,17 @@ bypass:
         if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
             res = -1;
             pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
+                       errno, strerror(errno));
+        }
+    }
+    if (no_waitq && sg_version_ge_40045) {
+        memset(seip, 0, sizeof(*seip));
+        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_WAIT_POLL;
+        seip->ctl_flags |= SG_CTL_FLAGM_NO_WAIT_POLL;
+        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+            res = -1;
+            pr2serr_lk("ioctl(EXTENDED(NO_WAIT_POLL)) failed, errno=%d %s\n",
                        errno, strerror(errno));
         }
     }
@@ -3652,6 +3670,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->no_unshare = true;
         else if (0 == strcmp(cp, "no_waitq"))
             fp->no_waitq = true;
+        else if (0 == strcmp(cp, "no-waitq"))
+            fp->no_waitq = true;
         else if (0 == strcmp(cp, "nowaitq"))
             fp->no_waitq = true;
         else if (0 == strcmp(cp, "noxfer"))
@@ -3722,10 +3742,7 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->in_flags.defres,
-                          clp->elem_sz, clp->unit_nanosec,
-                          clp->in_flags.no_dur, clp->in_flags.masync,
-                          clp->in_flags.wq_excl, mmpp);
+    n = sg_prepare_resbuf(fd, true, clp, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (clp->noshare)
@@ -3757,10 +3774,7 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare_resbuf(fd, clp->bs, clp->bpt, clp->out_flags.defres,
-                          clp->elem_sz, clp->unit_nanosec,
-                          clp->out_flags.no_dur, clp->out_flags.masync,
-                          clp->out_flags.wq_excl, mmpp);
+    n = sg_prepare_resbuf(fd, false, clp, mmpp);
     if (n <= 0)
         return -SG_LIB_FILE_ERROR;
     if (clp->noshare)
@@ -4205,8 +4219,8 @@ main(int argc, char * argv[])
     if (sg_version > 40000) {
         clp->in_flags.v4 = true;
         clp->out_flags.v4 = true;
-        if (sg_version >= 40030)
-            sg_version_ge_40030 = true;
+        if (sg_version >= 40045)
+            sg_version_ge_40045 = true;
     }
 
     res = parse_cmdline_sanity(argc, argv, clp, inf, outf, out2f, outregf);
@@ -4775,6 +4789,9 @@ fini:
         pr2serr("Number of successful MRQ Aborts: %d\n",
                 num_mrq_abort_req_success.load());
     }
+    if (clp->verbose && (num_miscompare > 0))
+        pr2serr("Number of miscompare%s: %d\n",
+                (num_miscompare > 1) ? "s" : "", num_miscompare.load());
     if (clp->verbose > 1) {
         if (clp->verbose > 3)
             pr2serr("Final pack_id=%d, mrq_id=%d\n", mono_pack_id.load(),

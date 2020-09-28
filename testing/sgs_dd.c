@@ -1,7 +1,7 @@
 /*
  * Test code for the extensions to the Linux OS SCSI generic ("sg")
  * device driver.
- * Copyright (C) 1999-2019 D. Gilbert and P. Allworth
+ * Copyright (C) 1999-2020 D. Gilbert and P. Allworth
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -83,7 +83,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.14 20200330";
+static const char * version_str = "4.15 20200916";
 static const char * my_name = "sgs_dd";
 
 #define DEF_BLOCK_SIZE 512
@@ -121,6 +121,7 @@ struct flags_t {
     bool immed;
     bool mmap;
     bool noxfer;
+    bool no_waitq;
     bool pack;
     bool tag;
     bool v3;
@@ -169,6 +170,8 @@ typedef struct request_collection
     int bpt;
     int dio_incomplete;
     int sum_of_resids;
+    int poll_ms;
+    int pollerr_count;
     int debug;
     sigset_t blocked_sigs;
     int sigs_waiting;
@@ -187,31 +190,54 @@ static bool sgs_nanosec_unit = false;
 
 
 static void
-usage(void)
+usage(int pg_num)
 {
+    if (pg_num > 1)
+        goto second_page;
     printf("Usage: "
            "sgs_dd  [bpt=BPT] [bs=BS] [count=NUM] [deb=DEB] [if=IFILE]\n"
            "               [iflag=FLAGS] [no_sig=0|1] [of=OFILE] "
            "[oflag=FLAGS]\n"
-           "               [rt_sig=0|1] [seek=SEEK] [skip=SKIP] "
-           "[--version]\n"
+           "               [poll_ms=MS] [rt_sig=0|1] [seek=SEEK] "
+           "[skip=SKIP]\n"
+           "               [--help] [--version]\n"
            "where:\n"
            "  bpt      blocks_per_transfer (default: 65536/bs (or 128 for "
            "bs=512))\n"
            "  bs       must be the logical block size of device (def: 512)\n"
            "  deb      debug: 0->no debug (def); > 0 -> more debug\n"
            "  iflag    comma separated list from: dio,evfd,excl,immed,mmap,"
-           "noxfer,\n"
-           "           null,pack,tag,v3,v4 bound to IFILE\n"
+           "no_waitq,\n"
+           "           noxfer,null,pack,tag,v3,v4 bound to IFILE\n"
            "  no_sig   0-> use signals (def); 1-> no signals, hard polling "
            "instead\n"
            "  oflag    same flags as iflag but bound to OFILE\n"
+           "  poll_ms    number of milliseconds to wait on poll (def: 0)\n"
            "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
            "  <other operands>     as per dd command\n\n");
     printf("dd clone for testing Linux sg driver SIGPOLL and/or polling. "
            "Either\nIFILE or OFILE must be a scsi generic device. If OFILE "
            "not given then\n/dev/null assumed (rather than stdout like "
-           "dd).\n");
+           "dd). Use '-hh' or '-hhh'\nfor more information.\n");
+    return;
+second_page:
+    printf("flag description:\n"
+           "  dio      this driver's version of O_DIRECT\n"
+           "  evfd     when poll() gives POLLIN, use eventfd to find "
+           "out how many\n"
+           "  excl     open IFILE or OFILE with O_EXCL\n"
+           "  immed    use SGV4_FLAG_IMMED flag on each request\n"
+           "  mmap     use mmap()-ed IO on IFILE or OFILE\n"
+           "  no_waitq    use SGV4_FLAG_NO_WAIQ flag on each request\n"
+           "  noxfer    no transfer between user space and kernel IO "
+           "buffers\n"
+           "  null      does nothing, placeholder\n"
+           "  pack      submit with rising pack_id, complete matching "
+           "each pack_id\n"
+           "  tag       use tag (from block layer) rather than "
+           "pack_id\n"
+           "  v3        use sg v3 interface (default)\n"
+           "  v4        use sg vr interface (i.e. struct sg_io_v4)\n");
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -296,6 +322,8 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
         hp->flags |= SG_FLAG_MMAP_IO;
     if (flagp->evfd)
         hp->flags |= SGV4_FLAG_EVENTFD;
+    if (flagp->no_waitq)
+        hp->flags |= SGV4_FLAG_NO_WAITQ;
 #ifdef SG_DEBUG
     pr2serr("%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
             rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
@@ -559,7 +587,7 @@ sz_reserve(Rq_coll * clp, bool is_in)
         if (vb)
             pr2serr("sgs_dd: warning: sg driver prior to 4.0.00\n");
         sgs_old_sg_driver = true;
-    } else if (t < 40030) {
+    } else if (t < 40045) {
         sgs_old_sg_driver = false;
         sgs_full_v4_sg_driver = false;
     } else
@@ -625,6 +653,20 @@ sz_reserve(Rq_coll * clp, bool is_in)
                 return 1;
             }
         }
+        if (flagsp->no_waitq) {
+            memset(seip, 0, sizeof(*seip));
+            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
+            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_WAIT_POLL;
+            seip->ctl_flags |= SG_CTL_FLAGM_NO_WAIT_POLL;
+            if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                pr2serr("ioctl(EXTENDED(NO_WAIT_POLL)) failed, errno=%d %s\n",
+                        errno, strerror(errno));
+                return 1;
+            }
+        }
+    } else if (flagsp->no_waitq) {
+        pr2serr("need sg version >= 4.0.45 for no_waitq flag\n");
+        return 1;
     }
     if (!clp->no_sig) {
         if (-1 == fcntl(fd, F_SETOWN, getpid())) {
@@ -868,7 +910,7 @@ do_num_poll_in(Rq_coll * clp, int fd, bool is_evfd)
         }
     }
     a_pollfd.fd = fd;
-    if (poll(&a_pollfd, 1, 0) < 0) {
+    if (poll(&a_pollfd, 1, clp->poll_ms) < 0) {
         err = errno;
         pr2serr("%s: poll(): %s [%d]\n", __func__, strerror(err), err);
         return -err;
@@ -887,8 +929,10 @@ do_num_poll_in(Rq_coll * clp, int fd, bool is_evfd)
             return (int)count;
         } else
             return 1;   /* could be more but don't know without evfd */
-    } else
-        return 0;
+    } else if (a_pollfd.revents & POLLERR)
+        ++clp->pollerr_count;
+
+    return 0;
 }
 
 static int
@@ -1055,6 +1099,9 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->immed = true;
         else if (0 == strcmp(cp, "mmap"))
             fp->mmap = true;
+        else if ((0 == strcmp(cp, "no_waitq")) ||
+                 (0 == strcmp(cp, "no-waitq")))
+            fp->no_waitq = true;
         else if (0 == strcmp(cp, "noxfer"))
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
@@ -1088,6 +1135,7 @@ main(int argc, char * argv[])
     int count = -1;
     int in_num_sect = 0;
     int out_num_sect = 0;
+    int help_pg = 0;
     int res, k, in_sect_sz, out_sect_sz, crw, open_fl;
     char str[STR_SZ];
     char * key;
@@ -1105,7 +1153,7 @@ main(int argc, char * argv[])
     inf[0] = '\0';
     outf[0] = '\0';
     if (argc < 2) {
-        usage();
+        usage(1);
         return 1;
     }
     sgs_nanosec_unit = !!getenv("SG3_UTILS_LINUX_NANO");
@@ -1151,7 +1199,9 @@ main(int argc, char * argv[])
                 pr2serr("%sbad argument to 'oflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key,"rt_sig"))
+        } else if (0 == strcmp(key,"poll_ms"))
+            clp->poll_ms = sg_get_num(buf);
+        else if (0 == strcmp(key,"rt_sig"))
             clp->use_rt_sig = !!sg_get_num(buf);
         else if (0 == strcmp(key,"seek"))
             seek = sg_get_num(buf);
@@ -1168,9 +1218,17 @@ main(int argc, char * argv[])
             clp->debug +=2;
         else if ((0 == strcmp(key,"-v")) || (0 == strcmp(key,"--verbose")))
             ++clp->debug;
+        else if (0 == strcmp(key,"-hhhh"))
+            help_pg +=4;
+        else if (0 == strcmp(key,"-hhh"))
+            help_pg +=3;
+        else if (0 == strcmp(key,"-hh"))
+            help_pg +=2;
+        else if ((0 == strcmp(key,"-h")) || (0 == strcmp(key,"--help")))
+            ++help_pg;
         else {
             pr2serr("Unrecognized argument '%s'\n", key);
-            usage();
+            usage(help_pg);
             return 1;
         }
     }
@@ -1179,9 +1237,14 @@ main(int argc, char * argv[])
     } else
         bs_given = true;
 
+    if (help_pg > 0) {
+        usage(help_pg);
+        return 0;
+    }
+
     if ((ibs && (ibs != clp->bs)) || (obs && (obs != clp->bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
-        usage();
+        usage(1);
         return 1;
     }
     if (clp->bpt <= 0) {
@@ -1420,6 +1483,9 @@ main(int argc, char * argv[])
     if ((! clp->no_sig) && clp->debug > 0)
         pr2serr("SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
                 clp->sigs_io_received, clp->sigs_rt_received);
+    if (clp->pollerr_count > 0)
+        pr2serr(">> poll() system call gave POLLERR %d times\n",
+                clp->pollerr_count);
     remove_elems(clp);
     return res < 0 ? 99 : res;
 }

@@ -66,7 +66,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.16 20200825";
+static const char * version_str = "6.17 20200923";
 
 
 #define ME "sg_dd: "
@@ -222,12 +222,12 @@ print_stats(const char * str)
         pr2serr("%s%d recovered errors\n", str, recovered_errs);
     if (num_retries > 0)
         pr2serr("%s%d retries attempted\n", str, num_retries);
-    if (iflag.coe || oflag.coe) {
-        pr2serr("%s%d unrecovered errors\n", str, unrecovered_errs);
-        pr2serr("%s%d read_longs fetched part of unrecovered read errors\n",
-                str, read_longs);
-    } else if (unrecovered_errs > 0)
+    if (unrecovered_errs > 0) {
         pr2serr("%s%d unrecovered error(s)\n", str, unrecovered_errs);
+        if (iflag.coe || oflag.coe)
+            pr2serr("%s%d read_longs fetched part of unrecovered read "
+                    "errors\n", str, read_longs);
+    }
     if (miscompare_errs > 0)
         pr2serr("%s%d miscompare error(s)\n", str, miscompare_errs);
 }

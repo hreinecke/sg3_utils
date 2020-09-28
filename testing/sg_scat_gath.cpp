@@ -560,7 +560,7 @@ scat_gath_list::append_1or(int64_t extra_blks, int64_t start_lba)
     int64_t cnt = 0;
     class scat_gath_elem sge;
 
-    if ((extra_blks <= 0) || (start_lba < 0))
+    if ((extra_blks <= 0) && (start_lba < 0))
         return o_num;       /* nothing to do */
     if ((o_num > 0) && (! sum_hard)) {
         sge = sgl[o_num - 1];   /* assume sge.num==0 */
@@ -578,9 +578,16 @@ scat_gath_list::append_1or(int64_t extra_blks, int64_t start_lba)
                 return o_num;
             }
         }
-    } else if (0 == o_num)
+    } else if (0 == o_num) {
         lowest_lba = start_lba;
-
+        if (0 == extra_blks) {
+            sge.lba = start_lba;
+            sge.num = 0;
+            sgl.push_back(sge);
+            high_lba_p1 = sge.lba;
+            return sgl.size();
+        }
+    }
     for ( ; cnt < extra_blks; cnt += max_nbs) {
         sge.lba = start_lba + cnt;
         if ((extra_blks - cnt) <= max_nbs)
@@ -599,10 +606,12 @@ int
 scat_gath_list::append_1or(int64_t extra_blks)
 {
     int o_num = sgl.size();
+
     if (o_num < 1)
         return append_1or(extra_blks, 0);
 
     class scat_gath_elem sge = sgl[o_num - 1];
+
     return append_1or(extra_blks, sge.lba + sge.num);
 }
 
