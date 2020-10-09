@@ -50,6 +50,7 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <sys/sysmacros.h>
+#include <sys/random.h>         /* for getrandom() system call */
 #ifndef major
 #include <sys/types.h>
 #endif
@@ -66,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.17 20200923";
+static const char * version_str = "6.19 20201008";
 
 
 #define ME "sg_dd: "
@@ -115,9 +116,13 @@ static const char * version_str = "6.17 20200923";
 #define FT_BLOCK 32             /* filetype is block device */
 #define FT_FIFO 64              /* filetype is a fifo (name pipe) */
 #define FT_NVME 128             /* NVMe char device (e.g. /dev/nvme2) */
-#define FT_ERROR 256            /* couldn't "stat" file */
+#define FT_RANDOM_0_FF 256      /* iflag=00, iflag=ff and iflag=random
+                                   overriding if=IFILE */
+#define FT_ERROR 512            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
+
+#define SG_DD_BYPASS 999        /* failed but coe set */
 
 /* If platform does not support O_DIRECT then define it harmlessly */
 #ifndef O_DIRECT
@@ -166,6 +171,9 @@ static uint8_t * zeros_buff = NULL;
 static uint8_t * free_zeros_buff = NULL;
 static int read_long_blk_inc = READ_LONG_DEF_BLK_INC;
 
+static long seed;
+static struct drand48_data drand;/* opaque, used by srand48_r and mrand48_r */
+
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 struct flags_t {
@@ -176,9 +184,12 @@ struct flags_t {
     bool dsync;
     bool excl;
     bool flock;
+    bool ff;
     bool fua;
+    bool random;
     bool sgio;
     bool sparse;
+    bool zero;
     int cdbsz;
     int coe;
     int nocache;
@@ -447,9 +458,9 @@ usage()
             "    ibs         input logical block size (if given must be same "
             "as 'bs=')\n"
             "    if          file or device to read from (def: stdin)\n"
-            "    iflag       comma separated list from: [coe,dio,direct,"
-            "dpo,dsync,excl,\n"
-            "                flock,fua,nocache,null,sgio]\n"
+            "    iflag       comma separated list from: [00,coe,dio,direct,"
+            "dpo,dsync,\n"
+            "                excl,ff,flock,fua,nocache,null,random,sgio]\n"
             "    obs         output logical block size (if given must be "
             "same as 'bs=')\n"
             "    odir        1->use O_DIRECT when opening block dev, "
@@ -665,13 +676,13 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
 }
 
 
-/* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
-   SG_LIB_CAT_UNIT_ATTENTION -> try again,
-   SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> 'io_addrp' written to,
-   SG_LIB_CAT_MEDIUM_HARD -> no info field,
-   SG_LIB_CAT_NOT_READY, SG_LIB_CAT_ABORTED_COMMAND,
-   -2 -> ENOMEM
-   -1 other errors */
+/* Does SCSI READ on IFILE. Returns 0 -> successful,
+ * SG_LIB_SYNTAX_ERROR -> unable to build cdb,
+ * SG_LIB_CAT_UNIT_ATTENTION -> try again,
+ * SG_LIB_CAT_MEDIUM_HARD_WITH_INFO -> 'io_addrp' written to,
+ * SG_LIB_CAT_MEDIUM_HARD -> no info field,
+ * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_ABORTED_COMMAND,
+ * -2 -> ENOMEM, -1 other errors */
 static int
 sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
             int bs, const struct flags_t * ifp, bool * diop,
@@ -811,10 +822,10 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
 }
 
 
-/* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
-   SG_LIB_CAT_UNIT_ATTENTION -> try again, SG_LIB_CAT_NOT_READY,
-   SG_LIB_CAT_MEDIUM_HARD, SG_LIB_CAT_ABORTED_COMMAND,
-   -2 -> ENOMEM, -1 other errors */
+/* Does repeats associated with a SCSI READ on IFILE. Returns 0 -> successful,
+ * SG_LIB_SYNTAX_ERROR  -> unable to build cdb, SG_LIB_CAT_UNIT_ATTENTION ->
+ * try again, SG_LIB_CAT_NOT_READY, SG_LIB_CAT_MEDIUM_HARD,
+ * SG_LIB_CAT_ABORTED_COMMAND, -2 -> ENOMEM, -1 other errors */
 static int
 sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
         int bs, struct flags_t * ifp, bool * diop, int * blks_readp)
@@ -1077,11 +1088,11 @@ err_out:
 }
 
 
-/* 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
+/* Does a SCSI WRITE or VERIFY (if do_verify set) on OFILE. Returns:
+ * 0 -> successful, SG_LIB_SYNTAX_ERROR -> unable to build cdb,
  * SG_LIB_CAT_NOT_READY, SG_LIB_CAT_UNIT_ATTENTION, SG_LIB_CAT_MEDIUM_HARD,
  * SG_LIB_CAT_ABORTED_COMMAND, -2 -> recoverable (ENOMEM),
- * -1 -> unrecoverable error + others.  Note: if do_verify is true then does
- * a VERIFY rather than a WRITE command. */
+ * -1 -> unrecoverable error + others. SG_DD_BYPASS -> failed but coe set. */
 static int
 sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
          int bs, const struct flags_t * ofp, bool * diop)
@@ -1157,10 +1168,17 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     case SG_LIB_CAT_UNIT_ATTENTION:
         sg_chk_n_print3(op_str, &io_hdr, verbose > 1);
         return res;
-    case SG_LIB_CAT_MISCOMPARE:
+    case SG_LIB_CAT_MISCOMPARE: /* must be VERIFY cpommand */
         ++miscompare_errs;
-        pr2serr("VERIFY reports miscompare\n");
-        return res;
+        if (ofp->coe) {
+            if (verbose > 1)
+                pr2serr(">> bypass due to miscompare: out blk=%" PRId64
+                        " for %d blocks\n", to_block, blocks);
+            return SG_DD_BYPASS; /* fudge success */
+        } else {
+            pr2serr("VERIFY reports miscompare\n");
+            return res;
+        }
     case SG_LIB_CAT_NOT_READY:
         ++unrecovered_errs;
         pr2serr("device not ready (w)\n");
@@ -1172,9 +1190,10 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
             sg_print_command_len(wrCmd, ofp->cdbsz);
         ++unrecovered_errs;
         if (ofp->coe) {
-            pr2serr(">> ignored errors for out blk=%" PRId64 " for %d "
-                    "bytes\n", to_block, bs * blocks);
-            return 0; /* fudge success */
+            if (verbose > 1)
+                pr2serr(">> ignored errors for out blk=%" PRId64 " for %d "
+                        "bytes\n", to_block, bs * blocks);
+            return SG_DD_BYPASS; /* fudge success */
         } else
             return res;
     }
@@ -1234,7 +1253,9 @@ process_flags(const char * arg, struct flags_t * fp)
         np = strchr(cp, ',');
         if (np)
             *np++ = '\0';
-        if (0 == strcmp(cp, "append"))
+        if (0 == strcmp(cp, "00"))
+            fp->zero = true;
+        else if (0 == strcmp(cp, "append"))
             fp->append = true;
         else if (0 == strcmp(cp, "coe"))
             ++fp->coe;
@@ -1250,12 +1271,16 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->excl = true;
         else if (0 == strcmp(cp, "flock"))
             fp->flock = true;
+        else if (0 == strcmp(cp, "ff"))
+            fp->ff = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
         else if (0 == strcmp(cp, "nocache"))
             ++fp->nocache;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "random"))
+            fp->random = true;
         else if (0 == strcmp(cp, "sgio"))
             fp->sgio = true;
         else if (0 == strcmp(cp, "sparse"))
@@ -1766,6 +1791,8 @@ main(int argc, char * argv[])
     int64_t out_num_sect = -1;
     char * key;
     char * buf;
+    const char * ccp = NULL;
+    const char * cc2p;
     uint8_t * wrkBuff = NULL;
     uint8_t * wrkPos;
     char inf[INOUTF_SZ];
@@ -2035,7 +2062,33 @@ main(int argc, char * argv[])
     outfd = STDOUT_FILENO;
     iflag.pdt = -1;
     oflag.pdt = -1;
-    if (inf[0] && ('-' != inf[0])) {
+    if (iflag.ff) {
+        ccp = "<0xff bytes>";
+        cc2p = "ff";
+    } else if (iflag.random) {
+        ssize_t ssz;
+
+        ccp = "<random>";
+        cc2p = "random";
+        ssz = getrandom(&seed, sizeof(seed), 0);
+        if (ssz < (ssize_t)sizeof(seed))
+            pr2serr("getrandom() failed, ret=%d\n", (int)ssz);
+        if (verbose > 1)
+            pr2serr("seed=%ld\n", seed);
+        srand48_r(seed, &drand);
+    } else if (iflag.zero) {
+       ccp = "<zero bytes>";
+       cc2p = "00";
+    }
+    if (ccp) {
+        if (inf[0]) {
+            pr2serr("iflag=%s and if=%s contradict\n", cc2p, inf);
+            return SG_LIB_CONTRADICT;
+        }
+        in_type = FT_RANDOM_0_FF;
+        strcpy(inf, ccp);
+        infd = -1;
+    } else if (inf[0] && ('-' != inf[0])) {
         infd = open_if(inf, skip, bpt, &iflag, &in_type, verbose);
         if (infd < 0)
             return -infd;
@@ -2269,6 +2322,29 @@ main(int argc, char * argv[])
                 if (iflag.dio && (! dio_tmp))
                     dio_incomplete_count++;
             }
+        } else if (FT_RANDOM_0_FF == in_type) {
+            res = blocks * blk_sz;
+            if (iflag.zero)
+                memset(wrkPos, 0, res);
+            else if (iflag.ff)
+                memset(wrkPos, 0xff, res);
+            else {
+                int kk, j;
+                const int jbump = sizeof(uint32_t);
+                long rn;
+                uint8_t * bp;
+
+                bp = wrkPos;
+                for (kk = 0; kk < blocks; ++kk, bp += blk_sz) {
+                    for (j = 0; j < blk_sz; j += jbump) {
+                       /* mrand48 takes uniformly from [-2^31, 2^31) */
+                        mrand48_r(&drand, &rn);
+                        *((uint32_t *)(bp + j)) = (uint32_t)rn;
+                    }
+                }
+            }
+            bytes_read = res;
+            in_full += blocks;
         } else {
             while (((res = read(infd, wrkPos, blocks * blk_sz)) < 0) &&
                    ((EINTR == errno) || (EAGAIN == errno) ||
@@ -2365,9 +2441,9 @@ main(int argc, char * argv[])
             retries_tmp = oflag.retries;
             first = true;
             while (1) {
-                ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz,
-                               &oflag, &dio_tmp);
-                if (0 == ret)
+                ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz, &oflag,
+                               &dio_tmp);
+                if ((0 == ret) || (SG_DD_BYPASS))
                     break;
                 if ((SG_LIB_CAT_NOT_READY == ret) ||
                     (SG_LIB_SYNTAX_ERROR == ret))
@@ -2414,7 +2490,9 @@ main(int argc, char * argv[])
                     break;
                 first = false;
             }
-            if (0 != ret) {
+            if (SG_DD_BYPASS == ret)
+                ret = 0;        /* not bumping out_full */
+            else if (0 != ret) {
                 pr2serr("sg_write failed,%s seek=%" PRId64 "\n",
                         ((-2 == ret) ? " try reducing bpt," : ""), seek);
                 break;

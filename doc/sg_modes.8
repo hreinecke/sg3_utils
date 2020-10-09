@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_MODES "8" "September 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
@@ -171,11 +171,11 @@ the sg_wr_mode(8) utility.
 open \fIDEVICE\fR in "read\-write" mode. Default is to open it in read\-only
 mode.
 .TP
-\fB\-6\fR, \fB\-\-six\fR
-by default this utility sends a 10 byte MODE SENSE command to
-the \fIDEVICE\fR. However some SCSI devices only support 6 byte MODE SENSE
-commands (e.g. SCSI\-2 tape drives). This parameter forces the use
-of 6 byte MODE SENSE commands.
+\fB\-6\fR, \fB\-s\fR, \fB\-\-six\fR
+by default this utility sends a 10 byte MODE SENSE command to the
+\fIDEVICE\fR. However some SCSI devices only support 6 byte MODE SENSE
+commands (e.g. SCSI\-2 tape drives). This parameter forces the use of 6
+byte MODE SENSE commands.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level of verbosity. Can be used multiple times.

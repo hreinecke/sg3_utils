@@ -1,4 +1,4 @@
-.TH SG_DD "8" "April 2020" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_DD "8" "October 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -90,7 +90,7 @@ that a 4 byte block number may be exceeded or \fIBPT\fR is greater than
 16 bits (65535), in which case it defaults to 16 byte SCSI commands).
 .TP
 \fBcoe\fR={0|1|2|3}
-set to 1 or more for continue on error. Only applies to errors on sg
+set to 1 or more for continue on error ('coe'). Only applies to errors on sg
 devices or block devices with the 'sgio' flag set. Thus errors on other
 files will stop sg_dd. Default is 0 which implies stop on any error. See
 the 'coe' flag for more information.
@@ -231,13 +231,13 @@ be used with "oflag=sparse". \fIof=OFILE\fR must be given and \fIOFILE\fR
 must be an sg device or a block device with "oflag=sgio" also given. Uses the
 SCSI VERIFY command with the BYTCHK field set to 1. The VERIFY command is
 used instead of WRITE when this option is given. There is no VERIFY(6)
-command.
+command. Stops on the first miscompare unless \fIoflag=coe\fR is given.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 outputs version number information and exits.
 .SH CONVERSIONS
-One or more conversions can be given to the "conv=" option. If more than
-one is given, they should be comma separated. sg_dd does not perform the
+One or more conversions can be given to the "conv=" option. If more than one
+is given, they should be comma separated. sg_dd does not perform the
 traditional dd conversions (e.g. ASCII to EBCDIC). Recently added
 conversions overlap somewhat with the flags so some conversions are
 now supported by sg_dd.
@@ -264,40 +264,46 @@ functionality as sg_dd's "iflag=coe".
 .SH FLAGS
 Here is a list of flags and their meanings:
 .TP
+00
+this flag is only active with \fIiflag=\fR and when given replaces
+\fIif=IFILE\fR. If both are given an error is generated. The input will
+be a stream of zeros, similar to using "if=/dev/zero" alone (but a little
+quicker).
+.TP
 append
 causes the O_APPEND flag to be added to the open of \fIOFILE\fR. For regular
-files this will lead to data appended to the end of any existing data.
-Cannot be used together with the \fIseek=SEEK\fR option as they conflict.
-The default action of this utility is to overwrite any existing data
-from the beginning of the file or, if \fISEEK\fR is given, starting at
-block \fISEEK\fR. Note that attempting to 'append' to a device file (e.g.
-a disk) will usually be ignored or may cause an error to be reported.
+files this will lead to data appended to the end of any existing data. Cannot
+be used together with the \fIseek=SEEK\fR option as they conflict. The default
+action of this utility is to overwrite any existing data from the beginning
+of the file or, if \fISEEK\fR is given, starting at block \fISEEK\fR. Note
+that attempting to 'append' to a device file (e.g. a disk) will usually be
+ignored or may cause an error to be reported.
 .TP
 coe
-continue on error. Only active for sg devices and block devices that
-have the 'sgio' flag set. 'iflag=coe oflag=coe' and 'coe=1' are
-equivalent. Use this flag twice (e.g. 'iflag=coe,coe') to have the
-same action as the 'coe=2'. A medium, hardware or blank check error
-while reading will re\-read blocks prior to the bad block, then try to
-recover the bad block, supplying zeros if that fails, and finally reread
-the blocks after the bad block. A medium, hardware or blank check error
-while writing is noted and ignored. The recovery of the bad block when
-reading uses the SCSI READ LONG command if 'coe' given twice or
-more (also with the command line option 'coe=2'). Further, the READ LONG
-will set its CORRCT bit if 'coe' given thrice. SCSI disks may automatically
-try and remap faulty sectors (see the AWRE and ARRE in the read write
-error recovery mode page (the sdparm utility can access and possibly change
-these attributes)). Errors occurring on other files types will stop sg_dd.
-Error messages are sent to stderr. This flag is similar
- o 'conv=noerror,sync' in the
+continue on error. Only active for sg devices and block devices that have
+the 'sgio' flag set. 'iflag=coe oflag=coe' and 'coe=1' are equivalent. Use
+this flag twice (e.g. 'iflag=coe,coe') to have the same action as the 'coe=2'.
+A medium, hardware or blank check error while reading will re\-read blocks
+prior to the bad block, then try to recover the bad block, supplying zeros
+if that fails, and finally re\-read the blocks after the bad block. A medium,
+hardware or blank check error while writing is noted and ignored. A miscompare
+sense key during a VERIFY command (i.e. \fI\-\-verify\fR given) is noted and
+ignored when 'oflag=coe'. The recovery of the bad block when reading uses the
+SCSI READ LONG command if 'coe' given twice or more (also with the command
+line option 'coe=2'). Further, the READ LONG will set its CORRCT bit if 'coe'
+given thrice. SCSI disks may automatically try and remap faulty sectors (see
+the AWRE and ARRE in the read write error recovery mode page (the sdparm
+utility can access and possibly change these attributes)). Errors occurring on
+other files types will stop sg_dd. Error messages are sent to stderr. This
+flag is similar to 'conv=noerror,sync' in the
 .B dd(1)
 utility. See note about READ LONG below.
 .TP
 dio
-request the sg device node associated with this flag does direct IO.
-If direct IO is not available, falls back to indirect IO and notes
-this at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
-has the value of 0 then a warning is issued (and indirect IO is performed).
+request the sg device node associated with this flag does direct IO. If direct
+IO is not available, falls back to indirect IO and notes this at completion.
+If direct IO is selected and /proc/scsi/sg/allow_dio has the value of 0 then a
+warning is issued (and indirect IO is performed).
 .TP
 direct
 causes the O_DIRECT flag to be added to the open of \fIIFILE\fR and/or
@@ -309,10 +315,9 @@ commands are issued via the SG_IO ioctl.
 .TP
 dpo
 set the DPO bit (disable page out) in SCSI READ and WRITE commands. Not
-supported for 6 byte cdb variants of READ and WRITE. Indicates that
-data is unlikely to be required to stay in device (e.g. disk) cache.
-May speed media copy and/or cause a media copy to have less impact
-on other device users.
+supported for 6 byte cdb variants of READ and WRITE. Indicates that data is
+unlikely to be required to stay in device (e.g. disk) cache. May speed media
+copy and/or cause a media copy to have less impact on other device users.
 .TP
 dsync
 causes the O_SYNC flag to be added to the open of \fIIFILE\fR and/or
@@ -323,6 +328,11 @@ end of the transfer).
 excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR.
+.TP
+ff
+this flag is only active with \fIiflag=\fR and when given replaces
+\fIif=IFILE\fR. If both are given an error is generated. The input will
+be a stream of 0xff bytes (or all bits set).
 .TP
 flock
 after opening the associated file (i.e. \fIIFILE\fR and/or \fIOFILE\fR)
@@ -344,6 +354,16 @@ the file buffer with recently read or written blocks.
 .TP
 null
 has no affect, just a placeholder.
+.TP
+random
+this flag is only active with \fIiflag=\fR and when given replaces
+\fIif=IFILE\fR. If both are given an error is generated. The input will
+be a stream of pseudo random bytes. The Linux getrandom(2) system call is
+used to create a seed and thereadter mrand48_r(3) is used to generate a
+pseudo random sequence, 4 bytes at a time. The quality of the randomness
+can be viewed with the ent(1) utility. This is not a high quality random
+number generator, it is built for speed, not quality. One application is
+checking the correctness of the copy and verify operations of this utility.
 .TP
 sgio
 causes block devices to be accessed via the SG_IO ioctl rather than

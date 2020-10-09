@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.13 20200927";
+static const char * version_str = "1.14 20201008";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1829,6 +1829,7 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         t_v4p->request = (uint64_t)t_cdb.data();
         t_v4p->usr_ptr = t_v4p->request;
         t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->flags = rflags;
         t_v4p->request_len = cdbsz;
         if (is_wr) {
@@ -2352,6 +2353,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->request = (uint64_t)t_cdb.data();
         t_v4p->usr_ptr = t_v4p->request;
         t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->flags = iflags;
         t_v4p->request_len = cdbsz;
         t_v4p->din_xfer_len = num * clp->bs;

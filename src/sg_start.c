@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 1999-2018 D. Gilbert
+ *  Copyright (C) 1999-2020 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.66 20180628";  /* sbc3r14; mmc6r01a */
+static const char * version_str = "0.67 20200930";  /* sbc3r14; mmc6r01a */
 
 static struct option long_options[] = {
         {"eject", no_argument, 0, 'e'},
@@ -162,7 +162,7 @@ usage_old()
             "action\n"
             "    --stop     stop unit (same as '0')\n"
             "    -v         verbose (print out SCSI commands)\n"
-            "    -N|--new   use new interface\n"
+            "    --new|-N   use new interface\n"
             "    -V         print version string then exit\n\n"
             "    Example: 'sg_start --stop /dev/sdb'    stops unit\n"
             "             'sg_start --eject /dev/scd0'  stops unit and "

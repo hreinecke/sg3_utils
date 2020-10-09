@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.71 20200121";
+static const char * version_str = "1.72 20200930";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -330,7 +330,7 @@ usage()
            "                    hex (same result as '--raw --raw')\n"
            "    --readwrite|-w    open DEVICE read-write (def: open "
            "read-only)\n"
-           "    --six|-6        use MODE SENSE(6), by default uses MODE "
+           "    --six|-6|-s     use MODE SENSE(6), by default uses MODE "
            "SENSE(10)\n"
            "    --verbose|-v    increase verbosity\n"
            "    --old|-O        use old interface (use as first option)\n"
