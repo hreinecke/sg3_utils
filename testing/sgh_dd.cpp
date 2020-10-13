@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.94 20200927";
+static const char * version_str = "1.95 20201012";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -177,6 +177,7 @@ struct flags_t {
     bool mrq_immed;     /* mrq submit non-blocking */
     bool mrq_svb;       /* mrq shared_variable_block, for sg->sg copy */
     bool no_dur;
+    bool nocreat;
     bool noshare;
     bool no_unshare;    /* leave it for driver close/release */
     bool no_waitq;
@@ -889,11 +890,11 @@ usage(int pg_num)
     else if (pg_num > 1)
         goto page2;
 
-    pr2serr("Usage: sgh_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
-            " [iflag=FLAGS]\n"
-            "               [obs=BS] [of=OFILE] [oflag=FLAGS] "
-            "[seek=SEEK] [skip=SKIP]\n"
-            "               [--help] [--version]\n\n");
+    pr2serr("Usage: sgh_dd  [bs=BS] [conv=CONVS] [count=COUNT] [ibs=BS] "
+	    "[if=IFILE]\n"
+            "               [iflag=FLAGS] [obs=BS] [of=OFILE] [oflag=FLAGS] "
+            "[seek=SEEK]\n"
+	    "               [skip=SKIP] [--help] [--version]\n\n");
     pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1]\n"
             "               [dio=0|1] [elemsz_kb=EKB] [fail_mask=FM] "
@@ -908,6 +909,9 @@ usage(int pg_num)
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
+            "    conv        comma separated list from: [nocreat,noerror,"
+            "notrunc,\n"
+            "                null,sync]\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,defres,dio,"
@@ -1021,6 +1025,7 @@ page3:
             "                 blocking)\n"
             "    mrq_svb     if mrq and sg->sg copy, do shared_variable_"
             "blocking\n"
+            "    nocreat     will fail rather than create OFILE\n"
             "    nodur       turns off command duration calculations\n"
             "    no_waitq     when non-blocking (async) don't use wait "
             "queue\n"
@@ -3660,6 +3665,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->no_dur = true;
         else if (0 == strcmp(cp, "no_dur"))
             fp->no_dur = true;
+        else if (0 == strcmp(cp, "nocreat"))
+            fp->nocreat = true;
         else if (0 == strcmp(cp, "noshare"))
             fp->noshare = true;
         else if (0 == strcmp(cp, "no_share"))
@@ -3784,6 +3791,46 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
     return fd;
 }
 
+/* Process arguments given to 'conv=" option. Returns 0 on success,
+ * 1 on error. */
+static int
+process_conv(const char * arg, struct flags_t * ifp, struct flags_t * ofp)
+{
+    char buff[256];
+    char * cp;
+    char * np;
+
+    strncpy(buff, arg, sizeof(buff));
+    buff[sizeof(buff) - 1] = '\0';
+    if ('\0' == buff[0]) {
+        pr2serr("no conversions found\n");
+        return 1;
+    }
+    cp = buff;
+    do {
+        np = strchr(cp, ',');
+        if (np)
+            *np++ = '\0';
+        if (0 == strcmp(cp, "nocreat"))
+            ofp->nocreat = true;
+        else if (0 == strcmp(cp, "noerror"))
+            ifp->coe = true;         /* will still fail on write error */
+        else if (0 == strcmp(cp, "notrunc"))
+            ;         /* this is the default action of sg_dd so ignore */
+        else if (0 == strcmp(cp, "null"))
+            ;
+        else if (0 == strcmp(cp, "sync"))
+            ;   /* dd(susv4): pad errored block(s) with zeros but sg_dd does
+                 * that by default. Typical dd use: 'conv=noerror,sync' */
+        else {
+            pr2serr("unrecognised flag: %s\n", cp);
+            return 1;
+        }
+        cp = np;
+    } while (cp);
+    return 0;
+}
+
 #define STR_SZ 1024
 #define INOUTF_SZ 512
 
@@ -3853,6 +3900,11 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         } else if (0 == strcmp(key, "coe")) {
             clp->in_flags.coe = !! sg_get_num(buf);
             clp->out_flags.coe = clp->in_flags.coe;
+        } else if (0 == strcmp(key, "conv")) {
+            if (process_conv(buf, &clp->in_flags, &clp->out_flags)) {
+                pr2serr("%s: bad argument to 'conv='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key, "count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
@@ -4327,7 +4379,9 @@ main(int argc, char * argv[])
             clp->outfd = -1; /* don't bother opening */
         else {
             if (FT_RAW != clp->out_type) {
-                flags = O_WRONLY | O_CREAT;
+                flags = O_WRONLY;
+                if (! clp->out_flags.nocreat)
+                    flags |= O_CREAT;
                 if (clp->out_flags.direct)
                     flags |= O_DIRECT;
                 if (clp->out_flags.excl)
@@ -4395,7 +4449,9 @@ main(int argc, char * argv[])
             clp->out2fd = -1; /* don't bother opening */
         else {
             if (FT_RAW != clp->out2_type) {
-                flags = O_WRONLY | O_CREAT;
+                flags = O_WRONLY;
+                if (! clp->out_flags.nocreat)
+                    flags |= O_CREAT;
                 if (clp->out_flags.direct)
                     flags |= O_DIRECT;
                 if (clp->out_flags.excl)

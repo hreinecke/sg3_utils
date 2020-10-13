@@ -242,6 +242,10 @@ traditional dd conversions (e.g. ASCII to EBCDIC). Recently added
 conversions overlap somewhat with the flags so some conversions are
 now supported by sg_dd.
 .TP
+nocreat
+this conversion has the same effect as "oflag=nocreat", namely: \fIOFILE\fR
+must exist, it will not be created.
+.TP
 noerror
 this conversion is very close to "iflag=coe" and is treated as such. See
 the "coe" flag. Note that an error on \fIOFILE\fR will stop the copy.
@@ -351,6 +355,16 @@ WRITE commands do not support the FUA bit.
 nocache
 use posix_fadvise() to advise corresponding file there is no need to fill
 the file buffer with recently read or written blocks.
+.TP
+nocreat
+this flag is only active in \fIoflag=FLAGS\fR. If present then \fIOFILE\fR
+will be opened if it exists. If \fIOFILE\fR doesn't exist then an error
+is generated. Without this flag a regular (empty) file named \fIOFILE\fR
+will be created (and then filled). For production quality scripts where
+\fIOFILE\fR is a device node (e.g. '/dev/sdc') this flag is recommended.
+It guards against the remote possibility of 'dev/sdc' disappearing
+temporarily (e.g. a USB memory key removed) resulting in a large regular
+file called '/dev/sdc' being created.
 .TP
 null
 has no affect, just a placeholder.

@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.19 20201008";
+static const char * version_str = "6.20 20201011";
 
 
 #define ME "sg_dd: "
@@ -186,6 +186,7 @@ struct flags_t {
     bool flock;
     bool ff;
     bool fua;
+    bool nocreat;
     bool random;
     bool sgio;
     bool sparse;
@@ -425,11 +426,12 @@ dd_filetype_str(int ft, char * buff)
 static void
 usage()
 {
-    pr2serr("Usage: sg_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE] "
-            "[iflag=FLAGS]\n"
-            "              [obs=BS] [of=OFILE] [oflag=FLAGS] "
-            "[seek=SEEK] [skip=SKIP]\n"
-            "              [--dry-run] [--help] [--verbose] [--version]\n\n"
+    pr2serr("Usage: sg_dd  [bs=BS] [conv=CONV] [count=COUNT] [ibs=BS] "
+	    "[if=IFILE]\n"
+            "              [iflag=FLAGS] [obs=BS] [of=OFILE] [oflag=FLAGS] "
+            "[seek=SEEK]\n"
+	    "              [skip=SKIP] [--dry-run] [--help] [--verbose] "
+	    "[--version]\n\n"
             "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1|2|3]\n"
             "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
@@ -452,6 +454,9 @@ usage()
             "    coe_limit   limit consecutive 'bad' blocks on reads to CL "
             "times\n"
             "                when COE>1 (default: 0 which is no limit)\n"
+	    "    conv        comma separated list from: [nocreat,noerror,"
+	    "notrunc,\n"
+	    "                null,sparse,sync]\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    dio         for direct IO, 1->attempt, 0->indirect IO "
             "(def)\n"
@@ -473,7 +478,7 @@ usage()
             "                normal file or pipe\n"
             "    oflag       comma separated list from: [append,coe,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,flock,fua,nocache,null,sgio,"
+            "                dsync,excl,flock,fua,nocache,nocreat,null,sgio,"
             "sparse]\n"
             "    retries     retry sgio errors RETR times (def: 0)\n"
             "    seek        block position to start writing to OFILE\n"
@@ -1277,6 +1282,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->fua = true;
         else if (0 == strcmp(cp, "nocache"))
             ++fp->nocache;
+        else if (0 == strcmp(cp, "nocreat"))
+            fp->nocreat = true;
         else if (0 == strcmp(cp, "null"))
             ;
         else if (0 == strcmp(cp, "random"))
@@ -1314,31 +1321,19 @@ process_conv(const char * arg, struct flags_t * ifp, struct flags_t * ofp)
         np = strchr(cp, ',');
         if (np)
             *np++ = '\0';
-#if 0
-        if (0 == strcmp(cp, "fdatasync"))
-            ++ofp->fdatasync;
-        else if (0 == strcmp(cp, "fsync"))
-            ++ofp->fsync;
-#endif
-        if (0 == strcmp(cp, "noerror"))
+        if (0 == strcmp(cp, "nocreat"))
+            ofp->nocreat = true;
+        else if (0 == strcmp(cp, "noerror"))
             ++ifp->coe;         /* will still fail on write error */
         else if (0 == strcmp(cp, "notrunc"))
-            ;         /* this is the default action of ddpt so ignore */
+            ;         /* this is the default action of sg_dd so ignore */
         else if (0 == strcmp(cp, "null"))
             ;
-#if 0
-        else if (0 == strcmp(cp, "sparing"))
-            ++ofp->sparing;
-#endif
         else if (0 == strcmp(cp, "sparse"))
             ofp->sparse = true;
         else if (0 == strcmp(cp, "sync"))
-            ;   /* dd(susv4): pad errored block(s) with zeros but ddpt does
+            ;   /* dd(susv4): pad errored block(s) with zeros but sg_dd does
                  * that by default. Typical dd use: 'conv=noerror,sync' */
-#if 0
-        else if (0 == strcmp(cp, "trunc"))
-            ++ofp->trunc;
-#endif
         else {
             pr2serr("unrecognised flag: %s\n", cp);
             return 1;
@@ -1549,7 +1544,9 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
         outfd = -1; /* don't bother opening */
     else {
         if (! (FT_RAW & *out_typep)) {
-            flags = O_WRONLY | O_CREAT;
+            flags = O_WRONLY;
+            if (! ofp->nocreat)
+                flags = O_CREAT;
             if (ofp->direct)
                 flags |= O_DIRECT;
             if (ofp->excl)

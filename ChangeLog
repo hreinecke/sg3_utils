@@ -2,13 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for sg3_utils-1.46 [20201009] [svn: r864]
+Changelog for sg3_utils-1.46 [20201013] [svn: r865]
   - sg_rep_pip: report new provisioning initialization pattern cmd
   - sg_turs: estimated time-to-ready [20-061r2]
     - add --delay=MS option
   - sg_requests: substantial cleanup
   - sg_dd: --verify : separate category for miscompare errors
     - --verify : oflag=coe continue on miscompares, counts them
+    - add oflag=nocreat and conv=nocreat : OFILE must exist
     - add iflag=00,ff, random flags
   - sg_get_elem_status: add ralwd bit sbc4r20a
   - sg_write_x: add dld bits to write(32) [sbc4r19a]

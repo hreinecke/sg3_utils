@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.14 20201008";
+static const char * version_str = "1.15 20201012";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -180,6 +180,7 @@ struct flags_t {
     bool fua;
     bool masync;        /* more async sg v4 driver fd flag */
     bool no_dur;
+    bool nocreat;
     bool order;
     bool qhead;
     bool qtail;
@@ -816,11 +817,11 @@ usage(int pg_num)
     else if (pg_num > 1)
         goto page2;
 
-    pr2serr("Usage: sg_mrq_dd  [bs=BS] [count=COUNT] [ibs=BS] [if=IFILE]"
-            " [iflag=FLAGS]\n"
-            "                  [obs=BS] [of=OFILE] [oflag=FLAGS] "
-            "[seek=SEEK]\n"
-            "                  [skip=SKIP] [--help] [--verify] "
+    pr2serr("Usage: sg_mrq_dd  [bs=BS] [conv=CONV] [count=COUNT] [ibs=BS] "
+            "[if=IFILE]\n"
+            "                  [iflag=FLAGS] [obs=BS] [of=OFILE] "
+            "[oflag=FLAGS]\n"
+            "                  [seek=SEEK] [skip=SKIP] [--help] [--verify] "
             "[--version]\n\n");
     pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
             "[elemsz_kb=EKB]\n"
@@ -838,6 +839,9 @@ usage(int pg_num)
             "above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
+            "    conv        comma separated list from: [nocreat,noerror,"
+            "notrunc,\n"
+            "                null,sync]\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [coe,dio,"
@@ -848,8 +852,8 @@ usage(int pg_num)
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
             "uses /dev/null\n"
-            "    oflag       comma separated list from: [append,<<list from "
-            "iflag>>]\n"
+            "    oflag       comma separated list from: [append,nocreat,\n"
+	    "                <<list from iflag>>]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -928,6 +932,7 @@ page3:
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE\n"
             "    mmap,mmap    when used twice, doesn't call munmap()\n"
+            "    nocreat     will fail rather than create OFILE\n"
             "    nodur       turns off command duration calculations\n"
             "    order       require write ordering on sg->sg copy; only "
             "for oflag\n"
@@ -3032,6 +3037,46 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
     return fd;
 }
 
+/* Process arguments given to 'conv=" option. Returns 0 on success,
+ * 1 on error. */
+static int
+process_conv(const char * arg, struct flags_t * ifp, struct flags_t * ofp)
+{
+    char buff[256];
+    char * cp;
+    char * np;
+
+    strncpy(buff, arg, sizeof(buff));
+    buff[sizeof(buff) - 1] = '\0';
+    if ('\0' == buff[0]) {
+        pr2serr("no conversions found\n");
+        return 1;
+    }
+    cp = buff;
+    do {
+        np = strchr(cp, ',');
+        if (np)
+            *np++ = '\0';
+        if (0 == strcmp(cp, "nocreat"))
+            ofp->nocreat = true;
+        else if (0 == strcmp(cp, "noerror"))
+            ifp->coe = true;         /* will still fail on write error */
+        else if (0 == strcmp(cp, "notrunc"))
+            ;         /* this is the default action of sg_dd so ignore */
+        else if (0 == strcmp(cp, "null"))
+            ;
+        else if (0 == strcmp(cp, "sync"))
+            ;   /* dd(susv4): pad errored block(s) with zeros but sg_dd does
+                 * that by default. Typical dd use: 'conv=noerror,sync' */
+        else {
+            pr2serr("unrecognised flag: %s\n", cp);
+            return 1;
+        }
+        cp = np;
+    } while (cp);
+    return 0;
+}
+
 #define STR_SZ 1024
 #define INOUTF_SZ 512
 
@@ -3087,6 +3132,11 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             /* not documented, for compat with sgh_dd */
             clp->in_flags.coe = !! sg_get_num(buf);
             clp->out_flags.coe = clp->in_flags.coe;
+        } else if (0 == strcmp(key, "conv")) {
+            if (process_conv(buf, &clp->in_flags, &clp->out_flags)) {
+                pr2serr("%s: bad argument to 'conv='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
         } else if (0 == strcmp(key, "count")) {
             if (clp->count_given) {
                 pr2serr("second 'count=' argument detected, only one "
@@ -3664,14 +3714,14 @@ main(int argc, char * argv[])
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
     if (clp->in_flags.ff) {
-       ccp = "<0xff bytes>";
-       cc2p = "ff";
+        ccp = "<0xff bytes>";
+        cc2p = "ff";
     } else if (clp->in_flags.random) {
-       ccp = "<random>";
-       cc2p = "random";
+        ccp = "<random>";
+        cc2p = "random";
     } else if (clp->in_flags.zero) {
-       ccp = "<zero bytes>";
-       cc2p = "00";
+        ccp = "<zero bytes>";
+        cc2p = "00";
     }
     if (ccp) {
         if (inf[0]) {
@@ -3737,7 +3787,9 @@ main(int argc, char * argv[])
             clp->outfd = -1; /* don't bother opening */
         else {
             if (FT_RAW != clp->out_type) {
-                flags = O_WRONLY | O_CREAT;
+                flags = O_WRONLY;
+                if (! clp->out_flags.nocreat)
+                    flags |= O_CREAT;
                 if (clp->out_flags.direct)
                     flags |= O_DIRECT;
                 if (clp->out_flags.excl)
