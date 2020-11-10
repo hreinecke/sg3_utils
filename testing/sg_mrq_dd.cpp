@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.15 20201012";
+static const char * version_str = "1.16 20201105";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -241,6 +241,7 @@ struct global_collection        /* one instance visible to all threads */
     off_t outreg_st_size;
     atomic<int> dio_incomplete_count;
     atomic<int> sum_of_resids;
+    atomic<int> reason_res;
     int verbose;
     int dry_run;
     bool mrq_eq_0;              /* true when user gives mrq=0 */
@@ -279,7 +280,6 @@ typedef struct request_element
     uint8_t sb[SENSE_BUFF_LEN];
     int dio_incomplete_count;
     int mmap_active;
-    int resid;
     int rd_p_id;
     int rep_count;
     int rq_id;
@@ -853,7 +853,7 @@ usage(int pg_num)
             "                from dd it defaults to stdout). If 'of=.' "
             "uses /dev/null\n"
             "    oflag       comma separated list from: [append,nocreat,\n"
-	    "                <<list from iflag>>]\n"
+            "                <<list from iflag>>]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
@@ -1212,7 +1212,7 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
     if (clp->in_flags.random) {
         ssize_t ssz;
 
-        ssz = getrandom(&rep->seed, sizeof(rep->seed), 0);
+        ssz = getrandom(&rep->seed, sizeof(rep->seed), GRND_NONBLOCK);
         if (ssz < (ssize_t)sizeof(rep->seed))
             pr2serr_lk("[%d] %s: getrandom() failed, ret=%d\n", id, __func__,
                        (int)ssz);
@@ -1398,6 +1398,7 @@ fini:
     clp->out_rem_count -= rep->out_local_count;
     clp->in_partial += rep->in_local_partial;
     clp->out_partial += rep->out_local_partial;
+    clp->sum_of_resids += rep->in_resid_bytes;
     if (rep->alloc_bp)
         free(rep->alloc_bp);
 }
@@ -1665,6 +1666,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int n_cmpl = ctl_v4p->info;
     int n_good = 0;
     int hole_count = 0;
+    int cat = 0;
     int vb = clp->verbose;
     int k, j, f1, slen, sstatus;
     char b[160];
@@ -1731,7 +1733,8 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                 if (ssh.response_code & 0x1) {
                     ok = true;
                     last_err_on_in = false;
-                }
+                } else
+                    cat = sg_err_category_sense(sbp, slen);
                 if (SPC_SK_MISCOMPARE == ssh.sense_key)
                     ++num_miscompare;
 
@@ -1739,7 +1742,8 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                 if (vb)
                     lk_chk_n_print4("  >>", a_v4p, vb > 4);
             }
-        }
+        } else if (! ok)
+            cat = SG_LIB_CAT_OTHER;
         if (ok && f1) {
             ++n_good;
             if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs)
@@ -1775,6 +1779,8 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     if (all_good)
         pr2serr_lk("    ... all good\n");
 fini:
+    if (cat > 0)
+        clp->reason_res.store(cat);
     return n_good;
 }
 
@@ -4016,5 +4022,7 @@ fini:
                 (num_miscompare > 1) ? "s" : "", num_miscompare.load());
     if (clp->verify && (SG_LIB_CAT_MISCOMPARE == res))
         pr2serr("Verify/compare failed due to miscompare\n");
+    if (0 == res)
+        res = clp->reason_res.load();
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

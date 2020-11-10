@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.20 20201011";
+static const char * version_str = "6.22 20201031";
 
 
 #define ME "sg_dd: "
@@ -427,11 +427,11 @@ static void
 usage()
 {
     pr2serr("Usage: sg_dd  [bs=BS] [conv=CONV] [count=COUNT] [ibs=BS] "
-	    "[if=IFILE]\n"
+            "[if=IFILE]\n"
             "              [iflag=FLAGS] [obs=BS] [of=OFILE] [oflag=FLAGS] "
             "[seek=SEEK]\n"
-	    "              [skip=SKIP] [--dry-run] [--help] [--verbose] "
-	    "[--version]\n\n"
+            "              [skip=SKIP] [--dry-run] [--help] [--verbose] "
+            "[--version]\n\n"
             "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1|2|3]\n"
             "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
@@ -454,9 +454,9 @@ usage()
             "    coe_limit   limit consecutive 'bad' blocks on reads to CL "
             "times\n"
             "                when COE>1 (default: 0 which is no limit)\n"
-	    "    conv        comma separated list from: [nocreat,noerror,"
-	    "notrunc,\n"
-	    "                null,sparse,sync]\n"
+            "    conv        comma separated list from: [nocreat,noerror,"
+            "notrunc,\n"
+            "                null,sparse,sync]\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    dio         for direct IO, 1->attempt, 0->indirect IO "
             "(def)\n"
@@ -1486,6 +1486,7 @@ static int
 open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
         int * out_typep, int vb)
 {
+    bool not_found;
     int outfd = -1;
     int flags, t, res;
     char ebuff[EBUFF_SZ];
@@ -1495,6 +1496,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
     if (vb)
         pr2serr(" >> Output file type: %s\n",
                 dd_filetype_str(*out_typep, ebuff));
+    not_found = (FT_ERROR == *out_typep);  /* assume error was not found */
 
     if ((FT_BLOCK & *out_typep) && ofp->sgio)
         *out_typep |= FT_SG;
@@ -1542,43 +1544,41 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
         goto file_err;
     } else if (FT_DEV_NULL & *out_typep)
         outfd = -1; /* don't bother opening */
-    else {
-        if (! (FT_RAW & *out_typep)) {
-            flags = O_WRONLY;
-            if (! ofp->nocreat)
-                flags = O_CREAT;
-            if (ofp->direct)
-                flags |= O_DIRECT;
-            if (ofp->excl)
-                flags |= O_EXCL;
-            if (ofp->dsync)
-                flags |= O_SYNC;
-            if (ofp->append)
-                flags |= O_APPEND;
-            if ((outfd = open(outf, flags, 0666)) < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                        ME "could not open %s for writing", outf);
-                perror(ebuff);
-                goto file_err;
-            }
-        } else {
-            flags = O_WRONLY;
-            if (ofp->direct)
-                flags |= O_DIRECT;
-            if (ofp->excl)
-                flags |= O_EXCL;
-            if (ofp->dsync)
-                flags |= O_SYNC;
-            if ((outfd = open(outf, flags)) < 0) {
-                snprintf(ebuff, EBUFF_SZ,
-                        ME "could not open %s for raw writing", outf);
-                perror(ebuff);
-                goto file_err;
-            }
+    else if (FT_RAW & *out_typep) {
+        flags = O_WRONLY;
+        if (ofp->direct)
+            flags |= O_DIRECT;
+        if (ofp->excl)
+            flags |= O_EXCL;
+        if (ofp->dsync)
+            flags |= O_SYNC;
+        if ((outfd = open(outf, flags)) < 0) {
+            snprintf(ebuff, EBUFF_SZ,
+                    ME "could not open %s for raw writing", outf);
+            perror(ebuff);
+            goto file_err;
+        }
+    } else {    /* FT_OTHER or FT_ERROR (not found so create) */
+        flags = O_WRONLY;
+        if (! ofp->nocreat)
+            flags |= O_CREAT;
+        if (ofp->direct)
+            flags |= O_DIRECT;
+        if (ofp->excl)
+            flags |= O_EXCL;
+        if (ofp->dsync)
+            flags |= O_SYNC;
+        if (ofp->append)
+            flags |= O_APPEND;
+        if ((outfd = open(outf, flags, 0666)) < 0) {
+            snprintf(ebuff, EBUFF_SZ,
+                    ME "could not open %s for writing", outf);
+            perror(ebuff);
+            goto file_err;
         }
         if (vb)
             pr2serr("        %s output, flags=0x%x\n",
-                    ((O_CREAT & flags) ? "create" : "open"), flags);
+                    (not_found ? "create" : "open"), flags);
         if (seek > 0) {
             off64_t offset = seek;
 
@@ -2067,7 +2067,7 @@ main(int argc, char * argv[])
 
         ccp = "<random>";
         cc2p = "random";
-        ssz = getrandom(&seed, sizeof(seed), 0);
+        ssz = getrandom(&seed, sizeof(seed), GRND_NONBLOCK);
         if (ssz < (ssize_t)sizeof(seed))
             pr2serr("getrandom() failed, ret=%d\n", (int)ssz);
         if (verbose > 1)

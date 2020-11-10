@@ -191,7 +191,7 @@ int
 sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, bool noisy, int verbose, int * o_sense_cat)
 {
-    bool transport_sense;
+    bool favour_sense;
     int cat, slen, resp_code, sstat, req_din_x, req_dout_x;
     int act_din_x, act_dout_x;
     const uint8_t * sbp;
@@ -321,13 +321,14 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
             get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
             pr2ws("%s: transport: %s\n", leadin, b);
         }
+        /* Shall we favour sense data over a transport error (given both) */
 #ifdef SG_LIB_LINUX
-        transport_sense = (slen > 0);
+        favour_sense = false; /* DRIVER_SENSE is not passed through */
 #else
-        transport_sense = ((SAM_STAT_CHECK_CONDITION ==
+        favour_sense = ((SAM_STAT_CHECK_CONDITION ==
                             get_scsi_pt_status_response(ptvp)) && (slen > 0));
 #endif
-        if (transport_sense)
+        if (favour_sense)
             return sg_cmds_process_helper(leadin, req_din_x, act_din_x,
                                           req_dout_x, act_dout_x, sbp, slen,
                                           noisy, verbose, o_sense_cat);

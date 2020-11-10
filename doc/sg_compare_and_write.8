@@ -1,4 +1,4 @@
-.TH "COMPARE AND WRITE" "8" "August 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH "COMPARE AND WRITE" "8" "November 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 .SH SYNOPSIS
@@ -10,36 +10,36 @@ sg_compare_and_write \- send the SCSI COMPARE AND WRITE command
 [\fI\-\-xferlen=LEN\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-Send the SCSI COMPARE AND WRITE command to \fIDEVICE\fR. This utility
-reads a compare buffer and a write buffer from either one or two files. If
-the \fI\-\-inw=WF\fR option is not given then the concatenated compare
-and write buffers are read from the file indicated by the \fI\-\-in=IF\fR
-option. If the \fI\-\-inw=WF\fR option is given then the compare buffer
-is read from the file indicated by the \fI\-\-in=IF\fR while the write
-buffer is read from the file indicated by the \fI\-\-inw=WF\fR.
+Send the SCSI COMPARE AND WRITE command to \fIDEVICE\fR. This utility fetches
+a compare buffer and a write buffer from either one or two files. If the
+\fI\-\-inw=WF\fR option is given then the compare buffer is fetched from the
+file indicated by the \fI\-\-in=IF\fR while the write buffer is fetched from
+the file indicated by the \fI\-\-inw=WF\fR. If the \fI\-\-inw=WF\fR option is
+not given then the concatenated compare and write buffers are fetched from the
+file indicated by the \fI\-\-in=IF\fR option.
 .PP
 Those buffers are expected to each contain \fINUM\fR blocks of data. The
-compare starts at logical block address \fILBA\fR on the \fIDEVICE\fR
-and if the comparison fails (i.e. the provided compare buffer does not
-equal at \fILBA\fR on the \fIDEVICE\fR) then the COMPARE AND WRITE command
-finishes with a sense key of MISCOMPARE. In this case this utility will
-completes and set an exit status of 14 (which happens to be the sense key
-value of MISCOMPARE).
+compare starts at logical block address \fILBA\fR on the \fIDEVICE\fR and if
+the comparison fails (i.e. the provided compare buffer does not equal the data
+at \fILBA\fR on the \fIDEVICE\fR) then the COMPARE AND WRITE command finishes
+with a sense key of MISCOMPARE. In this case this utility will complete and
+set an exit status of 14 (which happens to be the sense key value of
+MISCOMPARE).
 .PP
-If the comparison succeeds then the provided write buffer is written to
-starting at \fILBA\fR for \fINUM\fR blocks on the \fIDEVICE\fR.
+If the comparison succeeds then the provided write buffer is stored starting
+at \fILBA\fR for \fINUM\fR blocks on the \fIDEVICE\fR.
 .PP
-The actual number of bytes transferred in the data\-out buffer of the
-COMPARE AND WRITE command may need to be given by the user with the
+The actual number of bytes transferred in the data\-out buffer of the COMPARE
+AND WRITE command may need to be given by the user with the
 \fI\-\-xferlen=LEN\fR option. \fILEN\fR defaults to (2 * \fINUM\fR * 512)
-which is 1024 for the default \fINUM\fR of 1. If the block size is
-other than 512 then the user will need to use \fI\-\-xferlen=LEN\fR option.
-If protection information is given (indicated by a value of \fIWP\fR
-other than 0 (the default)) then for a \fINUM\fR of 1 \fILEN\fR should
-be 1040 . Note that the SCSI READ CAPACITY command is not checked by
-this utility (e.g. to find the block size).
+which is 1024 for the default \fINUM\fR of 1. If the block size is other than
+512 then the user will need to use \fI\-\-xferlen=LEN\fR option.  If
+protection information is given (indicated by a value of \fIWP\fR other than
+0 (the default)) then for a \fINUM\fR of 1 \fILEN\fR should be 1040 . Note
+that the SCSI READ CAPACITY command is not performed by this utility (e.g.
+to find the block size).
 .PP
-The definition of the SCSI COMPARE AND WRITE command requires that the
+The T10 definition of the SCSI COMPARE AND WRITE command requires that the
 \fIDEVICE\fR implement the compare and optional write as an uninterrupted
 series of actions. Depending on some other \fIDEVICE\fR settings a
 verify operation may occur prior to the compare.
@@ -131,6 +131,74 @@ for \fILEN\fR
 Various numeric arguments (e.g. \fILBA\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
+.SH EXAMPLES
+Before overwriting the first two blocks of whatever (SCSI) storage device
+that is chosen, take a small backup. The logical block size is assumed to
+be 512 bytes. Take a copy (in backup01.bin) of the first two blocks::
+.PP
+  # sg_dd if=/dev/sg1 bs=512 of=backup01.bin count=2
+  2+0 records in
+  2+0 records out
+.PP
+.B WARNING:
+if /dev/sg1 corresponds to a disk on your system that contains currently
+mounted file systems, do _not_ continue. If you can, unmount all file
+systems on that disk. If that is not possible, use another disk with no
+mounted file systems on it. In Linux the scsi_debug driver is a good
+candidate for experimentation.
+.PP
+Now fill the first block with 0xff bytes:
+.PP
+  # sg_dd iflag=ff bs=512 of=/dev/sg1 count=1
+  1+0 records in
+  1+0 records out
+.PP
+and the second block with 0x0 bytes:
+.PP
+  # sg_dd iflag=00 bs=512 seek=1 of=/dev/sg1 count=1
+  1+0 records in
+  1+0 records out
+.PP
+Now copy those two blocks into a file:
+.PP
+  # sg_dd if=/dev/sg1 bs=512 of=ff00.bin count=2
+  2+0 records in
+  2+0 records out
+.PP
+Now we can do a compare and write command. It is told to compare the first
+block (i.e. LBA 0) with the first block in the given file (i.e. ff00.bin).
+If they are equal (they should be both full of 0xff bytes). Since the
+compare succeeds, it will write the second block in ff00.bin over LBA 0:
+.PP
+  # sg_compare_and_write \-\-in=ff00.bin \-\-lba=0 \-\-num=1 /dev/sg1
+
+.PP
+No news is good news. Now if we do that command again:
+.PP
+  # sg_compare_and_write \-\-in=ff00.bin \-\-lba=0 \-\-num=1 /dev/sg1
+  Miscompare at byte offset: 0 [0x0]
+  sg_compare_and_write failed: Miscompare
+.PP
+This is expected. The first sg_compare_and_write ended up writing 0x0 bytes
+over LBA 0x0. The second sg_compare_and_write command compares LBA 0x0 with
+0xff bytes and fails immediately (i.e. at byte offset: 0). Now we will
+overwrite the first 3 bytes of ff00.bin with 0x0:
+.PP
+  # sg_dd bs=1 iflag=00 of=ff00.bin count=3
+  3+0 records in
+  3+0 records out
+.PP
+Notice the 'bs=1' operand. The dd utility (and thus sg_dd) is very useful for
+doing small binary edits on a file. Now if we do that sg_compare_and_write
+again, it still fails but with a small difference:
+.PP
+  # sg_compare_and_write \-\-in=ff00.bin \-\-lba=0 \-\-num=1 /dev/sg1
+  Miscompare at byte offset: 3 [0x3]
+  sg_compare_and_write failed: Miscompare
+.PP
+So the bytes at offset 0, 1, and 2 compared equal but not the byte at
+offset 3. The SCSI COMPARE AND WRITE will stop on the first micompared
+byte.
 .SH EXIT STATUS
 The exit status of sg_compare_and_write is 0 when it is successful. If the
 compare step fails then the exit status is 14. For other exit status values
@@ -144,7 +212,7 @@ Eric Seppanen.
 .SH "REPORTING BUGS"
 Report bugs to shahar.salzman@kaminario.com or dgilbert@interlog.com
 .SH COPYRIGHT
-Copyright \(co 2012\-2018 Kaminario Technologies LTD
+Copyright \(co 2012\-2020 Kaminario Technologies LTD
 .br
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:

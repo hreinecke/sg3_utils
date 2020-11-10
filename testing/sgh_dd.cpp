@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.95 20201012";
+static const char * version_str = "1.96 20201019";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1200,7 +1200,7 @@ mrq_abort_thread(void * v_maip)
     Mrq_abort_info l_mai = *(Mrq_abort_info *)v_maip;
     struct sg_io_v4 ctl_v4;
 
-    ssz = getrandom(&rn, sizeof(rn), 0);
+    ssz = getrandom(&rn, sizeof(rn), GRND_NONBLOCK);
     if (ssz < (ssize_t)sizeof(rn))
         pr2serr_lk("%s: getrandom() failed, returned %d\n", __func__,
                    (int)ssz);

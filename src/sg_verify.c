@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2019 Douglas Gilbert.
+ * Copyright (c) 2004-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.26 20191216";    /* sbc4r17 */
+static const char * version_str = "1.27 20201029";    /* sbc4r17 */
 
 #define ME "sg_verify: "
 
@@ -123,7 +123,7 @@ usage()
             "    --verbose|-v        increase verbosity\n"
             "    --version|-V        print version string and exit\n"
             "    --vrprotect=VRP|-P VRP    set vrprotect field to VRP "
-            "(def: 0)\n"
+            "(def: 0)\n\n"
             "Performs one or more SCSI VERIFY(10) or SCSI VERIFY(16) "
             "commands. sbc3r34\nmade the BYTCHK field two bits wide "
             "(it was a single bit).\n");
@@ -388,7 +388,7 @@ main(int argc, char * argv[])
     }
 skip:
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
