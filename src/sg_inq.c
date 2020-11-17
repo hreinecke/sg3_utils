@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.07 20200422";    /* SPC-6 rev 01 */
+static const char * version_str = "2.08 20201114";  /* spc6r02 + 20-0114r2 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -109,6 +109,7 @@ static const char * version_str = "2.07 20200422";    /* SPC-6 rev 01 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
 #define VPD_FORMAT_PRESETS 0xb8         /* sbc4r18 */
+#define VPD_CON_POS_RANGE 0xb9          /* 20-089r2 */
 
 #ifndef SG_NVME_VPD_NICR
 #define SG_NVME_VPD_NICR 0xde
@@ -179,6 +180,8 @@ static struct svpd_values_name_t vpd_pg[] = {
      "extension (SBC)"},
     {VPD_BLOCK_LIMITS, 0, 0, 0, "bl", "Block limits (SBC)"},
     {VPD_BLOCK_LIMITS_EXT, 0, 0, 0, "ble", "Block limits extension (SBC)"},
+    {VPD_CON_POS_RANGE, 0, 0, 0, "cpr", "Concurrent positioning ranges "
+     "(SBC)"},
     {VPD_DEVICE_ID, 0, -1, 0, "di", "Device identification"},
 #if 0           /* following found in sg_vpd */
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, 0, "di_asis", "Like 'di' "
@@ -2808,9 +2811,9 @@ std_inq_decode(const struct opts_t * op, int act_len)
         if (strlen(cp) > 0)
             printf("SCSI_TYPE=%s\n", cp);
     } else {
-        printf("  PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  "
+        printf("  PQual=%d  PDT=%d  RMB=%d  LU_CONG=%d  hot_pluggable=%d  "
                "version=0x%02x ", pqual, peri_type, !!(rp[1] & 0x80),
-               !!(rp[1] & 0x40), (unsigned int)rp[2]);
+               !!(rp[1] & 0x40), (rp[1] >> 4) & 0x3, (unsigned int)rp[2]);
         printf(" [%s]\n", get_ansi_version_str(ansi_version, buff,
                                                sizeof(buff)));
         printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
@@ -3348,6 +3351,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
 static int
 vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
 {
+    bool bad = false;
     int len, pdt, pn, vb, mxlen;
     int res = 0;
     uint8_t * rp;
@@ -3611,6 +3615,16 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb3\n");
         break;
+    case 0xb4:
+    case 0xb5:
+    case 0xb6:
+    case 0xb7:
+    case 0xb8:
+    case 0xb9:
+        bad = true;
+        pr2serr("Please try the sg_vpd utility which decodes more VPD "
+                "pages\n\n");
+        break;
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
@@ -3656,6 +3670,10 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             decode_scsi_ports_vpd(rp, len, op->do_hex, op->verbose);
         break;
     default:
+        bad = true;
+        break;
+    }
+    if (bad) {
         if ((pn > 0) && (pn < 0x80)) {
             if (!op->do_raw && (op->do_hex < 2))
                 printf("VPD INQUIRY: ASCII information page, FRU code=0x%x\n",

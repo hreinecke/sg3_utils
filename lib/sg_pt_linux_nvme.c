@@ -646,7 +646,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     } else {            /* Standard INQUIRY response */
         /* pdt=0 --> disk; pdt=0xd --> SES; pdt=3 --> processor (safte) */
         inq_dout[0] = (0x1f & ptp->dev_stat.pdt);  /* (PQ=0)<<5 */
-        /* inq_dout[1] = (RMD=0)<<7 | (LU_CONG=0)<<6; rest reserved */
+        /* inq_dout[1] = (RMD=0)<<7 | (LU_CONG=0)<<6 | (HOT_PLUG=0)<<4; */
         inq_dout[2] = 6;   /* version: SPC-4 */
         inq_dout[3] = 2;   /* NORMACA=0, HISUP=0, response data format: 2 */
         inq_dout[4] = 31;  /* so response length is (or could be) 36 bytes */

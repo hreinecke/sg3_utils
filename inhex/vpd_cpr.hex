@@ -1,0 +1,14 @@
+# Dummy data for Concurrent positioning ranges VPD page
+00 b9 00 7c 00 00 00 00
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0
+ 0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0 
+# after 64 byte header there is the first LBA range descriptor (32 bytes)
+01 02  00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+00 00 00 00 10 00 00 00
+ 00 00 00 00 00 00 00 00
+# second LBA range descriptor (32 bytes)
+02 02  00 00 00 00 00 00
+00 00 00 00 10 00 00 00
+00 00 00 00 10 00 00 00
+ 00 00 00 00 00 00 00 00

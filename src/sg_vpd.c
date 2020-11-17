@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.60 20200501";  /* spc6r01 + sbc4r20a */
+static const char * version_str = "1.61 20201114";  /* spc6r02 + sbc4r22 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -79,6 +79,7 @@ static const char * version_str = "1.60 20200501";  /* spc6r01 + sbc4r20a */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
 #define VPD_FORMAT_PRESETS 0xb8         /* sbc4r18 */
+#define VPD_CON_POS_RANGE 0xb9          /* 20-089r2 */
 #define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
 /* Device identification VPD page associations */
@@ -198,6 +199,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_BLOCK_DEV_C_EXTENS, 0, 0, "bdce", "Block device characteristics "
      "extension (SBC)"},
     {VPD_CFA_PROFILE_INFO, 0, 0, "cfa", "CFA profile information"},
+    {VPD_CON_POS_RANGE, 0, 0, "cpr", "Concurrent positioning ranges"},
     {VPD_DEVICE_CONSTITUENTS, 0, -1, "dc", "Device constituents"},
     {VPD_DEVICE_ID, 0, -1, "di", "Device identification"},
     {VPD_DEVICE_ID, VPD_DI_SEL_AS_IS, -1, "di_asis", "Like 'di' "
@@ -500,9 +502,9 @@ std_inq_decode(uint8_t * b, int len, int verbose)
         printf(" [PQ indicates LU not accessible via this port]\n");
     else
         printf(" [reserved or vendor specific qualifier [%d]]\n", pqual);
-    printf("  PQual=%d  Device_type=%d  RMB=%d  LU_CONG=%d  version=0x%02x ",
-           pqual, b[0] & 0x1f, !!(b[1] & 0x80), !!(b[1] & 0x40),
-           (unsigned int)b[2]);
+    printf("  PQual=%d  PDT=%d  RMB=%d  LU_CONG=%d  hot_pluggable=%d  "
+           "version=0x%02x ", pqual, b[0] & 0x1f, !!(b[1] & 0x80),
+               !!(b[1] & 0x40), (b[1] >> 4) & 0x3, (unsigned int)b[2]);
     printf(" [%s]\n", sg_ansi_version_arr[b[2] & 0xf]);
     printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
            " Resp_data_format=%d\n",
@@ -2646,6 +2648,84 @@ decode_b7_vpd(uint8_t * buff, int len, int do_hex, int pdt)
     }
 }
 
+/* VPD_FORMAT_PRESETS  0xb8 (added sbc4r18) */
+static void
+decode_format_presets_vpd(uint8_t * buff, int len, bool do_hex)
+{
+    int k;
+    unsigned int sch_type;
+    uint8_t * bp;
+
+    if (do_hex) {
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("Format presets VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += 64, bp += 64) {
+        printf("  Preset identifier: 0x%x\n", sg_get_unaligned_be32(bp));
+        sch_type = bp[4];
+        printf("    schema type: %u\n", sch_type);
+        printf("    logical blocks per physical block exponent type: %u\n",
+               0xf & bp[7]);
+        printf("    logical block length: %u\n",
+               sg_get_unaligned_be32(bp + 8));
+        printf("    designed last LBA: 0x%" PRIx64 "\n",
+               sg_get_unaligned_be64(bp + 16));
+        printf("    FMPT_INFO: %u\n", (bp[38] >> 6) & 0x3);
+        printf("    protection field usage: %u\n", bp[38] & 0x7);
+        printf("    protection interval exponent: %u\n", bp[39] & 0xf);
+        if (2 == sch_type)
+            printf("    Defines zones for host aware device:\n");
+        else if (3 == sch_type)
+            printf("    Defines zones for host managed device:\n");
+        if ((2 == sch_type) || (3 == sch_type)) {
+            unsigned int u = bp[40 + 0];
+
+            printf("        low LBA conventional zones percentage: "
+                   "%u.%u %%\n", u / 10, u % 10);
+            u = bp[40 + 1];
+            printf("        high LBA conventional zones percentage: "
+                   "%u.%u %%\n", u / 10, u % 10);
+            printf("        logical blocks per zone: %u\n",
+                   sg_get_unaligned_be32(bp + 40 + 12));
+        }
+    }
+}
+
+/* VPD_CON_POS_RANGE  0xb9 (added 20-089r2) */
+static void
+decode_con_pos_range_vpd(uint8_t * buff, int len, bool do_hex)
+{
+    int k;
+    uint64_t u;
+    uint8_t * bp;
+
+    if (do_hex) {
+        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 64) {
+        pr2serr("Concurrent position ranges VPD page length too short=%d\n",
+                len);
+        return;
+    }
+    len -= 64;
+    bp = buff + 64;
+    for (k = 0; k < len; k += 32, bp += 32) {
+        printf("  LBA range number: %u\n", bp[0]);
+        printf("    number of storage elements: %u\n", bp[1]);
+        printf("    starting LBA: 0x%" PRIx64 "\n",
+               sg_get_unaligned_be64(bp + 8));
+        u = sg_get_unaligned_be64(bp + 16);
+        printf("    number of LBAs: 0x%" PRIx64 " [%" PRIu64 "]\n", u, u);
+    }
+}
+
 /* Returns 0 if successful */
 static int
 svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
@@ -3425,6 +3505,68 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
                 decode_b7_vpd(rp, len, op->do_hex, pdt);
+            }
+            return 0;
+        } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
+                   (0 == op->examine))
+            printf("%sVPD page=0xb7\n", pre);
+        break;
+    case 0xb8:          /* VPD_FORMAT_PRESETS */
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        if (0 == res) {
+            pdt = rp[0] & 0x1f;
+            switch (pdt) {
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                np = "Format presets VPD page (SBC):";
+                break;
+            default:
+                np = NULL;
+                break;
+            }
+            if (NULL == np)
+                printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+            else if (allow_name || allow_if_found)
+                printf("%s%s\n", pre, np);
+            if (op->do_raw)
+                dStrRaw(rp, len);
+            else {
+                pdt = rp[0] & 0x1f;
+                if (vb || long_notquiet)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_format_presets_vpd(rp, len, op->do_hex);
+            }
+            return 0;
+        } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
+                   (0 == op->examine))
+            printf("%sVPD page=0xb7\n", pre);
+        break;
+    case 0xb9:          /* VPD_CON_POS_RANGE */
+        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        if (0 == res) {
+            pdt = rp[0] & 0x1f;
+            switch (pdt) {
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                np = "Concurrent positioning ranges VPD page (SBC):";
+                break;
+            default:
+                np = NULL;
+                break;
+            }
+            if (NULL == np)
+                printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+            else if (allow_name || allow_if_found)
+                printf("%s%s\n", pre, np);
+            if (op->do_raw)
+                dStrRaw(rp, len);
+            else {
+                pdt = rp[0] & 0x1f;
+                if (vb || long_notquiet)
+                    printf("   [PQual=%d  Peripheral device type: %s]\n",
+                           (rp[0] & 0xe0) >> 5,
+                           sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_con_pos_range_vpd(rp, len, op->do_hex);
             }
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&

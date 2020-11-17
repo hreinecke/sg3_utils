@@ -1,0 +1,27 @@
+# Dummy data for Format presets VPD page
+00 b8 00 80
+
+# after 4 byte header here is the first Format preset descriptor (64 bytes)
+00 00 01 00
+01  0 0  00
+01 00 00 00
+0 0 0 0
+00 00 00 00  00 ff ff ff	# last LBA
+0 0 0 0 0 0 0 0  0 0 0 0 0 0
+00 00		# FMPTINFO, Protection field usage and protection interval exp
+0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0  
+
+# second Format preset descriptor (64 bytes)
+00 00 01 01
+02  0 0  00
+01 00 00 00
+0 0 0 0
+00 00 00 00  01 ff ff ff	# last LBA
+0 0 0 0 0 0 0 0  0 0 0 0 0 0
+00 00		# FMPTINFO, Protection field usage and protection interval exp
+# host-aware zones schema type specific information
+5 ff
+0 0 0 0 0 0 0 0  0 0
+20 00 00 00
+0 0 0 0  
