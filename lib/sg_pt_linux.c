@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.49 20200820 */
+/* sg_pt_linux version 1.50 20201123 */
 
 
 #include <stdio.h>
@@ -655,7 +655,7 @@ get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return (uint8_t *)ptp->io_hdr.request;
+    return (uint8_t *)(sg_uintptr_t)ptp->io_hdr.request;
 }
 
 void
@@ -880,7 +880,7 @@ get_scsi_pt_sense_buf(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    return (uint8_t *)ptp->io_hdr.response;
+    return (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
 }
 
 int

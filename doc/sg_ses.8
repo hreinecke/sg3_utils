@@ -1,4 +1,4 @@
-.TH SG_SES "8" "February 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_SES "8" "November 2020" "sg3_utils\-1.45" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -164,8 +164,10 @@ If the enclosure sets the actual EIIOE field to 1 or more then this option has
 no effect. It is recommended that HP JBOD users set \-\-eiioe=auto .
 .TP
 \fB\-e\fR, \fB\-\-enumerate\fR
-enumerate all known dpage names and SES elements when this option is given
-once.
+enumerate all known diagnostic page (dpage) names and SES elements that this
+utility recognizes plus the abbreviations accepted by this utility. Ignores
+\fIDEVICE\fR if it is given. Essentially it is dumping out tables held
+internally by this utility.
 .br
 If \fI\-\-enumerate\fR is given twice, then the recognised acronyms for the
 \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options are

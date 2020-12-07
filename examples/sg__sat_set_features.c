@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2020 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,9 +56,9 @@
 
 #define ATA_SET_FEATURES 0xef
 
-#define EBUFF_SZ 256
+#define EBUFF_SZ 512
 
-static char * version_str = "1.05 20180220";
+static char * version_str = "1.06 20201125";
 
 static struct option long_options[] = {
         {"count", required_argument, 0, 'c'},

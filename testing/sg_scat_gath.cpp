@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Version 1.01 [20200820]
+ * Version 1.02 [20201124]
  */
 
 // C headers
@@ -14,6 +14,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <limits.h>
+#include <ctype.h>
+#include <errno.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
 

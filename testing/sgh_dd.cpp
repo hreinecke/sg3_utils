@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.96 20201019";
+static const char * version_str = "1.97 20201124";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -839,7 +839,7 @@ tsafe_strerror(int code, char * ebp)
     strncpy(ebp, cp, STRERR_BUFF_LEN);
     pthread_mutex_unlock(&strerr_mut);
 
-    ebp[STRERR_BUFF_LEN - 1] = '\0';
+    ebp[strlen(ebp) - 1] = '\0';
     return ebp;
 }
 
@@ -848,7 +848,7 @@ tsafe_strerror(int code, char * ebp)
  * ISBN 0-201-63392-2 . [Highly recommended book.] Changed __FILE__
  * to __func__ */
 #define err_exit(code,text) do { \
-    char strerr_buff[STRERR_BUFF_LEN]; \
+    char strerr_buff[STRERR_BUFF_LEN + 1]; \
     pr2serr("%s at \"%s\":%d: %s\n", \
         text, __func__, __LINE__, tsafe_strerror(code, strerr_buff)); \
     exit(1); \
@@ -1684,7 +1684,7 @@ fini:
     if ((1 == rep->mmap_active) && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
             int err = errno;
-            char bb[64];
+            char bb[STRERR_BUFF_LEN + 1];
 
             pr2serr_lk("thread=%d: munmap() failed: %s\n", rep->id,
                        tsafe_strerror(err, bb));
@@ -1748,7 +1748,7 @@ normal_in_rd(Rq_elem * rep, int blocks)
     bool stop_after_write = false;
     bool same_fds = clp->in_flags.same_fds || clp->out_flags.same_fds;
     int res;
-    char strerr_buff[STRERR_BUFF_LEN];
+    char strerr_buff[STRERR_BUFF_LEN + 1];
 
     if (clp->verbose > 4)
         pr2serr_lk("%s: tid=%d: iblk=%" PRIu64 ", blocks=%d\n", __func__,
@@ -1830,7 +1830,7 @@ normal_out_wr(Rq_elem * rep, int blocks)
 {
     int res;
     struct global_collection * clp = rep->clp;
-    char strerr_buff[STRERR_BUFF_LEN];
+    char strerr_buff[STRERR_BUFF_LEN + 1];
 
     /* enters holding out_mutex */
     if (clp->verbose > 4)

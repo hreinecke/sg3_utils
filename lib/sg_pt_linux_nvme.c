@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.13 20200501 */
+/* sg_pt_linux_nvme version 1.14 20201123 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -1429,7 +1429,7 @@ sntl_do_nvm_cmd(struct sg_pt_linux_scsi * ptp, struct sg_nvme_user_io * iop,
 
     struct sg_nvme_passthru_cmd nvme_pt_cmd;
     struct sg_nvme_passthru_cmd *cmdp = &nvme_pt_cmd;
-    void * dp = (void *)iop->addr;
+    void * dp = (void *)(sg_uintptr_t)iop->addr;
 
     memset(cmdp, 0, sizeof(*cmdp));
     cmdp->opcode = iop->opcode;
