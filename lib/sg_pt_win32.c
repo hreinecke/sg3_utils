@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_win32 version 1.31 20200723 */
+/* sg_pt_win32 version 1.32 20201207 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -439,7 +439,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int vb)
     shp->scsi_pdt = -1;
     shp->verbose = vb;
     memset(shp->adapter, 0, sizeof(shp->adapter));
-    strncpy(shp->adapter, "\\\\.\\", 4);
+    memcpy(shp->adapter, "\\\\.\\", 4);
     if (shp->got_physical_drive)
         snprintf(shp->adapter + 4, sizeof(shp->adapter) - 5,
                  "PhysicalDrive%d", pd_num);
