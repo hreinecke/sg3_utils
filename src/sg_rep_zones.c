@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.22 20200420";
+static const char * version_str = "1.23 20201216";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -516,6 +516,7 @@ main(int argc, char * argv[])
                    verbose));
             printf("   Zone condition: %s\n", zone_condition_str(zc, b,
                    sizeof(b), verbose));
+            printf("   PUEP: %d\n", !!(bp[1] & 0x4));   /* added in zbc2r07 */
             printf("   Non_seq: %d\n", !!(bp[1] & 0x2));
             printf("   Reset: %d\n", bp[1] & 0x1);
             printf("   Zone Length: 0x%" PRIx64 "\n",

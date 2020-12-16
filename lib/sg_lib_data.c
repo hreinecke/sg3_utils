@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.77 20200731";
+const char * sg_lib_version_str = "2.78 20201214";
 /* spc6r02, sbc4r20a, zbc2r04 */
 
 
@@ -364,6 +364,7 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0x17, 0, "Get physical element status"},   /* added sbc4r13 */
     {0x18, 0, "Remove element and truncate"},   /* added sbc4r13 */
     {0x19, 0, "Restore elements and rebuild"},  /* added sbc4r19 */
+    {0x1a, 0, "Remove element and modify zones"},   /* added zbc2r07 */
     {0xffff, 0, NULL},
 };
 
