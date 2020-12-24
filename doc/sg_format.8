@@ -671,18 +671,25 @@ Now /dev/sdd should have 512 byte logical block size. And to switch it back:
 Since fast formats can be very quick (a matter of seconds) using the
 \-\-wait option may be appropriate.
 .PP
-And tu use Format with preset this invocation might be used:
+And to use the Format with preset command this invocation could be used:
 .PP
    # sg_format \-\-preset=1 \-\-fmtmaxlba /dev/sdd
 .PP
 The FORMAT PRESETS VPD page (0xb8) should be consulted to check that Preset
 identifier 0x1 is there and has the expected format (i.e. "default host aware
 zoned block device model with 512 bytes of user data in each logical block").
+That VPD page can be viewed with the sg_vpd utility.
 .SH EXIT STATUS
 The exit status of sg_format is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
 exit status may not reflect the success of otherwise of the format.
 Using sg_turs(8) and sg_readcap(8) after the format operation may be wise.
+.PP
+The Unix convention is that "no news is good news" but that can be a bit
+unnerving after an operation like format, especially if it finishes
+quickly (i.e. before the first progress poll is sent). Giving the
+\fI\-\-verbose\fR option once should supply enough additional output to 
+settle those nerves.
 .SH AUTHORS
 Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"

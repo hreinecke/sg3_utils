@@ -1,4 +1,4 @@
-.TH SG_READ_ATTR "8" "November 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_READ_ATTR "8" "December 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_read_attr \- send SCSI READ ATTRIBUTE command
 .SH SYNOPSIS
@@ -133,8 +133,8 @@ Much of the information provided by READ ATTRIBUTE can also be found in
 pages returned by LOG SENSE (see the sg_logs utility) and in the VPD
 pages returned by the INQUIRY command.
 .SH EXAMPLES
-To list the attributes of a tape drive whose xxxx is /dev/sg1 the following
-could be used:
+To list the attributes of a tape drive whose \fIDEVICE\fR is /dev/sg1 ,
+the following could be used:
 .PP
 # sg_read_attr \-s al /dev/sg1
 .br
@@ -206,7 +206,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2016\-2017 Douglas Gilbert
+Copyright \(co 2016\-2020 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

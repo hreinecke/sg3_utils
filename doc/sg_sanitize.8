@@ -1,4 +1,4 @@
-.TH SG_SANITIZE "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_SANITIZE "8" "December 2020" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_sanitize \- remove all user data from disk with SCSI SANITIZE command
 .SH SYNOPSIS
@@ -41,10 +41,13 @@ command every 30 seconds. Otherwise if the \fI\-\-wait\fR option is given
 then this utility will wait until the SANITIZE command completes (or fails)
 and that can be many hours.
 .PP
-If neither the \fI\-\-early\fR nor \fI\-\-wait\fR option is given then
-the SANITIZE command is started with the IMMED bit set. After that this
-utility sends a REQUEST SENSE command every 60 seconds until there are
-no more progress indications.
+If the \fI\-\-wait\fR option is not given then the SANITIZE command is
+started with the IMMED bit set. If neither the \fI\-\-early\fR nor the
+\fI\-\-wait\fR options are given then this utility sends a REQUEST SENSE
+command after every 60 seconds until there are no more progress indications
+in which case this utility exits silently. If additionally the
+\fI\-\-verbose\fR option is given the exit will be marked by a short
+message that the sanitize seems to have succeeded.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -63,7 +66,12 @@ sanitize operation. \fIOC\fR can be a value between 1 and 31 and 1 is
 the default.
 .TP
 \fB\-C\fR, \fB\-\-crypto\fR
-perform a "cryptographic erase" sanitize operation.
+perform a "cryptographic erase" sanitize operation. Note that this erase is
+often very quick as it simply overwrites an internal cryptographic key with
+a new value. Those keys are not accessible to users and encrypt all data
+written then decrypt all data read from the media. The primary reason for
+doing that is to make this operation fast. This operation can not be
+reversed.
 .TP
 \fB\-d\fR, \fB\-\-desc\fR
 sets the DESC field in the REQUEST SENSE command used for polling. By
@@ -190,6 +198,13 @@ variant of this utility should have no effect unless it follows an already
 failed sanitize operation. If the SCSI REPORT SUPPORTED OPERATION CODES
 command (see sg_opcodes) is supported then using it would be a better
 approach for finding if sanitize is supported.
+.PP
+If using the dd command to check the before and after data of a particular
+block (i.e. check the erase actually worked) it is a good idea to use
+the 'iflag=direct' operand. Otherwise the first read might be cached and
+returned when the same LBA is read a little later. Obviously this utility
+should only be used to sanitize data on a disk whose mounted file
+systems (if any) have been unmounted prior to the erase!
 .SH EXAMPLES
 These examples use Linux device names. For suitable device names in
 other supported Operating Systems see the sg3_utils(8) man page.
@@ -233,12 +248,18 @@ To overwrite with zeros use:
 The exit status of sg_sanitize is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page. Unless the \fI\-\-wait\fR option is given, the
 exit status may not reflect the success of otherwise of the format.
+.PP
+The Unix convention is that "no news is good news" but that can be a bit
+unnerving after an operation like sanitize, especially if it finishes
+quickly (i.e. before the first progress poll is sent). Giving the
+\fI\-\-verbose\fR option once should supply enough additional output to
+settle those nerves.
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2011\-2018 Douglas Gilbert
+Copyright \(co 2011\-2020 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

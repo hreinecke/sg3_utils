@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.61 20200123";
+static const char * version_str = "1.62 20201223";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -155,6 +155,10 @@ static struct option long_options[] = {
         {"wait", no_argument, 0, 'w'},
         {0, 0, 0, 0},
 };
+
+static const char * fu_s = "Format unit";
+static const char * fm_s = "Format medium";
+static const char * fwp_s = "Format with preset";
 
 
 static void
@@ -288,7 +292,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         if (verbose) {
                 char b[128];
 
-                pr2serr("    Format medium cdb: %s\n",
+                pr2serr("    %s cdb: %s\n", fm_s,
                         sg_get_command_str(fm_cdb, SG_FORMAT_MEDIUM_CMDLEN,
                                            false, sizeof(b), b));
         }
@@ -302,8 +306,8 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
         set_scsi_pt_data_out(ptvp, (uint8_t *)paramp, transfer_len);
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
-        ret = sg_cmds_process_resp(ptvp, "format medium", res, noisy,
-                                   verbose, &sense_cat);
+        ret = sg_cmds_process_resp(ptvp, fm_s, res, noisy, verbose,
+                                   &sense_cat);
         if (-1 == ret)
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
         else if (-2 == ret) {
@@ -316,8 +320,12 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
                         ret = sense_cat;
                         break;
                 }
-        } else
+        } else {
                 ret = 0;
+                if (verbose)
+                        pr2serr("%s command %s without error\n", fm_s,
+                                (immed ? "launched" : "completed"));
+        }
         destruct_scsi_pt_obj(ptvp);
         return ret;
 }
@@ -344,7 +352,7 @@ sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
         if (verbose) {
                 char b[128];
 
-                pr2serr("    Format with preset cdb: %s\n",
+                pr2serr("    %s cdb: %s\n", fwp_s,
                         sg_get_command_str(fwp_cdb,
                                            SG_FORMAT_WITH_PRESET_CMDLEN,
                                            false, sizeof(b), b));
@@ -357,8 +365,8 @@ sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
         set_scsi_pt_cdb(ptvp, fwp_cdb, sizeof(fwp_cdb));
         set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
-        ret = sg_cmds_process_resp(ptvp, "format with preset", res, noisy,
-                                   verbose, &sense_cat);
+        ret = sg_cmds_process_resp(ptvp, fwp_s, res, noisy, verbose,
+                                   &sense_cat);
         if (-1 == ret)
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
         else if (-2 == ret) {
@@ -371,8 +379,12 @@ sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
                         ret = sense_cat;
                         break;
                 }
-        } else
+        } else {
                 ret = 0;
+                if (verbose)
+                        pr2serr("%s command %s without error\n", fwp_s,
+                                (immed ? "launched" : "completed"));
+        }
         destruct_scsi_pt_obj(ptvp);
         return ret;
 }
@@ -381,7 +393,7 @@ sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
 static int
 scsi_format_unit(int fd, const struct opts_t * op)
 {
-        bool need_param_lst, longlist, ip_desc;
+        bool need_param_lst, longlist, ip_desc, first;
         bool immed = ! op->fwait;
         int res, progress, pr, rem, param_sz, off, resp_len, tmout;
         int poll_wait_secs;
@@ -441,15 +453,15 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         "command\n");
                 if (vb) {
                         if (need_param_lst) {
-                                pr2serr("  FU would have received parameter "
-                                        "list: ");
+                                pr2serr("  %s would have received parameter "
+                                        "list: ", fu_s);
                                 hex2stderr(param, max_param_sz, -1);
                         } else
-                                pr2serr("  FU would not have received a "
-                                        "parameter list\n");
-                        pr2serr("  FU cdb fields: fmtpinfo=0x%x, "
+                                pr2serr("  %s would not have received a "
+                                        "parameter list\n", fu_s);
+                        pr2serr("  %s cdb fields: fmtpinfo=0x%x, "
                                 "longlist=%d, fmtdata=%d, cmplst=%d, "
-                                "ffmt=%d [timeout=%d secs]\n",
+                                "ffmt=%d [timeout=%d secs]\n", fu_s,
                                 op->fmtpinfo, longlist, need_param_lst,
                                 op->cmplst, op->ffmt, tmout);
                 }
@@ -463,20 +475,22 @@ scsi_format_unit(int fd, const struct opts_t * op)
 
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, vb);
-                pr2serr("Format unit command: %s\n", b);
+                pr2serr("%s command: %s\n", fu_s, b);
                 return res;
-        }
+        } else if (op->verbose)
+                pr2serr("%s command %s without error\n", fu_s,
+                        (immed ? "launched" : "completed"));
         if (! immed)
                 return 0;
 
         if (! op->dry_run)
-                printf("\nFormat unit has started\n");
+                printf("\n%s has started\n", fu_s);
 
         if (op->early) {
                 if (immed)
-                        printf("Format continuing,\n    request sense or "
+                        printf("%s continuing,\n    request sense or "
                                "test unit ready can be used to monitor "
-                               "progress\n");
+                               "progress\n", fu_s);
                 return 0;
         }
 
@@ -487,7 +501,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
         poll_wait_secs = op->ffmt ? POLL_DURATION_FFMT_SECS :
                                     POLL_DURATION_SECS;
         if (! op->poll_type) {
-                for(;;) {
+                for(first = true; ; first = false) {
                         sleep_for(poll_wait_secs);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
@@ -495,10 +509,15 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
-                                printf("Format in progress, %d.%02d%% done\n",
-                                       pr, rem);
-                        } else
+                                printf("%s in progress, %d.%02d%% done\n",
+                                       fu_s, pr, rem);
+                        } else {
+                                if (first && op->verbose)
+                                        pr2serr("%s seems to be successful "
+                                                "and finished quickly\n",
+                                                fu_s);
                                 break;
+                        }
                 }
         }
         if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
@@ -511,7 +530,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                                 "Sense\n", __func__);
                         return sg_convert_errno(ENOMEM);
                 }
-                for(;;) {
+                for(first = true; ; first = false) {
                         sleep_for(poll_wait_secs);
                         memset(reqSense, 0x0, MAX_BUFF_SZ);
                         res = sg_ll_request_sense(fd, false, reqSense,
@@ -533,10 +552,15 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
-                                printf("Format in progress, %d.%02d%% done\n",
-                                       pr, rem);
-                        } else
+                                printf("%s in progress, %d.%02d%% done\n",
+                                       fu_s, pr, rem);
+                        } else {
+                                if (first && op->verbose)
+                                        pr2serr("%s seems to be successful "
+                                                "and finished quickly\n",
+                                                fu_s);
                                 break;
+                        }
                 }
                 if (free_reqSense)
                         free(free_reqSense);
@@ -549,9 +573,10 @@ scsi_format_unit(int fd, const struct opts_t * op)
 static int
 scsi_format_medium(int fd, const struct opts_t * op)
 {
+        bool first;
+        bool immed = ! op->fwait;
         int res, progress, pr, rem, resp_len, tmout;
         int vb = op->verbose;
-        bool immed = ! op->fwait;
         char b[80];
 
         if (immed)
@@ -568,27 +593,27 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 tmout = op->timeout;
         if (op->dry_run) {
                 res = 0;
-                pr2serr("Due to --dry-run option bypassing FORMAT MEDIUM "
-                        "command\n");
+                pr2serr("Due to --dry-run option bypassing %s command\n",
+                        fm_s);
         } else
                 res = sg_ll_format_medium(fd, op->verify, immed,
                                           0xf & op->tape, NULL, 0, tmout,
                                           true, vb);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, vb);
-                pr2serr("Format medium command: %s\n", b);
+                pr2serr("%s command: %s\n", fm_s, b);
                 return res;
         }
         if (! immed)
                 return 0;
 
         if (! op->dry_run)
-                printf("\nFormat medium has started\n");
+                printf("\n%s has started\n", fm_s);
         if (op->early) {
                 if (immed)
-                        printf("Format continuing,\n    request sense or "
+                        printf("%s continuing,\n    request sense or "
                                "test unit ready can be used to monitor "
-                               "progress\n");
+                               "progress\n", fm_s);
                 return 0;
         }
 
@@ -597,7 +622,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                 return 0;
         }
         if (! op->poll_type) {
-                for(;;) {
+                for(first = true; ; first = false) {
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
@@ -605,10 +630,15 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
-                                printf("Format in progress, %d.%02d%% done\n",
-                                       pr, rem);
-                        } else
+                                printf("%s in progress, %d.%02d%% done\n",
+                                       fm_s, pr, rem);
+                        } else {
+                                if (first && op->verbose)
+                                        pr2serr("%s seems to be successful "
+                                                "and finished quickly\n",
+                                                fm_s);
                                 break;
+                        }
                 }
         }
         if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
@@ -621,7 +651,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                                 "Sense\n", __func__);
                         return sg_convert_errno(ENOMEM);
                 }
-                for(;;) {
+                for(first = true; ; first = false) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, MAX_BUFF_SZ);
                         res = sg_ll_request_sense(fd, false, reqSense,
@@ -643,10 +673,15 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
-                                printf("Format in progress, %d.%02d%% done\n",
-                                       pr, rem);
-                        } else
+                                printf("%s in progress, %d.%02d%% done\n",
+                                       fm_s, pr, rem);
+                        } else {
+                                if (first && op->verbose)
+                                        pr2serr("%s seems to be successful "
+                                                "and finished quickly\n",
+                                                fm_s);
                                 break;
+                        }
                 }
                 if (free_reqSense)
                         free(free_reqSense);
@@ -659,9 +694,10 @@ scsi_format_medium(int fd, const struct opts_t * op)
 static int
 scsi_format_with_preset(int fd, const struct opts_t * op)
 {
+        bool first;
+        bool immed = ! op->fwait;
         int res, progress, pr, rem, resp_len, tmout;
         int vb = op->verbose;
-        bool immed = ! op->fwait;
         char b[80];
 
         if (immed)
@@ -685,18 +721,18 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
                                                op->p_id, tmout, true, vb);
         if (res) {
                 sg_get_category_sense_str(res, sizeof(b), b, vb);
-                pr2serr("Format with preset command: %s\n", b);
+                pr2serr("%s command: %s\n", fwp_s, b);
                 return res;
         }
         if (! immed)
                 return 0;
 
         if (! op->dry_run)
-                printf("\nFormat with preset has started\n");
+                printf("\n%s has started\n", fwp_s);
         if (op->early) {
                 if (immed)
-                        printf("Format continuing,\n    Request sense can "
-                               "be used to monitor progress\n");
+                        printf("%s continuing,\n    Request sense can "
+                               "be used to monitor progress\n", fwp_s);
                 return 0;
         }
 
@@ -705,7 +741,7 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
                 return 0;
         }
         if (! op->poll_type) {
-                for(;;) {
+                for(first = true; ; first = false) {
                         sleep_for(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
@@ -713,10 +749,15 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
-                                printf("Format in progress, %d.%02d%% done\n",
-                                       pr, rem);
-                        } else
+                                printf("%s in progress, %d.%02d%% done\n",
+                                       fwp_s, pr, rem);
+                        } else {
+                                if (first && op->verbose)
+                                        pr2serr("%s seems to be successful "
+                                                "and finished quickly\n",
+                                                fwp_s);
                                 break;
+                        }
                 }
         }
         if (op->poll_type || (SG_LIB_CAT_NOT_READY == res)) {
@@ -729,7 +770,7 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
                                 "Sense\n", __func__);
                         return sg_convert_errno(ENOMEM);
                 }
-                for(;;) {
+                for(first = true; ; first = false) {
                         sleep_for(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, MAX_BUFF_SZ);
                         res = sg_ll_request_sense(fd, false, reqSense,
@@ -751,10 +792,15 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
                         if (progress >= 0) {
                                 pr = (progress * 100) / 65536;
                                 rem = ((progress * 100) % 65536) / 656;
-                                printf("Format in progress, %d.%02d%% done\n",
-                                       pr, rem);
-                        } else
+                                printf("%s in progress, %d.%02d%% done\n",
+                                       fwp_s, pr, rem);
+                        } else {
+                                if (first && op->verbose)
+                                        pr2serr("%s seems to be successful "
+                                                "and finished quickly\n",
+                                                fwp_s);
                                 break;
+                        }
                 }
                 if (free_reqSense)
                         free(free_reqSense);

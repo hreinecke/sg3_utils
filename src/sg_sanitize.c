@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 Douglas Gilbert.
+ * Copyright (c) 2011-2020 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20191220";
+static const char * version_str = "1.15 20201223";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -271,8 +271,12 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
             ret = sense_cat;
             break;
         }
-    } else
+    } else {
         ret = 0;
+        if (op->verbose)
+            pr2serr("Sanitize command %s without error\n",
+                    (immed ? "launched" : "completed"));
+    }
 
     destruct_scsi_pt_obj(ptvp);
     return ret;
@@ -778,6 +782,9 @@ main(int argc, char * argv[])
                 if (vb > 1)
                      pr2serr("No progress indication found, iteration %d\n",
                              k + 1);
+                if ((0 == k) && vb)
+                     pr2serr("Sanitize seems to be successful and finished "
+                             "quickly\n");
                 /* N.B. exits first time there isn't a progress indication */
                 break;
             } else

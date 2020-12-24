@@ -110,6 +110,7 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+/* Common to all SCSI devices (found in SPCx). In numerical order */
 static struct page_code_desc pc_desc_common[] = {
     {0x0, 0x0, "ua", "Unit Attention condition [vendor specific format]"},
     {0x2, 0x0, "dr", "Disconnect-Reconnect"},
@@ -144,6 +145,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0xa, 0x5, "ioad", "IO advice hints grouping"}, /* added sbc4r06 */
     {0xa, 0x6, "bop", "Background operation control"}, /* added sbc4r07 */
     {0xa, 0xf1, "pat", "Parallel ATA control (SAT)"},
+    {0xa, 0xf2, "afc", "ATA feature control (SAT)"},   /* added 20-085r2 */
     {0xb, 0x0, "mts", "Medium types supported (obsolete)"},
     {0xc, 0x0, "not", "Notch and partition (obsolete)"},
     {0xd, 0x0, "pco", "Power condition (obsolete, moved to 0x1a)"},
