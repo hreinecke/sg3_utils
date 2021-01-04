@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 Douglas Gilbert.
+ * Copyright (c) 2017-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.14 20201123 */
+/* sg_pt_linux_nvme version 1.15 20210102 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -464,7 +464,7 @@ sntl_do_identify(struct sg_pt_linux_scsi * ptp, int cns, int nsid,
 /* Currently only caches associated identify controller response (4096 bytes).
  * Returns 0 on success; otherwise a positive value is returned */
 static int
-sntl_cache_identity(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
+sntl_cache_identify(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
 {
     int ret;
     uint32_t pg_sz = sg_get_page_size();
@@ -536,7 +536,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         return 0;
     }
     if (NULL == ptp->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        res = sntl_cache_identify(ptp, time_secs, vb);
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
             return 0;
@@ -683,7 +683,7 @@ sntl_rluns(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     sel_report = cdbp[2];
     alloc_len = sg_get_unaligned_be32(cdbp + 6);
     if (NULL == ptp->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        res = sntl_cache_identify(ptp, time_secs, vb);
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
             return 0;
@@ -743,7 +743,7 @@ sntl_tur(struct sg_pt_linux_scsi * ptp, int time_secs, int vb)
     if (vb > 4)
         pr2ws("%s: start\n", __func__);
     if (NULL == ptp->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        res = sntl_cache_identify(ptp, time_secs, vb);
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
             return 0;
@@ -782,7 +782,7 @@ sntl_req_sense(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     if (vb > 3)
         pr2ws("%s: time_secs=%d\n", __func__, time_secs);
     if (NULL == ptp->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        res = sntl_cache_identify(ptp, time_secs, vb);
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
             return 0;
@@ -835,7 +835,7 @@ sntl_mode_ss(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     if (vb > 3)
         pr2ws("%s: mode se%s\n", __func__, (is_msense ? "nse" : "lect"));
     if (NULL == ptp->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        res = sntl_cache_identify(ptp, time_secs, vb);
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
             return 0;
@@ -1256,7 +1256,7 @@ sntl_rep_tmfs(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
  * is the "Logical Block Length In Bytes" field in the RCAP response. */
 static int
 sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
-              int time_secs, int vb)
+             int time_secs, int vb)
 {
     bool is_rcap10 = (SCSI_READ_CAPACITY10_OPC == cdbp[0]);
     int res, n, len, alloc_len, dps;
@@ -1283,7 +1283,7 @@ sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         res = sg_convert_errno(-res);
         goto fini;
     }
-    memset(resp, 0, sizeof(*resp));
+    memset(resp, 0, sizeof(resp));
     nsze = sg_get_unaligned_le64(up + 0);
     flbas = up[26];     /* NVME FLBAS field from Identify, want LBAF[flbas] */
     index = 128 + (4 * (flbas & 0xf));
@@ -1315,7 +1315,7 @@ sntl_readcap(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     }
     len = ptp->io_hdr.din_xfer_len;
     bp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.din_xferp;
-    n = 16;
+    n = 32;
     n = (n < alloc_len) ? n : alloc_len;
     n = (n < len) ? n : len;
     ptp->io_hdr.din_resid = len - n;
@@ -1614,7 +1614,7 @@ sntl_write_same(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         if (dp == NULL)
             return sg_convert_errno(ENOMEM);
         if (NULL == ptp->nvme_id_ctlp) {
-            res = sntl_cache_identity(ptp, time_secs, vb);
+            res = sntl_cache_identify(ptp, time_secs, vb);
             if (SG_LIB_NVME_STATUS == res) {
                 mk_sense_from_nvme_status(ptp, vb);
                 return 0;

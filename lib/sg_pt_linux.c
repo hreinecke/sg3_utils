@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2020 Douglas Gilbert.
+ * Copyright (c) 2005-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.50 20201123 */
+/* sg_pt_linux version 1.51 20210102 */
 
 
 #include <stdio.h>
@@ -794,7 +794,7 @@ get_scsi_pt_resid(const struct sg_pt_base * vp)
 {
     const struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if ((NULL == ptp) || (! ptp->nvme_our_sntl))
+    if ((NULL == ptp) || (ptp->is_nvme && ! ptp->nvme_our_sntl))
         return 0;
     else if ((ptp->io_hdr.din_xfer_len > 0) &&
              (ptp->io_hdr.dout_xfer_len > 0))
@@ -853,8 +853,8 @@ get_scsi_pt_status_response(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return (int)(ptp->nvme_our_sntl ? ptp->io_hdr.device_status :
-                                      ptp->nvme_status);
+    return (int)((ptp->is_nvme && ! ptp->nvme_our_sntl) ?
+                         ptp->nvme_status : ptp->io_hdr.device_status);
 }
 
 uint32_t
@@ -864,7 +864,8 @@ get_pt_result(const struct sg_pt_base * vp)
 
     if (NULL == ptp)
         return 0;
-    return ptp->nvme_our_sntl ? ptp->io_hdr.device_status : ptp->nvme_result;
+    return (ptp->is_nvme && ! ptp->nvme_our_sntl) ?
+                        ptp->nvme_result : ptp->io_hdr.device_status;
 }
 
 int
@@ -1152,6 +1153,9 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     }
     if (ptp->os_err)
         return -ptp->os_err;
+    if (verbose > 5)
+        pr2ws("%s:  is_nvme=%d, is_sg=%d, is_bsg=%d\n", __func__,
+              (int)ptp->is_nvme, (int)ptp->is_sg, (int)ptp->is_bsg);
     if (ptp->is_nvme)
         return sg_do_nvme_pt(vp, -1, time_secs, verbose);
     else if (ptp->is_sg) {

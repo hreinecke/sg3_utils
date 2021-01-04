@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2020 Douglas Gilbert.
+ * Copyright (c) 2006-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_win32 version 1.32 20201207 */
+/* sg_pt_win32 version 1.33 20210103 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2142,7 +2142,7 @@ do_nvme_admin_cmd(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
                   get_err_str(n, sizeof(b), b), n);
         }
     }
-    /* nvme_status is SCT|SC, therefor it excludes DNR+More */
+    /* nvme_status is SCT|SC, therefore it excludes DNR+More */
     psp->nvme_status = 0x3ff & (pthru->CplEntry[3] >> 17);
     if (psp->nvme_status && (vb > 1)) {
         uint16_t s = psp->nvme_status;

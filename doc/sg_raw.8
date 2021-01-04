@@ -1,13 +1,14 @@
-.TH SG_RAW "8" "August 2020" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_RAW "8" "January 2021" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_raw \- send arbitrary SCSI or NVMe command to a device
 .SH SYNOPSIS
 .B sg_raw
-[\fI\-\-binary\fR] [\fI\-\-cmdfile=CF\fR] [\fI\-\-enumerate\fR]
-[\fI\-\-help\fR] [\fI\-\-infile=IFILE\fR] [\fI\-\-nosense\fR]
-[\fI\-\-nvm\fR] [\fI\-\-outfile=OFILE\fR] [\fI\-\-readonly\fR]
-[\fI\-\-request=RLEN\fR] [\fI\-\-send=SLEN\fR] [\fI\-\-skip=KLEN\fR]
-[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-binary\fR] [\fI\-\-cmdfile=CF\fR] [\fI\-\-cmdset=CS\fR]
+[\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-infile=IFILE\fR]
+[\fI\-\-nosense\fR] [\fI\-\-nvm\fR] [\fI\-\-outfile=OFILE\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-request=RLEN\fR] [\fI\-\-scan=FO,LO\fR]
+[\fI\-\-send=SLEN\fR] [\fI\-\-skip=KLEN\fR] [\fI\-\-timeout=SECS\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR]
 \fIDEVICE\fR [CDB0 CDB1 ...]
 .SH DESCRIPTION
 This utility sends an arbitrary SCSI command (between 6 and 256 bytes) to
@@ -30,7 +31,9 @@ Experimental support has been added to send NVMe Admin and NVM commands to
 the \fIDEVICE\fR. Since all NVMe commands are 64 bytes long it is more
 convenient to use the \fI\-\-cmdfile=CF\fR option rather than type the 64
 bytes of the NVMe command on the command line. See the section on NVME
-below.
+below. A heuristic based on command length is used to decide if the given
+command is SCSI or NVMe, to override this heuristic use the
+\fI\-\-cmdset=CS\fR option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -43,6 +46,13 @@ Dump data in binary form, even when writing to stdout.
 \fICF\fR is the name of a file which contains the command to be executed.
 Without this option the command must be given on the command line, after
 the options and the \fIDEVICE\fR.
+.TP
+\fB\-C\fR, \fB\-\-cmdset\fR=\fICS\fR
+\fICS\fR is a number to indicate which command set (i.e. SCSI or NVMe)
+to use. 0, the default, causes a heuristic based on command length to be
+used. Use a \fICS\fR of 1 to override that heuristic and choose the SCSI
+command set. Use a \fICS\fR of 2 to override that heuristic and choose
+the NVMe command set.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Display usage information and exit.
@@ -65,6 +75,10 @@ written in binary. By default, data is dumped in hex format to stdout.
 If \fIOFILE\fR is '\-' then data is dumped in binary to stdout.
 This option is ignored if \fI\-\-request\fR is not specified.
 .TP
+\fB\-w\fR, \fB\-\-raw\fR
+interpret \fICF\fR (i.e. the command file) as containing binary. The default
+is to assume that it contains ASCII hexadecimal.
+.TP
 \fB\-R\fR, \fB\-\-readonly\fR
 Open \fIDEVICE\fR read\-only. The default (without this option) is to open
 it read\-write.
@@ -84,6 +98,20 @@ bytes) a length that the \fIDEVICE\fR would "like" to send back if
 the "allocation length" field in the cdb is large enough. In practice, the
 \fIDEVICE\fR will return no more bytes than indicated in the "allocation
 length" field of the cdb.
+.TP
+\fB\-Q\fR, \fB\-\-scan\fR=\fIFO\fR,\fILO\fR
+Scan a range of opcodes (i.e. first byte of each command). The first opcode
+in the scan is \fIFO\fR (which is decimal unless it has a '0x' prefix or 'h'
+suffix). The last opcode in the scan is \fILO\fR. The maximum value of
+\fILO\fR is 255. The remaining bytes of the SCSI/NVMe command are as
+supplied at invocation.
+.br
+Warning: this option can be
+.B dangerous.
+Sending somewhat arbitrary commands to a device can have unexpected results.
+It is recommended that this option is used with the \fI\-\-cmdset=CS\fR
+option where \fICS\fR is 1 or 2 in order to stop the command set possibly
+changing during the scan.
 .TP
 \fB\-s\fR, \fB\-\-send\fR=\fISLEN\fR
 Read \fISLEN\fR bytes of data, either from stdin or from a file, and send
@@ -130,6 +158,11 @@ The CDB command name defined by T10 for the given CDB is shown if
 the '\-vv' option is given. The command line syntax still needs to be
 correct, so /dev/null may be used for the \fIDEVICE\fR since the CDB
 command name decoding is done before the \fIDEVICE\fR is checked.
+.PP
+The intention of the \fI\-\-scan=FO,LO\fR option is to slightly simplify
+the process of finding hidden or undocumented commands. It should be used
+with care; for example checking for vendor specific SCSI
+commands: 'sg_raw \-\-cmdset=1 \-\-scan=0xc0,0xff /dev/sg1 0 0 0 0 0 0'.
 .SH NVME SUPPORT
 Support for NVMe (a.k.a. NVM Express) is currently experimental. NVMe concepts
 map reasonably well to the SCSI architecture. A SCSI logical unit (LU) is
@@ -224,7 +257,7 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de> or to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2020 Ingo van Lil
+Copyright \(co 2001\-2021 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

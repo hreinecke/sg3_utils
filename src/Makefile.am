@@ -59,6 +59,7 @@ AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
 # AM_CFLAGS = -Wall -W -pedantic -std=c++14
 # AM_CFLAGS = -Wall -W -pedantic -std=c++1z
+# AM_CFLAGS = -Wall -W -pedantic -std=c++20
 
 sg_bg_ctl_LDADD = ../lib/libsgutils2.la
 

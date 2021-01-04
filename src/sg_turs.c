@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000-2020 D. Gilbert
+ * Copyright (C) 2000-2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.47 20200722";
+static const char * version_str = "3.48 20210102";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -264,7 +264,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->version_given = true;
                     break;
                 case '?':
-                    usage_old();
+                    ++op->do_help;
                     return 0;
                 default:
                     jmp_out = true;

@@ -3,7 +3,7 @@
 # fc_wwpn_id
 #
 # Generates device node names links based on FC WWPN
-# Copyright (c) 2016 Hannes Reinecke, SUSE Linux GmbH
+# Copyright (c) 2016-2021 Hannes Reinecke, SUSE Linux GmbH
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -38,7 +38,9 @@ while [ -n "$d" ] ; do
     esac
 done
 
-echo "FC_TARGET_LUN=$target_lun"
+if [ -n "$rport_wwpn" ] || [ -n "$host_wwpn" ] ; then
+    echo "FC_TARGET_LUN=$target_lun"
+fi
 
 if [ -n "$rport_wwpn" ] ; then
     echo "FC_TARGET_WWPN=$rport_wwpn"

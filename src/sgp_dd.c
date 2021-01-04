@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2020 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2021 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -84,7 +84,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.76 20200510";
+static const char * version_str = "5.77 20210103";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -229,14 +229,17 @@ static atomic_uint ascending_val;
 static pthread_mutex_t av_mut = PTHREAD_MUTEX_INITIALIZER;
 static int ascending_val = 1;
 
-#define GET_NEXT_PACK_ID(_v)                            \
-    ( { int _r;                                         \
-    do {                                                \
-        pthread_mutex_lock(&av_mut);                    \
-        _r = ascending_val;                             \
-        ascending_val += _v;                            \
-        pthread_mutex_lock(&av_mut);                    \
-    } while (0) ; _r; } )
+static unsigned int
+GET_NEXT_PACK_ID(unsigned int val)
+{
+    int res;
+
+    pthread_mutex_lock(&av_mut);
+    res = ascending_val;
+    ascending_val += val;
+    pthread_mutex_unlock(&av_mut);
+    return res;
+}
 
 #endif
 

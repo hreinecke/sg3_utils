@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2020 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2021 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.33 (2020-08-02)"
+#define SG_RAW_VERSION "0.4.34 (2021-01-03)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -54,6 +54,7 @@
 static struct option long_options[] = {
     { "binary",  no_argument,       NULL, 'b' },
     { "cmdfile", required_argument, NULL, 'c' },
+    { "cmdset",  required_argument, NULL, 'C' },
     { "enumerate", no_argument,     NULL, 'e' },
     { "help",    no_argument,       NULL, 'h' },
     { "infile",  required_argument, NULL, 'i' },
@@ -64,6 +65,7 @@ static struct option long_options[] = {
     { "raw",     no_argument,       NULL, 'w' },
     { "request", required_argument, NULL, 'r' },
     { "readonly", no_argument,      NULL, 'R' },
+    { "scan",    required_argument, NULL, 'Q' },
     { "send",    required_argument, NULL, 's' },
     { "timeout", required_argument, NULL, 't' },
     { "verbose", no_argument,       NULL, 'v' },
@@ -83,11 +85,14 @@ struct opts_t {
     bool verbose_given;
     bool version_given;
     int cdb_length;
+    int cmdset;
     int datain_len;
     int dataout_len;
     int timeout;
     int raw;
     int readonly;
+    int scan_first;
+    int scan_last;
     int verbose;
     off_t dataout_offset;
     uint8_t cdb[MAX_SCSI_CDBSZ];        /* might be NVMe command (64 byte) */
@@ -102,7 +107,7 @@ static void
 pr_version()
 {
     pr2serr("sg_raw " SG_RAW_VERSION "\n"
-            "Copyright (C) 2007-2020 Ingo van Lil <inguin@gmx.de>\n"
+            "Copyright (C) 2007-2021 Ingo van Lil <inguin@gmx.de>\n"
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
@@ -121,6 +126,9 @@ usage()
             "                         stdout\n"
             "  --cmdfile=CF|-c CF     CF is file containing command in hex "
             "bytes\n"
+            "  --cmdset=CS|-C CS      CS is 0 (def) heuristic chooses "
+            "command set;\n"
+            "                         1: force SCSI; 2: force NVMe\n"
             "  --enumerate|-e         Decodes cdb name then exits; requires "
             "DEVICE but\n"
             "                         ignores it\n"
@@ -129,9 +137,10 @@ usage()
             "(default:\n"
             "                             stdin)\n"
             "  --nosense|-n           Don't display sense information\n"
-            "  --nvm|-N               command is for NVM command set (def: "
-            "if NVMe fd:\n"
-            "                         Admin command set)\n"
+            "  --nvm|-N               command is for NVM command set (e.g. "
+            "Read);\n"
+            "                         default, if NVMe fd, Admin command "
+            "set\n"
             "  --outfile=OFILE|-o OFILE    Write binary data to OFILE (def: "
             "hexdump\n"
             "                              to stdout)\n"
@@ -142,6 +151,11 @@ usage()
             "read-write)\n"
             "  --request=RLEN|-r RLEN    Request up to RLEN bytes of data "
             "(data-in)\n"
+            "  --scan=FO,LO|-Q FO,LO    scan command set from FO (first "
+            "opcode)\n"
+            "                           to LO (last opcode) inclusive. Uses "
+            "given\n"
+            "                           command bytes, varying the opcode\n"
             "  --send=SLEN|-s SLEN    Send SLEN bytes of data (data-out)\n"
             "  --skip=KLEN|-k KLEN    Skip the first KLEN bytes when "
             "reading\n"
@@ -162,9 +176,10 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
 {
     while (1) {
         int c, n;
+        const char * cp;
 
-        c = getopt_long(argc, argv, "bc:ehi:k:nNo:r:Rs:t:vVw", long_options,
-                        NULL);
+        c = getopt_long(argc, argv, "bc:C:ehi:k:nNo:Q:r:Rs:t:vVw",
+                        long_options, NULL);
         if (c == -1)
             break;
 
@@ -175,6 +190,14 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         case 'c':
             op->cmd_file = optarg;
             op->cmdfile_given = true;
+            break;
+        case 'C':
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 2)) {
+                pr2serr("Invalid argument to --cmdset= expect 0, 1 or 2\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->cmdset = n;
             break;
         case 'e':
             op->do_enumerate = true;
@@ -210,6 +233,27 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
                 return SG_LIB_CONTRADICT;
             }
             op->datain_file = optarg;
+            break;
+        case 'Q':       /* --scan=FO,LO */
+            cp = strchr(optarg, ',');
+            if (NULL == cp) {
+                pr2serr("--scan= expects two numbers, comma separated\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            n = sg_get_num(optarg);
+            if ((n < 0) || (n > 255)) {
+                pr2serr("Invalid first number to --scan= expect 0 to 255\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->scan_first = n;
+            n = sg_get_num(cp + 1);
+            if ((n < 0) || (n > 255)) {
+                pr2serr("Invalid second number to --scan= expect 0 to 255\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->scan_last = n;
+            if (op->scan_first >= n)
+                pr2serr("Warning: scan range degenerate, ignore\n");
             break;
         case 'r':
             op->do_datain = true;
@@ -262,6 +306,13 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
     op->device_name = argv[optind];
     ++optind;
 
+    if (op->version_given
+#ifdef DEBUG
+        && ! op->verbose_given
+#endif
+       )
+        return 0;
+
     while (optind < argc) {
         char *opt = argv[optind++];
         char *endptr;
@@ -305,6 +356,16 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         int sa;
         char b[80];
 
+        if ((1 == op->cmdset) && !is_scsi_cdb) {
+            is_scsi_cdb = true;
+            if (op->verbose > 3)
+                printf(">>> overriding cmdset guess to SCSI\n");
+        }
+        if ((2 == op->cmdset) && is_scsi_cdb) {
+            is_scsi_cdb = false;
+            if (op->verbose > 3)
+                printf(">>> overriding cmdset guess to NVMe\n");
+        }
         if (is_scsi_cdb) {
             if (op->cdb_length > 16) {
                 sa = sg_get_unaligned_be16(op->cdb + 8);
@@ -472,6 +533,7 @@ int
 main(int argc, char *argv[])
 {
     bool is_scsi_cdb = true;
+    bool do_scan = false;
     int ret = 0;
     int err = 0;
     int res_cat, status, s_len, k, ret2;
@@ -538,7 +600,24 @@ main(int argc, char *argv[])
         goto done;
     }
 
+    if (op->scan_first < op->scan_last)
+        do_scan = true;
+
+and_again:
+    if (do_scan) {
+        op->cdb[0] = op->scan_first;
+        printf("Command bytes in hex:");
+        for (k = 0; k < op->cdb_length; ++k)
+            printf(" %02x", op->cdb[k]);
+        printf("\n");
+    }
+
     is_scsi_cdb = sg_is_scsi_cdb(op->cdb, op->cdb_length);
+    if ((1 == op->cmdset) && !is_scsi_cdb)
+        is_scsi_cdb = true;
+    else if ((2 == op->cmdset) && is_scsi_cdb)
+        is_scsi_cdb = false;
+
     if (op->do_dataout) {
         uint32_t dout_len;
 
@@ -743,6 +822,14 @@ main(int argc, char *argv[])
     }
 
 done:
+    if (do_scan) {
+        ++op->scan_first;
+        if (op->scan_first <= op->scan_last) {
+            clear_scsi_pt_obj(ptvp);
+            goto and_again;
+        }
+    }
+
     if (op->verbose && is_scsi_cdb) {
         sg_get_category_sense_str(ret, b_len, b, op->verbose - 1);
         pr2serr("%s\n", b);

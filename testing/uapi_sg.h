@@ -12,9 +12,9 @@
  *   Copyright (C) 1992 Lawrence Foard
  *
  * Later extensions (versions 2, 3 and 4) to driver:
- *   Copyright (C) 1998 - 2020 Douglas Gilbert
+ *   Copyright (C) 1998 - 2021 Douglas Gilbert
  *
- * Version 4.0.45 (20200913)
+ * Version 4.0.46 (20210101)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -129,6 +129,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_EVENTFD 0x40000	/* signal completion on ... */
 #define SGV4_FLAG_ORDERED_WR 0x80000	/* svb: issue in-order writes */
 #define SGV4_FLAG_REC_ORDER 0x100000 /* receive order in v4:request_priority */
+#define SGV4_FLAG_HIPRI 0x200000	/* completion via SG_SEIM_BLK_POLL */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1
@@ -199,7 +200,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIM_CHG_SHARE_FD	0x40	/* read-side given new write-side fd */
 #define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
 #define SG_SEIM_EVENTFD		0x100	/* pass eventfd to driver */
-#define SG_SEIM_ALL_BITS	0x1ff	/* should be OR of previous items */
+#define SG_SEIM_BLK_POLL	0x200	/* call blk_poll, uses general field */
+#define SG_SEIM_ALL_BITS	0x3ff	/* should be OR of previous items */
 
 /* flag and mask values for boolean fields follow */
 #define SG_CTL_FLAGM_TIME_IN_NS	0x1	/* time: nanosecs (def: millisecs) */
@@ -260,7 +262,9 @@ struct sg_extended_info {
 	__u32	minor_index;	/* rd: kernel's sg device minor number */
 	__u32	share_fd;	/* for SHARE_FD, CHG_SHARE_FD or EVENTFD */
 	__u32	sgat_elem_sz;	/* sgat element size (must be power of 2) */
-	__u8	pad_to_96[52];	/* pad so struct is 96 bytes long */
+	__s32	num;		/* blk_poll: spin for num (0: no spin); raw */
+				/* read number completed */
+	__u8	pad_to_96[48];	/* pad so struct is 96 bytes long */
 };
 
 /*
