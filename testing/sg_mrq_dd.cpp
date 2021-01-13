@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2020 D. Gilbert
+ * Copyright (C) 2018-2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.16 20201105";
+static const char * version_str = "1.17 20210106";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -178,6 +178,7 @@ struct flags_t {
     bool excl;
     bool ff;
     bool fua;
+    bool hipri;
     bool masync;        /* more async sg v4 driver fd flag */
     bool no_dur;
     bool nocreat;
@@ -537,13 +538,23 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_EVENTFD & flags) {          /* 0x40000 */
+    if (SGV4_FLAG_EVENTFD & flags) {           /* 0x40000 */
         n += sg_scnpr(b + n, b_len - n, "EVFD|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_ORDERED_WR & flags) {      /* 0x80000 */
+    if (SGV4_FLAG_ORDERED_WR & flags) {        /* 0x80000 */
         n += sg_scnpr(b + n, b_len - n, "OWR|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_REC_ORDER & flags) {         /* 0x100000 */
+        n += sg_scnpr(b + n, b_len - n, "RECO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_HIPRI & flags) {             /* 0x200000 */
+        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
         if (n >= b_len)
             goto fini;
     }
@@ -929,6 +940,8 @@ page3:
             "iflags)\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
+            "    hipri       set HIPRI flag and use blk_poll() for "
+            "completions\n"
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE\n"
             "    mmap,mmap    when used twice, doesn't call munmap()\n"
@@ -1814,6 +1827,8 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_TAIL;
     if (clp->no_waitq)
         rflags |= SGV4_FLAG_NO_WAITQ;
+    if (flagsp->hipri)
+        rflags |= SGV4_FLAG_HIPRI;
 
     for (k = 0, num = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
@@ -1930,6 +1945,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_TAIL;
     if (clp->no_waitq)
         rflags |= SGV4_FLAG_NO_WAITQ;
+    if (flagsp->hipri)
+        rflags |= SGV4_FLAG_HIPRI;
 
     for (k = 0, num = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
@@ -1992,6 +2009,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
     if (! flagsp->coe)
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
+    if (flagsp->hipri)
+        rflags |= SGV4_FLAG_HIPRI;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
@@ -2324,6 +2343,8 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_TAIL;
     if (clp->no_waitq)
         iflags |= SGV4_FLAG_NO_WAITQ;
+    if (iflagsp->hipri)
+        iflags |= SGV4_FLAG_HIPRI;
 
     oflags = SGV4_FLAG_SHARE | SGV4_FLAG_NO_DXFER;
     if (oflagsp->dio)
@@ -2334,6 +2355,8 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_TAIL;
     if (clp->no_waitq)
         oflags |= SGV4_FLAG_NO_WAITQ;
+    if (oflagsp->hipri)
+        oflags |= SGV4_FLAG_HIPRI;
 
     for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
@@ -2501,6 +2524,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_TAIL;
     if (clp->no_waitq)
         iflags |= SGV4_FLAG_NO_WAITQ;
+    if (iflagsp->hipri)
+        iflags |= SGV4_FLAG_HIPRI;
 
     oflags = SGV4_FLAG_SHARE | SGV4_FLAG_NO_DXFER;
     if (oflagsp->dio)
@@ -2511,6 +2536,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_TAIL;
     if (clp->no_waitq)
         oflags |= SGV4_FLAG_NO_WAITQ;
+    if (oflagsp->hipri)
+        oflags |= SGV4_FLAG_HIPRI;
     oflags |= SGV4_FLAG_DO_ON_OTHER;
 
     for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
@@ -2603,6 +2630,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     if ((! clp->verify) && clp->out_flags.order)
         ctl_v4.flags |= SGV4_FLAG_ORDERED_WR;
+    if (! (iflagsp->hipri || oflagsp->hipri))
+        ctl_v4.flags |= SGV4_FLAG_HIPRI;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
@@ -2692,6 +2721,31 @@ fini:
     return res < 0 ? res : (min<int>(in_fin_blks, out_fin_blks));
 }
 
+/* Returns number found and (partially) processed. 'num' is the number of
+ * completions to wait for when > 0. When 'num' is zero check all inflight
+ * request on 'fd' and return quickly if none completed (i.e. don't wait)
+ * If error return negative errno and if no request inflight or waiting
+ * then return -9999 . */
+static int
+sg_blk_poll(int fd, int num)
+{
+    int res;
+    struct sg_extended_info sei;
+    struct sg_extended_info * seip = &sei;
+
+    memset(seip, 0, sizeof(*seip));
+    seip->sei_rd_mask |= SG_SEIM_BLK_POLL;
+    seip->sei_wr_mask |= SG_SEIM_BLK_POLL;
+    seip->num = (num < 0) ? 0 : num;
+    res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
+    if (res < 0) {
+        pr2serr_lk("%s: SG_SET_GET_EXTENDED(BLK_POLL) error: %s\n",
+                   __func__, strerror(errno));
+        return res;
+    }
+    return (seip->num == -1) ? -9999 : seip->num;
+}
+
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
 sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
@@ -2705,9 +2759,8 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
     int res, t, num, err;
     uint8_t *mmp;
     struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 40000)) {
         if (ioctl(fd, SG_GET_RESERVED_SIZE, &num) < 0) {
@@ -2944,6 +2997,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->ff = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
+        else if (0 == strcmp(cp, "hipri"))
+            fp->hipri = true;
         else if (0 == strcmp(cp, "masync"))
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))

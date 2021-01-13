@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2020 D. Gilbert
+ * Copyright (C) 2018-2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.97 20201124";
+static const char * version_str = "1.98 20210106";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -173,6 +173,7 @@ struct flags_t {
     bool excl;
     bool ff;
     bool fua;
+    bool hipri;
     bool masync;        /* more async sg v4 driver flag */
     bool mrq_immed;     /* mrq submit non-blocking */
     bool mrq_svb;       /* mrq shared_variable_block, for sg->sg copy */
@@ -589,13 +590,23 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_EVENTFD & flags) {          /* 0x40000 */
+    if (SGV4_FLAG_EVENTFD & flags) {           /* 0x40000 */
         n += sg_scnpr(b + n, b_len - n, "EVFD|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_ORDERED_WR & flags) {      /* 0x80000 */
+    if (SGV4_FLAG_ORDERED_WR & flags) {        /* 0x80000 */
         n += sg_scnpr(b + n, b_len - n, "OWR|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_REC_ORDER & flags) {         /* 0x100000 */
+        n += sg_scnpr(b + n, b_len - n, "RECO|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_HIPRI & flags) {             /* 0x200000 */
+        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
         if (n >= b_len)
             goto fini;
     }
@@ -891,10 +902,10 @@ usage(int pg_num)
         goto page2;
 
     pr2serr("Usage: sgh_dd  [bs=BS] [conv=CONVS] [count=COUNT] [ibs=BS] "
-	    "[if=IFILE]\n"
+            "[if=IFILE]\n"
             "               [iflag=FLAGS] [obs=BS] [of=OFILE] [oflag=FLAGS] "
             "[seek=SEEK]\n"
-	    "               [skip=SKIP] [--help] [--version]\n\n");
+            "               [skip=SKIP] [--help] [--version]\n\n");
     pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
             "[coe=0|1]\n"
             "               [dio=0|1] [elemsz_kb=EKB] [fail_mask=FM] "
@@ -1016,6 +1027,8 @@ page3:
             "iflags)\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
+            "    hipri       set HIPRI flag on command, uses blk_poll() to "
+            "complete\n"
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
@@ -3001,6 +3014,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
     bool qhead = wr ? clp->out_flags.qhead : clp->in_flags.qhead;
     bool qtail = wr ? clp->out_flags.qtail : clp->in_flags.qtail;
+    bool hipri = wr ? clp->out_flags.hipri : clp->in_flags.hipri;
     bool prefetch = xtrp ? xtrp->prefetch : false;
     bool is_wr2 = xtrp ? xtrp->is_wr2 : false;
     int cdbsz = wr ? clp->cdbsz_out : clp->cdbsz_in;
@@ -3059,6 +3073,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         flags |= SG_FLAG_NO_DXFER;
     if (dio)
         flags |= SG_FLAG_DIRECT_IO;
+    if (hipri)
+        flags |= SGV4_FLAG_HIPRI;
     if (qhead)
         flags |= SG_FLAG_Q_AT_HEAD;
     if (qtail)
@@ -3651,6 +3667,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->ff = true;
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
+        else if (0 == strcmp(cp, "hipri"))
+            fp->hipri = true;
         else if (0 == strcmp(cp, "masync"))
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))

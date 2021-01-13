@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2021 Douglas Gilbert
  *
- * Version 4.0.46 (20210101)
+ * Version 4.0.46 (20210111)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -119,17 +119,17 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_COMPLETE_B4  0x100	/* mrq: complete this rq before next */
 #define SGV4_FLAG_SIGNAL 0x200	/* v3: ignored; v4 signal on completion */
 #define SGV4_FLAG_IMMED 0x400   /* issue request and return immediately ... */
-#define SGV4_FLAG_STOP_IF 0x800	/* Stops sync mrq if error or warning */
-#define SGV4_FLAG_DEV_SCOPE 0x1000 /* permit SG_IOABORT to have wider scope */
-#define SGV4_FLAG_SHARE 0x2000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
-#define SGV4_FLAG_DO_ON_OTHER 0x4000 /* available on either of shared pair */
-#define SGV4_FLAG_KEEP_SHARE 0x8000  /* ... buffer for another dout command */
+#define SGV4_FLAG_HIPRI 0x800 /* request will use blk_poll to complete */
+#define SGV4_FLAG_STOP_IF 0x1000	/* Stops sync mrq if error or warning */
+#define SGV4_FLAG_DEV_SCOPE 0x2000 /* permit SG_IOABORT to have wider scope */
+#define SGV4_FLAG_SHARE 0x4000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
+#define SGV4_FLAG_DO_ON_OTHER 0x8000 /* available on either of shared pair */
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
-#define SGV4_FLAG_MULTIPLE_REQS 0x20000	/* 1 or more sg_io_v4-s in data-in */
-#define SGV4_FLAG_EVENTFD 0x40000	/* signal completion on ... */
-#define SGV4_FLAG_ORDERED_WR 0x80000	/* svb: issue in-order writes */
-#define SGV4_FLAG_REC_ORDER 0x100000 /* receive order in v4:request_priority */
-#define SGV4_FLAG_HIPRI 0x200000	/* completion via SG_SEIM_BLK_POLL */
+#define SGV4_FLAG_KEEP_SHARE 0x20000  /* ... buffer for another dout command */
+#define SGV4_FLAG_MULTIPLE_REQS 0x40000	/* 1 or more sg_io_v4-s in data-in */
+#define SGV4_FLAG_EVENTFD 0x80000	/* signal completion on ... */
+#define SGV4_FLAG_ORDERED_WR 0x100000	/* svb: issue in-order writes */
+#define SGV4_FLAG_REC_ORDER 0x200000 /* receive order in v4:request_priority */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1
@@ -199,8 +199,8 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_SEIM_SHARE_FD	0x20	/* write-side gives fd of read-side */
 #define SG_SEIM_CHG_SHARE_FD	0x40	/* read-side given new write-side fd */
 #define SG_SEIM_SGAT_ELEM_SZ	0x80	/* sgat element size (>= PAGE_SIZE) */
-#define SG_SEIM_EVENTFD		0x100	/* pass eventfd to driver */
-#define SG_SEIM_BLK_POLL	0x200	/* call blk_poll, uses general field */
+#define SG_SEIM_BLK_POLL	0x100	/* call blk_poll, uses 'num' field */
+#define SG_SEIM_EVENTFD		0x200	/* pass eventfd to driver */
 #define SG_SEIM_ALL_BITS	0x3ff	/* should be OR of previous items */
 
 /* flag and mask values for boolean fields follow */
@@ -262,8 +262,7 @@ struct sg_extended_info {
 	__u32	minor_index;	/* rd: kernel's sg device minor number */
 	__u32	share_fd;	/* for SHARE_FD, CHG_SHARE_FD or EVENTFD */
 	__u32	sgat_elem_sz;	/* sgat element size (must be power of 2) */
-	__s32	num;		/* blk_poll: spin for num (0: no spin); raw */
-				/* read number completed */
+	__s32	num;		/* blk_poll: loop_count (-1 -> spin)) */
 	__u8	pad_to_96[48];	/* pad so struct is 96 bytes long */
 };
 
