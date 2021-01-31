@@ -71,6 +71,7 @@ RECEIVE COPY OPERATING PARAMETERS    ddpt, sg_copy_results, sg_xcopy, ++
 RECEIVE COPY STATUS(LID1)    sg_copy_results, ++
 RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses, sg_ses_microcode ++
 RECEIVE ROD TOKEN INFORMATION    ddpt, ddptctl ++
+REMOVE ELEMENT AND MODIFY ZONES   sg_zone
 REPORT ALL ROD TOKENS    ddptctl ++
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
@@ -177,4 +178,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-23rd April 2020
+23rd January 2021

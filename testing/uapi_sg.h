@@ -97,8 +97,8 @@ typedef struct sg_io_hdr {
 /* SG_FLAG_UNUSED_LUN_INHIBIT is ignored in sg v4 driver */
 #define SG_FLAG_UNUSED_LUN_INHIBIT 2  /* ignored, was LUN overwrite in cdb */
 #define SG_FLAG_MMAP_IO 4	/* request memory mapped IO */
-/* no transfer of kernel buffers to/from user space; used for sharing */
-#define SG_FLAG_NO_DXFER 0x10000
+/* no transfers between kernel<-->user space; keep device<-->kernel xfers */
+#define SG_FLAG_NO_DXFER 0x10000 /* See comment on previous line! */
 /* defaults: for sg driver (v3_v4): Q_AT_HEAD; for block layer: Q_AT_TAIL */
 #define SG_FLAG_Q_AT_TAIL 0x10
 #define SG_FLAG_Q_AT_HEAD 0x20
@@ -124,7 +124,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_DEV_SCOPE 0x2000 /* permit SG_IOABORT to have wider scope */
 #define SGV4_FLAG_SHARE 0x4000	/* share IO buffer; needs SG_SEIM_SHARE_FD */
 #define SGV4_FLAG_DO_ON_OTHER 0x8000 /* available on either of shared pair */
-#define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER	/* needed for sharing */
+#define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER /* but keep dev<-->kernel xfr */
 #define SGV4_FLAG_KEEP_SHARE 0x20000  /* ... buffer for another dout command */
 #define SGV4_FLAG_MULTIPLE_REQS 0x40000	/* 1 or more sg_io_v4-s in data-in */
 #define SGV4_FLAG_EVENTFD 0x80000	/* signal completion on ... */

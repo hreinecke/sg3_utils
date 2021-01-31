@@ -1,21 +1,23 @@
-.TH SG_ZONE "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_ZONE "8" "January 2021" "sg3_utils\-1.43" SG3_UTILS
 .SH NAME
-sg_zone \- send SCSI OPEN, CLOSE, FINISH or SEQUENTIALIZE ZONE command
+sg_zone \- send a SCSI ZONE modifying command
 .SH SYNOPSIS
 .B sg_zone
-[\fI\-\-all\fR] [\fI\-\-close\fR] [\fI\-\-count=ZC\fR] [\fI\-\-finish\fR]
-[\fI\-\-help\fR] [\fI\-\-open\fR] [\fI\-\-sequentialize\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-zone=ID\fR] \fIDEVICE\fR
+[\fI\-\-all\fR] [\fI\-\-close\fR] [\fI\-\-count=ZC\fR] [\fI\-\-element=EID\fR]
+[\fI\-\-finish\fR] [\fI\-\-help\fR] [\fI\-\-open\fR] [\fI\-\-remove\fR]
+[\fI\-\-sequentialize\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-zone=ID\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends a SCSI OPEN ZONE, CLOSE ZONE, FINISH ZONE or SEQUENTIALIZE ZONE
-command to the \fIDEVICE\fR. All but the last are found in the soon to
-be released ZBC standard (close to draft ZBC BSR INCITS 536 revision 05).
-The SEQUENTIALIZE ZONE command was added in zbc2r01b.
+Sends a SCSI OPEN ZONE, CLOSE ZONE, FINISH ZONE, REMOVE ELEMENT AND MODIFY
+ZONES or SEQUENTIALIZE ZONE command to the \fIDEVICE\fR. All but the last
+two are found in the ZBC standard (INCITS 536-2016). The REMOVE ELEMENT AND
+MODIFY ZONES command was added in zbc2r07 while the SEQUENTIALIZE ZONE command
+was added in zbc2r01b.
 .PP
-One and only one of the \fI\-\-open\fR, \fI\-\-close\fR, \fI\-\-finish\fR
-and \fI\-\-sequentialize\fR options can be chosen.
+One and only one of the \fI\-\-open\fR, \fI\-\-close\fR, \fI\-\-finish\fR,
+\fI\-\-remove\fR and \fI\-\-sequentialize\fR options can be chosen.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -30,6 +32,12 @@ ZC is placed in the Zone Count field in the cdb of all four commands
 supported by this utility. ZC should be a value from 0 to 65535 (0xffff)
 inclusive.
 .TP
+\fB\-e\fR, \fB\-\-element\fR=\fIEID\fR
+where \fIEID\fR is an element identifier which is a 32 bit unsigned integer
+starting at one. This field is used by the REMOVE ELEMENT AND MODIFY ZONES
+command and its default value is zero (which is invalid). So the user needs
+to supply a valid element identifier when \fI\-\-remove\fR is used.
+.TP
 \fB\-f\fR, \fB\-\-finish\fR
 causes the FINISH ZONE command to be sent to the \fIDEVICE\fR.
 .TP
@@ -38,6 +46,10 @@ output the usage message then exit.
 .TP
 \fB\-o\fR, \fB\-\-open\fR
 causes the OPEN ZONE command to be sent to the \fIDEVICE\fR.
+.TP
+\fB\-r\fR, \fB\-\-remove\fR
+causes the REMOVE ELEMENT AND MODIFY ZONES command to be sent to the
+\fIDEVICE\fR. In practice, \fI\-\-element=EID\fR needs to be also given.
 .TP
 \fB\-S\fR, \fB\-\-sequentialize\fR
 causes the SEQUENTIALIZE ZONE command to be sent to the \fIDEVICE\fR.
@@ -61,7 +73,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2018 Douglas Gilbert
+Copyright \(co 2014\-2021 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

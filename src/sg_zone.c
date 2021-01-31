@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 Douglas Gilbert.
+ * Copyright (c) 2014-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,13 +37,14 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.14 20191220";
+static const char * version_str = "1.15 20210122";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
 #define FINISH_ZONE_SA 0x2
 #define OPEN_ZONE_SA 0x3
 #define SEQUENTIALIZE_ZONE_SA 0x10
+#define REM_ELEM_MOD_ZONES_SA 0x1a      /* uses SERVICE ACTION IN(16) */
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
@@ -53,10 +54,12 @@ static struct option long_options[] = {
         {"all", no_argument, 0, 'a'},
         {"close", no_argument, 0, 'c'},
         {"count", required_argument, 0, 'C'},
+        {"element", required_argument, 0, 'e'},
         {"finish", no_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"open", no_argument, 0, 'o'},
-        {"reset-all", no_argument, 0, 'R'},
+        {"remove", no_argument, 0, 'r'},
+        {"reset-all", no_argument, 0, 'R'},     /* same as --all */
         {"reset_all", no_argument, 0, 'R'},
         {"sequentialize", no_argument, 0, 'S'},
         {"verbose", no_argument, 0, 'v'},
@@ -67,17 +70,21 @@ static struct option long_options[] = {
 
 /* Indexed by service action */
 static const char * sa_name_arr[] = {
-    "no SA=0",
+    "no SA=0",			/* 0x0 */
     "Close zone",
     "Finish zone",
     "Open zone",
     "-", "-", "-", "-",
-    "-",                /* 0x8 */
+    "Zone activate",            /* 0x8 */
     "-", "-", "-", "-",
     "-",
     "-",
     "-",
     "Sequentialize zone",       /* 0x10 */
+    "-", "-", "-", "-",
+    "-", "-", "-", "-",
+    "-",
+    "Remove element and modify zones", /* 0x1a */
 };
 
 
@@ -85,17 +92,25 @@ static void
 usage()
 {
     pr2serr("Usage: "
-            "sg_zone  [--all] [--close] [--count=ZC] [--finish] [--help]\n"
-            "                [--open] [--sequentialize] [--verbose] "
-            "[--version]\n"
-            "                [--zone=ID] DEVICE\n");
+            "sg_zone  [--all] [--close] [--count=ZC] [--element=EID] "
+            "[--finish]\n"
+            "                [--help] [--open] [--remove] "
+            "[--sequentialize] "
+            "[--verbose]\n"
+            "                [--version] [--zone=ID] DEVICE\n");
     pr2serr("  where:\n"
             "    --all|-a           sets the ALL flag in the cdb\n"
             "    --close|-c         issue CLOSE ZONE command\n"
             "    --count=ZC|-C ZC    set zone count field (def: 0)\n"
+            "    --element=EID|-e EID    EID is the element identifier to "
+            "remove;\n"
+            "                            default is 0 which is an invalid "
+            "EID\n"
             "    --finish|-f        issue FINISH ZONE command\n"
             "    --help|-h          print out usage message\n"
             "    --open|-o          issue OPEN ZONE command\n"
+            "    --remove|-r        issue REMOVE ELEMENT AND MODIFY ZONES "
+            "command\n"
             "    --sequentialize|-S    issue SEQUENTIALIZE ZONE command\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
@@ -104,8 +119,8 @@ usage()
             "Performs a SCSI OPEN ZONE, CLOSE ZONE, FINISH ZONE or "
             "SEQUENTIALIZE\nZONE command. ID is decimal by default, for hex "
             "use a leading '0x'\nor a trailing 'h'. Either --close, "
-            "--finish, --open or\n--sequentialize option needs to be "
-            "given.\n");
+            "--finish, --open, --remove or\n--sequentialize option needs to "
+            "be given.\n");
 }
 
 /* Invokes the zone out command indicated by 'sa' (ZBC).  Return of 0
@@ -122,10 +137,15 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
     char b[64];
 
     zo_cdb[1] = 0x1f & sa;
-    sg_put_unaligned_be64(zid, zo_cdb + 2);
-    sg_put_unaligned_be16(zc, zo_cdb + 12);
-    if (all)
-        zo_cdb[14] = 0x1;
+    if (REM_ELEM_MOD_ZONES_SA == sa) {  /* zid carries element identifier */
+        zo_cdb[0] = SG_SERVICE_ACTION_IN_16;    /* N.B. changing opcode */
+        sg_put_unaligned_be32((uint32_t)zid, zo_cdb + 10);
+    } else {
+        sg_put_unaligned_be64(zid, zo_cdb + 2);
+        sg_put_unaligned_be16(zc, zo_cdb + 12);
+        if (all)
+            zo_cdb[14] = 0x1;
+    }
     sg_get_opcode_sa_name(zo_cdb[0], sa, -1, sizeof(b), b);
     if (verbose) {
         char d[128];
@@ -143,7 +163,7 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
     set_scsi_pt_cdb(ptvp, zo_cdb, sizeof(zo_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "reset write pointer", res, noisy,
+    ret = sg_cmds_process_resp(ptvp, b, res, noisy,
                                verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
@@ -171,6 +191,7 @@ main(int argc, char * argv[])
     bool close = false;
     bool finish = false;
     bool open = false;
+    bool reamz = false;
     bool sequentialize = false;
     bool verbose_given = false;
     bool version_given = false;
@@ -188,7 +209,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acC:fhoRSvVz:", long_options,
+        c = getopt_long(argc, argv, "acC:e:fhorRSvVz:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -211,6 +232,16 @@ main(int argc, char * argv[])
             }
             zc = (uint16_t)n;
             break;
+        case 'e':
+            ll = sg_get_llnum(optarg);
+            if ((ll < 0) || (ll > UINT32_MAX)) {
+                pr2serr("bad argument to '--element=EID'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (0 == ll)
+                pr2serr("Warning: 0 is an invalid element identifier\n");
+            zid = (uint64_t)ll;
+            break;
         case 'f':
             finish = true;
             sa = FINISH_ZONE_SA;
@@ -222,6 +253,10 @@ main(int argc, char * argv[])
         case 'o':
             open = true;
             sa = OPEN_ZONE_SA;
+            break;
+        case 'r':
+            reamz = true;
+            sa = REM_ELEM_MOD_ZONES_SA;
             break;
         case 'S':
             sequentialize = true;
@@ -283,9 +318,10 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    if (1 != ((int)close + (int)finish + (int)open + (int)sequentialize)) {
-        pr2serr("one from the --close, --finish, --open and --sequentialize "
-                "options must be given\n");
+    if (1 != ((int)close + (int)finish + (int)open + (int)sequentialize +
+              (int)reamz)) {
+        pr2serr("one of these options: --close, --finish, --open "
+                "--sequentialize and\n--remove must be given\n");
         usage();
         return SG_LIB_CONTRADICT;
     }

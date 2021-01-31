@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.46 [20210113] [svn: r873]
+Changelog for pre-release sg3_utils-1.46 [20210131] [svn: r874]
   - sg_rep_pip: report new provisioning initialization pattern cmd
   - sg_turs: estimated time-to-ready [20-061r2]
     - add --delay=MS option
@@ -23,6 +23,7 @@ Changelog for pre-release sg3_utils-1.46 [20210113] [svn: r873]
   - sg_modes: document '-s' option (same as '-6')
   - sg_sanitize + sg_format: when --verbose given once report
     probable success; without --verbose 'no news is good news'
+  - sg_zone: add Remove element and modify zones command
   - sg_raw: increase maximum data-in and data-out buffer size
     from 64 KB to 1 MB
     - fix --cmdfile= handling

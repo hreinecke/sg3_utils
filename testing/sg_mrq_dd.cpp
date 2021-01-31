@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.17 20210106";
+static const char * version_str = "1.18 20210130";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -144,6 +144,7 @@ using namespace std;
 #define DEF_NUM_THREADS 4
 #define MAX_NUM_THREADS 1024 /* was SG_MAX_QUEUE with v3 driver */
 #define DEF_MRQ_NUM 16
+#define DEF_STALL_THRESH 4
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikely value */
@@ -243,6 +244,7 @@ struct global_collection        /* one instance visible to all threads */
     atomic<int> dio_incomplete_count;
     atomic<int> sum_of_resids;
     atomic<int> reason_res;
+    atomic<int> most_recent_pack_id;
     int verbose;
     int dry_run;
     bool mrq_eq_0;              /* true when user gives mrq=0 */
@@ -340,9 +342,9 @@ static sigset_t signal_set;
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static int sg_in_open(struct global_collection *clp, const char *inf,
-                      uint8_t **mmpp, int *mmap_len);
+                      uint8_t **mmpp, int *mmap_len, bool move_data);
 static int sg_out_open(struct global_collection *clp, const char *outf,
-                       uint8_t **mmpp, int *mmap_len);
+                       uint8_t **mmpp, int *mmap_len, bool move_data);
 static int do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
                               scat_gath_iter & o_sg_it, int seg_blks,
                               vector<cdb_arr_t> & a_cdb,
@@ -1101,20 +1103,57 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 #endif
 }
 
+/* Has an infinite loop doing a timed wait for any signals in sig_set. After
+ * each timeout (300 ms) checks if the most_recent_pack_id atomic integer
+ * has changed. If not after another two timeouts announces a stall has
+ * been detected. If shutting down atomic is true breaks out of loop and
+ * shuts down this thread. Other than that, this thread is normally cancelled
+ * by the main thread, after other threads have exited. */
 static void
 sig_listen_thread(struct global_collection * clp)
 {
-    int sig_number;
+    bool stall_reported = false;
+    int stall_count = 0;
+    int prev_pack_id = 0;
+    int sig_number, pack_id;
+    struct timespec ts;
+    struct timespec * tsp = &ts;
 
+    tsp->tv_sec = 0;
+    tsp->tv_nsec = 300 * 1000 * 1000;   /* 300 ms */
     while (1) {
-        sigwait(&signal_set, &sig_number);
+        sig_number = sigtimedwait(&signal_set, NULL, tsp);
         if (shutting_down)
             break;
+        if (sig_number < 0) {
+                int err = errno;
+
+                if (EAGAIN == err) { /* timeout */
+                    pack_id = clp->most_recent_pack_id.load();
+                    if (pack_id == prev_pack_id) {
+                        ++stall_count;
+                        if (0 == (stall_count % DEF_STALL_THRESH)) {
+                            if (! stall_reported) {
+                                stall_reported = true;
+                                pr2serr_lk("%s: stall at pack_id=%d "
+                                           "detected\n", __func__, pack_id);
+                        }
+                    }
+                } else {
+                    stall_count = 0;
+                    prev_pack_id = pack_id;
+                }
+            } else
+                pr2serr_lk("%s: sigtimedwait() errno=%d\n", __func__, err);
+        }
         if (SIGINT == sig_number) {
             pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
             clp->next_count_pos.store(-1);
+            shutting_down.store(true);
         }
     }
+    if (clp->verbose > 1)
+        pr2serr_lk("%s: exiting\n", __func__);
 }
 
 static bool
@@ -1236,7 +1275,7 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
 
     if (in_is_sg && clp->infp) {
         fd = sg_in_open(clp, clp->infp, (in_mmap ? &rep->buffp : NULL),
-                        (in_mmap ? &rep->mmap_len : NULL));
+                        (in_mmap ? &rep->mmap_len : NULL), true);
         if (fd < 0)
             goto fini;
         rep->infd = fd;
@@ -1250,7 +1289,7 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
     }
     if (out_is_sg && clp->outfp) {
         fd = sg_out_open(clp, clp->outfp, (out_mmap ? &rep->buffp : NULL),
-                         (out_mmap ? &rep->mmap_len : NULL));
+                         (out_mmap ? &rep->mmap_len : NULL), true);
         if (fd < 0)
             goto fini;
         rep->outfd = fd;
@@ -1867,6 +1906,7 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         }
         t_v4p->timeout = DEF_TIMEOUT;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(t_v4p->request_extra);
 mrq0_again:
         res = ioctl(fd, SG_IO, t_v4p);
         err = errno;
@@ -1984,6 +2024,7 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         t_v4p->timeout = DEF_TIMEOUT;
         mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(t_v4p->request_extra);
         a_v4.push_back(t_v4);
 
         sg_it.add_blks(num);
@@ -2015,8 +2056,10 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
     ctl_v4.din_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
-    if (false /* allow_mrq_abort */)
+    if (false /* allow_mrq_abort */) {
         ctl_v4.request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(ctl_v4.request_extra);
+    }
 
     if (vb && vb_first_time.load()) {
         pr2serr_lk("First controlling object output by ioctl(%s), flags: "
@@ -2393,6 +2436,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->din_xfer_len = num * clp->bs;
         t_v4p->timeout = DEF_TIMEOUT;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(t_v4p->request_extra);
 mrq0_again:
         res = ioctl(rep->infd, SG_IO, t_v4p);
         err = errno;
@@ -2442,6 +2486,7 @@ mrq0_again:
         t_v4p->dout_xfer_len = num * clp->bs;
         t_v4p->timeout = DEF_TIMEOUT;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(t_v4p->request_extra);
 mrq0_again2:
         res = ioctl(rep->outfd, SG_IO, t_v4p);
         err = errno;
@@ -2574,6 +2619,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->timeout = DEF_TIMEOUT;
         in_mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(t_v4p->request_extra);
         a_v4.push_back(t_v4);
 
         /* Now build the command/request for write-side (WRITE or VERIFY) */
@@ -2597,6 +2643,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->timeout = DEF_TIMEOUT;
         out_mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(t_v4p->request_extra);
         a_v4.push_back(t_v4);
 
         i_sg_it.add_blks(num);
@@ -2636,8 +2683,10 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
     ctl_v4.din_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
-    if (false /* allow_mrq_abort */)
+    if (false /* allow_mrq_abort */) {
         ctl_v4.request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
+        clp->most_recent_pack_id.store(ctl_v4.request_extra);
+    }
 
     if (vb && vb_first_time.load()) {
         pr2serr_lk("First controlling object output by ioctl(%s), flags: "
@@ -2721,6 +2770,7 @@ fini:
     return res < 0 ? res : (min<int>(in_fin_blks, out_fin_blks));
 }
 
+#if 0
 /* Returns number found and (partially) processed. 'num' is the number of
  * completions to wait for when > 0. When 'num' is zero check all inflight
  * request on 'fd' and return quickly if none completed (i.e. don't wait)
@@ -2745,6 +2795,7 @@ sg_blk_poll(int fd, int num)
     }
     return (seip->num == -1) ? -9999 : seip->num;
 }
+#endif
 
 /* Returns reserved_buffer_size/mmap_size if success, else 0 for failure */
 static int
@@ -3040,7 +3091,7 @@ process_flags(const char * arg, struct flags_t * fp)
 
 static int
 sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
-           int * mmap_lenp)
+           int * mmap_lenp, bool move_data)
 {
     int fd, err, n;
     int flags = O_RDWR;
@@ -3060,9 +3111,12 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare_resbuf(fd, clp, true, mmpp);
-    if (n <= 0)
-        return -SG_LIB_FILE_ERROR;
+    if (move_data) {
+        n = sg_prepare_resbuf(fd, clp, true, mmpp);
+        if (n <= 0)
+            return -SG_LIB_FILE_ERROR;
+    } else
+        n = 0;
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3070,7 +3124,7 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
 
 static int
 sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
-            int * mmap_lenp)
+            int * mmap_lenp, bool move_data)
 {
     int fd, err, n;
     int flags = O_RDWR;
@@ -3090,9 +3144,12 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
         perror(ebuff);
         return -sg_convert_errno(err);
     }
-    n = sg_prepare_resbuf(fd, clp, false, mmpp);
-    if (n <= 0)
-        return -SG_LIB_FILE_ERROR;
+    if (move_data) {
+        n = sg_prepare_resbuf(fd, clp, false, mmpp);
+        if (n <= 0)
+            return -SG_LIB_FILE_ERROR;
+    } else
+        n = 0;
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -3802,7 +3859,7 @@ main(int argc, char * argv[])
             pr2serr("%sunable to use scsi tape device %s\n", my_name, inf);
             return SG_LIB_FILE_ERROR;
         } else if (FT_SG == clp->in_type) {
-            clp->infd = sg_in_open(clp, inf, NULL, NULL);
+            clp->infd = sg_in_open(clp, inf, NULL, NULL, false);
             if (clp->infd < 0)
                 return -clp->infd;
         } else {
@@ -3841,7 +3898,7 @@ main(int argc, char * argv[])
             pr2serr("%sunable to use scsi tape device %s\n", my_name, outf);
             return SG_LIB_FILE_ERROR;
         } else if (FT_SG == clp->out_type) {
-            clp->outfd = sg_out_open(clp, outf, NULL, NULL);
+            clp->outfd = sg_out_open(clp, outf, NULL, NULL, false);
             if (clp->outfd < 0)
                 return -clp->outfd;
         } else if (FT_DEV_NULL == clp->out_type)
