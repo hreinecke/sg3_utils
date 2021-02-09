@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.18 20210130";
+static const char * version_str = "1.19 20210208";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -237,6 +237,7 @@ struct global_collection        /* one instance visible to all threads */
     mutex infant_mut;
     int bs;
     int bpt;
+    int cmd_timeout;            /* in milliseconds */
     int elem_sz;
     int outregfd;
     int outreg_type;
@@ -252,6 +253,7 @@ struct global_collection        /* one instance visible to all threads */
     bool cdbsz_given;
     bool count_given;
     bool flexible;
+    bool mrq_hipri;
     bool ofile_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool no_waitq;              /* if set use polling for response instead */
@@ -838,12 +840,13 @@ usage(int pg_num)
             "[--version]\n\n");
     pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
             "[elemsz_kb=EKB]\n"
-            "                  [fua=0|1|2|3] [mrq=MRQ] [no_waitq=0|1] "
-            "[ofreg=OFREG]\n"
-            "                  [sync=0|1] [thr=THR] [time=0|1|2] "
-            "[verbose=VERB]\n"
-            "                  [--dry-run] [--pre-fetch] [--verbose] "
-            "[--version]\n\n"
+            "                  [fua=0|1|2|3] [hipri=NRQS] [mrq=NRQS] "
+            "[no_waitq=0|1]\n"
+            "                  [ofreg=OFREG] [sync=0|1] [thr=THR] "
+            "[time=0|1|2[,TO]]\n"
+            "                  [verbose=VERB] [--dry-run] [--pre-fetch] "
+            "[--verbose]\n"
+            "                  [--version]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n"
             "         style commands, and options start with one or "
@@ -899,8 +902,11 @@ page2:
             "                3->OFILE+IFILE\n"
             "    ibs         IFILE logical block size, cannot differ from "
             "obs or bs\n"
-            "    mrq         number of cmds placed in each sg call "
-            "(def: 16)\n"
+            "    hipri       similar to mrq=NRQS operand but does set mrq "
+            "hipri flag\n"
+            "    mrq         NRQS is number of cmds placed in each sg "
+            "ioctl\n"
+            "                (def: 16). Does not set mrq hipri flag.\n"
             "                if mrq=0 does one-by-one, blocking "
             "ioctl(SG_IO)s\n"
             "    no_waitq=0|1    poll for completion when 1; def: 0 (use "
@@ -915,7 +921,8 @@ page2:
             "    thr         is number of threads, must be > 0, default 4, "
             "max 1024\n"
             "    time        0->no timing; 1/2->millisec/nanosec precision "
-            "(def: 1)\n"
+            "(def: 1);\n"
+            "                TO is command timeout in seconds (def: 60)\n"
             "    verbose     increase verbosity (def: VERB=0)\n"
             "    --dry-run|-d     prepare but bypass copy/read\n"
             "    --prefetch|-p    with verify: do pre-fetch first\n"
@@ -1904,7 +1911,7 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
             t_v4p->din_xfer_len = num * clp->bs;
             t_v4p->din_xferp = (uint64_t)(dp + (q_blks * clp->bs));
         }
-        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
 mrq0_again:
@@ -2013,6 +2020,9 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         t_v4p->guard = 'Q';
         t_v4p->flags = rflags;
         t_v4p->request_len = cdbsz;
+        t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->max_response_len = sizeof(rep->sb);
+        t_v4p->flags = rflags;
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         if (is_wr) {
             t_v4p->dout_xfer_len = num * clp->bs;
@@ -2021,7 +2031,7 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
             t_v4p->din_xfer_len = num * clp->bs;
             t_v4p->din_xferp = (uint64_t)(dp + (mrq_q_blks * clp->bs));
         }
-        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->timeout = clp->cmd_timeout;
         mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
@@ -2050,8 +2060,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
     if (! flagsp->coe)
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
-    if (flagsp->hipri)
-        rflags |= SGV4_FLAG_HIPRI;
+    if (clp->mrq_hipri)
+        ctl_v4.flags |= SGV4_FLAG_HIPRI;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
@@ -2434,7 +2444,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->flags = iflags;
         t_v4p->request_len = cdbsz;
         t_v4p->din_xfer_len = num * clp->bs;
-        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
 mrq0_again:
@@ -2481,10 +2491,11 @@ mrq0_again:
         t_v4p->request = (uint64_t)t_cdb.data();
         t_v4p->usr_ptr = t_v4p->request;
         t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->flags = oflags;
         t_v4p->request_len = cdbsz;
         t_v4p->dout_xfer_len = num * clp->bs;
-        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
 mrq0_again2:
@@ -2614,9 +2625,11 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->guard = 'Q';
         t_v4p->flags = iflags;
         t_v4p->request_len = cdbsz;
+        t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         t_v4p->din_xfer_len = num * clp->bs;
-        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->timeout = clp->cmd_timeout;
         in_mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
@@ -2638,9 +2651,11 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->guard = 'Q';
         t_v4p->flags = oflags;
         t_v4p->request_len = cdbsz;
+        t_v4p->response = (uint64_t)rep->sb;
+        t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         t_v4p->dout_xfer_len = num * clp->bs;
-        t_v4p->timeout = DEF_TIMEOUT;
+        t_v4p->timeout = clp->cmd_timeout;
         out_mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
@@ -2677,7 +2692,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     if ((! clp->verify) && clp->out_flags.order)
         ctl_v4.flags |= SGV4_FLAG_ORDERED_WR;
-    if (! (iflagsp->hipri || oflagsp->hipri))
+    if (clp->mrq_hipri)
         ctl_v4.flags |= SGV4_FLAG_HIPRI;
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
@@ -3309,12 +3324,13 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 pr2serr("%sbad argument to 'iflag='\n", my_name);
                 goto syn_err;
             }
-        } else if (0 == strcmp(key, "mrq")) {
+        } else if ((0 == strcmp(key, "hipri")) ||
+                   (0 == strcmp(key, "mrq"))) {
             if (isdigit(buf[0]))
                 cp = buf;
             else {
-                pr2serr("%sonly mrq=NRQS which is a number allowed here\n",
-                        my_name);
+                pr2serr("%sonly mrq=NRQS or hipri=NRQS which is a number "
+                        "allowed here\n", my_name);
                 goto syn_err;
             }
             clp->mrq_num = sg_get_num(cp);
@@ -3327,6 +3343,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 clp->mrq_num = 1;
                 pr2serr("note: send single, non-mrq commands\n");
             }
+            if ('h' == key[0])
+                clp->mrq_hipri = true;
         } else if ((0 == strcmp(key, "no_waitq")) ||
                    (0 == strcmp(key, "no-waitq"))) {
             n = sg_get_num(buf);
@@ -3384,9 +3402,23 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             do_sync = !! sg_get_num(buf);
         else if (0 == strcmp(key, "thr"))
             num_threads = sg_get_num(buf);
-        else if (0 == strcmp(key, "time"))
+        else if (0 == strcmp(key, "time")) {
+            const char * ccp = strchr(buf, ',');
+
             do_time = sg_get_num(buf);
-        else if (0 == strncmp(key, "verb", 4))
+            if (do_time < 0) {
+                pr2serr("%sbad argument to 'time=0|1|2'\n", my_name);
+                goto syn_err;
+            }
+            if (ccp) {
+                n = sg_get_num(ccp + 1);
+                if (n < 0) {
+                    pr2serr("%sbad argument to 'time=0|1|2,TO'\n", my_name);
+                    goto syn_err;
+                }
+                clp->cmd_timeout = n ? (n * 1000) : DEF_TIMEOUT;
+            }
+        } else if (0 == strncmp(key, "verb", 4))
             clp->verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
@@ -3794,6 +3826,7 @@ main(int argc, char * argv[])
     /* memset(clp, 0, sizeof(*clp)); */
     clp->dd_count = SG_COUNT_INDEFINITE;
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
+    clp->cmd_timeout = DEF_TIMEOUT;
     clp->in_type = FT_FIFO;
     /* change dd's default: if of=OFILE not given, assume /dev/null */
     clp->out_type = FT_DEV_NULL;

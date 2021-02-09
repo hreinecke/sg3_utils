@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.98 20210106";
+static const char * version_str = "1.98 20210108";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -231,6 +231,7 @@ struct global_collection
     pthread_mutex_t out2_mutex;
     int bs;
     int bpt;
+    int cmd_timeout;            /* in milliseconds */
     int outregfd;
     int outreg_type;
     int ofsplit;
@@ -912,11 +913,12 @@ usage(int pg_num)
             "[fua=0|1|2|3]\n"
             "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
             "[of2=OFILE2]\n"
-            "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] [thr=THR] "
-            "[time=0|1|2]\n"
-            "               [unshare=1|0] [verbose=VERB] [--dry-run] "
-            "[--prefetch]\n"
-            "               [--verbose] [--verify] [--version]\n\n"
+            "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] "
+            "[thr=THR]\n"
+            "               [time=0|1|2[,TO]] [unshare=1|0] [verbose=VERB] "
+            "[--dry-run]\n"
+            "               [--prefetch] [--verbose] [--verify] "
+            "[--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -996,7 +998,9 @@ page2:
             "    thr         is number of threads, must be > 0, default 4, "
             "max 1024\n"
             "    time        0->no timing, 1->calc throughput(def), "
-            "2->nanosec precision\n"
+            "2->nanosec\n"
+            "                precision; TO is command timeout in seconds "
+            "(def: 60)\n"
             "    unshare     0->don't explicitly unshare after share; 1->let "
             "close do\n"
             "                file unshare (default)\n"
@@ -3164,7 +3168,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         hp->dxfer_direction = SG_DXFER_TO_DEV;
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
-    hp->timeout = DEF_TIMEOUT;
+    hp->timeout = clp->cmd_timeout;
     hp->usr_ptr = rep;
     hp->pack_id = pack_id;
     hp->flags = flags;
@@ -3215,7 +3219,7 @@ do_v4:
     }
     h4p->max_response_len = sizeof(rep->sb);
     h4p->response = (uint64_t)rep->sb;
-    h4p->timeout = DEF_TIMEOUT;
+    h4p->timeout = clp->cmd_timeout;
     h4p->usr_ptr = (uint64_t)rep;
     h4p->request_extra = pack_id;    /* this is the pack_id */
     h4p->flags = flags;
@@ -4060,9 +4064,22 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             do_sync = !! sg_get_num(buf);
         else if (0 == strcmp(key, "thr"))
             num_threads = sg_get_num(buf);
-        else if (0 == strcmp(key, "time"))
+        else if (0 == strcmp(key, "time")) {
             do_time = sg_get_num(buf);
-        else if (0 == strcmp(key, "unshare"))
+            if (do_time < 0) {
+                pr2serr("%sbad argument to 'time=0|1|2'\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            cp = strchr(buf, ',');
+            if (cp) {
+                n = sg_get_num(cp + 1);
+                if (n < 0) {
+                    pr2serr("%sbad argument to 'time=0|1|2,TO'\n", my_name);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                clp->cmd_timeout = n ? (n * 1000) : DEF_TIMEOUT;
+            }
+        } else if (0 == strcmp(key, "unshare"))
             clp->unshare = !! sg_get_num(buf);  /* default: true */
         else if (0 == strncmp(key, "verb", 4))
             clp->verbose = sg_get_num(buf);
@@ -4273,6 +4290,7 @@ main(int argc, char * argv[])
     /* memset(clp, 0, sizeof(*clp)); */
     memset(thread_arr, 0, sizeof(thread_arr));
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
+    clp->cmd_timeout = DEF_TIMEOUT;
     clp->in_type = FT_OTHER;
     /* change dd's default: if of=OFILE not given, assume /dev/null */
     clp->out_type = FT_DEV_NULL;

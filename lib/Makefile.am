@@ -46,8 +46,9 @@ endif
 
 # For C++/clang testing
 ## CC = gcc-9
-## CC = g++
+## CXX = g++
 ## CC = clang
+## CXX = clang++
 ## CC = clang++
 ## CC = powerpc64-linux-gnu-gcc
 

@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2020 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2021 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.22 20201031";
+static const char * version_str = "6.23 20210208";
 
 
 #define ME "sg_dd: "
@@ -164,6 +164,7 @@ static int max_uas = MAX_UNIT_ATTENTIONS;
 static int max_aborted = MAX_ABORTED_CMDS;
 static int coe_limit = 0;
 static int coe_count = 0;
+static int cmd_timeout = DEF_TIMEOUT;   /* in milliseconds */
 static uint32_t glob_pack_id = 0;       /* pre-increment */
 static struct timeval start_tm;
 
@@ -436,8 +437,9 @@ usage()
             "[coe=0|1|2|3]\n"
             "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
             "[of2=OFILE2] [retries=RETR]\n"
-            "              [sync=0|1] [time=0|1] [verbose=VERB] "
-            "[--progress] [--verify]\n"
+            "              [sync=0|1] [time=0|1[,TO]] [verbose=VERB] "
+            "[--progress]\n"
+            "             [--verify]\n"
             "  where:\n"
             "    blk_sgio    0->block device use normal I/O(def), 1->use "
             "SG_IO\n"
@@ -486,7 +488,8 @@ usage()
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on "
             "OFILE after copy\n"
             "    time        0->no timing(def), 1->time plus calculate "
-            "throughput\n"
+            "throughput;\n"
+            "                TO is command timeout in seconds (def: 60)\n"
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
             "    --dry-run    do preparation but bypass copy (or read)\n"
@@ -717,7 +720,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     io_hdr.dxferp = buff;
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
-    io_hdr.timeout = DEF_TIMEOUT;
+    io_hdr.timeout = cmd_timeout;
     io_hdr.pack_id = (int)++glob_pack_id;
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
@@ -1126,7 +1129,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     io_hdr.dxferp = buff;
     io_hdr.mx_sb_len = SENSE_BUFF_LEN;
     io_hdr.sbp = senseBuff;
-    io_hdr.timeout = DEF_TIMEOUT;
+    io_hdr.timeout = cmd_timeout;
     io_hdr.pack_id = (int)++glob_pack_id;
     if (diop && *diop)
         io_hdr.flags |= SG_FLAG_DIRECT_IO;
@@ -1932,9 +1935,19 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key, "sync"))
             do_sync = !! sg_get_num(buf);
-        else if (0 == strcmp(key, "time"))
+        else if (0 == strcmp(key, "time")) {
+            const char * cp = strchr(buf, ',');
+
             do_time = !! sg_get_num(buf);
-        else if (0 == strncmp(key, "verb", 4))
+            if (cp) {
+                n = sg_get_num(cp + 1);
+                if (n < 0) {
+                    pr2serr(ME "bad argument to 'time=0|1,TO'\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                cmd_timeout = n ? (n * 1000) : DEF_TIMEOUT;
+            }
+        } else if (0 == strncmp(key, "verb", 4))
             verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
@@ -2440,7 +2453,7 @@ main(int argc, char * argv[])
             while (1) {
                 ret = sg_write(outfd, wrkPos, blocks, seek, blk_sz, &oflag,
                                &dio_tmp);
-                if ((0 == ret) || (SG_DD_BYPASS))
+                if ((0 == ret) || (SG_DD_BYPASS == ret))
                     break;
                 if ((SG_LIB_CAT_NOT_READY == ret) ||
                     (SG_LIB_SYNTAX_ERROR == ret))

@@ -1,4 +1,4 @@
-.TH SG_DD "8" "October 2020" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_DD "8" "February 2021" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -11,9 +11,9 @@ devices
 .PP
 [\fIblk_sgio=\fR{0|1}] [\fIbpt=BPT\fR] [\fIcdbsz=\fR{6|10|12|16}]
 [\fIcoe=\fR{0|1|2|3}] [\fIcoe_limit=CL\fR] [\fIdio=\fR{0|1}]
-[\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR] [\fIretries=RETR\fR] [\fIsync=\fR{0|1}]
-[\fItime=\fR{0|1}] [\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR]
-[\fI\-\-progress\fR] [\fI\-\-verify\fR]
+[\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR] [\fIretries=RETR\fR]
+[\fIsync=\fR{0|1}] [\fItime=\fR{0|1}[,TO]] [\fIverbose=VERB\fR]
+[\fI\-\-dry\-run\fR] [\fI\-\-progress\fR] [\fI\-\-verify\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -189,9 +189,13 @@ when 1, does SYNCHRONIZE CACHE command on \fIOFILE\fR at the end of the
 transfer. Only active when \fIOFILE\fR is a sg device file name or a block
 device and 'blk_sgio=1' is given.
 .TP
-\fBtime\fR={0|1}
+\fBtime\fR={0|1}[,\fITO\fR]
 when 1, times transfer and does throughput calculation, outputting the
 results (to stderr) at completion. When 0 (default) doesn't perform timing.
+.br
+If that value is followed by a comma, then \fITO\fR is the command timeout
+in seconds for SCSI READ, WRITE or VERIFY commands issued by this utility.
+The default is 60 seconds.
 .TP
 \fBverbose\fR=\fIVERB\fR
 as \fIVERB\fR increases so does the amount of debug output sent to stderr.
@@ -550,7 +554,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2020 Douglas Gilbert
+Copyright \(co 2000\-2021 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -29,9 +29,11 @@ LD = $(CXX)
 CXXLD = $(CXX)
 
 CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME
-CXXFLAGS = -std=c++17 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+CXXFLAGS = -std=c++11 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+## CXXFLAGS = -std=c++14 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+## CXXFLAGS = -std=c++17 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
+## CXXFLAGS = -std=c++20 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CXXFLAGS = -std=c++2a -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
-# CXXFLAGS = -std=c++11 -pthread -ggdb -O2 -W -Wall -iquote ../include -D_REENTRANT $(LARGE_FILE_FLAGS)
 # CPPFLAGS = -iquote ../include -iquote .. -D_REENTRANT $(LARGE_FILE_FLAGS) -DHAVE_CONFIG_H -DHAVE_NVME -DDEBUG
 CFLAGS = -g -O2 -W -Wall
 # CFLAGS = -ggdb -O2 -W -Wall -DDEBUG
@@ -39,6 +41,7 @@ CFLAGS = -g -O2 -W -Wall
 # CFLAGS = -g -O2 -Wall -pedantic
 # CFLAGS = -Wall -W -pedantic -std=c11 --analyze
 # CFLAGS = -Wall -W -pedantic -std=c++14 -fPIC
+# CFLAGS = -Wall -W -pedantic -std=c++20
 
 LDFLAGS =
 

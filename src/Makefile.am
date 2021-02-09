@@ -47,6 +47,7 @@ endif
 ## CC = gcc-9
 ## CC = g++
 ## CC = clang
+## CXX = clang++
 ## CC = clang++
 ## CC = powerpc64-linux-gnu-gcc
 
