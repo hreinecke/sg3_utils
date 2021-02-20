@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.98 20210108";
+static const char * version_str = "1.99 20210216";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -119,6 +119,10 @@ using namespace std;
 
 /* comment out following line to stop ioctl(SG_CTL_FLAGM_SNAP_DEV) */
 #define SGH_DD_SNAP_DEV 1
+
+#ifndef SGV4_FLAG_HIPRI
+#define SGV4_FLAG_HIPRI 0x800
+#endif
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -917,7 +921,7 @@ usage(int pg_num)
             "[thr=THR]\n"
             "               [time=0|1|2[,TO]] [unshare=1|0] [verbose=VERB] "
             "[--dry-run]\n"
-            "               [--prefetch] [--verbose] [--verify] "
+            "               [--prefetch] [-v|-vv|-vvv] [--verbose] [--verify] "
             "[--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
@@ -1895,7 +1899,7 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
     memset(cdbp, 0, cdb_sz);
     if (ver_true) {     /* only support VERIFY(10) */
         if (cdb_sz < 10) {
-            pr2serr_lk("%s only support VERIFY(10)\n", my_name);
+            pr2serr_lk("%sonly support VERIFY(10)\n", my_name);
             return 1;
         }
         cdb_sz = 10;
@@ -3532,16 +3536,16 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
-            pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
-                       "error: %s\n", __func__, strerror(errno));
+            pr2serr_lk("%s%s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
+                       "error: %s\n", my_name, __func__, strerror(errno));
         if (clp->elem_sz != (int)seip->sgat_elem_sz) {
             memset(seip, 0, sizeof(*seip));
             seip->sei_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
             seip->sgat_elem_sz = clp->elem_sz;
             res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
             if (res < 0)
-                pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) "
-                           "wr error: %s\n", __func__, strerror(errno));
+                pr2serr_lk("%s%s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) wr "
+                           "error: %s\n", my_name, __func__, strerror(errno));
         }
     }
     if (no_dur || masync) {
@@ -3561,8 +3565,8 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
         }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
-            pr2serr_lk("sgh_dd: %s: SG_SET_GET_EXTENDED(NO_DURATION) "
-                       "error: %s\n", __func__, strerror(errno));
+            pr2serr_lk("%s%s: SG_SET_GET_EXTENDED(NO_DURATION) error: %s\n",
+                       my_name, __func__, strerror(errno));
     }
 bypass:
     if (! def_res) {
@@ -3591,8 +3595,8 @@ bypass:
             if (MAP_FAILED == mmp) {
                 int err = errno;
 
-                pr2serr_lk("sgh_dd: %s: sz=%d, fd=%d, mmap() failed: %s\n",
-                           __func__, num, fd, strerror(err));
+                pr2serr_lk("%s%s: sz=%d, fd=%d, mmap() failed: %s\n",
+                           my_name, __func__, num, fd, strerror(err));
                 return 0;
             }
             *mmpp = mmp;
@@ -3627,7 +3631,7 @@ bypass:
     t = 1;
     res = ioctl(fd, SG_SET_DEBUG, &t);  /* more info in /proc/scsi/sg/debug */
     if (res < 0)
-        perror("sgh_dd: SG_SET_DEBUG error");
+        perror("sgs_dd: SG_SET_DEBUG error");
     return (res < 0) ? 0 : num;
 }
 

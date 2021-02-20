@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003-2020 D. Gilbert
+ * Copyright (C) 2003-2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -68,7 +68,7 @@
 // C++ local header
 #include "sg_scat_gath.h"
 
-static const char * version_str = "1.07 20201108";
+static const char * version_str = "1.08 20210214";
 
 #define ME "sg_iovec_tst: "
 
@@ -114,7 +114,7 @@ usage(void)
            "                    [--skip=SKIP] [--verbose] [--version] "
            "SG_DEV OUT_F\n");
     printf("where:\n"
-           "    --async|-a       async sg use (def: use ioctl(SGIO) )\n");
+           "    --async|-a       async sg usage (def: use ioctl(SGIO) )\n");
     printf("    --bs=BS|-b BS    logical block size of SG_DEV (def: 512 "
            "bytes)\n");
     printf("    --elem_sz=ES|-e ES    iovec element size (def: BS bytes)\n");
@@ -125,9 +125,10 @@ usage(void)
     printf("    --from_skip|-F    sgl output starts from SKIP (def: 0)\n");
     printf("    --help|-h        this usage message\n");
     printf("    --num=NUM|-n NUM    number of blocks to read from SG_DEV\n");
-    printf("    --sgl=SFN|-S SFN    Sgl FileName (SFN) that written to, with "
-           "addresses\n"
-           "                        and lengths having ES as their unit\n");
+    printf("    --sgl=SFN|-S SFN    Sgl FileName (SFN) that is written to, "
+	   "with\n"
+           "                        addresses and lengths having ES as "
+	   "their unit\n");
     printf("    --sgv4|-4        use the sg v4 interface (def: v3 "
            "interface)\n");
     printf("    --skip=SKIP|-s SKIP    SKIP blocks before reading S_DEV "

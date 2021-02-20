@@ -1,7 +1,7 @@
 /*
  * Test code for the extensions to the Linux OS SCSI generic ("sg")
  * device driver.
- * Copyright (C) 1999-2020 D. Gilbert and P. Allworth
+ * Copyright (C) 1999-2021 D. Gilbert and P. Allworth
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,6 +51,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>           /* for mmap() system call */
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #define __STDC_FORMAT_MACROS 1
@@ -83,13 +84,15 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.15 20200916";
+static const char * version_str = "4.17 20210218";
 static const char * my_name = "sgs_dd";
+
+#ifndef SGV4_FLAG_HIPRI
+#define SGV4_FLAG_HIPRI 0x800
+#endif
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BPT_TIMES_BS_SZ (64 * 1024) /* 64 KB */
-
-/* #define SG_DEBUG  1          comment out if not needed */
 
 #define SENSE_BUFF_LEN 32       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT 40000       /* 40,000 millisecs == 40 seconds */
@@ -109,6 +112,8 @@ static const char * my_name = "sgs_dd";
 #define SGQ_CAN_WRITE 2
 #define SGQ_TIMEOUT 4
 
+#define DEF_SIGTIMEDWAIT_USEC 100
+
 
 #define STR_SZ 1024
 #define INOUTF_SZ 900
@@ -118,6 +123,7 @@ struct flags_t {
     bool dio;
     bool evfd;
     bool excl;
+    bool hipri;
     bool immed;
     bool mmap;
     bool noxfer;
@@ -126,6 +132,7 @@ struct flags_t {
     bool tag;
     bool v3;
     bool v4;
+    bool given_v3v4;
 };
 
 typedef struct request_element
@@ -153,6 +160,7 @@ typedef struct request_collection
     bool out_is_sg;
     bool no_sig;
     bool use_rt_sig;
+    bool both_mmap;
     int infd;
     int in_evfd;
     int in_blk;                 /* most recent read */
@@ -172,13 +180,16 @@ typedef struct request_collection
     int sum_of_resids;
     int poll_ms;
     int pollerr_count;
-    int debug;
+    int debug;                  /* also set with -v up to -vvvvv */
     sigset_t blocked_sigs;
     int sigs_waiting;
     int sigs_rt_received;
     int sigs_io_received;
+    int blk_poll_count;
     Rq_elem * rd_posp;
     Rq_elem * wr_posp;
+    uint8_t * in_mmapp;
+    uint8_t * out_mmapp;
     struct flags_t iflag;
     struct flags_t oflag;
     Rq_elem elem[SGQ_NUM_ELEMS];
@@ -187,6 +198,10 @@ typedef struct request_collection
 static bool sgs_old_sg_driver = false;  /* true if VERSION_NUM < 4.00.00 */
 static bool sgs_full_v4_sg_driver = false; /* set if VERSION_NUM >= 4.00.30 */
 static bool sgs_nanosec_unit = false;
+
+static int sgq_rd_ahead_lim = SGQ_MAX_RD_AHEAD;
+static int sgq_wr_ahead_lim = SGQ_MAX_WR_AHEAD;
+static int sgq_num_elems = (SGQ_MAX_RD_AHEAD + SGQ_MAX_WR_AHEAD + 1);
 
 
 static void
@@ -206,11 +221,13 @@ usage(int pg_num)
            "bs=512))\n"
            "  bs       must be the logical block size of device (def: 512)\n"
            "  deb      debug: 0->no debug (def); > 0 -> more debug\n"
-           "  iflag    comma separated list from: dio,evfd,excl,immed,mmap,"
-           "no_waitq,\n"
-           "           noxfer,null,pack,tag,v3,v4 bound to IFILE\n"
-           "  no_sig   0-> use signals (def); 1-> no signals, hard polling "
-           "instead\n"
+           "           -v (up to -vvvvv) sets deb value to number of 'v's\n"
+           "  iflag    comma separated list from: dio,evfd,excl,hipri,immed,"
+           "mmap\n"
+           "           no_waitq,noxfer,null,pack,tag,v3,v4 bound to IFILE\n"
+           "  no_sig   0-> use signals; 1-> no signals, hard polling "
+           "instead;\n"
+           "           default 0, unless hipri flag(s) given then it's 1\n"
            "  oflag    same flags as iflag but bound to OFILE\n"
            "  poll_ms    number of milliseconds to wait on poll (def: 0)\n"
            "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
@@ -218,7 +235,7 @@ usage(int pg_num)
     printf("dd clone for testing Linux sg driver SIGPOLL and/or polling. "
            "Either\nIFILE or OFILE must be a scsi generic device. If OFILE "
            "not given then\n/dev/null assumed (rather than stdout like "
-           "dd). Use '-hh' or '-hhh'\nfor more information.\n");
+           "dd). Use '-hh' for flag\ninformation.\n");
     return;
 second_page:
     printf("flag description:\n"
@@ -226,6 +243,7 @@ second_page:
            "  evfd     when poll() gives POLLIN, use eventfd to find "
            "out how many\n"
            "  excl     open IFILE or OFILE with O_EXCL\n"
+           "  hipri    set HIPRI flag and use blk_poll() for completion\n"
            "  immed    use SGV4_FLAG_IMMED flag on each request\n"
            "  mmap     use mmap()-ed IO on IFILE or OFILE\n"
            "  no_waitq    use SGV4_FLAG_NO_WAIQ flag on each request\n"
@@ -238,6 +256,26 @@ second_page:
            "pack_id\n"
            "  v3        use sg v3 interface (default)\n"
            "  v4        use sg vr interface (i.e. struct sg_io_v4)\n");
+}
+
+static int
+get_mmap_addr(int fd, int num, uint8_t ** mmpp)
+{
+    uint8_t * mmp;
+
+    if (! mmpp)
+        return -EINVAL;
+    mmp = (uint8_t *)mmap(NULL, num, PROT_READ | PROT_WRITE,
+                          MAP_SHARED, fd, 0);
+    if (MAP_FAILED == mmp) {
+        int err = errno;
+
+        pr2serr("%s%s: sz=%d, fd=%d, mmap() failed: %s\n",
+                my_name, __func__, num, fd, strerror(err));
+        return -err;
+    }
+    *mmpp = mmp;
+    return 0;
 }
 
 /* Return of 0 -> success, -1 -> failure, 2 -> try again */
@@ -273,13 +311,8 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
         sg_chk_n_print3("read capacity", &io_hdr, true);
         return -1;
     }
-    *num_sect = 1 + ((rcBuff[0] << 24) | (rcBuff[1] << 16) |
-                (rcBuff[2] << 8) | rcBuff[3]);
-    *sect_sz = (rcBuff[4] << 24) | (rcBuff[5] << 16) |
-               (rcBuff[6] << 8) | rcBuff[7];
-#ifdef SG_DEBUG
-    pr2serr("number of sectors=%d, sector size=%d\n", *num_sect, *sect_sz);
-#endif
+    *num_sect = sg_get_unaligned_be32(rcBuff + 0) + 1;
+    *sect_sz = sg_get_unaligned_be32(rcBuff + 4);
     return 0;
 }
 
@@ -287,14 +320,18 @@ read_capacity(int sg_fd, int * num_sect, int * sect_sz)
 static int
 sg_start_io(Rq_coll * clp, Rq_elem * rep)
 {
+    bool is_wr = rep->wr;
     int res;
-    int fd = rep->wr ? clp->outfd : clp->infd;
-    struct flags_t * flagp = rep->wr ? rep->oflagp : rep->iflagp;
+    int fd = is_wr ? clp->outfd : clp->infd;
+    int num_bytes = clp->bs * rep->num_blks;
+    struct flags_t * flagp = is_wr ? rep->oflagp : rep->iflagp;
     sg_io_hdr_t * hp = &rep->io_hdr;
     struct sg_io_v4 * h4p = &rep->io_v4;
 
+    if (clp->both_mmap && is_wr)
+        memcpy(clp->out_mmapp, clp->in_mmapp, num_bytes);
     memset(rep->cmd, 0, sizeof(rep->cmd));
-    rep->cmd[0] = rep->wr ? 0x2a : 0x28;
+    rep->cmd[0] = is_wr ? 0x2a : 0x28;
     sg_put_unaligned_be32((uint32_t)rep->blk, rep->cmd + 2);
     sg_put_unaligned_be16((uint16_t)rep->num_blks, rep->cmd + 7);
     if (flagp->v4)
@@ -304,9 +341,8 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
     hp->interface_id = 'S';
     hp->cmd_len = sizeof(rep->cmd);
     hp->cmdp = rep->cmd;
-    hp->dxfer_direction = rep->wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
-    hp->dxfer_len = clp->bs * rep->num_blks;
-    hp->dxferp = rep->buffp;
+    hp->dxfer_direction = is_wr ? SG_DXFER_TO_DEV : SG_DXFER_FROM_DEV;
+    hp->dxfer_len = num_bytes;
     hp->mx_sb_len = sizeof(rep->sb);
     hp->sbp = rep->sb;
     hp->timeout = DEF_TIMEOUT;
@@ -314,23 +350,28 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
     hp->pack_id = rep->blk;
     if (flagp->dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
+    if (flagp->hipri)
+        hp->flags |= SGV4_FLAG_HIPRI;
     if (flagp->noxfer)
         hp->flags |= SG_FLAG_NO_DXFER;
     if (flagp->immed)
         hp->flags |= SGV4_FLAG_IMMED;
-    if (flagp->mmap)
+    if (flagp->mmap) {
         hp->flags |= SG_FLAG_MMAP_IO;
+        hp->dxferp = is_wr ? clp->out_mmapp : clp->in_mmapp;
+    } else
+        hp->dxferp = rep->buffp;
     if (flagp->evfd)
         hp->flags |= SGV4_FLAG_EVENTFD;
     if (flagp->no_waitq)
         hp->flags |= SGV4_FLAG_NO_WAITQ;
-#ifdef SG_DEBUG
-    pr2serr("%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
-            rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
-    sg_print_command(hp->cmdp);
-    pr2serr("dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n", hp->dxfer_direction,
-            hp->dxfer_len, hp->dxferp, hp->cmd_len);
-#endif
+    if (clp->debug > 5) {
+        pr2serr("%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
+                is_wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
+        sg_print_command(hp->cmdp);
+        pr2serr("dir=%d, len=%d, dxfrp=%p, cmd_len=%d\n", hp->dxfer_direction,
+                hp->dxfer_len, hp->dxferp, hp->cmd_len);
+    }
 
     while (((res = write(fd, hp, sizeof(sg_io_hdr_t))) < 0) &&
            (EINTR == errno))
@@ -355,13 +396,10 @@ do_v4:
     h4p->guard = 'Q';
     h4p->request_len = sizeof(rep->cmd);
     h4p->request = (uint64_t)(uintptr_t)rep->cmd;
-    if (rep->wr) {
-        h4p->dout_xfer_len = clp->bs * rep->num_blks;
-        h4p->dout_xferp = (uint64_t)(uintptr_t)rep->buffp;
-    } else if (rep->num_blks > 0) {
-        h4p->din_xfer_len = clp->bs * rep->num_blks;
-        h4p->din_xferp = (uint64_t)(uintptr_t)rep->buffp;
-    }
+    if (is_wr)
+        h4p->dout_xfer_len = num_bytes;
+    else if (rep->num_blks > 0)
+        h4p->din_xfer_len = num_bytes;
     h4p->max_response_len = sizeof(rep->sb);
     h4p->response = (uint64_t)(uintptr_t)rep->sb;
     h4p->timeout = DEF_TIMEOUT;
@@ -371,10 +409,19 @@ do_v4:
         h4p->flags |= SG_FLAG_DIRECT_IO;
     if (flagp->noxfer)
         h4p->flags |= SG_FLAG_NO_DXFER;
+    if (flagp->hipri)
+        h4p->flags |= SGV4_FLAG_HIPRI;
     if (flagp->immed)
         h4p->flags |= SGV4_FLAG_IMMED;
-    if (flagp->mmap)
+    if (flagp->mmap) {
         h4p->flags |= SG_FLAG_MMAP_IO;
+        hp->dxferp = is_wr ? clp->out_mmapp : clp->in_mmapp;
+    } else {
+        if (is_wr)
+            h4p->dout_xferp = (uint64_t)(uintptr_t)rep->buffp;
+        else if (rep->num_blks > 0)
+            h4p->din_xferp = (uint64_t)(uintptr_t)rep->buffp;
+    }
     if (flagp->tag)
         h4p->flags |= SGV4_FLAG_YIELD_TAG;
     if (flagp->evfd)
@@ -399,11 +446,11 @@ do_v4:
     rep->state = SGQ_IO_STARTED;
     if (! clp->no_sig)
         clp->sigs_waiting++;
-#ifdef SG_DEBUG
-    if (rep->wr ? clp->oflag.tag : clp->iflag.tag)
-        pr2serr("%s:  generated_tag=0x%" PRIx64 "\n", __func__,
-                (uint64_t)h4p->generated_tag);
-#endif
+    if (clp->debug > 5) {
+        if (is_wr ? clp->oflag.tag : clp->iflag.tag)
+            pr2serr("%s:  generated_tag=0x%" PRIx64 "\n", __func__,
+                    (uint64_t)h4p->generated_tag);
+    }
     return 0;
 }
 
@@ -426,13 +473,38 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
 
     if (is_v4)
         goto do_v4;
+    if (use_pack) {
+        while (true) {
+            if ( ((res = ioctl(fd, SG_GET_NUM_WAITING, &n))) < 0) {
+                res = -errno;
+                pr2serr("%s: ioctl(SG_GET_NUM_WAITING): %s [%d]\n",
+                        __func__, strerror(errno), errno);
+                return res;
+            }
+            if (n > 0) {
+                if ( ((res = ioctl(fd, SG_GET_PACK_ID, &id))) < 0) {
+                    res = -errno;
+                    pr2serr("%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
+                            __func__, strerror(errno), errno);
+                    return res;
+                }
+                /* got pack_id or tag of first waiting */
+                break;
+            }
+        }
+    }
     memset(&io_hdr, 0 , sizeof(sg_io_hdr_t));
+    if (use_pack)
+        io_hdr.pack_id = id;
     while (((res = read(fd, &io_hdr, sizeof(sg_io_hdr_t))) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         ;
     rep = (Rq_elem *)io_hdr.usr_ptr;
-    if (rep)
+    if (rep) {
         dio = flagsp->dio;
+        if (rep->io_hdr.flags & SGV4_FLAG_HIPRI)
+            ++clp->blk_poll_count;
+    }
     if (res < 0) {
         res = -errno;
         pr2serr("%s: read(): %s [%d]\n", __func__, strerror(errno), errno);
@@ -461,7 +533,7 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
         case SG_LIB_CAT_UNIT_ATTENTION:
             return 1;
         default:
-            sg_chk_n_print3(rep->wr ? "writing": "reading", hp, true);
+            sg_chk_n_print3(wr ? "writing": "reading", hp, true);
             rep->state = SGQ_IO_ERR;
             return -1;
     }
@@ -469,10 +541,10 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
         ++clp->dio_incomplete; /* count dios done as indirect IO */
     clp->sum_of_resids += hp->resid;
     rep->state = SGQ_IO_FINISHED;
-#ifdef SG_DEBUG
-    pr2serr("%s: %s  ", __func__, wr ? "writing" : "reading");
-    pr2serr("    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
-#endif
+    if (clp->debug > 5) {
+        pr2serr("%s: %s  ", __func__, wr ? "writing" : "reading");
+        pr2serr("    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
+    }
     return 0;
 do_v4:
     id = -1;
@@ -517,6 +589,10 @@ do_v4:
             rep->state = SGQ_IO_ERR;
         return res;
     }
+    if (rep) {
+        if (rep->io_v4.flags & SGV4_FLAG_HIPRI)
+            ++clp->blk_poll_count;
+    }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
         pr2serr("%s: bad usr_ptr=0x%p\n", __func__, (void *)rep);
         if (rep)
@@ -542,7 +618,7 @@ do_v4:
         case SG_LIB_CAT_UNIT_ATTENTION:
             return 1;
         default:
-            sg_linux_sense_print(rep->wr ? "writing": "reading",
+            sg_linux_sense_print(wr ? "writing": "reading",
                                  h4p->device_status, h4p->transport_status,
                                  h4p->driver_status,
                          (const uint8_t *)(unsigned long)h4p->response,
@@ -554,15 +630,15 @@ do_v4:
         ++clp->dio_incomplete; /* count dios done as indirect IO */
     clp->sum_of_resids += h4p->din_resid;
     rep->state = SGQ_IO_FINISHED;
-#ifdef SG_DEBUG
-    pr2serr("%s: %s  ", __func__, wr ? "writing" : "reading");
-    pr2serr("    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
-    if (use_pack)
-        pr2serr("%s:  pack_id=%d\n", __func__, h4p->request_extra);
-    else if (use_tag)
-        pr2serr("%s:  request_tag=0x%" PRIx64 "\n", __func__,
-                (uint64_t)h4p->request_tag);
-#endif
+    if (clp->debug > 5) {
+        pr2serr("%s: %s  ", __func__, wr ? "writing" : "reading");
+        pr2serr("    SGQ_IO_FINISHED elem idx=%zd\n", rep - clp->elem);
+        if (use_pack)
+            pr2serr("%s:  pack_id=%d\n", __func__, h4p->request_extra);
+        else if (use_tag)
+            pr2serr("%s:  request_tag=0x%" PRIx64 "\n", __func__,
+                    (uint64_t)h4p->request_tag);
+    }
     return 0;
 }
 
@@ -581,11 +657,11 @@ sz_reserve(Rq_coll * clp, bool is_in)
     seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 30000)) {
-        pr2serr("sgs_dd: sg driver prior to 3.0.00\n");
+        pr2serr("%s: sg driver prior to 3.0.00\n", my_name);
         return 1;
     } else if (t < 40000) {
         if (vb)
-            pr2serr("sgs_dd: warning: sg driver prior to 4.0.00\n");
+            pr2serr("%s: warning: sg driver prior to 4.0.00\n", my_name);
         sgs_old_sg_driver = true;
     } else if (t < 40045) {
         sgs_old_sg_driver = false;
@@ -689,22 +765,50 @@ sz_reserve(Rq_coll * clp, bool is_in)
 static int
 init_elems(Rq_coll * clp)
 {
-    Rq_elem * rep;
+    bool either_mmap = false;
     int res = 0;
+    int num_bytes = clp->bpt * clp->bs;
     int k;
+    Rq_elem * rep;
 
     clp->wr_posp = &clp->elem[0]; /* making ring buffer */
     clp->rd_posp = clp->wr_posp;
-    for (k = 0; k < SGQ_NUM_ELEMS - 1; ++k)
+    if (clp->iflag.mmap || clp->oflag.mmap) {
+        int res;
+
+        either_mmap = true;
+        sgq_num_elems = 2;
+        sgq_rd_ahead_lim = 1;
+        sgq_wr_ahead_lim = 1;
+        if (clp->iflag.mmap) {
+            res = get_mmap_addr(clp->infd, num_bytes, &clp->in_mmapp);
+            if (res < 0)
+                return res;
+        }
+        if (clp->oflag.mmap) {
+            res = get_mmap_addr(clp->outfd, num_bytes, &clp->out_mmapp);
+            if (res < 0)
+                return res;
+        }
+    }
+    for (k = 0; k < sgq_num_elems - 1; ++k)
         clp->elem[k].nextp = &clp->elem[k + 1];
-    clp->elem[SGQ_NUM_ELEMS - 1].nextp = &clp->elem[0];
-    for (k = 0; k < SGQ_NUM_ELEMS; ++k) {
+    clp->elem[sgq_num_elems - 1].nextp = &clp->elem[0];
+    for (k = 0; k < sgq_num_elems; ++k) {
         rep = &clp->elem[k];
         rep->state = SGQ_FREE;
         rep->iflagp = &clp->iflag;
         rep->oflagp = &clp->oflag;
-        rep->buffp = sg_memalign(clp->bpt * clp->bs, 0, &rep->free_buffp,
-                                 false);
+        if (either_mmap) {
+            if (clp->both_mmap)
+                continue;
+            if (clp->iflag.mmap)
+                rep->buffp = clp->in_mmapp;
+            else
+                rep->buffp = clp->out_mmapp;
+            continue;
+        }
+        rep->buffp = sg_memalign(num_bytes, 0, &rep->free_buffp, false);
         if (NULL == rep->buffp) {
             pr2serr("out of memory creating user buffers\n");
             res = -ENOMEM;
@@ -719,7 +823,7 @@ remove_elems(Rq_coll * clp)
     Rq_elem * rep;
     int k;
 
-    for (k = 0; k < SGQ_NUM_ELEMS; ++k) {
+    for (k = 0; k < sgq_num_elems; ++k) {
         rep = &clp->elem[k];
         if (rep->free_buffp)
             free(rep->free_buffp);
@@ -734,9 +838,8 @@ start_read(Rq_coll * clp)
     int buf_sz, res;
     char ebuff[EBUFF_SZ];
 
-#ifdef SG_DEBUG
-    pr2serr("%s: elem idx=%zd\n", __func__, rep - clp->elem);
-#endif
+    if (clp->debug > 5)
+        pr2serr("%s: elem idx=%zd\n", __func__, rep - clp->elem);
     rep->wr = false;
     rep->blk = clp->in_blk;
     rep->num_blks = blocks;
@@ -759,7 +862,8 @@ start_read(Rq_coll * clp)
                 res = -ENOMEM;
         }
         else if (res < 0) {
-            pr2serr("sgs_dd inputting from sg failed, blk=%d\n", rep->blk);
+            pr2serr("%s: inputting from sg failed, blk=%d\n", my_name,
+                    rep->blk);
             rep->state = SGQ_IO_ERR;
             return res;
         }
@@ -771,7 +875,8 @@ start_read(Rq_coll * clp)
             ;
         if (res < 0) {
             res = -errno;
-            snprintf(ebuff, EBUFF_SZ, "sgs_dd: reading, in_blk=%d ", rep->blk);
+            snprintf(ebuff, EBUFF_SZ, "%s: reading, in_blk=%d ", my_name,
+                     rep->blk);
             perror(ebuff);
             rep->state = SGQ_IO_ERR;
             return res;
@@ -810,9 +915,8 @@ start_write(Rq_coll * clp)
         if (rep == clp->rd_posp)
             return -1;
     }
-#ifdef SG_DEBUG
-    pr2serr("%s: elem idx=%zd\n", __func__, rep - clp->elem);
-#endif
+    if (clp->debug > 5)
+        pr2serr("%s: elem idx=%zd\n", __func__, rep - clp->elem);
     rep->wr = true;
     blocks = rep->num_blks;
     rep->blk = clp->out_blk;
@@ -823,7 +927,7 @@ start_write(Rq_coll * clp)
         if (1 == res)      /* ENOMEM, give up */
             return -ENOMEM;
         else if (res < 0) {
-            pr2serr("sgs_dd output to sg failed, blk=%d\n", rep->blk);
+            pr2serr("%s: output to sg failed, blk=%d\n", my_name, rep->blk);
             rep->state = SGQ_IO_ERR;
             return res;
         }
@@ -835,7 +939,8 @@ start_write(Rq_coll * clp)
             ;
         if (res < 0) {
             res = -errno;
-            snprintf(ebuff, EBUFF_SZ, "sgs_dd: output, out_blk=%d ", rep->blk);
+            snprintf(ebuff, EBUFF_SZ, "%s: output, out_blk=%d ", my_name,
+                     rep->blk);
             perror(ebuff);
             rep->state = SGQ_IO_ERR;
             return res;
@@ -863,14 +968,16 @@ do_sigwait(Rq_coll * clp, bool inc1_clear0)
 
     if (clp->debug > 9)
         pr2serr("%s: inc1_clear0=%d\n", __func__, (int)inc1_clear0);
-    ts.tv_sec = 60;         /* 60 second timeout */
-    ts.tv_nsec = 0;
+    ts.tv_sec = 0;
+    ts.tv_nsec = DEF_SIGTIMEDWAIT_USEC * 1000;
     while (sigtimedwait(&clp->blocked_sigs, &info, &ts) < 0) {
-        if (EINTR != errno) {
-            int err = errno;
+        int err = errno;
 
-            pr2serr("%s: sigtimedwait(): %s [%d]\n", __func__,
-                    strerror(err), err);        /* EAGAIN is timeout */
+        if (EINTR != err) {
+
+            if (EAGAIN != err)
+                pr2serr("%s: sigtimedwait(): %s [%d]\n", __func__,
+                        strerror(err), err);
             return -err;        /* EAGAIN is timeout error */
         }
     }
@@ -905,7 +1012,7 @@ do_num_poll_in(Rq_coll * clp, int fd, bool is_evfd)
         if (clp->sigs_waiting) {
             int res = do_sigwait(clp, true);
 
-            if (res < 0)
+            if ((res < 0) && (-EAGAIN != res))
                 return res;
         }
     }
@@ -1034,17 +1141,18 @@ can_read_write(Rq_coll * clp)
         else
             res = 0;
     }
-    if (clp->debug) {
-        if ((clp->debug >= 9) || wr_waiting || rd_waiting)
+    if (clp->debug > 6) {
+        if ((clp->debug > 7) || wr_waiting || rd_waiting) {
             pr2serr("%d/%d (nwb/nrb): read=%d/%d (do/wt) "
                     "write=%d/%d (do/wt) writeable=%d sg_fin=%d\n",
                     clp->out_blk, clp->in_blk, reading, rd_waiting,
                     writing, wr_waiting, (int)writeable, sg_finished);
-        fflush(stdout);
+        }
+        // fflush(stdout);
     }
-    if (writeable && (writing < SGQ_MAX_WR_AHEAD) && (clp->out_count > 0))
+    if (writeable && (writing < sgq_wr_ahead_lim) && (clp->out_count > 0))
         return SGQ_CAN_WRITE;
-    if ((reading < SGQ_MAX_RD_AHEAD) && (clp->in_count > 0) &&
+    if ((reading < sgq_rd_ahead_lim) && (clp->in_count > 0) &&
         (0 == rd_waiting) && (clp->rd_posp->nextp != clp->wr_posp))
         return SGQ_CAN_READ;
 
@@ -1054,8 +1162,8 @@ can_read_write(Rq_coll * clp)
     /* usleep(10000); */      /* hang about for 10 milliseconds */
     if ((! clp->no_sig) && clp->sigs_waiting) {
         res = do_sigwait(clp, false);
-        if (res < 0)
-            return res;
+        if ((res < 0) && (-EAGAIN != res))
+            return res;     /* wasn't timeout */
     }
     /* Now check the _whole_ buffer for pending requests */
     for (rep = clp->rd_posp->nextp; rep != clp->rd_posp; rep = rep->nextp) {
@@ -1081,7 +1189,7 @@ process_flags(const char * arg, struct flags_t * fp)
     strncpy(buff, arg, sizeof(buff));
     buff[sizeof(buff) - 1] = '\0';
     if ('\0' == buff[0]) {
-        pr2serr("no flag found\n");
+        pr2serr("no flag found, 'null' can be used as a placeholder\n");
         return false;
     }
     cp = buff;
@@ -1095,6 +1203,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->evfd = true;
         else if (0 == strcmp(cp, "excl"))
             fp->excl = true;
+        else if (0 == strcmp(cp, "hipri"))
+            fp->hipri = true;
         else if (0 == strcmp(cp, "immed"))
             fp->immed = true;
         else if (0 == strcmp(cp, "mmap"))
@@ -1110,16 +1220,26 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->pack = true;
         else if (0 == strcmp(cp, "tag"))
             fp->tag = true;
-        else if (0 == strcmp(cp, "v3"))
+        else if (0 == strcmp(cp, "v3")) {
             fp->v3 = true;
-        else if (0 == strcmp(cp, "v4"))
+            fp->given_v3v4 = true;
+        } else if (0 == strcmp(cp, "v4")) {
             fp->v4 = true;
-        else {
+            fp->given_v3v4 = true;
+        } else {
             pr2serr("unrecognised flag: %s\n", cp);
             return false;
         }
         cp = np;
     } while (cp);
+    if (fp->dio && fp->mmap) {
+        pr2serr(" Can't set both mmap and dio\n");
+        return false;
+    }
+    if ((fp->dio || fp->mmap) && fp->noxfer) {
+        pr2serr(" Can't have mmap or dio with noxfer\n");
+        return false;
+    }
     return true;
 }
 
@@ -1128,6 +1248,8 @@ int
 main(int argc, char * argv[])
 {
     bool bs_given = false;
+    bool no_sig_given = false;
+    bool hipri_present;
     int skip = 0;
     int seek = 0;
     int ibs = 0;
@@ -1184,19 +1306,20 @@ main(int argc, char * argv[])
             inf[INOUTF_SZ - 1] = '\0';
         } else if (0 == strcmp(key, "iflag")) {
             if (! process_flags(buf, &clp->iflag)) {
-                pr2serr("%sbad argument to 'iflag='\n", my_name);
+                pr2serr("%s: bad argument to 'iflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key,"no_sig"))
+        } else if (0 == strcmp(key,"no_sig")) { /* default changes */
             clp->no_sig = !!sg_get_num(buf);
-        else if (0 == strcmp(key,"obs"))
+            no_sig_given = true;
+        } else if (0 == strcmp(key,"obs"))
             obs = sg_get_num(buf);
         else if (strcmp(key,"of") == 0) {
             memcpy(outf, buf, INOUTF_SZ);
             outf[INOUTF_SZ - 1] = '\0';
         } else if (0 == strcmp(key, "oflag")) {
             if (! process_flags(buf, &clp->oflag)) {
-                pr2serr("%sbad argument to 'oflag='\n", my_name);
+                pr2serr("%s: bad argument to 'oflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"poll_ms"))
@@ -1210,20 +1333,26 @@ main(int argc, char * argv[])
         else if ((0 == strcmp(key,"-V")) || (0 == strcmp(key,"--version"))) {
             pr2serr("%s: version: %s\n", my_name, version_str);
             return 0;
-        } else if (0 == strcmp(key,"-vvvv"))
-            clp->debug +=4;
-        else if (0 == strcmp(key,"-vvv"))
-            clp->debug +=3;
-        else if (0 == strcmp(key,"-vv"))
-            clp->debug +=2;
-        else if ((0 == strcmp(key,"-v")) || (0 == strcmp(key,"--verbose")))
+        } else if (0 == strncmp(key,"-vvvvvvv", 8))
+            clp->debug += 7;
+        else if (0 == strncmp(key,"-vvvvvv", 7))
+            clp->debug += 6;
+        else if (0 == strncmp(key,"-vvvvv", 6))
+            clp->debug += 5;
+        else if (0 == strncmp(key,"-vvvv", 5))
+            clp->debug += 4;
+        else if (0 == strncmp(key,"-vvv", 4))
+            clp->debug += 3;
+        else if (0 == strncmp(key,"-vv", 3))
+            clp->debug += 2;
+        else if ((0 == strcmp(key,"--verbose")) || (0 == strncmp(key,"-v", 2)))
             ++clp->debug;
         else if (0 == strcmp(key,"-hhhh"))
-            help_pg +=4;
+            help_pg += 4;
         else if (0 == strcmp(key,"-hhh"))
-            help_pg +=3;
+            help_pg += 3;
         else if (0 == strcmp(key,"-hh"))
-            help_pg +=2;
+            help_pg += 2;
         else if ((0 == strcmp(key,"-h")) || (0 == strcmp(key,"--help")))
             ++help_pg;
         else {
@@ -1242,6 +1371,13 @@ main(int argc, char * argv[])
         return 0;
     }
 
+    hipri_present = (clp->iflag.hipri || clp->oflag.hipri);
+    if (no_sig_given) {
+        if ((0 == clp->no_sig) && hipri_present)
+            pr2serr("Warning: signalling doesn't work with hipri\n");
+    } else      /* no_sig default varies: 0 normally and 1 if hipri present */
+        clp->no_sig = hipri_present ? 1 : 0;
+
     if ((ibs && (ibs != clp->bs)) || (obs && (obs != clp->bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
         usage(1);
@@ -1258,13 +1394,15 @@ main(int argc, char * argv[])
         pr2serr("Assume 'bs' (block size) of %d bytes\n", clp->bs);
 
     if ((skip < 0) || (seek < 0)) {
-        pr2serr("skip and seek cannot be negative\n");
+        pr2serr("%s: skip and seek cannot be negative\n", my_name);
         return 1;
     }
-#ifdef SG_DEBUG
-    pr2serr("sgs_dd: if=%s skip=%d of=%s seek=%d count=%d\n",
-           inf, skip, outf, seek, count);
-#endif
+    if (clp->iflag.mmap && clp->oflag.mmap)
+        clp->both_mmap = true;;
+
+    if (clp->debug > 3)
+        pr2serr("%s: if=%s skip=%d of=%s seek=%d count=%d\n", my_name,
+                inf, skip, outf, seek, count);
     if (! clp->no_sig) {
         /* Need to block signals before SIGPOLL is enabled in sz_reserve() */
         sigemptyset(&clp->blocked_sigs);
@@ -1280,8 +1418,8 @@ main(int argc, char * argv[])
     if (inf[0] && ('-' != inf[0])) {
         open_fl = clp->iflag.excl ? O_EXCL : 0;
         if ((clp->infd = open(inf, open_fl | O_RDONLY)) < 0) {
-            snprintf(ebuff, EBUFF_SZ, "sgs_dd: could not open %s for reading",
-                     inf);
+            snprintf(ebuff, EBUFF_SZ, "%s: could not open %s for reading",
+                     my_name, inf);
             perror(ebuff);
             return 1;
         }
@@ -1292,8 +1430,8 @@ main(int argc, char * argv[])
 
                 offset *= clp->bs;       /* could overflow here! */
                 if (lseek(clp->infd, offset, SEEK_SET) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                "sgs_dd: couldn't skip to required position on %s", inf);
+                    snprintf(ebuff, EBUFF_SZ, "%s: couldn't skip to required "
+                                              "position on %s", my_name, inf);
                     perror(ebuff);
                     return 1;
                 }
@@ -1343,7 +1481,7 @@ main(int argc, char * argv[])
             open_fl |= (O_WRONLY | O_CREAT);
             if ((clp->outfd = open(outf, open_fl, 0666)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-                         "sgs_dd: could not open %s for writing", outf);
+                         "%s: could not open %s for writing", my_name, outf);
                 perror(ebuff);
                 return 1;
             }
@@ -1352,8 +1490,8 @@ main(int argc, char * argv[])
 
                 offset *= clp->bs;       /* could overflow here! */
                 if (lseek(clp->outfd, offset, SEEK_SET) < 0) {
-                    snprintf(ebuff, EBUFF_SZ,
-                "sgs_dd: couldn't seek to required position on %s", outf);
+                    snprintf(ebuff, EBUFF_SZ, "%s: couldn't seek to required "
+                             "position on %s", my_name, outf);
                     perror(ebuff);
                     return 1;
                 }
@@ -1378,6 +1516,11 @@ main(int argc, char * argv[])
             return 1;
         }
     }
+    if ((clp->in_is_sg || clp->out_is_sg) && !clp->iflag.given_v3v4 &&
+        !clp->oflag.given_v3v4 && (clp->debug > 0))
+        pr2serr("using sg driver version 3 interface on %s\n",
+                clp->in_is_sg ? inf : outf);
+
     if (0 == count)
         return 0;
     else if (count < 0) {
@@ -1390,8 +1533,10 @@ main(int argc, char * argv[])
             if (0 != res) {
                 pr2serr("Unable to read capacity on %s\n", inf);
                 in_num_sect = -1;
-            }
-            else {
+            } else {
+                if (clp->debug > 4)
+                    pr2serr("ifile: number of sectors=%d, sector size=%d\n",
+                            in_num_sect, in_sect_sz);
                 if (in_num_sect > skip)
                     in_num_sect -= skip;
             }
@@ -1405,16 +1550,17 @@ main(int argc, char * argv[])
             if (0 != res) {
                 pr2serr("Unable to read capacity on %s\n", outf);
                 out_num_sect = -1;
-            }
-            else {
+            } else {
+                if (clp->debug > 4)
+                    pr2serr("ofile: number of sectors=%d, sector size=%d\n",
+                            out_num_sect, out_sect_sz);
                 if (out_num_sect > seek)
                     out_num_sect -= seek;
             }
         }
-#ifdef SG_DEBUG
-        pr2serr("Start of loop, count=%d, in_num_sect=%d, out_num_sect=%d\n",
-                count, in_num_sect, out_num_sect);
-#endif
+        if (clp->debug > 3)
+            pr2serr("Start of loop, count=%d, in_num_sect=%d, "
+                    "out_num_sect=%d\n", count, in_num_sect, out_num_sect);
         if (in_num_sect > 0) {
             if (out_num_sect > 0)
                 count = (in_num_sect > out_num_sect) ? out_num_sect :
@@ -1425,10 +1571,8 @@ main(int argc, char * argv[])
         else
             count = out_num_sect;
     }
-
-#ifdef SG_DEBUG
-    pr2serr("Start of loop, count=%d, bpt=%d\n", count, clp->bpt);
-#endif
+    if (clp->debug > 4)
+        pr2serr("Start of loop, count=%d, bpt=%d\n", count, clp->bpt);
 
     clp->in_count = count;
     clp->in_done_count = count;
@@ -1480,9 +1624,14 @@ main(int argc, char * argv[])
     if (clp->sum_of_resids)
         pr2serr(">> Non-zero sum of residual counts=%d\n",
                 clp->sum_of_resids);
-    if ((! clp->no_sig) && clp->debug > 0)
-        pr2serr("SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
-                clp->sigs_io_received, clp->sigs_rt_received);
+    if (clp->debug > 0) {
+        if (! clp->no_sig)
+            pr2serr("SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
+                    clp->sigs_io_received, clp->sigs_rt_received);
+        if (hipri_present)
+            pr2serr("HIPRI (blk_poll) used to complete %d commands\n",
+                    clp->blk_poll_count);
+    }
     if (clp->pollerr_count > 0)
         pr2serr(">> poll() system call gave POLLERR %d times\n",
                 clp->pollerr_count);

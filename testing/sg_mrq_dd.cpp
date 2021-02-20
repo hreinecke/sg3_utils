@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.19 20210208";
+static const char * version_str = "1.20 20210210";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -116,6 +116,10 @@ using namespace std;
 // #endif
 // #endif
 
+
+#ifndef SGV4_FLAG_HIPRI
+#define SGV4_FLAG_HIPRI 0x800
+#endif
 
 #define MAX_SGL_NUM_VAL (INT32_MAX - 1)  /* should reduce for testing */
 // #define MAX_SGL_NUM_VAL 7  /* should reduce for testing */
