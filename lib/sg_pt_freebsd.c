@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.37 20210102 */
+/* sg_pt_freebsd version 1.38 20210221 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -159,7 +159,7 @@ int
 scsi_pt_open_flags(const char * device_name, int oflags, int vb)
 {
     bool is_char, is_block, possible_nvme;
-    char tmp;
+    char tmp, first_ch;
     int k, err, dev_fd, ret;
     uint32_t nsid, nv_ctrlid;
     ssize_t s;
@@ -167,7 +167,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
     struct cam_device* cam_dev;
     struct stat a_stat;
     char b[PATH_MAX];
-    char  full_path[64];
+    char dev_nm[PATH_MAX];
 
     // Search table for a free entry
     for (k = 0; k < FREEBSD_MAXDEV; k++)
@@ -182,9 +182,25 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         ret = -EMFILE;
         goto err_out;
     }
-    if (stat(device_name, &a_stat) < 0) {
+    first_ch = device_name[0];
+    if (('/' != first_ch) && ('.' != first_ch)) {
+        /* Step 1: if device_name is symlink, follow it */
+        s = readlink(device_name,  b, sizeof(b));
+        if (s <= 0) {
+            strncpy(b, device_name, PATH_MAX - 1);
+            b[PATH_MAX - 1] = '\0';
+        }
+        /* Step 2: if no leading '/' nor '.' given, prepend '/dev/' */
+        first_ch = b[0];
+        if (('/' != first_ch) && ('.' != first_ch))
+            snprintf(dev_nm, PATH_MAX, "%s%s", "/dev/", b);
+        else
+            strcpy(dev_nm, b);
+    } else
+        strcpy(dev_nm, device_name);
+    if (stat(dev_nm, &a_stat) < 0) {
         err = errno;
-        pr2ws("%s: unable to stat(%s): %s\n", __func__, device_name,
+        pr2ws("%s: unable to stat(%s): %s\n", __func__, dev_nm,
               strerror(err));
         ret = -err;
         goto err_out;
@@ -194,14 +210,9 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
     if (! (is_block || is_char)) {
         if (vb)
             pr2ws("%s: %s is not char nor block device\n", __func__,
-                            device_name);
+                            dev_nm);
         ret = -ENODEV;
         goto err_out;
-    }
-    s = readlink(device_name,  b, sizeof(b));
-    if (s <= 0) {
-        strncpy(b, device_name, PATH_MAX - 1);
-        b[PATH_MAX - 1] = '\0';
     }
 
     /* Some code borrowed from smartmontools, Christian Franke */
@@ -247,7 +258,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
             err = errno;
             if (vb)
                 pr2ws("%s: open(%s) failed: %s (errno=%d), try SCSI/ATA\n",
-                      __func__, full_path, strerror(err), err);
+                      __func__, fdc_p->devname, strerror(err), err);
             goto scsi_ata_try;
         }
         fdc_p->is_nvme = true;
@@ -262,7 +273,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
 
 scsi_ata_try:
     fdc_p->is_char = is_char;
-    if (cam_get_device(device_name, fdc_p->devname, DEV_IDLEN,
+    if (cam_get_device(dev_nm, fdc_p->devname, DEV_IDLEN,
                        &(fdc_p->unitnum)) == -1) {
         if (vb)
             pr2ws("bad device name structure\n");

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.46 [20210219] [svn: r876]
+Changelog for pre-release sg3_utils-1.46 [20210222] [svn: r877]
   - sg_rep_pip: report new provisioning initialization pattern cmd
   - sg_turs: estimated time-to-ready [20-061r2]
     - add --delay=MS option
@@ -31,6 +31,8 @@ Changelog for pre-release sg3_utils-1.46 [20210219] [svn: r876]
     - add --nvm option to send commands from the NVM command set
     - add --cmdset option to bypass cdb heuristic
     - add --scan= first_opcode,last_opcode
+  - sg_pt_freebsd: allow device names without leading /dev/
+    fix for regression introduced in rev 731 (ver: 1.43)
   - sg_pt_solaris+sg_pt_osf1: fix problem with clear_scsi_pt_obj()
     which needs to remember is_nvme and dev_fd values
   - sg_lib: restore elements and rebuild command added

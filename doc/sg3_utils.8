@@ -192,6 +192,13 @@ corresponding pass\-through device name of the form /dev/pass<num>
 where <num> is an integer starting at zero. The "camcontrol devlist"
 command may be useful for finding out which SCSI device names are
 available and the correspondence between class and pass\-through names.
+.PP
+FreeBSD allows device names to be given without the leading "/dev/" (e.g.
+da0 instead of /dev/da0). That worked in this package up until version
+1.43 when the unadorned device name (e.g. "da0") gave an error. The
+original action (i.e. allowing unadorned device names) has been restored
+in version 1.46 . Also note that symlinks (to device names) are followed
+before prepending "/dev/" if the resultant name doesn't start with a "/".
 .SH SOLARIS DEVICE NAMING
 SCSI device names below the /dev directory have a form like: c5t4d3s2
 where the number following "c" is the controller (HBA) number, the number
