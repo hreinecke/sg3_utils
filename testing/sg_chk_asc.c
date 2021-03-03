@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2019 Douglas Gilbert.
+ * Copyright (c) 2006-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -27,7 +27,7 @@
  * http://www.t10.org/lists/asc-num.txt
  */
 
-static const char * version_str = "1.08 20191014";
+static const char * version_str = "1.09 20210226";
 
 
 #define MAX_LINE_LEN 1024
@@ -53,8 +53,8 @@ static void usage()
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Checks asc/ascq codes in <asc_ascq_file> against the sg3_utils "
-            "library.\nThe additional sense code (asc_ascq) can be found at\n"
-            "www.t10.org/lists/asc-num.txt .\n"
+            "library.\nThe additional sense codes (asc_ascq) can be found "
+            "at\nwww.t10.org/lists/asc-num.txt .\n"
            );
 
 }

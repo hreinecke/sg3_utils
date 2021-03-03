@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 Douglas Gilbert
+ * Copyright (c) 2018-2021 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.06 20190113";
+static const char * version_str = "1.07 20210225";
 
 
 #define ME "sg_tst_nvme: "
@@ -116,7 +116,7 @@ static int next_dev_name_pos = 0;
 static void
 usage()
 {
-    pr2serr("Usage: sg_tst_nvme [--ctl] [dev-id] [--help] [--long] "
+    pr2serr("Usage: sg_tst_nvme [--ctl] [--dev-id] [--help] [--long] "
             "[--maxlen=LEN]\n"
             "                   [--nsid=ID] [--self-test=ST] [--to-ms=TO] "
             "[--verbose]\n"

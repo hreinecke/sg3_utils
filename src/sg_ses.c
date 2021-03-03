@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2020 Douglas Gilbert.
+ * Copyright (c) 2004-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -740,6 +740,7 @@ static bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
 
 /* Command line long option names with corresponding short letter. */
 static struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
     {"byte1", required_argument, 0, 'b'},
     {"clear", required_argument, 0, 'C'},
     {"control", no_argument, 0, 'c'},
@@ -824,7 +825,7 @@ usage(int help_num)
 {
     if (2 != help_num) {
         pr2serr(
-            "Usage: sg_ses [--descriptor=DES] [--dev-slot-num=SN] "
+            "Usage: sg_ses [--all] [--descriptor=DES] [--dev-slot-num=SN] "
             "[--eiioe=A_F]\n"
             "              [--filter] [--get=STR] [--hex] "
             "[--index=IIA | =TIA,II]\n"
@@ -851,10 +852,11 @@ usage(int help_num)
                );
         if ((help_num < 1) || (help_num > 2)) {
             pr2serr("Or the corresponding short option usage: \n"
-                    "  sg_ses [-D DES] [-x SN] [-E A_F] [-f] [-G STR] [-H] "
-                    "[-I IIA|TIA,II] [-i]\n"
-                    "         [-j] [-m LEN] [-p PG] [-q] [-r] [-R] [-A SA] "
-                    "[-s] [-v] [-w] DEVICE\n\n"
+                    "  sg_ses [-a] [-D DES] [-x SN] [-E A_F] [-f] [-G STR] "
+                    "[-H] [-I IIA|TIA,II]\n"
+                    "         [-i] [-j] [-m LEN] [-p PG] [-q] [-r] [-R] "
+                    "[-A SA] [-s] [-v] [-w]\n"
+                    "         DEVICE\n\n"
                     "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DES] "
                     "[-x SN] [-I IIA|TIA,II]\n"
                     "         [-M] [-m LEN] [-N SEID] [-n SEN] [-p PG] "
@@ -866,11 +868,13 @@ usage(int help_num)
                     "form>]\n\n"
                     "  sg_ses [-e] [-h] [-I IIA] [-l] [-V]\n"
                    );
-            pr2serr("\nFor help use with '-h' one or more times\n");
+            pr2serr("\nFor help use '-h' one or more times.\n");
             return;
         }
         pr2serr(
             "  where the main options are:\n"
+            "    --all|-a            show (almost) all status pages (same "
+            "as --join)\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
             "    --control|-c        send control information (def: fetch "
             "status)\n"
@@ -1142,12 +1146,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "A:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:qrRs"
+        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:qrRs"
                         "S:vVwx:", long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'a':       /* --all is synonym for --join */
+            ++op->do_join;
+            break;
         case 'A':       /* SAS address, assumed to be hex */
             cp = optarg;
             if ((strlen(optarg) > 2) && ('X' == toupper(optarg[1])))

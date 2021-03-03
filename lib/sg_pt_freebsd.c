@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.38 20210221 */
+/* sg_pt_freebsd version 1.39 20210225 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -166,7 +166,6 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
     struct freebsd_dev_channel *fdc_p = NULL;
     struct cam_device* cam_dev;
     struct stat a_stat;
-    char b[PATH_MAX];
     char dev_nm[PATH_MAX];
 
     // Search table for a free entry
@@ -184,6 +183,8 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
     }
     first_ch = device_name[0];
     if (('/' != first_ch) && ('.' != first_ch)) {
+        char b[PATH_MAX];
+
         /* Step 1: if device_name is symlink, follow it */
         s = readlink(device_name,  b, sizeof(b));
         if (s <= 0) {
@@ -220,11 +221,11 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
     nv_ctrlid = broadcast_nsid;
     possible_nvme = false;
     while (true) {      /* dummy loop, so can 'break' out */
-        if(sscanf(b, NVME_CTRLR_PREFIX "%u%c", &nv_ctrlid, &tmp) == 1) {
+        if(sscanf(dev_nm, NVME_CTRLR_PREFIX "%u%c", &nv_ctrlid, &tmp) == 1) {
             if(nv_ctrlid == broadcast_nsid)
                 break;
-        } else if (sscanf(b, NVME_CTRLR_PREFIX "%d" NVME_NS_PREFIX "%d%c",
-                          &nv_ctrlid, &nsid, &tmp) == 2) {
+        } else if (sscanf(dev_nm, NVME_CTRLR_PREFIX "%d" NVME_NS_PREFIX
+                          "%d%c", &nv_ctrlid, &nsid, &tmp) == 2) {
             if((nv_ctrlid == broadcast_nsid) || (nsid == broadcast_nsid))
                 break;
         } else
