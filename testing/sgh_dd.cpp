@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "1.99 20210216";
+static const char * version_str = "2.00 20210305";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -931,12 +931,13 @@ usage(int pg_num)
             "                null,sync]\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    if          file or device to read from (def: stdin)\n"
-            "    iflag       comma separated list from: [coe,defres,dio,"
+            "    iflag       comma separated list from: [00,coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,masync,mmap,mrq_immed,mrq_svb,"
-            "nodur,\n"
-            "                no_waitq,noxfer,null,qtail,same_fds,"
-            "v3,v4,wq_excl]\n"
+            "                dsync,excl,ff,fua,hipri,masync,mmap,mrq_immed,"
+            "mrq_svb,\n"
+            "                nocreat,nodur,no_waitq,noxfer,null,qhead,qtail,"
+            "random,\n"
+            "                same_fds,v3,v4,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
@@ -1051,6 +1052,7 @@ page3:
             "    no_waitq     when non-blocking (async) don't use wait "
             "queue\n"
             "    noxfer      no transfer to/from the user space\n"
+            "    null        does nothing, placeholder\n"
             "    qhead       queue new request at head of block queue\n"
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"

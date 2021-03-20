@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2020 Douglas Gilbert.
+ * Copyright (c) 2007-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,8 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.78 20201214";
-/* spc6r02, sbc4r20a, zbc2r04 */
+const char * sg_lib_version_str = "2.79 20210304";
+/* spc6r03, sbc4r20a, zbc2r04 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -1057,7 +1057,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x38,0x04,"Esn - media class event"},
     {0x38,0x06,"Esn - device busy class event"},
     {0x38,0x07,"Thin provisioning soft threshold reached"},
-    {0x38,0x08,"Depopulation interrupted"},     /* > spc6r02 */
+    {0x38,0x08,"Depopulation interrupted"},     /* spc6r03 */
     {0x39,0x00,"Saving parameters not supported"},
     {0x3A,0x00,"Medium not present"},
     {0x3A,0x01,"Medium not present - tray closed"},
@@ -1538,6 +1538,9 @@ struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
     {SCSI_FS_SBC_BASE_2016, PDT_DISK, "SBC Base 2016"},
     {SCSI_FS_SBC_BASIC_PROV_2016, PDT_DISK, "Basic provisioning 2016"},
     {SCSI_FS_SBC_DRIVE_MAINT_2016, PDT_DISK, "Drive maintenance 2016"},
+    {SCSI_FS_ZBC_HOST_AWARE_2020, PDT_ZBC, "Host Aware 2020"},
+    {SCSI_FS_ZBC_HOST_MANAGED_2020, PDT_ZBC, "Host Managed 2020"},
+    {SCSI_FS_ZBC_DOMAINS_REALMS_2020, PDT_ZBC, "Domains and Realms 2020"},
     {0x0, 0, NULL},     /* 0x0 is reserved sfs; trailing sentinel */
 };
 

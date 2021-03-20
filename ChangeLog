@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for released sg3_utils-1.46 [20210301] [svn: r878]
+Changelog for released sg3_utils-1.46 [20210320] [svn: r879]
   - sg_rep_pip: new utility: report provisioning initialization
     pattern command
   - sg_turs: estimated time-to-ready [20-061r2]
@@ -20,6 +20,7 @@ Changelog for released sg3_utils-1.46 [20210301] [svn: r878]
   - sg_write_x: add dld bits to write(32) [sbc4r19a]
   - sg_rep_zones: print invalid write pointer LBA as -1 rather
     than 16 "f"s
+  - sg_opcodes: improve handling of RWCDLP field
   - sg_ses: use fan speed factor field for calculation [ses4r04]
     - add --all (-a) option, same action as --join
   - sg_compare_and_write: add examples section to its manpage
@@ -37,6 +38,7 @@ Changelog for released sg3_utils-1.46 [20210301] [svn: r878]
     thus fix for regression introduced in rev 731 (ver: 1.43)
   - sg_pt_solaris+sg_pt_osf1: fix problem with clear_scsi_pt_obj()
     which needs to remember is_nvme and dev_fd values
+  - sg_lib: add ZBC (2020) feature set entries
   - sg_lib: restore elements and rebuild command added
   - sg_lib,sg_pt: add partial_clear_scsi_pt_obj(),
     get_scsi_pt_cdb_len() and get_scsi_pt_cdb_buf()

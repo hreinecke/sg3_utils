@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.20 20210210";
+static const char * version_str = "1.21 20210314";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -256,6 +256,7 @@ struct global_collection        /* one instance visible to all threads */
     bool processed;
     bool cdbsz_given;
     bool count_given;
+    bool ese;
     bool flexible;
     bool mrq_hipri;
     bool ofile_given;
@@ -278,6 +279,7 @@ typedef struct request_element
     bool only_in_sg;
     bool only_out_sg;
     bool stop_after_write;
+    bool stop_now;
     int id;
     int infd;
     int outfd;
@@ -377,7 +379,6 @@ static int do_time = 1;
 static struct global_collection gcoll;
 static struct timeval start_tm;
 static int num_threads = DEF_NUM_THREADS;
-static int exit_status = 0;
 static bool after1 = false;
 
 static const char * my_name = "sg_mrq_dd: ";
@@ -449,6 +450,18 @@ hex2stderr_lk(const uint8_t * b_str, int len, int no_ascii)
     lock_guard<mutex> lk(strerr_mut);
 
     hex2stderr(b_str, len, no_ascii);
+}
+
+static int
+system_wrapper(const char * cmd)
+{
+    int res;
+
+    res = system(cmd);
+    if (WIFSIGNALED(res) &&
+        (WTERMSIG(res) == SIGINT || WTERMSIG(res) == SIGQUIT))
+        raise(WTERMSIG(res));
+    return WEXITSTATUS(res);
 }
 
 /* Flags decoded into abbreviations for those that are set, separated by
@@ -844,13 +857,13 @@ usage(int pg_num)
             "[--version]\n\n");
     pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
             "[elemsz_kb=EKB]\n"
-            "                  [fua=0|1|2|3] [hipri=NRQS] [mrq=NRQS] "
-            "[no_waitq=0|1]\n"
-            "                  [ofreg=OFREG] [sync=0|1] [thr=THR] "
-            "[time=0|1|2[,TO]]\n"
-            "                  [verbose=VERB] [--dry-run] [--pre-fetch] "
-            "[--verbose]\n"
-            "                  [--version]\n\n"
+            "                  [ese=0|1] [fua=0|1|2|3] [hipri=NRQS] "
+            "[mrq=NRQS]\n"
+            "                  [no_waitq=0|1] [ofreg=OFREG] [sync=0|1] "
+            "[thr=THR]\n"
+            "                  [time=0|1|2[,TO]] [verbose=VERB] [--dry-run] "
+            "[--pre-fetch]\n"
+            "                  [--verbose] [--version]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n"
             "         style commands, and options start with one or "
@@ -901,12 +914,13 @@ page2:
             "kibibytes;\n"
             "                     must be power of two, >= page_size "
             "(typically 4)\n"
+            "    ese=0|1     exit on secondary error when 1, else continue\n"
             "    fua         force unit access: 0->don't(def), 1->OFILE, "
             "2->IFILE,\n"
             "                3->OFILE+IFILE\n"
             "    ibs         IFILE logical block size, cannot differ from "
             "obs or bs\n"
-            "    hipri       similar to mrq=NRQS operand but does set mrq "
+            "    hipri       similar to mrq=NRQS operand but also sets "
             "hipri flag\n"
             "    mrq         NRQS is number of cmds placed in each sg "
             "ioctl\n"
@@ -939,7 +953,7 @@ page3:
             "  where: 'iflag=<arg>' and 'oflag=<arg>' arguments are listed "
             "below:\n\n"
             "    00          use all zeros instead of if=IFILE (only in "
-            "iflags)\n"
+            "iflag)\n"
             "    append      append output to OFILE (assumes OFILE is "
             "regular file)\n"
             "    coe         continue of error (reading, fills with zeros)\n"
@@ -950,7 +964,7 @@ page3:
             "    dsync       sets the O_SYNC flag on open()\n"
             "    excl        sets the O_EXCL flag on open()\n"
             "    ff          use all 0xff bytes instead of if=IFILE (only in "
-            "iflags)\n"
+            "iflag)\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
             "    hipri       set HIPRI flag and use blk_poll() for "
@@ -966,7 +980,7 @@ page3:
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"
             "    random      use random data instead of if=IFILE (only in "
-            "iflags)\n"
+            "iflag)\n"
             "    serial      serialize sg command execution (def: overlap)\n"
             "    wq_excl     set SG_CTL_FLAGM_EXCL_WAITQ on this sg fd\n"
             "\n"
@@ -1149,6 +1163,9 @@ sig_listen_thread(struct global_collection * clp)
                                 pr2serr_lk("%s: stall at pack_id=%d "
                                            "detected\n", __func__, pack_id);
                         }
+                        pr2serr_lk("%s: stall at pack_id=%d, dump sg/debug\n",
+                                   __func__, pack_id);
+                        system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
                     }
                 } else {
                     stall_count = 0;
@@ -1389,7 +1406,7 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
             clp->infant_cv.notify_one();
             singleton = false;
         }
-        if (rep->stop_after_write) {
+        if (rep->stop_after_write || rep->stop_now) {
             shutting_down = true;
             break;
         }
@@ -1938,6 +1955,7 @@ mrq0_again:
         }
         if (t_v4p->device_status || t_v4p->transport_status ||
             t_v4p->driver_status) {
+            rep->stop_now = true;
             pr2serr_lk("[%d] t_v4[%d]:\n", id, k);
             lk_chk_n_print4("    ", t_v4p, vb > 4);
             return q_blks;
@@ -2138,6 +2156,15 @@ try_again:
                    "out_q/fin blks=%u/%u\n", __func__, o_seg_blks, num_good,
                    in_mrq_q_blks, in_fin_blks, out_mrq_q_blks, out_fin_blks);
 
+    if (clp->ese) {
+        int sres = ctl_v4.spare_out;
+
+        if (sres != 0) {
+            clp->reason_res.store(sg_convert_errno(sres));
+            pr2serr_lk("Exit due to secondary error [%d]\n", sres);
+            return -sres;
+        }
+    }
     if (num_good < 0)
         return -ENODATA;
     else {
@@ -2377,12 +2404,14 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
     uint32_t in_fin_blks = 0;
     uint32_t out_fin_blks = 0;
     struct global_collection * clp = rep->clp;
+    int vb = clp->verbose;
     cdb_arr_t t_cdb = {};
     struct sg_io_v4 t_v4;
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * iflagsp = &clp->in_flags;
     struct flags_t * oflagsp = &clp->out_flags;
-    int vb = clp->verbose;
+    const char * const a_ioctl_s = "do_both_sg_segment_mrq0: after "
+                                   "ioctl(SG_IO)";
 
     id = rep->id;
     pack_id_base = id * PACK_ID_TID_MULTIPLIER;
@@ -2455,8 +2484,7 @@ mrq0_again:
         res = ioctl(rep->infd, SG_IO, t_v4p);
         err = errno;
         if (vb > 5)
-            v4hdr_out_lk("do_both_sg_segment_mrq0: >> after ioctl(SG_IO)",
-                         t_v4p, id, false);
+            v4hdr_out_lk(a_ioctl_s, t_v4p, id, false);
         if (res < 0) {
             if (E2BIG == err)
                 sg_take_snap(rep->infd, id, true);
@@ -2471,6 +2499,7 @@ mrq0_again:
         }
         if (t_v4p->device_status || t_v4p->transport_status ||
             t_v4p->driver_status) {
+            rep->stop_now = true;
             pr2serr_lk("[%d] t_v4[%d]:\n", id, k);
             lk_chk_n_print4("    ", t_v4p, vb > 4);
             return min<int>(in_fin_blks, out_fin_blks);
@@ -2506,8 +2535,7 @@ mrq0_again2:
         res = ioctl(rep->outfd, SG_IO, t_v4p);
         err = errno;
         if (vb > 5)
-            v4hdr_out_lk("do_both_sg_segment_mrq0: >> after ioctl(SG_IO)",
-                         t_v4p, id, false);
+            v4hdr_out_lk(a_ioctl_s, t_v4p, id, false);
         if (res < 0) {
             if (E2BIG == err)
                 sg_take_snap(rep->outfd, id, true);
@@ -2522,6 +2550,7 @@ mrq0_again2:
         }
         if (t_v4p->device_status || t_v4p->transport_status ||
             t_v4p->driver_status) {
+            rep->stop_now = true;
             pr2serr_lk("[%d] t_v4[%d]:\n", id, k);
             lk_chk_n_print4("    ", t_v4p, vb > 4);
             return min<int>(in_fin_blks, out_fin_blks);
@@ -2763,6 +2792,15 @@ try_again:
                    "out_q/fin blks=%u/%u\n", __func__, o_seg_blks, num_good,
                    in_mrq_q_blks, in_fin_blks, out_mrq_q_blks, out_fin_blks);
 
+    if (clp->ese) {
+        int sres = ctl_v4.spare_out;
+
+        if (sres != 0) {
+            clp->reason_res.store(sg_convert_errno(sres));
+            pr2serr_lk("Exit due to secondary error [%d]\n", sres);
+            return -sres;
+        }
+    }
     if (num_good < 0)
         res = -ENODATA;
     else {
@@ -3303,6 +3341,13 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
             clp->elem_sz = n * 1024;
+        } else if (0 == strcmp(key, "ese")) {
+            n = sg_get_num(buf);
+            if (n < 0) {
+                pr2serr("ese= wants 0 (default) or 1\n");
+                goto syn_err;
+            }
+            clp->ese = !!n;
         } else if (0 == strcmp(key, "fua")) {
             n = sg_get_num(buf);
             if (n & 1)
@@ -3979,8 +4024,10 @@ main(int argc, char * argv[])
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if ((FT_SG == clp->in_type ) && (FT_SG == clp->out_type)) {
-        ;
+    if ((FT_SG == clp->in_type) && (FT_SG == clp->out_type)) {
+        if (clp->in_flags.serial || clp->out_flags.serial)
+            pr2serr("serial flag ignored when both IFILE and OFILE are sg "
+                    "devices\n");
     } else if (clp->in_flags.order)
         pr2serr("Warning: oflag=order only active on sg->sg copies\n");
 
@@ -4140,7 +4187,6 @@ fini:
     if ((clp->outregfd >= 0) && (STDOUT_FILENO != clp->outregfd) &&
         (FT_DEV_NULL != clp->outreg_type))
         close(clp->outregfd);
-    res = exit_status;
     print_stats("");
     if (clp->dio_incomplete_count.load()) {
         int fd;

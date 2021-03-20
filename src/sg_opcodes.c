@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2020 D. Gilbert
+ *  Copyright (C) 2004-2021 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.68 20200111";    /* spc6r01 */
+static const char * version_str = "0.69 20210319";    /* spc6r05 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -125,12 +125,8 @@ usage()
             "all listed\n"
             "    --mlu|-M        show MLU bit when all listed\n"
             "    --no-inquiry|-n    don't output INQUIRY information\n"
-            "    --opcode=OP|-o OP    first byte of command to query\n"
-            "                         (decimal, prefix with '0x' for hex)\n"
-            "    --opcode=OP,SA|-o OP,SA    opcode (OP) and service action "
-            "(SA)\n"
-            "                         (decimal, each prefix with '0x' for "
-            "hex)\n"
+            "    --opcode=OP[,SA]|-o OP[,SA]    opcode (OP) and service "
+            "action (SA)\n"
             "    --pdt=DT|-p DT    give peripheral device type for "
             "'--no-inquiry'\n"
             "                      '--enumerate'\n"
@@ -140,7 +136,6 @@ usage()
             "    --repd|-q       set Report Extended Parameter Data bit, "
             "with --tmf\n"
             "    --sa=SA|-s SA    service action in addition to opcode\n"
-            "                     (decimal, prefix with '0x' for hex)\n"
             "    --tmf|-t        output list of supported task management "
             "functions\n"
             "    --unsorted|-u    output list of operation codes as is\n"
@@ -150,7 +145,9 @@ usage()
             "    --old|-O        use old interface (use as first option)\n"
             "    --version|-V    print version string then exit\n\n"
             "Performs a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT "
-            "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command.\n");
+            "SUPPORTED\nTASK MANAGEMENT FUNCTIONS command. All values are "
+            "in decimal by default,\nprefix with '0x' or add a trailing 'h' "
+            "for hex numbers.\n");
 }
 
 static void
@@ -701,12 +698,12 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             printf(  "  (hex)        \n");
             printf("---------------------------------------\n");
         } else if (op->do_mlu) {
-            printf("\nOpcode  Service    CDB    CDLP,  Name\n");
-            printf(  "(hex)   action(h)  size   MLU        \n");
+            printf("\nOpcode  Service    CDB    MLU    Name\n");
+            printf(  "(hex)   action(h)  size              \n");
             printf("-----------------------------------------------\n");
         } else {
-            printf("\nOpcode  Service    CDB    CDLP   Name\n");
-            printf(  "(hex)   action(h)  size              \n");
+            printf("\nOpcode  Service    CDB  RWCDLP,  Name\n");
+            printf(  "(hex)   action(h)  size   CDLP       \n");
             printf("-----------------------------------------------\n");
         }
     }
@@ -775,19 +772,21 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                            "%s\n", opcode, sa_buff,
                            sg_get_unaligned_be16(bp + 6), name_buff);
         } else {            /* RCTD clear in cdb */
-            /* treat RWCDLP (1 bit) and CDLP (2 bits) as a 3 bit field */
-            int cdl_mp = ((byt5 >> 2) & 0x3) + ((0x40 & byt5) ? 4 : 0);
+            /* before version 0.69 treated RWCDLP (1 bit) and CDLP (2 bits),
+             * as a 3 bit field, now break them out separately */
+            int rwcdlp = (byt5 >> 2) & 0x3;
+            int cdlp = !!(0x40 & byt5);
 
             if (op->do_compact)
                 printf(" %.2x%c%.4s   %s\n", bp[0], (sa_v ? ',' : ' '),
                        sa_buff, name_buff);
             else if (op->do_mlu)
-                printf(" %.2x     %.4s       %3d   %2d,%d    %s\n", bp[0],
+                printf(" %.2x     %.4s       %3d   %3d     %s\n", bp[0],
                        sa_buff, sg_get_unaligned_be16(bp + 6),
-                       cdl_mp, ((byt5 >> 4) & 0x3), name_buff);
+                       ((byt5 >> 4) & 0x3), name_buff);
             else
-                printf(" %.2x     %.4s       %3d     %2d    %s\n", bp[0],
-                       sa_buff, sg_get_unaligned_be16(bp + 6), cdl_mp,
+                printf(" %.2x     %.4s       %3d    %d,%d    %s\n", bp[0],
+                       sa_buff, sg_get_unaligned_be16(bp + 6), rwcdlp, cdlp,
                        name_buff);
         }
         if (op->do_mask) {
@@ -859,7 +858,7 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
          struct opts_t * op)
 {
     bool valid = false;
-    int k, mlu;
+    int k, mlu, rwcdlp;
     uint8_t * bp;
     const char * cp;
     const char * dlp;
@@ -898,21 +897,32 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         break;
     }
     k = 0x3 & (rsoc_buff[1] >> 3);
+    rwcdlp = rsoc_buff[0] & 1;
     switch (k) {        /* CDLP field */
     case 0:
-        dlp = "no command duration limit mode page";
+        if (rwcdlp)
+            dlp = "Reserved [RWCDLP=1, CDLP=0]";
+        else
+            dlp = "No command duration limit mode page";
         break;
     case 1:
-        dlp = "command duration limit A mode page";
+        if (rwcdlp)
+            dlp = "Command duration limit T2A mode page";
+        else
+            dlp = "Command duration limit A mode page";
         break;
     case 2:
-        dlp = "command duration limit B mode page";
+        if (rwcdlp)
+            dlp = "Command duration limit T2B mode page";
+        else
+            dlp = "Command duration limit B mode page";
         break;
     default:
         dlp = "reserved [CDLP=3]";
         break;
     }
-    printf("  Command is %s, [%s]\n", cp, dlp);
+    printf("  Command is %s\n", cp);
+    printf("  %s\n", dlp);
     mlu = 0x3 & (rsoc_buff[1] >> 5);
     switch (mlu) {
     case 0:
@@ -1128,6 +1138,9 @@ open_rw:                /* if not already open */
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, vb);
         pr2serr("%s: %s\n", op_name, b);
+        if ((0 == op->servact) && (op->opcode >= 0))
+            pr2serr("    >> perhaps try again without a service action "
+                    "[SA] of 0\n");
         goto err_out;
     }
     act_len = (rq_len < act_len) ? rq_len : act_len;
