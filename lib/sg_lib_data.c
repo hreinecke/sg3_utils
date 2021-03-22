@@ -20,7 +20,7 @@
 
 
 const char * sg_lib_version_str = "2.79 20210304";
-/* spc6r03, sbc4r20a, zbc2r04 */
+/* spc6r05, sbc4r22, zbc2r09 */
 
 
 /* indexed by pdt; those that map to own index do not decay */

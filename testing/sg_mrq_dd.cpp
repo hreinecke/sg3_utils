@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.21 20210314";
+static const char * version_str = "1.22 20210321";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -194,6 +194,7 @@ struct flags_t {
     bool serial;
     bool wq_excl;
     bool zero;
+    int cdl;            /* command duration limits, 0 --> no cdl */
     int mmap;
 };
 
@@ -255,6 +256,7 @@ struct global_collection        /* one instance visible to all threads */
     bool mrq_eq_0;              /* true when user gives mrq=0 */
     bool processed;
     bool cdbsz_given;
+    bool cdl_given;
     bool count_given;
     bool ese;
     bool flexible;
@@ -855,15 +857,15 @@ usage(int pg_num)
             "[oflag=FLAGS]\n"
             "                  [seek=SEEK] [skip=SKIP] [--help] [--verify] "
             "[--version]\n\n");
-    pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [dio=0|1] "
-            "[elemsz_kb=EKB]\n"
-            "                  [ese=0|1] [fua=0|1|2|3] [hipri=NRQS] "
-            "[mrq=NRQS]\n"
-            "                  [no_waitq=0|1] [ofreg=OFREG] [sync=0|1] "
-            "[thr=THR]\n"
-            "                  [time=0|1|2[,TO]] [verbose=VERB] [--dry-run] "
-            "[--pre-fetch]\n"
-            "                  [--verbose] [--version]\n\n"
+    pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [cdl=CDL] "
+            "[dio=0|1]\n"
+            "                  [elemsz_kb=EKB] [ese=0|1] [fua=0|1|2|3] "
+            "[hipri=NRQS]\n"
+            "                  [mrq=NRQS] [no_waitq=0|1] [ofreg=OFREG] "
+            "[sync=0|1]\n"
+            "                  [thr=THR] [time=0|1|2[,TO]] [verbose=VERB] "
+            "[--dry-run]\n"
+            "                  [--pre-fetch] [--verbose] [--version]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n"
             "         style commands, and options start with one or "
@@ -909,6 +911,8 @@ page2:
             "    bpt         is blocks_per_transfer (default is 128)\n"
             "    cdbsz       size of SCSI READ, WRITE or VERIFY cdb_s "
             "(default is 10)\n"
+            "    cdl         command duration limits value 0 to 7 (def: "
+            "0 (no cdl))\n"
             "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
             "    elemsz_kb=EKB    scatter gather list element size in "
             "kibibytes;\n"
@@ -1649,8 +1653,9 @@ extra_out_wr(Rq_elem * rep, int num_bytes, int d_boff)
 static int
 sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
                   int64_t start_block, bool ver_true, bool write_true,
-                  bool fua, bool dpo)
+                  bool fua, bool dpo, int cdl)
 {
+    bool normal_rw = true;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
     int ve_opcode[] = {0xff /* no VER(6) */, 0x2f, 0xaf, 0x8f};
     int wr_opcode[] = {0xa, 0x2a, 0xaa, 0x8a};
@@ -1666,6 +1671,7 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         fua = false;
         cdbp[1] |= 0x2; /* BYTCHK=1 --> sending dout for comparison */
         cdbp[0] = ve_opcode[1];
+        normal_rw = false;
     }
     if (dpo)
         cdbp[1] |= 0x10;
@@ -1721,6 +1727,12 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
                                          rd_opcode[sz_ind]);
         sg_put_unaligned_be64((uint64_t)start_block, cdbp + 2);
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);
+        if (normal_rw && (cdl > 0)) {
+            if (cdl & 0x4)
+                cdbp[1] |= 0x1;
+            if (cdl & 0x3)
+                cdbp[14] |= ((cdl & 0x3) << 6);
+        }
         break;
     default:
         pr2serr_lk("%sexpected cdb size of 6, 10, 12, or 16 but got %d\n",
@@ -1910,7 +1922,8 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         /* First build the command/request for the read-side */
         cdbsz = is_wr ? clp->cdbsz_out : clp->cdbsz_in;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num, sg_it.current_lba(),
-                                false, is_wr, flagsp->fua, flagsp->dpo);
+                                false, is_wr, flagsp->fua, flagsp->dpo,
+                                flagsp->cdl);
         if (res) {
             pr2serr_lk("[%d] %s: sg_build_scsi_cdb() failed\n", id, __func__);
             break;
@@ -2030,7 +2043,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         /* First build the command/request for the read-side */
         cdbsz = is_wr ? clp->cdbsz_out : clp->cdbsz_in;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num, sg_it.current_lba(),
-                                false, is_wr, flagsp->fua, flagsp->dpo);
+                                false, is_wr, flagsp->fua, flagsp->dpo,
+                                flagsp->cdl);
         if (res) {
             pr2serr_lk("[%d] %s: sg_build_scsi_cdb() failed\n", id, __func__);
             break;
@@ -2460,7 +2474,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         cdbsz = clp->cdbsz_in;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
                                 i_sg_it.current_lba(), false, false,
-                                iflagsp->fua, iflagsp->dpo);
+                                iflagsp->fua, iflagsp->dpo, iflagsp->cdl);
         if (res) {
             pr2serr_lk("%s: t=%d: input sg_build_scsi_cdb() failed\n",
                        __func__, id);
@@ -2511,7 +2525,7 @@ mrq0_again:
         cdbsz = clp->cdbsz_out;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
                                 o_sg_it.current_lba(), clp->verify, true,
-                                oflagsp->fua, oflagsp->dpo);
+                                oflagsp->fua, oflagsp->dpo, oflagsp->cdl);
         if (res) {
             pr2serr_lk("%s: t=%d: output sg_build_scsi_cdb() failed\n",
                        __func__, id);
@@ -2645,7 +2659,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         cdbsz = clp->cdbsz_in;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
                                 i_sg_it.current_lba(), false, false,
-                                iflagsp->fua, iflagsp->dpo);
+                                iflagsp->fua, iflagsp->dpo, iflagsp->cdl);
         if (res) {
             pr2serr_lk("%s: t=%d: input sg_build_scsi_cdb() failed\n",
                        __func__, id);
@@ -2672,7 +2686,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         cdbsz = clp->cdbsz_out;
         res = sg_build_scsi_cdb(t_cdb.data(), cdbsz, num,
                                 o_sg_it.current_lba(), clp->verify, true,
-                                oflagsp->fua, oflagsp->dpo);
+                                oflagsp->fua, oflagsp->dpo, oflagsp->cdl);
         if (res) {
             pr2serr_lk("%s: t=%d: output sg_build_scsi_cdb() failed\n",
                        __func__, id);
@@ -3273,6 +3287,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     char * skip_buf = NULL;
     char * seek_buf = NULL;
     const char * cp;
+    const char * ccp;
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
@@ -3300,9 +3315,43 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
         } else if (0 == strcmp(key, "cdbsz")) {
-            clp->cdbsz_in = sg_get_num(buf);
-            clp->cdbsz_out = clp->cdbsz_in;
+            ccp = strchr(buf, ',');
+            n = sg_get_num(buf);
+            if ((n < 0) || (n > 32)) {
+                pr2serr("%s: bad argument to 'cdbsz=', expect 6, 10, 12 or "
+                        "16\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            clp->cdbsz_in = n;
+            if (ccp) {
+                n = sg_get_num(ccp + 1);
+                if ((n < 0) || (n > 32)) {
+                    pr2serr("%s: bad second argument to 'cdbsz=', expect 6, "
+                            "10, 12 or 16\n", my_name);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
+            clp->cdbsz_out = n;
             clp->cdbsz_given = true;
+        } else if (0 == strcmp(key, "cdl")) {
+            ccp = strchr(buf, ',');
+            n = sg_get_num(buf);
+            if ((n < 0) || (n > 7)) {
+                pr2serr("%s: bad argument to 'cdl=', expect 0 to 7\n",
+                         my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            clp->in_flags.cdl = n;
+            if (ccp) {
+                n = sg_get_num(ccp + 1);
+                if ((n < 0) || (n > 7)) {
+                    pr2serr("%s: bad second argument to 'cdl=', expect 0 "
+                            "to 7\n", my_name);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            }
+            clp->out_flags.cdl = n;
+            clp->cdl_given = true;
         } else if (0 == strcmp(key, "coe")) {
             /* not documented, for compat with sgh_dd */
             clp->in_flags.coe = !! sg_get_num(buf);
@@ -3452,8 +3501,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         else if (0 == strcmp(key, "thr"))
             num_threads = sg_get_num(buf);
         else if (0 == strcmp(key, "time")) {
-            const char * ccp = strchr(buf, ',');
-
+            ccp = strchr(buf, ',');
             do_time = sg_get_num(buf);
             if (do_time < 0) {
                 pr2serr("%sbad argument to 'time=0|1|2'\n", my_name);
@@ -3962,6 +4010,21 @@ main(int argc, char * argv[])
             }
         }
         clp->infp = inf;
+    }
+    if (clp->cdl_given && (! clp->cdbsz_given)) {
+        bool changed = false;
+
+        if ((clp->cdbsz_in < 16) && (clp->in_flags.cdl > 0)) {
+            clp->cdbsz_in = 16;
+            changed = true;
+        }
+        if ((clp->cdbsz_out < 16) && (! clp->verify) &&
+            (clp->out_flags.cdl > 0)) {
+            clp->cdbsz_out = 16;
+            changed = true;
+        }
+        if (changed)
+            pr2serr(">> increasing cdbsz to 16 due to cdl > 0\n");
     }
     if (outf[0]) {
         clp->ofile_given = true;

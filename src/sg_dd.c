@@ -67,7 +67,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.23 20210208";
+static const char * version_str = "6.24 20210321";
 
 
 #define ME "sg_dd: "
@@ -193,6 +193,7 @@ struct flags_t {
     bool sparse;
     bool zero;
     int cdbsz;
+    int cdl;
     int coe;
     int nocache;
     int pdt;
@@ -434,12 +435,12 @@ usage()
             "              [skip=SKIP] [--dry-run] [--help] [--verbose] "
             "[--version]\n\n"
             "              [blk_sgio=0|1] [bpt=BPT] [cdbsz=6|10|12|16] "
-            "[coe=0|1|2|3]\n"
-            "              [coe_limit=CL] [dio=0|1] [odir=0|1] "
-            "[of2=OFILE2] [retries=RETR]\n"
-            "              [sync=0|1] [time=0|1[,TO]] [verbose=VERB] "
-            "[--progress]\n"
-            "             [--verify]\n"
+            "[cdl=CDL]\n"
+            "              [coe=0|1|2|3] [coe_limit=CL] [dio=0|1] "
+            "[odir=0|1]\n"
+            "              [of2=OFILE2] [retries=RETR] [sync=0|1] "
+            "[time=0|1[,TO]]\n"
+            "              [verbose=VERB] [--progress] [--verify]\n"
             "  where:\n"
             "    blk_sgio    0->block device use normal I/O(def), 1->use "
             "SG_IO\n"
@@ -448,6 +449,8 @@ usage()
             "    bs          logical block size (default is 512)\n");
     pr2serr("    cdbsz       size of SCSI READ or WRITE cdb (default is "
             "10)\n"
+            "    cdl         command duration limits value 0 to 7 (def: "
+            "0 (no cdl))\n"
             "    coe         0->exit on error (def), 1->continue on sg "
             "error (zero\n"
             "                fill), 2->also try read_long on unrecovered "
@@ -501,10 +504,10 @@ usage()
             "(OFILE must\n"
             "                   be a sg device)\n"
             "    --version|-V    print version information then exit\n\n"
-            "Copy from IFILE to OFILE, similar to dd command; "
-            "specialized for SCSI devices.\nIf the --verify option is given "
-            " then IFILE is read and that data is used to\ncompare with "
-            "OFILE using the VERIFY(n) SCSI command (with BYTCHK=1).\n");
+            "Copy from IFILE to OFILE, similar to dd command; specialized "
+            "for SCSI\ndevices. If the --verify option is given then IFILE "
+            "is read and that data\nis used to compare with OFILE using "
+            "the VERIFY(n) SCSI command (with\nBYTCHK=1).\n");
 }
 
 
@@ -597,7 +600,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 static int
 sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
                   int64_t start_block, bool is_verify, bool write_true,
-                  bool fua, bool dpo)
+                  bool fua, bool dpo, int cdl)
 {
     int sz_ind;
     int rd_opcode[] = {0x8, 0x28, 0xa8, 0x88};
@@ -672,6 +675,12 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         else
             cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
                                              rd_opcode[sz_ind]);
+        if ((! is_verify) && (cdl > 0)) {
+            if (cdl & 0x4)
+                cdbp[1] |= 0x1;
+            if (cdl & 0x3)
+                cdbp[14] |= ((cdl & 0x3) << 6);
+        }
         sg_put_unaligned_be64(start_block, cdbp + 2);
         sg_put_unaligned_be32(blocks, cdbp + 10);
         break;
@@ -705,7 +714,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, do_verify,
-                          false, ifp->fua, ifp->dpo)) {
+                          false, ifp->fua, ifp->dpo, ifp->cdl)) {
         pr2serr(ME "bad rd cdb build, from_block=%" PRId64 ", blocks=%d\n",
                 from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
@@ -1114,7 +1123,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, do_verify,
-                          true, ofp->fua, ofp->dpo)) {
+                          true, ofp->fua, ofp->dpo, ofp->cdl)) {
         pr2serr(ME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
                 to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
@@ -1765,6 +1774,7 @@ main(int argc, char * argv[])
 {
     bool bpt_given = false;
     bool cdbsz_given = false;
+    bool cdl_given = false;
     bool dio_tmp, first;
     bool do_sync = false;
     bool penult_sparse_skip = false;
@@ -1844,6 +1854,24 @@ main(int argc, char * argv[])
             iflag.cdbsz = sg_get_num(buf);
             oflag.cdbsz = iflag.cdbsz;
             cdbsz_given = true;
+        } else if (0 == strcmp(key, "cdl")) {
+            const char * cp = strchr(buf, ',');
+
+            iflag.cdl = sg_get_num(buf);
+            if ((iflag.cdl < 0) || (iflag.cdl > 7)) {
+                pr2serr(ME "bad argument to 'cdl=', expect 0 to 7\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            if (cp) {
+                oflag.cdl = sg_get_num(cp + 1);
+                if ((oflag.cdl < 0) || (oflag.cdl > 7)) {
+                    pr2serr(ME "bad argument to 'cdl=ICDL,OCDL', expect OCDL "
+                            "to be 0 to 7\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+            } else
+                oflag.cdl = iflag.cdl;
+            cdl_given = true;
         } else if (0 == strcmp(key, "coe")) {
             iflag.coe = sg_get_num(buf);
             oflag.coe = iflag.coe;
@@ -2121,6 +2149,20 @@ main(int argc, char * argv[])
             ret = SG_LIB_CONTRADICT;
             goto bypass_copy;
         }
+    }
+    if (cdl_given && (! cdbsz_given)) {
+        bool changed = false;
+
+        if ((iflag.cdbsz < 16) && (iflag.cdl > 0)) {
+            iflag.cdbsz = 16;
+            changed = true;
+        }
+        if ((oflag.cdbsz < 16) && (! do_verify) && (oflag.cdl > 0)) {
+            oflag.cdbsz = 16;
+            changed = true;
+        }
+        if (changed)
+            pr2serr(">> increasing cdbsz to 16 due to cdl > 0\n");
     }
     if (out2f[0]) {
         out2_type = dd_filetype(out2f);

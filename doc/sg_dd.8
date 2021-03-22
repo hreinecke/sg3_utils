@@ -1,4 +1,4 @@
-.TH SG_DD "8" "February 2021" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_DD "8" "March 2021" "sg3_utils\-1.46" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -10,10 +10,11 @@ devices
 [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 .PP
 [\fIblk_sgio=\fR{0|1}] [\fIbpt=BPT\fR] [\fIcdbsz=\fR{6|10|12|16}]
-[\fIcoe=\fR{0|1|2|3}] [\fIcoe_limit=CL\fR] [\fIdio=\fR{0|1}]
-[\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR] [\fIretries=RETR\fR]
-[\fIsync=\fR{0|1}] [\fItime=\fR{0|1}[,TO]] [\fIverbose=VERB\fR]
-[\fI\-\-dry\-run\fR] [\fI\-\-progress\fR] [\fI\-\-verify\fR]
+[\fIcdl=CDL\fR] [\fIcoe=\fR{0|1|2|3}] [\fIcoe_limit=CL\fR]
+[\fIdio=\fR{0|1}] [\fIodir=\fR{0|1}] [\fIof2=OFILE2\fR]
+[\fIretries=RETR\fR] [\fIsync=\fR{0|1}] [\fItime=\fR{0|1}[,TO]]
+[\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR] [\fI\-\-progress\fR]
+[\fI\-\-verify\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -88,6 +89,22 @@ names (or block devices when 'iflag=sgio' and/or 'oflag=sgio' is given).
 Default is 10 byte SCSI command blocks (unless calculations indicate
 that a 4 byte block number may be exceeded or \fIBPT\fR is greater than
 16 bits (65535), in which case it defaults to 16 byte SCSI commands).
+.TP
+\fBcdl\fR=\fICDL\fR
+allows setting of command duration limits. \fICDL\fR is either a single value
+or two values separated by a comma. If one value is given, it applies to both
+\fIIFILE\fR and \fIOFILE\fR (if they are pass\-through devices). If two
+values are given, the first applies to \fIIFILE\fR while the second applies
+to \fIOFILE\fR. The value may be from 0 to 7 where 0 is the default and means
+there are no command duration limits. Command duration limits are only
+supported by 16 byte READ and WRITE commands (plus READ(32), WRITE(32) and
+the WRITE SCATTERED command, bit thay are used by this utility). If the
+cdbsz operand is not given and would have a value less than 16, then if
+\fICDL\fR is greater than 0, the cdbsz is increased to 16.
+.br
+Command duration limits can be accesses and changed in the Command duration
+limit A and B mode pages, plus the Command duration limit T2A and T2B mode
+pages. The sdparm utility may be used to access and change these mode pages.
 .TP
 \fBcoe\fR={0|1|2|3}
 set to 1 or more for continue on error ('coe'). Only applies to errors on sg
