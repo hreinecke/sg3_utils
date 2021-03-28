@@ -13010,6 +13010,21 @@ RT_LIB=$rt_lib
 printf "%s\n" "#define SG_LIB_BUILD_HOST \"${host}\"" >>confdefs.h
 
 
+check_for_getrandom() {
+	       for ac_header in sys/random.h
+do :
+  ac_fn_c_check_header_compile "$LINENO" "sys/random.h" "ac_cv_header_sys_random_h" "$ac_includes_default"
+if test "x$ac_cv_header_sys_random_h" = xyes
+then :
+  printf "%s\n" "#define HAVE_SYS_RANDOM_H 1" >>confdefs.h
+
+printf "%s\n" "#define HAVE_GETRANDOM 1" >>confdefs.h
+
+fi
+
+done
+}
+
 check_for_linux_nvme_headers() {
 	       for ac_header in linux/nvme_ioctl.h
 do :
@@ -13207,7 +13222,6 @@ printf "%s\n" "#define HAVE_LINUX_SG_V4_HDR 1" >>confdefs.h
 fi
 rm -rf conftest*
 
-
 }
 
 case "${host}" in
@@ -13219,6 +13233,7 @@ printf "%s\n" "#define SG_LIB_ANDROID 1" >>confdefs.h
 printf "%s\n" "#define SG_LIB_LINUX 1" >>confdefs.h
 
 		check_for_linux_sg_v4_hdr
+		check_for_getrandom
 		check_for_linux_nvme_headers;;
         *-*-freebsd*|*-*-kfreebsd*-gnu*)
 
@@ -13227,6 +13242,7 @@ printf "%s\n" "#define SG_LIB_FREEBSD 1" >>confdefs.h
 
 printf "%s\n" "#define HAVE_NVME 1" >>confdefs.h
 
+		check_for_getrandom
                 LIBS="$LIBS -lcam";;
         *-*-solaris*)
 
@@ -13244,6 +13260,7 @@ printf "%s\n" "#define SG_LIB_WIN32 1" >>confdefs.h
 
 printf "%s\n" "#define HAVE_NVME 1" >>confdefs.h
 
+		check_for_getrandom
                 CFLAGS="$CFLAGS -Wno-char-subscripts";;
         *-*-mingw*)
 
@@ -13256,12 +13273,14 @@ printf "%s\n" "#define SG_LIB_MINGW 1" >>confdefs.h
 
 printf "%s\n" "#define HAVE_NVME 1" >>confdefs.h
 
+		check_for_getrandom
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)
 
 printf "%s\n" "#define SG_LIB_LINUX 1" >>confdefs.h
 
 		check_for_linux_sg_v4_hdr
+		check_for_getrandom
                 check_for_linux_nvme_headers;;
 esac
 

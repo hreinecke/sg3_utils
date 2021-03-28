@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2020 Douglas Gilbert.
+ * Copyright (c) 2006-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.61 20201114";  /* spc6r02 + sbc4r22 */
+static const char * version_str = "1.62 20210326";  /* spc6r05 + sbc4r22 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0

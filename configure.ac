@@ -50,6 +50,10 @@ AC_CANONICAL_HOST
 
 AC_DEFINE_UNQUOTED(SG_LIB_BUILD_HOST, "${host}", [sg3_utils Build Host])
 
+check_for_getrandom() {
+	AC_CHECK_HEADERS([sys/random.h], [AC_DEFINE_UNQUOTED(HAVE_GETRANDOM, 1, [Found sys/random.h])], [], [])
+}
+
 check_for_linux_nvme_headers() {
 	AC_CHECK_HEADERS([linux/nvme_ioctl.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])
 	AC_CHECK_HEADERS([linux/types.h linux/bsg.h linux/kdev_t.h], [], [],
@@ -67,7 +71,6 @@ check_for_linux_sg_v4_hdr() {
 		  #endif
 		],
 		[AC_DEFINE_UNQUOTED(HAVE_LINUX_SG_V4_HDR, 1, [Have Linux sg v4 header]) ])
-
 }
 
 case "${host}" in
@@ -75,10 +78,12 @@ case "${host}" in
 		AC_DEFINE_UNQUOTED(SG_LIB_ANDROID, 1, [sg3_utils on android])
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
 		check_for_linux_sg_v4_hdr
+		check_for_getrandom
 		check_for_linux_nvme_headers;;
         *-*-freebsd*|*-*-kfreebsd*-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
+		check_for_getrandom
                 LIBS="$LIBS -lcam";;
         *-*-solaris*)
 		AC_DEFINE_UNQUOTED(SG_LIB_SOLARIS, 1, [sg3_utils on Solaris]);;
@@ -88,16 +93,19 @@ case "${host}" in
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
 		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
+		check_for_getrandom
                 CFLAGS="$CFLAGS -Wno-char-subscripts";;
         *-*-mingw*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
 		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
 		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
+		check_for_getrandom
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *)
                 AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
 		check_for_linux_sg_v4_hdr
+		check_for_getrandom
                 check_for_linux_nvme_headers;;
 esac
 

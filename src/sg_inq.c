@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- * Copyright (C) 2000-2020 D. Gilbert
+ * Copyright (C) 2000-2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.08 20201114";  /* spc6r02 + 20-0114r2 */
+static const char * version_str = "2.09 20210226";  /* spc6r05 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a

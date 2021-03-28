@@ -86,8 +86,13 @@ hopefully will not confuse the FreeBSD users.
 Device naming
 =============
 In FreeBSD disks have block names like '/dev/da0' with a corresponding
-pass-through device name like '/dev/pass0'. Use this command
-"camcontrol devlist" to see that SCSI devices available.
+pass-through device name like '/dev/pass0'. Use this command:
+"camcontrol devlist" to see that SCSI devices available. To list NVMe
+devices: "nvmecontrol devlist" can be used. Any many, but not all
+contexts, the device name can be used without the '/dev/' prefix.
+FreeBSD is relatively unique in this respect and support for this
+abbreviated form has been broken in this package and fixed in
+release 1.46 .
 
 FreeBSD installation
 ====================
@@ -144,4 +149,4 @@ utilities.
 
 
 Douglas Gilbert
-5th June 2020
+26th March 2021

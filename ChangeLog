@@ -2,20 +2,21 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for released sg3_utils-1.46 [20210321] [svn: r880]
+Changelog for released sg3_utils-1.46 [20210326] [svn: r882]
   - sg_rep_pip: new utility: report provisioning initialization
     pattern command
-  - sg_turs: estimated time-to-ready [20-061r2]
+  - sg_turs: estimated time-to-ready [spc6r03]
     - add --delay=MS option
   - sg_requests: substantial cleanup
   - sg_vpd: add Format presets and Concurrent positioning ranges
-    - add hot-pluggable field in standard Inquiry [20-114r2]
+    - add hot-pluggable field in standard Inquiry [spc6r05]
   - sg_inq: add hot-pluggable field in standard Inquiry
   - sg_dd: --verify : separate category for miscompare errors
     - --verify : oflag=coe continue on miscompares, counts them
     - add cdl= operand for command duration limit indexes
     - add oflag=nocreat and conv=nocreat : OFILE must exist
     - add iflag=00, ff, random flags
+    - setup conditional auto rule for getrandom()
     - add command timeout after comma in time= operand
   - sg_get_elem_status: add ralwd bit sbc4r20a
   - sg_write_x: add dld bits to write(32) [sbc4r19a]

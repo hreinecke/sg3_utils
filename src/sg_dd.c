@@ -42,6 +42,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>
 #include <limits.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -50,7 +51,6 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <sys/sysmacros.h>
-#include <sys/random.h>         /* for getrandom() system call */
 #ifndef major
 #include <sys/types.h>
 #endif
@@ -60,6 +60,9 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+#ifdef HAVE_GETRANDOM
+#include <sys/random.h>         /* for getrandom() system call */
+#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
@@ -67,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.24 20210321";
+static const char * version_str = "6.25 20210326";
 
 
 #define ME "sg_dd: "
@@ -2104,13 +2107,21 @@ main(int argc, char * argv[])
         ccp = "<0xff bytes>";
         cc2p = "ff";
     } else if (iflag.random) {
-        ssize_t ssz;
 
         ccp = "<random>";
         cc2p = "random";
-        ssz = getrandom(&seed, sizeof(seed), GRND_NONBLOCK);
-        if (ssz < (ssize_t)sizeof(seed))
-            pr2serr("getrandom() failed, ret=%d\n", (int)ssz);
+#ifdef HAVE_GETRANDOM
+        {
+            ssize_t ssz = getrandom(&seed, sizeof(seed), GRND_NONBLOCK);
+
+            if (ssz < (ssize_t)sizeof(seed)) {
+                pr2serr("getrandom() failed, ret=%d\n", (int)ssz);
+                seed = (long)time(NULL);
+            }
+        }
+#else
+        seed = (long)time(NULL);    /* use seconds since epoch as proxy */
+#endif
         if (verbose > 1)
             pr2serr("seed=%ld\n", seed);
         srand48_r(seed, &drand);
