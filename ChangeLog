@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for released sg3_utils-1.46 [20210327] [svn: r884]
+Changelog for released sg3_utils-1.46 [20210328] [svn: r885]
   - sg_rep_pip: new utility: report provisioning initialization
     pattern command
   - sg_turs: estimated time-to-ready [spc6r03]
@@ -10,6 +10,7 @@ Changelog for released sg3_utils-1.46 [20210327] [svn: r884]
   - sg_requests: substantial cleanup
   - sg_vpd: add Format presets and Concurrent positioning ranges
     - add hot-pluggable field in standard Inquiry [spc6r05]
+    - fix vendor struct opts_t alignment
   - sg_inq: add hot-pluggable field in standard Inquiry
   - sg_dd: --verify : separate category for miscompare errors
     - --verify : oflag=coe continue on miscompares, counts them

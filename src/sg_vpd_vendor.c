@@ -97,22 +97,24 @@
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 
-/* These structures are duplicates of those of the same name in
- * sg_vpd.c . Take care that both are the same. */
-
+/* These two structures are duplicates of those of the same name in
+ * sg_vpd.c . <<< Take care that both are the same. >>> */
 struct opts_t {
     bool do_all;
     bool do_enum;
     bool do_force;
     bool do_long;
     bool do_quiet;
+    bool verbose_given;
+    bool version_given;
     int do_hex;
-    int vpd_pn;
     int do_ident;
-    int maxlen;
     int do_raw;
+    int examine;
+    int maxlen;
     int vend_prod_num;
     int verbose;
+    int vpd_pn;
     const char * device_name;
     const char * page_str;
     const char * inhex_fn;

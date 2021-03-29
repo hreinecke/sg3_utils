@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.22 20210321";
+static const char * version_str = "1.23 20210328";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -62,7 +62,6 @@ static const char * version_str = "1.22 20210321";
 #include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
 #include <linux/fs.h>           /* for BLKSSZGET and friends */
 #include <sys/mman.h>           /* for mmap() system call */
-#include <sys/random.h>         /* for getrandom() system call */
 
 #include <vector>
 #include <array>
@@ -75,6 +74,10 @@ static const char * version_str = "1.22 20210321";
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_GETRANDOM
+#include <sys/random.h>         /* for getrandom() system call */
 #endif
 
 #ifndef HAVE_LINUX_SG_V4_HDR
@@ -1294,12 +1297,17 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
             rep->same_sg = true;
     }
     if (clp->in_flags.random) {
-        ssize_t ssz;
+#ifdef HAVE_GETRANDOM
+        ssize_t ssz = getrandom(&rep->seed, sizeof(rep->seed), GRND_NONBLOCK);
 
-        ssz = getrandom(&rep->seed, sizeof(rep->seed), GRND_NONBLOCK);
-        if (ssz < (ssize_t)sizeof(rep->seed))
+        if (ssz < (ssize_t)sizeof(rep->seed)) {
             pr2serr_lk("[%d] %s: getrandom() failed, ret=%d\n", id, __func__,
                        (int)ssz);
+            rep->seed = (long)time(NULL);
+        }
+#else
+        rep->seed = (long)time(NULL);    /* use seconds since epoch as proxy */
+#endif
         if (vb > 1)
             pr2serr_lk("[%d] %s: seed=%ld\n", id, __func__, rep->seed);
         srand48_r(rep->seed, &rep->drand);

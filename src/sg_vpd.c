@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.62 20210326";  /* spc6r05 + sbc4r22 */
+static const char * version_str = "1.63 20210328";  /* spc6r05 + sbc4r22 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -104,8 +104,8 @@ static const char * version_str = "1.62 20210326";  /* spc6r05 + sbc4r22 */
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
-/* These structures are duplicates of those of the same name in
- * sg_vpd_vendor.c . Take care that both are the same. */
+/* These two structures are duplicates of those of the same name in
+ * sg_vpd_vendor.c . <<< Take care that both are the same. >>> */
 struct opts_t {
     bool do_all;
     bool do_enum;

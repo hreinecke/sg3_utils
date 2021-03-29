@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.09 20210226";  /* spc6r05 */
+static const char * version_str = "2.10 20210328";  /* spc6r05 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -159,8 +159,6 @@ struct opts_t;
 static void prepare_ata_identify(const struct opts_t * op, int inhex_len);
 #endif
 
-/* This structure is a duplicate of one of the same name in sg_vpd_vendor.c .
-   Take care that both have the same fields (and types). */
 struct svpd_values_name_t {
     int value;
     int subvalue;
@@ -3688,7 +3686,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         } else {
             if (op->do_hex < 2)
                 pr2serr(" Only hex output supported. The sg_vpd and sdparm "
-                        "utilies decode more VPD pages.\n");
+                        "utilities decode more VPD pages.\n");
             return vpd_mainly_hex(sg_fd, op, inhex_len);
         }
     }

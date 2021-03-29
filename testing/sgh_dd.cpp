@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.00 20210305";
+static const char * version_str = "2.01 20210328";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -68,7 +68,6 @@ static const char * version_str = "2.00 20210305";
 #include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
 #include <linux/fs.h>           /* for BLKSSZGET and friends */
 #include <sys/mman.h>           /* for mmap() system call */
-#include <sys/random.h>         /* for getrandom() system call */
 
 #include <vector>
 #include <array>
@@ -80,6 +79,10 @@ static const char * version_str = "2.00 20210305";
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_GETRANDOM
+#include <sys/random.h>         /* for getrandom() system call */
 #endif
 
 #ifndef HAVE_LINUX_SG_V4_HDR
@@ -1219,15 +1222,21 @@ mrq_abort_thread(void * v_maip)
     int n = 0;
     int seed;
     unsigned int rn;
-    ssize_t ssz;
     Mrq_abort_info l_mai = *(Mrq_abort_info *)v_maip;
     struct sg_io_v4 ctl_v4;
 
-    ssz = getrandom(&rn, sizeof(rn), GRND_NONBLOCK);
-    if (ssz < (ssize_t)sizeof(rn))
-        pr2serr_lk("%s: getrandom() failed, returned %d\n", __func__,
-                   (int)ssz);
-    seed = rn;
+#ifdef HAVE_GETRANDOM
+    {
+        ssize_t ssz = getrandom(&seed, sizeof(seed), GRND_NONBLOCK);
+
+        if (ssz < (ssize_t)sizeof(seed)) {
+            pr2serr("getrandom() failed, ret=%d\n", (int)ssz);
+            seed = (int)time(NULL);
+        }
+    }
+#else
+    seed = (int)time(NULL);    /* use seconds since epoch as proxy */
+#endif
     if (l_mai.debug)
         pr2serr_lk("%s: from_id=%d: to abort mrq_pack_id=%d\n", __func__,
                    l_mai.from_tid, l_mai.mrq_id);
@@ -1469,12 +1478,17 @@ read_write_thread(void * v_tip)
         rep->only_out_sg = true;
 
     if (clp->in_flags.random) {
-        ssize_t ssz;
+#ifdef HAVE_GETRANDOM
+        ssize_t ssz = getrandom(&rep->seed, sizeof(rep->seed), GRND_NONBLOCK);
 
-        ssz = getrandom(&rep->seed, sizeof(rep->seed), 0);
-        if (ssz < (ssize_t)sizeof(rep->seed))
-            pr2serr_lk("thread=%d: getrandom() failed, ret=%d\n", rep->id,
-                       (int)ssz);
+        if (ssz < (ssize_t)sizeof(rep->seed)) {
+            pr2serr_lk("thread=%d: getrandom() failed, ret=%d\n",
+                       rep->id, (int)ssz);
+            rep->seed = (long)time(NULL);
+        }
+#else
+        rep->seed = (long)time(NULL);    /* use seconds since epoch as proxy */
+#endif
         if (vb > 1)
             pr2serr_lk("thread=%d: seed=%ld\n", rep->id, rep->seed);
         srand48_r(rep->seed, &rep->drand);
