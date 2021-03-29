@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for released sg3_utils-1.46 [20210328] [svn: r887]
+Changelog for released sg3_utils-1.46 [20210329] [svn: r891]
   - sg_rep_pip: new utility: report provisioning initialization
     pattern command
   - sg_turs: estimated time-to-ready [spc6r03]

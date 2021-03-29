@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2020 Douglas Gilbert.
+ * Copyright (c) 2004-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.35 20200723";
+static const char * version_str = "1.36 20210329";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -270,7 +270,13 @@ main(int argc, char * argv[])
     }
     if (do_raw || do_hex) {
         not_raw_hex = false;
-        if (do_progress || do_time) {
+#ifdef SG_LIB_MINGW
+        bool prog_time = do_progress;
+#else
+        bool prog_time = do_progress || do_time;
+#endif
+
+        if (prog_time) {
             pr2serr("With either --raw or --hex, --progress and --time "
                     "contradict\n");
             ret = SG_LIB_CONTRADICT;
